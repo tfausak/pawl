@@ -158,7 +158,7 @@ logSpec s registry =
           expected = Projection.project piker gs
           after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
       case S.eventsOf after of
-        GameEvent.Moved (Moved.MkMoved _ snapshot _ _) : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
+        GameEvent.Moved (Moved.MkMoved _ snapshot _ _ _) : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
         _ -> Spec.assertFailure s "expected exactly one Moved event"
     -- CR 704.5h's window is "since the last SBA check": the check CONSUMES by
     -- bumping a watermark, and the record survives.
@@ -231,7 +231,7 @@ scanSpec s registry =
     Spec.it s "CR 603.2b the active player rides a step trigger in the reserved slot" $ do
       let upkeepOf pid = GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) pid)
           cond = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.EachTurn)
-          boundOf pid = Binding.targetsOf (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty pid cond (upkeepOf pid))
+          boundOf pid = Binding.targetsOf (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) pid cond (upkeepOf pid))
       Spec.assertEqWith s "carol's upkeep binds carol under thatPlayer" (boundOf S.carol) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
       Spec.assertEqWith s "and bob's binds bob" (boundOf S.bob) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.bob)))
       -- The same slot under the OTHER TurnScope, which eventBindingSlots'
@@ -240,7 +240,7 @@ scanSpec s registry =
       Spec.assertEqWith
         s
         "a ControllersTurn step binds it too"
-        (Binding.targetsOf (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)) (upkeepOf S.alice)))
+        (Binding.targetsOf (Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.alice (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn)) (upkeepOf S.alice)))
         (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.alice)))
     -- CR 603.3a / 109.5: "your upkeep" is the ABILITY CONTROLLER's (603.3a
     -- controls the ability; 109.5 makes "your" mean that controller), so the

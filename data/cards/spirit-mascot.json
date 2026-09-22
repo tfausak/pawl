@@ -33,7 +33,7 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "CardsLeaveGraveyard",
+            "type": "CardsLeaveZone",
             "value": {
               "filter": {
                 "type": "And",
@@ -51,6 +51,9 @@
                     }
                   }
                 ]
+              },
+              "from": {
+                "type": "Graveyard"
               },
               "scope": {
                 "type": "EachTurn"

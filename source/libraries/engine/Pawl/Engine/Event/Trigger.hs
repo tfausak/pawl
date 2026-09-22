@@ -21,7 +21,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
-import Pawl.Engine.Event.Binding (eventBindings)
+import Pawl.Engine.Event.Binding (batchBindings, eventBindings)
 import Pawl.Engine.Event.Match (matchesTriggerGiven)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -111,7 +112,7 @@ battlefieldAt group gs = Map.findWithDefault (battlefieldCandidates gs) group (G
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
 movedOf event = case event of
-  GameEvent.Moved (Moved.MkMoved zc _ _ _) -> Just zc
+  GameEvent.Moved (Moved.MkMoved zc _ _ _ _) -> Just zc
   -- CR 712.21 / CR 730.3: each component card after the leading one DID change
   -- zones, so the event that announces it answers with its zone change like any
   -- other. That is what puts it in front of the two graveyard candidate sources
@@ -285,11 +286,12 @@ looksBack condition = case condition of
   -- swept up in its own batch still sees the group-mates returned beside it.
   TriggerCondition.PermanentsReturnedToHand _ -> True
   -- CR 603.10a's third family, named in that rule's own list: "abilities that
-  -- trigger when a card leaves a graveyard".
-  TriggerCondition.CardLeavesGraveyard {} -> True
+  -- trigger when a card leaves a graveyard". A card leaving any other zone is
+  -- not in the list.
+  TriggerCondition.CardLeavesZone p -> CardLeavesZone.from p == Zone.Graveyard
   -- The batch reading is in the same family, PermanentsDie's reason: CR 603.10a
   -- names the family without counting its members.
-  TriggerCondition.CardsLeaveGraveyard {} -> True
+  TriggerCondition.CardsLeaveZone p -> CardLeavesZone.from p == Zone.Graveyard
   -- CR 603.10a's first family read off the HOST rather than the bearer: this
   -- triggers when a permanent leaves the battlefield, so the rule reaches the
   -- ability however the bearer is found.
@@ -546,14 +548,14 @@ batchScoped condition = case condition of
   -- Per-card, PermanentReturnedToHand's answer: Kishla Skimmer's "whenever a card
   -- leaves your graveyard" is CR 603.2c's second sentence, so a resolution that
   -- moved two cards out of one graveyard fires it twice.
-  TriggerCondition.CardLeavesGraveyard {} -> False
+  TriggerCondition.CardLeavesZone {} -> False
   -- A True beside the arm above, PermanentsReturnedToHand's reason one zone over:
   -- CR 608.2f's sweep moves the cards as one action, Pawl.Engine.Resolve brackets
   -- it as one Pawl.Types.EventGroup, and "one or more cards leave your graveyard"
   -- (Spirit Mascot) names that whole group as its trigger event. Proved by
   -- Pawl.LeavesTriggerSpec's "CR 603.2c two cards leaving alice's graveyard at
   -- once put ONE counter on the Mascot".
-  TriggerCondition.CardsLeaveGraveyard {} -> True
+  TriggerCondition.CardsLeaveZone {} -> True
   TriggerCondition.AttachedCreatureDies -> False
   -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
   -- occurrence; no printing of that event says "one or more".
@@ -946,7 +948,7 @@ eventTriggers events gs =
       -- not characteristics and so are reached through Game.delayedAbilitiesOf
       -- off the id.
       leftBattlefield event = case event of
-        GameEvent.Moved (Moved.MkMoved zc _ _ _)
+        GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
               case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
@@ -1057,7 +1059,7 @@ eventTriggers events gs =
         Map.fromList
           ( Maybe.mapMaybe
               ( ( \event -> case event of
-                    GameEvent.Moved (Moved.MkMoved zc _ _ _)
+                    GameEvent.Moved (Moved.MkMoved zc _ _ _ _)
                       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
                           Just (ZoneChange.departed zc, ZoneChange.object zc)
                     _ -> Nothing
@@ -1731,7 +1733,7 @@ eventTriggers events gs =
             -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard ctrl (TriggeredAbility.condition ab) event) Nothing (Just event)
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl (TriggeredAbility.condition ab) event) Nothing (Just event)
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
             -- is per-occurrence and every member of the batch is its own trigger
@@ -1779,29 +1781,35 @@ eventTriggers events gs =
       -- the sweeper that fires a "whenever A land is put into a graveyard" ability
       -- once per land).
       --
-      -- The FIRST match wins rather than the last, which keeps the canonical order
-      -- below intact: this drops later duplicates and reorders nothing, so a batch
-      -- trigger sits exactly where its earliest matching event would have put it.
-      -- Which member won is unobservable anyway -- eventBindingSlots gives a
-      -- batch-scoped condition no slots, so every duplicate carries identical
-      -- bindings.
+      -- The FIRST match keeps its place rather than the last, which keeps the
+      -- canonical order below intact: this drops later duplicates and reorders
+      -- nothing, so a batch trigger sits exactly where its earliest matching event
+      -- would have put it. Its BINDINGS are every duplicate's, joined by
+      -- batchBindings, since the trigger event is the whole group -- Rakshasa
+      -- Vizier's "that many" counts every card the group moved.
       --
       -- Per GROUP and never per scan: several groups can share one CR 117.5 scan
       -- (GameState.scannedThrough is not bumped until the scan ends), and CR 704.3
       -- makes each state-based-action pass its own single event.
       -- Pawl.ZoneTriggerSpec's "CR 704.3 two death groups in one trigger scan are
       -- two trigger events" is what tells the two readings apart.
-      oncePerBatch seen entries = case entries of
-        [] -> []
-        (k, trigger) : rest -> case k of
-          Nothing -> trigger : oncePerBatch seen rest
-          Just batch
-            | Set.member batch seen -> oncePerBatch seen rest
-            | otherwise -> trigger : oncePerBatch (Set.insert batch seen) rest
+      oncePerBatch entries =
+        let joined = Map.fromListWith (flip (<>)) [(batch, [PendingTrigger.bindings trigger]) | (Just batch, trigger) <- entries]
+            joinedFor batch trigger = case Map.lookup batch joined of
+              Just (first : rest) -> trigger {PendingTrigger.bindings = batchBindings (first NonEmpty.:| rest)}
+              _ -> trigger
+            go seen remaining = case remaining of
+              [] -> []
+              (k, trigger) : rest -> case k of
+                Nothing -> trigger : go seen rest
+                Just batch
+                  | Set.member batch seen -> go seen rest
+                  | otherwise -> joinedFor batch trigger : go (Set.insert batch seen) rest
+         in go Set.empty entries
       -- The battlefield reading is per GROUP and so is hoisted out of the block:
       -- every event in one group happened at the same time, so they share it. A
       -- group with no events cannot occur, which `eventGroups` states in the type.
-      scanBlock block later same arrivedAfter = oncePerBatch Set.empty (concatMap (scanOne (onBattlefieldAt (LoggedEvent.group (NonEmpty.head block))) later same arrivedAfter . LoggedEvent.event) block)
+      scanBlock block later same arrivedAfter = oncePerBatch (concatMap (scanOne (onBattlefieldAt (LoggedEvent.group (NonEmpty.head block))) later same arrivedAfter . LoggedEvent.event) block)
    in concat (List.zipWith4 scanBlock groups laterGroups sameGroup arrivedLater)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
@@ -2336,9 +2344,9 @@ zonesTriggeredFrom cond =
         -- CR 113.6's default once more: Kishla Skimmer is a creature watching its
         -- controller's graveyard from the battlefield, and CR 113.6k's exception is for
         -- a condition that cannot trigger from there at all.
-        TriggerCondition.CardLeavesGraveyard {} -> battlefield
+        TriggerCondition.CardLeavesZone {} -> battlefield
         -- The batch reading watches the same graveyard from the same zone.
-        TriggerCondition.CardsLeaveGraveyard {} -> battlefield
+        TriggerCondition.CardsLeaveZone {} -> battlefield
         -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
         -- abilities of cards with haunt that refer to the haunted creature can trigger
         -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
@@ -2583,8 +2591,8 @@ stateTriggers gs
               TriggerCondition.PermanentLeavesTheBattlefield _ -> False
               TriggerCondition.PermanentReturnedToHand _ -> False
               TriggerCondition.PermanentsReturnedToHand _ -> False
-              TriggerCondition.CardLeavesGraveyard {} -> False
-              TriggerCondition.CardsLeaveGraveyard {} -> False
+              TriggerCondition.CardLeavesZone {} -> False
+              TriggerCondition.CardsLeaveZone {} -> False
               TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.AbilityIsCountered -> False
@@ -2846,21 +2854,30 @@ delayedPending grouped gs =
       -- board but a PER-OCCURRENCE condition's batch. A batch-scoped one is never
       -- a choice, `occurrences` having left the block a singleton.
       firedBy entry
-        | Maybe.isJust (DelayedTrigger.expiry entry) = pure (fmap LoggedEvent.event (occurrences entry))
+        | Maybe.isJust (DelayedTrigger.expiry entry) = pure (occurrences entry)
         | otherwise = case eventGroups (occurrences entry) of
             [] -> pure []
             block : _ ->
               let candidates = fmap LoggedEvent.event block
                in if not (asks entry)
-                    then pure [NonEmpty.head candidates]
+                    then pure [NonEmpty.head block]
                     else do
                       let controller = DelayedTrigger.controller entry
                       -- Filtered rather than trusted: every candidate offered
                       -- already matched the entry's condition, and an answer off
                       -- the end falls back to the earliest.
                       answer <- Game.choose (Prompt.ChooseDelayedTriggerEvent (Decide.deciderFor controller gs) controller (DelayedTrigger.source entry) candidates)
-                      pure [Replacement.at (NonEmpty.toList candidates) answer (NonEmpty.head candidates)]
-      pend entry event =
+                      pure [Replacement.at (NonEmpty.toList block) answer (NonEmpty.head block)]
+      -- CR 603.2c's first sentence on this path, `oncePerBatch`'s join: a
+      -- batch-scoped condition's bindings are every matching member's of the
+      -- group that fired it, a per-occurrence one's are its own event's.
+      eventSlots entry logged =
+        let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
+            one = eventBindings gs Nothing Map.empty (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond . LoggedEvent.event
+         in case filter ((== LoggedEvent.group logged) . LoggedEvent.group) (matching entry) of
+              first : rest | batchScoped cond -> batchBindings (fmap one (first NonEmpty.:| rest))
+              _ -> one logged
+      pend entry logged =
         PendingTrigger.MkPendingTrigger
           (TriggerSource.OfObject (DelayedTrigger.source entry))
           (DelayedTrigger.controller entry)
@@ -2877,12 +2894,12 @@ delayedPending grouped gs =
           -- same reason -- this scan gathers no batch -- which is why CR 400.7e's
           -- new object is claimed by eventBindingSlotsSometimes and not by the
           -- floor wherever eventBindings reads that table.
-          (Map.union (eventBindings gs Nothing Map.empty (DelayedTrigger.controller entry) (TriggeredAbility.condition (DelayedTrigger.ability entry)) event) (DelayedTrigger.bindings entry))
+          (Map.union (eventSlots entry logged) (DelayedTrigger.bindings entry))
           -- CR 603.7a: what tells the ability this becomes apart from one its
           -- source simply has, once it is on the stack.
           (Just (DelayedTrigger.createdAt entry))
           -- CR 603.2's event, the same one the slots above were read off.
-          (Just event)
+          (Just (LoggedEvent.event logged))
       store = GameState.delayedTriggers gs
       -- CR 603.12's exception to all of the above, and the ONE place the reflexive
       -- form differs from an ordinary CR 603.7 entry: it is "checked immediately

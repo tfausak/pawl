@@ -210,8 +210,8 @@ library codec
     Pawl.Codec.Card
     Pawl.Codec.CardArrivedIn
     Pawl.Codec.CardArrivedInSpec
-    Pawl.Codec.CardLeavesGraveyard
-    Pawl.Codec.CardLeavesGraveyardSpec
+    Pawl.Codec.CardLeavesZone
+    Pawl.Codec.CardLeavesZoneSpec
     Pawl.Codec.CardName
     Pawl.Codec.CardNameSpec
     Pawl.Codec.CardSpec
@@ -1683,7 +1683,7 @@ library types
     Pawl.Types.CantSearchLibraries
     Pawl.Types.Card
     Pawl.Types.CardArrivedIn
-    Pawl.Types.CardLeavesGraveyard
+    Pawl.Types.CardLeavesZone
     Pawl.Types.CardName
     Pawl.Types.CardType
     Pawl.Types.CarryOver

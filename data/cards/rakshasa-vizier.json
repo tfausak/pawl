@@ -1,12 +1,20 @@
 {
   "faces": [
     {
-      "keywords": [
-        {
-          "type": "Flying"
-        }
-      ],
       "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
         {
           "type": "OfType",
           "value": {
@@ -26,19 +34,19 @@
           }
         }
       ],
-      "name": "Kishla Skimmer",
+      "name": "Rakshasa Vizier",
       "power": {
         "type": "Literal",
-        "value": 2
+        "value": 4
       },
       "toughness": {
         "type": "Literal",
-        "value": 2
+        "value": 4
       },
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "CardLeavesZone",
+            "type": "CardsLeaveZone",
             "value": {
               "filter": {
                 "type": "And",
@@ -61,12 +69,12 @@
                 "type": "Graveyard"
               },
               "scope": {
-                "type": "ControllersTurn"
+                "type": "EachTurn"
+              },
+              "to": {
+                "type": "Exile"
               }
             }
-          },
-          "limit": {
-            "type": "OncePerTurn"
           },
           "modal": {
             "modes": [
@@ -75,17 +83,18 @@
                   {
                     "effects": [
                       {
-                        "type": "Draw",
+                        "type": "PutCounters",
                         "value": {
-                          "player": {
-                            "type": "Relative",
-                            "value": {
-                              "type": "You"
-                            }
+                          "kind": {
+                            "type": "PlusOnePlusOne"
                           },
                           "quantity": {
-                            "type": "Literal",
-                            "value": 1
+                            "type": "InSlot",
+                            "value": "thatMuch"
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "self"
                           }
                         }
                       }
@@ -100,10 +109,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Bird"
-          },
-          {
-            "type": "Scout"
+            "type": "Demon"
           }
         ],
         "types": [

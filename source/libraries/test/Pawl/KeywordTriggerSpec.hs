@@ -107,7 +107,7 @@ poisonousSpec s registry =
         -- controller (Binding.you) instead.
         Spec.it s "CR 603.2 the damaged player rides the trigger in the reserved slot" $ do
           let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing Nothing mempty False DamageKind.Combat)
-              bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) ev
+              bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.alice (TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer) ev
           Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.bob)))
         -- The proving test. CR 702.70a: "Whenever this creature deals combat
         -- damage to a player, that player gets N poison counters." bob is dealt
@@ -390,7 +390,7 @@ annihilatorSpec s registry =
         -- "defending player" reads. The falsifier is an arm that binds the
         -- attacking side instead.
         Spec.it s "CR 603.2 the defending player rides the declaration in the reserved slot" $ do
-          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty S.alice (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 7) S.carol (AttackTarget.OfPlayer S.carol) 1))
+          let bindings = Event.eventBindings (Setup.emptyGame S.bothPlayers) Nothing Map.empty (ObjectId.MkObjectId 0) S.alice (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 7) S.carol (AttackTarget.OfPlayer S.carol) 1))
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 613.8's dependency, read off the projection before any attack: WHICH
         -- permanents actually carry the granted keyword. Without this the two

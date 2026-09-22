@@ -83,7 +83,7 @@ import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
-import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
@@ -926,8 +926,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PermanentsReturnedToHand _ -> []
   -- CR 603.10a's third family carries a Filter and a TurnScope, and neither holds
   -- a Count.
-  TriggerCondition.CardLeavesGraveyard {} -> []
-  TriggerCondition.CardsLeaveGraveyard {} -> []
+  TriggerCondition.CardLeavesZone {} -> []
+  TriggerCondition.CardsLeaveZone {} -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
@@ -3821,10 +3821,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentsReturnedToHand f -> unframed [f]
   -- CR 603.10a's third family carries its Filter inside a record, and it is card
   -- text like any other -- Kishla Skimmer's "your graveyard" is that Filter.
-  TriggerCondition.CardLeavesGraveyard payload -> unframed [CardLeavesGraveyard.filter payload]
+  TriggerCondition.CardLeavesZone payload -> unframed [CardLeavesZone.filter payload]
   -- The batch reading carries the same record, swept the same way for
   -- PermanentsReturnedToHand's reason.
-  TriggerCondition.CardsLeaveGraveyard payload -> unframed [CardLeavesGraveyard.filter payload]
+  TriggerCondition.CardsLeaveZone payload -> unframed [CardLeavesZone.filter payload]
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
@@ -4076,8 +4076,8 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
   TriggerCondition.PermanentReturnedToHand _ -> []
   TriggerCondition.PermanentsReturnedToHand _ -> []
-  TriggerCondition.CardLeavesGraveyard {} -> []
-  TriggerCondition.CardsLeaveGraveyard {} -> []
+  TriggerCondition.CardLeavesZone {} -> []
+  TriggerCondition.CardsLeaveZone {} -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
   TriggerCondition.SelfBecomesUntapped -> []

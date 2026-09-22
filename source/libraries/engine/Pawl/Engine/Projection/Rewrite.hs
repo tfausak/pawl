@@ -30,7 +30,7 @@ import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
-import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastOffer as CastOffer
@@ -1547,8 +1547,8 @@ rewriteTriggerCondition pairs condition = case condition of
   -- The Filter is rewritten and the TurnScope carried through, the SpellCast arm's
   -- reason: a rebuild that dropped the field would reset the trigger to firing on
   -- every turn.
-  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard f scope) -> TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard (Filter.rewrite pairs f) scope)
-  TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard f scope) -> TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard (Filter.rewrite pairs f) scope)
+  TriggerCondition.CardLeavesZone p -> TriggerCondition.CardLeavesZone p {CardLeavesZone.filter = Filter.rewrite pairs (CardLeavesZone.filter p)}
+  TriggerCondition.CardsLeaveZone p -> TriggerCondition.CardsLeaveZone p {CardLeavesZone.filter = Filter.rewrite pairs (CardLeavesZone.filter p)}
   -- The Filter is rewritten and the counter kind is not: CR 612.1's pairs swap
   -- SUBTYPE words, and a counter kind names none.
   TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind f) -> TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.rewrite pairs f))
