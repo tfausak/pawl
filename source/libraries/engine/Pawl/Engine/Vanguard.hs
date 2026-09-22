@@ -38,6 +38,7 @@ module Pawl.Engine.Vanguard where
 import qualified Data.List as List
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Conspiracy as Conspiracy
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.Card as Card
@@ -72,9 +73,9 @@ isVanguard :: ObjectId -> GameState -> Bool
 isVanguard oid gs = maybe False isVanguardFace (Game.faceOf oid gs)
 
 -- | CR 113.6p: does an ability that STATES NO ZONE function here because of what
--- this command-zone object is? An emblem's does (CR 114.4) and a face-up vanguard
--- card's does (CR 902.7 \/ 313.4); everything else falls back on CR 113.6's own
--- default, which leaves a card's abilities functioning on the battlefield -- so a
+-- this command-zone object is? An emblem's does (CR 114.4), a face-up vanguard
+-- card's does (CR 902.7 \/ 313.4) and a face-up conspiracy card's does (CR
+-- 315.5); everything else falls back on CR 113.6's own default, which leaves a card's abilities functioning on the battlefield -- so a
 -- commander's unstated row does nothing here, and Pawl.CommanderSpec's "CR 113.6
 -- a commander's static ability does not function from the command zone" is what
 -- proves it.
@@ -89,19 +90,20 @@ isVanguard oid gs = maybe False isVanguardFace (Game.faceOf oid gs)
 -- and Pawl.Types.TriggeredAbility have no functionsFrom field).
 --
 -- A CLASSIFICATION and never an identity: the emblem arm reads
--- Pawl.Types.Source's own tag and the vanguard arm reads the printed card type.
+-- Pawl.Types.Source's own tag and the card arm reads the printed card type.
 --
--- Rule 902.7's "face-up" is not asked, and cannot come apart from the card type:
--- CR 902.3 places the card face up and CR 313.2 keeps it in this zone, so no rule
--- pawl implements can turn one over.
+-- Rule 902.7's and CR 315.5's "face-up" is not asked, and cannot come apart from
+-- the card type: CR 902.3 and CR 315.2 place the card face up, and CR 313.2 and
+-- CR 315.3 keep it in this zone, so no rule pawl implements can turn one over.
+-- Pawl.ConspiracySpec's Sentinel Dispatch case proves the conspiracy arm.
 --
--- Not implemented: rule 113.6p's other three arms -- plane cards (#934), scheme
--- cards (#935) and conspiracy cards (#937) -- none of which pawl can put into a
--- command zone at all, so each answers False here by never arriving.
+-- Not implemented: rule 113.6p's plane cards (#934) and scheme cards (#935),
+-- neither of which pawl can put into a command zone at all, so each answers
+-- False here by never arriving.
 functionsFromCommandZone :: ObjectId -> GameState -> Bool
 functionsFromCommandZone oid gs = case fmap Object.source (Game.lookupObject oid gs) of
   Just (Source.OfEmblem _) -> True
-  Just (Source.OfCard _) -> isVanguard oid gs
+  Just (Source.OfCard _) -> isVanguard oid gs || Conspiracy.isConspiracy oid gs
   _ -> False
 
 -- | CR 902.3 \/ 902.6: this player's vanguard card, which is theirs to own and

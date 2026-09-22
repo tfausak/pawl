@@ -2066,9 +2066,10 @@ playGame =
 -- throughout. Setup.applyCrossings carries that argument in full.
 --
 -- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders and
--- vanguards are the kinds Setup carries both ways, and dungeons ride
--- Player.dungeons rather than the command zone; planes and phenomena (#934),
--- schemes (#935) and conspiracies (#937) do not exist.
+-- vanguards are the kinds Setup carries both ways, dungeons ride
+-- Player.dungeons rather than the command zone, and a conspiracy stays in the
+-- main game, which is CR 729.2's "no other cards ... are moved"; planes and
+-- phenomena (#934) and schemes (#935) do not exist.
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get

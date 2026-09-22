@@ -1116,6 +1116,7 @@ library engine
     Pawl.Engine.Commander
     Pawl.Engine.Companion
     Pawl.Engine.Condition
+    Pawl.Engine.Conspiracy
     Pawl.Engine.Cost
     Pawl.Engine.Count
     Pawl.Engine.CounterRestriction
@@ -1492,6 +1493,7 @@ library test
     Pawl.CompanionSpec
     Pawl.ConditionSpec
     Pawl.ConjureSpec
+    Pawl.ConspiracySpec
     Pawl.CopySpec
     Pawl.CoreSpec
     Pawl.CostSpec
