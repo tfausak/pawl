@@ -812,6 +812,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ExileUntilMonarch _ -> effect
   Effect.ExileHaunting {} -> effect
   Effect.Attach _ -> effect
+  Effect.AttachAsThoughCreature _ -> effect
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot filter_) -> Effect.AttachTarget (AttachTarget.MkAttachTarget slot (Filter.rewrite pairs filter_))
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot filter_) -> Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot (Filter.rewrite pairs filter_))
   -- No Filter to rewrite: both fields are slot names.

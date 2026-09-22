@@ -55,10 +55,10 @@ data Keyword
   | -- | 702.6a: "Equip [cost]" means "[Cost]: Attach this permanent to target
     -- creature you control. Activate only as a sorcery." One ability per
     -- instance (CR 702.6d), and CR 702.6c's optional quality on the payload.
-    --
-    -- Not implemented: CR 702.6e's "equip planeswalker", whose ability attaches
-    -- to a different pool "as though that planeswalker were a creature" (#2291).
     Equip (Equip.Equip Keyword)
+  | -- | 702.6e: "Equip planeswalker [cost]", equip's variant targeting a
+    -- planeswalker you control as though it were a creature.
+    EquipPlaneswalker (Cost.Cost Keyword)
   | FirstStrike -- 702.7
   | -- | 702.8a: may be played any time you could cast an instant.
     Flash

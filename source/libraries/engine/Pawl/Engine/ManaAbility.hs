@@ -419,6 +419,7 @@ manaProduced effect = case effect of
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
+  Effect.AttachAsThoughCreature _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.AttachTargetToEach {} -> Nothing
   Effect.AttachBound {} -> Nothing
@@ -660,6 +661,7 @@ movesLibraryCard effect = case effect of
   Effect.ExileUntilMonarch _ -> False
   Effect.ExileHaunting {} -> False
   Effect.Attach _ -> False
+  Effect.AttachAsThoughCreature _ -> False
   Effect.AttachTarget {} -> False
   Effect.AttachTargetToEach {} -> False
   Effect.AttachBound {} -> False

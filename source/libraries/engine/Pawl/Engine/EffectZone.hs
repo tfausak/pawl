@@ -274,6 +274,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
+  Effect.AttachAsThoughCreature _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.AttachTargetToEach {} -> Nothing
   Effect.AttachBound {} -> Nothing

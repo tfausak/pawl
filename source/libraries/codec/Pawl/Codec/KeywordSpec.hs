@@ -532,6 +532,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (fortify 3)
       " {\"type\":\"Fortify\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (fortify 3) /= Codec.encode Keyword.codec (Keyword.Equip (Equip.MkEquip (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []) Nothing))) "and is not equip"
+  -- CR 702.6e's payload is fortify's bare Cost, under its own tag.
+  Spec.it s "EquipPlaneswalker carries its cost" $ do
+    let equipPlaneswalker n = Keyword.EquipPlaneswalker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (equipPlaneswalker 1)
+      " {\"type\":\"EquipPlaneswalker\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (equipPlaneswalker 3) /= Codec.encode Keyword.codec (Keyword.Fortify (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3])) []))) "and is not fortify"
   -- CR 702.49a's payload is a bare Cost, fortify's shape, and the arm is
   -- Arm.tagged: a Keyword constructor ships with no wire format and nothing red
   -- unless a case like this one is written (#1715).

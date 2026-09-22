@@ -42,6 +42,7 @@ codec =
       Arm.nullary "Defender" Keyword.Defender,
       Arm.nullary "DoubleStrike" Keyword.DoubleStrike,
       Arm.payload "Equip" (Equip.codec codec) Keyword.Equip (\x -> case x of Keyword.Equip y -> Just y; _ -> Nothing),
+      Arm.payload "EquipPlaneswalker" (Cost.codec codec) Keyword.EquipPlaneswalker (\x -> case x of Keyword.EquipPlaneswalker y -> Just y; _ -> Nothing),
       Arm.nullary "FirstStrike" Keyword.FirstStrike,
       Arm.nullary "Flash" Keyword.Flash,
       Arm.nullary "Flying" Keyword.Flying,
@@ -246,6 +247,7 @@ tagOf x = case x of
   Keyword.Defender {} -> "Defender"
   Keyword.DoubleStrike {} -> "DoubleStrike"
   Keyword.Equip {} -> "Equip"
+  Keyword.EquipPlaneswalker {} -> "EquipPlaneswalker"
   Keyword.FirstStrike {} -> "FirstStrike"
   Keyword.Flash {} -> "Flash"
   Keyword.Flying {} -> "Flying"

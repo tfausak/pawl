@@ -397,6 +397,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Attach (SlotName.MkSlotName (Text.pack "target")))
       " {\"type\":\"Attach\",\"value\":\"target\"} "
+  Spec.it s "AttachAsThoughCreature" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.AttachAsThoughCreature (SlotName.MkSlotName (Text.pack "target")))
+      " {\"type\":\"AttachAsThoughCreature\",\"value\":\"target\"} "
   -- CR 701.3: the destination Filter travels in the payload, distinguishing
   -- this arm's wire format from Attach's bare slot above.
   Spec.it s "AttachTarget" $

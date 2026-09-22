@@ -231,6 +231,7 @@ codec cardCodec abilityCodec =
           Arm.payload "ExileUntilMonarch" SlotName.codec Effect.ExileUntilMonarch (\x -> case x of Effect.ExileUntilMonarch y -> Just y; _ -> Nothing),
           Arm.payload "ExileHaunting" ExileHaunting.codec Effect.ExileHaunting (\x -> case x of Effect.ExileHaunting y -> Just y; _ -> Nothing),
           Arm.payload "Attach" SlotName.codec Effect.Attach (\x -> case x of Effect.Attach y -> Just y; _ -> Nothing),
+          Arm.payload "AttachAsThoughCreature" SlotName.codec Effect.AttachAsThoughCreature (\x -> case x of Effect.AttachAsThoughCreature y -> Just y; _ -> Nothing),
           Arm.payload "AttachTarget" AttachTarget.codec Effect.AttachTarget (\x -> case x of Effect.AttachTarget y -> Just y; _ -> Nothing),
           Arm.payload "AttachTargetToEach" AttachTarget.codec Effect.AttachTargetToEach (\x -> case x of Effect.AttachTargetToEach y -> Just y; _ -> Nothing),
           Arm.payload "AttachBound" AttachBound.codec Effect.AttachBound (\x -> case x of Effect.AttachBound y -> Just y; _ -> Nothing),
@@ -372,6 +373,7 @@ tagOf x = case x of
   Effect.ExileUntilMonarch {} -> "ExileUntilMonarch"
   Effect.ExileHaunting {} -> "ExileHaunting"
   Effect.Attach {} -> "Attach"
+  Effect.AttachAsThoughCreature {} -> "AttachAsThoughCreature"
   Effect.AttachTarget {} -> "AttachTarget"
   Effect.AttachTargetToEach {} -> "AttachTargetToEach"
   Effect.AttachBound {} -> "AttachBound"

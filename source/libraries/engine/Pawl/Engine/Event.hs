@@ -6614,9 +6614,18 @@ becameTarget source kind controller chosen =
 -- The event carries the tag attachmentFor produced rather than the caller's
 -- `destination`, so a reader sees the same Recipient Object.attachedTo holds.
 attach :: ObjectId -> Recipient.Recipient -> Game ()
-attach subject destination = do
+attach = attachVia Attach.attachmentFor
+
+-- CR 702.6e: `attach` with Attach.attachmentAsThoughCreature's legality test,
+-- Effect.AttachAsThoughCreature's funnel.
+attachAsThoughCreature :: ObjectId -> Recipient.Recipient -> Game ()
+attachAsThoughCreature = attachVia Attach.attachmentAsThoughCreature
+
+-- The body of both, parameterised by the legality reading.
+attachVia :: (ObjectId -> Recipient.Recipient -> GameState -> Maybe Recipient.Recipient) -> ObjectId -> Recipient.Recipient -> Game ()
+attachVia legality subject destination = do
   gs <- State.get
-  case Attach.attachmentFor subject destination gs of
+  case legality subject destination gs of
     Nothing -> pure ()
     Just attachment -> Monad.unless (fmap Object.attachedTo (Game.lookupObject subject gs) == Just (Just attachment)) $ do
       let (ts, gs1) = Game.freshTimestamp gs
