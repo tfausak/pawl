@@ -2529,6 +2529,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Destroy {} -> False
   Effect.Sacrifice {} -> False
   Effect.Attach {} -> False
+  Effect.AttachAsThoughCreature {} -> False
   Effect.AttachTarget {} -> False
   Effect.AttachTargetToEach {} -> False
   Effect.AttachBound {} -> False
@@ -7075,6 +7076,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         destination <- Attach.arbitrate source group
         Foldable.for_ destination (Event.attach source . Recipient.ToObject)
       _ -> Foldable.for_ (legalOne slot legal) (Event.attach source)
+  -- CR 702.6e: the same move with the slot's planeswalker treated as a creature
+  -- by CR 301.5's legality test. Rule 702.6e's minted ability is the writer, and
+  -- its slot is a target, so there is no group to arbitrate.
+  Effect.AttachAsThoughCreature slot -> Foldable.for_ (legalOne slot legal) (Event.attachAsThoughCreature source)
   -- CR 701.3a, the other direction: the SLOT's target moves, to a destination
   -- chosen now rather than targeted.
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot filter_) ->

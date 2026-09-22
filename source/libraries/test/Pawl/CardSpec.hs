@@ -1263,6 +1263,7 @@ ownCounts effect = case effect of
   Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
+  Effect.AttachAsThoughCreature _ -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
@@ -1625,6 +1626,7 @@ effectNestedEffects effect = case effect of
   Effect.ExileUntilMonarch {} -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach {} -> []
+  Effect.AttachAsThoughCreature {} -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
@@ -2117,6 +2119,7 @@ effectReplacements effect = case effect of
   Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
+  Effect.AttachAsThoughCreature _ -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
@@ -2570,6 +2573,7 @@ effectMintedFaces effect = case effect of
   Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
+  Effect.AttachAsThoughCreature _ -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
@@ -2982,6 +2986,8 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.67a's payload is equip's, and so is this: the "target land you
   -- control" filter its minted ability carries is the ENGINE's, never a card's.
   Keyword.Fortify cost -> costFilters cost
+  -- CR 702.6e's cost, fortify's shape for the same reason.
+  Keyword.EquipPlaneswalker cost -> costFilters cost
   -- CR 702.49a carries a whole Cost, so a Filter inside it is the card's. The
   -- "unblocked attacking creature you control" filter its minted ability carries
   -- is the ENGINE's, never a card's.
@@ -5444,6 +5450,7 @@ effectFilters effect = case effect of
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and
   -- carries no destination filter at all.
   Effect.Attach _ -> []
+  Effect.AttachAsThoughCreature _ -> []
   Effect.AttachBound {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []

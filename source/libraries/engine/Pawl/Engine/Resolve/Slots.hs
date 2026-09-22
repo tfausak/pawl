@@ -584,6 +584,7 @@ effectObjectRefs effect = case effect of
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> [ref]
   Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> [ref]
   Effect.Attach {} -> []
+  Effect.AttachAsThoughCreature {} -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
@@ -779,6 +780,7 @@ effectPlayerRefs effect = case effect of
   Effect.Destroy {} -> []
   Effect.Sacrifice {} -> []
   Effect.Attach {} -> []
+  Effect.AttachAsThoughCreature {} -> []
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
@@ -1214,6 +1216,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ExileUntilMonarch slot -> oneSlot slot
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) -> joinSlots [oneSlot card, oneSlot slot]
   Effect.Attach slot -> oneSlot slot
+  Effect.AttachAsThoughCreature slot -> oneSlot slot
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
   -- Two READS: the binding the entrant sits in and the slot the card targeted.
@@ -1806,6 +1809,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ExileUntilMonarch _ -> True
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ _) -> True
   Effect.Attach _ -> True
+  Effect.AttachAsThoughCreature _ -> True
   Effect.AttachTarget (AttachTarget.MkAttachTarget _ _) -> True
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ _) -> True
   Effect.AttachBound (AttachBound.MkAttachBound _ _) -> True
@@ -2004,6 +2008,7 @@ readsX =
         Effect.ExileUntilMonarch _ -> False
         Effect.ExileHaunting {} -> False
         Effect.Attach _ -> False
+        Effect.AttachAsThoughCreature _ -> False
         Effect.AttachTarget {} -> False
         Effect.AttachTargetToEach {} -> False
         Effect.AttachBound {} -> False
@@ -2231,6 +2236,7 @@ boundSlots effect = case effect of
   Effect.ExileUntilMonarch _ -> Set.empty
   Effect.ExileHaunting {} -> Set.empty
   Effect.Attach _ -> Set.empty
+  Effect.AttachAsThoughCreature _ -> Set.empty
   Effect.AttachTarget {} -> Set.empty
   Effect.AttachTargetToEach {} -> Set.empty
   Effect.AttachBound {} -> Set.empty
