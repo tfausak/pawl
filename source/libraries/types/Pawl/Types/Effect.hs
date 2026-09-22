@@ -171,6 +171,9 @@ data Effect card ability
   | -- | CR 701.3 / 702.6a: attach this permanent (the effect's source) to the
     -- slot's target.
     Attach SlotName.SlotName
+  | -- | CR 702.6e: Attach, with the slot's planeswalker treated as though it were
+    -- a creature for CR 301.5's legality test.
+    AttachAsThoughCreature SlotName.SlotName
   | -- | CR 701.3 / 303.4j: attach the slot's target -- an attachment already on
     -- the battlefield -- to an object the Filter admits, chosen as this resolves
     -- (Crown of the Ages).

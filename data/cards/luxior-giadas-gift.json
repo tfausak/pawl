@@ -1,0 +1,119 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Equip",
+          "value": {
+            "cost": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 3
+                }
+              ]
+            },
+            "quality": null
+          }
+        },
+        {
+          "type": "EquipPlaneswalker",
+          "value": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        }
+      ],
+      "name": "Luxior, Giada's Gift",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "HasAttached",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": {
+                "power": {
+                  "type": "ObjectCountersOfAnyKind"
+                },
+                "toughness": {
+                  "type": "ObjectCountersOfAnyKind"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasAttached",
+              "value": {
+                "type": "IsSource"
+              }
+            }
+          },
+          "modifications": [
+            {
+              "type": "LoseCardType",
+              "value": {
+                "type": "Planeswalker"
+              }
+            },
+            {
+              "type": "AddCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Equipment"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

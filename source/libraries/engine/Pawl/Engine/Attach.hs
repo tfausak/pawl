@@ -106,7 +106,19 @@ import qualified Pawl.Types.Subtype as Subtype
 -- able to compare against that same list later, so `destination` is matched by
 -- which object or player it names rather than by how the caller tagged it.
 attachmentFor :: ObjectId -> Recipient -> GameState -> Maybe Recipient
-attachmentFor src destination gs
+attachmentFor = attachmentWith Projection.isCreatureOf
+
+-- CR 702.6e: attachmentFor, with a planeswalker destination treated "as though
+-- that planeswalker were a creature" by the Equipment branch's CR 301.5 test.
+-- Effect.AttachAsThoughCreature's alone: every other move asks attachmentFor,
+-- and CR 704.5n's re-check (Sba.becomesUnattached) reads the host as it is.
+attachmentAsThoughCreature :: ObjectId -> Recipient -> GameState -> Maybe Recipient
+attachmentAsThoughCreature =
+  attachmentWith (\oid gs -> Projection.isCreatureOf oid gs || Set.member CardType.Planeswalker (Projection.cardTypesOf oid gs))
+
+-- The body of both, parameterised by the Equipment branch's creature test.
+attachmentWith :: (ObjectId -> GameState -> Bool) -> ObjectId -> Recipient -> GameState -> Maybe Recipient
+attachmentWith equippable src destination gs
   | Recipient.objectOf destination == Just src = Nothing
   -- CR 303.4's last sentence and CR 301.5 with CR 101.2: the DESTINATION's own
   -- limit on what may become attached to it, which CR 101.2 makes beat rule
@@ -139,7 +151,7 @@ attachmentFor src destination gs
       if Projection.isCreatureOf src gs && not hasReconfigure
         then Nothing
         else case Recipient.objectOf destination of
-          Just oid | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
+          Just oid | equippable oid gs -> Just (Recipient.ToCreature oid)
           _ -> Nothing
   -- CR 301.6, the Equipment branch above with a land where that rule has a
   -- creature: "a Fortification can be attached to a land. It can't legally be

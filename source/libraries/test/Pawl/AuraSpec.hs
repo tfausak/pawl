@@ -249,6 +249,51 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
         Spec.assertEqWith s "CR 702.6d the plain ability, on the same board, attached it to the Goblin" (fmap Object.attachedTo (Game.lookupObject bladeId afterPlain)) (Just (Just (Recipient.ToCreature goblin)))
         Spec.assertEqWith s "which is then 4/1" (Projection.powerOf goblin afterPlain) (Just 4)
       _ -> Spec.assertFailure s "Dúnedain Blade should offer both of rule 702.6's minted abilities"
+  -- CR 702.6e: "Equip planeswalker [cost]" means "[Cost]: Attach this permanent
+  -- to target planeswalker you control as though that planeswalker were a
+  -- creature." Luxior, Giada's Gift ("Equip planeswalker {1}" / "Equip {3}",
+  -- Scryfall 2026-09-22) is the producer, and its second static -- "Equipped
+  -- permanent isn't a planeswalker and is a creature in addition to its other
+  -- types" (CR 205.1b, with CR 205.1a taking the Jace subtype) -- is what keeps
+  -- it attached past CR 704.5n.
+  --
+  -- Jace Beleren is cast, so his three loyalty counters are CR 306.5b's. The
+  -- attachment is read AFTER state-based actions: without the static he is a
+  -- noncreature host and CR 704.5n detaches Luxior on that pass.
+  Spec.it s "CR 702.6e equip planeswalker suits up Jace, and CR 704.5n leaves Luxior on him" $ do
+    island <- S.printingOf s registry "Island"
+    jace <- S.printingOf s registry "Jace Beleren"
+    piker <- S.printingOf s registry "Goblin Piker"
+    luxior <- S.printingOf s registry "Luxior, Giada's Gift"
+    let (handGs, jaceInHand) = S.handOne jace (S.landsInPlay island 5)
+        cast = S.runPure S.identityAnswer handGs (do S.cast S.alice jaceInHand; Stack.resolveTop)
+        jaceId = case filter (\oid -> Game.cardOf oid cast == Just (Printing.card jace)) (Set.toList (GameState.battlefield cast)) of
+          oid : _ -> oid
+          [] -> jaceInHand
+        (goblin, withGoblin) = S.addPermanent piker S.alice cast
+        (luxiorId, withLuxior) = S.addPermanent luxior S.alice withGoblin
+        board = withLuxior {GameState.priority = Just S.alice}
+        abilityCosting n =
+          List.find
+            ((==) (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) . Cost.Type.mana . ActivatedAbility.cost)
+            (Projection.abilitiesOf luxiorId board)
+        slot = SlotName.MkSlotName (Text.pack "equipped")
+        candidates ability =
+          Set.map Recipient.objectOf (Maybe.maybe Set.empty (\targetSlot -> Target.legalRecipients (Just S.alice) luxiorId targetSlot board) (Map.lookup slot (Modal.allTargetSlots (ActivatedAbility.modal ability))))
+    case (abilityCosting 1, abilityCosting 3) of
+      (Just planeswalker, Just plain) -> do
+        let activated = S.runPure (aimedAtObject jaceId) board (Activate.activateAbility S.alice luxiorId planeswalker)
+            resolved = S.runPure (aimedAtObject jaceId) activated Stack.resolveTop
+            after = S.settleSba resolved
+        Spec.assertEqWith s "CR 704.5n Luxior is still on Jace after state-based actions" (fmap Object.attachedTo (Game.lookupObject luxiorId after)) (Just (Just (Recipient.ToCreature jaceId)))
+        Spec.assertEqWith s "CR 702.6e the ability attached it as though Jace were a creature" (fmap Object.attachedTo (Game.lookupObject luxiorId resolved)) (Just (Just (Recipient.ToCreature jaceId)))
+        Spec.assertBool s (Projection.isCreatureOf jaceId after) "CR 205.1b Jace is a creature"
+        Spec.assertBool s (not (Set.member CardType.Planeswalker (Projection.cardTypesOf jaceId after))) "and not a planeswalker"
+        Spec.assertBool s (not (Set.member Subtype.Jace (Projection.subtypesOf jaceId after))) "CR 205.1a so the Jace subtype goes too"
+        Spec.assertEqWith s "a 0/0 with +1/+1 for each of his three loyalty counters" (S.powerToughnessOf jaceId after) (Just (3, 3))
+        Spec.assertEqWith s "CR 702.6e the planeswalker ability offers Jace and not the Goblin" (candidates planeswalker) (Set.singleton (Just jaceId))
+        Spec.assertEqWith s "CR 702.6a the plain ability offers the Goblin and not Jace" (candidates plain) (Set.singleton (Just goblin))
+      _ -> Spec.assertFailure s "Luxior should offer both of rule 702.6's minted abilities"
   -- CR 702.151a's first ability -- "[Cost]: Attach this permanent to another
   -- target creature you control. Activate only as a sorcery" -- driven as the
   -- whole card, plus the two rules that make it mean anything: CR 301.5c's
