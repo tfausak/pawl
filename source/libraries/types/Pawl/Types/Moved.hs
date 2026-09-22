@@ -35,7 +35,12 @@ data Moved = MkMoved
     -- CR 712.21a's arrangement where the owner was asked for one
     -- (Pawl.Engine.Event.arrangeComponents) and the order they melded in
     -- otherwise.
-    others :: Seq.Seq ObjectId.ObjectId,
+    otherArrivals :: Seq.Seq ObjectId.ObjectId,
+    -- | CR 701.42a / CR 712.14c: the departure-side twin of `otherArrivals`. A
+    -- meld puts several cards onto the battlefield as one permanent, so `change`
+    -- names the first card that left and this names every one after it, in
+    -- Pawl.Engine.Event.meldable's order. Empty for every other move.
+    otherDepartures :: Seq.Seq ObjectId.ObjectId,
     -- | CR 608.2n: True only for the move that puts an instant or sorcery spell
     -- into its owner's graveyard as the final part of its own resolution.
     --
@@ -51,10 +56,16 @@ data Moved = MkMoved
 -- | The ordinary move: one departure, one arrival, no CR 712.21 split. Every
 -- construction site but Pawl.Engine.Event's zone-change funnel uses this.
 moved :: ZoneChange.ZoneChange -> ProjectedCharacteristics.ProjectedCharacteristics -> Moved
-moved zc pc = MkMoved {change = zc, characteristics = pc, others = Seq.empty, duringResolution = False}
+moved zc pc = MkMoved {change = zc, characteristics = pc, otherArrivals = Seq.empty, otherDepartures = Seq.empty, duringResolution = False}
 
 -- | CR 400.7e's "the new object it became", in the plural CR 712.21c asks for:
 -- every incarnation this move minted, first arrival first. A singleton for every
 -- move but a melded permanent's departure.
 arrivals :: Moved -> Seq.Seq ObjectId.ObjectId
-arrivals m = ZoneChange.object (change m) Seq.<| others m
+arrivals m = ZoneChange.object (change m) Seq.<| otherArrivals m
+
+-- | CR 400.7's departed incarnations in the plural a meld asks for (CR 701.42a):
+-- every id that left its zone in this move, first departure first. A singleton
+-- for every move but a meld's entry.
+departures :: Moved -> Seq.Seq ObjectId.ObjectId
+departures m = ZoneChange.departed (change m) Seq.<| otherDepartures m

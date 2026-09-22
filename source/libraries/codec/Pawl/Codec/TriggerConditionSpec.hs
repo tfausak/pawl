@@ -5,7 +5,7 @@ import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
-import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
@@ -42,6 +42,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.Zone as Zone
 
 -- | At least one case per TriggerCondition constructor. RoomFullyUnlocked gets
 -- two, one per PlayerRelation, since CR 109.5's "you" against "an opponent" is
@@ -534,21 +535,21 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   -- CR 603.10a's third family, whose payload is a record rather than a bare
   -- Filter: Kishla Skimmer's "your graveyard" is the Filter and its "during your
   -- turn" is the TurnScope beside it.
-  Spec.it s "CardLeavesGraveyard round-trips with its Filter and TurnScope" $
+  Spec.it s "CardLeavesZone round-trips with its Filter, TurnScope and zone" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard (Filter.OwnedBy PlayerRelation.You) TurnScope.ControllersTurn))
-      " {\"type\":\"CardLeavesGraveyard\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"ControllersTurn\"}}} "
+      (TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone (Filter.OwnedBy PlayerRelation.You) TurnScope.ControllersTurn Zone.Graveyard Nothing))
+      " {\"type\":\"CardLeavesZone\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"ControllersTurn\"},\"from\":{\"type\":\"Graveyard\"}}} "
   -- CR 603.2c's batch reading of the family above, carrying the same record:
   -- Spirit Mascot's "your graveyard" is the Filter and its silence about turns is
   -- the EachTurn beside it.
-  Spec.it s "CardsLeaveGraveyard round-trips with its Filter and TurnScope" $
+  Spec.it s "CardsLeaveZone round-trips with its Filter, TurnScope and zones" $
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard (Filter.OwnedBy PlayerRelation.You) TurnScope.EachTurn))
-      " {\"type\":\"CardsLeaveGraveyard\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"}}} "
+      (TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone (Filter.OwnedBy PlayerRelation.You) TurnScope.EachTurn Zone.Graveyard (Just Zone.Exile)))
+      " {\"type\":\"CardsLeaveZone\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"from\":{\"type\":\"Graveyard\"},\"to\":{\"type\":\"Exile\"}}} "
   -- CR 700.4's death read off the enchanted permanent. Nullary: the link it
   -- matches on is board state, HauntedCreatureDies' reason.
   Spec.it s "AttachedCreatureDies" $

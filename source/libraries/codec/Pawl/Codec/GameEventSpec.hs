@@ -90,7 +90,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard) ProjectedCharacteristicsSpec.testCharacteristics))
       ( "{\"type\":\"Moved\",\"value\":{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> ",\"others\":[]}}"
+          <> ",\"otherArrivals\":[]}}"
       )
   -- CR 712.21's second card, whose destination differs from the departure's
   -- origin the same way a Moved event's does -- and which carries no snapshot.

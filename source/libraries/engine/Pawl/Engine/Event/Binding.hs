@@ -4,11 +4,14 @@
 -- sits below Pawl.Engine.Event.Match and Pawl.Engine.Event.Trigger.
 module Pawl.Engine.Event.Binding where
 
+import Control.Applicative ((<|>))
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Target as Target
@@ -23,6 +26,8 @@ import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
+import qualified Pawl.Types.Binding as Binding.Type
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -81,14 +86,16 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- rather than a second Maybe is that the permanent the event names is not the
 -- bearer -- Prowling Geistcatcher watches other creatures die.
 --
--- THE FOURTH ARGUMENT is CR 109.5 / 603.3a's "you", the ability's controller --
--- matchesTriggerGiven's own third argument, and read the same way at both call
--- sites (eventTriggers' `ctrl`, delayedPending's `DelayedTrigger.controller`).
--- Most arms never read it; DamageToPlayerPrevented below does, to re-ask the
--- condition's relation of a record a wider shield stamped for more than one
--- player (#3079).
-eventBindings :: GameState -> Maybe ObjectId -> Map.Map ObjectId ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
-eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, event) of
+-- THE FOURTH AND FIFTH ARGUMENTS are the bearer and CR 109.5 / 603.3a's "you",
+-- the ability's controller -- matchesTriggerGiven's own second and third
+-- arguments, and read the same way at both call sites (eventTriggers' `oid` and
+-- `ctrl`, delayedPending's `DelayedTrigger.source` and
+-- `DelayedTrigger.controller`). Most arms never read them; DamageToPlayerPrevented
+-- below reads "you", to re-ask the condition's relation of a record a wider
+-- shield stamped for more than one player (#3079), and CardsLeaveZone reads
+-- both, to re-ask its filter of each card that left.
+eventBindings :: GameState -> Maybe ObjectId -> Map.Map ObjectId ObjectId -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
+eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (cond, event) of
   -- CR 603.2b's "that player": the active player, on whose turn the step began.
   -- Shizuko, Caller of Autumn's "at the beginning of each player's upkeep, THAT
   -- PLAYER adds {G}{G}{G}" is the reader, and the seat it names is nobody the
@@ -334,7 +341,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- RECEIVE what the payload does is the payload's question (CR 120.1a for
   -- damage), and a binding that existed only for creatures would make the slot's
   -- presence depend on the entrant, which eventBindingSlots cannot express.
-  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _ _ _)) ->
+  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _ _ _ _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
   -- CR 708.7's "that creature": the permanent that was turned face up, which Pine
   -- Walker untaps. The bearer is a bystander here -- CR 113.7a's source slot names
@@ -764,7 +771,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- a graveyard whose `departed` IS the bearer's host, so the id is always there.
   -- The event is therefore matched rather than wildcarded, unlike every other
   -- arm's use of the first argument.
-  (TriggerCondition.AttachedCreatureDies, GameEvent.Moved (Moved.MkMoved zc _ _ _)) ->
+  (TriggerCondition.AttachedCreatureDies, GameEvent.Moved (Moved.MkMoved zc _ _ _ _)) ->
     Binding.setDepartedPermanent (ZoneChange.departed zc) (maybe Map.empty (`Binding.setBecame` Map.empty) bearerBecame)
   -- Nothing at all, stated rather than left to the fallthrough below: the
   -- attachment link already names the permanent that became tapped, and CR 109.5
@@ -916,6 +923,13 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- bearer, whom CR 113.7a's source slot already names.
   (TriggerCondition.SelfIsDealtDamage, GameEvent.DamageDealt ev) ->
     Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
+  -- CR 603.2c's "that many" (Rakshasa Vizier): THIS event's contribution to the
+  -- batch, the number of cards it moved that the condition admits. A meld's entry
+  -- is one event moving two (CR 701.42a); every other move, one. batchBindings
+  -- sums the contributions across the group. Unconditional given a match, which
+  -- admits a zone change only.
+  (TriggerCondition.CardsLeaveZone p, GameEvent.Moved m) ->
+    Binding.setEventAmount (Natural.length (admittedDepartures gs bearer you p m)) Map.empty
   -- CR 603.1b's multi-condition ability, bound as the UNION of what its branches
   -- stamp off this one event -- the only answer that fills a slot two branches
   -- name. Case of the Pilfered Proof's "whenever a Detective you control enters
@@ -932,7 +946,7 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- promises is stamped by whichever branch matched. The slots only some branch
   -- binds are eventBindingSlotsSometimes' AnyOf arm.
   (TriggerCondition.AnyOf conditions, _) ->
-    Map.unions (fmap (\c -> eventBindings gs bearerBecame becameInGraveyard you c event) conditions)
+    Map.unions (fmap (\c -> eventBindings gs bearerBecame becameInGraveyard bearer you c event) conditions)
   -- The CR 701/702 keyword-action conditions reach this fallthrough and
   -- stamp nothing, deliberately: no card in the pool reads the scrying player,
   -- the plotted card, the explorer or the forager, and
@@ -955,6 +969,38 @@ eventBindings gs bearerBecame becameInGraveyard you cond event = case (cond, eve
   -- is nothing an arm could read. What such an ability knows comes from CR
   -- 603.7c's captured environment instead.
   _ -> Map.empty
+
+-- CR 603.2c's FIRST sentence, read back: a batch-scoped condition's trigger event
+-- is the whole Pawl.Types.EventGroup, so its bindings are the JOIN of what each
+-- member it matched contributes, in log order. Binding.amount ADDS across
+-- members -- "that many" counts the batch, not its first event -- and
+-- Binding.objects appends; every other field keeps Binding.mergeBinding's left
+-- bias. Called by both gatherers, eventTriggers and delayedPending, with the
+-- per-member eventBindings of every matching member.
+--
+-- Pawl.LeavesTriggerSpec's Rakshasa Vizier group proves the sum: two cards
+-- exiled from one graveyard in one group are two Moved events.
+batchBindings :: NonEmpty.NonEmpty (Map.Map SlotName.SlotName Binding) -> Map.Map SlotName.SlotName Binding
+batchBindings (first NonEmpty.:| rest) = List.foldl' (Map.unionWith join) first rest
+  where
+    join a b =
+      (Binding.mergeBinding a b)
+        { Binding.Type.amount = (+) <$> Binding.Type.amount a <*> Binding.Type.amount b <|> Binding.Type.amount a <|> Binding.Type.amount b,
+          Binding.Type.objects = Binding.Type.objects a <> Binding.Type.objects b
+        }
+
+-- The cards a Moved event took out of the condition's zone that its filter
+-- admits, read off CR 608.2h's last known information: by the time CR 603.10
+-- checks, each is gone from the zone it left. Every departure is asked, not
+-- only ZoneChange.departed, since a meld's entry is one event for several cards
+-- (CR 701.42a). The zones and the turn are CardLeavesZone's match arm's
+-- questions, not this one's.
+admittedDepartures :: GameState -> ObjectId -> PlayerId -> CardLeavesZone.CardLeavesZone -> Moved.Moved -> Seq.Seq ObjectId
+admittedDepartures gs bearer you p = Seq.filter admits . Moved.departures
+  where
+    admits departed = case Projection.viewWithLastKnown departed gs departed of
+      Nothing -> False
+      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view (CardLeavesZone.filter p)
 
 -- CR 400.7e's `became` slot, in the plural CR 712.21c asks for: "if an effect
 -- can find the new object that a melded permanent becomes as it leaves the
@@ -1149,11 +1195,9 @@ eventBindingSlots cond = case cond of
   -- card" reads -- the same slot the self-scoped arm above stamps. Guaranteed
   -- given a match: matchesTrigger admits only a player recipient here.
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.fromList [Binding.combatDamager, Binding.eventAmount, Binding.triggerPlayer]
-  -- Empty where the arm above binds three, and NECESSARILY so, PermanentsDie's
-  -- reason one event family over: the trigger event is a whole CR 510.2 step,
-  -- which may hold several damagers, amounts and damaged players, and one slot
-  -- cannot name them all. Pia Nalaar, Chief Mechanic's payload names none of
-  -- them. Not implemented: a slot for the damagers' CONTROLLER, which Norn's
+  -- Empty where the arm above binds three, by decision, PermanentsDie's reason
+  -- one event family over: the trigger event is a whole CR 510.2 step, and Pia
+  -- Nalaar, Chief Mechanic's payload names none of it. Not implemented: a slot for the damagers' CONTROLLER, which Norn's
   -- Decree's "that opponent" reads and which IS one seat per step, CR 508.1
   -- letting only the active player declare attackers (#2930).
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Set.empty
@@ -1346,15 +1390,13 @@ eventBindingSlots cond = case cond of
   -- graveyard pair, which CR 400.2 makes public, and every zone change carries
   -- `departed`.
   TriggerCondition.PermanentDies _ -> Set.fromList [Binding.became, Binding.departedPermanent]
-  -- Empty where PermanentDies binds two, and NECESSARILY so: the trigger event is
-  -- a whole CR 704.3 batch, which may have buried several cards, and neither slot
-  -- can name them all. Nothing in print asks for
-  -- one either: Scryfall o:"one or more other creatures you control die",
-  -- 2026-08-24, matches Vengeful Townsfolk and Vraan, Executioner Thane, whose
-  -- payloads act on the bearer and on the players. A printing whose payload said
-  -- "it" would refute this, and the lint would reject it -- and rightly, since
-  -- one slot naming one of several buried cards is no partial binding but a
-  -- wrong one, which is why this is no member of eventBindingSlotsSometimes.
+  -- Empty where PermanentDies binds two, by decision: the trigger event is a
+  -- whole CR 704.3 batch, and no pool card's payload reads a slot off it
+  -- (Vengeful Townsfolk and Vraan, Executioner Thane act on the bearer and on the
+  -- players). A slot here would be joined across the batch by batchBindings,
+  -- never read off one member: one slot naming one of several buried cards is
+  -- no partial binding but a wrong one, which is why this is no member of
+  -- eventBindingSlotsSometimes.
   TriggerCondition.PermanentsDie _ -> Set.empty
   -- The same slot and rule as SelfDies, but bound only for a PUBLIC destination
   -- (CR 400.7e's proviso over CR 400.2's hidden zones), so the guaranteed floor is
@@ -1379,10 +1421,9 @@ eventBindingSlots cond = case cond of
   -- (a token); eventBindings' own arm has the whole of that. CR 400.7e's
   -- `became` is withheld, the hand being hidden (CR 400.2).
   TriggerCondition.PermanentReturnedToHand _ -> Set.fromList [Binding.departedPermanent, Binding.triggerPlayer]
-  -- Empty where the arm above binds two, and NECESSARILY so, PermanentsDie's
-  -- reason one event family over: the batch may return several permanents to
-  -- several owners' hands, and one slot cannot name them all. Tameshi, Reality
-  -- Architect's payload names none of them.
+  -- Empty where the arm above binds two, by decision, PermanentsDie's reason one
+  -- event family over: Tameshi, Reality Architect's payload names none of the
+  -- batch.
   TriggerCondition.PermanentsReturnedToHand _ -> Set.empty
   -- Nothing either, and not for the batch arm's reason: Kishla Skimmer's payload
   -- draws a card and names neither the card that left nor what it became, so no
@@ -1390,13 +1431,12 @@ eventBindingSlots cond = case cond of
   -- floor pins -- and a FLOOR is what it would have to clear: this condition
   -- admits every destination, and CR 400.2 makes a hand and a library hidden, so
   -- CR 400.7e withholds `became` for some of the moves it matches.
-  TriggerCondition.CardLeavesGraveyard {} -> Set.empty
-  -- Nothing either, and NECESSARILY so where the arm above's is by decision:
-  -- PermanentsDie's reason, that the trigger event is a whole CR 608.2f batch
-  -- which may have moved several cards out of several graveyards, and no one
-  -- slot can name them all. Spirit Mascot's payload acts on the bearer and names
-  -- none of them.
-  TriggerCondition.CardsLeaveGraveyard {} -> Set.empty
+  TriggerCondition.CardLeavesZone {} -> Set.empty
+  -- CR 603.2c's "that many" (Rakshasa Vizier): how many cards the whole batch
+  -- moved that the filter admits, each event's share stamped by eventBindings'
+  -- arm and summed by batchBindings. Guaranteed given a match, the one event
+  -- class this condition admits being a zone change.
+  TriggerCondition.CardsLeaveZone {} -> Set.singleton Binding.eventAmount
   -- Nothing, where PermanentDies binds CR 400.7e's graveyard card and CR 603.10a's
   -- departed permanent: rule 702.55b's ability speaks about the creature it
   -- HAUNTS -- an object GameState.haunting names rather than the event -- and

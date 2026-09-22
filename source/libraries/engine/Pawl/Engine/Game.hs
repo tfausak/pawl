@@ -2073,7 +2073,7 @@ diedChange event = do
 -- than in each of them.
 movedChange :: GameEvent -> Maybe ZoneChange.ZoneChange
 movedChange event = case event of
-  GameEvent.Moved (Moved.MkMoved change _ _ _) -> Just change
+  GameEvent.Moved (Moved.MkMoved change _ _ _ _) -> Just change
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew {} -> Nothing
   GameEvent.SpellCast {} -> Nothing

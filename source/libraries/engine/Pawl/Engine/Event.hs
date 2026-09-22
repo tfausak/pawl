@@ -72,7 +72,7 @@ import qualified Pawl.Types.Binding as Binding.Type
 import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
-import qualified Pawl.Types.CardLeavesGraveyard as CardLeavesGraveyard
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CarryOver as CarryOver
@@ -5982,7 +5982,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- of CARDS folds this event and every CardArrived below and sees
               -- two (Pawl.Engine.Count.snapshotView, Pawl.MeldSpec).
               --
-              -- The OTHER arrivals ride along in Moved.others as well as in the
+              -- The OTHER arrivals ride along in Moved.otherArrivals as well as in the
               -- CardArrived events below, which is CR 712.21c: "if an effect can
               -- find the new object that a melded permanent becomes as it leaves
               -- the battlefield, it finds both cards." eventBindings reads them
@@ -6008,7 +6008,9 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 $ Moved.MkMoved
                   { Moved.change = ZoneChange.MkZoneChange oid newId fromZone dest,
                     Moved.characteristics = snapshot,
-                    Moved.others = trailingIds,
+                    Moved.otherArrivals = trailingIds,
+                    -- One object left, `oid`: only a meld's entry departs more.
+                    Moved.otherDepartures = Seq.empty,
                     -- CR 608.2n's own move and no other: `resolving` is True only
                     -- at changeZoneResolvingReturning's door.
                     Moved.duringResolution = resolving
@@ -7249,13 +7251,15 @@ meld controller victims resultCard = do
       -- recordMintedEntry's reasons, one zone over. `from` is where the cards were,
       -- so an "enters from exile" read sees the truth of rule 701.42a.
       --
-      -- Not implemented: a ZoneChange names ONE departing incarnation and ONE
-      -- origin where a meld has one of each PER CARD, so a meld whose cards sit in
-      -- different zones reports the first card's zone, and only the first card's
-      -- id is named as having departed (#2492).
+      -- EVERY card that left is named, the first in the ZoneChange and the rest
+      -- in Moved.otherDepartures, since CR 400.7 gives each its own departure
+      -- while CR 712.14c makes the entry one. Pawl.MeldSpec's "CR 701.42a a
+      -- one-or-more-cards-leave-exile trigger counts both melded cards" proves
+      -- the count.
       placed <- State.get
       let snapshot = Projection.project newId placed
-      State.modify' (recordEvent (GameEvent.Moved (Moved.moved (ZoneChange.MkZoneChange (fst (NonEmpty.head melding)) newId origin Zone.Battlefield) snapshot)))
+          entry = (Moved.moved (ZoneChange.MkZoneChange (fst (NonEmpty.head melding)) newId origin Zone.Battlefield) snapshot) {Moved.otherDepartures = Seq.fromList (fmap fst (NonEmpty.tail melding))}
+      State.modify' (recordEvent (GameEvent.Moved entry))
       pure (Just newId)
 
 -- CR 701.42b: "only two cards belonging to the same meld pair can be melded.
@@ -7295,6 +7299,8 @@ meldable victims gs = do
     _ -> Nothing
   firstObj <- Game.lookupObject first gs
   let owner = Object.owner firstObj
+      -- One origin, read off the first card: CR 712.4a's ability exiles both
+      -- halves before melding them, so they always share a zone.
       origin = Object.zone firstObj
       printingOf oid = do
         obj <- Game.lookupObject oid gs
@@ -7935,10 +7941,10 @@ reactsToAbilityTriggering cond = case cond of
   -- another ability triggering either.
   TriggerCondition.PermanentReturnedToHand _ -> False
   TriggerCondition.PermanentsReturnedToHand _ -> False
-  -- A card leaving a graveyard is a zone change too, so CR 603.3b's first pass
+  -- A card leaving a zone is a zone change too, so CR 603.3b's first pass
   -- takes it like the arms above.
-  TriggerCondition.CardLeavesGraveyard {} -> False
-  TriggerCondition.CardsLeaveGraveyard {} -> False
+  TriggerCondition.CardLeavesZone {} -> False
+  TriggerCondition.CardsLeaveZone {} -> False
   -- CR 702.55b watches a death, not another ability triggering.
   TriggerCondition.HauntedCreatureDies -> False
   -- CR 701.6a's countering is a spell or ability DOING something, not one
@@ -8234,17 +8240,17 @@ controllerTurnScoped cond = case cond of
   -- The third arm carrying a TurnScope, and the classification follows the FIELD
   -- rather than the constructor: Kishla Skimmer prints "during your turn" and a
   -- printing of the same family without it would not.
-  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.ControllersTurn) -> True
-  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.EachTurn) -> False
+  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.ControllersTurn _ _) -> True
+  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.EachTurn _ _) -> False
   -- No printing of this family says "during an opponent's turn", so this arm is
   -- unreachable from card data; answering True would make the classification wrong
   -- for the sake of that unreachable case.
-  TriggerCondition.CardLeavesGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.OpponentsTurn) -> False
+  TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.OpponentsTurn _ _) -> False
   -- The batch reading of the same family, classified off the same field for the
   -- same reason: Spirit Mascot prints no turn clause where Kishla Skimmer does.
-  TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.ControllersTurn) -> True
-  TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.EachTurn) -> False
-  TriggerCondition.CardsLeaveGraveyard (CardLeavesGraveyard.MkCardLeavesGraveyard _ TurnScope.OpponentsTurn) -> False
+  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.ControllersTurn _ _) -> True
+  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.EachTurn _ _) -> False
+  TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.OpponentsTurn _ _) -> False
   -- Rule 702.55b names no turn.
   TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False

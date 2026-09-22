@@ -21,16 +21,17 @@ spec s = Spec.describe s "Pawl.Codec.Moved" $ do
       ( Moved.MkMoved
           { Moved.change = ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard,
             Moved.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
-            Moved.others = Seq.empty,
+            Moved.otherArrivals = Seq.empty,
+            Moved.otherDepartures = Seq.empty,
             Moved.duringResolution = False
           }
       )
       ( "{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> ",\"others\":[]}"
+          <> ",\"otherArrivals\":[]}"
       )
   -- CR 712.21's departure: one permanent left and TWO cards arrived, so the
-  -- second one rides in `others` while `change` names the first.
+  -- second one rides in `otherArrivals` while `change` names the first.
   Spec.it s "MkMoved, a melded permanent's second arriving card" $
     Common.assertCodec
       s
@@ -38,13 +39,32 @@ spec s = Spec.describe s "Pawl.Codec.Moved" $ do
       ( Moved.MkMoved
           { Moved.change = ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard,
             Moved.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
-            Moved.others = Seq.fromList [ObjectId.MkObjectId 3],
+            Moved.otherArrivals = Seq.fromList [ObjectId.MkObjectId 3],
+            Moved.otherDepartures = Seq.empty,
             Moved.duringResolution = False
           }
       )
       ( "{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> ",\"others\":[3]}"
+          <> ",\"otherArrivals\":[3]}"
+      )
+  -- CR 701.42a's entry: two cards left exile and ONE permanent arrived, so the
+  -- second departure rides in `otherDepartures` while `change` names the first.
+  Spec.it s "MkMoved, a meld's second departing card" $
+    Common.assertCodec
+      s
+      Moved.codec
+      ( Moved.MkMoved
+          { Moved.change = ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Exile Zone.Battlefield,
+            Moved.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
+            Moved.otherArrivals = Seq.empty,
+            Moved.otherDepartures = Seq.fromList [ObjectId.MkObjectId 3],
+            Moved.duringResolution = False
+          }
+      )
+      ( "{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Exile\"},\"to\":{\"type\":\"Battlefield\"}},\"characteristics\":"
+          <> ProjectedCharacteristicsSpec.testCharacteristicsJson
+          <> ",\"otherArrivals\":[],\"otherDepartures\":[3]}"
       )
   -- CR 608.2n's own move: the one Moved event that carries the flag, which is
   -- also the one shape the defaulted key appears in.
@@ -55,12 +75,13 @@ spec s = Spec.describe s "Pawl.Codec.Moved" $ do
       ( Moved.MkMoved
           { Moved.change = ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Stack Zone.Graveyard,
             Moved.characteristics = ProjectedCharacteristicsSpec.testCharacteristics,
-            Moved.others = Seq.empty,
+            Moved.otherArrivals = Seq.empty,
+            Moved.otherDepartures = Seq.empty,
             Moved.duringResolution = True
           }
       )
       ( "{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Stack\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> ",\"others\":[],\"duringResolution\":true}"
+          <> ",\"otherArrivals\":[],\"duringResolution\":true}"
       )
   Spec.it s "has a schema" $ Common.assertHasSchema s Moved.codec

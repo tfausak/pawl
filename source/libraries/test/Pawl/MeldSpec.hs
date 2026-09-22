@@ -25,11 +25,13 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Binding as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -44,7 +46,9 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
@@ -88,6 +92,8 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -328,6 +334,56 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "and nothing is left in exile" (Game.zoneMembers Zone.Exile S.alice after) []
         Spec.assertEqWith s "setup: the pair was on the battlefield before the ability resolved" (S.countOnBattlefieldByName townshipName S.alice board) 0
       abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
+  -- CR 701.42a / CR 712.14c: the two cards leave exile as ONE event, which names
+  -- both. Synthetic Exile Tally ("Whenever one or more cards leave exile, you gain
+  -- 1 life for each of them.") is the reader, no printing firing on a card
+  -- leaving exile; it carries no filter, so CR 603.10's reach cannot bite.
+  --
+  -- THE DISCRIMINATION is alice's life: 22 when the meld's entry names both
+  -- departures, 21 when it names the first card alone. A per-card reading firing
+  -- twice at 1 each also reaches 22, which the trigger count tells apart; that
+  -- count being 1 and not 3 also shows the two battlefield-to-exile moves before
+  -- the meld never fire an exile-departure condition.
+  Spec.it s "CR 701.42a a one-or-more-cards-leave-exile trigger counts both melded cards" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    tally <- S.printingOf s registry "Synthetic Exile Tally"
+    let (_, g0) = S.addPermanent tally S.alice (Setup.emptyGame S.bothPlayers)
+        (bId, g1) = S.addPermanent battlements S.alice g0
+        (_, g2) = S.addPermanent garrison S.alice g1
+        board = readyFor mountain g2
+    case Projection.abilitiesOf bId board of
+      [_, _, melding] -> do
+        let resolved = S.runPure (sparing bId S.identityAnswer) board (do Activate.activateAbility S.alice bId melding; Stack.resolveTop)
+            placed = S.runPure S.identityAnswer resolved Engine.settleForPriority
+            after = S.runPure S.identityAnswer placed Stack.resolveTop
+            movesBetween from to =
+              [ m
+              | GameEvent.Moved m <- fmap LoggedEvent.event (Foldable.toList (GameState.events resolved)),
+                ZoneChange.from (Moved.change m) == from,
+                ZoneChange.to (Moved.change m) == to
+              ]
+            entries = movesBetween Zone.Exile Zone.Battlefield
+            -- CR 400.7: the incarnations the printed "exile them" minted, which
+            -- are what the meld then takes out of exile.
+            exiled = List.sort (fmap (ZoneChange.object . Moved.change) (movesBetween Zone.Battlefield Zone.Exile))
+        Spec.assertEqWith s "CR 701.42a alice gained 2 life, one for each card that left exile" (S.lifeOf S.alice after) (Just 22)
+        -- The proxies, AFTER the assertion above so neither can absorb a
+        -- mutation aimed at the departures.
+        Spec.assertEqWith s "exactly one trigger reached the stack" (length (GameState.stack placed)) 1
+        Spec.assertEqWith s "the one entry names both exiled cards as departed" (fmap (List.sort . Foldable.toList . Moved.departures) entries, length exiled) ([exiled], 2)
+        Spec.assertEqWith s "setup: alice started at 20" (S.lifeOf S.alice board) (Just 20)
+        -- CR 603.2c's "that many" counts the cards the FILTER admits: the same
+        -- entry read under a creature-card filter binds 1, Hanweir Garrison
+        -- being the one creature and Hanweir Battlements a land.
+        let creatures = TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone (Filter.Type.HasCardType CardType.Creature) TurnScope.EachTurn Zone.Exile Nothing)
+        Spec.assertEqWith
+          s
+          "a creature-card filter admits one of the two departures"
+          (fmap (Event.eventBindings resolved Nothing Map.empty bId S.alice creatures . GameEvent.Moved) entries)
+          [Map.singleton Binding.eventAmount (Binding.toAmount 1)]
+      abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
   -- CR 608.2f: "some spells and abilities include actions taken on multiple
   -- players and/or objects. In most cases, each such action is processed
   -- simultaneously." The printed "exile them" is one such action over two
@@ -336,9 +392,9 @@ spec s registry = Spec.describe s "Meld" $ do
   -- two separate move instructions could not produce however they were ordered.
   --
   -- The board is the melding case above's, and the LOG is what the batch is read
-  -- off: the batch arms Pawl.Types.TriggerCondition has over a DEPARTURE are
-  -- PermanentsDie and PermanentsReturnedToHand, and an exile satisfies neither,
-  -- so no ability a card could print observes this one.
+  -- off: of the batch arms Pawl.Types.TriggerCondition has over a DEPARTURE,
+  -- PermanentsDie and PermanentsReturnedToHand take no exile, and no card in
+  -- data/cards/ spells CardsLeaveZone out of the battlefield.
   Spec.it s "CR 608.2f the pair leaves the battlefield in one event" $ do
     battlements <- S.printingOf s registry "Hanweir Battlements"
     garrison <- S.printingOf s registry "Hanweir Garrison"
