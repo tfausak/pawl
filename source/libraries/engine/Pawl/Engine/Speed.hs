@@ -182,9 +182,9 @@ belowMaxSpeed =
 -- Engine.placePendingTriggers merge it into the one batch CR 603.3b orders, and
 -- Pawl.Engine.Monarch.placeInherent put it on the stack.
 --
--- AT MOST ONE PER GATHER, and "one or more opponents lose life" is the reason:
--- a whole batch of simultaneous losses is a SINGLE occurrence, which is why this
--- scans the batch rather than mapping over it. The separate per-turn limit,
+-- AT MOST ONE PER ACTIVE PLAYER PER GATHER, and "one or more opponents lose
+-- life" is the reason: a whole batch of simultaneous losses is a SINGLE
+-- occurrence, which is why this scans the batch rather than mapping over it. The separate per-turn limit,
 -- "this ability triggers only once each turn", is NOT enforced here --
 -- `increaseAbility` prints the rider and Engine.withinTriggerLimit spends it off
 -- the CR 603.3b log, as it does for an ability a card bears.

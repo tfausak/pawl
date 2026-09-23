@@ -42,6 +42,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
+import qualified Pawl.SpeedSpec as SpeedSpec
 import qualified Pawl.Support as S
 import qualified Pawl.TurnSpec as TurnSpec
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -331,3 +332,31 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (S.lifeOf S.bob after, length (S.tokensOf after))
     Spec.assertEqWith s "bob lost 1 life and made a Faerie" (run sharedTurns) (Just 19, 1)
     Spec.assertEqWith s "without the option nothing happened" (run id) (Just 20, 0)
+  -- CR 702.179d / 805.4: alice and bob are both active players, so one opponent's
+  -- life loss raises both their speeds -- each spends their OWN once-each-turn
+  -- limit, which Engine.limitKey's controller component is what keeps apart.
+  Spec.it s "CR 702.179d each active teammate's speed rises once" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let atCarol :: Prompt.Prompt r -> r
+        atCarol p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.carol))) sets
+          _ -> S.identityAnswer p
+        run option =
+          let lands = S.landsFor mountain S.alice 1 (option (twoTeams S.fourPlayerGame))
+              (held, staged) = S.addHandCard bolt S.alice lands
+              board =
+                SpeedSpec.atSpeed 2 S.bob $
+                  SpeedSpec.atSpeed
+                    1
+                    S.alice
+                    staged
+                      { GameState.phase = Phase.PrecombatMain,
+                        GameState.activePlayer = S.alice,
+                        GameState.priority = Just S.alice
+                      }
+              cast = S.runPure atCarol board (S.cast S.alice held)
+              after = S.runPure atCarol cast Engine.priorityLoop
+           in (S.lifeOf S.carol after, fmap (`SpeedSpec.speedOf` after) [S.alice, S.bob])
+    Spec.assertEqWith s "carol took three, and both speeds rose" (run sharedTurns) (Just 17, [Just (Just 2), Just (Just 3)])
+    Spec.assertEqWith s "without the option only alice's rose" (run id) (Just 17, [Just (Just 2), Just (Just 2)])

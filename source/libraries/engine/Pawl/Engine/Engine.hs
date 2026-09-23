@@ -738,10 +738,9 @@ withinTriggerLimit gs =
 -- object to tell them apart, where an object-borne ability is CR 113.7's one
 -- instance whoever controls it.
 --
--- The controller component is a REGRESSION FENCE rather than a proven behaviour:
--- rule 702.179d's is the only sourceless ability printing the rider and it fires
--- for the active player alone, so no board can have two players spend it in one
--- turn, and dropping the component leaves the suite green.
+-- The controller component is proved by Pawl.TeamSpec's "CR 702.179d each
+-- active teammate's speed rises once": under the shared team turns option two
+-- active players each spend their own instance of rule 702.179d's ability.
 --
 -- Not implemented: two VALUE-IDENTICAL limited abilities on one source are one
 -- instance here, so one spends the other's turn (#3198).
