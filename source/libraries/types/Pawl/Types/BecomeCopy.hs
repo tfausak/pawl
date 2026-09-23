@@ -50,7 +50,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- "until end of turn") is stored as a Pawl.Types.ActiveCopy row instead, which
 -- carries the same snapshot plus the expiry that ends it, and which
 -- Pawl.Engine.Projection.View.stampedSnapshotOf layers over the stamp -- so CR
--- 707.3 holds on both roads and only the stored one can end.
+-- 707.3 holds on both roads and only the stored one can end. A stamp made while
+-- a row stands takes its subject out of the row (CR 613.7).
 data BecomeCopy ability = MkBecomeCopy
   { original :: ObjectRef.ObjectRef,
     subject :: ObjectRef.ObjectRef,
