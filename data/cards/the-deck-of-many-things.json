@@ -204,6 +204,61 @@
                         }
                       }
                     ]
+                  },
+                  {
+                    "condition": {
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "AtLeast"
+                        },
+                        "measured": {
+                          "type": "InSlot",
+                          "value": "result"
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 20
+                        }
+                      }
+                    },
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "ChosenCardInGraveyard",
+                            "value": {
+                              "chooser": {
+                                "type": "TheController"
+                              },
+                              "filter": {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              "players": {
+                                "type": "Scoped",
+                                "value": {
+                                  "type": "EachPlayer"
+                                }
+                              }
+                            }
+                          },
+                          "slot": "reanimated",
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      },
+                      {
+                        "type": "ArmDelayedTrigger",
+                        "value": {
+                          "name": "the deck's reanimated creature dies"
+                        }
+                      }
+                    ]
                   }
                 ]
               }
@@ -211,6 +266,33 @@
           }
         }
       ],
+      "delayedAbilities": {
+        "the deck's reanimated creature dies": {
+          "condition": {
+            "type": "BoundDies",
+            "value": "reanimated"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "LoseGame",
+                        "value": {
+                          "type": "OwnerOfBound",
+                          "value": "reanimated"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
       "manaCost": [
         {
           "type": "Generic",

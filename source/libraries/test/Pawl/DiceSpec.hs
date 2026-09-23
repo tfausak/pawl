@@ -88,6 +88,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -104,6 +105,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.Zone as Zone
 
@@ -118,6 +120,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   costedRerollSpec s registry
   nightShiftSpec s registry
   deckSpec s registry
+  deckOwnerSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -1293,8 +1296,9 @@ nightShiftRun rolls rerolls shifts index spell board =
 -- instruction's sum before the shift reads max 0 (-1) + 1 = 1, keeps the hand
 -- and returns the graveyard card on top of it.
 --
--- Not implemented: the Deck's 20 striation, which the card file leaves out
--- (#4015). Stricter than printed, and no roll here reaches 20.
+-- No roll here reaches 20, the Deck's other striation (Pawl.CardSpec's own
+-- "CR 108.3 a bound object's owner is not always its controller" proves that
+-- one).
 deckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 deckSpec s registry = Spec.describe s "UnclampedShift" $ do
   Spec.it s "CR 706.2 a shift applies to the unclamped sum" $ do
@@ -1332,3 +1336,46 @@ runDeck (deckId, abilities, board) =
         Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
         _ -> S.identityAnswer p
    in S.runPure answer board (mapM_ (Activate.activateAbility S.alice deckId) (take 1 abilities) >> Stack.resolveTop)
+
+-- CR 108.3, PlayerRef.OwnerOfBound's producer: The Deck of Many Things' 20
+-- band, "Put a creature card from any graveyard onto the battlefield under
+-- your control. When that creature dies, its owner loses the game." alice
+-- activates and so CONTROLS the reanimated creature; it is bob's own card, so
+-- he OWNS it. The two seats come apart, which is exactly what
+-- PlayerRef.ControllerOfBound could not have named -- that reference would
+-- have alice, the controller, lose instead of bob.
+deckOwnerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckOwnerSpec s registry = Spec.describe s "OwnerOfBound" $ do
+  Spec.it s "CR 108.3 a creature reanimated under another player's control still makes its OWNER lose the game" $ do
+    deck <- S.printingOf s registry "The Deck of Many Things"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+        (pikerId, board) = S.addGraveyardCard piker S.bob withDeck
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 20
+          Prompt.ChooseCardInGraveyard {} -> pikerId
+          _ -> S.identityAnswer p
+        activate = case Face.activatedAbilities (S.combinedFace deck) of
+          ability : _ -> Activate.activateAbility S.alice deckId ability
+          [] -> pure ()
+        activated = S.runPure answer board (activate >> Stack.resolveTop)
+        -- CR 108.3: the battlefield is shared and Game.zoneMembers indexes it
+        -- by OWNER, so bob's copy is where the reanimated creature is found
+        -- even though alice controls it.
+        reanimated = case Game.zoneMembers Zone.Battlefield S.bob activated of
+          [oid] -> oid
+          _ -> pikerId
+        marked = S.markDamage reanimated 1 activated
+        settled = S.runPure S.identityAnswer marked Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Stack.resolveTop
+    -- THE GAMEPLAY ASSERTION: bob, the owner, loses the game and alice, the
+    -- controller, wins -- readable only through CR 104.2a's two-player
+    -- decision, since neither status field alone says who WON.
+    Spec.assertEqWith s "CR 108.3 / 104.2a bob owned the reanimated creature, so its death is bob's loss" (GameState.result after) (Just (Result.Won S.alice))
+    -- The preconditions that assertion rests on, read after it so neither can
+    -- absorb a mutation aimed at the reference: the creature really did enter
+    -- under alice's control while staying bob's card, and it really did die.
+    Spec.assertEqWith s "setup: alice controlled the reanimated creature" (Projection.controllerOf reanimated activated) (Just S.alice)
+    Spec.assertEqWith s "setup: the creature really died" (Game.lookupObject reanimated settled) Nothing
