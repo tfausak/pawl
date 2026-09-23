@@ -5115,6 +5115,10 @@ payComponent moment slots pid oid component = case component of
   -- Reject-not-repair: an answer that is not a size-`n` subset of the offered
   -- candidates makes the whole payment Unpaid, which pay's restore turns into a
   -- no-op.
+  --
+  -- The sacrifices are ONE event group, ExileCardsFromGraveyard's reason below.
+  -- Pawl.CostSpec's "CR 601.2h Phyrexian Tribute's two sacrifices grow Vengeful
+  -- Townsfolk once" proves it.
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> do
     gs <- State.get
     let candidates = Replacement.sacrificeCandidates slots pid (Just oid) criterion gs
@@ -5125,7 +5129,7 @@ payComponent moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseSacrifices decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
-        Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
+        Event.simultaneously (Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen))
         -- CR 608.2h: the permanents are gone by the time anything this cost paid
         -- for resolves, so an effect that reads one ("the sacrificed creature's
         -- power") needs a name for it. One of the components that bind a slot
@@ -5182,6 +5186,9 @@ payComponent moment slots pid oid component = case component of
   -- to the tapped creature's power" needs a name for what its own cost tapped. Unlike Sacrifice's arm the object
   -- is still on the battlefield, so the read is CR 608.2h's CURRENT information
   -- rather than last known.
+  --
+  -- Not implemented, here or in TapForTotalPower above: the taps as one event
+  -- group, Sacrifice's bracket (#4010).
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates slots pid oid criterion gs
@@ -5202,7 +5209,9 @@ payComponent moment slots pid oid component = case component of
   --
   -- Through Event.changeZone, the CR 400.7 funnel, and never a direct zone poke:
   -- ReturnThis' call and for its reason, with CR 400.3 making the bare Zone.Hand
-  -- the printed "its owner's".
+  -- the printed "its owner's". The returns are ONE event group, Sacrifice's
+  -- reason; Pawl.CostSpec's "CR 601.2h Gush's two returned Islands draw once for
+  -- Synthetic Return Ledger" proves it.
   --
   -- Binds Binding.returnedPermanent, the ids as they were BEFORE the move: CR
   -- 702.49c's ninja reads what the returned creature was attacking, which CR
@@ -5217,7 +5226,7 @@ payComponent moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseReturns decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
-        Monad.mapM_ (\returned -> Event.changeZone returned Zone.Hand) (Set.toAscList chosen)
+        Event.simultaneously (Monad.mapM_ (\returned -> Event.changeZone returned Zone.Hand) (Set.toAscList chosen))
         pure (Payment.Paid (Map.singleton Binding.returnedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
@@ -5235,6 +5244,8 @@ payComponent moment slots pid oid component = case component of
   -- CR 701.9a's move goes through Event.discard, so the card gets a CR 400.7
   -- incarnation, Rest in Peace's redirect composes, and the discard is recorded
   -- for a rule 701.9a trigger to read.
+  --
+  -- Not implemented: the discards as one event group, Sacrifice's bracket (#4009).
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> do
     gs <- State.get
     let held = discardCandidates slots pid oid criterion gs
