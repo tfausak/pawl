@@ -2,7 +2,7 @@
 
 -- Covers: CR 602.2 / CR 101.2's ACTIVATION PROHIBITION --
 -- Pawl.Types.ActivationProhibition, the answer Pawl.Engine.ActivationProhibition
--- gives, and the two windows that read it (Pawl.Engine.Activate.activatableGiven
+-- gives, and the two windows that read it (Pawl.Engine.Activatable.activatableGiven
 -- for CR 602.2, Pawl.Engine.Cost's manaActivations for CR 605.3a). CR 605.1a's
 -- division is the second axis, since one of the two producers writes it into the
 -- printed sentence.
@@ -30,6 +30,7 @@ module Pawl.ActivationProhibitionSpec where
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
@@ -251,7 +252,7 @@ deadlockResolved s registry printingName pick = do
       (twin, withTwin) = S.addPermanent troll S.bob withVictim
       (trapId, withTrap) = S.addPermanent trap S.alice withTwin
       board = mainPhaseForAlice (S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice withTrap)
-      abilities = Activate.abilitiesFor trapId board
+      abilities = Activatable.abilitiesFor trapId board
       resolved = case abilities of
         [ability] -> S.runPure (namingTarget (pick victim twin)) board (Activate.activateAbility S.alice trapId ability >> Stack.resolveTop)
         _ -> board
@@ -305,7 +306,7 @@ replayed s registry bounce = do
       (trapId, withTrap) = S.addPermanent trap S.alice withTwin
       (withUnsummon, unsummonId) = S.handOne unsummon withTrap
       board = mainPhaseForAlice (S.addPlayerCounter PlayerCounterKind.Energy 2 S.alice withUnsummon)
-      abilities = Activate.abilitiesFor trapId board
+      abilities = Activatable.abilitiesFor trapId board
       prohibited = case abilities of
         [ability] -> S.runPure (namingTarget victim) board (Activate.activateAbility S.alice trapId ability >> Stack.resolveTop)
         _ -> board

@@ -15,6 +15,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -160,17 +161,17 @@ investigateSpec s registry = Spec.describe s "Investigate" $ do
         let oneMana = S.tapObject first twoMana
         Spec.assertEqWith s "two Plains untapped after the {W}" (length (untappedPlains twoMana)) 2
         Spec.assertEqWith s "one on the negative board" (length (untappedPlains oneMana)) 1
-        case Activate.abilitiesFor clueId twoMana of
+        case Activatable.abilitiesFor clueId twoMana of
           [ability] -> do
-            Spec.assertBool s (Activate.activatable S.alice clueId ability twoMana) "two mana pays {2}"
-            Spec.assertBool s (not (Activate.activatable S.alice clueId ability oneMana)) "one does not"
+            Spec.assertBool s (Activatable.activatable S.alice clueId ability twoMana) "two mana pays {2}"
+            Spec.assertBool s (not (Activatable.activatable S.alice clueId ability oneMana)) "one does not"
           other -> Spec.assertFailure s ("expected exactly one activated ability on the Clue, got " <> show (length other))
       _ -> Spec.assertFailure s "expected one token and at least one untapped Plains"
   Spec.it s "CR 111.10f cracking the Clue draws a card, and the token ceases to exist (CR 111.7)" $ do
     before <- investigateBoard s registry
     case clueOf before of
       Nothing -> Spec.assertFailure s "expected exactly one token on the battlefield"
-      Just clueId -> case Activate.abilitiesFor clueId before of
+      Just clueId -> case Activatable.abilitiesFor clueId before of
         [ability] -> do
           let activated = S.runPure S.identityAnswer before (Activate.activateAbility S.alice clueId ability)
               after = S.runPure S.identityAnswer activated (Stack.resolveTop >> Engine.settleForPriority)
@@ -404,7 +405,7 @@ repeatOffenderSpec s registry = Spec.describe s "RepeatOffender" $ do
     swamp <- S.printingOf s registry "Swamp"
     offender <- S.printingOf s registry "Repeat Offender"
     let (offenderId, board) = S.addPermanent offender S.alice (S.landsInPlay swamp 6)
-        activate gs = case Activate.abilitiesFor offenderId gs of
+        activate gs = case Activatable.abilitiesFor offenderId gs of
           [ability] -> Right (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice offenderId ability >> Stack.resolveTop >> Engine.settleForPriority))
           other -> Left (length other)
         state gs = (suspectedOf offenderId gs, S.counterOf CounterKind.PlusOnePlusOne offenderId gs, S.powerToughnessOf offenderId gs)
@@ -437,9 +438,9 @@ runeBrandJugglerSpec s registry = Spec.describe s "RuneBrandJuggler" $ do
     -- is suspected, so every assertion below has a same-board counterexample.
     Spec.assertEqWith s "the Piker is suspected, the Brute and the Juggler are not" (fmap (`suspectedOf` entered) [pikerId, bruteId, jugglerId]) [Just True, Just False, Just False]
     Spec.assertEqWith s "and the Brute's menace is printed rather than the designation's" (Projection.hasKeyword Keyword.Menace bruteId entered, suspectedOf bruteId entered) (True, Just False)
-    case Activate.abilitiesFor jugglerId entered of
+    case Activatable.abilitiesFor jugglerId entered of
       [ability] -> do
-        Spec.assertBool s (Activate.activatable S.alice jugglerId ability entered) "a suspected creature to sacrifice makes it activatable"
+        Spec.assertBool s (Activatable.activatable S.alice jugglerId ability entered) "a suspected creature to sacrifice makes it activatable"
         let after = S.runPure (jugglerAnswer wallId bruteId) entered (Activate.activateAbility S.alice jugglerId ability >> Stack.resolveTop >> Engine.settleForPriority)
         -- The interpreter asks for the BRUTE whenever a sacrifice is on offer, and
         -- CR 701.21a's prompt is raised only above one candidate -- so a criterion
@@ -458,12 +459,12 @@ runeBrandJugglerSpec s registry = Spec.describe s "RuneBrandJuggler" $ do
     (jugglerId, pikerId, bruteId, _, gs0) <- jugglerBoard s registry
     let entered = S.runPure decliningTargets gs0 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
     Spec.assertEqWith s "the ETB was declined, so no creature is suspected" (fmap (`suspectedOf` entered) [pikerId, bruteId, jugglerId]) [Just False, Just False, Just False]
-    case Activate.abilitiesFor jugglerId entered of
+    case Activatable.abilitiesFor jugglerId entered of
       [ability] -> do
         -- NOT a mana or a timing failure: the case above answers True for the same
         -- ability, on the same five lands, with the same three creatures and the
         -- same target available -- the designation is the only thing that moved.
-        Spec.assertBool s (not (Activate.activatable S.alice jugglerId ability entered)) "three unsuspected creatures are not candidates"
+        Spec.assertBool s (not (Activatable.activatable S.alice jugglerId ability entered)) "three unsuspected creatures are not candidates"
       other -> Spec.assertFailure s ("expected exactly one activated ability on the Juggler, got " <> show (length other))
 
 -- Rune-Brand Juggler entering under alice, who also controls the Goblin Piker its

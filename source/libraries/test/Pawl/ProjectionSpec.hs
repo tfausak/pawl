@@ -22,6 +22,7 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
@@ -4742,7 +4743,7 @@ honeCounterSpec s registry = Spec.describe s "HoneCounter" $ do
         (equip, g3) = S.addPermanent bonesplitter S.alice g2
         (aura, g4) = S.addPermanent strength S.alice g3
         onEquip = (S.addCounter CounterKind.Hone 1 equip (S.attach aura pikerId (S.attach equip pikerId g4))) {GameState.priority = Just S.alice}
-    case Activate.abilitiesFor defenseId onEquip of
+    case Activatable.abilitiesFor defenseId onEquip of
       [only] -> do
         let onAura = S.runPure (honeMoveAnswer equip aura) onEquip (Activate.activateAbility S.alice defenseId only >> Stack.resolveTop)
         Spec.assertEqWith s "on the Aura the counter gives nothing: 2 printed + the Bonesplitter's 2 + Unholy Strength's 2" (Projection.powerOf pikerId onAura) (Just 6)
@@ -4927,7 +4928,7 @@ levelUpsOf oid gs =
 -- offering anything but exactly one ability is a fixture bug, and a silent
 -- fallthrough would let a case pass having levelled up zero times.
 levelUpOnce :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-levelUpOnce oid gs = case Activate.abilitiesFor oid gs of
+levelUpOnce oid gs = case Activatable.abilitiesFor oid gs of
   [ability] -> S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability >> Stack.resolveTop)
   abilities -> error ("expected exactly one ability, got " <> show (length abilities))
 
@@ -5244,7 +5245,7 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
     let (ogreId, base) = S.addPermanent ogre S.alice (S.landsInPlay swamp 1)
         alone = base {GameState.priority = Just S.alice}
         withDemon = (snd (S.addPermanent demon S.alice base)) {GameState.priority = Just S.alice}
-        offered gs = (length (Activate.abilitiesFor ogreId gs), any (isActivateOfOgre ogreId) (Action.legalActions S.alice gs))
+        offered gs = (length (Activatable.abilitiesFor ogreId gs), any (isActivateOfOgre ogreId) (Action.legalActions S.alice gs))
     Spec.assertEqWith
       s
       "no Demon, no ability; one Demon, one activation"
@@ -5260,7 +5261,7 @@ conditionalAbilitySpec s registry = Spec.describe s "ConditionalActivatedAbility
     let (ogreId, base) = S.addPermanent ogre S.alice (S.landsInPlay swamp 1)
         gs = (snd (S.addPermanent nexus S.alice base)) {GameState.priority = Just S.alice}
     Spec.assertEqWith s "the Ogre is a Demon" (Set.member Subtype.Type.Demon (Projection.subtypesOf ogreId gs)) True
-    Spec.assertEqWith s "so the ability is offered" (length (Activate.abilitiesFor ogreId gs)) 1
+    Spec.assertEqWith s "so the ability is offered" (length (Activatable.abilitiesFor ogreId gs)) 1
   -- CR 613.1: and the clause is judged at the depth of whoever asked. Asked of
   -- Projection.viewUpTo directly rather than through a card, because a card that
   -- puts the question inside the fold cannot say WHICH bound it was asked at --
@@ -5365,7 +5366,7 @@ hiddenZoneStaticSpec s registry = Spec.describe s "HiddenZoneStatics" $ do
     Spec.assertEqWith
       s
       "payable with the Grist in hand, not with an ordinary planeswalker card"
-      (Activate.activatable S.alice gristEntomber ability gristBoard, Activate.activatable S.alice jaceEntomber ability jaceBoard)
+      (Activatable.activatable S.alice gristEntomber ability gristBoard, Activatable.activatable S.alice jaceEntomber ability jaceBoard)
       (True, False)
     -- CR 205.1b/205.3d on the same ability, and the reason Grist is transcribed
     -- in printed order ("a 1/1 Insect creature"): the AddCreatureSubtype comes

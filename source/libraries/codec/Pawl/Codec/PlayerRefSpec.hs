@@ -56,6 +56,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
       PlayerRef.codec
       (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "permanent")))
       " {\"type\":\"ControllerOfBound\",\"value\":\"permanent\"} "
+  Spec.it s "OwnerOfBound" $
+    Common.assertCodec
+      s
+      PlayerRef.codec
+      (PlayerRef.OwnerOfBound (SlotName.MkSlotName (Text.pack "permanent")))
+      " {\"type\":\"OwnerOfBound\",\"value\":\"permanent\"} "
   -- CR 614.1c / CR 702.174b: ControllerOfBound's shape one record over.
   Spec.it s "ChosenPlayerOfBound" $
     Common.assertCodec

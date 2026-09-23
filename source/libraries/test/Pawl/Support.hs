@@ -3409,7 +3409,9 @@ oneMountainState mountain ph =
           GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],
           GameState.subgamesThisMatch = 0,
-          GameState.turnAnchor = Nothing
+          GameState.turnAnchor = Nothing,
+          GameState.rollingDie = Nothing,
+          GameState.rerolledTo = Nothing
         }
 
 drawStep :: Game.Type.Game ()

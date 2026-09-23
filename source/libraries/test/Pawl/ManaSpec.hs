@@ -26,6 +26,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -1327,7 +1328,7 @@ laviniaTurnRiderSpec s registry = Spec.describe s "CR 102.1 a rider naming a tur
         paid active = S.tappedCount S.alice (activated active)
         gate active =
           let (wretchId, gs) = laviniaBoard lavinia wretch piker active
-           in Activate.activatable S.alice wretchId ability gs
+           in Activatable.activatable S.alice wretchId ability gs
     -- The gameplay-level assertion: CR 602.2a's activation happened, which it
     -- cannot without CR 601.2h's payment.
     Spec.assertEqWith s "CR 602.2a the Wretch's ability reaches the stack on both opponents' turns and not on hers" (fmap onStack [S.bob, S.carol, S.alice]) [1, 1, 0]

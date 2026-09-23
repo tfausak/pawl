@@ -228,6 +228,7 @@ ownQuantities effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> Maybe.maybeToList quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -1236,6 +1237,7 @@ effectObjectRefs effect =
         Effect.Search {} -> []
         Effect.ExileAllGraveyards -> []
         Effect.Proliferate -> []
+        Effect.Reroll -> []
         Effect.ChooseCardName {} -> []
         Effect.FromOutsideTheGame {} -> []
         Effect.ExileThisSpell -> []
@@ -1839,6 +1841,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Candidate -> True
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
+          -- One seat -- the arm above's answer, one word over.
+          PlayerRef.OwnerOfBound _ -> True
           -- One seat -- the arm above's answer, one record over.
           PlayerRef.ChosenPlayerOfBound _ -> True
           -- A SET -- Relative Opponent's answer, and for its reason: CR 508.6 is

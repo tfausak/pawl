@@ -441,6 +441,8 @@ data GameEvent
     -- ONE ENTRY PER INSTRUCTION and not per die, however many CR 706.1's count
     -- threw, where CoinFlipped records one per coin: the condition reading this
     -- event is worded "one or more dice", which scopes it to the instruction.
+    -- A reroll (CR 706.2b) is a roll of its own, recorded under the player who
+    -- throws it; Pawl.DiceSpec's Goblin Bookie group proves it.
     DiceRolled PlayerId.PlayerId
   | -- | CR 706.2: one die's result, after every modifier, recorded per die the
     -- instruction left unignored (CR 706.6) -- what "whenever you roll a 6"

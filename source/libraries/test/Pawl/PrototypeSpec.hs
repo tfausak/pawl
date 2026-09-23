@@ -24,6 +24,7 @@ import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -237,7 +238,7 @@ spec s registry = Spec.describe s "Prototype" $ do
           ability : _ -> do
             Spec.assertBool
               s
-              (Activate.activatable S.alice oid ability settled)
+              (Activatable.activatable S.alice oid ability settled)
               "CR 718.5: its printed activated ability is activatable"
             let activated = S.runPure prototyping settled (Activate.activateAbility S.alice oid ability)
                 counted = S.settleSba (S.runPure prototyping activated Stack.resolveTop)

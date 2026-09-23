@@ -16,6 +16,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -716,7 +717,7 @@ elvishPiperSpec s registry =
       -- Activate the Piper's one ability and resolve it, keeping the RESPONSES
       -- beside the board -- portOfKarfellSpec's run, one card over.
       run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Maybe (GameState.GameState, [Response.Response])
-      run answer piperId gs = case Activate.abilitiesFor piperId gs of
+      run answer piperId gs = case Activatable.abilitiesFor piperId gs of
         [ability] ->
           let ((_, after), responses) = Replay.record answer gs (Activate.activateAbility S.alice piperId ability >> Stack.resolveTop)
            in Just (after, responses)

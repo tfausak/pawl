@@ -175,4 +175,9 @@ data ActivationRestriction
     -- forgetting is free, the returning permanent being a new object with a new
     -- id.
     OnlyOnceEachTurn
+  | -- | "Activate only any time it makes sense" (Goblin Bookie): activatable only
+    -- inside CR 706.2's modification of a die roll, where the ability resolves
+    -- at once. No rule grants that window (CR 117.1b); Pawl.DiceSpec's Goblin
+    -- Bookie group proves the reading.
+    DuringDieRoll
   deriving (Eq, Ord, Show)

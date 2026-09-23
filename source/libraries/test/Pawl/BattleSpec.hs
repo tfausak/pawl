@@ -86,6 +86,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
@@ -720,7 +721,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     (board, spell) <- seizing s registry S.bob withNinja
     let declared = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackTheBattle battle) board {GameState.remaining = S.phasesAfterThroughPostcombatMain (Phase.Combat CombatStep.DeclareAttackers)}
         ready = declared {GameState.priority = Just S.alice}
-    case (Activate.abilitiesFor ninjaId ready, theirs) of
+    case (Activatable.abilitiesFor ninjaId ready, theirs) of
       ([ability], land : _) -> do
         let activated = S.runPure S.identityAnswer ready (Activate.activateAbility S.alice ninjaId ability)
             arrived = S.runPure S.identityAnswer activated Stack.resolveTop
@@ -749,7 +750,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         seized victim = (S.runToStep (Phase.Combat CombatStep.CombatDamage) (seizeAnswer battle spell victim) declared) {GameState.priority = Just S.alice}
         leg victim =
           let before = seized victim
-           in case Activate.abilitiesFor ninjaId before of
+           in case Activatable.abilitiesFor ninjaId before of
                 [ability] ->
                   let activated = S.runPure S.identityAnswer before (Activate.activateAbility S.alice ninjaId ability)
                       arrived = S.runPure S.identityAnswer activated Stack.resolveTop

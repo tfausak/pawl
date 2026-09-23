@@ -36,7 +36,7 @@ module Pawl.SacrificeRestrictionSpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -332,7 +332,7 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
 -- off the PROJECTION, the route Pawl.Engine.Activate itself reads.
 activatable :: ObjectId.ObjectId -> GameState.GameState -> Bool
 activatable oid gs = case Projection.abilitiesOf oid gs of
-  ability : _ -> Activate.activatable S.alice oid ability gs
+  ability : _ -> Activatable.activatable S.alice oid ability gs
   [] -> False
 
 -- Record the end step's beginning, place the triggers it gathers (CR 603.3), and

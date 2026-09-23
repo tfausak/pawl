@@ -19,6 +19,8 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
+import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Engine.Airbend as Airbend
 import qualified Pawl.Engine.Amass as Amass
 import qualified Pawl.Engine.Attach as Attach
@@ -79,10 +81,12 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Warp as Warp
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilityKind as AbilityKind
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction.Type
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
@@ -2670,6 +2674,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.FlipCoin {} -> False
   Effect.ExileHandThenDraw {} -> False
   Effect.Proliferate {} -> False
+  Effect.Reroll -> False
   Effect.ChooseCardName {} -> False
   Effect.Bolster {} -> False
   Effect.Amass {} -> False
@@ -3534,10 +3539,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- unnamed player on a resolving object is CR 109.5's "you" -- its controller. A
   -- card telling ANOTHER player to roll would put the seat on Pawl.Types.RollDie.
   --
-  -- One writer, one road: Prompt.RollDie is asked from this arm and from no
-  -- other place in the engine, so there is no second road to record on. A
-  -- reroll asks it a second time from inside the same arm, and records nothing
-  -- of its own -- see `rerolling`.
+  -- One writer per road: Prompt.RollDie is asked from this arm and from
+  -- Effect.Reroll below, and each records the roll it throws -- a reroll inside
+  -- this arm included, see `rerolling`.
   --
   -- Recorded AFTER the binding, so a trigger placed by CR 603.3 sees the same
   -- state a later effect of this resolution would. Nothing observes the order --
@@ -3547,7 +3551,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- FlipCoin below records one per coin: the condition reading this event is
   -- Feywild Trickster's "whenever you roll one or more dice", which the printed
   -- words scope to the instruction rather than to the die. An instruction that
-  -- rolls no dice at all records nothing, having rolled none.
+  -- rolls no dice at all records nothing, having rolled none; a reroll is a
+  -- roll of its own and records its own.
   Effect.RollDie rollDie -> do
     before <- State.get
     let sides = RollDie.sides rollDie
@@ -3590,13 +3595,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- The offers are re-read each round for the same reason, rather than
         -- captured before the first die.
         --
-        -- CR 706.1's EVENT is not recorded again: the die was rolled once, and
-        -- the discarded number is not CR 706.6's ignored roll -- it happened,
-        -- and it has already triggered "you roll one or more dice".
-        rerolling natural = do
+        -- A reroll IS a roll, and records CR 706.1's event again under the
+        -- player who throws it -- Pippa, Duchess of Dice's ruling, which has a
+        -- reroll trigger "whenever you roll a die". The discarded number is not
+        -- CR 706.6's ignored roll: it happened, and its event stands.
+        --
+        -- Answers the natural result with the player who THREW it: the roller,
+        -- or whoever activated a reroll in `window` below.
+        rerolling thrower natural = do
           gs <- State.get
           modifiers <- Dice.modifiersFor controller
-          offering (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers))) natural
+          offering (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers))) thrower natural
         -- CR 109.5's "you" on the modifier, which is the player its "may" and
         -- its CR 706.2a cost belong to -- Clam-I-Am's own controller, who is
         -- also the roller, and Wall of Fortune's, who need not be. The ROLLER
@@ -3618,24 +3627,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Not implemented: CR 706.2b's pick among COMPETING modifiers, which is
         -- the ROLLER's (#3976). The offers are put to their own payers in
         -- timestamp order instead, and the first taken is the one applied.
-        offering offers natural = case offers of
-          [] -> pure natural
+        offering offers thrower natural = case offers of
+          [] -> window thrower natural
           (payer, stated, offer) : rest -> do
             gs <- State.get
             let mCost = ModifiedRoll.cost offer
             if not (payable gs payer stated mCost)
-              then offering rest natural
+              then offering rest thrower natural
               else do
                 answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor payer gs) payer natural mCost)
                 case answer of
-                  OptionalDecision.Declines -> offering rest natural
+                  OptionalDecision.Declines -> offering rest thrower natural
                   OptionalDecision.Exercises -> do
                     paid <- payModifier payer stated mCost
                     if not paid
-                      then offering rest natural
+                      then offering rest thrower natural
                       else do
                         again <- Game.ask (Prompt.RollDie sides)
-                        rerolling (faceOf again)
+                        -- The roller throws it: Clam-I-Am's "you may reroll
+                        -- it", Wall of Fortune's "have any player reroll a die
+                        -- that player rolled".
+                        State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+                        rerolling controller (faceOf again)
         -- CR 118.3, Prompt.ChooseToPay's posture for CR 118.12: a cost the
         -- payer has not the resources to pay fully is not offered. A stated
         -- cost with no object behind it cannot be paid at all -- every
@@ -3724,9 +3737,59 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           began <- State.get
           outcome <- Cost.pay performManaAbility (Just began) PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
           pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
+        -- Goblin Bookie's "Activate only any time it makes sense", read as a
+        -- window inside CR 706.2's modification step, once the static offers
+        -- above are spent. No rule grants one: CR 117.1b ties activation to
+        -- priority, which CR 117.3b hands out only after a resolution. Each ability
+        -- ActivationRestriction.DuringDieRoll marks is offered to the player
+        -- who may activate it, through the same gate a priority activation
+        -- takes (Activatable.activatable), and it resolves at once, as CR
+        -- 605.3b's mana ability does -- the only reading in which the reroll
+        -- reaches the die. Pawl.CardSpec keeps such an ability to an untargeted
+        -- Effect.Reroll, which is what lets Prompt.RerollDie ask for it.
+        --
+        -- The stamp on GameState is what DuringDieRoll reads and what
+        -- Effect.Reroll throws against, restored on the way out so a roll
+        -- nested inside the window's own resolution cannot leave it open.
+        --
+        -- Not implemented: CR 706.2b's pick among competing modifiers, the
+        -- roller's (#3976). Players are asked in APNAP order, and within a
+        -- player in object order.
+        window thrower natural = do
+          previous <- State.get
+          State.modify' (\g -> g {GameState.rollingDie = Just sides, GameState.rerolledTo = Nothing})
+          opened <- State.get
+          let candidates =
+                [ (pid, oid, ability)
+                | pid <- Game.apnapOrder opened,
+                  oid <- Activatable.activationSources pid opened,
+                  ability <- Activatable.abilitiesFor oid opened,
+                  elem ActivationRestriction.Type.DuringDieRoll (ActivatedAbility.restrictions ability)
+                ]
+          rerolled <- windowOffering candidates natural
+          State.modify' (\g -> g {GameState.rollingDie = GameState.rollingDie previous, GameState.rerolledTo = GameState.rerolledTo previous})
+          case rerolled of
+            Nothing -> pure (thrower, natural)
+            Just (pid, face) -> rerolling pid face
+        windowOffering candidates natural = case candidates of
+          [] -> pure Nothing
+          (pid, oid, ability) : rest -> do
+            gs <- State.get
+            if not (Activatable.activatable pid oid ability gs)
+              then windowOffering rest natural
+              else do
+                answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor pid gs) pid natural (Just (ActivatedAbility.cost ability)))
+                case answer of
+                  OptionalDecision.Declines -> windowOffering rest natural
+                  OptionalDecision.Exercises -> do
+                    activated <- activateWhileRolling pid oid ability
+                    after <- State.get
+                    case (activated, GameState.rerolledTo after) of
+                      (True, Just face) -> pure (Just (pid, face))
+                      _ -> windowOffering rest natural
         rollOne = do
           rolled <- Game.ask (Prompt.RollDie sides)
-          natural <- rerolling (faceOf rolled)
+          (thrower, natural) <- rerolling controller (faceOf rolled)
           gs <- State.get
           let viewOf = effectViewOf source legal gs
               context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -3744,7 +3807,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Left unclamped: CR 706.2's result is the number after EVERY
           -- modifier, so a shift from another source applies to this sum as it
           -- stands, negative or not, and only the final figure is clamped below.
-          pure (toInteger natural + modifier)
+          pure (toInteger natural + modifier, thrower)
     -- CR 614.1a over CR 706.1: the instruction's count is offered to the
     -- replacement effects watching this roller's rolls (Pixie Guide) before the
     -- first die is thrown, and what comes back is how many dice to throw and how
@@ -3761,7 +3824,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 107.1b once, on the final figure, after every modifier: The Deck of
     -- Many Things' natural 3, four cards in hand and a shift up is a 0, not a 1
     -- (Pawl.DiceSpec's "CR 706.2 a shift applies to the unclamped sum").
-    results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (Dice.ignoreLowest ignored thrown))
+    --
+    -- Each die keeps the player who threw its final natural result, paired by
+    -- position so CR 706.6's tie still drops the first of the lowest.
+    let kept = Dice.ignoreLowest ignored (zip (fmap fst thrown) [0 :: Int ..])
+        throwers = fmap (\(_, i) -> maybe controller snd (Maybe.listToMaybe (drop i thrown))) kept
+    results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (fmap fst kept))
     Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
       gs <- State.get
       -- CR 706.4: WHICH result the instruction uses, where it threw more than
@@ -3791,9 +3859,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
       -- CR 706.2's final number, one entry per die the instruction kept, for
       -- "whenever you roll a 6" -- after every modifier, and never for an
-      -- ignored roll (CR 706.6).
-      Foldable.for_ results $ \result ->
-        State.modify' (Event.recordEvent (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = controller, DieResult.result = result}))
+      -- ignored roll (CR 706.6). Recorded under the player who threw the die's
+      -- final natural result: Pippa, Duchess of Dice's ruling gives a reroll of
+      -- another player's die to the rerolling player's "whenever you roll"
+      -- triggers.
+      Foldable.for_ (zip throwers results) $ \(thrower, result) ->
+        State.modify' (Event.recordEvent (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = thrower, DieResult.result = result}))
+  -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
+  -- the RollDie arm's window above: the same die, the new face filtered back to
+  -- CR 706.1a's range, and handed back through GameState.rerolledTo. No window
+  -- open, no die to reroll, and nothing happens.
+  --
+  -- Recorded as the rerolling player's roll: Pippa, Duchess of Dice's ruling
+  -- has a reroll of another player's die trigger the rerolling player's
+  -- "whenever you roll a die".
+  Effect.Reroll -> do
+    gs <- State.get
+    Foldable.for_ (GameState.rollingDie gs) $ \dieSides -> do
+      again <- Game.ask (Prompt.RollDie dieSides)
+      let face = if again >= 1 && again <= dieSides then again else 1
+      State.modify' (\g -> g {GameState.rerolledTo = Just face})
+      State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
   -- CR 705.1's flip, in RollDie's holder and for its reason: bindAmountSlot's
   -- `source` is the resolving object, and on a SPELL -- which Winter Sky is --
   -- `source` and `resolving` are the same object, so the ambiguity the arm above
@@ -8938,6 +9024,42 @@ performManaAbilityEffects source controller =
             manaAbilityBindings
             manaAbilityBindings
         )
+
+-- Activate an ability inside the RollDie arm's window and resolve it at once,
+-- answering whether it was paid for. The payment is Pawl.Engine.Activate's
+-- activateAbility without the stack object: CR 602.2b's cost, with CR 601.2f's
+-- adjustments, charged against the activator's own mana window. Pawl.CardSpec
+-- keeps these abilities to one untargeted mode and no X, so there is no mode,
+-- target or X to announce.
+--
+-- The effects then run as performManaAbilityEffects runs a mana ability's, the
+-- source standing in for the ability object.
+activateWhileRolling :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game Bool
+activateWhileRolling pid oid ability = do
+  before <- State.get
+  let stamp = ActivatedAbility.keyword ability
+      loyalty = Cost.loyaltyKindOf (ActivatedAbility.cost ability)
+      gathered = Cost.activationAdjustments Set.empty stamp AbilityKind.NonManaAbility loyalty pid oid before
+      totalled = Cost.plusComponents gathered (ActivatedAbility.cost ability)
+  (announced, _) <- Cost.announce (PaymentSubject.Activating oid) ManaSpending.AsProduced pid oid (Cost.substitutedManas (Cost.activationManaSubstitutions (Cost.Type.components totalled) Map.empty pid oid before) (Cost.totalManas gathered)) totalled
+  adjustments <- Cost.announceReductions pid oid before announced gathered
+  (payment, _) <- Cost.paySubstituting performManaAbility Nothing PaymentMoment.OutsideResolution (PaymentSubject.Activating oid) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.activationManaSubstitutions pid oid) (Cost.totalWith adjustments announced)
+  case payment of
+    Payment.Unpaid -> do
+      Cost.restoreKeepingLibraryActions before
+      pure False
+    Payment.Paid _ -> do
+      State.modify' (ActivationRestriction.recordActivation oid ability)
+      let modal = ActivatedAbility.modal ability
+          every = Set.fromList (fmap fst (zip (fmap ModeIndex.MkModeIndex [0 ..]) (Modal.modeEffects modal)))
+          bound =
+            Map.fromList
+              [ (Binding.triggerSource, Set.singleton (Recipient.ToObject oid)),
+                (Binding.you, Set.singleton (Recipient.ToPlayer pid))
+              ]
+      Foldable.for_ (Modal.forcedSelection every (Modal.Type.selection modal)) $ \selection ->
+        Monad.mapM_ (applyEffect oid oid pid bound bound) (Modal.modesEffects selection modal)
+      pure True
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a
 -- delayed ability armed later in the SAME resolution can name the object.

@@ -122,6 +122,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Search" Search.codec Effect.Search (\x -> case x of Effect.Search y -> Just y; _ -> Nothing),
           Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
           Arm.nullary "Proliferate" Effect.Proliferate,
+          Arm.nullary "Reroll" Effect.Reroll,
           Arm.payload "ChooseCardName" ChooseCardName.codec Effect.ChooseCardName (\x -> case x of Effect.ChooseCardName y -> Just y; _ -> Nothing),
           Arm.payload "FromOutsideTheGame" FromOutsideTheGame.codec Effect.FromOutsideTheGame (\x -> case x of Effect.FromOutsideTheGame y -> Just y; _ -> Nothing),
           Arm.nullary "ExileThisSpell" Effect.ExileThisSpell,
@@ -264,6 +265,7 @@ tagOf x = case x of
   Effect.Search {} -> "Search"
   Effect.ExileAllGraveyards {} -> "ExileAllGraveyards"
   Effect.Proliferate {} -> "Proliferate"
+  Effect.Reroll {} -> "Reroll"
   Effect.ChooseCardName {} -> "ChooseCardName"
   Effect.FromOutsideTheGame {} -> "FromOutsideTheGame"
   Effect.ExileThisSpell {} -> "ExileThisSpell"

@@ -18,6 +18,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
@@ -441,7 +442,7 @@ villageRitesSpec s registry = Spec.describe s "A cost's own sacrifice and its so
 -- which CR 605.1a never reads. So the Sphere stops being a mana ability under the
 -- new clause and the Star does not.
 --
--- The Sphere's negative is never routed through Activate.activatable, which
+-- The Sphere's negative is never routed through Activatable.activatable, which
 -- answers False for a mana ability on every board (CR 605.3b): every assertion
 -- here reads the menu Action.legalActions builds, or the board a priority loop
 -- leaves behind.
@@ -1587,7 +1588,7 @@ omenHawkerSpec s registry = Spec.describe s "Omen Hawker" $ do
     let (_, g1) = S.addPermanent hawker S.alice (Setup.emptyGame S.bothPlayers)
         (_, g2) = S.addPermanent star S.alice g1
         (greedId, board) = S.addPermanent greed S.alice g2
-        drawable gs = any (\ability -> Activate.activatable S.alice greedId ability gs) (Projection.abilitiesOf greedId gs)
+        drawable gs = any (\ability -> Activatable.activatable S.alice greedId ability gs) (Projection.abilitiesOf greedId gs)
     Spec.assertBool s (drawable board) "CR 106.6 the Hawker's {C} buys the Star, whose mana pays Greed's {B}"
     Spec.assertBool s (drawable (S.landsFor island S.alice 1 board)) "one untapped Island pays that same {1}, so the board is otherwise fine"
 

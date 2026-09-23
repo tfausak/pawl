@@ -17,6 +17,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cost as Cost
@@ -174,7 +175,7 @@ cyclingTriggerSpec s registry =
           (g1, avenId) = S.handOne aven g0
           gs = g1 {GameState.priority = Just S.alice}
       Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Flying creature gs)) "the Piker does not start with flying"
-      case Activate.abilitiesFor avenId gs of
+      case Activatable.abilitiesFor avenId gs of
         [ability] -> do
           let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice avenId ability)
               -- The settle PLACES the trigger and stamps its target (CR
@@ -198,7 +199,7 @@ cyclingTriggerSpec s registry =
       let (_, g0) = S.addPermanent piker S.alice (S.landsInPlay island 1)
           (g1, avenId) = S.handOne aven g0
           gs = g1 {GameState.priority = Just S.alice}
-      case Activate.abilitiesFor avenId gs of
+      case Activatable.abilitiesFor avenId gs of
         [ability] -> do
           let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice avenId ability)
               placed = S.runPure S.identityAnswer cycled Engine.placePendingTriggers
@@ -232,7 +233,7 @@ cyclingTriggerSpec s registry =
       let (_, g0) = S.addPermanent piker S.alice (S.landsInPlay forest 2)
           (g1, maulerId) = S.handOne mauler g0
           gs = g1 {GameState.priority = Just S.alice}
-      case Activate.abilitiesFor maulerId gs of
+      case Activatable.abilitiesFor maulerId gs of
         [ability] -> do
           let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
               placed = S.runPure S.identityAnswer cycled Engine.placePendingTriggers

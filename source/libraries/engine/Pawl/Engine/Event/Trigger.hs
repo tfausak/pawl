@@ -521,10 +521,11 @@ batchScoped condition = case condition of
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
   -- Per-occurrence, and indistinguishable from the batch reading of Feywild
-  -- Trickster's "one or more dice": one Effect.RollDie records exactly one
-  -- GameEvent.DiceRolled however many dice CR 706.1's count threw, so the
-  -- ability fires at most once either way. What would make the two readings
-  -- differ is an event per DIE, which the printed words do not ask for.
+  -- Trickster's "one or more dice": one Effect.RollDie's throw records exactly
+  -- one GameEvent.DiceRolled however many dice CR 706.1's count threw. A reroll
+  -- (CR 706.2b) records another, but it is a separate, later roll, so a batch
+  -- reading would fire for it too. What would make the two readings differ is
+  -- an event per DIE, which the printed words do not ask for.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
@@ -851,7 +852,7 @@ eventTriggers events gs =
       -- BEING ON THE BATTLEFIELD: a Squee, Goblin Nabob standing there does not
       -- see its own upkeep, because the ability that watches for it functions in
       -- the graveyard. The mirror of the filter
-      -- Pawl.Engine.Activate.abilitiesForGiven puts on its battlefield arm.
+      -- Pawl.Engine.Activatable.abilitiesForGiven puts on its battlefield arm.
       --
       -- Applied to every reading that says "this permanent was on the
       -- battlefield": the live `onBattlefield` set, the two group-scoped unions
@@ -882,7 +883,7 @@ eventTriggers events gs =
       -- PROJECTED list, so an ability granted by another object that arms a
       -- delayed trigger the GRANTOR declared resolves to no name here and takes
       -- CR 113.6's battlefield default. Nothing in data/cards/ grants an ability
-      -- that arms one; Pawl.Engine.Activate.abilitiesForGiven carries the same
+      -- that arms one; Pawl.Engine.Activatable.abilitiesForGiven carries the same
       -- pairing and the same note.
       battlefieldAbilitiesOf oid pc = filter (functionsIn (PC.subtypes pc) (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
@@ -1828,11 +1829,11 @@ eventTriggers events gs =
 -- No COST half. CR 602.1 gives an activated ability "a cost and an effect";
 -- CR 603.1 gives a triggered one "a trigger condition and an effect", and no
 -- cost at all -- so Pawl.Engine.Cost, the other half of
--- Activate.zoneFunctionedFrom, has nothing to be asked here. The CONDITION is
+-- Activatable.zoneFunctionedFrom, has nothing to be asked here. The CONDITION is
 -- read instead, and only for the rule's own exception: `enchantedObjectLeaves`
 -- below.
 --
--- ALL MODES, in printed order, for Activate.zoneFunctionedFrom's reason: CR
+-- ALL MODES, in printed order, for Activatable.zoneFunctionedFrom's reason: CR
 -- 700.2 makes a modal ability's modes alternatives, so a zone stated by any of
 -- them is a zone the ability can move its object out of.
 --
@@ -1863,7 +1864,7 @@ eventTriggers events gs =
 --
 -- The clause's "a previous part of its cost or effect specifies that the object
 -- is put into that zone" half belongs to the fold below rather than here, and
--- the fold reads it by construction: Pawl.Engine.Activate.zoneFunctionedFrom
+-- the fold reads it by construction: Pawl.Engine.Activatable.zoneFunctionedFrom
 -- carries the argument, which is CR 400.7's fresh id -- a later part cannot
 -- name the reserved source slot for an object an earlier part already moved.
 -- See #2501.

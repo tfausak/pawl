@@ -897,6 +897,16 @@ controllerWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> Just (LastKnown.controller lk)
   Nothing -> controllerOf oid gs
 
+-- CR 108.3's owner, with the same fallback -- unlike control (CR 110.2) an
+-- owner never moves, so the live half is Object.owner straight off the
+-- object rather than a projection. PlayerRef.OwnerOfBound's reader
+-- (Pawl.Engine.Resolve.Slots.playerRefPlayers); The Deck of Many Things' 20
+-- band is the producer.
+ownerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
+ownerWithLastKnown oid gs = case lastKnownOf oid gs of
+  Just lk -> Just (LastKnown.owner lk)
+  Nothing -> fmap Object.owner (Game.lookupObject oid gs)
+
 -- subtypesOf with the same fallback (CR 702.76a and CR 702.173a for why the
 -- types are wanted; CR 608.2h for the authority) -- a creature that dealt combat
 -- damage and then died still has to answer what its creature types were.

@@ -293,9 +293,9 @@ riderSlots riders =
    in joinSlots [attacked, maybe Map.empty oneSlot (EntryRiders.blocking riders), maybe Map.empty oneSlot (EntryRiders.attachedTo riders)]
 
 -- The slots a PlayerRef reads. EachPlayerExcept, EachOpponentExcept, InSlot,
--- ControllerOfBound, ChosenPlayerOfBound and Attacking name one at arity One and
--- EachInSlot names one at arity Many; the rest name none, and the arms below
--- carry the reason for each arity that is not self-evident.
+-- ControllerOfBound, OwnerOfBound, ChosenPlayerOfBound and Attacking name one
+-- at arity One and EachInSlot names one at arity Many; the rest name none, and
+-- the arms below carry the reason for each arity that is not self-evident.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
@@ -311,6 +311,9 @@ playerRefSlots ref = case ref of
   PlayerRef.Candidate -> Map.empty
   -- Read at arity one: a slot naming several objects names no one controller.
   PlayerRef.ControllerOfBound slot -> Map.singleton slot SlotArity.One
+  -- Read at arity one for the arm above's reason: a slot naming several objects
+  -- names no one owner.
+  PlayerRef.OwnerOfBound slot -> Map.singleton slot SlotArity.One
   -- Read at arity one for that arm's reason: a slot naming several objects names
   -- no one chooser.
   PlayerRef.ChosenPlayerOfBound slot -> Map.singleton slot SlotArity.One
@@ -708,6 +711,7 @@ effectObjectRefs effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName {} -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -880,6 +884,7 @@ effectPlayerRefs effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref _) -> [ref]
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -977,6 +982,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
       (maybe Map.empty oneSlot subject)
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
+  Effect.Reroll -> Map.empty
   -- CR 201.4's name is not an object, so the choice binds no slot of its own and
   -- the restriction Filter names none either -- a Filter reads a slot only
   -- through Filter.boundSlots, and no card writes one of those atoms here. The
@@ -1643,6 +1649,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> all Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
+  Effect.Reroll -> True
   Effect.ChooseCardName _ -> True
   Effect.FromOutsideTheGame _ -> True
   Effect.ExileThisSpell -> True
@@ -1883,6 +1890,7 @@ readsX =
         Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> any Quantity.readsX quantity
         Effect.ExileAllGraveyards -> False
         Effect.Proliferate -> False
+        Effect.Reroll -> False
         -- No Quantity: rule 201.4 chooses one name and states no count.
         Effect.ChooseCardName _ -> False
         Effect.FromOutsideTheGame _ -> False
@@ -2098,6 +2106,7 @@ boundSlots effect = case effect of
   Effect.Search {} -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
+  Effect.Reroll -> Set.empty
   -- Binds nothing: the name goes on the SOURCE (Object.chosenNames) and is read
   -- back off it by Filter.HasChosenName, so no slot carries it.
   Effect.ChooseCardName _ -> Set.empty
@@ -2322,6 +2331,16 @@ playerRefPlayers legal controller gs ref =
         PlayerRef.ControllerOfBound slot -> case legalOne slot legal of
           Just recipient -> case Recipient.objectOf recipient of
             Just oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
+            Nothing -> []
+          Nothing -> []
+        -- CR 108.3: the OWNER of the object the slot names, ControllerOfBound's
+        -- arm one word over -- The Deck of Many Things' 20 band, "its owner
+        -- loses the game", read off the reanimated creature's slot. An owner
+        -- never moves (CR 110.2), but the object CR 400.7 replaced still has to
+        -- answer, so this takes the same CR 608.2h last-known road.
+        PlayerRef.OwnerOfBound slot -> case legalOne slot legal of
+          Just recipient -> case Recipient.objectOf recipient of
+            Just oid -> Maybe.maybeToList (Projection.ownerWithLastKnown oid gs)
             Nothing -> []
           Nothing -> []
         -- CR 614.1c / CR 702.174b: the player that object CHOSE -- "the chosen

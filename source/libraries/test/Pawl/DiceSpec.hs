@@ -82,12 +82,15 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -98,13 +101,17 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -116,8 +123,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   dieRollRSpec s registry
   rerollSpec s registry
   costedRerollSpec s registry
+  activatedRerollSpec s registry
   nightShiftSpec s registry
   deckSpec s registry
+  deckOwnerSpec s registry
+  deckExactBandSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -1064,6 +1074,18 @@ costedRerollSpec s registry = Spec.describe s "Costed reroll" $ do
       "CR 109.5: bob is the seat the offer was put to"
       (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell withWall)
       [S.bob]
+  Spec.it s "CR 706.2b a reroll is a roll by the player who throws it" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (_, withWall) = S.addPermanent wall S.bob board
+        rolls p after = length (filter (== GameEvent.DiceRolled p) (S.eventsOf after))
+    -- Pippa, Duchess of Dice's ruling makes a reroll trigger "whenever you roll
+    -- a die". Bob's Wall has ALICE reroll, so alice has rolled twice -- the
+    -- instruction's roll and the reroll -- and bob not at all. The paired run
+    -- declines, and leaves the one roll.
+    Spec.assertEqWith s "the reroll is alice's second roll" (rolls S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall)) 2
+    Spec.assertEqWith s "and bob, who paid, did not roll" (rolls S.bob (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall)) 0
+    Spec.assertEqWith s "a declined reroll is no roll" (rolls S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell withWall)) 1
   Spec.it s "CR 706.2a each costed modifier is its own offer" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     wall <- S.printingOf s registry "Wall of Fortune"
@@ -1109,6 +1131,97 @@ rerollSeats rolls decisions spell board =
         pure answer
       (seats, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], (rolls, decisions))
    in reverse seats
+
+-- Goblin Bookie's "{R}, {T}: Reflip any coin or reroll any die. (Activate only
+-- any time it makes sense.)", read as a window inside CR 706.2's modification
+-- step where the ability is activated and resolves at once. The Endeavor
+-- fixture and the 3-6-2 script of the Wall group above: six Knights means the
+-- reroll happened, three that it did not.
+--
+-- BOB's Bookie over ALICE's roll, since "any die" reaches another player's,
+-- and a Mountain beside it for the {R}. The paired boards each take away one
+-- thing an ACTIVATED ability needs and a static modifier would not: the mana
+-- (CR 602.2b), and a creature's settle before paying {T} (CR 302.6).
+--
+-- Not transcribed: the "reflip any coin" half (#4017). Stricter than printed:
+-- bob can reflip nothing.
+activatedRerollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+activatedRerollSpec s registry = Spec.describe s "Activated reroll" $ do
+  Spec.it s "CR 706.2b Goblin Bookie rerolls another player's die" $ do
+    (spell, _, _, board, bookie, mountain) <- bookieBoard s registry
+    let after = runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell board
+    -- THE GAMEPLAY ASSERTION: bob activated the Bookie inside alice's roll and
+    -- the 3 came back a 6.
+    Spec.assertEqWith
+      s
+      "CR 706.2b: the Bookie's reroll turns the 3 into a 6"
+      (S.countOnBattlefieldByName knight S.alice after)
+      6
+    Spec.assertBool s (Game.isTapped bookie after && Game.isTapped mountain after) "CR 602.2b: bob paid {R} and {T}"
+    Spec.assertEqWith s "CR 109.5: bob is the seat the offer was put to" (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell board) [S.bob]
+    -- Pippa, Duchess of Dice's ruling: the reroll is the rerolling player's roll.
+    Spec.assertEqWith
+      s
+      "a reroll of alice's die is bob's roll"
+      (length (filter (== GameEvent.DiceRolled S.bob) (S.eventsOf after)))
+      1
+    -- The paired run: the same board with the offer declined.
+    Spec.assertEqWith
+      s
+      "and a declined offer leaves the 3"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell board))
+      3
+  Spec.it s "CR 706.2b the rerolling player rolled the final result" $ do
+    (spell, _, _, board, _, _) <- bookieBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.bob board)
+        (after, _) = nightShiftRun [3, 6, 2] [OptionalDecision.Exercises] [] 1 spell shifted
+        (declined, _) = nightShiftRun [3, 6, 2] [OptionalDecision.Declines] [] 1 spell shifted
+    -- THE GAMEPLAY ASSERTION: bob's Bookie rerolled alice's 3 into a 6, so
+    -- BOB rolled the 6 (Pippa, Duchess of Dice's ruling) and bob's Night Shift
+    -- of the Living Dead's "whenever you roll a 6" mints bob a Zombie.
+    Spec.assertEqWith s "the reroller's \"whenever you roll a 6\" fires" (S.countOnBattlefieldByName zombieEmployee S.bob after) 1
+    Spec.assertEqWith s "CR 706.2b: the 6 is the other result" (S.countOnBattlefieldByName knight S.alice after) 6
+    -- The paired run, declined: alice's 3 stands, the 6 is alice's second die,
+    -- and bob rolled nothing.
+    Spec.assertEqWith s "and bob's Night Shift sees no roll of his without the reroll" (S.countOnBattlefieldByName zombieEmployee S.bob declined) 0
+  Spec.it s "CR 602.2b the window asks what a priority activation asks" $ do
+    (spell, _, _, board, bookie, mountain) <- bookieBoard s registry
+    let unpaid = S.tapObject mountain board
+        sick = board {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) bookie (GameState.objects board)}
+    -- THE GAMEPLAY ASSERTIONS: every Exercises in the script is accepted, so an
+    -- engine that offered the Bookie anyway mints six. The sick Bookie is the
+    -- gate's proof; the tapped Mountain would also be refused by the payment.
+    Spec.assertEqWith
+      s
+      "CR 118.3: no {R} to pay, so no reroll"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell unpaid))
+      3
+    Spec.assertEqWith
+      s
+      "CR 302.6: a summoning-sick Bookie cannot pay {T}"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell sick))
+      3
+    Spec.assertEqWith s "and neither was offered" (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell unpaid <> rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell sick) []
+  Spec.it s "CR 117.1b the Bookie cannot be activated at priority" $ do
+    (_, _, _, board, bookie, _) <- bookieBoard s registry
+    -- No die is being rolled, so it never makes sense; with the mana and the
+    -- untapped Bookie that the first case paid with.
+    Spec.assertBool
+      s
+      (not (any (\ability -> Activatable.activatable S.bob bookie ability board) (Activatable.abilitiesFor bookie board)))
+      "the Bookie's ability is not activatable outside a roll"
+    Spec.assertBool s (not (null (Activatable.abilitiesFor bookie board))) "and the Bookie has the ability"
+
+-- The Endeavor board plus bob's Goblin Bookie and a Mountain to pay its {R}.
+bookieBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+bookieBoard s registry = do
+  (spell, weak, strong, board) <- endeavorBoard s registry
+  bookiePrinting <- S.printingOf s registry "Goblin Bookie"
+  mountainPrinting <- S.printingOf s registry "Mountain"
+  let (bookie, withBookie) = S.addPermanent bookiePrinting S.bob board
+      (mountain, withBoth) = S.addPermanent mountainPrinting S.bob withBookie
+  pure (spell, weak, strong, withBoth, bookie, mountain)
 
 -- CR 706.2's third sentence, "Modifiers may also come from other sources", in
 -- rule 706.2b's SECOND bucket: Night Shift of the Living Dead ("After you roll a
@@ -1293,8 +1406,9 @@ nightShiftRun rolls rerolls shifts index spell board =
 -- instruction's sum before the shift reads max 0 (-1) + 1 = 1, keeps the hand
 -- and returns the graveyard card on top of it.
 --
--- Not implemented: the Deck's 20 striation, which the card file leaves out
--- (#4015). Stricter than printed, and no roll here reaches 20.
+-- No roll here reaches 20, the Deck's other striation (this file's own
+-- deckOwnerSpec, "CR 108.3 a creature reanimated under another player's
+-- control still makes its OWNER lose the game", proves that one).
 deckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 deckSpec s registry = Spec.describe s "UnclampedShift" $ do
   Spec.it s "CR 706.2 a shift applies to the unclamped sum" $ do
@@ -1332,3 +1446,81 @@ runDeck (deckId, abilities, board) =
         Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
         _ -> S.identityAnswer p
    in S.runPure answer board (mapM_ (Activate.activateAbility S.alice deckId) (take 1 abilities) >> Stack.resolveTop)
+
+-- CR 108.3, PlayerRef.OwnerOfBound's producer: The Deck of Many Things' 20
+-- band, "Put a creature card from any graveyard onto the battlefield under
+-- your control. When that creature dies, its owner loses the game." alice
+-- activates and so CONTROLS the reanimated creature; it is bob's own card, so
+-- he OWNS it. The two seats come apart, which is exactly what
+-- PlayerRef.ControllerOfBound could not have named -- that reference would
+-- have alice, the controller, lose instead of bob.
+deckOwnerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckOwnerSpec s registry = Spec.describe s "OwnerOfBound" $ do
+  Spec.it s "CR 108.3 a creature reanimated under another player's control still makes its OWNER lose the game" $ do
+    deck <- S.printingOf s registry "The Deck of Many Things"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+        (pikerId, board) = S.addGraveyardCard piker S.bob withDeck
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 20
+          Prompt.ChooseCardInGraveyard {} -> pikerId
+          _ -> S.identityAnswer p
+        activate = case Face.activatedAbilities (S.combinedFace deck) of
+          ability : _ -> Activate.activateAbility S.alice deckId ability
+          [] -> pure ()
+        activated = S.runPure answer board (activate >> Stack.resolveTop)
+        -- CR 108.3: the battlefield is shared and Game.zoneMembers indexes it
+        -- by OWNER, so bob's copy is where the reanimated creature is found
+        -- even though alice controls it.
+        reanimated = case Game.zoneMembers Zone.Battlefield S.bob activated of
+          [oid] -> oid
+          _ -> pikerId
+        marked = S.markDamage reanimated 1 activated
+        settled = S.runPure S.identityAnswer marked Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Stack.resolveTop
+    -- THE GAMEPLAY ASSERTION: bob, the owner, loses the game and alice, the
+    -- controller, wins -- readable only through CR 104.2a's two-player
+    -- decision, since neither status field alone says who WON.
+    Spec.assertEqWith s "CR 108.3 / 104.2a bob owned the reanimated creature, so its death is bob's loss" (GameState.result after) (Just (Result.Won S.alice))
+    -- The preconditions that assertion rests on, read after it so neither can
+    -- absorb a mutation aimed at the reference: the creature really did enter
+    -- under alice's control while staying bob's card, and it really did die.
+    Spec.assertEqWith s "setup: alice controlled the reanimated creature" (Projection.controllerOf reanimated activated) (Just S.alice)
+    Spec.assertEqWith s "setup: the creature really died" (Game.lookupObject reanimated settled) Nothing
+
+-- CR 706.3a: a striation naming a single number means "if the result was N",
+-- not "N or more" -- Oracle prints the Deck's 20 band bare, not "20+". A
+-- natural 20 shifted UP by Night Shift of the Living Dead's own modifier
+-- lands on 21, which is on no band of the table at all, so nothing happens.
+-- The discriminating twin of deckOwnerSpec's board: same reanimation, same
+-- two seats, the die roll the one thing different.
+deckExactBandSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckExactBandSpec s registry = Spec.describe s "ExactBand" $ do
+  Spec.it s "CR 706.3a a natural 20 shifted past 20 reaches no band, so nothing is reanimated" $ do
+    deck <- S.printingOf s registry "The Deck of Many Things"
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+        (_shiftId, withShift) = S.addPermanent shift S.alice withDeck
+        (pikerId, board) = S.addGraveyardCard piker S.bob withShift
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 20
+          Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
+          Prompt.ChooseCardInGraveyard {} -> pikerId
+          _ -> S.identityAnswer p
+        activate = case Face.activatedAbilities (S.combinedFace deck) of
+          ability : _ -> Activate.activateAbility S.alice deckId ability
+          [] -> pure ()
+        after = S.runPure answer board (activate >> Stack.resolveTop)
+    -- THE GAMEPLAY ASSERTION: 21 reaches no striation, so nothing arrived on
+    -- bob's copy of the battlefield -- an AtLeast reading of "20" would put
+    -- his creature there instead.
+    Spec.assertEqWith s "CR 706.3a a shifted 21 reaches no band: nothing entered the battlefield" (Game.zoneMembers Zone.Battlefield S.bob after) []
+    -- The precondition, read after the assertion so it cannot absorb a
+    -- mutation aimed at the comparison: the card really is still where it
+    -- started, unreanimated.
+    Spec.assertEqWith s "setup: bob's creature card is still in his graveyard" (Game.zoneMembers Zone.Graveyard S.bob after) [pikerId]

@@ -576,7 +576,7 @@ mintedBy keyword ability = ability {ActivatedAbility.keyword = Just keyword}
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
 -- owner's hand. Named for the ZONE rather than for cycling, because that is the
--- classification its reader wants: Activate.abilitiesFor asks "what can be
+-- classification its reader wants: Activatable.abilitiesFor asks "what can be
 -- activated from here" rather than which rule produced any of them, which each
 -- ability carries for itself once `mintedBy` has stamped it.
 --
@@ -1371,7 +1371,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
 --
 -- THE RETURN names Zone.Graveyard as its `origin`, which is what confines the
 -- whole ability to a graveyard: CR 113.6m reads that field (Reassembling
--- Skeleton's reading, Pawl.Engine.Activate.zoneAbilitiesOf), so the ability a
+-- Skeleton's reading, Pawl.Engine.Activatable.zoneAbilitiesOf), so the ability a
 -- creature with unearth carries on the battlefield cannot be activated there.
 --
 -- THE SLOT is what the three later effects read. Rule 702.84a's "it" is the
@@ -8725,7 +8725,7 @@ madnessCast cost =
       -- Rule 702.35a's last sentence. No riders and no slot: the destination is
       -- a graveyard, which CR 400.3 makes the owner's, and nothing reads the
       -- arrival. `origin` is Nothing because that field is
-      -- Pawl.Engine.Activate.zoneAbilitiesOf's question about where an ability
+      -- Pawl.Engine.Activatable.zoneAbilitiesOf's question about where an ability
       -- may be ACTIVATED from, and this is a trigger.
       toGraveyard =
         Effect.MoveToZone

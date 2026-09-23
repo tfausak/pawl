@@ -49,7 +49,7 @@ import qualified Pawl.Types.RollModifier as RollModifier
 -- printings and @o:reroll is:digital@ none, and every one of the seven is a bare
 -- "may" (Clam-I-Am, Wall of Fortune, Monitor Monitor, Centaur of Attention) or
 -- an activated ability whose cost is the ABILITY's rather than the modifier's
--- (Goblin Bookie, Pippa Duchess of Dice, see #3989).
+-- (Goblin Bookie, Pippa Duchess of Dice: ActivationRestriction.DuringDieRoll).
 --
 -- A STOP is what it would need before it needs a producer, and rule 706 states
 -- none. The offer is re-read against each new natural result, so the decline is

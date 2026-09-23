@@ -16,6 +16,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -313,7 +314,7 @@ sauroformHybridSpec s registry = Spec.describe s "SauroformHybrid" $ do
           Activate.activateAbility S.alice hybridId ability
           Stack.resolveTop
         countersOn gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject hybridId gs)
-    case Activate.abilitiesFor hybridId board of
+    case Activatable.abilitiesFor hybridId board of
       [ability] -> do
         let once = adapt board ability
             twice = adapt once ability
@@ -353,7 +354,7 @@ nessianAspSpec s registry = Spec.describe s "NessianAsp" $ do
         monstrosity gs ability = S.runPure S.identityAnswer gs $ do
           Activate.activateAbility S.alice aspId ability
           Stack.resolveTop
-    case Activate.abilitiesFor aspId board of
+    case Activatable.abilitiesFor aspId board of
       [ability] -> do
         let once = monstrosity board ability
             twice = monstrosity once ability
@@ -376,7 +377,7 @@ nessianAspSpec s registry = Spec.describe s "NessianAsp" $ do
     asp <- S.printingOf s registry "Nessian Asp"
     let (aspId, placed) = S.addPermanent asp S.alice (S.landsInPlay forest 16)
         board = (S.addCounter CounterKind.PlusOnePlusOne 1 aspId placed) {GameState.priority = Just S.alice}
-    case Activate.abilitiesFor aspId board of
+    case Activatable.abilitiesFor aspId board of
       [ability] -> do
         let after = S.runPure S.identityAnswer board $ do
               Activate.activateAbility S.alice aspId ability
@@ -398,7 +399,7 @@ nessianAspSpec s registry = Spec.describe s "NessianAsp" $ do
     let (aspId, placed) = S.addPermanent asp S.alice (S.landsInPlay forest 16)
         (_, withIsland) = S.addPermanent island S.alice placed
         board = withIsland {GameState.priority = Just S.alice}
-    case Activate.abilitiesFor aspId board of
+    case Activatable.abilitiesFor aspId board of
       [ability] -> do
         let once = S.runPure S.identityAnswer board $ do
               Activate.activateAbility S.alice aspId ability
@@ -792,7 +793,7 @@ runScry ::
   ObjectId.ObjectId ->
   GameState.GameState ->
   GameState.GameState
-runScry answer ballId gs = case Activate.abilitiesFor ballId gs of
+runScry answer ballId gs = case Activatable.abilitiesFor ballId gs of
   [ability] -> S.runPure answer gs $ do
     Activate.activateAbility S.alice ballId ability
     Stack.resolveTop
@@ -866,7 +867,7 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
           State.modify (+ 1)
           pure (S.identityAnswer p)
         _ -> pure (S.identityAnswer p)
-      asks ballId gs = case Activate.abilitiesFor ballId gs of
+      asks ballId gs = case Activatable.abilitiesFor ballId gs of
         [ability] ->
           State.execState
             ( Engine.runGame counting gs $ do
@@ -2527,7 +2528,7 @@ optionalEffectSpec s registry =
    in Spec.describe s "OptionalEffect" $ do
         Spec.it s "CR 603.5 declining the may gains nothing, and the ability still resolves" $ do
           (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
-          case Activate.abilitiesFor faithId gs of
+          case Activatable.abilitiesFor faithId gs of
             [ability] -> do
               let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice faithId ability)
                   placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
@@ -2541,7 +2542,7 @@ optionalEffectSpec s registry =
             abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
         Spec.it s "CR 603.5 whole card: cycling Renewed Faith and taking the may gains exactly 2" $ do
           (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
-          case Activate.abilitiesFor faithId gs of
+          case Activatable.abilitiesFor faithId gs of
             [ability] -> do
               let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice faithId ability)
                   placed = S.runPure takeOptional cycled Engine.settleForPriority
@@ -2555,7 +2556,7 @@ optionalEffectSpec s registry =
         -- below, which must record NO such response.
         Spec.it s "CR 608.2d the choice is announced as a real prompt, and lands in the transcript" $ do
           (gs, faithId) <- handWithTwoLands "Renewed Faith" "Plains"
-          case Activate.abilitiesFor faithId gs of
+          case Activatable.abilitiesFor faithId gs of
             [ability] -> do
               let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice faithId ability)
                   placed = S.runPure takeOptional cycled Engine.settleForPriority
@@ -2575,7 +2576,7 @@ optionalEffectSpec s registry =
           let (_, g0) = S.addPermanent piker S.alice (S.landsInPlay island 1)
               (g1, avenId) = S.handOne aven g0
               gs = g1 {GameState.priority = Just S.alice}
-          case Activate.abilitiesFor avenId gs of
+          case Activatable.abilitiesFor avenId gs of
             [ability] -> do
               let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice avenId ability)
                   placed = S.runPure takeOptional cycled Engine.settleForPriority
@@ -2591,7 +2592,7 @@ optionalEffectSpec s registry =
         -- encoding of "may" would have collapsed.
         Spec.it s "CR 603.5 whole card: cycling Deem Worthy and taking the may deals 2 to the target" $ do
           (gs, worthyId, piker) <- deemWorthyBoard
-          case Activate.abilitiesFor worthyId gs of
+          case Activatable.abilitiesFor worthyId gs of
             [ability] -> do
               let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice worthyId ability)
                   placed = S.runPure takeOptional cycled Engine.settleForPriority
@@ -2606,7 +2607,7 @@ optionalEffectSpec s registry =
         -- engine does not ask a question whose answer cannot matter.
         Spec.it s "CR 608.2b a fizzled optional trigger is not asked about at all" $ do
           (gs, worthyId, piker) <- deemWorthyBoard
-          case Activate.abilitiesFor worthyId gs of
+          case Activatable.abilitiesFor worthyId gs of
             [ability] -> do
               let cycled = S.runPure takeOptional gs (Activate.activateAbility S.alice worthyId ability)
                   placed = S.runPure takeOptional cycled Engine.settleForPriority
