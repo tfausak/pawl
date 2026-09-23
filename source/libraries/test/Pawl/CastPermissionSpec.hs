@@ -2308,6 +2308,32 @@ serraParagonSpec s registry =
               Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Graveyard (pbBuried b) freePlayed) "the Crucible's left it"
             _ -> Spec.assertFailure s "expected the Forest to arrive under both answers"
 
+        -- CR 601.3 / 608.2g: Synthetic Woodland Bargainer's resolving offer is
+        -- itself an effect allowing the graveyard cast, so the Paragon's
+        -- permission is one alice may decline. The pair differs in her
+        -- answer and nothing else.
+        Spec.it s "CR 608.2g a cast an effect offers need not be made under Serra Paragon" $ do
+          b <- board "Llanowar Elves" "Forest" True
+          bargainer <- S.printingOf s registry "Synthetic Woodland Bargainer"
+          let (bargainerId, gs) = S.addPermanent bargainer S.alice (pbState b)
+              taking pick p = case p of
+                Prompt.OfferedCast {} -> OptionalDecision.Exercises
+                _ -> underPermission pick [] p
+              outcome ability pick =
+                let cast = S.runPure (taking pick) gs (Activate.activateAbility S.alice bargainerId ability >> Stack.resolveTop >> Stack.resolveTop)
+                 in case arrivedBetween gs cast of
+                      [permanent] -> Just (cast, diesAndResolves permanent cast)
+                      _ -> Nothing
+          case Face.activatedAbilities (S.combinedFace bargainer) of
+            [] -> Spec.assertFailure s "the Bargainer should declare one activated ability"
+            ability : _ -> case (outcome ability Nothing, outcome ability (pbParagon b)) of
+              (Just (offeredCast, underOffer), Just (paragonCast, underParagon)) -> do
+                Spec.assertEqWith s "declining the Paragon, alice gained nothing as the Elves died" (S.lifeOf S.alice underOffer) (S.lifeOf S.alice gs)
+                Spec.assertBool s (elem (pbGraveForest b, Nothing) (Action.playableLands S.alice offeredCast)) "and the Paragon's use is left for the graveyard Forest"
+                Spec.assertEqWith s "under the Paragon she gained 2 life" (S.lifeOf S.alice underParagon) (fmap (+ 2) (S.lifeOf S.alice gs))
+                Spec.assertBool s (notElem (pbGraveForest b, Nothing) (Action.playableLands S.alice paragonCast)) "and spent its use"
+              _ -> Spec.assertFailure s "expected the Elves to arrive under both answers"
+
 -- takeFirst, answering Prompt.ChoosePlayPermission with the option `pick`
 -- names: the permission that object grants, or Nothing for none of them. An
 -- option not offered answers the head, the engine's own default, so a missing

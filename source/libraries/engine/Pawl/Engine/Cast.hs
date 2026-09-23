@@ -2142,7 +2142,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- same PROPOSED state and for `spent`'s reason -- the ones the gate
           -- offered the cast under are the ones castProposed chooses among, and
           -- a rejected announcement spends none.
-          permissions = foldMap (\zone -> PlayerEffect.castPermissionOptions (\src -> not (null (Event.permissionRiders src proposed oid))) pid zone oid proposed) castFrom
+          permissions = foldMap (\zone -> PlayerEffect.castPermissionOptions (\src -> not (null (Event.permissionRiders src proposed oid))) offered pid zone oid proposed) castFrom
           -- CR 400.7h / 611.3d: what the permission a cast is made under gives
           -- the spell it becomes, asked of the same PROPOSED state -- the board
           -- that source was offering it on.

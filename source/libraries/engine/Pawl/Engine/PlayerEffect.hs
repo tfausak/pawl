@@ -1954,17 +1954,19 @@ unspentPermission pid source grant gs =
 -- gate read, and spent only once the announcement has succeeded, so a rejected
 -- or reversed cast (CR 601.2e, CR 733.1) spends nothing.
 --
--- Open without any of them only for a card in its owner's hand (CR 601.3's "a
--- rule"). A permission the OBJECT carries is not weighed here: every one pawl
+-- Open without any of them where something else is CR 601.3's "rule or effect"
+-- allowing the cast: the rules for a card in its owner's hand, and an effect
+-- offering the cast during resolution (`offered`, CR 608.2g). A permission the
+-- OBJECT carries is not weighed here: every one pawl
 -- has is a keyword's, offering its own CR 601.2b candidate (escape, flashback),
 -- so the candidate the cast chose says whether it was made under it --
 -- Pawl.Engine.Cast.castProposed asks nothing then, and
 -- Pawl.CastPermissionSpec's "CR 702.138a an escaped Chimera takes neither Serra
 -- Paragon's use nor its rider" proves it.
-castPermissionOptions :: (ObjectId -> Bool) -> PlayerId -> Zone.Zone -> ObjectId -> GameState -> [Maybe (ObjectId, CastFromZone.CastFromZone)]
-castPermissionOptions rides pid zone oid gs =
+castPermissionOptions :: (ObjectId -> Bool) -> Bool -> PlayerId -> Zone.Zone -> ObjectId -> GameState -> [Maybe (ObjectId, CastFromZone.CastFromZone)]
+castPermissionOptions rides offered pid zone oid gs =
   let owned = fmap Object.owner (Game.lookupObject oid gs) == Just pid
-   in permissionOptions rides (zone == Zone.Hand && owned) (castPermissionsFrom pid zone oid gs)
+   in permissionOptions rides (offered || (zone == Zone.Hand && owned)) (castPermissionsFrom pid zone oid gs)
 
 -- CR 601.3 / 305.1: the ways a play admitted by `usable` can be made, one per
 -- distinguishable outcome -- Nothing, where `open` says the play needs none of
