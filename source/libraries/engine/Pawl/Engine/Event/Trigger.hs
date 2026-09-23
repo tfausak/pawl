@@ -453,6 +453,7 @@ looksBack condition = case condition of
   -- target while it is still on the battlefield, so there is nothing gone for CR
   -- 603.10a to look back at.
   TriggerCondition.PermanentsBecomeTargeted {} -> False
+  TriggerCondition.PermanentBecomesTargeted {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   -- CR 603.3b's second class names no zone change at all -- its event is another
@@ -719,6 +720,8 @@ batchScoped condition = case condition of
   -- Engine.withinTurnLimit collapses a second firing whatever this answers, so
   -- the printed card cannot separate CR 603.2c's two sentences.
   TriggerCondition.PermanentsBecomeTargeted {} -> True
+  -- Its per-occurrence twin: "a creature" is CR 603.2c's second sentence.
+  TriggerCondition.PermanentBecomesTargeted {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SagaFinalChapterTriggers _ -> False
@@ -906,10 +909,9 @@ eventTriggers events gs =
       -- appends to the log directly has no sampled board, and the game as it
       -- stands is the only one there is. Lazy, so a scan whose every group is
       -- sampled never projects it.
-      onBattlefieldAt group =
+      onBattlefieldOf =
         Map.mapWithKey
           (\oid candidate -> (BattlefieldCandidate.controller candidate, battlefieldAbilitiesOf oid (BattlefieldCandidate.characteristics candidate)))
-          (battlefieldAt group gs)
       -- The permanent this event took OFF the battlefield, read from
       -- CR 608.2h last known information -- both the abilities and the objects'
       -- appearance immediately prior to the event, which is what CR 603.10 says
@@ -1101,7 +1103,7 @@ eventTriggers events gs =
       -- The controller and abilities here are the ones the permanent had as it
       -- LEFT, one moment after the event that triggered them rather than at it --
       -- so this is the SECOND reading of such a permanent, and loses to the first.
-      -- `onBattlefieldAt` above already holds it, sampled at the event itself,
+      -- `onBattlefieldOf` above already holds it, sampled at the event itself,
       -- because a permanent that departs at a later group was still standing when
       -- this group's sample was taken; Map.unions is left-biased and that entry
       -- comes first. What is left for this binding is the group the sample does not
@@ -1149,7 +1151,7 @@ eventTriggers events gs =
       -- card can be found that reaches it: the only id the `drop 1` keeps is one
       -- that arrived at this very group and departed at a later one, and such an
       -- id is on the battlefield when `recordEvent` samples the group's last
-      -- member -- so `onBattlefieldAt` already holds it, and Map.unions' left
+      -- member -- so `onBattlefieldOf` already holds it, and Map.unions' left
       -- bias makes the sample outrank whatever this narrowing does to `later`.
       -- The one path where it decides anything is the sample's fallback to the
       -- LIVE board, which is a fixture appending to the log directly. Written
@@ -1733,7 +1735,7 @@ eventTriggers events gs =
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
-      forOne event (oid, (ctrl, abilities)) =
+      forOne board event (oid, (ctrl, abilities)) =
         let -- The bearer's own slot environment, so a condition naming a slot
             -- (TriggerCondition.LoseControlOfBound) is read the same way here as it
             -- is for a CR 603.7 delayed entry. Empty for a bearer that has since
@@ -1743,7 +1745,7 @@ eventTriggers events gs =
             -- Each entry pairs the conditions that function in the bearer's zone
             -- (`functionsIn`) with the ability as printed, which is what the
             -- pending trigger carries.
-            fires (cond, _) = matchesTriggerGiven bindings gs oid ctrl cond event
+            fires (cond, _) = matchesTriggerGiven bindings board gs oid ctrl cond event
             pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event) Nothing (Just event)
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
@@ -1784,7 +1786,7 @@ eventTriggers events gs =
       -- no other. Nor does `revealedInHand`: CR 701.20b leaves the revealed card
       -- in the hand, which no other source reads.
       candidates onBattlefield event later same arrivedAfter = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, Map.withoutKeys inGraveyards arrivedAfter, arrivedInGraveyard event, inCommand, inExile])
-      scanOne onBattlefield later same arrivedAfter event = concatMap (forOne event) (candidates onBattlefield event later same arrivedAfter)
+      scanOne board later same arrivedAfter event = concatMap (forOne board event) (candidates (onBattlefieldOf board) event later same arrivedAfter)
       -- CR 603.2c's FIRST sentence, applied to ONE event group: a batch-scoped
       -- condition's trigger event is the whole group, which occurs once however
       -- many of the group's members matched, where a per-occurrence condition
@@ -1820,7 +1822,7 @@ eventTriggers events gs =
       -- The battlefield reading is per GROUP and so is hoisted out of the block:
       -- every event in one group happened at the same time, so they share it. A
       -- group with no events cannot occur, which `eventGroups` states in the type.
-      scanBlock block later same arrivedAfter = oncePerBatch (concatMap (scanOne (onBattlefieldAt (LoggedEvent.group (NonEmpty.head block))) later same arrivedAfter . LoggedEvent.event) block)
+      scanBlock block later same arrivedAfter = oncePerBatch (concatMap (scanOne (battlefieldAt (LoggedEvent.group (NonEmpty.head block)) gs) later same arrivedAfter . LoggedEvent.event) block)
    in concat (List.zipWith4 scanBlock groups laterGroups sameGroup arrivedLater)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
@@ -2453,6 +2455,7 @@ zonesTriggeredFrom cond =
         -- CR 113.6's default once again: Professor Hojo is a creature, watching the
         -- creatures beside it from the battlefield.
         TriggerCondition.PermanentsBecomeTargeted {} -> battlefield
+        TriggerCondition.PermanentBecomesTargeted {} -> battlefield
         -- CR 113.6's default a last time: Historian's Boon is an enchantment watching
         -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
         TriggerCondition.SagaFinalChapterTriggers _ -> battlefield
@@ -2769,6 +2772,7 @@ stateTriggers gs
               TriggerCondition.SelfBecomesTargeted _ -> False
               TriggerCondition.ControllerBecomesTarget {} -> False
               TriggerCondition.PermanentsBecomeTargeted {} -> False
+              TriggerCondition.PermanentBecomesTargeted {} -> False
               -- CR 709.5i is an EVENT trigger, for CR 709.5h's reason one arm up:
               -- it fires on the LAST designation arriving, and CR 709.5c leaves
               -- the permanent holding both thereafter, so a state read would fire
@@ -2840,7 +2844,7 @@ delayedPending grouped gs =
             -- arming spell resolved, and the store is the only thing that still
             -- remembers it.
             if armed entry
-              then filter (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond . LoggedEvent.event) grouped
+              then filter (\logged -> matchesTriggerGiven (DelayedTrigger.bindings entry) (battlefieldAt (LoggedEvent.group logged) gs) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond (LoggedEvent.event logged)) grouped
               else []
       -- CR 603.2c's FIRST sentence on the CR 603.7 path, which is eventTriggers'
       -- `oncePerBatch` asked of a delayed entry: a batch-scoped condition names the
