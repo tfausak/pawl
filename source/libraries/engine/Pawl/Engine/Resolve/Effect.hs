@@ -3673,7 +3673,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             gs <- State.get
             let payer = payerOf gs stated
                 mCost = ModifiedRoll.cost offer
-            if not (Dice.withinLimit gs stated offer && payable gs payer stated mCost)
+            if not (Dice.withinLimit gs payer stated offer && payable gs payer stated mCost)
               then adjustingThrough rest results
               else do
                 answer <- Game.choose (Prompt.AdjustDieRoll (Decide.deciderFor payer gs) payer shown amount mCost)

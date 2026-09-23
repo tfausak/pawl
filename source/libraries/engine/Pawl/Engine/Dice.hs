@@ -73,20 +73,26 @@ adjustOffers sides modifiers =
 
 -- | Whether a modifier's printed budget still admits it: Night Shift of the
 -- Living Dead's "Do this only once each turn", read against
--- GameState.rollModifiersUsedThisTurn. A budgeted modifier with no object
--- behind it has nowhere to be spent and is not offered; no printing has one.
-withinLimit :: GameState -> Maybe ObjectId -> ModifiedRoll.ModifiedRoll -> Bool
-withinLimit gs stated modifier = case ModifiedRoll.limit modifier of
-  PermissionLimit.Unlimited -> True
-  PermissionLimit.OnceEachTurn -> case stated of
-    Nothing -> False
-    Just oid -> Set.notMember modifier (Map.findWithDefault Set.empty oid (GameState.rollModifiersUsedThisTurn gs))
+-- GameState.rollModifiersUsedThisTurn; a once-each-of-your-turns budget only on
+-- `payer`'s own turn as well, `payer` being the modifier's "you" (CR 109.5). A
+-- budgeted modifier with no object behind it has nowhere to be spent and is not
+-- offered; no printing has one.
+withinLimit :: GameState -> PlayerId -> Maybe ObjectId -> ModifiedRoll.ModifiedRoll -> Bool
+withinLimit gs payer stated modifier =
+  let unspent = case stated of
+        Nothing -> False
+        Just oid -> Set.notMember modifier (Map.findWithDefault Set.empty oid (GameState.rollModifiersUsedThisTurn gs))
+   in case ModifiedRoll.limit modifier of
+        PermissionLimit.Unlimited -> True
+        PermissionLimit.OnceEachTurn -> unspent
+        PermissionLimit.OnceEachOfYourTurns -> GameState.activePlayer gs == payer && unspent
 
 -- | Spend a modifier's budget once it is taken; a no-op for an unbudgeted one.
 spendLimit :: Maybe ObjectId -> ModifiedRoll.ModifiedRoll -> GameState -> GameState
-spendLimit stated modifier gs = case (ModifiedRoll.limit modifier, stated) of
-  (PermissionLimit.OnceEachTurn, Just oid) ->
-    gs {GameState.rollModifiersUsedThisTurn = Map.insertWith Set.union oid (Set.singleton modifier) (GameState.rollModifiersUsedThisTurn gs)}
+spendLimit stated modifier gs = case stated of
+  Just oid
+    | ModifiedRoll.limit modifier /= PermissionLimit.Unlimited ->
+        gs {GameState.rollModifiersUsedThisTurn = Map.insertWith Set.union oid (Set.singleton modifier) (GameState.rollModifiersUsedThisTurn gs)}
   _ -> gs
 
 -- | CR 706.6: throw away the `n` lowest of these rolls, so that what comes back
