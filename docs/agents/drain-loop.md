@@ -108,10 +108,13 @@ no linked blocker). Neither is dispatchable unattended.
 Dispatch an implementation agent, with `isolation: "worktree"`, to work it end
 to end and open a PR. Its brief must open with: read
 `docs/agents/implementing.md` first, then `CLAUDE.md` and `CONTRIBUTING.md`.
-Everything else is specific to the unit. **Model, on trial**: opus for
-blocker-consumer pairs, subsystem roots and audit rounds; sonnet for
-send-backs, existing-vocabulary card transcriptions, and bug fixes under
-~200 lines.
+Everything else is specific to the unit. **Model**: opus for every unit that
+touches engine code, and for audits. Sonnet only for docs- or data-only
+changes. Measured 2026-09-22/23 over four sonnet engine units: 120k--458k
+tokens each, no cheaper than opus on the same shapes; both audited units
+carried a CR divergence (one also an invented CR quote), one grew scope
+during its fix, and one declined a real bug over a performance hoist the
+project does not weigh.
 
 **Dispatch on ready, not on merge.** The moment a unit's PR is marked ready,
 dispatch the next one. The lane is agent-bound, so an idle build lane is the
