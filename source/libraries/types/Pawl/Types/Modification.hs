@@ -135,7 +135,9 @@ data Modification ability
     --
     -- EXPANDED AS THE ABILITY RESOLVES, by Pawl.Engine.Resolve.Effect's
     -- ModifyTarget arm, into one ordinary GainKeyword or GainAbility per ability
-    -- the source's COPIABLE characteristics (CR 707.2) carry. So this arm never
+    -- the source's COPIABLE characteristics (CR 707.2) carried as the ability
+    -- was put on the stack (CR 702.165d), which is when Pawl.Engine.Engine's
+    -- placeBorne stamps them. So this arm never
     -- reaches Pawl.Engine.Projection, and the grant outlives the source: a
     -- projection-time read would evaporate when the creature with backup died,
     -- where CR 702.165a's "until end of turn" keeps it.

@@ -89,6 +89,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal.Type
@@ -1111,7 +1112,13 @@ placeBorne srcId pending = do
           -- placement-time bindings must be the LEFT argument; backwards, the
           -- arming spell's mode or X wins. unionWith, not Map.union, which would
           -- drop the whole captured entry.
-          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
+          --
+          -- CR 702.165d: the source's copiable values are stamped too, since what
+          -- a backup ability grants is determined as the ability is put on the
+          -- stack. Off its last known information when the source is already
+          -- gone (CR 113.7a).
+          let placedSource = maybe (Projection.copiableCharacteristics srcId gs) LastKnown.copiable (Projection.lastKnownOf srcId gs)
+          State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setPlacedSourceCopy placedSource (Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending))))}) abilId (GameState.objects g)})
           -- CR 601.2c through CR 603.3d: each chosen object became a target, which
           -- is what CR 702.21a's ward watches. Raised only on an announcement the
           -- joint check accepted, so a re-asked answer never made anything a

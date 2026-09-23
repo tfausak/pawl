@@ -53,6 +53,14 @@ flippedMergeSource = SlotName.MkSlotName (Text.pack "flippedMergeSource")
 turnedMergeSource :: SlotName
 turnedMergeSource = SlotName.MkSlotName (Text.pack "turnedMergeSource")
 
+-- CR 702.165d: the reserved slot under which a triggered ability's SOURCE's
+-- copiable values (CR 707.2) are stamped as the ability is put on the stack
+-- (Pawl.Engine.Engine.placeBorne), so what backup grants is fixed then rather
+-- than read off the source at resolution. No card's targetSlots may name it: a
+-- source is not a target.
+placedSourceCopy :: SlotName
+placedSourceCopy = SlotName.MkSlotName (Text.pack "placedSourceCopy")
+
 -- CR 113.7: the reserved slot under which a triggered ability's SOURCE object
 -- (the object whose ability triggered) is bound as the ability is placed, so
 -- "this creature" / "this enchantment" is a slot read rather than a
@@ -1264,6 +1272,15 @@ copyOf m = Binding.copy =<< Map.lookup copySource m
 -- -- Pawl.Engine.Event.merge stamps it only where the two readings differ.
 flippedCopyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics
 flippedCopyOf m = Binding.copy =<< Map.lookup flippedMergeSource m
+
+-- The source's copiable values as this triggered ability was put on the stack,
+-- if they were stamped (CR 702.165d).
+placedSourceCopyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics
+placedSourceCopyOf m = Binding.copy =<< Map.lookup placedSourceCopy m
+
+-- Stamp them, under `placedSourceCopy` above.
+setPlacedSourceCopy :: ProjectedCharacteristics -> Map SlotName Binding -> Map SlotName Binding
+setPlacedSourceCopy pc = Map.insert placedSourceCopy (Binding.empty {Binding.copy = Just pc})
 
 -- Store a copy snapshot under the reserved copySource slot. Nothing else is
 -- ever stored there, so overwriting it wholesale is lossless.
