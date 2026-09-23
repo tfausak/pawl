@@ -140,7 +140,7 @@ legalActions pid gs =
       -- played during another player's turn", and the land plays remaining still
       -- gate it.
       canPlayLand =
-        GameState.activePlayer gs == pid
+        Turn.isActive gs pid
           -- CR 305.2a: compare the number of lands this player CAN play this
           -- turn with the number they HAVE already played; the play is legal
           -- only if the first is greater. A comparison of two counts and never

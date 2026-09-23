@@ -10,6 +10,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.EndingStep as EndingStep
 import Pawl.Types.ExtraPhase (ExtraPhase)
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Phase (Phase)
@@ -17,6 +18,7 @@ import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Teams as Teams
 
 allPhases :: [Phase]
 allPhases =
@@ -33,6 +35,29 @@ allPhases =
     Phase.Ending EndingStep.EndStep,
     Phase.Ending EndingStep.Cleanup
   ]
+
+-- | CR 805.4: do these two players take their turns together -- the same
+-- player, or teammates in a game using the shared team turns option?
+sharesTurn :: GameState -> PlayerId -> PlayerId -> Bool
+sharesTurn gs one other =
+  let settings = GameState.settings gs
+   in one == other
+        || (GameSettings.sharedTeamTurns settings && Teams.sameTeam (GameSettings.teams settings) one other)
+
+-- | CR 805.4a / 805.9: is this player an active player -- the active player, or
+-- under the shared team turns option a member of the active team?
+isActive :: GameState -> PlayerId -> Bool
+isActive gs = sharesTurn gs (GameState.activePlayer gs)
+
+-- | Every active player in seating order from the active player, departed
+-- seats included (CR 800.4j); a caller that must not name one filters them.
+--
+-- Not implemented: CR 805.6's "in whatever order they like" -- the active team
+-- does not choose the order its members act in (#4001).
+activePlayers :: GameState -> [PlayerId]
+activePlayers gs =
+  let (before, from) = break (== GameState.activePlayer gs) (GameState.turnOrder gs)
+   in filter (isActive gs) (from <> before)
 
 firstPhase :: Phase
 firstPhase = Phase.Beginning BeginningStep.Untap
@@ -80,7 +105,7 @@ grantsPriority phase = case phase of
 sorcerySpeedWindow :: PlayerId -> GameState -> Bool
 sorcerySpeedWindow pid gs =
   isMainPhase (GameState.phase gs)
-    && GameState.activePlayer gs == pid
+    && isActive gs pid
     && null (GameState.stack gs)
 
 isMainPhase :: Phase -> Bool
@@ -103,7 +128,7 @@ isMainPhase phase = case phase of
 declareBlockersWindow :: PlayerId -> GameState -> Bool
 declareBlockersWindow pid gs =
   GameState.phase gs == Phase.Combat CombatStep.DeclareBlockers
-    && GameState.activePlayer gs == pid
+    && isActive gs pid
 
 -- CR 500: the final step of the phase this one belongs to -- the step whose end
 -- ends the phase. CR 511.3 names combat's; CR 501.1 and CR 512.1 list the
