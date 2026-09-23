@@ -109,6 +109,50 @@ poolOf pid gs = Map.findWithDefault (Mana.MkMana []) pid (GameState.manaPool gs)
 lookupObject :: ObjectId -> GameState -> Maybe Object
 lookupObject oid gs = Map.lookup oid (GameState.objects gs)
 
+-- CR 601.2a: is this object the card whose cast is being PROPOSED right now? The
+-- card is put onto the stack before CR 601.2f determines the total cost and CR
+-- 601.2h pays it, so no pool a payability gate reads may count it -- neither the
+-- hand a mana source's own cost would spend nor the graveyard the spell's own
+-- cost would exile.
+--
+-- Read off the STAMP rather than taken as an argument, which is what lets one
+-- reading serve both: Pawl.Engine.Cast.asProposed writes castFrom one step ahead
+-- of the move and every offer gate measures the board it returns, so an object
+-- whose stamp names the zone it is STILL IN is exactly one CR 601.2a has yet to
+-- move -- whether the cost being measured is the spell's own or some mana
+-- source's. Nothing else in a game satisfies it: after the move the stack
+-- incarnation's zone is Stack and its stamp is the zone it left, and CR 400.7
+-- mints every other arrival a fresh incarnation with the field cleared.
+--
+-- An ACTIVATION stamps nothing, which is what keeps CR 602.2a's source in the
+-- pool its own cost draws on: an ability activated from a graveyard leaves its
+-- source there, a legal candidate for its own cost, and no reading of this can
+-- reach it.
+--
+-- Pawl.CostSpec's "CR 601.2a the cast is not offered: the Arbiter is not fuel for
+-- the Bloom" and Pawl.CastSpec's "CR 601.2a with two other cards the cast is not
+-- offered" are the two that prove it. withoutBeingCast below is the same
+-- reading lifted onto the whole board, for a condition rather than a pool.
+beingCast :: GameState -> ObjectId -> Bool
+beingCast gs candidate = case lookupObject candidate gs of
+  Nothing -> False
+  Just object -> Object.castFrom object == Just (Object.zone object)
+
+-- CR 601.2a's move, as far as a board condition can see it: the state a cast
+-- gate was handed, with every object `beingCast` taken out of the zone it is
+-- leaving. The same state unchanged wherever nothing is stamped -- CR 605.3a's
+-- priority window, every activation (CR 602.2a moves no card) and the payment
+-- itself, which runs after the move.
+--
+-- NOT put on GameState.stack: no mana ability prints a rider reading the stack
+-- beyond CR 307.5's, which ActivationRestriction.needsEmptyStack owns.
+withoutBeingCast :: GameState -> GameState
+withoutBeingCast gs =
+  Map.foldrWithKey
+    (\oid object acc -> if Object.castFrom object == Just (Object.zone object) then removeFromZones (Object.owner object) oid acc else acc)
+    gs
+    (GameState.objects gs)
+
 objectCount :: GameState -> Int
 objectCount gs = Map.size (GameState.objects gs)
 

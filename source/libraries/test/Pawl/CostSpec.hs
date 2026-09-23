@@ -941,7 +941,7 @@ headlessSkaabSpec s registry =
 -- bar a second activation -- two FUEL cards in hand are two activations and
 -- {B}{B}{B}{B}. Goblin Piker is the fuel: it is never cast, so nothing but the
 -- exile can move it. The Arbiter is in that hand too and is not fuel, CR 601.2a
--- putting it on the stack before the Bloom is asked to pay (Cost.beingCast).
+-- putting it on the stack before the Bloom is asked to pay (Game.beingCast).
 cadaverousBloomSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cadaverousBloomSpec s registry =
   Spec.describe s "Cadaverous Bloom" $ do

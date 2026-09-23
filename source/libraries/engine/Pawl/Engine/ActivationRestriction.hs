@@ -146,13 +146,20 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- Nimbus Maze is the producer on that path -- "{T}: Add {W}. Activate only if
   -- you control an Island" -- and Pawl.ManaSpec's Nimbus Maze group is what proves
   -- this arm gates both of CR 605.3a's windows.
+  --
+  -- Read against the board AFTER CR 601.2a's move (Game.withoutBeingCast): a
+  -- cast gate asks this one step ahead of it, and the payment asks it after, so
+  -- a condition over the zone the card leaves answers the same at both.
+  -- Pawl.ManaSpec's Lys Alana Dignitary group proves the refused offer and its
+  -- Synthetic Hollow Spring group the admitted one.
   ActivationRestriction.OnlyIf condition ->
-    Condition.holds
-      (Projection.fullView gs)
-      (Filter.contextFor (Game.teams gs) (Just pid) (Just srcId))
-      gs
-      srcId
-      condition
+    let moved = Game.withoutBeingCast gs
+     in Condition.holds
+          (Projection.fullView moved)
+          (Filter.contextFor (Game.teams moved) (Just pid) (Just srcId))
+          moved
+          srcId
+          condition
   -- CR 602.5b's counted rider, one of the two arms that read neither a window nor
   -- the board: has THIS ability of THIS object already been activated, EVER? CR 400.7
   -- ends the memory with the incarnation (Object.newIncarnation), so a permanent
@@ -234,8 +241,8 @@ recordActivation srcId ability gs =
 -- reads a phase, a turn or a combat record, and CR 500.12 puts no game event
 -- between the gate and the payment while CR 601.2a's move changes no phase -- so
 -- their two windows agree already (riderWindowSpec's pair in Pawl.ManaSpec is
--- that argument for the phase axis). The two arms below that read no window say
--- for themselves why each answers False without that argument.
+-- that argument for the phase axis). The arms below that read no window say for
+-- themselves why each answers False without that argument.
 needsEmptyStack :: ActivationRestriction.ActivationRestriction -> Bool
 needsEmptyStack restriction = case restriction of
   ActivationRestriction.SorcerySpeed -> True
@@ -245,13 +252,8 @@ needsEmptyStack restriction = case restriction of
   ActivationRestriction.AfterBlockersDeclared -> False
   ActivationRestriction.BeforeCombatDamage -> False
   -- A board condition reads no stack, so the empty-stack question is not its
-  -- question.
-  --
-  -- Not implemented: a board condition CR 601.2a's or CR 602.2a's move falsifies
-  -- -- "activate only if you have no cards in hand", asked of a mana ability
-  -- serving a cast whose card just left the hand. False here keeps the route in
-  -- the supply, and `restrictionsOk` at Cost.payMana reads the real board and
-  -- refuses it, so the payment is right and only the offer is optimistic (#3192).
+  -- question. What CR 601.2a's move does to the zone the card leaves,
+  -- `restrictionMet` reads for itself (Game.withoutBeingCast).
   ActivationRestriction.OnlyIf _ -> False
   -- A record of past activations reads no stack either, and CR 601.2a's and CR
   -- 602.2a's move cannot write one: nothing is spent until the payment
