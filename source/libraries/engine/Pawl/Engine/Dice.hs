@@ -8,11 +8,17 @@ module Pawl.Engine.Dice where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.RollModifier as RollModifier
 
@@ -39,8 +45,7 @@ modifiersFor pid = fmap (PlayerEffect.rollModifiers pid) State.get
 --
 -- The matching modifiers and not a Bool, because CR 706.2a lets each one carry
 -- its own COST and name its own payer, and two offers that differ in either are
--- two different questions. Rule 706.2b's pick among COMPETING modifiers is what
--- a second bucket would need (#3976), and there is only one bucket.
+-- two different questions.
 --
 -- An unstated `sides` or `natural` matches every roll -- Wall of Fortune's bare
 -- "a die" -- rather than none.
@@ -51,6 +56,38 @@ rerollOffers sides natural modifiers =
           && all (== sides) (ModifiedRoll.sides modifier)
           && all (== natural) (ModifiedRoll.natural modifier)
    in filter (matches . snd) modifiers
+
+-- | CR 706.2b's SECOND step: which of the modifiers in force offer to increase
+-- or decrease the result of a die of `sides`, each tagged with the object that
+-- states it and paired with the amount.
+--
+-- `natural` is not read: it is a reroll's narrowing (Clam-I-Am), and no
+-- increase-or-decrease printing states one.
+adjustOffers :: Natural.Natural -> [(Maybe ObjectId, ModifiedRoll.ModifiedRoll)] -> [(Maybe ObjectId, ModifiedRoll.ModifiedRoll, Natural.Natural)]
+adjustOffers sides modifiers =
+  let amountOf (stated, modifier) = case ModifiedRoll.modifier modifier of
+        RollModifier.Reroll -> Nothing
+        RollModifier.IncreaseOrDecrease amount ->
+          if all (== sides) (ModifiedRoll.sides modifier) then Just (stated, modifier, amount) else Nothing
+   in Maybe.mapMaybe amountOf modifiers
+
+-- | Whether a modifier's printed budget still admits it: Night Shift of the
+-- Living Dead's "Do this only once each turn", read against
+-- GameState.rollModifiersUsedThisTurn. A budgeted modifier with no object
+-- behind it has nowhere to be spent and is not offered; no printing has one.
+withinLimit :: GameState -> Maybe ObjectId -> ModifiedRoll.ModifiedRoll -> Bool
+withinLimit gs stated modifier = case ModifiedRoll.limit modifier of
+  PermissionLimit.Unlimited -> True
+  PermissionLimit.OnceEachTurn -> case stated of
+    Nothing -> False
+    Just oid -> Set.notMember modifier (Map.findWithDefault Set.empty oid (GameState.rollModifiersUsedThisTurn gs))
+
+-- | Spend a modifier's budget once it is taken; a no-op for an unbudgeted one.
+spendLimit :: Maybe ObjectId -> ModifiedRoll.ModifiedRoll -> GameState -> GameState
+spendLimit stated modifier gs = case (ModifiedRoll.limit modifier, stated) of
+  (PermissionLimit.OnceEachTurn, Just oid) ->
+    gs {GameState.rollModifiersUsedThisTurn = Map.insertWith Set.union oid (Set.singleton modifier) (GameState.rollModifiersUsedThisTurn gs)}
+  _ -> gs
 
 -- | CR 706.6: throw away the `n` lowest of these rolls, so that what comes back
 -- is the rolls the instruction may still read. Rule 706.6 makes an ignored roll

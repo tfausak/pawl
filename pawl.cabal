@@ -414,6 +414,7 @@ library codec
     Pawl.Codec.DevourCount
     Pawl.Codec.DevourCountSpec
     Pawl.Codec.DevourSpec
+    Pawl.Codec.DieResult
     Pawl.Codec.DieRollR
     Pawl.Codec.DieRollRewrite
     Pawl.Codec.DieRollRewriteSpec
@@ -1799,6 +1800,7 @@ library types
     Pawl.Types.Devour
     Pawl.Types.DevourCount
     Pawl.Types.DiceRoll
+    Pawl.Types.DieResult
     Pawl.Types.DieRollR
     Pawl.Types.DieRollRewrite
     Pawl.Types.Discard
@@ -2071,6 +2073,7 @@ library types
     Pawl.Types.Reveal
     Pawl.Types.RevealCause
     Pawl.Types.Revealed
+    Pawl.Types.RollAdjustment
     Pawl.Types.RollDie
     Pawl.Types.RollModifier
     Pawl.Types.RoomIndex

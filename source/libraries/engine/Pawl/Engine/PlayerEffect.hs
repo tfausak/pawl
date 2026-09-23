@@ -3250,8 +3250,8 @@ statedFlips pid gs =
    in Maybe.mapMaybe (says . snd) (applying pid gs)
 
 -- CR 706.2's third sentence: every modifier in force right now over a die roll
--- `pid` is about to make from an instruction that knows nothing about it.
--- Clam-I-Am is the whole producer.
+-- `pid` is about to make from an instruction that knows nothing about it
+-- (Clam-I-Am, Wall of Fortune, Night Shift of the Living Dead).
 --
 -- `statedFlips` above one rule over, and the same division of labour: a LIST
 -- rather than a first or a last, because rule 706.2 puts no limit on how many

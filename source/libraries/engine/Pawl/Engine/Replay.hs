@@ -58,6 +58,7 @@ encode p answer = case p of
   Prompt.RollDie _ -> Response.RolledDie answer
   Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
   Prompt.RerollDie {} -> Response.ChoseReroll answer
+  Prompt.AdjustDieRoll {} -> Response.ChoseRollAdjustment answer
   Prompt.FlipCoin -> Response.FlippedCoin answer
   Prompt.CallCoin {} -> Response.CalledCoin answer
   Prompt.ChooseCoinResult {} -> Response.ChoseCoinResult answer
@@ -224,6 +225,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RerollDie {} -> case response of
     Response.ChoseReroll d -> Just d
+    _ -> Nothing
+  Prompt.AdjustDieRoll {} -> case response of
+    Response.ChoseRollAdjustment d -> Just d
     _ -> Nothing
   Prompt.FlipCoin -> case response of
     Response.FlippedCoin face -> Just face
@@ -655,6 +659,8 @@ defaultAnswer p = case p of
   -- the answer that throws no further die -- Prompt.ChooseExplore's posture
   -- below and for its reason.
   Prompt.RerollDie {} -> OptionalDecision.Declines
+  -- The same "may", and the same answer: declining leaves the result standing.
+  Prompt.AdjustDieRoll {} -> Nothing
   -- CR 705.1 designates the two sides, so either is a legal answer and neither
   -- is "least eventful" -- which branch of a card's flip is quieter is the
   -- CARD's business, not this function's. FIXED for the reason RandomObject

@@ -10,6 +10,10 @@ module Pawl.Types.PermissionLimit where
 -- permission has been used, so an effect that prints a limit is the only thing
 -- that can say there is one.
 --
+-- Also the budget on a CR 706.2 die-roll modifier (Pawl.Types.ModifiedRoll's
+-- `limit`, Night Shift of the Living Dead's "Do this only once each turn"),
+-- spent in Pawl.Types.GameState.rollModifiersUsedThisTurn.
+--
 -- The CASTING-side twin of Pawl.Types.ActivationRestriction's OnlyOnceEachTurn,
 -- and deliberately a separate type rather than that one reused: CR 602.5b's
 -- rider is one clause of a list an activated ability prints about itself, while

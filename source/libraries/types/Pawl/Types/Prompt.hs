@@ -51,6 +51,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
+import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -134,6 +135,17 @@ data Prompt r where
   -- Never elided. CR 706.2a's "may" makes one offer a real fork, and the two
   -- answers are two different numbers on the board.
   RerollDie :: Decider.Decider -> PlayerId.PlayerId -> Natural.Natural -> Maybe (Cost.Cost Keyword.Keyword) -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 706.2b's second step: whether an increase-or-decrease modifier a
+  -- permanent offers is taken, on which die, and which way (Night Shift of the
+  -- Living Dead's "you may pay 1 life. If you do, increase or decrease the
+  -- result by 1"). Nothing declines; the Natural in the answer indexes the
+  -- results.
+  --
+  -- Asked once the instruction's every die has come up, with all the results
+  -- in roll order, since the printed ruling lets the roller see them all before
+  -- picking the one to shift. RerollDie's seat and cost, for its reasons; the
+  -- lone Natural is the amount.
+  AdjustDieRoll :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty Natural.Natural -> Natural.Natural -> Maybe (Cost.Cost Keyword.Keyword) -> Prompt (Maybe (Natural.Natural, RollAdjustment.RollAdjustment))
   -- | CR 705.1: which face a flipped coin came up, asked after CallCoin (CR
   -- 705.2). RandomObject's reasons for carrying neither Decider nor PlayerId.
   FlipCoin :: Prompt CoinFace.CoinFace

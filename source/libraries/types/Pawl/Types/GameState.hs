@@ -36,6 +36,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -293,6 +294,11 @@ data GameState = MkGameState
     -- one: Pawl.Engine.Projection.Rewrite swaps subtype words, and the pool's
     -- one budgeted permission narrows by card type.
     castPermissionsUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set CastFromZone.CastFromZone),
+    -- | CR 706.2: which budgeted die-roll modifiers have been taken this turn,
+    -- read by a Pawl.Types.ModifiedRoll whose limit is
+    -- PermissionLimit.OnceEachTurn (Night Shift of the Living Dead); cleared at
+    -- turn handoff. Keyed as castPermissionsUsedThisTurn above and for its reason.
+    rollModifiersUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set ModifiedRoll.ModifiedRoll),
     -- | The printed rider "This ability triggers only once"
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
     -- ability carrying that rider, as the same record CR 603.3b's log carries.

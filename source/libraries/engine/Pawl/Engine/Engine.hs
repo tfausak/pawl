@@ -805,6 +805,7 @@ abilityTriggeredOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -1674,6 +1675,9 @@ beginTurnOf pid gs =
             -- rather than a player's, so a permanent whose controller is not the
             -- active player gets its use back here just the same.
             GameState.castPermissionsUsedThisTurn = Map.empty,
+            -- Night Shift of the Living Dead's "Do this only once each turn", the
+            -- budget on a CR 706.2 modifier, cleared for every object for its reason.
+            GameState.rollModifiersUsedThisTurn = Map.empty,
             -- CR 502.2 / 731.2: the count the NEXT turn's untap step asks about
             -- "the previous turn's active player".
             GameState.spellsCastLastTurn = Map.findWithDefault 0 (GameState.activePlayer gs) casts,
