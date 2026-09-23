@@ -4588,11 +4588,6 @@ genericOf symbol = case symbol of
 -- Not implemented: rule 733.1's option to keep the mana abilities this window
 -- activated when the cast is reversed -- its undo is discarded and the cast
 -- unwinds whole, `paySubstituting`'s reason (#3119).
---
--- Not implemented: a cast this keyword ENABLES. CR 601.2's announcement runs
--- whether or not the caster can pay, where Pawl.Engine.Cast gates it on
--- `payableCost` over the caster's own sources -- so an assisted cast can save
--- the caster mana and never afford them a spell (#3959).
 offerAssist :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set Keyword.Type.Keyword -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Maybe PlayerId)
 offerAssist perform keywords subject pid sid cost
   | not (Set.member Keyword.Type.Assist keywords) = pure Nothing
@@ -4612,6 +4607,27 @@ offerAssist perform keywords subject pid sid cost
                 Monad.void (payManaWindow perform Set.empty Nothing subject ManaSpending.AsProduced helper (\mc -> pure (mc, [])) (ManaCost.MkManaCost []))
             )
           pure chosen
+
+-- CR 702.132a at the castability gate: a totalled mana cost less the generic
+-- mana the best-placed other player could pay of it. CR 601.2 lets a player
+-- propose a cast whatever they can pay, so a gate on payability has to count
+-- what the chosen player COULD add; whether they do is theirs to answer at
+-- `payAssist`, and a cast they decline to help fails CR 601.2h and unwinds
+-- (CR 733.1).
+--
+-- The HELPER's supply is measured apart from the caster's, which is exact: each
+-- pays from their own pool and the mana abilities of what they control, so
+-- neither payment can spend what the other's needs, and paying more of the
+-- generic only makes the caster's residual easier.
+assistable :: Set.Set Keyword.Type.Keyword -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
+assistable keywords subject pid oid gs manaCost
+  | not (Set.member Keyword.Type.Assist keywords) = manaCost
+  | otherwise =
+      let generic = sum (fmap genericOf (ManaCost.unwrap manaCost))
+          pays helper n = canPaySomeCompletion Map.empty subject ManaSpending.AsProduced helper oid pure (\mc -> [(mc, [])]) (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) gs
+          capacity helper = Natural.length (takeWhile (pays helper) [1 .. generic])
+          best = maximum (0 : fmap capacity (filter (/= pid) (Game.stillPlaying gs)))
+       in withoutMana (ManaSymbol.Generic 0) best manaCost
 
 -- CR 702.132a's last sentence: before the caster begins to pay the total cost,
 -- the player they chose may pay for any amount of the generic mana in it.
