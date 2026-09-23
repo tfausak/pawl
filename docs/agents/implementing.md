@@ -313,18 +313,36 @@ otherwise, and then say so in the PR.
 
 ## Follow-ups: fold in or file
 
-- **Fold it in** when it lives in files you already have open, is small (a
-  clause on the card you are adding, a sibling arm, a lint, a comment made
-  wrong), needs no design call and no new card, and its proof fits in the same
-  spec. Say in the PR what you folded in. Two adjacent issues in one PR is
-  fine, not scope creep.
-- **File it** when it needs its own card, its own design decision, or touches
-  files outside your unit --- and cite it inline where the code elides it.
-  **A filed gap names the real card that needs it**, found the way `CLAUDE.md`
-  says a producer is found, in the issue body. If you cannot name one, the gap
-  is not filed: fold it in, or record it in the PR body under "deferred" and
-  let it go. An elision still gets its issue, since the comment at the code
-  site must cite one; the card rule applies to the gap it elides.
+Measured 2026-08-18/09-22: net closes per PR were +1.40 for blocker-consumer
+pairs, +0.49 for bug/rules-correctness singles, +0.07 for card-driven gap
+singles, ~-1 for subsystem roots. Filing is the expensive path; folding is the
+default.
+
+- **Fold it in** unless one of three things is true: it needs an owner design
+  call; it needs new engine state or a new core type; folding would push the
+  unit past the size signal (~300k subagent tokens or ~300 tool uses). Needing
+  one extra card, or touching a neighbouring module outside the files you
+  started in, is not by itself a reason to file --- **fold anything that costs
+  one more proving test and roughly 30k tokens**, even across those
+  boundaries. Say in the PR what you folded in. Two or three adjacent issues
+  closed by one PR is the target shape, not scope creep.
+- **Never file a rules-correctness shortfall in behaviour your own unit adds
+  or makes reachable.** If your change makes a case observable for the first
+  time, get that case right or ship less of the change --- filing it is
+  shipping a known-wrong answer.
+- **One fix, one PR, every sibling site.** When a fix applies to more than one
+  site of the same shape, apply it to all of them and prove it on the
+  observable one; don't file an elision per site the current board can't
+  observe. A sibling constructor of one you're already adding (an owner twin
+  of a controller reference, the second face of a keyword pair) is folded, not
+  filed, for the same reason.
+- **File it** only when it clears the bar above, and cite it inline where the
+  code elides it. **A filed gap names the real card that needs it**, found the
+  way `CLAUDE.md` says a producer is found, in the issue body. If you cannot
+  name one, the gap is not filed: fold it in, or record it in the PR body
+  under "deferred" and let it go. An elision still gets its issue, since the
+  comment at the code site must cite one; the card rule applies to the gap it
+  elides.
 
 Each filed leaf costs a whole unit's fixed overhead later, and a merged PR
 filing about one issue is why the backlog holds its size. A follow-up that
