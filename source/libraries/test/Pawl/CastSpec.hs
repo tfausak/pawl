@@ -4064,9 +4064,10 @@ awakenSpec s registry = Spec.describe s "Awaken" $ do
     Spec.assertEqWith s "CR 702.113a the printed cost was paid, so the Forest gains nothing at all" (reading (cast waterveilCost)) (Nothing, 0, False, False, True, False)
     Spec.assertEqWith s "the control: both casts exiled the Waterveil and gave alice an extra turn" (fmap (\gs -> (S.onBattlefield waterveilId gs, length (GameState.extraTurns gs))) [cast awakenCost, cast waterveilCost]) [(False, 1), (False, 1)]
 
-  -- CR 702.113b/601.2c/700.2c: "its controller will need to choose that target
-  -- only if the creature [Part the Waterveil, awaken's general case] was
-  -- awakened" -- proved by COUNTING the CR 601.2c prompt rather than by reading
+  -- CR 702.113b: "The controller of a spell with awaken chooses the target of
+  -- the awaken spell ability only if that player chose to pay the spell's
+  -- awaken cost. Otherwise the spell is cast as if it didn't have that
+  -- target." -- proved by COUNTING the CR 601.2c prompt rather than by reading
   -- resolution, which the group above already covers and which stays silent
   -- either way (the awaken clause is gated again at CR 608.2c). ONE board, the
   -- same nine Islands and Forest as above, so the only difference between the
@@ -4085,6 +4086,35 @@ awakenSpec s registry = Spec.describe s "Awaken" $ do
         targetAsks cost = State.execState (Engine.runGame (countingAnswer cost) board (S.cast S.alice waterveilId)) 0
     Spec.assertEqWith s "CR 702.113b cast for the printed {4}{U}{U}, the land is never asked for" (targetAsks waterveilCost) 0
     Spec.assertEqWith s "CR 702.113a cast for the {6}{U}{U}{U} awaken cost, it is asked once" (targetAsks awakenCost) 1
+
+  -- CR 702.113b's CASTABILITY half: a mode unfillable under one candidate may
+  -- still be fillable under another, since CR 601.2b chooses the modes before
+  -- its cost. Alice controls NO land at all -- six Birds of Paradise instead,
+  -- so the printed {4}{U}{U} is payable but "target land you control" has
+  -- nothing to offer -- so the printed-cost cast must still be legal
+  -- (Cast.targetable/the CR 700.2a mode gate, trimModalForCandidate), and must
+  -- still resolve rather than being taken back by CR 601.2e. The awaken
+  -- candidate itself is not exercised here: it would need the very land this
+  -- board withholds, which is CR 601.2e's own remedy and not this unit's claim.
+  Spec.it s "CR 702.113b/601.2c/700.2a the printed cast is offered though no land exists to target" $ do
+    birds <- S.printingOf s registry "Birds of Paradise"
+    waterveil <- S.printingOf s registry "Part the Waterveil"
+    let stocked = List.foldl' (\g _ -> snd (S.addPermanent birds S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. (6 :: Int)]
+        (waterveilId, gs1) = S.addHandCard waterveil S.alice stocked
+        board = aliceOnTurn gs1
+        -- Blue whenever Birds offers a colour, so its six taps can cover the
+        -- {U}{U} pips as well as the generic mana -- the fallback
+        -- (identityAnswer, Replay.defaultAnswer's NonEmpty.head) picks WHITE,
+        -- the first of the five colours Mana.manaTypesOf lists, and the cast
+        -- would come up two blue mana short for a reason this unit is not
+        -- about.
+        tappingBlue :: Prompt.Prompt r -> r
+        tappingBlue p = case p of
+          Prompt.ChooseManaYield _ _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (any ((== ManaType.Colored Color.Blue) . ManaUnit.manaType) . Mana.yieldUnits) (NonEmpty.toList candidates))
+          _ -> payingFor waterveilCost p
+        after = castResolved tappingBlue waterveilId board
+    Spec.assertBool s (any (S.isCastOf waterveilId) (Action.legalActions S.alice board)) "CR 601.2c/700.2a the printed-cost cast is offered although no land is a legal target"
+    Spec.assertEqWith s "CR 702.113a it resolved rather than being taken back by CR 601.2e, giving alice an extra turn" (length (GameState.extraTurns after)) 1
 
 -- payingFor with every target slot aimed at `victim`. Still needed by the group
 -- above's awakened case (CR 702.113a) -- the printed-cost case no longer raises
