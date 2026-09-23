@@ -3428,9 +3428,19 @@ projectWith admits cands =
 -- here and cannot be re-derived from a layer-bounded view without contradicting
 -- either CR 613.6 or CR 613.7/613.8.
 projectDeciding :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
+projectDeciding = projectDecidingFrom copiableCharacteristics
+
+-- CR 612.5: the seed textBoxAt folds an exchange partner from -- its copiable
+-- values while it exists, and CR 608.2h's record of them once it has left.
+textBoxSeed :: ObjectId -> GameState -> ProjectedCharacteristics
+textBoxSeed oid gs = maybe (copiableCharacteristics oid gs) LastKnown.copiable (lastKnownOf oid gs)
+
+-- projectDeciding with the CR 613.2c seed named, for textBoxAt's one departure
+-- from copiableCharacteristics.
+projectDecidingFrom :: (ObjectId -> GameState -> ProjectedCharacteristics) -> (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
 -- Candidates-in, then a worker taking the object: everything derived from the
 -- candidate list alone is bound before `oid`, so projectAll shares it.
-projectDeciding admits cands =
+projectDecidingFrom seedOf admits cands =
   let -- Layers 4, 5 and 7a are always visited, even with no gathered effect there:
       -- an object's own CDAs are not gathered candidates.
       layers = filter admits (Set.toAscList (Set.insert Layer.Type (Set.insert Layer.Color (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))))
@@ -3454,7 +3464,12 @@ projectDeciding admits cands =
       -- WELL-FOUNDED rather than circular: the filter is STRICT, so a second
       -- exchange on the same pair is projected against a strictly shorter
       -- candidate list and the recursion bottoms out at the copiable seed.
-      textBoxAt ts gs o = projectWith (<= Layer.Text) (filter (\c -> gLayer c /= Layer.Text || gTimestamp c < ts) cands) o gs
+      --
+      -- A partner that has LEFT is seeded from the copiable values it left with
+      -- (CR 608.2h), since Exchange of Words' ruling keeps the survivor's text box
+      -- until the enchantment itself goes. Pawl.ProjectionSpec's "CR 612.5 the
+      -- Sentry keeps the ping after the Sorcerer dies" proves it.
+      textBoxAt ts gs o = fst (projectDecidingFrom textBoxSeed (<= Layer.Text) (filter (\c -> gLayer c /= Layer.Text || gTimestamp c < ts) cands) o gs)
       countsItsOwnLayer c = not (Set.disjoint (modificationReads (gModification c)) (Map.findWithDefault Set.empty (gLayer c) writesByLayer))
       forObject oid gs =
         let -- One grant walk per projected object, shared by every affected-set
@@ -3869,7 +3884,7 @@ projectDeciding admits cands =
                             Just k -> Map.findWithDefault False k decided2
                           ordered = effectUnits (List.sortOn gTimestamp (filter applies here))
                        in (List.foldl' (applyUnit bounded oid) seeded ordered, decided2)
-            (folded, decisions) = List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers
+            (folded, decisions) = List.foldl' applyLayer (seedOf oid gs, Map.empty) layers
          in (noncreaturePT oid gs folded, decisions)
    in forObject
 
