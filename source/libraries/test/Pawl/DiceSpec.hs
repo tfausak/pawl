@@ -90,6 +90,7 @@ import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -108,6 +109,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Zone as Zone
@@ -124,6 +126,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   activatedRerollSpec s registry
   nightShiftSpec s registry
   deckSpec s registry
+  deckOwnerSpec s registry
+  deckExactBandSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -1402,8 +1406,9 @@ nightShiftRun rolls rerolls shifts index spell board =
 -- instruction's sum before the shift reads max 0 (-1) + 1 = 1, keeps the hand
 -- and returns the graveyard card on top of it.
 --
--- Not implemented: the Deck's 20 striation, which the card file leaves out
--- (#4015). Stricter than printed, and no roll here reaches 20.
+-- No roll here reaches 20, the Deck's other striation (this file's own
+-- deckOwnerSpec, "CR 108.3 a creature reanimated under another player's
+-- control still makes its OWNER lose the game", proves that one).
 deckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 deckSpec s registry = Spec.describe s "UnclampedShift" $ do
   Spec.it s "CR 706.2 a shift applies to the unclamped sum" $ do
@@ -1441,3 +1446,81 @@ runDeck (deckId, abilities, board) =
         Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
         _ -> S.identityAnswer p
    in S.runPure answer board (mapM_ (Activate.activateAbility S.alice deckId) (take 1 abilities) >> Stack.resolveTop)
+
+-- CR 108.3, PlayerRef.OwnerOfBound's producer: The Deck of Many Things' 20
+-- band, "Put a creature card from any graveyard onto the battlefield under
+-- your control. When that creature dies, its owner loses the game." alice
+-- activates and so CONTROLS the reanimated creature; it is bob's own card, so
+-- he OWNS it. The two seats come apart, which is exactly what
+-- PlayerRef.ControllerOfBound could not have named -- that reference would
+-- have alice, the controller, lose instead of bob.
+deckOwnerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckOwnerSpec s registry = Spec.describe s "OwnerOfBound" $ do
+  Spec.it s "CR 108.3 a creature reanimated under another player's control still makes its OWNER lose the game" $ do
+    deck <- S.printingOf s registry "The Deck of Many Things"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+        (pikerId, board) = S.addGraveyardCard piker S.bob withDeck
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 20
+          Prompt.ChooseCardInGraveyard {} -> pikerId
+          _ -> S.identityAnswer p
+        activate = case Face.activatedAbilities (S.combinedFace deck) of
+          ability : _ -> Activate.activateAbility S.alice deckId ability
+          [] -> pure ()
+        activated = S.runPure answer board (activate >> Stack.resolveTop)
+        -- CR 108.3: the battlefield is shared and Game.zoneMembers indexes it
+        -- by OWNER, so bob's copy is where the reanimated creature is found
+        -- even though alice controls it.
+        reanimated = case Game.zoneMembers Zone.Battlefield S.bob activated of
+          [oid] -> oid
+          _ -> pikerId
+        marked = S.markDamage reanimated 1 activated
+        settled = S.runPure S.identityAnswer marked Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Stack.resolveTop
+    -- THE GAMEPLAY ASSERTION: bob, the owner, loses the game and alice, the
+    -- controller, wins -- readable only through CR 104.2a's two-player
+    -- decision, since neither status field alone says who WON.
+    Spec.assertEqWith s "CR 108.3 / 104.2a bob owned the reanimated creature, so its death is bob's loss" (GameState.result after) (Just (Result.Won S.alice))
+    -- The preconditions that assertion rests on, read after it so neither can
+    -- absorb a mutation aimed at the reference: the creature really did enter
+    -- under alice's control while staying bob's card, and it really did die.
+    Spec.assertEqWith s "setup: alice controlled the reanimated creature" (Projection.controllerOf reanimated activated) (Just S.alice)
+    Spec.assertEqWith s "setup: the creature really died" (Game.lookupObject reanimated settled) Nothing
+
+-- CR 706.3a: a striation naming a single number means "if the result was N",
+-- not "N or more" -- Oracle prints the Deck's 20 band bare, not "20+". A
+-- natural 20 shifted UP by Night Shift of the Living Dead's own modifier
+-- lands on 21, which is on no band of the table at all, so nothing happens.
+-- The discriminating twin of deckOwnerSpec's board: same reanimation, same
+-- two seats, the die roll the one thing different.
+deckExactBandSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckExactBandSpec s registry = Spec.describe s "ExactBand" $ do
+  Spec.it s "CR 706.3a a natural 20 shifted past 20 reaches no band, so nothing is reanimated" $ do
+    deck <- S.printingOf s registry "The Deck of Many Things"
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+        (_shiftId, withShift) = S.addPermanent shift S.alice withDeck
+        (pikerId, board) = S.addGraveyardCard piker S.bob withShift
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 20
+          Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
+          Prompt.ChooseCardInGraveyard {} -> pikerId
+          _ -> S.identityAnswer p
+        activate = case Face.activatedAbilities (S.combinedFace deck) of
+          ability : _ -> Activate.activateAbility S.alice deckId ability
+          [] -> pure ()
+        after = S.runPure answer board (activate >> Stack.resolveTop)
+    -- THE GAMEPLAY ASSERTION: 21 reaches no striation, so nothing arrived on
+    -- bob's copy of the battlefield -- an AtLeast reading of "20" would put
+    -- his creature there instead.
+    Spec.assertEqWith s "CR 706.3a a shifted 21 reaches no band: nothing entered the battlefield" (Game.zoneMembers Zone.Battlefield S.bob after) []
+    -- The precondition, read after the assertion so it cannot absorb a
+    -- mutation aimed at the comparison: the card really is still where it
+    -- started, unreanimated.
+    Spec.assertEqWith s "setup: bob's creature card is still in his graveyard" (Game.zoneMembers Zone.Graveyard S.bob after) [pikerId]

@@ -1841,6 +1841,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Candidate -> True
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
+          -- One seat -- the arm above's answer, one word over.
+          PlayerRef.OwnerOfBound _ -> True
           -- One seat -- the arm above's answer, one record over.
           PlayerRef.ChosenPlayerOfBound _ -> True
           -- A SET -- Relative Opponent's answer, and for its reason: CR 508.6 is

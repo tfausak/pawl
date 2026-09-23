@@ -137,6 +137,9 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- permanent its own earlier clause has already bounced, and a last-known
         -- aware view is what still names them.
         PlayerRef.ControllerOfBound _ -> Count.playersFor viewOf context gs ref
+        -- CR 108.3's owner, the arm above's route: Count.playersFor reads the
+        -- slot's owner off the same injected view.
+        PlayerRef.OwnerOfBound _ -> Count.playersFor viewOf context gs ref
         -- The arm above's route: Count.playersFor reads the slot the same way.
         PlayerRef.ChosenPlayerOfBound _ -> Count.playersFor viewOf context gs ref
         PlayerRef.EachPlayer -> Count.playersFor viewOf context gs ref
@@ -1264,6 +1267,8 @@ playerRefIsSlotless ref = case ref of
   -- InSlot's answer, and for its reason: the slot is a TARGET slot, which
   -- Resolve.Slots.quantitySlots reports by folding nestedRefs.
   PlayerRef.ControllerOfBound _ -> False
+  -- The arm above's answer, one field over: the object is named by a slot.
+  PlayerRef.OwnerOfBound _ -> False
   -- The arm above's answer: the object is named by a slot.
   PlayerRef.ChosenPlayerOfBound _ -> False
   -- InSlot's answer again: the player attacked is named by a slot.
@@ -1332,6 +1337,7 @@ forCandidate pid =
         PlayerRef.EachInSlot _ -> ref
         PlayerRef.Specific _ -> ref
         PlayerRef.ControllerOfBound _ -> ref
+        PlayerRef.OwnerOfBound _ -> ref
         PlayerRef.ChosenPlayerOfBound _ -> ref
         PlayerRef.Attacking _ -> ref
    in QuantitySlot.mapPlayerRefs substitute (\c -> c {Count.Type.scope = QuantitySlot.mapScope substitute (Count.Type.scope c)})
@@ -1369,6 +1375,10 @@ bakePlayerRef players ref = case ref of
   -- goes unanswered and ends, which is Pawl.Engine.Condition.holds' stated
   -- collapse; no card in the pool stores one (#3058).
   PlayerRef.ControllerOfBound _ -> ref
+  -- LEFT STANDING for the arm above's reason, one field over: this reference
+  -- names CR 108.3's owner of a slot's OBJECT, which no map of the resolution's
+  -- own bound PLAYERS can answer either.
+  PlayerRef.OwnerOfBound _ -> ref
   -- LEFT STANDING for the arm above's reason: this map holds the PLAYERS a
   -- resolution's slots name, and this reference names a slot holding an OBJECT.
   PlayerRef.ChosenPlayerOfBound _ -> ref

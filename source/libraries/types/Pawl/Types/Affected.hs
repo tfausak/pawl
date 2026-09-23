@@ -74,17 +74,17 @@ data Affected
     --
     -- The set is {o} when the source is attached to o, and EMPTY when it is
     -- unattached -- an Aura in the graveyard, or one the CR 704.5m sweep has not
-    -- reached yet. Payload-free: CR 303.4m defines it for any permanent, Aura or
-    -- not, so this atom is the phrase that names no type -- Song of the Dryads'
-    -- "enchanted permanent", CR 301.6's "fortified land". A phrase that DOES name
-    -- one is narrower (CR 301.5f, CR 303.4m), and spells the type out beside this
-    -- atom's own content: @Matching (And [HasCardType Creature, HasAttached
-    -- IsSource])@, as Bonesplitter's card data does.
+    -- reached yet. An Aura's "enchanted [object]" is this bare atom whatever its
+    -- object names, Control Magic's "enchanted creature" included (CR 303.4m):
+    -- the host is whatever the source is attached to, and the word's own
+    -- narrowing is carried by the Aura's enchant ability, at cast legality and at
+    -- CR 704.5m's falls-off check, not by this affected set. "equipped
+    -- creature"/"fortified land" ARE typed (CR 301.5f, CR 301.6), and spell the
+    -- type out beside this atom's own content: @Matching (And [HasCardType
+    -- Creature, HasAttached IsSource])@, as Bonesplitter's card data does.
     --
-    -- Not implemented: Control Magic, the one card in the pool whose printed
-    -- phrase names a type and still carries the bare atom, because the layer-2
-    -- control fold reads copiable characteristics and so cannot see a type
-    -- change (#3150).
+    -- Proven by Pawl.AuraSpec's "CR 613.1b/704.5m Control Magic keeps a crewed
+    -- Vehicle and loses it the instant the crew wears off".
     Attached
   | -- | CR 303.4b / 303.4m: the objects matching the Filter that the ENCHANTED
     -- PLAYER controls -- Curse of Death's Hold's "creatures enchanted player
