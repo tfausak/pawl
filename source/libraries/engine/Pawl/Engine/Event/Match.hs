@@ -29,6 +29,7 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
+import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.BecameAttached as BecameAttached
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
@@ -408,8 +409,11 @@ boundDeparts bindings destinations slot event = case event of
 --
 -- An empty map is not a special case -- it simply names no slot, so the arms
 -- that read a slot find none and answer False.
-matchesTriggerGiven :: Map.Map SlotName.SlotName Binding -> GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
-matchesTriggerGiven bindings gs bearer you cond event = case cond of
+--
+-- `board` is CR 603.10's first sentence: the battlefield immediately after the
+-- event (Event.Trigger.battlefieldAt), for an arm that must not read the live one.
+matchesTriggerGiven :: Map.Map SlotName.SlotName Binding -> Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics) -> GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
+matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
   TriggerCondition.SelfEnters -> case event of
     GameEvent.Moved (Moved.MkMoved zc _ _ _ _) -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
@@ -4543,14 +4547,14 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Pawl.Types.EventGroup. So this arm answering True for every member of the batch
   -- is deliberate, not a missing dedup: the arm and the dedup are two halves of one
   -- rule, and matchesTrigger alone is not the whole of it.
-  TriggerCondition.PermanentsDie f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentDies f) event
+  TriggerCondition.PermanentsDie f -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentDies f) event
   -- CR 603.2c's batch reading of PermanentDealsCombatDamageToPlayer (Pia Nalaar,
   -- Chief Mechanic's "whenever ONE OR MORE artifact creatures you control deal
   -- combat damage to a player"), delegated for PermanentsDie's reason: which
   -- damage events this condition admits is the singular arm's answer, filter,
   -- kind and recipient alike, and firing once for the CR 510.2 step is
   -- `batchScoped` below plus eventTriggers' dedup, never this arm.
-  TriggerCondition.PermanentsDealCombatDamageToPlayer f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentDealsCombatDamageToPlayer f) event
+  TriggerCondition.PermanentsDealCombatDamageToPlayer f -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentDealsCombatDamageToPlayer f) event
   -- CR 700.4's "dies" once more, asked of the permanent the bearer is attached
   -- to: PermanentDies' battlefield-to-graveyard pair, matched on
   -- ZoneChange.departed for that arm's reason (CR 603.10a).
@@ -5346,7 +5350,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- hand"), delegated for PermanentsDie's reason: which moves this condition
   -- admits is the arm below's answer, and firing once for the batch is
   -- `batchScoped` below plus eventTriggers' dedup, never this arm.
-  TriggerCondition.PermanentsReturnedToHand f -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentReturnedToHand f) event
+  TriggerCondition.PermanentsReturnedToHand f -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentReturnedToHand f) event
   -- CR 603.6c's family with the DESTINATION pinned: PermanentLeavesTheBattlefield's
   -- match above, narrowed to the one zone this condition names. CR 110.1 is what makes the
   -- origin implicit -- a permanent is on the battlefield, so "returned to hand"
@@ -5628,7 +5632,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- reason: which moves this condition admits is the arm above's answer, and
   -- firing once for the batch is `batchScoped` plus eventTriggers' dedup, never
   -- this arm.
-  TriggerCondition.CardsLeaveZone p -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.CardLeavesZone p) event
+  TriggerCondition.CardsLeaveZone p -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.CardLeavesZone p) event
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -6005,7 +6009,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- which gains the condition admits is the same question either way, and what
   -- separates the two is `batchScoped` plus eventTriggers' dedup, never this
   -- matcher.
-  TriggerCondition.PlayersGainLife relation -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PlayerGainsLife relation) event
+  TriggerCondition.PlayersGainLife relation -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PlayerGainsLife relation) event
   -- CR 119.9: a source caused a player the relation admits to gain life. The
   -- gaining player comes from the event; CR 109.5 / 603.3a fix "you" as the
   -- ability's controller, exactly as PlayerDiscards, SpellOrAbilityCounters and
@@ -6419,7 +6423,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- placements the condition admits is the same question either way, and what
   -- separates the two is `batchScoped` below plus eventTriggers' dedup, never
   -- this matcher.
-  TriggerCondition.PermanentsGetCounters p -> matchesTriggerGiven bindings gs bearer you (TriggerCondition.PermanentGetsCounters p) event
+  TriggerCondition.PermanentsGetCounters p -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentGetsCounters p) event
   TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement wanted f) -> case event of
     GameEvent.CountersPut (CounterChange.MkCounterChange oid kind _ _)
       | kind == wanted -> case Projection.viewWithLastKnown oid gs oid of
@@ -6877,15 +6881,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- is any Recipient, so a creature SPELL on the stack its controller named
   -- would otherwise satisfy "creatures you control".
   --
-  -- The LIVE view rather than viewWithLastKnown, and the same membership test
-  -- says so: CR 601.2c makes the object a target while it is still where the
-  -- announcement found it.
-  --
-  -- The board it reads is the one at the CR 117.5 boundary, where CR 603.2 fires
-  -- the ability at the announcement -- so a permanent named as a target and gone
-  -- before the gather is invisible here, and the trigger that the rules already
-  -- fired does not. Rune-Brand Juggler reaches it: its ability may target the
-  -- suspected creature its own cost sacrifices (gap #3418).
+  -- Membership and view both off `board`, CR 603.10's sample of the
+  -- announcement (Event.becameTarget takes it before any cost is paid), not the
+  -- board at the CR 117.5 gather: a permanent named as a target and sacrificed
+  -- to pay for it was a target while it stood. Pawl.LeavesTriggerSpec's
+  -- "Professor Hojo sees a target its own cost sacrificed" proves it.
   --
   -- Firing ONCE for the whole announcement is Event.Trigger.batchScoped's
   -- answer and not this function's: matchesTriggerGiven sees one event at a
@@ -6893,10 +6893,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.PermanentsBecomeTargeted c -> case event of
     GameEvent.BecameTarget t -> case Recipient.objectOf (BecameTarget.targeted t) of
       Nothing -> False
-      Just oid ->
-        Set.member oid (GameState.battlefield gs)
-          && maybe True (== BecameTarget.kind t) (PermanentsBecomeTargeted.kind c)
-          && Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) (Projection.viewOfObject oid gs) (PermanentsBecomeTargeted.filter c)
+      Just oid -> case Map.lookup oid board of
+        Nothing -> False
+        Just candidate ->
+          maybe True (== BecameTarget.kind t) (PermanentsBecomeTargeted.kind c)
+            && Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) (Projection.sampledView oid candidate gs) (PermanentsBecomeTargeted.filter c)
     GameEvent.BecameAttached {} -> False
     GameEvent.BecameUnattached {} -> False
     GameEvent.LeftTheGame _ -> False
@@ -6965,6 +6966,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
+  -- The same question per targeted permanent; only Event.Trigger.batchScoped
+  -- tells the two apart.
+  TriggerCondition.PermanentBecomesTargeted c -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PermanentsBecomeTargeted c) event
   -- CR 709.5h: the bearer is the permanent that was given the designation, and
   -- the door named is the one it was given for. A bare comparison of an id and a
   -- name, in SelfEnters' shape and for its reason -- nothing about the entrant's
@@ -8332,7 +8336,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- the SAME event fire the ability once here, which is also the right answer --
   -- CR 603.2 matches an event against "a triggered ability's trigger event", and
   -- the ability is one ability.
-  TriggerCondition.AnyOf conditions -> any (\c -> matchesTriggerGiven bindings gs bearer you c event) conditions
+  TriggerCondition.AnyOf conditions -> any (\c -> matchesTriggerGiven bindings board gs bearer you c event) conditions
   -- CR 603.3b's second class, the one condition in this type whose event is
   -- another ability triggering: "whenever the final chapter ability of a Saga you
   -- control triggers".

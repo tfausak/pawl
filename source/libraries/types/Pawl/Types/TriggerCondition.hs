@@ -403,6 +403,9 @@ data TriggerCondition
     -- "whenever one or more creatures you control become the target of an
     -- activated ability" (Professor Hojo), once for the whole announcement.
     PermanentsBecomeTargeted PermanentsBecomeTargeted.PermanentsBecomeTargeted
+  | -- | CR 601.2c per permanent: "whenever a creature you control becomes the
+    -- target of a spell" (Venerated Rotpriest), once per creature targeted.
+    PermanentBecomesTargeted PermanentsBecomeTargeted.PermanentsBecomeTargeted
   | -- | CR 709.5h: "when you unlock this door", however the named half was
     -- unlocked. Self-scoped plus the half, which is what separates a Room's two
     -- doors.

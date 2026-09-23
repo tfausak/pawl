@@ -6317,7 +6317,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- 707.10's "a copy of a spell is itself a spell" and "a copy of an
             -- ability is itself an ability".
             gsCopied <- State.get
-            Event.becameTarget copyId kind copier (targetsOnStack copyId gsCopied)
+            Event.becameTarget gsCopied copyId kind copier (targetsOnStack copyId gsCopied)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and not belt and braces: the source can
