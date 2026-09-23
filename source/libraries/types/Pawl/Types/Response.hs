@@ -8,6 +8,7 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
@@ -598,6 +599,9 @@ data Response
     ChoseAttachment ObjectId.ObjectId
   | -- | CR 601.2b: the cost a caster announced they would pay.
     ChoseCost (Cost.Cost Keyword.Keyword)
+  | -- | CR 601.3 / 305.1: the permission a player made a play under (Nothing =
+    -- none of the offered ones).
+    ChosePlayPermission (Maybe (ObjectId.ObjectId, CastFromZone.CastFromZone))
   | -- | CR 103.5: a player's mulligan declaration.
     DeclaredMulligan MulliganDecision.MulliganDecision
   | -- | CR 103.5: the cards a player put on the bottom of their library after a
