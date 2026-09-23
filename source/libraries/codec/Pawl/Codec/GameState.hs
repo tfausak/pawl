@@ -166,6 +166,7 @@ codec resolve = Fields.object $ do
   drewFromEmpty <- Fields.defaulted "drewFromEmpty" Set.empty (Common.set PlayerId.codec) GameState.drewFromEmpty
   landsPlayed <- Fields.defaulted "landsPlayed" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.landsPlayed
   drawsThisTurn <- Fields.defaulted "drawsThisTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.drawsThisTurn
+  departedThisTurn <- Fields.defaulted "departedThisTurn" Set.empty (Common.set PlayerId.codec) GameState.departedThisTurn
   activatedThisTurn <- Fields.defaulted "activatedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec)))) GameState.activatedThisTurn
   castPermissionsUsedThisTurn <- Fields.defaulted "castPermissionsUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set CastFromZone.codec)) GameState.castPermissionsUsedThisTurn
   rollModifiersUsedThisTurn <- Fields.defaulted "rollModifiersUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set ModifiedRoll.codec)) GameState.rollModifiersUsedThisTurn
@@ -251,6 +252,7 @@ codec resolve = Fields.object $ do
         GameState.drewFromEmpty = drewFromEmpty,
         GameState.landsPlayed = landsPlayed,
         GameState.drawsThisTurn = drawsThisTurn,
+        GameState.departedThisTurn = departedThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
         GameState.castPermissionsUsedThisTurn = castPermissionsUsedThisTurn,
         GameState.rollModifiersUsedThisTurn = rollModifiersUsedThisTurn,

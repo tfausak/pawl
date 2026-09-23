@@ -273,6 +273,10 @@ data GameState = MkGameState
     -- ordinal onto GameEvent.Drew; cleared for every player at turn handoff,
     -- and after CR 103.3's opening hands.
     drawsThisTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- | CR 801.2c: the players who have left the game since this turn began,
+    -- whose seats still count toward range of influence until the next turn
+    -- begins; cleared at turn handoff.
+    departedThisTurn :: Set.Set PlayerId.PlayerId,
     -- | CR 602.5b: which abilities of which objects have been activated this
     -- turn, read by ActivationRestriction.OnlyOnceEachTurn alone; cleared at turn
     -- handoff, which is the whole of "each turn". Keyed by the SOURCE object and

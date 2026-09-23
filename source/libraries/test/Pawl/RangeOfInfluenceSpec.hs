@@ -5,7 +5,8 @@
 -- and its readers: Pawl.Engine.Combat's attackableOpponents (CR 801.3),
 -- Pawl.Engine.Target's legalRecipientsGiven (CR 801.4),
 -- Pawl.Engine.Activate's activatableGiven (CR 801.6) and Pawl.Engine.Sba's
--- fallsOff and becomesUnattached (CR 801.8 / CR 801.9).
+-- fallsOff and becomesUnattached (CR 801.8 / CR 801.9); and CR 801.2c's
+-- turn-start seating, Pawl.Types.GameState's departedThisTurn.
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
 -- carol, dave]: bob and dave sit next to alice and carol sits two seats away.
@@ -19,6 +20,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Target as Target
@@ -28,6 +30,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
@@ -160,3 +163,44 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (S.onBattlefield equipment limited) "CR 801.9 and stays on the battlefield"
     Spec.assertBool s (S.onBattlefield steal limited) "carol's Control Magic, on a creature she controls, stays"
     Spec.assertEqWith s "at an unlimited range the Piker keeps both" (S.powerToughnessOf creature unlimited) (Just (6, 2))
+
+  -- CR 801.2c and its example: bob concedes during alice's turn, and carol,
+  -- two seats from alice across bob's emptied seat, stays out of alice's range
+  -- for the rest of that turn, then comes into it as the next turn begins. The
+  -- Ravenous Rats offer is read as the CR 801.4 case above reads it: alice's on
+  -- her own turn, then carol's on hers, which the handoff reaches past bob.
+  Spec.it s "CR 801.2c a seat emptied mid-turn closes up only when the next turn begins" $ do
+    rats <- S.printingOf s registry "Ravenous Rats"
+    swamp <- S.printingOf s registry "Swamp"
+    let lands = S.landsFor swamp S.carol 2 (S.landsFor swamp S.alice 2 S.fourPlayerGame)
+        (alices, g0) = S.addHandCard rats S.alice lands
+        (carols, g1) = S.addHandCard rats S.carol g0
+        board =
+          S.withRange
+            1
+            g1
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+        conceded = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.bob)
+        carolsTurn = S.runPure S.identityAnswer conceded Engine.handoffTurn
+        carolsMain = carolsTurn {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.carol}
+        recording :: Prompt.Prompt r -> State.State [[Recipient.Recipient]] r
+        recording p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.modify' (<> fmap (Set.toAscList . snd) (Map.elems sets))
+            pure (S.preferring (const True) sets)
+          _ -> pure (S.identityAnswer p)
+        offered pid held gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer gs (S.cast pid held)) Engine.priorityLoop) []
+    Spec.assertEqWith
+      s
+      "CR 801.2c for the rest of alice's turn carol is still two seats away, so only dave is offered"
+      (offered S.alice alices conceded)
+      [[Recipient.ToPlayer S.dave]]
+    Spec.assertEqWith
+      s
+      "CR 801.2c from carol's turn on bob's seat has closed up, so alice is offered beside dave"
+      (offered S.carol carols carolsMain)
+      [[Recipient.ToPlayer S.alice, Recipient.ToPlayer S.dave]]
+    Spec.assertEqWith s "the handoff skipped bob's seat" (GameState.activePlayer carolsTurn) S.carol
