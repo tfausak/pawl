@@ -70,6 +70,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
           []
+          0
           ( Modal.MkModal
               ( Seq.singleton
                   ( Mode.MkMode
@@ -96,6 +97,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [CostComponent.TapThis])
           []
+          0
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           [ ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers)) TurnScope.EachTurn),
             ActivationRestriction.AttackedThisStep
@@ -118,6 +120,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
           []
+          0
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           [ActivationRestriction.SorcerySpeed]
           Activator.Controller
@@ -136,6 +139,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [])
           []
+          0
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           []
           Activator.Controller
@@ -144,3 +148,22 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           Nothing
       )
       " {\"cost\":{\"mana\":null},\"modal\":{\"modes\":[{}]}} "
+  -- CR 101.1: Katara, Water Tribe's Hope's "X can't be 0" is the key's one
+  -- producer; the default 0 stays out of the JSON, as above.
+  Spec.it s "an ability's floor on X round-trips" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( ActivatedAbility.MkActivatedAbility
+          (Cost.MkCost Nothing [])
+          []
+          1
+          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
+          []
+          Activator.Controller
+          Nothing
+          Nothing
+          Nothing
+      )
+      " {\"cost\":{\"mana\":null},\"minimumX\":1,\"modal\":{\"modes\":[{}]}} "

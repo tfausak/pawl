@@ -490,7 +490,7 @@ scopeRefs scope = case scope of
 -- rename, and the one function a caller wants when the question is "which of this
 -- announcement's own slots does this bound depend on" --
 -- Pawl.Engine.Target.jointlyJudged and legalSetsGiven both ask it, and
--- Pawl.Engine.Resolve.targetSlotSlots asks the same question with arities.
+-- Pawl.Engine.Resolve.Slots.targetSlotSlots asks the same question with arities.
 allSlots :: Quantity -> Set SlotName
 allSlots quantity = Set.union (slots quantity) (refSlots quantity)
 

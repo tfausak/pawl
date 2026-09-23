@@ -2813,9 +2813,12 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- narrowed to what the card permits. The affordable half rides the
               -- CHOSEN cost, and nothing filters the answer against it: an
               -- unaffordable announcement still reverses the whole cast (#417).
+              --
+              -- Not implemented: a spell's printed floor ("X can't be 0"), so the
+              -- least value offered is always 0 (#4027).
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX mCeiling chosenReductions spending pid sid bestowedGs chosenCost)))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid 0 (affordableX mCeiling chosenReductions spending pid sid bestowedGs chosenCost)))
                   else pure Nothing
               -- CR 101.1, and CR 101.2 for its direction: the card's sentence
               -- overrides the rule that would otherwise leave X free, and a

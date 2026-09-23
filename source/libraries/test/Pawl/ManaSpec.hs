@@ -516,6 +516,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) (Quantity.Literal 1) ManaRetention.Ordinary Nothing Nothing)] Map.empty,
               ActivatedAbility.maximumX = [],
+              ActivatedAbility.minimumX = 0,
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
@@ -533,6 +534,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
                   [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) (Quantity.Literal 1) ManaRetention.Ordinary Nothing Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.maximumX = [],
+              ActivatedAbility.minimumX = 0,
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
@@ -550,6 +552,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
                   [Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing Nothing)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.maximumX = [],
+              ActivatedAbility.minimumX = 0,
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
@@ -1365,10 +1368,9 @@ laviniaBoard lavinia wretch piker active =
 -- is exactly {W}, so the Maze's own {C} route -- live on both boards -- pays
 -- nothing here.
 --
--- NEITHER condition is one CR 601.2a's move can falsify: a card leaving a hand
--- for the stack changes no permanent alice controls, so the gate's optimistic
--- read of this arm and the payment's real one agree here, and this pair cannot
--- observe the divergence #3192 is about.
+-- NEITHER condition is one CR 601.2a's move can change: a card leaving a hand
+-- for the stack changes no permanent alice controls. lysAlanaDignitarySpec below
+-- is the board where it does.
 nimbusMazeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 nimbusMazeSpec s registry = Spec.describe s "Nimbus Maze" $ do
   Spec.it s "CR 602.5 a board condition gates the ridden mana route at both of CR 605.3a's windows" $ do
@@ -1462,6 +1464,75 @@ hackingMaze mazeId from to p = case p of
   Prompt.ChooseLandTypeSwap {} -> (from, to)
   Prompt.ChooseManaSource _ _ candidates -> Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (mazeId /=) (NonEmpty.toList candidates)))
   _ -> paysWithWhite p
+
+-- CR 601.2a's move against CR 602.5's board condition, in the direction that
+-- REFUSES: Lys Alana Dignitary ("{T}: Add {G}{G}. Activate only if there is an
+-- Elf card in your graveyard") paying for Bloodbraid Challenger's escape, cast
+-- out of that same graveyard. The Challenger is put on the stack before CR
+-- 601.2g's mana abilities are activated, so when it is the graveyard's only Elf
+-- card the rider is false by the time the Dignitary could tap.
+--
+-- TWO BOARDS one card apart: three Mountains, a settled Dignitary, and the
+-- Challenger over three Goblin Pikers; the control adds a Llanowar Elves as a
+-- fourth other card. Escape's {3}{R}{G} needs the Dignitary's {G} on both, so a
+-- refusal is the rider's and not the supply's, and the escape's three exiles
+-- are there on both.
+lysAlanaDignitarySpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+lysAlanaDignitarySpec s registry = Spec.describe s "Lys Alana Dignitary" $ do
+  Spec.it s "CR 601.2a the card leaving the graveyard falsifies the rider before the mana is paid" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    dignitary <- S.printingOf s registry "Lys Alana Dignitary"
+    challenger <- S.printingOf s registry "Bloodbraid Challenger"
+    piker <- S.printingOf s registry "Goblin Piker"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let board extra =
+          let (_, g1) = S.addPermanent dignitary S.alice (S.landsInPlay mountain 3)
+              (oid, g2) = S.addGraveyardCard challenger S.alice g1
+              g3 = List.foldl' (\acc p -> snd (S.addGraveyardCard p S.alice acc)) g2 (replicate 3 piker <> extra)
+           in (oid, g3 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+        offered (oid, gs) = any (S.isCastOf oid) (Action.legalActions S.alice gs)
+        (alone, aloneBoard) = board []
+        (beside, besideBoard) = board [elves]
+        cast = snd (Engine.runGamePure tapsFirstOffered besideBoard (S.cast S.alice beside))
+    Spec.assertBool s (not (offered (alone, aloneBoard))) "CR 601.2a the only Elf card is the one being cast, so the Dignitary pays nothing and the escape is not offered"
+    Spec.assertBool s (offered (beside, besideBoard)) "CR 602.5 a second Elf card stays behind, the rider holds, and the escape is offered"
+    Spec.assertBool s (notElem beside (Game.zoneMembers Zone.Graveyard S.alice cast)) "CR 601.2h and the Challenger leaves the graveyard"
+    Spec.assertEqWith s "CR 601.2g paid by the three Mountains and the Dignitary" (S.tappedCount S.alice cast) 4
+
+-- The other direction, which ADMITS: a mana ability whose rider only the move
+-- makes true. Synthetic Hollow Spring ("{T}: Add {C}. Activate only if you have
+-- no cards in hand") is the only source for Sol Ring's {1}; with the Ring as her
+-- last card, the hand is empty once CR 601.2a moves it. No printed mana ability
+-- carries a rider the move makes true.
+--
+-- TWO BOARDS one card apart: the control adds an Island to her hand, which
+-- leaves the hand non-empty after the move too.
+hollowSpringSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+hollowSpringSpec s registry = Spec.describe s "Synthetic Hollow Spring" $ do
+  Spec.it s "CR 601.2a the card leaving the hand makes the rider true before the mana is paid" $ do
+    spring <- S.printingOf s registry "Synthetic Hollow Spring"
+    ring <- S.printingOf s registry "Sol Ring"
+    island <- S.printingOf s registry "Island"
+    let board extra =
+          let (oid, g1) = S.addHandCard ring S.alice (S.landsInPlay spring 1)
+              g2 = List.foldl' (\acc p -> snd (S.addHandCard p S.alice acc)) g1 extra
+           in (oid, g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+        offered (oid, gs) = any (S.isCastOf oid) (Action.legalActions S.alice gs)
+        (last_, lastBoard) = board []
+        (kept, keptBoard) = board [island]
+        cast = snd (Engine.runGamePure tapsFirstOffered lastBoard (S.cast S.alice last_))
+    Spec.assertBool s (offered (last_, lastBoard)) "CR 601.2a Sol Ring is her last card, the hand is empty once it moves, and the cast is offered"
+    Spec.assertBool s (notElem last_ (Game.zoneMembers Zone.Hand S.alice cast)) "CR 601.2h and the Spring pays for it"
+    Spec.assertEqWith s "CR 601.2g the Spring is tapped" (S.tappedCount S.alice cast) 1
+    Spec.assertBool s (not (offered (kept, keptBoard))) "CR 602.5 with an Island still in hand the rider stays false and the cast is not offered"
+
+-- CR 601.2g's two questions answered with the first thing offered.
+-- S.identityAnswer DECLINES a Prompt.ChooseManaSource.
+tapsFirstOffered :: Prompt.Prompt r -> r
+tapsFirstOffered p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
+  _ -> S.identityAnswer p
 
 isManaActivation :: Action.Type.Action -> Bool
 isManaActivation action = case action of
@@ -3800,6 +3871,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   laviniaTurnRiderSpec s registry
   nimbusMazeSpec s registry
   nimbusMazeTextChangeSpec s registry
+  lysAlanaDignitarySpec s registry
+  hollowSpringSpec s registry
   wellspringSpec s registry
   manaConfluenceSpec s registry
   phyrexianTowerSpec s registry
@@ -4003,7 +4076,7 @@ atLife n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.a
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
 
 -- CR 502: the untap step's turn-based actions alone, which is what makes the
 -- permanents this spec taps available again on the next turn without running a

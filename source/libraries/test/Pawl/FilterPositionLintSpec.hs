@@ -1761,7 +1761,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         -- may carry is a separate question and is not tagged with it.
         alternatively = base {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing sacrificeCost]}
         -- CR 602.2b, paid as the ability is activated -- after CR 601.2c too.
-        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost [] (spellOf []) [] Activator.Controller Nothing Nothing Nothing]}
+        activating = base {Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility sacrificeCost [] 0 (spellOf []) [] Activator.Controller Nothing Nothing Nothing]}
         -- CR 116.2d: a special action uses no stack (CR 116.1), so no
         -- announcement could answer in any engine.
         ignoring = base {Face.specialActions = [SpecialAction.IgnoreThisUntilEndOfTurn (AbilityName.MkAbilityName (Text.pack "the prohibition")) sacrificeCost]}
@@ -2268,7 +2268,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- than CR 702.39a's: a PlayerId that only a resolution can know, round-tripped
   -- by a total codec, so nothing but this keeps card JSON from naming a seat
   -- (#199). The UNBAKED atom beside it is card data and is not swept -- Trygon
-  -- Predator writes it, and Pawl.Engine.Resolve.modeSlots is what checks the slot
+  -- Predator writes it, and Pawl.Engine.Resolve.Slots.modeSlots is what checks the slot
   -- it names is one the ability's condition binds.
   Spec.it s "CR 603.2 no card writes ControlledByPlayer" $ do
     ps <- S.allPrintings s

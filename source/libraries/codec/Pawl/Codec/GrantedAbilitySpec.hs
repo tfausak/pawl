@@ -41,6 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
           ( ActivatedAbility.MkActivatedAbility
               (Cost.MkCost Nothing [CostComponent.TapThis])
               []
+              0
               emptyModal
               []
               Activator.Controller

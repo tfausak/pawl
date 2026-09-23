@@ -32,7 +32,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, clauseIsImpossible, noSubgame, performManaAbility, targetSlotsOf)
-import Pawl.Engine.Resolve.Slots (boundSlots, conditionSlots, effectContext, effectViewOf, joinSlots, objectRefObjects, oneSlot, playerRefSlots, quantitySlots, slotBindings, slotsAreExhaustive, slotsOf)
+import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, effectViewOf, objectRefObjects, slotBindings, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
 import Pawl.Types.AbilityName (AbilityName)
@@ -83,146 +83,13 @@ import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerScope as PlayerScope
-import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
-import Pawl.Types.SlotArity (SlotArity)
-import qualified Pawl.Types.SlotArity as SlotArity
-import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
-import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
-import qualified Pawl.Types.ZoneScope as ZoneScope
-
--- Every slot ONE target slot reads: its pool's, its filter's, and its CR 202.3
--- computed bound's. Its own name is not among them -- this is what the slot
--- READS, and CR 601.2c binds it only once it has been answered.
---
--- Its own function because a card declares a target slot in THREE places, and
--- each needs its own reader. Enumerated off the three types that hold one:
---
---   * Mode.targetSlots -- CR 601.2c's ordinary target, declared inside a mode.
---     modeSlots below folds this one, and the corpus lint that pairs a mode's
---     reads with its declarations is what consumes it.
---   * Face.enchant -- CR 303.4a's enchant slot, declared on the face BESIDE the
---     modes (Card.enchantSlotMap), so it is in no mode's declared set.
---   * Modification.GainEnchant -- the same slot GRANTED by a CR 613.1f layer 6
---     effect (Cloudform, the Licids, CR 702.103b's bestow). What answers it is
---     never the granting mode: the grant is a CR 611.2 continuous effect that
---     outlives the resolution that made it, so by the time CR 601.2c chooses for
---     a bestowed spell (Card.modesTargetSlotsGiven) or CR 303.4c's state-based
---     action re-reads CR 702.5a against a permanent, the announcement the grant
---     was written in is gone. Declaring the name would not rescue it.
---
--- The last two are one claim, and Pawl.CardSpec's "an enchant slot reads no slot,
--- printed or granted" sweep is what states it: neither may read anything.
-targetSlotSlots :: TargetSlot.TargetSlot -> Map.Map SlotName SlotArity
-targetSlotSlots slot =
-  joinSlots
-    [ poolSlot (TargetSlot.pool slot),
-      -- Every slot the slot's own FILTER names -- CR 603.2's "target artifact or
-      -- enchantment that player controls".
-      maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots) (TargetSlot.filter slot),
-      -- And every slot its CR 202.3 computed bound names -- Venerable Warsinger's
-      -- "mana value X or less ... where X is the amount of damage this creature
-      -- dealt to that player", whose X is the trigger's own event amount
-      -- (Pawl.Engine.Binding.eventAmount). Target.slotContext is what answers it,
-      -- off the announcement the caller hands over.
-      --
-      -- What it buys is the pairing -- a card whose bound names an amount its
-      -- CONDITION does not supply (Pawl.Engine.Event.Binding.eventBindingSlots) is caught
-      -- only because the read is reported here. No card in data/cards/ misauthors
-      -- that pairing, so the proof is a planted one.
-      --
-      -- quantitySlots' WHOLE answer, which is what makes a bound naming a slot
-      -- only through a PlayerRef buried inside the number ("mana value X or less,
-      -- where X is the amount of life THAT PLAYER gained this turn") or through CR
-      -- 400.7j's Scope.OverBound visible to the equality above.
-      -- Pawl.AbilitySlotLintSpec's "the lint itself catches a computed bound
-      -- naming a slot through a player" is the case that proves it.
-      maybe Map.empty quantitySlots (TargetSlot.amount slot),
-      -- CR 601.2c's computed COUNT is a Quantity too, and names slots the same
-      -- way its bound does, so it is reported beside it or a slot named only
-      -- there would dangle.
-      maybe Map.empty quantitySlots (SlotCount.quantity (TargetSlot.count slot))
-    ]
-
--- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
--- [a player] pays" names, every slot that gate's own "for each" counts over,
--- every slot a gate's described cost reads a mana cost off,
--- every slot a CR 701.46a "if" tests, and every slot a target slot's own pool,
--- filter or bound names. A payer, multiplier, gate or pool slot no effect also
--- reads would otherwise dangle.
-modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
-modeSlots mode =
-  let -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
-      payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
-      -- And the gate's OTHER slot-reading position, its "for each" multiplier
-      -- (Pawl.Types.PayGate.perEach): a cost scaled by what a bound object names is
-      -- a read the payer field need not repeat, and payGatePaidBy evaluates it
-      -- against this resolution's own context, so the slot really is asked for.
-      -- quantitySlots' WHOLE answer, targetSlotSlots' computed bound's reason.
-      multiplierSlot = maybe Map.empty quantitySlots . (Clause.payGate Monad.>=> PayGate.perEach)
-      -- And the slot a gate's DESCRIBED cost reads its mana part off
-      -- (Pawl.Types.CostBasis): Flash's "its mana cost reduced by {2}" names the
-      -- creature its first clause put onto the battlefield, a read no other
-      -- field of the clause repeats. At arity ONE -- a slot naming several names
-      -- no one mana cost, and `describedCost` answers Nothing there rather than
-      -- picking.
-      basisSlot = maybe Map.empty (oneSlot . CostBasis.slot) . (Clause.payGate Monad.>=> PayGate.basis)
-      -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
-      -- clause too, and Jungle Wayfinder's names the table rather than a slot --
-      -- but a card may name one, and an asker slot no effect also reads would
-      -- otherwise dangle.
-      askerSlot clause = case Clause.optionality clause of
-        Optionality.Mandatory -> Map.empty
-        Optionality.Optional ref -> playerRefSlots ref
-      -- And every clause's branch CHOOSER, for the same reason one rider over: CR
-      -- 608.2d's announcement is scoped to a clause pair and its reference may
-      -- name a slot.
-      chooserSlot = maybe Map.empty (playerRefSlots . OrElse.chooser) . Clause.orElse
-      -- And every clause's CR 701.46a "if", which CR 608.2c lets read what an
-      -- earlier clause of the same resolution bound: Psychic Miasma's "if a land
-      -- card is discarded this way" counts over CR 400.7j's fold of the slot its
-      -- first clause binds. A gate is the ONLY place a card may read a slot and
-      -- perform nothing, so a read reported nowhere else dangles here.
-      conditionSlot = maybe Map.empty conditionSlots . Clause.condition
-   in joinSlots
-        [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
-          joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
-          joinSlots (fmap multiplierSlot (Foldable.toList (Mode.clauses mode))),
-          joinSlots (fmap basisSlot (Foldable.toList (Mode.clauses mode))),
-          joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
-          joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
-          joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
-          joinSlots (fmap targetSlotSlots (Map.elems (Mode.targetSlots mode)))
-        ]
-
--- The slot a target pool draws its candidates from, if it draws them from one
--- (CR 400.1's per-player graveyard), read singly.
-poolSlot :: Pool.Pool -> Map.Map SlotName SlotArity
-poolSlot pool = case pool of
-  Pool.Creatures -> Map.empty
-  Pool.Players -> Map.empty
-  Pool.AnyTarget -> Map.empty
-  Pool.Permanents -> Map.empty
-  Pool.Spells -> Map.empty
-  Pool.Abilities -> Map.empty
-  Pool.SpellsAndPermanents -> Map.empty
-  Pool.PlayersAndPlaneswalkers -> Map.empty
-  Pool.CardsInGraveyard scope -> case scope of
-    ZoneScope.Scoped _ -> Map.empty
-    ZoneScope.InSlot slot -> oneSlot slot
-    ZoneScope.ControllerOfBound slot -> oneSlot slot
-  Pool.CardsInExile -> Map.empty
-  -- The graveyard half's scope; the battlefield half names no slot.
-  Pool.CreaturesAndCardsInGraveyard scope -> case scope of
-    ZoneScope.Scoped _ -> Map.empty
-    ZoneScope.InSlot slot -> oneSlot slot
-    ZoneScope.ControllerOfBound slot -> oneSlot slot
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name.
 armedAbilities :: [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Set AbilityName
@@ -1474,7 +1341,7 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
 -- object has no mana cost (CR 202.1b) -- CR 118.6's own second sentence, "an
 -- ability can also have an unpayable cost if its cost is based on the mana cost
 -- of an object with no mana cost", which Cost.canPay then refuses. A slot
--- naming several names no one cost, which is why Pawl.Engine.Resolve.modeSlots
+-- naming several names no one cost, which is why Pawl.Engine.Resolve.Slots.modeSlots
 -- reports the read at SlotArity.One.
 --
 -- The stated COMPONENTS survive: what a basis supplies is the mana part alone,

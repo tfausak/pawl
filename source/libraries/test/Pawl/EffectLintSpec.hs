@@ -858,7 +858,7 @@ isByDirectionShield effect = case effect of
 
 -- Every PlayerRef a CLAUSE of this face holds: CR 118.12a's payer and CR 603.5's
 -- asker. Both sit on Pawl.Types.Clause rather than inside any effect, so neither
--- effect traversal reaches them; Pawl.Engine.Resolve.modeSlots reads exactly this
+-- effect traversal reaches them; Pawl.Engine.Resolve.Slots.modeSlots reads exactly this
 -- pair, through the same playerRefSlots classification.
 --
 -- Over the GRANTED carriers as well as the printed ones, cardResolutionEffects'

@@ -69,6 +69,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -350,6 +351,58 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (S.lifeOf S.bob after, length (S.tokensOf after))
     Spec.assertEqWith s "bob lost 1 life and made a Faerie" (run sharedTurns) (Just 19, 1)
     Spec.assertEqWith s "without the option nothing happened" (run id) (Just 20, 0)
+  -- CR 805.4d: "each player's upkeep" reading "that player" triggers once per
+  -- active player. Carol controls it, so "that player" is neither her nor alone
+  -- the seat the turn began with.
+  --
+  -- Elkin Lair, {3}{R} World Enchantment: "At the beginning of each player's
+  -- upkeep, that player exiles a card at random from their hand. ..." Each hand
+  -- holds one card, so the random pick is forced.
+  Spec.it s "CR 805.4d an each-player's-upkeep trigger fires once per active teammate" $ do
+    island <- S.printingOf s registry "Island"
+    lair <- S.printingOf s registry "Elkin Lair"
+    let run option =
+          let (_, placed) = S.addPermanent lair S.carol (stockedWith island option)
+              board = List.foldl' (\g pid -> snd (S.addHandCard island pid g)) placed [S.alice, S.bob]
+              after = fst (TurnSpec.runTurn S.identityAnswer board)
+           in fmap (\pid -> length (Game.zoneMembers Zone.Exile pid after)) [S.alice, S.bob]
+    Spec.assertEqWith s "alice and bob each exiled their card" (run sharedTurns) [1, 1]
+    Spec.assertEqWith s "without the option only alice did" (run id) [1, 0]
+  -- CR 805.4d / 603.4: the intervening "if" is asked of each opponent in turn.
+  -- Only bob holds seven, so a single trigger naming alice would do nothing.
+  --
+  -- Ebony Owl Netsuke, {2} Artifact: "At the beginning of each opponent's
+  -- upkeep, if that player has seven or more cards in hand, this artifact deals
+  -- 4 damage to that player."
+  Spec.it s "CR 805.4d an each-opponent's-upkeep trigger asks its if of each active opponent" $ do
+    island <- S.printingOf s registry "Island"
+    owl <- S.printingOf s registry "Ebony Owl Netsuke"
+    let run option =
+          let (_, placed) = S.addPermanent owl S.carol (stockedWith island option)
+              hands = List.foldl' (\g _ -> snd (S.addHandCard island S.alice g)) placed [1 :: Int .. 2]
+              board = List.foldl' (\g _ -> snd (S.addHandCard island S.bob g)) hands [1 :: Int .. 8]
+              after = fst (TurnSpec.runTurn S.identityAnswer board)
+           in fmap (`S.lifeOf` after) [S.alice, S.bob]
+    Spec.assertEqWith s "bob took 4, alice nothing" (run sharedTurns) [Just 20, Just 16]
+    Spec.assertEqWith s "without the option bob's upkeep has not come" (run id) [Just 20, Just 20]
+  -- CR 805.4d's other half: an ability that does not refer to "that player"
+  -- triggers once, however many players share the turn.
+  --
+  -- Khabál Ghoul, {2}{B} Creature -- Zombie 1/1: "At the beginning of each end
+  -- step, put a +1/+1 counter on this creature for each creature that died this
+  -- turn."
+  Spec.it s "CR 805.4d an ability not naming that player triggers once for the team" $ do
+    ghoul <- S.printingOf s registry "Khabál Ghoul"
+    let run option =
+          let endStep = Phase.Ending EndingStep.EndStep
+              (_, placed) = S.addPermanent ghoul S.carol (option (twoTeams S.fourPlayerGame))
+              began =
+                S.withEvents
+                  [GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)]
+                  placed {GameState.phase = endStep, GameState.activePlayer = S.alice}
+           in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer began Engine.placePendingTriggers)))
+    Spec.assertEqWith s "one trigger with the option" (run sharedTurns) 1
+    Spec.assertEqWith s "and one without" (run id) 1
   -- CR 702.179d / 805.4: alice and bob are both active players, so one opponent's
   -- life loss raises both their speeds -- each spends their OWN once-each-turn
   -- limit, which Engine.limitKey's controller component is what keeps apart.
