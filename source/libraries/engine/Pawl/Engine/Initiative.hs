@@ -30,7 +30,6 @@ import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Match as Event
-import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
@@ -124,7 +123,7 @@ initiativeAbilities = [upkeepVenture, combatHandoff, takeVenture]
 beginsHoldersUpkeep :: PlayerId -> GameState -> LoggedEvent.LoggedEvent -> Bool
 beginsHoldersUpkeep holder gs logged = case (TriggeredAbility.condition upkeepVenture, LoggedEvent.event logged) of
   (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active)) ->
-    began == wanted && Event.turnScopeAdmits (Game.teams gs) scope active holder
+    began == wanted && Event.turnScopeAdmits gs scope active holder
   _ -> False
 
 -- CR 726.2: the inherent triggers that fire on this batch of events, as ordinary
@@ -220,6 +219,9 @@ takeInitiative pid gs = Event.recordEvent (GameEvent.TookInitiative pid) gs {Gam
 -- game as soon as one player is left, so no departure empties the seats. Answered
 -- Nothing rather than left naming the departed holder, because a designation held
 -- by a player who has left the game is a state no rule describes.
+--
+-- Not implemented: which active player "the active player" is under the shared
+-- team turns option (#4003).
 reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
 reassignOnDeparture leaving playing gs =
   if GameState.initiative gs /= Just leaving

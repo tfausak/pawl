@@ -13,6 +13,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Companion as Companion
+import qualified Pawl.Engine.Conspiracy as Conspiracy
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
@@ -127,7 +128,7 @@ emptyGame order =
       --
       -- CR 102.4 / CR 808.1: and a game not played between teams, which every
       -- variant but CR 808's, CR 809's, CR 810's and CR 811's is.
-      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
+      settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
       newPlayer pid =
         ( pid,
           Player.MkPlayer
@@ -369,6 +370,12 @@ createDeck pid deck = do
   Monad.forM_ (Deck.vanguard deck) $ \printing -> do
     printingId <- State.state (Game.intern printing)
     Monad.void (createInCommandZone pid printingId)
+  -- CR 315.2: "before decks are shuffled", the conspiracies this player chose
+  -- from their sideboard go face up into the command zone; CR 315.6 makes them
+  -- this player's to own and control. Pawl.ConspiracySpec proves it.
+  conspiracyIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.conspiracies deck))
+  Monad.forM_ conspiracyIds $ \(printingId, n) ->
+    Monad.replicateM_ (Natural.toIntSaturating n) (createInCommandZone pid printingId)
   -- CR 903.7 / CR 103.4 / CR 103.4d / CR 902.4: the starting life total, which is
   -- the deck's business -- and the settings' and the seat count's and the
   -- vanguard's -- and so cannot be settled by emptyGame above.
@@ -412,8 +419,8 @@ createDeck pid deck = do
   -- Deck.cards PLUS every commander, which is rule 702.139b's second sentence: "in a
   -- Commander game, this is also before you've set aside your commander". The
   -- sideboard interned above is not among them, which is rule 103.2a's first
-  -- sentence; nor is the vanguard or a dungeon, neither of which CR 902.3 or CR
-  -- 309.2 puts in the deck to begin with.
+  -- sentence; nor is the vanguard, a conspiracy or a dungeon, none of which CR
+  -- 902.3, CR 315.3 or CR 309.2 puts in the deck to begin with.
   let starting = foldr (\printingId -> Map.insertWith (+) printingId 1) (Map.fromListWith (+) cardIds) commanderIds
   State.modify' $ \gs ->
     gs
@@ -421,11 +428,12 @@ createDeck pid deck = do
           Map.adjust (\p -> p {Player.startingDeck = starting}) pid (GameState.players gs)
       }
 
--- CR 903.6 / CR 902.3: mint one of this player's cards straight into the command
--- zone, which is where both of the cards a deck starts outside its library begin.
+-- CR 903.6 / CR 902.3 / CR 315.2: mint one of this player's cards straight into
+-- the command zone, which is where every card a deck starts outside its library
+-- begins.
 --
--- Shared by the two rather than written twice, because what it does is CR 400.1's
--- zone bookkeeping and neither rule's own business: Object.zone tracks the zone
+-- Shared rather than written three times, because what it does is CR 400.1's
+-- zone bookkeeping and no one rule's own business: Object.zone tracks the zone
 -- sets, so it moves with them, and this is a hand-written move outside
 -- Event.changeZone for createCard's own reason -- the game is being built, so
 -- there is no CR 400.7 event to emit and nothing to trigger.
@@ -585,7 +593,11 @@ startGameFromCards perform exemptions = do
       -- (#940), and rule 313.2 is stated of each vanguard card rather than of the
       -- one the player designated, so there is nothing here to choose between.
       vanguardIds = Map.keysSet (Map.filterWithKey (\oid _ -> Vanguard.isVanguard oid gs) rebuilt)
-      inCommandIds = Set.union commanderIds vanguardIds
+      -- CR 315.3: "if a conspiracy card would leave the command zone, it remains
+      -- in the command zone" -- rule 313.2's hold, stated of a conspiracy, and
+      -- held back on the vanguard's terms.
+      conspiracyIds = Map.keysSet (Map.filterWithKey (\oid _ -> Conspiracy.isConspiracy oid gs) rebuilt)
+      inCommandIds = Set.unions [commanderIds, vanguardIds, conspiracyIds]
       commandZoneCards = fmap toCommandCard (Map.restrictKeys rebuilt inCommandIds)
       cards = fmap toLibraryCard (Map.withoutKeys rebuilt inCommandIds)
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
@@ -856,9 +868,9 @@ subgameStateFrom starter parent =
       -- the attraction (#871), planar (#934) and scheme (#935) decks CR 100.2d
       -- names, neither of them implemented.
       --
-      -- The command-zone residents pawl DOES have -- an emblem, and a dungeon a
-      -- player has ventured into -- stay in the parent, which is what CR 729.2
-      -- asks rather than an elision: `movedObjects` below restricts to the
+      -- The other command-zone residents pawl DOES have -- an emblem, a
+      -- conspiracy, and a dungeon a player has ventured into -- stay in the
+      -- parent, which is what CR 729.2 asks rather than an elision: `movedObjects` below restricts to the
       -- libraries, CR 729.2b's vanguards and CR 729.2c's commanders, so nothing
       -- else crosses.
       --

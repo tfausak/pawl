@@ -55,6 +55,9 @@ startingHandSize = Vanguard.handSize openingHand
 -- loop to completion. Assumes each player's library is already built and
 -- shuffled. The per-player mulligan count is a local Map (absent = 0) read only
 -- by this loop, so it never enters GameState. `owners` is in turn order.
+--
+-- Not implemented: CR 103.5d's order within a team under the shared team turns
+-- option, which that team chooses (#4001).
 openingHands :: HandActionPerformer -> [PlayerId] -> Game ()
 openingHands perform owners = do
   -- CR 103.5 sentence 1: every player draws a full opening hand. A short

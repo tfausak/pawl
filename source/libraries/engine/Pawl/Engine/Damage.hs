@@ -500,6 +500,9 @@ attackerAssignment gs contested (attacker, target) = case Projection.combatDamag
 -- The "bands with other [quality]" half of the rule is not read, and is part of
 -- the unmodeled half Pawl.Types.Keyword's Banding note describes: no card in the
 -- pool prints it.
+--
+-- Not implemented: CR 805.9's choice of which active player that is under the
+-- shared team turns option (#4003).
 blockerChooser :: GameState -> [ObjectId] -> PlayerId -> PlayerId
 blockerChooser gs attackers controller =
   if any (\attacker -> Projection.hasKeyword Keyword.Banding attacker gs) attackers

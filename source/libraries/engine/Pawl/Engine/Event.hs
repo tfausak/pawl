@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Coin as Coin
 import qualified Pawl.Engine.Commander as Commander
+import qualified Pawl.Engine.Conspiracy as Conspiracy
 import qualified Pawl.Engine.CounterRestriction as CounterRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EntryRestriction as EntryRestriction
@@ -58,6 +59,7 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype.Engine
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -1156,6 +1158,10 @@ createEmblem pid card = do
 -- did: what the filter is matched against is CR 708.2a's public 2/2, and every
 -- entry scanned is one the acting player OWNS (CR 108.3b's guard below), so it
 -- is a card they already know even where another player controls it.
+--
+-- CR 315.3: "conspiracy cards that aren't in the game can't be brought into the
+-- game", whatever the filter admits -- a card-type classification, read off the
+-- printing. Pawl.OutsideTheGameSpec's Ring of Ma'rûf pair proves it.
 eligible :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> [OutsideCard.OutsideCard]
 eligible predicate source pid gs =
   let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
@@ -1163,7 +1169,7 @@ eligible predicate source pid gs =
       matchesFace face = Filter.matches context (Projection.viewOfCard face) predicate
       admits printingId = case Game.cardOfPrinting printingId gs of
         Nothing -> False
-        Just card -> matchesFace (Game.resolveFaceFor Nothing card)
+        Just card -> let face = Game.resolveFaceFor Nothing card in not (Conspiracy.isConspiracyFace face) && matchesFace face
       -- Pawl.Engine.Card.faceDownFace is the same substitution
       -- Pawl.Engine.Game.faceOfObject performs for an object in this game, so
       -- the two frames cannot disagree about what a face-down object is.
@@ -8449,7 +8455,7 @@ settleOnsets gs =
         -- The turn that is beginning IS the one the printed phrase named exactly
         -- when it belongs to the entry's controller (CR 603.7d-f).
         TurnWindow.ControllersNextTurn
-          | DelayedTrigger.controller entry == GameState.activePlayer gs ->
+          | Turn.isActive gs (DelayedTrigger.controller entry) ->
               entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
         -- Anyone else's turn, including an intervening opponent's: still waiting.
         TurnWindow.ControllersNextTurn -> entry

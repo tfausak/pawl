@@ -2584,7 +2584,7 @@ lifeGainedThisTurn gs pid =
 -- which records the attacker and the defender but not the declarer: the active
 -- player is the attacking player, and one turn's log can only hold one active
 -- player's declarations. CR 805.10a's several attacking players would break that
--- (#2848).
+-- (#4002).
 --
 -- CR 508.4's creature put onto the battlefield attacking stays out, only
 -- Pawl.Engine.Combat.declareAttackers appending the event -- the same scope

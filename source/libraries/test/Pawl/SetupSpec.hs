@@ -228,7 +228,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     let build commander =
           S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) $
-            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = commander, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
+            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = commander, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty}
     Spec.assertEqWith s "forty with a commander" (S.lifeOf S.alice (build (Set.singleton shimatsu))) (Just 40)
     Spec.assertEqWith s "twenty without" (S.lifeOf S.alice (build Set.empty)) (Just 20)
     Spec.assertEqWith s "and bob, whose deck was never built, keeps CR 103.4's twenty" (S.lifeOf S.bob (build (Set.singleton shimatsu))) (Just 20)
@@ -241,7 +241,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     let build seats brawl =
           S.runPure S.identityAnswer (settingsOf brawl (Setup.emptyGame seats)) $
-            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.singleton shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
+            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Set.singleton shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty}
     Spec.assertEqWith s "two-player Brawl: 25" (S.lifeOf S.alice (build S.bothPlayers True)) (Just 25)
     Spec.assertEqWith s "multiplayer Brawl: 30" (S.lifeOf S.alice (build S.threePlayers True)) (Just 30)
     Spec.assertEqWith s "the same deck outside Brawl: CR 903.7's forty" (S.lifeOf S.alice (build S.bothPlayers False)) (Just 40)
@@ -256,7 +256,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
   Spec.it s "CR 727.1 / 729.2 a rebuilt Brawl game is still a Brawl game" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     mountain <- S.printingOf s registry "Mountain"
-    let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 10, Deck.commander = Set.singleton shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty}
+    let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 10, Deck.commander = Set.singleton shimatsu, Deck.vanguard = Nothing, Deck.dungeons = Set.empty, Deck.sideboard = Map.empty, Deck.conspiracies = Map.empty}
         built brawl =
           S.runPure S.identityAnswer (settingsOf brawl (Setup.emptyGame S.bothPlayers)) $
             Setup.createDeck S.alice deck

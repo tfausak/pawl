@@ -1412,7 +1412,7 @@ restrictionMet pid gs restriction = case restriction of
   -- (CR 307.5).
   CastingRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
-      && Event.turnScopeAdmits (Game.teams gs) scope (GameState.activePlayer gs) pid
+      && Event.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
   -- CR 508.3b's question, and it lives in Pawl.Engine.Turn because the ability
   -- side's clause of the same name asks exactly it: one question about the combat
   -- record, two gates that differ in what ELSE they may read (CR 307.5).

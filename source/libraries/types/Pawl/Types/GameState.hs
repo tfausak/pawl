@@ -327,8 +327,8 @@ data GameState = MkGameState
     daytime :: Maybe Daytime.Daytime,
     -- | CR 502.2 / 731.2: how many spells the previous turn's active player cast
     -- that turn, snapshotted at handoff from the outgoing log, which is cleared
-    -- there. Not implemented: CR 731.2a's reading for the shared team turns
-    -- option, which asks about a whole team (#2848).
+    -- there. Under the shared team turns option, the most any one player on the
+    -- previous active team cast (CR 731.2a).
     spellsCastLastTurn :: Natural.Natural,
     -- | CR 601.2i / 608.2i: how many spells each player cast during the turn
     -- just ended, sparse, snapshotted at the same handoff; spellsCastLastTurn
