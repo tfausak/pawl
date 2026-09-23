@@ -726,6 +726,8 @@ elvishPiperSpec s registry =
       -- is the observation that pins the candidate set: one matching card is
       -- elided (CR 101.3), so a gather that offered the whole hand would ask.
       handChoices responses = length (filter (\r -> case r of Response.ChoseCardInHand _ -> True; _ -> False) responses)
+      -- How many times CR 603.5's printed "may" was put.
+      mays responses = length (filter (\r -> case r of Response.ChoseOptional _ -> True; _ -> False) responses)
       named = Just . CardName.MkCardName . Text.pack
       -- alice's battlefield minus the Forests: the Piper, plus whatever the
       -- ability put there. By NAME, since CR 400.7 mints a fresh id at the
@@ -763,6 +765,7 @@ elvishPiperSpec s registry =
           case mineIds of
             [_, mountainId, _] -> case run (taking mountainId) piperId gs of
               Just (after, responses) -> do
+                Spec.assertEqWith s "CR 608.2d a creature card to put makes the may a real option: it was put" (mays responses) 1
                 Spec.assertEqWith s "one candidate matched, so nothing was asked" (handChoices responses) 0
                 Spec.assertEqWith
                   s
@@ -812,11 +815,10 @@ elvishPiperSpec s registry =
                   (List.sort [named "Elvish Piper", named "Russet Wolves"])
               _ -> Spec.assertFailure s "Elvish Piper's ability did not resolve"
             _ -> Spec.assertFailure s "the fixture did not put three cards in alice's hand"
-        -- No candidate at all. CR 609.3 and CR 101.3: the instruction does as much
-        -- as possible, which is nothing, and the "may" was still offered. An
-        -- unfiltered gather would offer the land and the instant and put one of
-        -- them onto the battlefield.
-        Spec.it s "CR 609.3 a hand holding no creature card offers nothing" $ do
+        -- No candidate at all, so the option is impossible and CR 608.2d does not
+        -- put the "may". An unfiltered gather would offer the land and the
+        -- instant and put one of them onto the battlefield.
+        Spec.it s "CR 608.2d a hand holding no creature card offers nothing" $ do
           piper <- S.printingOf s registry "Elvish Piper"
           forest <- S.printingOf s registry "Forest"
           mountain <- S.printingOf s registry "Mountain"
@@ -825,6 +827,7 @@ elvishPiperSpec s registry =
           case mineIds of
             [mountainId, _] -> case run (taking mountainId) piperId gs of
               Just (after, responses) -> do
+                Spec.assertEqWith s "CR 608.2d the may was never put" (mays responses) 0
                 Spec.assertEqWith s "nothing was asked" (handChoices responses) 0
                 Spec.assertEqWith s "only the Piper is on her battlefield" (arrivals after) [named "Elvish Piper"]
                 Spec.assertEqWith s "and both cards are still in her hand" (List.sort (namesIn Zone.Hand S.alice after)) (List.sort [named "Mountain", named "Giant Growth"])
