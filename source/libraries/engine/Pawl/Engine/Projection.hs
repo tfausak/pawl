@@ -4601,14 +4601,14 @@ replacementsAffecting gs =
 -- text at all: a resolved spell or ability has left the stack and its effect
 -- outlives it, so no walk of anybody's static abilities can find it.
 --
--- Reads the SAME list gatherGiven's `stored` arm does, entire, which is what
--- makes it sound. CR 611.2c's locked affected set is deliberately NOT consulted:
--- deciding which permanents an effect reaches means building the projection this
--- gate exists to skip, so a stored effect writing a minting modification gathers
--- the whole board however narrow its set. That over-trips and can never drop a
--- row.
+-- Reads the SAME list gatherGiven's `stored` arm does, entire and expanded
+-- through grantedDefiningParts, which is what makes it sound. CR 611.2c's locked
+-- affected set is deliberately NOT consulted: deciding which permanents an
+-- effect reaches means building the projection this gate exists to skip, so a
+-- stored effect writing a minting modification gathers the whole board however
+-- narrow its set. That over-trips and can never drop a row.
 storedWrites :: (Modification -> Bool) -> GameState -> Bool
-storedWrites p gs = any (p . ContinuousEffect.modification) (GameState.continuousEffects gs)
+storedWrites p gs = any (any p . grantedDefiningParts . ContinuousEffect.modification) (GameState.continuousEffects gs)
 
 -- Does any static ability functioning from a zone OTHER than the battlefield
 -- write a modification satisfying `p`? storedWrites' sibling disjunct in both

@@ -160,9 +160,9 @@ permanentLeavesTheBattlefieldSpec s registry =
           Spec.assertEqWith s "and it is bob's Shredder that grew, off alice's permanent" (Projection.powerOf shredderId after, Projection.toughnessOf shredderId after) (Just 2, Just 2)
           Spec.assertEqWith s "one counter, from one departure" (fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject shredderId after)) (Just (Just 1))
         -- CR 400.2's hidden half of the same rule: a bounce reaches a HAND, and
-        -- the watcher still sees it. The bearer reads the departing permanent
-        -- from CR 608.2h last known information, which is what makes this
-        -- answerable at all -- there is no public incarnation to read.
+        -- the watcher still sees it. "Another permanent" reads no controller, so
+        -- this board cannot tell CR 603.10a's look-back from CR 108.4a's owner;
+        -- permanentReturnedToHandSpec's stolen Piker does.
         Spec.it s "CR 603.6c whole card: Unsummon bounces the Piker to a hidden zone and the Shredder still grows" $ do
           island <- S.printingOf s registry "Island"
           unsummon <- S.printingOf s registry "Unsummon"
@@ -307,10 +307,10 @@ permanentReturnedToHandSpec s registry =
               Spec.assertEqWith s "the Island leaves Justice a 2/2" (sizeOf justiceId (moveTo landId Zone.Hand board)) (Just 2, Just 2)
               Spec.assertEqWith s "the Piker, on the same board and the same destination, makes it a 3/3" (sizeOf justiceId (moveTo pikerId Zone.Hand board)) (Just 3, Just 3)
             other -> Spec.assertFailure s ("expected one Island and one Piker, got " <> show other)
-        -- The printed "you control", read from CR 608.2h last known information:
-        -- by the time CR 117.5's scan runs the Piker is a card in a hand, which
-        -- CR 108.4 gives no controller at all. Same board shape as the case
-        -- above, the owner of the Piker the only difference.
+        -- The printed "you control" against no clause at all. Same board shape as
+        -- the case above, the owner of the Piker the only difference; each Piker
+        -- is its owner's, so which reading answers "you control" is the next
+        -- case's question, not this one's.
         Spec.it s "CR 603.10a bob's Piker returned to hand leaves alice's Justice a 2/2" $ do
           island <- S.printingOf s registry "Island"
           (justiceId, bobPikers, bobBoard) <- justiceBoard (S.landsInPlay island 1) [S.bob]
@@ -320,6 +320,22 @@ permanentReturnedToHandSpec s registry =
               Spec.assertEqWith s "bob's Piker is not one alice controls" (sizeOf justiceId (moveTo bobPiker Zone.Hand bobBoard)) (Just 2, Just 2)
               Spec.assertEqWith s "alice's is, on the board that differs in nothing else" (sizeOf aliceJusticeId (moveTo alicePiker Zone.Hand aliceBoard)) (Just 3, Just 3)
             other -> Spec.assertFailure s ("expected one Piker each, got " <> show other)
+        -- CR 603.10a: by the time CR 117.5's scan runs the Piker is a card in a
+        -- hand, which CR 108.4 gives no controller, so "you control" is read
+        -- looking back at the permanent. bob owns the Piker and alice has stolen
+        -- it with Control Magic: CR 108.4a's owner substitution would answer
+        -- bob and leave Justice a 2/2.
+        Spec.it s "CR 603.10a bob's Piker, stolen by alice and returned to hand, grows alice's Justice" $ do
+          island <- S.printingOf s registry "Island"
+          controlMagic <- S.printingOf s registry "Control Magic"
+          (justiceId, pikerIds, board) <- justiceBoard (S.landsInPlay island 1) [S.bob]
+          case pikerIds of
+            [pikerId] -> do
+              let (aura, withAura) = S.addPermanent controlMagic S.alice board
+                  stolen = S.attach aura pikerId withAura
+              Spec.assertEqWith s "alice controlled the Piker as it left" (Projection.controllerOf pikerId stolen) (Just S.alice)
+              Spec.assertEqWith s "so her Justice grew" (sizeOf justiceId (moveTo pikerId Zone.Hand stolen)) (Just 3, Just 3)
+            other -> Spec.assertFailure s ("expected one Piker, got " <> show (length other))
         -- CR 603.2c: "it can trigger repeatedly if one event contains multiple
         -- occurrences". Evacuation returns every creature in one resolution, so
         -- two of alice's Pikers are two occurrences and Justice's ability

@@ -2369,8 +2369,9 @@ representativeEvents cond =
         -- The one destination the arm above's three events narrow to, and the
         -- only event this condition admits at all: CR 400.2 makes a hand hidden,
         -- so CR 400.7e withholds the arrival; what the floor holds is the
-        -- departed permanent and CR 400.3's owner, read off CR 608.2h's record
-        -- of `departed` in the pin's state.
+        -- departed permanent and its owner. The owner is read off the pin's
+        -- last-known record of `departed`, though CR 108.3's owner is the same
+        -- on the card in hand, so no board tells the two reads apart.
         TriggerCondition.PermanentReturnedToHand _ -> one (moved Zone.Battlefield Zone.Hand)
         -- The same one event, and NOT because the batch reading matches nothing:
         -- Event.matchesTrigger answers alike for both (its batch arm delegates to
