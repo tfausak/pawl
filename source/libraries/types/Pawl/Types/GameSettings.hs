@@ -62,6 +62,14 @@ data GameSettings = MkGameSettings
     -- shares no resource between players, and one player has never been able to
     -- touch another's cards.
     teams :: Teams.Teams,
+    -- | CR 805.1: whether each team takes its turns together, every member of
+    -- the active team being an active player (CR 805.4a, 805.9). Off by
+    -- default (Pawl.Engine.Setup.emptyGame), and read through
+    -- Pawl.Engine.Turn.sharesTurn.
+    --
+    -- Not implemented: CR 805.1's adjacent seating is not checked, the turn
+    -- order being the caller's list (#2847).
+    sharedTeamTurns :: Bool,
     -- | CR 801.2a: each player's range of influence.
     -- 'RangeOfInfluence.unlimited' by default (Pawl.Engine.Setup.emptyGame), since
     -- CR 801.1 makes a limited range an option. Read through
