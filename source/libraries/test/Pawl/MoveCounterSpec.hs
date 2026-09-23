@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Resolve's Effect.MoveCounters arm -- CR 122.5's move of
 -- counters from one object onto a second, and the atomicity that makes it one
@@ -94,6 +95,13 @@ toolkitAnswer pick p = case p of
     pure (case pick of Highest -> NonEmpty.last offered; _ -> NonEmpty.head offered)
   _ -> pure (S.identityAnswer p)
 
+-- toolkitAnswer counting CR 603.5's "may" rather than the counter question,
+-- for the case whose point is that the option was never put.
+mayCounted :: Pick -> Prompt.Prompt r -> State.State Int r
+mayCounted pick p = case p of
+  Prompt.ChooseOptional {} -> State.modify' (+ 1) >> toolkitAnswer pick p
+  _ -> State.state (\n -> (State.evalState (toolkitAnswer pick p) 0, n))
+
 -- The four kinds Agent's Toolkit's entry line names, read off one object.
 kindsOn :: ObjectId.ObjectId -> GameState.GameState -> (Natural, Natural, Natural, Natural)
 kindsOn oid gs =
@@ -157,10 +165,12 @@ moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
       -- Cast the artifact, then the other spell, then let the artifact's trigger
       -- reach the stack and resolve. settleForPriority is where CR 704's
       -- state-based actions run and the trigger is placed, in that order.
-      play pick (heldToolkit, heldSecond, ready) =
+      play pick = playWith (toolkitAnswer pick)
+      playWith :: (forall r. Prompt.Prompt r -> State.State Int r) -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState) -> (Int, Maybe ObjectId.ObjectId, GameState.GameState)
+      playWith answer (heldToolkit, heldSecond, ready) =
         let run =
               Engine.runGame
-                (toolkitAnswer pick)
+                answer
                 ready
                 ( S.cast S.alice heldToolkit
                     >> Stack.resolveTop
@@ -224,6 +234,21 @@ moveCounterSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
         Spec.assertEqWith s "the praetor halved every kind away, so the artifact bears none" (kindsOn toolkit after) (0, 0, 0, 0)
         Spec.assertEqWith s "and nothing was put on the creature that entered" (fmap (`kindsOn` after) (newestNamed pikerName after)) (Just (0, 0, 0, 0))
         Spec.assertEqWith s "and with no kind to offer the player was not asked" asked 0
+      _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
+  -- CR 608.2d on that board: a move no counter can make is not an option, so
+  -- the printed "may" is not put either. The control is the same count on the
+  -- first case's board, where the artifact bears all four.
+  Spec.it s "CR 608.2d the may is not put when the artifact bears no counter" $ do
+    let withPraetor gs = do
+          vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+          pure (snd (S.addPermanent vorinclex S.bob gs))
+    bare <- board "Goblin Piker" withPraetor
+    stocked <- board "Goblin Piker" pure
+    case (playWith (mayCounted Lowest) bare, playWith (mayCounted Lowest) stocked) of
+      ((offered, Just _, _), (controlOffered, Just _, control)) -> do
+        Spec.assertEqWith s "CR 608.2d CR 603.5's may was never put over the bare artifact" offered 0
+        Spec.assertEqWith s "the control: over the stocked artifact it was put once" controlOffered 1
+        Spec.assertEqWith s "and taking it moved the counter onto the creature" (fmap (`kindsOn` control) (newestNamed pikerName control)) (Just (1, 0, 0, 0))
       _ -> Spec.assertFailure s "the artifact did not reach the battlefield"
   -- CR 122.5's FOURTH impossibility, on the SECOND object -- "either object is no
   -- longer in the correct zone". Clone enters with no creature on the battlefield
