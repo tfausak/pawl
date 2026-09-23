@@ -242,7 +242,13 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- every event in its body shares the one the bracket froze. Only advanced at
 -- depth 0, which is what freezes it.
 recordEvent :: GameEvent -> GameState -> GameState
-recordEvent event gs =
+recordEvent event gs = recordEventOver gs event gs
+
+-- `recordEvent`, sampling CR 603.10's board off `board` rather than off the state
+-- the entry is appended to: for an event the caller records after the moment it
+-- happened, `becameTarget`'s reason.
+recordEventOver :: GameState -> GameEvent -> GameState -> GameState
+recordEventOver board event gs =
   let group = GameState.nextEventGroup gs
    in gs
         { GameState.events = GameState.events gs Seq.|> LoggedEvent.MkLoggedEvent {LoggedEvent.group = group, LoggedEvent.event = event},
@@ -251,7 +257,7 @@ recordEvent event gs =
               then EventGroup.next group
               else group,
           GameState.battlefieldWhenTriggered =
-            Map.insert group (battlefieldCandidates gs) (GameState.battlefieldWhenTriggered gs)
+            Map.insert group (battlefieldCandidates board) (GameState.battlefieldWhenTriggered gs)
         }
 
 -- CR 725.2 / CR 726.2: the creature that dealt this logged event's COMBAT damage
@@ -6621,11 +6627,12 @@ counterOne source controller oid = do
 -- but holds the ability off the stack "until the spell has finished being cast",
 -- and CR 601.2 rewinds the whole announcement if it does not.
 --
--- The position IS observable, and not only through a rewind: this runs after the
--- costs are paid, so an activation whose cost removes the creature it also
--- targeted -- Rune-Brand Juggler sacrificing the suspected creature its own
--- ability names -- records the event with that permanent already gone, where CR
--- 601.2c made it a target while it stood (gap #3418).
+-- `announced` is the state rule 601.2c left, before any cost was paid, and the
+-- group's CR 603.10 sample is taken off it rather than off the state the events
+-- are appended to: an activation whose cost removes the creature it also targeted
+-- -- Rune-Brand Juggler sacrificing the suspected creature its own ability names
+-- -- still made that creature a target while it stood. Proved by
+-- Pawl.LeavesTriggerSpec's "Professor Hojo sees a target its own cost sacrificed".
 --
 -- BRACKETED, which is what makes CR 603.2c's first sentence readable: rule
 -- 601.2c makes the chosen objects targets in one announcement, so every event
@@ -6634,11 +6641,11 @@ counterOne source controller oid = do
 -- Unbracketed, a batch-scoped arm is inert -- each recipient gets a group of its
 -- own and fires the ability again. Per-occurrence siblings are unaffected:
 -- eventTriggers keys them Nothing, so ward on two creatures still fires twice.
-becameTarget :: ObjectId -> StackObjectKind.StackObjectKind -> PlayerId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Game ()
-becameTarget source kind controller chosen =
+becameTarget :: GameState -> ObjectId -> StackObjectKind.StackObjectKind -> PlayerId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Game ()
+becameTarget announced source kind controller chosen =
   simultaneously . Foldable.for_ (concatMap Set.toAscList (Map.elems chosen)) $ \targeted ->
     State.modify'
-      . recordEvent
+      . recordEventOver announced
       $ GameEvent.BecameTarget
         BecameTarget.MkBecameTarget
           { BecameTarget.targeted = targeted,
@@ -7862,7 +7869,7 @@ reveal cause pid oid = do
 -- and every condition but one. `matchesTriggerGiven` below is the same act with CR
 -- 603.7c's captured environment in hand.
 matchesTrigger :: GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
-matchesTrigger = matchesTriggerGiven Map.empty
+matchesTrigger gs = matchesTriggerGiven Map.empty (battlefieldCandidates gs) gs
 
 -- CR 603.3b: is this trigger condition "another ability triggering"? The
 -- classification the rule's two-part placement turns on -- False puts a trigger
@@ -8040,6 +8047,7 @@ reactsToAbilityTriggering cond = case cond of
   -- Nor is the batch reading of the same rule: CR 601.2c's announcement is not
   -- an ability triggering however many permanents it named.
   TriggerCondition.PermanentsBecomeTargeted {} -> False
+  TriggerCondition.PermanentBecomesTargeted {} -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SelfTurnedFaceUp -> False
@@ -8365,6 +8373,7 @@ controllerTurnScoped cond = case cond of
   -- And the bystander batch reading likewise: an activated ability can name a
   -- creature on anybody's turn.
   TriggerCondition.PermanentsBecomeTargeted {} -> False
+  TriggerCondition.PermanentBecomesTargeted {} -> False
   -- CR 714.3c's turn-based action falls on the Saga controller's own turn, but
   -- nothing restricts this CONDITION to it: CR 714.3a's entry replacement can put
   -- a Saga's last lore counter on during anybody's turn, and the watcher is not

@@ -31,6 +31,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -881,6 +882,18 @@ lastKnownOf oid gs =
   if Map.member oid (GameState.objects gs)
     then Nothing
     else Map.lookup oid (GameState.lastKnown gs)
+
+-- CR 603.10's first sentence: a permanent as a trigger event's own board sample
+-- (Event.Trigger.battlefieldAt) shows it -- the characteristics and controller it
+-- had immediately after the event -- whether it still stands or has since left,
+-- in which case CR 608.2h's record supplies what the sample does not carry.
+sampledView :: ObjectId -> BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics -> GameState -> Filter.View
+sampledView oid candidate gs =
+  let pc = BattlefieldCandidate.characteristics candidate
+      controller = BattlefieldCandidate.controller candidate
+   in case lastKnownOf oid gs of
+        Just lk -> lastKnownView (viewWithLastKnownAnywhere gs) oid gs lk {LastKnown.characteristics = pc, LastKnown.controller = controller}
+        Nothing -> viewOfCharacteristics (viewWithLastKnownAnywhere gs) oid pc (Just controller) (countersOf oid gs) gs
 
 -- keywordsOf with CR 608.2h's fallback (CR 702.2e, CR 702.15c, CR 702.90d); toxic
 -- (rule 702.164) has no such clause and rides this by uniformity.
