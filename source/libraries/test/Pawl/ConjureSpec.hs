@@ -254,7 +254,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
         (_, stocked) = S.addLibraryCard islandPrinting S.alice entered
         conjured = settleTriggers stocked
         inYard = namedIn thinkTwice Zone.Graveyard conjured
-        -- CR 304.1: an instant needs only priority, so the main phase is where
+        -- CR 117.1a: an instant needs only priority, so the main phase is where
         -- the cases above cast from rather than something this one requires.
         main_ = conjured {GameState.phase = Phase.PrecombatMain}
         flashedBack = case inYard of
