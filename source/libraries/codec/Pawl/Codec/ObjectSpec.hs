@@ -6,6 +6,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbilitySourceSpec as ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.Object as Object
+import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Binding as Binding
@@ -89,6 +90,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.warped = Nothing,
           Object.preparedCopyOf = Nothing,
           Object.ringBearerFor = Nothing,
+          Object.duplicate = Nothing,
           Object.paired = Nothing,
           Object.protector = Nothing,
           Object.ventureRoom = Nothing,
@@ -192,6 +194,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.warped = Just 28,
           Object.preparedCopyOf = Just (ObjectId.MkObjectId 26),
           Object.ringBearerFor = Just (PlayerId.MkPlayerId 16),
+          Object.duplicate = Just ProjectedCharacteristicsSpec.minimalCharacteristics,
           Object.paired = Nothing,
           Object.protector = Just (PlayerId.MkPlayerId 17),
           Object.ventureRoom = Just (RoomIndex.MkRoomIndex 18),
@@ -252,7 +255,9 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"plotted\":0,\"foretold\":15"
           <> ",\"foretellCostReduction\":[{\"type\":\"Generic\",\"value\":29}]"
           <> ",\"warped\":28,\"preparedCopyOf\":26"
-          <> ",\"ringBearerFor\":16,\"protector\":17"
+          <> ",\"ringBearerFor\":16"
+          <> ",\"duplicate\":{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
+          <> ",\"protector\":17"
           <> ",\"ventureRoom\":18,\"classLevel\":2,\"unlockedHalves\":[\"Fire\"]"
           <> ",\"designations\":[{\"type\":\"Renowned\"}]"
           <> ",\"designationValues\":[{\"designation\":{\"type\":\"Monstrous\"},\"value\":26}]"
