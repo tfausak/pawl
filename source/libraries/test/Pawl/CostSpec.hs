@@ -5791,22 +5791,20 @@ kataraBoard mountain katara piker others =
           }
       )
 
--- alice holds `card`, controls one Forest and seven Mountains, and bob controls
--- seven Plains; she has priority in her own precombat main phase so a creature
--- spell is castable (CR 302.1). Returns the spell, the Forest, bob's Plains and
--- that state.
+-- alice holds `card`, controls one Forest and `mountains` Mountains, and bob
+-- controls `plainses` Plains; she has priority in her own precombat main phase so
+-- a creature spell is castable (CR 302.1). Returns the spell, the Forest, bob's
+-- Plains and that state.
 --
--- EIGHT sources for alice, where the cast below spends one: CR 601.2's
--- announcement is gated on what the CASTER can pay (#3959), so the assist has to
--- save her mana rather than afford her the spell. Her other seven are Mountains
--- and bob's are Plains, so each window's answer is named by its printing and no
--- counting is needed to keep the two apart.
-assistBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-assistBoard forest mountain plains card =
+-- Her Mountains and bob's Plains are different printings, so each window's
+-- answer is named by its printing and no counting is needed to keep the two
+-- apart.
+assistBoard :: Int -> Int -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+assistBoard mountains plainses forest mountain plains card =
   let place printing who n gs = List.foldl' (\(ids, acc) _ -> let (oid, next) = S.addPermanent printing who acc in (ids <> [oid], next)) ([], gs) (replicate n ())
       (forestId, gs1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
-      (_, gs2) = place mountain S.alice 7 gs1
-      (plainsIds, gs3) = place plains S.bob 7 gs2
+      (_, gs2) = place mountain S.alice mountains gs1
+      (plainsIds, gs3) = place plains S.bob plainses gs2
       (spell, gs4) = S.addHandCard card S.alice gs3
    in ( spell,
         forestId,
@@ -5833,7 +5831,7 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     forest <- S.printingOf s registry "Forest"
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
-    let (spell, forestId, plainsIds, gs) = assistBoard forest mountain plains binox
+    let (spell, forestId, plainsIds, gs) = assistBoard 7 7 forest mountain plains binox
         answer :: Prompt.Prompt r -> r
         answer = assisting (Just S.bob) 7 forestId plainsIds
         cast = S.runPure answer gs (S.cast S.alice spell)
@@ -5854,13 +5852,52 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     forest <- S.printingOf s registry "Forest"
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
-    let (spell, forestId, plainsIds, gs) = assistBoard forest mountain plains binox
+    let (spell, forestId, plainsIds, gs) = assistBoard 7 7 forest mountain plains binox
         answer :: Prompt.Prompt r -> r
         answer = assisting Nothing 7 forestId plainsIds
         cast = S.runPure answer gs (S.cast S.alice spell)
         resolved = S.runPure answer cast Stack.resolveTop
     Spec.assertEqWith s "the Binox is nowhere: CR 601.2h's payment failed and CR 601.2e took the cast back" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Charging Binox")) S.alice resolved) 0
     Spec.assertEqWith s "and bob's Plains were never offered a window" (S.tappedCount S.bob resolved) 0
+  -- CR 601.2 lets a player propose a cast they cannot pay alone, and rule
+  -- 702.132a's chosen player pays at CR 601.2h: alice's one Forest and bob's
+  -- seven Plains are {7}{G} between them.
+  Spec.it s "CR 702.132a alice, with one Forest, casts the Binox bob pays seven of" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, forestId, plainsIds, gs) = assistBoard 0 7 forest mountain plains binox
+        answer :: Prompt.Prompt r -> r
+        answer = assisting (Just S.bob) 7 forestId plainsIds
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "the Binox resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Charging Binox")) S.alice resolved) 1
+    Spec.assertEqWith s "the cast was offered to alice" (S.castable S.alice spell gs) True
+    Spec.assertEqWith s "bob's seven Plains paid the generic mana" (S.tappedCount S.bob resolved) 7
+  -- The negative, one Plains fewer: {7}{G} is out of reach of both players
+  -- together, so the cast is not offered.
+  Spec.it s "CR 702.132a alice is not offered the Binox when bob could pay only six" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, _, _, gs) = assistBoard 0 6 forest mountain plains binox
+    Spec.assertEqWith s "the cast is not offered" (S.castable S.alice spell gs) False
+  -- The engine does not answer for bob: a caster offered the cast on his
+  -- account who then names nobody fails CR 601.2h, and CR 733.1 unwinds it.
+  Spec.it s "CR 702.132a the same cast unwinds when alice names nobody" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, forestId, plainsIds, gs) = assistBoard 0 7 forest mountain plains binox
+        answer :: Prompt.Prompt r -> r
+        answer = assisting Nothing 7 forestId plainsIds
+        cast = S.runPure answer gs (S.cast S.alice spell)
+    Spec.assertEqWith s "the stack is empty" (null (GameState.stack cast)) True
+    Spec.assertEqWith s "the Binox is back in alice's hand" (S.handSize S.alice cast) 1
+    Spec.assertEqWith s "and her Forest is untapped" (S.tappedCount S.alice cast) 0
 
 -- Answer CR 702.132a's two prompts with `helper` and `amount`, and each mana
 -- window with the lands that window's player is meant to tap -- alice the one
