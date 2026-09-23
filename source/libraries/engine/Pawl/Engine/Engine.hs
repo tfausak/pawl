@@ -2019,9 +2019,9 @@ runStepThatBegan phase = do
   -- during the untap step (CR 502.4), so an ability that triggers then is held
   -- until upkeep, where CR 503.1a puts it on the stack first.
   --
-  -- Not implemented: CR 805.4d -- one beginning is recorded, naming the active
-  -- player, so an "each player's" trigger reading "that player" fires once for a
-  -- whole team's turn (#4004).
+  -- One beginning, naming the active player, however many share the turn: CR
+  -- 805.4d's once-per-player fan-out is the trigger scan's
+  -- (Pawl.Engine.Event.Trigger.stepTriggerPlayers).
   State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan phase (GameState.activePlayer gs))) gs)
   -- CR 702.30a's clock, advanced HERE and not in `runTurnBasedActions`: CR 503.1
   -- gives the upkeep step no turn-based actions, and this is bookkeeping rather

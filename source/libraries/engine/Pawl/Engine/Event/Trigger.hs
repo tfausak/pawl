@@ -22,7 +22,7 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
 import Pawl.Engine.Event.Binding (batchBindings, eventBindings)
-import Pawl.Engine.Event.Match (matchesTriggerGiven)
+import Pawl.Engine.Event.Match (matchesTriggerGiven, stepPlayers)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Resolve.Slots as Slots
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
@@ -54,6 +55,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RevealCause as RevealCause
@@ -61,6 +63,8 @@ import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
+import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -748,6 +752,21 @@ batchScoped condition = case condition of
 -- occur, which spares both callers an impossible arm.
 eventGroups :: [LoggedEvent.LoggedEvent] -> [NonEmpty.NonEmpty LoggedEvent.LoggedEvent]
 eventGroups = NonEmpty.groupBy (\a b -> LoggedEvent.group a == LoggedEvent.group b)
+
+-- CR 805.4d: the players a step beginning triggers this ability once each for,
+-- or Nothing where it triggers once. An ability that reads CR 603.2b's "that
+-- player" (Binding.triggerPlayer) through its effects, targets or CR 603.4
+-- intervening "if" triggers once per player whose step it is (stepPlayers);
+-- one that does not triggers once, however many share the turn.
+--
+-- A partial case with a wildcard: this answers about one condition and one
+-- event shape, and every other pair keeps its single trigger.
+stepTriggerPlayers :: GameState -> PlayerId -> TriggerCondition -> GameEvent -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe [PlayerId]
+stepTriggerPlayers gs you cond event ability = case (cond, event) of
+  (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began _))
+    | began == wanted && Map.member Binding.triggerPlayer (Slots.triggeredAbilitySlots ability) -> Just (stepPlayers gs scope you)
+  (TriggerCondition.AnyOf conditions, _) -> Maybe.listToMaybe (Maybe.mapMaybe (\c -> stepTriggerPlayers gs you c event ability) conditions)
+  _ -> Nothing
 
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
@@ -1747,6 +1766,12 @@ eventTriggers events gs =
             -- pending trigger carries.
             fires (cond, _) = matchesTriggerGiven bindings board gs oid ctrl cond event
             pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event) Nothing (Just event)
+            -- CR 805.4d: one trigger per player whose step this is, each naming
+            -- its own "that player", where the ability reads that player.
+            pends (cond, ab) =
+              let one = pend (cond, ab)
+                  for player = one {PendingTrigger.bindings = Binding.setTriggerPlayer player (PendingTrigger.bindings one)}
+               in maybe [one] (fmap for) (stepTriggerPlayers gs ctrl cond event ab)
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
             -- is per-occurrence and every member of the batch is its own trigger
@@ -1758,8 +1783,8 @@ eventTriggers events gs =
               if batchScoped cond
                 then Just (oid, index :: Natural)
                 else Nothing
-            keyed indexed = (key indexed, pend (snd indexed))
-         in fmap keyed (filter (fires . snd) (zip [0 ..] abilities))
+            keyed indexed = fmap ((,) (key indexed)) (pends (snd indexed))
+         in concatMap keyed (filter (fires . snd) (zip [0 ..] abilities))
       -- Map.unions is left-biased, so the battlefield reading wins over a
       -- last-known one, a cycled card and a graveyard reading. That rules out a
       -- double fire: one entry per id means one pass of `forOne` per id.
