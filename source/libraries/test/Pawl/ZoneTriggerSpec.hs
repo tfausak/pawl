@@ -2409,6 +2409,7 @@ representativeEvents cond =
         -- ActivatedAbility. It binds nothing, CR 603.2c's batch naming no one
         -- permanent, and the floor below pins that.
         TriggerCondition.PermanentsBecomeTargeted c -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived (Maybe.fromMaybe StackObjectKind.Spell (PermanentsBecomeTargeted.kind c)) S.bob))
+        TriggerCondition.PermanentBecomesTargeted c -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived (Maybe.fromMaybe StackObjectKind.Spell (PermanentsBecomeTargeted.kind c)) S.bob))
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
@@ -2754,6 +2755,8 @@ everyTriggerCondition =
     -- Professor Hojo's own, the only inhabitant in the pool: a Filter and a kind
     -- where the sibling above carries a relation and a kind.
     TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted Filter.Type.IsSource (Just StackObjectKind.ActivatedAbility)),
+    -- Venerated Rotpriest's per-creature twin.
+    TriggerCondition.PermanentBecomesTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted Filter.Type.IsSource (Just StackObjectKind.Spell)),
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
     -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds

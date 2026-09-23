@@ -127,6 +127,7 @@ codec =
           Arm.payload "SelfBecomesTargeted" PlayerRelation.codec TriggerCondition.SelfBecomesTargeted (\x -> case x of TriggerCondition.SelfBecomesTargeted y -> Just y; _ -> Nothing),
           Arm.payload "ControllerBecomesTarget" ControllerBecomesTarget.codec TriggerCondition.ControllerBecomesTarget (\x -> case x of TriggerCondition.ControllerBecomesTarget y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsBecomeTargeted" PermanentsBecomeTargeted.codec TriggerCondition.PermanentsBecomeTargeted (\x -> case x of TriggerCondition.PermanentsBecomeTargeted y -> Just y; _ -> Nothing),
+          Arm.payload "PermanentBecomesTargeted" PermanentsBecomeTargeted.codec TriggerCondition.PermanentBecomesTargeted (\x -> case x of TriggerCondition.PermanentBecomesTargeted y -> Just y; _ -> Nothing),
           Arm.payload "SelfHalfUnlocked" CardName.codec TriggerCondition.SelfHalfUnlocked (\x -> case x of TriggerCondition.SelfHalfUnlocked y -> Just y; _ -> Nothing),
           Arm.payload "RoomFullyUnlocked" PlayerRelation.codec TriggerCondition.RoomFullyUnlocked (\x -> case x of TriggerCondition.RoomFullyUnlocked y -> Just y; _ -> Nothing),
           Arm.payload "AnyOf" (Common.list codec) TriggerCondition.AnyOf (\x -> case x of TriggerCondition.AnyOf y -> Just y; _ -> Nothing),
@@ -265,6 +266,7 @@ tagOf x = case x of
   TriggerCondition.SelfBecomesTargeted {} -> "SelfBecomesTargeted"
   TriggerCondition.ControllerBecomesTarget {} -> "ControllerBecomesTarget"
   TriggerCondition.PermanentsBecomeTargeted {} -> "PermanentsBecomeTargeted"
+  TriggerCondition.PermanentBecomesTargeted {} -> "PermanentBecomesTargeted"
   TriggerCondition.SelfHalfUnlocked {} -> "SelfHalfUnlocked"
   TriggerCondition.RoomFullyUnlocked {} -> "RoomFullyUnlocked"
   TriggerCondition.AnyOf {} -> "AnyOf"

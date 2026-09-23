@@ -380,6 +380,9 @@ activateAbility pid srcId ability = do
               -- triggered, an ability exists on the stack independently of its
               -- source."
               State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setThisAbility abilId (Binding.setYou pid (Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes)))}) abilId (GameState.objects g)})
+              -- CR 601.2c's board, before CR 601.2g/h's window and payment can
+              -- change it: what Event.becameTarget samples below.
+              announced <- State.get
               -- CR 601.2f, at the position CR 602.2b gives it and in Cast.castSpell's
               -- own order: the reductions that apply to this activation are announced
               -- (CR 118.7e's choice of half) and then applied to the announced cost.
@@ -479,7 +482,7 @@ activateAbility pid srcId ability = do
                   --
                   -- After the payment for Cast.castSpell's reason: everything
                   -- above can still restore `before` and unwind the activation.
-                  Event.becameTarget abilId StackObjectKind.ActivatedAbility pid chosen
+                  Event.becameTarget announced abilId StackObjectKind.ActivatedAbility pid chosen
                 -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason:
                 -- a mana ability tapped in the window this payment opened may
                 -- have shuffled or revealed, and this reject-not-repair

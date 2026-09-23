@@ -1726,6 +1726,7 @@ eventBindingSlots cond = case cond of
   -- lint would reject it -- no member of eventBindingSlotsSometimes for
   -- PermanentsDie's reason.
   TriggerCondition.PermanentsBecomeTargeted {} -> Set.empty
+  TriggerCondition.PermanentBecomesTargeted {} -> Set.empty
   -- CR 603.3b's second class names two things and binds both: CR 113.7's Saga,
   -- which the chapter ability hangs on, under CR 400.7e's slot for the reason
   -- eventBindings' arm gives, and CR 603.3a's controller of that chapter ability
