@@ -67,7 +67,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, matchingFromAmong, objectRefObjects, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, matchingFromAmong, objectRefObjects, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -2487,14 +2487,28 @@ conjuredName card = Face.name (NonEmpty.head (Card.Type.faces card))
 -- ALL its effects and not any, clauseIsInert's shape: an option whose
 -- instructions partly happen is carried out as much as possible (CR 609.3) and
 -- is still an option, so a clause is impossible only when nothing in it can
--- happen. Every either-or and every printed "may" in data/cards carries one
--- instruction, so no board tells the two readings apart today.
+-- happen.
+--
+-- An instruction acting only on what an EARLIER instruction of the same clause
+-- binds is left out of that test, its fate being its definer's: Carth the
+-- Lion's "you may reveal a planeswalker card from among them and put it into
+-- your hand" moves nothing when the reveal found nothing. Pawl.MassEffectSpec's
+-- "CR 608.2d Carth the Lion's reveal is not offered without a planeswalker among
+-- them" proves it.
 --
 -- An EMPTY clause is not impossible, for the reason clauseIsInert gives.
 clauseIsImpossible :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 clauseIsImpossible resolving source controller legal gs clause =
   let effects = Foldable.toList (Clause.effects clause)
-   in not (null effects) && all (effectIsImpossible resolving source controller legal gs) effects
+      definedBefore = List.scanl (\defined effect -> Set.union defined (boundSlots effect)) Set.empty effects
+      readsOnly defined ref = case ref of
+        ObjectRef.InSlot slot -> Set.member slot defined
+        _ -> False
+      dependent defined effect =
+        let refs = effectObjectRefs effect
+         in not (null refs) && null (effectPlayerRefs effect) && all (readsOnly defined) refs
+      independent = [effect | (defined, effect) <- zip definedBefore effects, not (dependent defined effect)]
+   in not (null independent) && all (effectIsImpossible resolving source controller legal gs) independent
 
 -- clauseIsImpossible's per-opcode half: the CR 608.2d question one instruction
 -- at a time.
@@ -2512,13 +2526,8 @@ clauseIsImpossible resolving source controller legal gs clause =
 -- Exhaustive with no wildcard, ownSlotsAreExhaustive's shape and for its reason:
 -- a new opcode must answer here. Each arm below mirrors the read its
 -- applyOneEffect arm performs, so the offer and the execution cannot disagree.
---
--- Not implemented: every other opcode answers the conservative "not
--- impossible", so an option that provably does nothing is still offered where
--- its instruction is one of those -- a counter move off a permanent bearing
--- none of the kind, a TurnFaceUp on a face-up permanent, a Heal of a permanent
--- with no marked damage, and the Chosen* object refs, whose candidate pool is
--- the arm's own rather than objectRefObjects (#3673).
+-- An arm answering False is one whose instruction always does something, or
+-- one no printed "may" reaches.
 effectIsImpossible :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> GameState -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.DealDamage {} -> False
@@ -2540,7 +2549,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.AttachTarget {} -> False
   Effect.AttachTargetToEach {} -> False
   Effect.AttachBound {} -> False
-  Effect.MoveToZone {} -> False
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> choosesFromNothing ref
   Effect.Draw {} -> False
   -- CR 701.17b: "a player can't mill a number of cards greater than the number
   -- of cards in their library. If given the choice to do so, they can't choose
@@ -2555,10 +2564,10 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
           Just n | n > 0 -> n > List.genericLength (Game.zoneMembers Zone.Library pid gs)
           _ -> False
      in not (null millers) && all beyondLibrary millers
-  Effect.Reveal {} -> False
+  Effect.Reveal (Reveal.MkReveal ref _) -> choosesFromNothing ref
   Effect.FromOutsideTheGame {} -> False
   Effect.ExileThisSpell {} -> False
-  Effect.LookAt {} -> False
+  Effect.LookAt (LookAt.MkLookAt ref _) -> choosesFromNothing ref
   Effect.ArrangeInLibrary {} -> False
   Effect.Scry {} -> False
   Effect.Surveil {} -> False
@@ -2568,9 +2577,9 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Clash {} -> False
   Effect.Explore {} -> False
   Effect.Connive {} -> False
-  -- "Discard THESE cards" names the cards themselves, so it is the naming-nobody
-  -- case: a ref matching none discards nothing and is not impossible.
-  Effect.Discard (Discard.These _) -> False
+  -- "Discard THESE cards" names the cards themselves, so a sweep matching none
+  -- is the naming-nobody case; only a chosen card can be impossible.
+  Effect.Discard (Discard.These ref) -> choosesFromNothing ref
   Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _)) ->
     -- CR 701.9a: the victims are the slot's player recipients, read through
     -- legalMany and Recipient.playerOf as the executing arm reads them, and the
@@ -2611,7 +2620,15 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n | n > 0 -> maybe False ((== 0) . Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject target gs)
       _ -> False
-  Effect.MoveCounters {} -> False
+  -- CR 122.5: every pair the move names fails one of the rule's
+  -- impossibilities, so no counter can cross. The pair guard and the movable
+  -- kinds are the executing arm's own (movablePair, movableCounters), and
+  -- kindsCanCross mirrors its per-MovedKinds reads.
+  Effect.MoveCounters (MoveCounters.MkMoveCounters fromRef kinds _ toRef) ->
+    let named = objectRefObjects legal resolving controller source gs
+        pairs = [(from, to) | from <- named fromRef, to <- named toRef]
+        crosses (from, to) = movablePair gs from to && kindsCanCross gs from to kinds
+     in not (null pairs) && not (any crosses pairs)
   Effect.PutCountersFrom {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.RemovePlayerCounters {} -> False
@@ -2632,7 +2649,13 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Meld {} -> False
   Effect.PhaseOut {} -> False
   Effect.TurnFaceDown {} -> False
-  Effect.TurnFaceUp {} -> False
+  -- CR 708, FaceDown.turnFaceUpByEffect's own guard: only a face-down
+  -- permanent on the battlefield turns face up. A regression fence: the one
+  -- "may" in data/cards reaching this opcode, Hauntwoods Shrieker's, targets a
+  -- face-down permanent, so CR 608.2b drops a face-up one first.
+  Effect.TurnFaceUp slot -> case legalOne slot legal >>= Recipient.objectOf of
+    Nothing -> False
+    Just target -> not (Set.member target (GameState.battlefield gs) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject target gs))
   Effect.RemoveFromCombat {} -> False
   Effect.BecomesBlocked {} -> False
   Effect.SwitchBlockers {} -> False
@@ -2728,7 +2751,11 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.MakeForetold {} -> False
   Effect.MakeWarped {} -> False
   Effect.ForEach {} -> False
-  Effect.Heal {} -> False
+  -- CR 701.69a removes marked damage, so permanents bearing none have nothing
+  -- to lose. A regression fence: no printed "may" in data/cards reaches it.
+  Effect.Heal ref ->
+    let named = objectRefObjects legal resolving controller source gs ref
+     in not (null named) && all ((== Just 0) . fmap Object.damage . flip Game.lookupObject gs) named
   where
     viewOf = effectViewOf source legal gs
     context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -2738,6 +2765,69 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     noneNamedIs state ref =
       let named = objectRefObjects legal resolving controller source gs ref
        in not (null named) && not (any ((== Just state) . fmap Object.tapped . flip Game.lookupObject gs) named)
+    -- CR 608.2d for the refs that ASK rather than read: a chosen card or
+    -- permanent is an instruction to choose one, and an empty pool leaves
+    -- nothing to choose. Each pool is its asking arm's own read
+    -- (chooseCardsInHand, MoveToZone's ChosenCardInGraveyard gather,
+    -- chooseCardFromAmong, chosenPermanentOf); a ref naming no chooser, and
+    -- every ref that reads, answers False.
+    choosesFromNothing ref = case ref of
+      ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand player filter_) ->
+        let choosers = handChoosers legal controller gs player
+         in not (null choosers) && all (\pid -> null (handCardsOf context gs pid filter_)) choosers
+      ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_ count) ->
+        positive count && case chooser of
+          Chooser.TheController -> null (graveyardCards context legal controller gs scope filter_)
+          Chooser.EachInScope ->
+            let scoped = zoneScopePlayers legal controller gs scope
+             in not (null scoped) && all (\pid -> null (graveyardCardsOf context gs pid filter_)) scoped
+          Chooser.BoundInSlot _ -> False
+      ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count _) ->
+        positive count && maybe False (null . matchingFromAmong legal resolving controller source gs filter_) (fromAmongBound slot)
+      ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> null (battlefieldMatching legal resolving controller source gs filter_)
+      _ -> False
+    positive quantity = maybe False (> 0) (Quantity.evaluateFor viewOf context gs resolving source quantity)
+    -- fromAmongMembers' three reads, pure, with a fourth answer: a slot nothing
+    -- has bound yet is Nothing, the naming-nobody case a sibling will define.
+    fromAmongBound slot = case slotGroup slot resolving gs of
+      Just objects -> Just (Foldable.toList objects)
+      Nothing
+        | Map.member slot legal -> Just (Maybe.mapMaybe Recipient.objectOf (legalMany slot legal))
+        | otherwise -> fmap (: []) (slotOne slot resolving gs)
+
+-- CR 122.5's first and fourth impossibilities for one pair: the two objects
+-- differ and both are on the battlefield. Shared by the MoveCounters arm and
+-- effectIsImpossible, so the offer and the move cannot disagree.
+movablePair :: GameState -> ObjectId -> ObjectId -> Bool
+movablePair gs from to = from /= to && Set.member from (GameState.battlefield gs) && Set.member to (GameState.battlefield gs)
+
+-- The kinds on the first object that can cross: present, and not refused by
+-- the second (CR 122.5's second and third impossibilities). The MoveCounters
+-- arm's `onFrom`.
+movableCounters :: GameState -> ObjectId -> ObjectId -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural
+movableCounters gs from to =
+  Map.filterWithKey
+    (\kind n -> n > 0 && not (CounterRestriction.prohibited to kind gs))
+    (maybe Map.empty Object.counters (Game.lookupObject from gs))
+
+-- Whether any kind the MovedKinds arm would move is among movableCounters: the
+-- named kind for the arms naming one, an absent kind for EachAbsentKind, and any
+-- kind at all otherwise.
+kindsCanCross :: GameState -> ObjectId -> ObjectId -> MovedKinds.MovedKinds -> Bool
+kindsCanCross gs from to kinds =
+  let onFrom = movableCounters gs from to
+   in case kinds of
+        MovedKinds.Named wanted _ -> Map.member wanted onFrom
+        MovedKinds.EveryOfKind wanted -> Map.member wanted onFrom
+        MovedKinds.AnyNumberOfKind wanted -> Map.member wanted onFrom
+        MovedKinds.EachAbsentKind ->
+          let onTo = Map.filter (> 0) (maybe Map.empty Object.counters (Game.lookupObject to gs))
+           in not (Map.null (Map.withoutKeys onFrom (Map.keysSet onTo)))
+        MovedKinds.Every -> not (Map.null onFrom)
+        MovedKinds.Chosen _ -> not (Map.null onFrom)
+        MovedKinds.AnyNumber -> not (Map.null onFrom)
+        MovedKinds.AtLeastOne -> not (Map.null onFrom)
+        MovedKinds.UpToOneChosen -> not (Map.null onFrom)
 
 -- One effect, applied. `runSubgame` is the injected nested-game runner; only
 -- the PlaySubgame arm consults it.
@@ -7641,38 +7731,37 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         movePair to from = case from of
           _
             -- "This may occur if the first and second objects are the same object".
-            | from /= to,
-              -- "... or if either object is no longer in the correct zone". CR 122.1
-              -- puts a counter on "an object or player", and CR 122.1a/122.1b
-              -- contemplate counters on a card in a zone other than the battlefield,
-              -- so the battlefield is not the correct zone by the rule alone -- it is
-              -- the correct zone for THIS opcode because every producer in
-              -- data/cards/ names permanents on both sides, in every combination the
-              -- pool writes (Agent's Toolkit binds the artifact itself and the
-              -- creature that entered; Explorer's Cache binds the artifact and a
-              -- targeted creature; Black Panther, Wakandan King binds a targeted land
-              -- and a targeted creature; Fate Transfer binds two targeted creatures;
-              -- Goldberry, River-Daughter binds a targeted permanent and herself,
-              -- and her second ability the two the other way about; Scrounging
-              -- Bandar binds itself and a targeted creature, where Bioshift binds
-              -- two targeted ones; Spike Cannibal sweeps every creature on the
-              -- battlefield onto itself; Takesies sweeps every permanent onto a
-              -- targeted one; Forgotten Ancient sweeps itself onto every other
-              -- creature). A slot bound as the ability triggered may
-              -- name an object CR 400.7 has since moved, and a targeted one may have
-              -- become illegal, which is CR 608.2b's re-read in the legalMany inside
-              -- objectRefObjects.
-              --
-              -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
-              -- proven boards. Pawl.Engine.Phasing spells "treated as though it does
-              -- not exist" by moving the object OUT of GameState.battlefield, while
-              -- CR 702.26d leaves its counters and its Object.zone alone -- so a
-              -- phased-out source is off the battlefield still bearing every kind,
-              -- and without this read the candidate sweep below would strip one off
-              -- it. Pawl.MoveCounterSpec's Reality Ripple case is that board; its
-              -- sacrifice case is CR 122.2's.
-              Set.member from (GameState.battlefield gs),
-              Set.member to (GameState.battlefield gs) ->
+            | movablePair gs from to ->
+                -- "... or if either object is no longer in the correct zone". CR 122.1
+                -- puts a counter on "an object or player", and CR 122.1a/122.1b
+                -- contemplate counters on a card in a zone other than the battlefield,
+                -- so the battlefield is not the correct zone by the rule alone -- it is
+                -- the correct zone for THIS opcode because every producer in
+                -- data/cards/ names permanents on both sides, in every combination the
+                -- pool writes (Agent's Toolkit binds the artifact itself and the
+                -- creature that entered; Explorer's Cache binds the artifact and a
+                -- targeted creature; Black Panther, Wakandan King binds a targeted land
+                -- and a targeted creature; Fate Transfer binds two targeted creatures;
+                -- Goldberry, River-Daughter binds a targeted permanent and herself,
+                -- and her second ability the two the other way about; Scrounging
+                -- Bandar binds itself and a targeted creature, where Bioshift binds
+                -- two targeted ones; Spike Cannibal sweeps every creature on the
+                -- battlefield onto itself; Takesies sweeps every permanent onto a
+                -- targeted one; Forgotten Ancient sweeps itself onto every other
+                -- creature). A slot bound as the ability triggered may
+                -- name an object CR 400.7 has since moved, and a targeted one may have
+                -- become illegal, which is CR 608.2b's re-read in the legalMany inside
+                -- objectRefObjects.
+                --
+                -- The `from` half answers CR 702.26b as much as CR 400.7, and both are
+                -- proven boards. Pawl.Engine.Phasing spells "treated as though it does
+                -- not exist" by moving the object OUT of GameState.battlefield, while
+                -- CR 702.26d leaves its counters and its Object.zone alone -- so a
+                -- phased-out source is off the battlefield still bearing every kind,
+                -- and without this read the candidate sweep below would strip one off
+                -- it. Pawl.MoveCounterSpec's Reality Ripple case is that board; its
+                -- sacrifice case is CR 122.2's.
+                --
                 -- "... if the first object doesn't have the appropriate kind of
                 -- counter on it". Which kinds are appropriate is the one place the
                 -- printed spellings part, and rule 122.5's clause reads differently
@@ -7686,10 +7775,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- own tally settled it. Rule 122.5's atomicity is why it is dropped
                 -- here rather than half-performed -- "no counter is removed from or
                 -- put onto anything".
-                let onFrom =
-                      Map.filterWithKey
-                        (\kind n -> n > 0 && not (CounterRestriction.prohibited to kind gs))
-                        (maybe Map.empty Object.counters (Game.lookupObject from gs))
+                let onFrom = movableCounters gs from to
                     -- CR 609.3 for a count larger than the object has: "it does only
                     -- as much as possible". The clamp is load-bearing --
                     -- Event.removeCounters saturates where Event.putCounters does not,
