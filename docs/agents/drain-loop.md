@@ -87,9 +87,9 @@ consumer. Run it inline before dispatching.
 (ii) **Single `bug` or `rules-correctness` issues** (+0.49), picked by hand.
 
 (iii) **Card-demand singles** (+0.07): count the real cards the gap unblocks
---- a `grep -c` of the Oracle phrase over `_scratch/AllPrintings.json`, or a
-Scryfall `/cards/search` with a `User-Agent` header when the dump is absent
---- and take the largest count that is file-disjoint from the build. Put the
+--- a `grep -c` of the Oracle phrase over a local MTGJSON dump (see
+`CLAUDE.md`), or a Scryfall `/cards/search` with a `User-Agent` header when
+there is none --- and take the largest count that is file-disjoint from the build. Put the
 count in the brief; the implementer picks the producer from those cards.
 
 Take the highest-ranked option that is file-disjoint from the build. A
@@ -108,13 +108,10 @@ no linked blocker). Neither is dispatchable unattended.
 Dispatch an implementation agent, with `isolation: "worktree"`, to work it end
 to end and open a PR. Its brief must open with: read
 `docs/agents/implementing.md` first, then `CLAUDE.md` and `CONTRIBUTING.md`.
-Everything else is specific to the unit. **Model**: opus for every unit that
-touches engine code, and for audits. Sonnet only for docs- or data-only
-changes. Measured 2026-09-22/23 over four sonnet engine units: 120k--458k
-tokens each, no cheaper than opus on the same shapes; both audited units
-carried a CR divergence (one also an invented CR quote), one grew scope
-during its fix, and one declined a real bug over a performance hoist the
-project does not weigh.
+Everything else is specific to the unit. **Model**: opus, for every unit and
+every audit. A 2026-09-22/23 sonnet trial over four engine units was no
+cheaper in tokens than opus on the same shapes, and both audited units
+carried a CR divergence.
 
 **Dispatch on ready, not on merge.** The moment a unit's PR is marked ready,
 dispatch the next one. The lane is agent-bound, so an idle build lane is the
