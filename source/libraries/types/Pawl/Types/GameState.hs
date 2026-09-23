@@ -278,9 +278,10 @@ data GameState = MkGameState
     -- identically worded twin is the caveat Object.activatedOnce's haddock states
     -- about the same key.
     activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
-    -- | CR 601.3: which once-each-turn cast permissions have been used this
-    -- turn, read by PermissionLimit.OnceEachTurn alone; cleared at turn handoff,
-    -- which is the whole of "each turn". Keyed by the object granting the
+    -- | CR 601.3: which once-each-turn permissions have been used this turn, by
+    -- a cast or (a Play-verb one) a land play, read only for a budgeted
+    -- PermissionLimit; cleared at turn handoff, which is the whole of "each
+    -- turn". Keyed by the object granting the
     -- permission and then by the permission itself, so two copies of one
     -- enchantment grant two budgets and one permanent printing two permissions
     -- spends them separately -- the grain activatedThisTurn above uses for CR
@@ -290,8 +291,8 @@ data GameState = MkGameState
     -- The permission BY VALUE, so a CR 612.1 word swap that changed this
     -- permission's own filter mid-turn would leave a spent budget unfound --
     -- the caveat activatedThisTurn's key carries too. No text change reaches
-    -- one: Pawl.Engine.Projection.Rewrite swaps subtype words, and the pool's
-    -- one budgeted permission narrows by card type.
+    -- one: Pawl.Engine.Projection.Rewrite swaps subtype words, and no budgeted
+    -- permission in data/cards/ names a subtype.
     castPermissionsUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set CastFromZone.CastFromZone),
     -- | The printed rider "This ability triggers only once"
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an

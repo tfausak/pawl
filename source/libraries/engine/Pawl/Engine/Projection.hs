@@ -743,6 +743,9 @@ affectsWith grants peers source oid a partial gs = case a of
             && controller == Just pid
             && Filter.matches (affectedContext source (controllerOfGiven grants Set.empty source gs) gs) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
     Nothing -> False
+  -- CR 611.3d: a rider, applied by storing it (Event.permissionRiders) and never
+  -- derived, so a projection's own read of the template names nothing.
+  Affected.PlayedThisWay _ -> False
 
 -- The Filter.Context an affected set is matched through: CR 109.5's "you" is the
 -- source's controller, and CR 607.2d's link puts the SOURCE's entry choice (CR
@@ -1879,6 +1882,9 @@ candidatesFor a gs = case a of
   -- Already fixed (CR 611.2c), so freezing it is the identity. Returned rather
   -- than special-cased away, so the caller has one shape to filter.
   Affected.TheseObjects s -> s
+  -- Names nothing on any board (affectsWith): the stored rider carries its own
+  -- fixed set instead.
+  Affected.PlayedThisWay _ -> Set.empty
 
 -- CR 613.1f, hoisted over the whole game: "were THIS object's abilities removed
 -- by the time layer 6 finished?", as one predicate. For a caller OUTSIDE the
@@ -2944,6 +2950,7 @@ affectedReadsPeers a = case a of
   Affected.MatchingAnywhere f -> filterReadsPeers f
   Affected.MatchingOffBattlefield f -> filterReadsPeers f
   Affected.AttachedPlayerControls f -> filterReadsPeers f
+  Affected.PlayedThisWay _ -> False
 
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
@@ -3225,6 +3232,8 @@ movableAspects c =
         -- Always movable, whatever the filter reads: the set is narrowed by WHO
         -- CONTROLS each candidate, and layer 2 writes Controller (CR 613.1b).
         Affected.AttachedPlayerControls f -> Just (Set.insert Controller (filterReads f))
+        -- Names nothing to move (affectsWith).
+        Affected.PlayedThisWay _ -> Nothing
 
 -- Could another effect move this one's affected set at all? movableAspects above
 -- with the aspects thrown away and an empty filter still counted movable.
@@ -3238,6 +3247,7 @@ staticallyMovable c = case gAffected c of
   -- Movable, unlike Attached: WHO CONTROLS a candidate is a layer-2 effect's
   -- business (CR 613.1b).
   Affected.AttachedPlayerControls _ -> True
+  Affected.PlayedThisWay _ -> False
 
 -- The aspects one effect's parts at a layer write, and the aspects their
 -- quantities read. Both halves of CR 613.8a's clause (b) are asked of the whole

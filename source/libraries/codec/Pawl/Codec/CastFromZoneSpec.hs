@@ -9,6 +9,7 @@ import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
@@ -24,7 +25,8 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
       ( CastFromZone.MkCastFromZone
           { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Graveyard, InZone.player = PlayerRef.Relative PlayerRelation.You},
             CastFromZone.matching = Filter.And [],
-            CastFromZone.limit = PermissionLimit.Unlimited
+            CastFromZone.limit = PermissionLimit.Unlimited,
+            CastFromZone.verb = PermissionVerb.Cast
           }
       )
       " {\"from\":{\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"matching\":{\"type\":\"And\",\"value\":[]}} "
@@ -36,7 +38,8 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
       ( CastFromZone.MkCastFromZone
           { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Hand, InZone.player = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "opponent"))},
             CastFromZone.matching = Filter.HasCardType CardType.Creature,
-            CastFromZone.limit = PermissionLimit.Unlimited
+            CastFromZone.limit = PermissionLimit.Unlimited,
+            CastFromZone.verb = PermissionVerb.Cast
           }
       )
       " {\"from\":{\"zone\":{\"type\":\"Hand\"},\"player\":{\"type\":\"InSlot\",\"value\":\"opponent\"}},\"matching\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
@@ -50,8 +53,23 @@ spec s = Spec.describe s "Pawl.Codec.CastFromZone" $ do
       ( CastFromZone.MkCastFromZone
           { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Library, InZone.player = PlayerRef.Relative PlayerRelation.You},
             CastFromZone.matching = Filter.And [],
-            CastFromZone.limit = PermissionLimit.OnceEachTurn
+            CastFromZone.limit = PermissionLimit.OnceEachTurn,
+            CastFromZone.verb = PermissionVerb.Cast
           }
       )
       " {\"from\":{\"zone\":{\"type\":\"Library\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"matching\":{\"type\":\"And\",\"value\":[]},\"limit\":{\"type\":\"OnceEachTurn\"}} "
+  -- Serra Paragon's shape: your own graveyard, once during each of your turns,
+  -- a land played or a spell cast.
+  Spec.it s "a play verb" $
+    Common.assertCodec
+      s
+      CastFromZone.codec
+      ( CastFromZone.MkCastFromZone
+          { CastFromZone.from = InZone.MkInZone {InZone.zone = Zone.Graveyard, InZone.player = PlayerRef.Relative PlayerRelation.You},
+            CastFromZone.matching = Filter.And [],
+            CastFromZone.limit = PermissionLimit.OnceEachOfYourTurns,
+            CastFromZone.verb = PermissionVerb.Play
+          }
+      )
+      " {\"from\":{\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"matching\":{\"type\":\"And\",\"value\":[]},\"limit\":{\"type\":\"OnceEachOfYourTurns\"},\"verb\":{\"type\":\"Play\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CastFromZone.codec

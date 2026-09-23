@@ -1072,6 +1072,7 @@ continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.MatchingOffBattlefield _ -> False
   Affected.Attached -> False
   Affected.AttachedPlayerControls _ -> False
+  Affected.PlayedThisWay _ -> False
 
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
 -- Object id 998 is a stand-in source: nothing in these tests reads the

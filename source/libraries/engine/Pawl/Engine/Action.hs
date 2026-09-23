@@ -27,6 +27,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.SpecialAction as SpecialAction
@@ -41,7 +42,8 @@ import qualified Pawl.Types.Zone as Zone
 -- allowance and CR 101.1 lets a card widen it. The player's OWN hand needs no
 -- permission; the granted piles are a CR 613.11 player-axis grant, which names
 -- both the zone and whose copy of it (Crucible of Worlds and Yawgmoth's Will
--- their own graveyard, Sen Triplets an opponent's hand); and exile is the
+-- their own graveyard, Sen Triplets an opponent's hand) -- or, for a Play-verb
+-- permission (Serra Paragon), a pile narrowed card by card; and exile is the
 -- object-borne permission CR 715.3d and Effect.GrantPlayFromExile write. That
 -- split is the same one Pawl.Engine.Cast.castableZones draws for the cast side,
 -- and the exile source is read through that module's own zoneCandidates so the
@@ -108,10 +110,15 @@ playableLands pid gs =
       -- Future Sight states the play half and the cast half in one sentence, so
       -- the two sides share the narrowing rather than each keeping their own.
       fromGranted = ListUtils.nubOrd (concatMap (\(zone, owner) -> Cast.pileCandidates zone owner gs) (PlayerEffect.playLandPiles pid gs))
+      -- CR 305.1 / 601.3: a Play-verb permission (Serra Paragon) narrows by
+      -- card and has a budget, so each land in the piles it opens is asked
+      -- whether a use is left for it.
+      permitted oid = maybe False (\obj -> not (null (PlayerEffect.landPermissionsFrom pid (Object.zone obj) oid gs))) (Game.lookupObject oid gs)
+      fromPermitted = concatMap (\(zone, owner) -> filter permitted (Cast.pileCandidates zone owner gs)) (PlayerEffect.playPermissionPiles pid gs)
       -- Per card instead, because CR 715.3d's permission is state on ONE exiled
       -- incarnation naming ONE player.
       fromExile = filter (\oid -> Cast.permitsPlayFromExile pid oid gs) (Cast.zoneCandidates Zone.Exile pid gs)
-   in concatMap playable (ListUtils.nubOrd (fromHand <> fromGranted <> fromExile))
+   in concatMap playable (ListUtils.nubOrd (fromHand <> fromGranted <> fromPermitted <> fromExile))
 
 -- The cards in this player's hand whose own text grants CR 116.2e's special
 -- action: Circling Vultures' "you may discard this card any time you could cast

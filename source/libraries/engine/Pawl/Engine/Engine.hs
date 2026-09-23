@@ -1413,12 +1413,14 @@ priorityLoop = do
                                 -- turns a put-onto-the-battlefield instruction
                                 -- away: playing a land is a special action.
                                 --
-                                -- Not implemented: CR 400.7i, the land half of the
-                                -- sentence Pawl.Engine.Cast.followIntoSpell keeps
-                                -- for spells (CR 400.7h) -- the rest of the effect
-                                -- that allowed this play cannot find the permanent
-                                -- the land card became, so a rider on the
-                                -- permission has nothing to attach to (gap #2398).
+                                -- Not implemented: CR 400.7i for an exile
+                                -- permission, the land half of the sentence
+                                -- Pawl.Engine.Cast.followIntoSpell keeps for
+                                -- spells (CR 400.7h) -- the rest of that effect
+                                -- cannot find the permanent the land card became,
+                                -- so a rider on it has nothing to attach to (gap
+                                -- #2398). A player permission's rider is
+                                -- `riders` below.
                                 --
                                 -- CR 611.2a / 601.1a: the one-shot flash grants
                                 -- this play spends, asked on the PRE-MOVE id while
@@ -1435,12 +1437,22 @@ priorityLoop = do
                                 -- rule's characteristicless object.
                                 State.modify' (Cast.turnedUpForPlay oid Facing.FaceUp)
                                 spent <- State.gets (PlayerEffect.spentByLandPlay p oid)
+                                -- CR 305.1 / 400.7i: the Play-verb permission
+                                -- this play spends and the riders it hands the
+                                -- land, both asked of the pre-move board for
+                                -- `spent`'s reason.
+                                before <- State.get
+                                let (sources, permission) = PlayerEffect.landPermissionUse p oid before
+                                    riders played = concatMap (\src -> Event.permissionRiders src before played) sources
                                 -- CR 110.2 / 305.1: the permanent enters under
                                 -- the player who PLAYED it, which is not the
                                 -- card's owner once a permission opens somebody
                                 -- else's hand (Sen Triplets); see #2169.
                                 moved <- Event.changeZoneShowing (Just p) oid Zone.Battlefield mName
-                                Monad.unless (Seq.null moved) (State.modify' (PlayerEffect.consume spent))
+                                Monad.unless (Seq.null moved) $ do
+                                  State.modify' (PlayerEffect.consume spent)
+                                  State.modify' (PlayerEffect.spendCastPermission permission)
+                                  State.modify' (\g -> g {GameState.continuousEffects = concatMap riders (filter (`Set.member` GameState.battlefield g) (Foldable.toList moved)) <> GameState.continuousEffects g})
                                 -- CR 305.2a counts the lands played this turn, so
                                 -- this TALLIES rather than flagging. CR 305.4:
                                 -- the only tally, an effect that PUTS a land onto

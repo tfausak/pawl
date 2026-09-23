@@ -754,6 +754,8 @@ library codec
     Pawl.Codec.PermanentWasSacrificedSpec
     Pawl.Codec.PermissionLimit
     Pawl.Codec.PermissionLimitSpec
+    Pawl.Codec.PermissionVerb
+    Pawl.Codec.PermissionVerbSpec
     Pawl.Codec.Phase
     Pawl.Codec.PhasedOut
     Pawl.Codec.PhasedOutSpec
@@ -1994,6 +1996,7 @@ library types
     Pawl.Types.PermanentTappedForMana
     Pawl.Types.PermanentWasSacrificed
     Pawl.Types.PermissionLimit
+    Pawl.Types.PermissionVerb
     Pawl.Types.Phase
     Pawl.Types.PhasedOut
     Pawl.Types.PhasePattern
