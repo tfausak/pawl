@@ -329,6 +329,13 @@ zoneMembers zone pid gs =
         Zone.Command -> ownedShared (GameState.command gs)
         Zone.Stack -> filter ownedBy (GameState.stack gs)
 
+-- CR 404.1: the top card of a player's graveyard, its NEWEST arrival and so its
+-- LAST member (insertIntoZone appends one). The one reader both
+-- Pawl.Types.ObjectRef.TopOfGraveyard and Pawl.Types.Scope.TopOfGraveyard go
+-- through, so the card a Condition tests is the card the effect then moves.
+topOfGraveyard :: PlayerId -> GameState -> Maybe ObjectId
+topOfGraveyard pid gs = Maybe.listToMaybe (reverse (zoneMembers Zone.Graveyard pid gs))
+
 -- CR 506.4: remove a permanent from combat. The one performer, shared by CR
 -- 701.19a regeneration (Pawl.Engine.Replacement), an effect that specifically
 -- removes it (Pawl.Engine.Resolve), and the two derived clauses -- a controller

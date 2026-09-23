@@ -2660,7 +2660,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.TopOfGraveyard player ->
     let named = playerRefPlayers legal controller gs player
      in Maybe.mapMaybe
-          (\pid -> Maybe.listToMaybe (reverse (Game.zoneMembers Zone.Graveyard pid gs)))
+          (`Game.topOfGraveyard` gs)
           (filter (`elem` named) (Game.apnapOrder gs))
   -- A card somebody CHOOSES is a QUESTION, and this function cannot ask one; the
   -- MoveToZone arm's own gather does. Under any other opcode this empty answer is

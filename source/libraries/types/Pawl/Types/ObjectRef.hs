@@ -102,10 +102,6 @@ data ObjectRef
     -- @o:/top card of .*graveyard/@, 2026-09-06, returns no printing that reads
     -- this position more than one card deep. A card naming "the top two cards of
     -- your graveyard" would want the depth the library arm above carries.
-    --
-    -- TESTING that card without acting on it is Pawl.Types.Scope.TopOfGraveyard,
-    -- the same position read from inside a Condition -- Guiding Spirit prints
-    -- both halves and is what proves the pair agree.
     TopOfGraveyard PlayerRef.PlayerRef
   | -- | CR 608.2d / Port of Karfell: a card in a graveyard matching the Filter,
     -- chosen as the effect runs rather than targeted (CR 115.1).

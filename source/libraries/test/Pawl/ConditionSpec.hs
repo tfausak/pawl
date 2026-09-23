@@ -1050,9 +1050,8 @@ guidingSpiritSpec s registry =
         pure (spirit, spiritId, g4 {GameState.priority = Just S.alice})
       named = CardName.MkCardName . Text.pack
       -- Both piles in their own stored order: a graveyard reads OLDEST FIRST (CR
-      -- 404.1's arrival end is the last member) and a library TOP FIRST (CR
-      -- 401.2), which is why an arriving card is expected at opposite ends of the
-      -- two lists.
+      -- 404.1's arrival end is the last member) and a library TOP FIRST, which is
+      -- why an arriving card is expected at opposite ends of the two lists.
       pilesOf pid gs = (zoneNames Zone.Graveyard pid gs, zoneNames Zone.Library pid gs)
       -- One activation of the Spirit's ability by alice, aimed at bob, resolved.
       activate spirit spiritId gs = case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace spirit)) of

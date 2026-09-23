@@ -75,20 +75,6 @@ data Scope
     -- where the object landed either way; what the fold then reads for a
     -- departure is CR 608.2h's last known information.
     OverBound SlotName.SlotName
-  | -- | CR 404.1 / Guiding Spirit: the top card of each graveyard the PlayerRef
-    -- names -- the NEWEST arrival, which is the LAST member of the pile.
-    -- Pawl.Types.ObjectRef.TopOfGraveyard reads the same position to ACT on the
-    -- card; this arm is how a Condition TESTS it without acting.
-    --
-    -- Not InZone narrowed by a Filter, and that is the whole reason it is an arm
-    -- of its own: a Filter in that position means "every member that matches",
-    -- so "if the top card is a creature card" would become "if any creature card
-    -- is in the graveyard". The POSITION has to be the scope and the Filter the
-    -- test, in that order. Pawl.Engine.Cost.topExileCandidate reads the other
-    -- composition -- "the top MATCHING card" -- and is not this.
-    --
-    -- One card per named graveyard, none at all from an empty one, so
-    -- Aggregation.Members over it is 0 or the number of named graveyards whose
-    -- top matches.
+  | -- | CR 404.1 / Guiding Spirit: the top card of each graveyard the PlayerRef names.
     TopOfGraveyard PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)
