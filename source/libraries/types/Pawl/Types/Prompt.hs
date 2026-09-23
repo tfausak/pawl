@@ -677,6 +677,11 @@ data Prompt r where
   -- controller. Groups are asked in APNAP order (CR 101.4), each for two or
   -- more members.
   OrderForEach :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt [Natural.Natural]
+  -- | CR 608.2d: any number of the members a per-member loop swept, the ones
+  -- its body then runs for (Pawl.Types.LoopMembers' AnyNumber); asked at one
+  -- candidate, skipped at zero. ChooseAnyNumberOfPermanents' shape over the
+  -- loop's own member type. Answers as Response.ChoseLoopMembers.
+  ChooseLoopMembers :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt (Set.Set Recipient.Recipient)
   -- | CR 613.7m: the relative order of the timestamps one player's objects
   -- receive at one moment, first named stamped earlier; asked by
   -- Pawl.Engine.Restamp.order, per group in APNAP order, for two or more.

@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -26,6 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
       codec
       ( ForEach.MkForEach
           { ForEach.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victims")),
+            ForEach.members = LoopMembers.Every,
             ForEach.slot = SlotName.MkSlotName (Text.pack "victim"),
             ForEach.body = Seq.fromList [Text.pack "first", Text.pack "second"],
             -- CR 608.2f's second sentence, which that rule's Soulfire Eruption
@@ -43,6 +45,7 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
       codec
       ( ForEach.MkForEach
           { ForEach.ref = ObjectRef.EachPlayer,
+            ForEach.members = LoopMembers.Every,
             ForEach.slot = SlotName.MkSlotName (Text.pack "victim"),
             ForEach.body = Seq.empty,
             -- The default CR 608.2f's "in most cases" gives, so the key is absent
@@ -51,4 +54,19 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
           }
       )
       " {\"ref\":{\"type\":\"EachPlayer\"},\"slot\":\"victim\",\"body\":[]} "
+  -- Rule 702.116a's "for each opponent ..., you may": the one non-default
+  -- membership, so the key is on the wire.
+  Spec.it s "MkForEach over any number of its members" $
+    Common.assertCodec
+      s
+      codec
+      ( ForEach.MkForEach
+          { ForEach.ref = ObjectRef.EachOpponent,
+            ForEach.members = LoopMembers.AnyNumber,
+            ForEach.slot = SlotName.MkSlotName (Text.pack "opponent"),
+            ForEach.body = Seq.singleton (Text.pack "mint"),
+            ForEach.individually = False
+          }
+      )
+      " {\"ref\":{\"type\":\"EachOpponent\"},\"members\":{\"type\":\"AnyNumber\"},\"slot\":\"opponent\",\"body\":[\"mint\"]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

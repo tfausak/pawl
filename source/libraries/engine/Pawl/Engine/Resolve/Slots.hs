@@ -752,7 +752,7 @@ effectObjectRefs effect = case effect of
   Effect.MakeForetold x -> [MakeForetold.cards x]
   Effect.MakeWarped ref -> [ref]
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
-  Effect.ForEach (ForEach.MkForEach ref _ _ _) -> [ref]
+  Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> [ref]
   Effect.Heal ref -> [ref]
 
 -- Every PlayerRef this ONE effect holds in a field of its own: not the ones
@@ -1270,7 +1270,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)
   -- Everything the BODY reads. The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> joinSlots (fmap slotsOf (Foldable.toList body))
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> joinSlots (fmap slotsOf (Foldable.toList body))
   Effect.Heal _ -> Map.empty
 
 -- Every PlayerRef nested in a Duration: the seat CR 611.2a's window is counted
@@ -1846,7 +1846,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
   -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
   -- nested in the DEPTH is one slotsOf cannot see.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> all slotsAreExhaustive body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> all slotsAreExhaustive body
   Effect.Heal _ -> True
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
@@ -2049,7 +2049,7 @@ readsX =
         Effect.OfferCast {} -> False
         Effect.GrantPlayFromExile {} -> False
         -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
-        Effect.ForEach (ForEach.MkForEach _ _ body _) -> readsX (Foldable.toList body)
+        Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> readsX (Foldable.toList body)
         Effect.Heal _ -> False
    in any effectReadsX
 
@@ -2269,7 +2269,7 @@ boundSlots effect = case effect of
   -- The loop's member slot, plus every name the BODY authors -- which the loop
   -- really does leave bound once it is over, to the union across its members
   -- (Pawl.Engine.Resolve.Effect's arm).
-  Effect.ForEach (ForEach.MkForEach _ slot body _) -> Set.insert slot (foldMap boundSlots body)
+  Effect.ForEach (ForEach.MkForEach _ _ slot body _) -> Set.insert slot (foldMap boundSlots body)
   Effect.Heal _ -> Set.empty
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
