@@ -798,7 +798,7 @@ magicalHackSpec s registry = Spec.describe s "MagicalHack" $ do
 -- identity fallback elsewhere (the liar pattern answerXOf uses).
 answerAtBound :: Prompt.Prompt r -> State.State [Natural] r
 answerAtBound p = case p of
-  Prompt.ChooseX _ _ _ bound -> do
+  Prompt.ChooseX _ _ _ _ bound -> do
     State.modify' (\seen -> seen <> [bound])
     pure bound
   Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets)
@@ -808,7 +808,7 @@ answerAtBound p = case p of
 -- construction, whatever the board is.
 answerAboveBound :: Prompt.Prompt r -> r
 answerAboveBound p = case p of
-  Prompt.ChooseX _ _ _ bound -> bound + 1
+  Prompt.ChooseX _ _ _ _ bound -> bound + 1
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
@@ -819,7 +819,7 @@ answerAboveBound p = case p of
 -- reversed earlier.
 answerAtBoundOffsetCounting :: Natural -> Prompt.Prompt r -> State.State Int r
 answerAtBoundOffsetCounting offset p = case p of
-  Prompt.ChooseX _ _ _ bound -> pure (bound + offset)
+  Prompt.ChooseX _ _ _ _ bound -> pure (bound + offset)
   Prompt.ChooseTargets _ _ _ sets -> do
     State.modify' (+ 1)
     pure (fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets)

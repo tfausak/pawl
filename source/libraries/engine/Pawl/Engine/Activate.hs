@@ -91,7 +91,7 @@ revealIfHidden pid srcId = do
 -- target answer.
 --
 -- An announced X can lose the activation all by itself: enumeration measures the
--- cost at CR 601.2b's X=0 floor, and the value the player names is theirs to
+-- cost at the least X the ability permits, and the value the player names is theirs to
 -- name freely. See the gate below.
 --
 -- `before` is the pre-announcement state and is the ONLY thing the rejection
@@ -252,9 +252,12 @@ activateAbility pid srcId ability = do
           -- every other quantity on this road is evaluated against. It is still in
           -- its zone here, the activation cost being unpaid until below.
           mCeiling = Cost.ceilingOf pid srcId (ActivatedAbility.maximumX ability) gs
+          -- CR 101.1: the floor the same words put on it -- Katara, Water Tribe's
+          -- Hope's "X can't be 0". Printed, so there is nothing to evaluate.
+          floorX = ActivatedAbility.minimumX ability
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (Activatable.affordableX mCeiling aimableUnannounced stamp pid srcId gs printedCost)))
+          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId floorX (Activatable.affordableX mCeiling aimableUnannounced stamp pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
           -- CR 101.1, and CR 101.2 for its direction, exactly as Cast.castProposed
@@ -264,6 +267,8 @@ activateAbility pid srcId ability = do
           overCeiling = case (mCeiling, mAmount) of
             (Just c, Just x) -> x > c
             _ -> False
+          -- The floor's side of the same sentence, rejected the same way.
+          underFloor = maybe False (< floorX) mAmount
           -- CR 601.2c's slots and their legal recipients as the announcement
           -- ACTUALLY made can reach them, seeded with CR 601.2b's X: a slot's own
           -- CR 202.3 computed bound reads it (Blighted Nightmare's "creature card
@@ -285,9 +290,9 @@ activateAbility pid srcId ability = do
           aimable = [fmap Activatable.recipientObjects sets]
       -- CR 602.2: an activation a player cannot comply with is illegal, and the
       -- game returns to the moment before it started. The X just named is where
-      -- that can first become true: `activatable` measured the cost at CR
-      -- 601.2b's X=0 floor, the only value it can know before an announcement
-      -- exists. Both gates look ahead to CR 601.2c's candidate targets the same
+      -- that can first become true: `activatable` measured the cost at the
+      -- least X the ability permits, the only value it can know before an
+      -- announcement exists. Both gates look ahead to CR 601.2c's candidate targets the same
       -- way (aimingSomewhere); what the player actually aims at is charged
       -- below, and a choice that reduces nothing loses the ability at the
       -- payment rather than here.
@@ -310,7 +315,7 @@ activateAbility pid srcId ability = do
       -- Asked unconditionally rather than only when there is an {X}, which buys
       -- one predicate over one cost instead of two spellings of when the gate
       -- applies.
-      if overCeiling || not (Activatable.payableCost aimable stamp pid srcId gs announcedAtX)
+      if overCeiling || underFloor || not (Activatable.payableCost aimable stamp pid srcId gs announcedAtX)
         then State.put before -- reject: the whole activation is a no-op
         else do
           -- CR 118.13a's announcement, which names an activated ability's
