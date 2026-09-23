@@ -63,6 +63,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -3630,6 +3631,34 @@ backupSpec s registry =
               Spec.assertEqWith s "the Frog really resolved first, leaving a 1/1 with the counter" (Projection.powerOf pikerId frogFirst) (Just 2)
               Spec.assertEqWith s "and last" (Projection.powerOf pikerId frogLast) (Just 2)
             _ -> Spec.assertFailure s "fixture should give alice a Piker"
+        -- CR 305.7's last clause: Blood Moon makes the nonbasic Dryad Arbor a
+        -- Mountain and strips its rules text, but not an ability another
+        -- effect granted. Aspirant's Ascent makes the backed-up Arbor a 3/5
+        -- flier, so its toughness and power are different damage.
+        Spec.it s "CR 305.7 a Blood Moon'd Dryad Arbor keeps the static ability backup granted it" $ do
+          arbor <- S.printingOf s registry "Dryad Arbor"
+          negotiator <- S.printingOf s registry "Streetwise Negotiator"
+          bloodMoon <- S.printingOf s registry "Blood Moon"
+          ascent <- S.printingOf s registry "Aspirant's Ascent"
+          island <- S.printingOf s registry "Island"
+          case S.combatBoardOf [arbor] [] of
+            (gs0, [arborId], _) -> do
+              let (_, mooned) = S.addPermanent bloodMoon S.bob (S.landsFor island S.alice 1 gs0)
+                  (card, staged) = S.addHandCard negotiator S.alice mooned
+                  (ascentId, armed) = S.addHandCard ascent S.alice staged
+                  backed = entersTargeting arborId card armed
+                  -- The Island pays; the Arbor is left untapped to attack.
+                  sparing :: Prompt.Prompt r -> r
+                  sparing p = case p of
+                    Prompt.ChooseManaSource _ _ candidates -> List.find (/= arborId) (NonEmpty.toList candidates)
+                    Prompt.ChooseExtraManaSource {} -> Nothing
+                    _ -> targeting arborId p
+                  pumped = S.runPure sparing backed (S.cast S.alice ascentId >> Stack.resolveTop)
+                  after = S.runCombat S.aggressiveAnswer pumped
+              Spec.assertEqWith s "CR 305.7 the Arbor dealt bob its toughness of 5" (S.lifeOf S.bob after) (Just 15)
+              Spec.assertEqWith s "where its power was 3" (Projection.powerOf arborId pumped) (Just 3)
+              Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf arborId pumped)) "and Blood Moon really had made it a Mountain"
+            _ -> Spec.assertFailure s "fixture should give alice a Dryad Arbor"
 
 -- CR 702.101a: "Extort is a triggered ability. 'Extort' means 'Whenever you cast
 -- a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you gain

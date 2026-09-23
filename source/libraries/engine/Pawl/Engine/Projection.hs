@@ -1842,53 +1842,58 @@ permanentParts :: ((Gathered -> Bool) -> ObjectId -> Bool) -> (ObjectId -> Layer
 permanentParts stripped functioning setEffs setStripped gs permId = case Game.lookupObject permId gs of
   Nothing -> []
   Just permObj ->
-    if null setEffs || liveGiven setEffs permId gs
-      then
-        -- CR 612: rewrite each static ability's subtype words by the text
-        -- changes affecting THIS source, before its effect is folded on.
-        let changes = textChangesAffecting permId gs
-            -- CR 613.1f's layer-6 removal and CR 305.7's layer-4 strip, asked
-            -- of ONE ability at CR 613.6's decision point rather than of the
-            -- permanent as a whole. Each spares an ability whose effect had
-            -- ALREADY started applying when the stripper did: rule 613.6 keeps
-            -- such an effect applying even though the ability generating it is
-            -- gone. An ability deciding AT layer 4 is spared here and left to
-            -- the base-characteristics gate above, which is CR 613.8's order
-            -- for it -- see liveGiven.
-            removed lowest = (lowest > Layer.Ability && stripped (const True) permId) || (lowest > Layer.Type && setStripped permId)
-            -- One thunk per permanent, shared by all its abilities. Bound
-            -- here, OUTSIDE the zipWith, which is what shares it.
-            partsOf = gatherStatic (functioning permId) permId (staticTimestampOf permId permObj gs) changes removed
-            -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
-            -- half of CR 613.6's decision memo and Pawl.Engine.Event's
-            -- departure handover indexes the SAME list by it, so an ability
-            -- this rule drops must leave a hole rather than shift its
-            -- neighbours up. That handover reads staticAbilitiesOf too, and
-            -- it must: the moment the two walks index different lists, `n`
-            -- means two different things and the join is silently wrong.
-            tagged n sa = if functionsFromZone Zone.Battlefield sa then fmap ((,) n) (partsOf n sa) else []
-            printed = staticAbilitiesOf permId gs
-            -- CR 613.1f / 113.3d: a static ability a stored grant gave this
-            -- permanent generates its effect from HERE, so "this creature" in it
-            -- is this permanent (CR 113.7). Indexed after the printed list, so
-            -- no printed ability's `n` moves.
-            --
-            -- CR 613.7a's timestamp: the permanent's or the grant's, whichever
-            -- is later, a regression fence: the pool's one granted static is a
-            -- CR 613.11 marker, which no order can change. CR 612.3: no text
-            -- change reaches it, so no word pairs.
-            -- CR 613.1f in timestamp order: only a removal applied AFTER the
-            -- grant takes it away, and CR 305.7's strip never does.
-            -- Pawl.KeywordTriggerSpec's Backup group proves the grant and the
-            -- removal order through Streetwise Negotiator.
-            granted n (grantTs, sa) =
-              let removedAfter lowest = lowest > Layer.Ability && stripped ((> grantTs) . gTimestamp) permId
-               in if functionsFromZone Zone.Battlefield sa
-                    then fmap ((,) n) (gatherStatic (functioning permId) permId (max (Object.timestamp permObj) grantTs) [] removedAfter n sa)
-                    else []
-         in concat (zipWith tagged [0 ..] printed)
-              <> concat (zipWith granted [List.genericLength printed ..] (grantedStaticAbilitiesOf permId gs))
-      else []
+    let printed = staticAbilitiesOf permId gs
+        -- CR 613.1f / 113.3d: a static ability a stored grant gave this
+        -- permanent generates its effect from HERE, so "this creature" in it
+        -- is this permanent (CR 113.7). Indexed after the printed list, so
+        -- no printed ability's `n` moves.
+        --
+        -- CR 613.7a's timestamp: the permanent's or the grant's, whichever
+        -- is later, a regression fence: the pool's one granted static is a
+        -- CR 613.11 marker, which no order can change. CR 612.3: no text
+        -- change reaches it, so no word pairs. CR 613.1f in timestamp order:
+        -- only a removal applied AFTER the grant takes it away.
+        --
+        -- Outside printedParts' CR 305.7 gate: a land-subtype setter does not
+        -- remove an ability another effect granted. Pawl.KeywordTriggerSpec's Backup group proves the grant,
+        -- the removal order and the Blood Moon case through Streetwise
+        -- Negotiator.
+        granted n (grantTs, sa) =
+          let removedAfter lowest = lowest > Layer.Ability && stripped ((> grantTs) . gTimestamp) permId
+           in if functionsFromZone Zone.Battlefield sa
+                then fmap ((,) n) (gatherStatic (functioning permId) permId (max (Object.timestamp permObj) grantTs) [] removedAfter n sa)
+                else []
+        grantedParts = concat (zipWith granted [List.genericLength printed ..] (grantedStaticAbilitiesOf permId gs))
+     in printedParts printed permObj <> grantedParts
+  where
+    printedParts printed permObj =
+      if null setEffs || liveGiven setEffs permId gs
+        then
+          -- CR 612: rewrite each static ability's subtype words by the text
+          -- changes affecting THIS source, before its effect is folded on.
+          let changes = textChangesAffecting permId gs
+              -- CR 613.1f's layer-6 removal and CR 305.7's layer-4 strip, asked
+              -- of ONE ability at CR 613.6's decision point rather than of the
+              -- permanent as a whole. Each spares an ability whose effect had
+              -- ALREADY started applying when the stripper did: rule 613.6 keeps
+              -- such an effect applying even though the ability generating it is
+              -- gone. An ability deciding AT layer 4 is spared here and left to
+              -- the base-characteristics gate above, which is CR 613.8's order
+              -- for it -- see liveGiven.
+              removed lowest = (lowest > Layer.Ability && stripped (const True) permId) || (lowest > Layer.Type && setStripped permId)
+              -- One thunk per permanent, shared by all its abilities. Bound
+              -- here, OUTSIDE the zipWith, which is what shares it.
+              partsOf = gatherStatic (functioning permId) permId (staticTimestampOf permId permObj gs) changes removed
+              -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
+              -- half of CR 613.6's decision memo and Pawl.Engine.Event's
+              -- departure handover indexes the SAME list by it, so an ability
+              -- this rule drops must leave a hole rather than shift its
+              -- neighbours up. That handover reads staticAbilitiesOf too, and
+              -- it must: the moment the two walks index different lists, `n`
+              -- means two different things and the join is silently wrong.
+              tagged n sa = if functionsFromZone Zone.Battlefield sa then fmap ((,) n) (partsOf n sa) else []
+           in concat (zipWith tagged [0 ..] printed)
+        else []
 
 -- CR 611.2c, applied to a static ability's effect: the parts `src`'s own static
 -- abilities are generating RIGHT NOW, each with the index of the ability it
