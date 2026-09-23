@@ -13,6 +13,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Card as Card
@@ -54,12 +55,18 @@ startingHandSize = Vanguard.handSize openingHand
 -- CR 103.5: draw opening hands, then run the declaration/mulligan/bottom round
 -- loop to completion. Assumes each player's library is already built and
 -- shuffled. The per-player mulligan count is a local Map (absent = 0) read only
--- by this loop, so it never enters GameState. `owners` is in turn order.
+-- by this loop, so it never enters GameState. `owners` is in turn order from
+-- the starting player.
+--
+-- CR 805.3a / 805.3b: under the shared team turns option the starting team's
+-- players go first and then each other team's in turn order, which is `owners`
+-- regrouped by team.
 --
 -- Not implemented: CR 103.5d's order within a team under the shared team turns
--- option, which that team chooses (#4001).
+-- option, which that team chooses (#4014).
 openingHands :: HandActionPerformer -> [PlayerId] -> Game ()
-openingHands perform owners = do
+openingHands perform seated = do
+  owners <- State.gets (\gs -> List.sortOn (\pid -> List.findIndex (Turn.sharesTurn gs pid) seated) seated)
   -- CR 103.5 sentence 1: every player draws a full opening hand. A short
   -- library sets drewFromEmpty here, and the flag survives the loop -- CR 727.3
   -- / 729.3.

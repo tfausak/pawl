@@ -152,7 +152,7 @@ codec resolve = Fields.object $ do
   phase <- Fields.required "phase" Phase.codec GameState.phase
   remaining <- Fields.required "remaining" (Common.seq Phase.codec) GameState.remaining
   priority <- Fields.defaulted "priority" Nothing (Common.maybe PlayerId.codec) GameState.priority
-  passes <- Fields.defaulted "passes" 0 Common.natural GameState.passes
+  passed <- Fields.defaulted "passed" Set.empty (Common.set PlayerId.codec) GameState.passed
   turnNumber <- Fields.required "turnNumber" Common.natural GameState.turnNumber
   result <- Fields.defaulted "result" Nothing (Common.maybe Result.codec) GameState.result
   restartSignal <- Fields.defaulted "restartSignal" RestartSignal.Type.Playing RestartSignal.codec GameState.restartSignal
@@ -234,7 +234,7 @@ codec resolve = Fields.object $ do
         GameState.phase = phase,
         GameState.remaining = remaining,
         GameState.priority = priority,
-        GameState.passes = passes,
+        GameState.passed = passed,
         GameState.turnNumber = turnNumber,
         GameState.result = result,
         GameState.restartSignal = restartSignal,

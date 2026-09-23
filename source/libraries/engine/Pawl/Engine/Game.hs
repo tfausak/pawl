@@ -14,6 +14,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
@@ -1775,8 +1776,30 @@ opponentsOf you gs = filter (areOpponents gs you) (stillPlaying gs)
 -- departed seat is still named here, and a caller that must not name one
 -- filters with stillPlaying. An active player somehow absent from the roster
 -- degrades to the roster itself rather than to nobody.
+--
+-- CR 805.6: under the shared team turns option the whole active team comes
+-- first, then each nonactive team in turn order, each team's players together.
+--
+-- Not implemented: CR 805.6's "in whatever order they like" -- a team's players
+-- come in seat order from the active player's, not an order the team chooses
+-- (#4014).
 apnapOrder :: GameState -> [PlayerId]
-apnapOrder gs = turnOrderFrom (GameState.activePlayer gs) gs
+apnapOrder gs =
+  let rotated = turnOrderFrom (GameState.activePlayer gs) gs
+   in List.sortOn (\pid -> List.findIndex (Turn.sharesTurn gs pid) rotated) rotated
+
+-- CR 805.2: the primary player of this player's team -- the still-playing
+-- teammate in the team's rightmost seat, which is the one turn order (CR 101.4,
+-- to the left) reaches first from outside the team. Without the shared team
+-- turns option every player is their own.
+primaryOf :: GameState -> PlayerId -> PlayerId
+primaryOf gs pid =
+  let seats = filter (\p -> List.elem p (stillPlaying gs)) (GameState.turnOrder gs)
+      mate = Turn.sharesTurn gs pid
+      before = drop (length seats - 1) seats <> seats
+   in case [seat | (previous, seat) <- zip before seats, mate seat, not (mate previous)] of
+        primary : _ -> primary
+        [] -> pid
 
 -- apnapOrder's generalisation: the seating roster rotated to start with the
 -- player NAMED rather than with the active player. CR 701.38a's vote is the

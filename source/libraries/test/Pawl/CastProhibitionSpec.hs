@@ -1593,7 +1593,7 @@ nextTurnFor :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 nextTurnFor pid gs =
   let untap = Phase.Beginning BeginningStep.Untap
       untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = pid, GameState.phase = untap}) (Engine.runTurnBasedActions untap)
-   in untapped {GameState.phase = Phase.PrecombatMain, GameState.priority = Just pid, GameState.passes = 0}
+   in untapped {GameState.phase = Phase.PrecombatMain, GameState.priority = Just pid, GameState.passed = Set.empty}
 
 -- CR 601.3b's board, shared by the two groups below it -- Vedalken Orrery's and
 -- Sigarda's Aid's -- since what a permission is read off is the caller's `extra`.

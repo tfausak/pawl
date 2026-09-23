@@ -1277,7 +1277,7 @@ timeStopBoard island mountain gnarlbark timeStop divination burst brothers =
       activated = case assaultAbility brothers of
         Nothing -> error "Pawl.TurnSpec: Brothers of Fire should have an activated ability"
         Just ability -> snd (Engine.runGamePure (aimPlayer S.alice) cast (Activate.activateAbility S.bob shaman ability))
-   in (activated {GameState.priority = Just S.alice, GameState.passes = 0}, tree, divine)
+   in (activated {GameState.priority = Just S.alice, GameState.passed = Set.empty}, tree, divine)
 
 -- CR 724.1, end to end, through the pool's simplest producer: Time Stop
 -- ({4}{U}{U} Instant, "End the turn.").
