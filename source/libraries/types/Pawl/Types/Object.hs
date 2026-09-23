@@ -851,9 +851,9 @@ data Object = MkObject
 --
 -- Leaves `owner`, `source` and `duplicate` alone, which are not per-incarnation
 -- at all (CR 108.3), and `zone` and `timestamp`, which the caller is DECIDING
--- rather than forgetting. A caller overrides the rest the same way -- CR 110.5b's "enters
--- tapped", CR 708.4's face-down status and CR 701.3's attach-on-entry are
--- choices the move makes about the new object.
+-- rather than forgetting. A caller overrides the rest the same way -- CR
+-- 110.5b's "enters tapped", CR 708.4's face-down status and CR 701.3's
+-- attach-on-entry are choices the move makes about the new object.
 newIncarnation :: Object -> Object
 newIncarnation object =
   object
