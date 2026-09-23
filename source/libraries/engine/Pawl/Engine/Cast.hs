@@ -436,12 +436,18 @@ payableCost = payableCostAt 0
 -- land, so a gate that measured the mana alone would refuse the cast convoke is
 -- printed to allow. Cost.manaSubstitutions is the offer, and castProposed asks
 -- the payer to pick among the same entries.
+--
+-- CR 702.132a's assisting player is counted the same way, after the totalling
+-- and ahead of the substitutes, which is where castProposed pays them
+-- (Cost.assistable): a caster with one Forest may propose Charging Binox beside a
+-- player holding seven Plains. Off the FACE being cast, as castProposed reads it.
 payableCostAt :: Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x extra spending pid oid gs cost =
   let adjustments = Cost.plusReductions extra (Cost.spellAdjustments pid oid gs)
       substituted = Cost.substituteX x cost
       totalled = Cost.plusComponents adjustments substituted
-      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
+      assisted = Cost.assistable (maybe Set.empty Face.keywordSet (Game.faceOf oid gs)) (PaymentSubject.Casting oid) pid oid gs
+      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
    in if Cost.readsBoundSlot substituted
         then any (any ask . Target.aimings) (castAimable pid oid gs)
         else ask Map.empty
@@ -2870,10 +2876,15 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- announcement says why it matters to the announcement itself:
                   -- a Phyrexian symbol offered without the added "Sacrifice a
                   -- Swamp" in view would be offered against a board that has one
-                  -- Swamp too many.
+                  -- Swamp too many. CR 702.132a's assisting player likewise
+                  -- (Cost.assistable), which payableCost counts. A fence, not a
+                  -- proof: no printing states assist beside a hybrid or
+                  -- Phyrexian symbol (Scryfall keyword:assist, 2026-09-23), so
+                  -- no announcement here has a choice it could change.
                   let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments pid sid bestowedGs)
                   let totalledCost = Cost.plusComponents gathered announcedAtX
-                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid bestowedGs) (Cost.totalManas gathered)) totalledCost
+                      assistedTotal = Cost.assistable (maybe Set.empty Face.keywordSet (Game.faceOf sid bestowedGs)) (PaymentSubject.Casting sid) pid sid bestowedGs
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid bestowedGs) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.paidCosts`'s
