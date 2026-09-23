@@ -110,6 +110,7 @@ withoutAnnouncement before entry closed = do
   drawsThisTurn <- mapOf GameState.drawsThisTurn
   activatedThisTurn <- mapOfSets GameState.activatedThisTurn
   castPermissionsUsedThisTurn <- mapOfSets GameState.castPermissionsUsedThisTurn
+  rollModifiersUsedThisTurn <- mapOfSets GameState.rollModifiersUsedThisTurn
   triggeredThisGame <- setOf GameState.triggeredThisGame
   pendingControl <- mapOf GameState.pendingControl
   control <- mapOf GameState.control
@@ -197,6 +198,7 @@ withoutAnnouncement before entry closed = do
         GameState.drawsThisTurn = drawsThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
         GameState.castPermissionsUsedThisTurn = castPermissionsUsedThisTurn,
+        GameState.rollModifiersUsedThisTurn = rollModifiersUsedThisTurn,
         GameState.triggeredThisGame = triggeredThisGame,
         GameState.pendingControl = pendingControl,
         GameState.control = control,

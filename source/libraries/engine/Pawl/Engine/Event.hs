@@ -613,6 +613,7 @@ damageOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -685,6 +686,7 @@ revealOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -7912,6 +7914,7 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 706.1's roll is something a resolving effect INSTRUCTS a player to do,
   -- never an ability triggering, so it takes CR 603.3b's first pass as well.
   TriggerCondition.PlayerRollsDice _ -> False
+  TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- The same answer for the same reason: CR 701.43a's exert is a keyword action a
@@ -8116,6 +8119,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerWaterbends _ -> False
   -- CR 706.1 names no turn either.
   TriggerCondition.PlayerRollsDice _ -> False
+  TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- False for the SelfAttacks arm's reason below, which is exactly this case one
