@@ -3,12 +3,14 @@
 module Pawl.Codec.ForEach where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.LoopMembers as LoopMembers
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.LoopMembers as LoopMembers
 
 -- | A bare object keyed by the record's field names.
 --
@@ -21,19 +23,22 @@ import qualified Pawl.Types.ForEach as ForEach
 -- author's mistake rather than a shorter way of saying something. `individually`
 -- is not one of them: CR 608.2f says simultaneous processing is what happens "in
 -- most cases", so its False is the rule's own default and a card states only the
--- exception.
+-- exception. `members` defaults to LoopMembers.Every for the same reason: "for
+-- each" is every member unless the card says "you may".
 codec ::
   (Typeable.Typeable effect) =>
   Codec.Codec effect ->
   Codec.Codec (ForEach.ForEach effect)
 codec effectCodec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec ForEach.ref
+  members <- Fields.defaulted "members" LoopMembers.Every LoopMembers.codec ForEach.members
   slot <- Fields.required "slot" SlotName.codec ForEach.slot
   body <- Fields.required "body" (Common.seq effectCodec) ForEach.body
   individually <- Fields.defaulted "individually" False Common.boolean ForEach.individually
   pure
     ForEach.MkForEach
       { ForEach.ref = ref,
+        ForEach.members = members,
         ForEach.slot = slot,
         ForEach.body = body,
         ForEach.individually = individually

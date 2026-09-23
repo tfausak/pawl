@@ -1398,7 +1398,7 @@ effectObjectRefs effect =
         Effect.Shuffle {} -> []
         Effect.OfferCast offer -> read_ [OfferCast.ref offer]
         Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
-        Effect.ForEach (ForEach.MkForEach ref _ _ _) -> read_ [ref]
+        Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> read_ [ref]
         Effect.Heal ref -> read_ [ref]
 
 -- The chooser-shaped refs one effect writes where nothing can ask for them: the
