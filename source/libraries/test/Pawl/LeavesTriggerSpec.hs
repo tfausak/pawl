@@ -2777,7 +2777,7 @@ professorHojoSpec s registry =
         -- Seven lands for the two producers, which never compete: one leg either
         -- activates Joraga's {4}{G}{W} or casts the Juggler's {B}{R}.
         let g0 = S.landsFor mountain S.alice 1 (S.landsFor swamp S.alice 1 (S.landsFor plains S.alice 1 (S.landsFor forest S.alice 4 S.threePlayerGame)))
-            (_hojoId, g1) = S.addPermanent hojo S.alice g0
+            (hojoId, g1) = S.addPermanent hojo S.alice g0
             (joragaId, g2) = S.addPermanent joraga S.alice g1
             -- TWO Pikers under alice, which the batch leg needs and every other
             -- leg leaves alone. Distinct ids, and the second is also what keeps
@@ -2801,7 +2801,8 @@ professorHojoSpec s registry =
               { GameState.phase = Phase.PrecombatMain,
                 GameState.activePlayer = S.alice,
                 GameState.priority = Just S.alice
-              }
+              },
+            hojoId
           )
       board = boardBearing "Professor Hojo"
       -- Down to the bottom: the watcher's trigger sits above whatever announced the
@@ -2827,7 +2828,7 @@ professorHojoSpec s registry =
    in Spec.describe s "CR 601.2c creatures becoming the target of an activated ability" $ do
         -- The positive every negative below rests on.
         Spec.it s "CR 113.3b whole card: an ACTIVATED ability targeting a creature you control draws" $ do
-          (joragaId, firstPiker, _, _, _, gs) <- board
+          (joragaId, firstPiker, _, _, _, gs, _) <- board
           Spec.assertEqWith s "alice's hand starts at the Juggler alone" (S.handSize S.alice gs) 1
           case activatedAt (Set.singleton (Recipient.ToCreature firstPiker)) joragaId gs of
             Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
@@ -2840,7 +2841,7 @@ professorHojoSpec s registry =
         -- Pawl.Types.StackObjectKind splits: the SAME board and the SAME Piker
         -- named, by an ability on the other side of rule 113.3.
         Spec.it s "CR 113.3c a TRIGGERED ability naming the same creature draws nothing" $ do
-          (_, firstPiker, _, _, jugglerId, gs) <- board
+          (_, firstPiker, _, _, jugglerId, gs, _) <- board
           let after = triggeredAt (Set.singleton (Recipient.ToCreature firstPiker)) jugglerId gs
           Spec.assertEqWith s "CR 601.2c the Hojo's trigger did not fire" (S.handSize S.alice after) 0
           -- The controls, which are what stop this leg passing because nothing
@@ -2865,7 +2866,7 @@ professorHojoSpec s registry =
         -- Event.Trigger.oncePerBatch has nothing to collapse, and this reads
         -- three.
         Spec.it s "CR 603.2c one activation naming two of your creatures draws once" $ do
-          (joragaId, firstPiker, secondPiker, _, _, gs) <- boardBearing "Synthetic Target Scryer"
+          (joragaId, firstPiker, secondPiker, _, _, gs, _) <- boardBearing "Synthetic Target Scryer"
           case activatedAt (Set.fromList [Recipient.ToCreature firstPiker, Recipient.ToCreature secondPiker]) joragaId gs of
             Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
             Just after -> do
@@ -2877,12 +2878,101 @@ professorHojoSpec s registry =
         -- permanent, and bob's Piker fails it. The same activation as the
         -- positive leg, differing in NOTHING but whose creature was named.
         Spec.it s "CR 109.2 an activated ability naming a creature you do not control draws nothing" $ do
-          (joragaId, _, _, bobsPiker, _, gs) <- board
+          (joragaId, _, _, bobsPiker, _, gs, _) <- board
           case activatedAt (Set.singleton (Recipient.ToCreature bobsPiker)) joragaId gs of
             Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
             Just after -> do
               Spec.assertEqWith s "alice's hand is still the Juggler alone" (S.handSize S.alice after) 1
               Spec.assertEqWith s "and the counter landed on bob's Piker" (S.powerToughnessOf bobsPiker after) (Just (3, 2))
+        -- CR 603.10's first sentence at CR 601.2c's moment: the Juggler's
+        -- ability names the suspected Piker and sacrifices that same Piker to
+        -- pay (CR 601.2h), so the Piker is gone by the CR 117.5 gather. It was
+        -- a creature alice controlled when it became a target, and that is the
+        -- board the trigger is checked against.
+        Spec.it s "Professor Hojo sees a target its own cost sacrificed" $ do
+          (_, firstPiker, _, _, _, gs0, _) <- board
+          juggler <- S.printingOf s registry "Rune-Brand Juggler"
+          let (jugglerId, gs1) = S.addPermanent juggler S.alice gs0
+              gs = gs1 {GameState.objects = Map.adjust (\o -> o {Object.designations = Set.singleton Designation.Suspected}) firstPiker (GameState.objects gs1)}
+          case activatedAt (Set.singleton (Recipient.ToCreature firstPiker)) jugglerId gs of
+            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor jugglerId gs)) 1
+            Just after -> do
+              Spec.assertEqWith s "CR 601.2c the Hojo's trigger drew a card" (S.handSize S.alice after) 2
+              -- The control: the cost really took the Piker it targeted.
+              Spec.assertEqWith s "and the targeted Piker was sacrificed" (Game.lookupObject firstPiker after) Nothing
+        -- The bearer's half of the same sample: the cost sacrifices the Hojo
+        -- itself, which stood when the Piker became a target, so its ability
+        -- triggered then (CR 603.2) and is put on the stack from its last known
+        -- information.
+        Spec.it s "Professor Hojo sacrificed to the cost still triggers" $ do
+          (_, firstPiker, _, _, _, gs0, hojoId) <- board
+          juggler <- S.printingOf s registry "Rune-Brand Juggler"
+          let (jugglerId, gs1) = S.addPermanent juggler S.alice gs0
+              gs = gs1 {GameState.objects = Map.adjust (\o -> o {Object.designations = Set.singleton Designation.Suspected}) hojoId (GameState.objects gs1)}
+          case activatedAt (Set.singleton (Recipient.ToCreature firstPiker)) jugglerId gs of
+            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor jugglerId gs)) 1
+            Just after -> do
+              Spec.assertEqWith s "CR 603.2 the sacrificed Hojo's trigger drew a card" (S.handSize S.alice after) 2
+              Spec.assertEqWith s "and the Hojo was the creature sacrificed" (Game.lookupObject hojoId after) Nothing
+
+-- CR 601.2c per permanent, off a SPELL: Venerated Rotpriest, {G} Creature --
+-- Phyrexian Druid 1/2, "Toxic 1. Whenever a creature you control becomes the
+-- target of a spell, target opponent gets a poison counter."
+--
+-- The poison count is the signal: one counter per trigger, and bob starts at
+-- none. bob is alice's only opponent, so the trigger's own target is forced.
+veneratedRotpriestSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+veneratedRotpriestSpec s registry =
+  let -- The wanted recipients where a slot offers any, and the first offered
+      -- otherwise -- the Rotpriest's "target opponent", which offers bob alone.
+      aiming :: ObjectId.ObjectId -> Set.Set Recipient.Recipient -> Prompt.Prompt r -> r
+      aiming fodder wanted p = case p of
+        Prompt.ChooseTargets _ _ _ sets ->
+          fmap (\(_, legal) -> let hit = Set.intersection legal wanted in if Set.null hit then Set.take 1 legal else hit) sets
+        Prompt.ChooseSacrifices _ _ _ offered _ -> Set.fromList (filter (== fodder) offered)
+        _ -> S.identityAnswer p
+      board spellName landName = do
+        land <- S.printingOf s registry landName
+        spell <- S.printingOf s registry spellName
+        rotpriest <- S.printingOf s registry "Venerated Rotpriest"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let g0 = S.landsFor land S.alice 2 (Setup.emptyGame S.bothPlayers)
+            (_, g1) = S.addPermanent rotpriest S.alice g0
+            (firstPiker, g2) = S.addPermanent piker S.alice g1
+            (secondPiker, g3) = S.addPermanent piker S.alice g2
+            (spellId, g4) = S.addHandCard spell S.alice g3
+        pure
+          ( spellId,
+            firstPiker,
+            secondPiker,
+            g4
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          )
+      castAt fodder wanted spellId gs =
+        let answer :: Prompt.Prompt r -> r
+            answer = aiming fodder wanted
+            cast = S.runPure answer (S.runPure answer gs (S.cast S.alice spellId)) Engine.settleForPriority
+         in S.runPure answer cast (Foldable.foldr (>>) (pure ()) (replicate 4 (Stack.resolveTop >> Engine.settleForPriority)))
+      poisonOf = S.playerCounterOf PlayerCounterKind.Poison S.bob
+   in Spec.describe s "CR 601.2c a creature becoming the target of a spell" $ do
+        -- CR 603.2c's second sentence: "a creature" is one trigger event per
+        -- creature targeted, where Professor Hojo's "one or more" is one.
+        Spec.it s "Venerated Rotpriest triggers once per creature a spell targets" $ do
+          (spellId, firstPiker, secondPiker, gs) <- board "Lead by Example" "Forest"
+          let after = castAt firstPiker (Set.fromList [Recipient.ToCreature firstPiker, Recipient.ToCreature secondPiker]) spellId gs
+          Spec.assertEqWith s "CR 603.2c bob got two poison counters" (poisonOf after) 2
+          Spec.assertEqWith s "and both Pikers took a counter" (S.powerToughnessOf firstPiker after, S.powerToughnessOf secondPiker after) (Just (3, 2), Just (3, 2))
+        -- CR 603.10's first sentence at CR 601.2c's moment, the spell half of
+        -- Professor Hojo's sacrificed-target leg: Fling names the Piker its own
+        -- additional cost sacrifices (CR 601.2h).
+        Spec.it s "Venerated Rotpriest sees a target its spell's cost sacrificed" $ do
+          (spellId, firstPiker, _, gs) <- board "Fling" "Mountain"
+          let after = castAt firstPiker (Set.singleton (Recipient.ToCreature firstPiker)) spellId gs
+          Spec.assertEqWith s "CR 601.2c bob got a poison counter" (poisonOf after) 1
+          Spec.assertEqWith s "and the targeted Piker was sacrificed" (Game.lookupObject firstPiker after) Nothing
 
 soulshiftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulshiftSpec s registry =
@@ -3461,10 +3551,10 @@ kindredSpec s registry =
 -- against Scryfall.)
 --
 -- The card would break under a reading that pinned it to the graveyard:
--- `Event.functionsIn Zone.Battlefield` would be False, `eventTriggers`'
+-- `Event.functionsIn Zone.Battlefield` would answer Nothing, `eventTriggers`'
 -- `battlefieldAbilitiesOf` filter would drop the ability, and the Aura would sit
--- in the graveyard CR 704.5m put it in. With the clause `zoneFunctionedFrom`
--- answers Nothing, `zonesTriggeredFrom` gives the battlefield, and the trigger
+-- in the graveyard CR 704.5m put it in. With the clause no zone is pinned,
+-- `zonesTriggeredFrom` gives the battlefield, and the trigger
 -- goes on the stack.
 --
 -- The clause is not what CARRIES that here, though, and the legs below do not
@@ -3606,8 +3696,8 @@ screamsFromWithinSpec s registry =
         Spec.it s "CR 113.6m control: an ordinary graveyard-recursion trigger is still pinned to the graveyard" $ do
           squee <- S.printingOf s registry "Squee, Goblin Nabob"
           screams <- S.printingOf s registry "Screams from Within"
-          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine (S.combinedFace squee))) (Face.delayedAbilities (S.combinedFace squee))) (Face.triggeredAbilities (S.combinedFace squee))) [Just Zone.Graveyard]
-          Spec.assertEqWith s "the Aura's names no zone at all" (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine (S.combinedFace screams))) (Face.delayedAbilities (S.combinedFace screams))) (Face.triggeredAbilities (S.combinedFace screams))) [Nothing]
+          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap (Event.zonesFunctionedIn (TypeLine.subtypes (Face.typeLine (S.combinedFace squee))) (Face.delayedAbilities (S.combinedFace squee))) (Face.triggeredAbilities (S.combinedFace squee))) [Set.singleton Zone.Graveyard]
+          Spec.assertEqWith s "the Aura's names no zone, so CR 113.6's battlefield default stands" (fmap (Event.zonesFunctionedIn (TypeLine.subtypes (Face.typeLine (S.combinedFace screams))) (Face.delayedAbilities (S.combinedFace screams))) (Face.triggeredAbilities (S.combinedFace screams))) [Set.singleton Zone.Battlefield]
 
 -- CR 113.6m's Aura clause read the other way round: the exception is granted
 -- "if the object is an Aura", so the SAME trigger condition on a non-Aura gets
@@ -3677,9 +3767,9 @@ widowedBladeSpec s registry =
         Spec.it s "CR 113.6m the same ability answers differently once its bearer is an Aura" $ do
           blade <- S.printingOf s registry "Synthetic Widowed Blade"
           let face = S.combinedFace blade
-              zonesWith subtypes = fmap (Event.zoneFunctionedFrom subtypes (Face.delayedAbilities face)) (Face.triggeredAbilities face)
-          Spec.assertEqWith s "as an Equipment the ability functions only in the graveyard" (zonesWith (TypeLine.subtypes (Face.typeLine face))) [Just Zone.Graveyard]
-          Spec.assertEqWith s "as an Aura the exception applies and it names no zone" (zonesWith (Set.insert Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) [Nothing]
+              zonesWith subtypes = fmap (Event.zonesFunctionedIn subtypes (Face.delayedAbilities face)) (Face.triggeredAbilities face)
+          Spec.assertEqWith s "as an Equipment the ability functions only in the graveyard" (zonesWith (TypeLine.subtypes (Face.typeLine face))) [Set.singleton Zone.Graveyard]
+          Spec.assertEqWith s "as an Aura the exception applies and it functions on the battlefield" (zonesWith (Set.insert Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) [Set.singleton Zone.Battlefield]
           Spec.assertBool s (not (Set.member Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) "and the printed card really is no Aura"
 
 -- Heirloom Blade: CR 205.3m's comparison against a BOUND slot,
@@ -3817,7 +3907,7 @@ skullclampSpec s registry =
 -- it. (Name, cost, type line and oracle text checked against Scryfall.)
 --
 -- The ability's only zone-relevant content sits INSIDE the delayed ability its
--- arm creates, so without the sentence Event.zoneFunctionedFrom answers Nothing
+-- arm creates, so without the sentence nothing is pinned
 -- off the arm, CR 113.6's own default puts the ability on the battlefield, and
 -- the card gets both halves wrong at once: it never fires from the graveyard,
 -- where all its work is, and it fires from the battlefield, where CR 113.6m says
@@ -3997,7 +4087,7 @@ banewaspAfflictionSpec s registry =
 -- to function to ever be checked at all.
 --
 -- The proving quantity is whether the trigger reaches the stack: without the
--- exception, `functionsIn Zone.Battlefield` is False for this ability,
+-- exception, `functionsIn Zone.Battlefield` answers Nothing for this ability,
 -- `leftBattlefield`'s filter excludes it from the death event's own candidates,
 -- and SelfDies is never checked against the one event that could satisfy it.
 --
@@ -4012,7 +4102,7 @@ banewaspAfflictionSpec s registry =
 -- graveyard card when the end step comes round.
 --
 -- Which is also why the exception above must survive the payload naming that
--- slot: `Event.zoneFunctionedFrom` reads the SELF-NAMING slots for a condition,
+-- slot: `Event.zonesFunctionedIn` reads the SELF-NAMING slots for a condition,
 -- and a condition that puts its own object into a zone makes CR 400.7e's
 -- incarnation one of them.
 ivoryGargoyleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -4058,9 +4148,9 @@ ivoryGargoyleSpec s registry =
           let face = S.combinedFace gargoyle
           Spec.assertEqWith
             s
-            "no zone is pinned once the exception is read"
-            (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face)) (Face.triggeredAbilities face))
-            [Nothing]
+            "the battlefield once the exception is read"
+            (fmap (Event.zonesFunctionedIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face)) (Face.triggeredAbilities face))
+            [Set.singleton Zone.Battlefield]
         -- The proving leg for CR 400.7e's delayed reader: the card the Gargoyle
         -- became is on the battlefield again when the end step has passed. The
         -- census runs FIRST so no precondition can absorb a mutation, and it is
@@ -4143,6 +4233,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   gomazoaSpec s registry
   amuletSpec s registry
   professorHojoSpec s registry
+  veneratedRotpriestSpec s registry
   soulshiftSpec s registry
   hauntSpec s registry
   hauntSpellSpec s registry

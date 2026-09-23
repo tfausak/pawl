@@ -3167,8 +3167,9 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- reason one line up -- everything between the two can
                           -- still reject the cast and rewind, and rule 601.2c
                           -- holds the trigger off the stack "until the spell has
-                          -- finished being cast" anyway.
-                          Event.becameTarget sid StackObjectKind.Spell pid chosen
+                          -- finished being cast" anyway. The board it samples
+                          -- is `pricedGs`, taken before CR 601.2g/h's payment.
+                          Event.becameTarget pricedGs sid StackObjectKind.Spell pid chosen
                           Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid keywordsBefore castFor sid)
                           -- CR 903.8: the cast is now announced, so this is a
                           -- "previous time they cast it from the command zone"

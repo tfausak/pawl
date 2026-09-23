@@ -1116,7 +1116,8 @@ placeBorne srcId pending = do
           -- is what CR 702.21a's ward watches. Raised only on an announcement the
           -- joint check accepted, so a re-asked answer never made anything a
           -- target.
-          Event.becameTarget abilId StackObjectKind.TriggeredAbility controller chosen
+          announced <- State.get
+          Event.becameTarget announced abilId StackObjectKind.TriggeredAbility controller chosen
 
 -- CR 101.4 / 603.3b: the players who control a pending trigger, active player
 -- first and then the rest in turn order, grouped by controller because the

@@ -1081,6 +1081,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Nor does the bystander batch reading, which carries a Filter and a
   -- StackObjectKind.
   TriggerCondition.PermanentsBecomeTargeted {} -> []
+  TriggerCondition.PermanentBecomesTargeted {} -> []
 
 -- Every Count reachable from one effect: the Quantities nested in its
 -- ObjectRefs, its own Quantity/Duration fields, and -- for Create/CreateEmblem
@@ -4011,6 +4012,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- The bystander batch reading DOES carry one, and it is card text like any
   -- other: Professor Hojo's "creatures you control".
   TriggerCondition.PermanentsBecomeTargeted payload -> unframed [PermanentsBecomeTargeted.filter payload]
+  TriggerCondition.PermanentBecomesTargeted payload -> unframed [PermanentsBecomeTargeted.filter payload]
 
 -- Every SlotName a TriggerCondition names OUTRIGHT. Exhaustive with no
 -- fallthrough, triggerConditionCounts' shape and for its reason: a condition
@@ -4115,6 +4117,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfBecomesTargeted _ -> []
   TriggerCondition.ControllerBecomesTarget _ -> []
   TriggerCondition.PermanentsBecomeTargeted _ -> []
+  TriggerCondition.PermanentBecomesTargeted _ -> []
   TriggerCondition.SelfHalfUnlocked _ -> []
   TriggerCondition.RoomFullyUnlocked _ -> []
   -- Recursive, for triggerConditionCounts' reason: a branch of an AnyOf may be

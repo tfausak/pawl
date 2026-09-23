@@ -819,6 +819,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted {PermanentsBecomeTargeted.filter = Filter.ControlledBy PlayerRelation.You, PermanentsBecomeTargeted.kind = Just StackObjectKind.ActivatedAbility}))
       " {\"type\":\"PermanentsBecomeTargeted\",\"value\":{\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"kind\":{\"type\":\"ActivatedAbility\"}}} "
+  Spec.it s "PermanentBecomesTargeted round-trips with its Filter and its kind" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentBecomesTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted {PermanentsBecomeTargeted.filter = Filter.ControlledBy PlayerRelation.You, PermanentsBecomeTargeted.kind = Just StackObjectKind.Spell}))
+      " {\"type\":\"PermanentBecomesTargeted\",\"value\":{\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"kind\":{\"type\":\"Spell\"}}} "
   Spec.it s "SelfCast" $
     Common.assertCodec
       s
