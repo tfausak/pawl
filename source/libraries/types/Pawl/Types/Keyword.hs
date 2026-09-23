@@ -517,9 +517,9 @@ data Keyword
     -- clause gated on Quantity.CastUsing, and rule 702.113a's N is written where
     -- the counters are put rather than copied here. No printing grants awaken to
     -- another object, which is what makes the two spellings observably the same.
-    --
-    -- Not implemented: rule 702.113b's "the spell is cast as if it didn't have
-    -- that target" -- the land is targeted on an unawakened cast too (#2833).
+    -- Rule 702.113b's "the spell is cast as if it didn't have that target" is
+    -- Pawl.Engine.Cast.trimModeTargetSlots, proved by Pawl.CastSpec's "CR
+    -- 702.113b the awaken-only land target is asked only on the awakened cast".
     Awaken (Cost.Cost Keyword)
   | Devoid -- 702.114
   | -- | 702.115a: whenever this creature deals combat damage to a player, that
