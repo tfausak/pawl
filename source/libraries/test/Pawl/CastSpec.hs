@@ -4033,15 +4033,16 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
 -- The spell ability rule 702.113a's second half states rides the CARD as a
 -- clause gated on Quantity.CastUsing, cleave's shape; Pawl.Types.Keyword's
 -- Awaken says why. Rule 702.113b's "cast as if it didn't have that target" is
--- not implemented, so the Forest is targeted on the unawakened cast too
--- (#2833) -- which is why both casts here are given a land to aim at.
+-- what the second Spec.it below proves (#2833): the target is asked only on the
+-- awakened cast, so this group's own cast still hands the printed-cost case a
+-- land to aim at, in case a regression brings the prompt back.
 --
 -- That clause is written ABOVE the card's own "Exile Part the Waterveil" rather
 -- than in printed order: CR 400.7 makes the exiled card a new object with no
 -- memory of the spell, so Object.castUsing is gone by the time a clause below
 -- the move reads it, and the gate answers false. Nothing happens between the
 -- two, so the orders are observably the same.
-awakenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+awakenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 awakenSpec s registry = Spec.describe s "Awaken" $ do
   Spec.it s "CR 702.113a awakened, the Forest becomes a 6/6 Elemental creature land with haste; cast for {4}{U}{U} it stays a plain land" $ do
     island <- S.printingOf s registry "Island"
@@ -4063,8 +4064,62 @@ awakenSpec s registry = Spec.describe s "Awaken" $ do
     Spec.assertEqWith s "CR 702.113a the printed cost was paid, so the Forest gains nothing at all" (reading (cast waterveilCost)) (Nothing, 0, False, False, True, False)
     Spec.assertEqWith s "the control: both casts exiled the Waterveil and gave alice an extra turn" (fmap (\gs -> (S.onBattlefield waterveilId gs, length (GameState.extraTurns gs))) [cast awakenCost, cast waterveilCost]) [(False, 1), (False, 1)]
 
--- payingFor with every target slot aimed at `victim`, which Part the Waterveil
--- needs because rule 702.113b's target is chosen on both casts (#2833).
+  -- CR 702.113b: "The controller of a spell with awaken chooses the target of
+  -- the awaken spell ability only if that player chose to pay the spell's
+  -- awaken cost. Otherwise the spell is cast as if it didn't have that
+  -- target." -- proved by COUNTING the CR 601.2c prompt rather than by reading
+  -- resolution, which the group above already covers and which stays silent
+  -- either way (the awaken clause is gated again at CR 608.2c). ONE board, the
+  -- same nine Islands and Forest as above, so the only difference between the
+  -- two counts is which cost was announced.
+  Spec.it s "CR 702.113b the awaken-only land target is asked only on the awakened cast" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    waterveil <- S.printingOf s registry "Part the Waterveil"
+    let (forestId, gs0) = S.addPermanent forest S.alice (S.landsInPlay island 9)
+        (waterveilId, gs1) = S.addHandCard waterveil S.alice gs0
+        board = aliceOnTurn gs1
+        countingAnswer :: [ManaSymbol.ManaSymbol] -> Prompt.Prompt r -> State.State Int r
+        countingAnswer cost p = case p of
+          Prompt.ChooseTargets {} -> State.modify' (+ 1) >> pure (aimedAt forestId p)
+          _ -> pure (payingFor cost p)
+        targetAsks cost = State.execState (Engine.runGame (countingAnswer cost) board (S.cast S.alice waterveilId)) 0
+    Spec.assertEqWith s "CR 702.113b cast for the printed {4}{U}{U}, the land is never asked for" (targetAsks waterveilCost) 0
+    Spec.assertEqWith s "CR 702.113a cast for the {6}{U}{U}{U} awaken cost, it is asked once" (targetAsks awakenCost) 1
+
+  -- CR 702.113b's CASTABILITY half: a mode unfillable under one candidate may
+  -- still be fillable under another, since CR 601.2b chooses the modes before
+  -- its cost. Alice controls NO land at all -- six Birds of Paradise instead,
+  -- so the printed {4}{U}{U} is payable but "target land you control" has
+  -- nothing to offer -- so the printed-cost cast must still be legal
+  -- (Cast.targetable/the CR 700.2a mode gate, trimModalForCandidate), and must
+  -- still resolve rather than being taken back by CR 601.2e. The awaken
+  -- candidate itself is not exercised here: it would need the very land this
+  -- board withholds, which is CR 601.2e's own remedy and not this unit's claim.
+  Spec.it s "CR 702.113b/601.2c/700.2a the printed cast is offered though no land exists to target" $ do
+    birds <- S.printingOf s registry "Birds of Paradise"
+    waterveil <- S.printingOf s registry "Part the Waterveil"
+    let stocked = List.foldl' (\g _ -> snd (S.addPermanent birds S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. (6 :: Int)]
+        (waterveilId, gs1) = S.addHandCard waterveil S.alice stocked
+        board = aliceOnTurn gs1
+        -- Blue whenever Birds offers a colour, so its six taps can cover the
+        -- {U}{U} pips as well as the generic mana -- the fallback
+        -- (identityAnswer, Replay.defaultAnswer's NonEmpty.head) picks WHITE,
+        -- the first of the five colours Mana.manaTypesOf lists, and the cast
+        -- would come up two blue mana short for a reason this unit is not
+        -- about.
+        tappingBlue :: Prompt.Prompt r -> r
+        tappingBlue p = case p of
+          Prompt.ChooseManaYield _ _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (any ((== ManaType.Colored Color.Blue) . ManaUnit.manaType) . Mana.yieldUnits) (NonEmpty.toList candidates))
+          _ -> payingFor waterveilCost p
+        after = castResolved tappingBlue waterveilId board
+    Spec.assertBool s (any (S.isCastOf waterveilId) (Action.legalActions S.alice board)) "CR 601.2c/700.2a the printed-cost cast is offered although no land is a legal target"
+    Spec.assertEqWith s "CR 702.113a it resolved rather than being taken back by CR 601.2e, giving alice an extra turn" (length (GameState.extraTurns after)) 1
+
+-- payingFor with every target slot aimed at `victim`. Still needed by the group
+-- above's awakened case (CR 702.113a) -- the printed-cost case no longer raises
+-- the prompt at all (#2833, this file's other Spec.it), so `aimedAt` there is
+-- simply never reached.
 payingAimedAt :: [ManaSymbol.ManaSymbol] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 payingAimedAt wanted victim p = case p of
   Prompt.ChooseTargets {} -> aimedAt victim p
