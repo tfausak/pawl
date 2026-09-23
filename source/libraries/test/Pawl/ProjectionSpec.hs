@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -4388,6 +4389,58 @@ hackSwapping oid swap p = case p of
   Prompt.ChooseLandTypeSwap {} -> swap
   _ -> S.identityAnswer p
 
+-- alice's Akiri, Line-Slinger (0/3, "First strike, vigilance / Akiri gets +1/+0
+-- for each artifact you control. / Partner") and Ogre Sentry (3/3, defender)
+-- beside two Sol Rings, bob's Goblin Piker as a third candidate, and Exchange of
+-- Words entering under alice with its trigger pending. Returns Akiri, the
+-- Sentry, the Piker, the board before the trigger resolves and the board after.
+akiriExchangeBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+akiriExchangeBoard akiri sentry ring piker exchange =
+  let (akiriId, b0) = S.addPermanent akiri S.alice (Setup.emptyGame S.bothPlayers)
+      (sentryId, b1) = S.addPermanent sentry S.alice b0
+      (_, b2) = S.addPermanent ring S.alice b1
+      (_, b3) = S.addPermanent ring S.alice b2
+      (pikerId, before) = S.addPermanent piker S.bob b3
+      (_, entered) = S.entersWithTrigger exchange S.alice before
+      -- Inlined rather than bound, for exchangeOfWordsBoard's reason.
+      staged = S.runPure (exchangeAnswer akiriId sentryId) entered Engine.settleForPriority
+      after = S.runPure (exchangeAnswer akiriId sentryId) staged Stack.resolveTop
+   in (akiriId, sentryId, pikerId, before, after)
+
+-- akiriExchangeBoard with the pump on a CLONE: bob's Akiri, and alice's Clone
+-- entering as a copy of her, so the static ability is in the Clone's copiable
+-- values (CR 707.2) and nowhere on its printed face. Exchange of Words then
+-- swaps the Clone's text box with alice's Ogre Sentry. Returns the Clone, the
+-- Sentry, the board before the exchange and the board after.
+clonedAkiriExchangeBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+clonedAkiriExchangeBoard akiri sentry ring clone exchange =
+  let (akiriId, b0) = S.addPermanent akiri S.bob (Setup.emptyGame S.bothPlayers)
+      (sentryId, b1) = S.addPermanent sentry S.alice b0
+      (_, b2) = S.addPermanent ring S.alice b1
+      (_, b3) = S.addPermanent ring S.alice b2
+      (_, staged) = S.spellOnStack clone S.alice b3
+      before = S.runPure (copyNamed akiriId) staged (Stack.resolveTop Monad.>> Engine.settleForPriority)
+   in case S.namedObjects (CardName.MkCardName (Text.pack "Clone")) before of
+        [cloneId] ->
+          let (_, entered) = S.entersWithTrigger exchange S.alice before
+              -- Inlined rather than bound, for exchangeOfWordsBoard's reason.
+              exchanging = S.runPure (exchangeAnswer cloneId sentryId) entered Engine.settleForPriority
+              after = S.runPure (exchangeAnswer cloneId sentryId) exchanging Stack.resolveTop
+           in Just (cloneId, sentryId, before, after)
+        _ -> Nothing
+
 exchangeTextBoxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
   -- CR 612.5 whole card: Exchange of Words ({1}{U}{U}, "When this enchantment
@@ -4449,6 +4502,118 @@ exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Defender sorcererId after) "CR 702.3 the Sorcerer has the Sentry's defender"
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Defender sentryId after)) "and the Sentry has lost it"
     Spec.assertBool s (Projection.hasKeyword Keyword.Defender sentryId before) "which it had before the exchange"
+
+  -- CR 612.5 / 604.1: a static ability is rules text too, so it moves with the
+  -- text box and generates its effect from the new host. Akiri, Line-Slinger
+  -- ("Akiri gets +1/+0 for each artifact you control", checked against Scryfall
+  -- 2026-09-23) beside two Sol Rings is a 2/3; exchanged with Ogre Sentry, the
+  -- Sentry is the one pumped and Akiri is her printed 0/3. The pump's "Akiri"
+  -- is CR 201.5's self-reference, so it re-binds to the Sentry (CR 113.7).
+  Spec.it s "CR 612.5 Akiri's pump moves with her text box" $ do
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    ring <- S.printingOf s registry "Sol Ring"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (akiriId, sentryId, _, before, after) = akiriExchangeBoard akiri sentry ring piker exchange
+    Spec.assertEqWith s "CR 612.5 the Sentry gets +1/+0 for each of alice's two artifacts" (S.powerToughnessOf sentryId after) (Just (5, 3))
+    Spec.assertEqWith s "and Akiri, having given the ability away, is her printed 0/3" (S.powerToughnessOf akiriId after) (Just (0, 3))
+    -- The control, after the behaviour: the pump really applied to Akiri on
+    -- the board the exchange was added to.
+    Spec.assertEqWith s "before the exchange Akiri is a 2/3" (S.powerToughnessOf akiriId before) (Just (2, 3))
+    Spec.assertEqWith s "and the Sentry its printed 3/3" (S.powerToughnessOf sentryId before) (Just (3, 3))
+
+  -- CR 613.7: a second Exchange of Words, later, between the Sentry and bob's
+  -- Goblin Piker moves the text box the first one LEFT on the Sentry --
+  -- Akiri's -- so the Piker carries Akiri's text and the Sentry the Piker's
+  -- empty one. Applied in the other order the Sentry would keep the pump.
+  Spec.it s "CR 613.7 a later exchange moves the text box an earlier one left" $ do
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    ring <- S.printingOf s registry "Sol Ring"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (akiriId, sentryId, pikerId, _, once) = akiriExchangeBoard akiri sentry ring piker exchange
+        (_, entered) = S.entersWithTrigger exchange S.alice once
+        staged = S.runPure (exchangeAnswer sentryId pikerId) entered Engine.settleForPriority
+        twice = S.runPure (exchangeAnswer sentryId pikerId) staged Stack.resolveTop
+    Spec.assertEqWith s "CR 613.7 the Sentry holds the Piker's empty text box and is its printed 3/3" (S.powerToughnessOf sentryId twice) (Just (3, 3))
+    Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike pikerId twice) "and the Piker holds Akiri's, first strike and all"
+    Spec.assertEqWith s "Akiri keeps the Sentry's text box from the first exchange" (S.powerToughnessOf akiriId twice) (Just (0, 3))
+    Spec.assertEqWith s "the first exchange really had pumped the Sentry" (S.powerToughnessOf sentryId once) (Just (5, 3))
+
+  -- CR 612.5 / 613.11: a rule-affecting static ability is rules text too.
+  -- Bonded Construct ("This creature can't attack alone", checked against
+  -- Scryfall 2026-09-23) exchanged with alice's Goblin Piker (no rules text)
+  -- makes the PIKER the one that can't attack alone.
+  Spec.it s "CR 612.5 Bonded Construct's restriction moves with its text box" $ do
+    construct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (before, mine, _) = S.combatBoardOf [construct, piker] []
+    case mine of
+      [constructId, pikerId] -> do
+        let (_, entered) = S.entersWithTrigger exchange S.alice before
+            staged = S.runPure (exchangeAnswer constructId pikerId) entered Engine.settleForPriority
+            after = S.runPure (exchangeAnswer constructId pikerId) staged Stack.resolveTop
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [pikerId] after)) "CR 612.5 the Piker may no longer attack alone"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [constructId] after) "and the Construct may"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [pikerId] before) "before the exchange the Piker could attack alone"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [constructId] before)) "and the Construct could not"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+
+  -- CR 612.5 / 613.11: a player static ability is rules text too, and its
+  -- "each opponent" is then read off the NEW host's controller. alice's Gnat
+  -- Miser ("Each opponent's maximum hand size is reduced by one", checked
+  -- against Scryfall 2026-09-23) exchanged with bob's Goblin Piker turns the
+  -- reduction around onto alice.
+  Spec.it s "CR 612.5 Gnat Miser's reduction moves to bob's Piker" $ do
+    gnat <- S.printingOf s registry "Gnat Miser"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (gnatId, b0) = S.addPermanent gnat S.alice (Setup.emptyGame S.bothPlayers)
+        (pikerId, before) = S.addPermanent piker S.bob b0
+        (_, entered) = S.entersWithTrigger exchange S.alice before
+        staged = S.runPure (exchangeAnswer gnatId pikerId) entered Engine.settleForPriority
+        after = S.runPure (exchangeAnswer gnatId pikerId) staged Stack.resolveTop
+    Spec.assertEqWith s "CR 612.5 alice's maximum hand size drops to six" (PlayerEffect.maximumHandSize S.alice after) (Just 6)
+    Spec.assertEqWith s "and bob's is back to seven" (PlayerEffect.maximumHandSize S.bob after) (Just 7)
+    Spec.assertEqWith s "before the exchange bob's was six" (PlayerEffect.maximumHandSize S.bob before) (Just 6)
+
+  -- CR 612.5 / 116.2: a special action a text box grants moves with it, and is
+  -- offered as the NEW host's. Leonin Arbiter ("Players can't search libraries.
+  -- Any player may pay {2} for that player to ignore this effect until end of
+  -- turn.", checked against Scryfall 2026-09-23) exchanged with Goblin Piker.
+  Spec.it s "CR 612.5 Leonin Arbiter's {2} offer moves to the Piker" $ do
+    arbiter <- S.printingOf s registry "Leonin Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    island <- S.printingOf s registry "Island"
+    let searchBan = AbilityName.MkAbilityName (Text.pack "search ban")
+        (arbiterId, b0) = S.addPermanent arbiter S.alice (S.landsInPlay island 2)
+        (pikerId, before) = S.addPermanent piker S.alice b0
+        (_, entered) = S.entersWithTrigger exchange S.alice before
+        staged = S.runPure (exchangeAnswer arbiterId pikerId) entered Engine.settleForPriority
+        after = S.runPure (exchangeAnswer arbiterId pikerId) staged Stack.resolveTop
+    Spec.assertBool s (List.elem (Action.Type.Ignore pikerId searchBan) (Action.legalActions S.alice after)) "CR 612.5 the {2} is offered as the Piker's"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice after)) "and no longer as the Arbiter's"
+    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice before)) "which offered it before the exchange"
+
+  -- CR 707.2a: the text box that moves is the one the copiable values give, so
+  -- a Clone that entered as a copy of Akiri hands HER pump to the Sentry --
+  -- the Clone's printed face has no static ability for a printed read to find.
+  Spec.it s "CR 707.2a a Clone of Akiri hands the copied pump across the exchange" $ do
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    ring <- S.printingOf s registry "Sol Ring"
+    clone <- S.printingOf s registry "Clone"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    case clonedAkiriExchangeBoard akiri sentry ring clone exchange of
+      Nothing -> Spec.assertFailure s "the Clone should be on the battlefield"
+      Just (cloneId, sentryId, before, after) -> do
+        Spec.assertEqWith s "CR 612.5 the Sentry gets the copied pump for alice's two artifacts" (S.powerToughnessOf sentryId after) (Just (5, 3))
+        Spec.assertEqWith s "and the Clone is the 0/3 it copied" (S.powerToughnessOf cloneId after) (Just (0, 3))
+        Spec.assertEqWith s "before the exchange the Clone is a pumped 2/3" (S.powerToughnessOf cloneId before) (Just (2, 3))
 
   -- CR 611.2b: the duration Exchange of Words states is "for as long as this
   -- enchantment remains on the battlefield", so the effect ends when it leaves

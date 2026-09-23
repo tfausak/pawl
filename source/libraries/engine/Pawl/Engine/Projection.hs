@@ -574,11 +574,10 @@ exchangePartner oid a = case a of
 -- from the ones layer 6 grants afterwards, and after this arm the ones layer 3
 -- left behind are exactly these.
 --
--- Not implemented: PC.staticAbilities, PC.playerAbilities and PC.specialActions
--- stay where they were printed. Each is gathered from the object's COPIABLE
--- characteristics rather than from the projection (Pawl.Engine.Projection.View's
--- staticAbilitiesOf and specialActionsOf), so a static ability moved here would
--- appear in the list and still generate its effect on the old host (#3748).
+-- The four ability lists no layer writes move here too, though nothing reads
+-- them off the projection: each is gathered from the copiable characteristics
+-- of Pawl.Engine.Projection.View.textBoxHolderOf, which answers the same
+-- exchange from the stored effects, so the record agrees with the gather.
 exchangeTextBoxFrom :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
 exchangeTextBoxFrom from pc =
   pc
@@ -591,7 +590,11 @@ exchangeTextBoxFrom from pc =
       -- so it moves with it. A regression fence rather than a proved behaviour:
       -- the one producer's test board uses two literal power/toughness boxes.
       PC.characteristicPT = PC.characteristicPT from,
-      PC.textChangedKeywords = PC.keywords from
+      PC.textChangedKeywords = PC.keywords from,
+      PC.staticAbilities = PC.staticAbilities from,
+      PC.playerAbilities = PC.playerAbilities from,
+      PC.specialActions = PC.specialActions from,
+      PC.ruleAbilities = PC.ruleAbilities from
     }
 
 -- CR 305.7's strip, shared by both modifications that set a land's subtype. It

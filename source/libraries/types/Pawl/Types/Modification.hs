@@ -152,7 +152,7 @@ data Modification ability
     -- action of the source. Those three are gathered from the object's copiable
     -- characteristics rather than from the projection
     -- (Pawl.Engine.Projection.View's staticAbilitiesOf), so a granted one would
-    -- go on generating its effect from the source instead (#3748). Streetwise
+    -- go on generating its effect from the source instead (#4040). Streetwise
     -- Negotiator is the card with backup that needs it.
     GainAbilitiesOfSource
   | LoseAllAbilities -- layer 6 (Humility)
@@ -374,12 +374,6 @@ data Modification ability
     -- the source of every ability that arrives and each "this permanent"
     -- self-reference re-binds to it -- the same posture GainAbility takes, and
     -- for the same reason.
-    --
-    -- Not implemented: exchanging a static ability, a player static ability or a
-    -- special action. Those three are gathered from the object's COPIABLE
-    -- characteristics rather than from the projection
-    -- (Pawl.Engine.Projection.View's staticAbilitiesOf), so moving them at layer
-    -- 3 would take every gather-time reader with it (#3748).
     ExchangeTextBoxes
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect, never chosen: the

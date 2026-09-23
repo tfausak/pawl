@@ -8838,7 +8838,7 @@ bindEarthbentLand resolving land gs =
 --
 -- Not implemented: the source's static abilities, player static abilities and
 -- special actions, which are gathered from the copiable characteristics rather
--- than from the projection (#3748). Streetwise Negotiator is the card with
+-- than from the projection (#4040). Streetwise Negotiator is the card with
 -- backup that needs them. A printed REPLACEMENT ability is out of reach for a
 -- different reason and no card asks: Pawl.Types.GrantedAbility holds CR 113.3's
 -- activated and triggered kinds alone, and no printing with backup prints one.
