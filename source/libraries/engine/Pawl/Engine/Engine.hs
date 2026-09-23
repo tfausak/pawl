@@ -182,14 +182,32 @@ nextStillPlaying gs pid =
 -- BELONGS to that seat, CR 800.4m's durations and CR 101.4's APNAP anchor both
 -- referencing it.
 --
--- Not implemented: CR 805.5's team priority -- under the shared team turns option
--- priority still passes player by player (#4001).
+-- CR 805.5b: under the shared team turns option the active TEAM receives
+-- priority, so a departed active player's still-playing teammate is asked first.
 priorityHolder :: GameState -> PlayerId
 priorityHolder gs =
-  let active = GameState.activePlayer gs
-   in if List.elem active (Game.stillPlaying gs)
-        then active
-        else nextStillPlaying gs active
+  case filter (\pid -> List.elem pid (Game.stillPlaying gs)) (Turn.activePlayers gs) of
+    holder : _ -> holder
+    [] -> nextStillPlaying gs (GameState.activePlayer gs)
+
+-- CR 117.3d / 805.5: who is asked after `pid` passes or leaves, given who has
+-- passed in succession. Under the shared team turns option the team holds
+-- priority, so each still-playing teammate who has not yet passed is asked
+-- before it moves on (CR 805.5b's "no player on that team wishes to do
+-- anything"), and then it goes to the next player in turn order off the team.
+-- Without the option a player's team is themselves, and this is
+-- nextStillPlaying.
+passPriorityFrom :: GameState -> PlayerId -> PlayerId
+passPriorityFrom gs pid =
+  let playing = Game.stillPlaying gs
+      order = GameState.turnOrder gs
+      scan = filter (\p -> List.elem p playing) (drop 1 (dropWhile (/= pid) order) <> order)
+      teammate = Turn.sharesTurn gs pid
+   in case filter (\p -> teammate p && not (Set.member p (GameState.passed gs))) scan of
+        p : _ -> p
+        [] -> case filter (not . teammate) scan of
+          p : _ -> p
+          [] -> nextStillPlaying gs pid
 
 -- The step's own CR 704.3 check. Samples CR 704.5k's clock first, this site
 -- following the turn-based actions and CR 514.2's sweep being able to change who
@@ -462,7 +480,7 @@ runTurnBasedActions phase = do
   -- actions that are the active player's own.
   --
   -- Not implemented: CR 805.6's order -- the team does not choose the order its
-  -- members untap, draw (CR 805.6a) and discard in (#4001).
+  -- members untap, draw (CR 805.6a) and discard in (#4014).
   hasActive <- State.gets (List.elem active . Game.stillPlaying)
   live <- State.gets (\gs -> filter (\pid -> List.elem pid (Game.stillPlaying gs)) (Turn.activePlayers gs))
   case phase of
@@ -1114,22 +1132,27 @@ apnapPlayers gs pending =
 
 -- CR 603.3b: APNAP across controllers, and within one controller's set, that
 -- player's chosen order. Asked only when they control two or more.
+--
+-- CR 805.7: under the shared team turns option a whole team's triggers are one
+-- set, in any order its players choose, interleaved. CR 805.2 makes the team's
+-- primary player the one asked, since a disagreement is theirs to settle.
 orderPending :: [PendingTrigger.PendingTrigger] -> Game [PendingTrigger.PendingTrigger]
 orderPending pending = do
   gs <- State.get
-  groups <- Monad.mapM (orderFor gs pending) (apnapPlayers gs pending)
+  groups <- Monad.mapM (orderFor gs pending) (List.groupBy (Turn.sharesTurn gs) (apnapPlayers gs pending))
   pure (concat groups)
 
-orderFor :: GameState -> [PendingTrigger.PendingTrigger] -> PlayerId -> Game [PendingTrigger.PendingTrigger]
-orderFor gs pending pid = do
-  let mine = filter (\pt -> PendingTrigger.controller pt == pid) pending
+orderFor :: GameState -> [PendingTrigger.PendingTrigger] -> [PlayerId] -> Game [PendingTrigger.PendingTrigger]
+orderFor gs pending team = do
+  let mine = filter (\pt -> List.elem (PendingTrigger.controller pt) team) pending
       entries = fmap entryOf mine
-  if length mine < 2 || interchangeable entries
-    then pure mine
-    else do
-      let decider = Decide.deciderFor pid gs
-      answer <- Game.choose (Prompt.OrderTriggers decider pid entries)
+  case team of
+    member : _ | length mine >= 2 && not (interchangeable entries) -> do
+      let orderer = Game.primaryOf gs member
+          decider = Decide.deciderFor orderer gs
+      answer <- Game.choose (Prompt.OrderTriggers decider orderer entries)
       pure (Game.permute mine answer)
+    _ -> pure mine
 
 -- CR 603.3b: is every permutation of this batch the same game, so that the prompt
 -- is a question with one answer? The entries must be EQUAL -- one ability of one
@@ -1298,7 +1321,7 @@ priorityLoop :: Game ()
 priorityLoop = do
   -- CR 800.4j: the active player, unless they have left the game.
   holder <- State.gets priorityHolder
-  State.modify' $ \gs -> gs {GameState.priority = Just holder, GameState.passes = 0}
+  State.modify' $ \gs -> gs {GameState.priority = Just holder, GameState.passed = Set.empty}
   -- settleForPriority (CR 117.5) runs where the board can CHANGE -- once at entry,
   -- and after each resolution or board-changing action -- never after a bare
   -- priority pass, which leaves the game state untouched. Observably identical to
@@ -1343,7 +1366,9 @@ priorityLoop = do
                             -- (CR 117.4); the CR does not settle that directly,
                             -- but not resetting risks resolving a spell a player
                             -- would have responded to.
-                            State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (nextStillPlaying g p)})
+                            State.modify' $ \g ->
+                              let reset = g {GameState.passed = Set.empty}
+                               in reset {GameState.priority = Just (passPriorityFrom reset p)}
                             loop
                           Concession.Continues -> do
                             let decider = Decide.deciderFor p gs
@@ -1371,16 +1396,19 @@ priorityLoop = do
                             -- the loop total and cannot wedge the game.
                             let chosen = if List.elem answered actions then answered else Action.Type.Pass
                             case chosen of
+                              -- CR 117.4 / 805.5b: every team has passed in
+                              -- succession once every still-playing player has,
+                              -- a team passing only when all its players do.
                               Action.Type.Pass -> do
-                                let passes = GameState.passes gs + 1
-                                    playing = Natural.length (Game.stillPlaying gs)
+                                let passed = Set.insert p (GameState.passed gs)
+                                    everyone = all (`Set.member` passed) (Game.stillPlaying gs)
                                 -- modify' over `State.put gs {...}`: `gs` predates
                                 -- the prompt, and putting it back would discard
                                 -- GameState.lastChoice (CR 104.4b), making every
                                 -- loop look mandatory.
-                                if passes >= playing
+                                if everyone
                                   then case GameState.stack gs of
-                                    [] -> State.modify' (\g -> g {GameState.priority = Nothing, GameState.passes = passes})
+                                    [] -> State.modify' (\g -> g {GameState.priority = Nothing, GameState.passed = passed})
                                     _ -> do
                                       Stack.resolveTopWith playSubgame
                                       ended <- State.gets GameState.endTurnSignal
@@ -1402,10 +1430,10 @@ priorityLoop = do
                                         EndTurnSignal.Ended -> State.modify' (\g -> g {GameState.priority = Nothing})
                                         EndTurnSignal.Running -> do
                                           settleForPriority
-                                          State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (priorityHolder g)})
+                                          State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just (priorityHolder g)})
                                           loop
                                   else do
-                                    State.modify' (\g -> g {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)})
+                                    State.modify' (\g -> g {GameState.passed = passed, GameState.priority = Just (passPriorityFrom gs {GameState.passed = passed} p)})
                                     loop
                               Action.Type.Play oid mName -> do
                                 -- CR 712.12: a modal double-faced card played as a
@@ -1458,7 +1486,7 @@ priorityLoop = do
                                 -- this TALLIES rather than flagging. CR 305.4:
                                 -- the only tally, an effect that PUTS a land onto
                                 -- the battlefield not being one.
-                                State.modify' (\g -> g {GameState.landsPlayed = Map.insertWith (+) p 1 (GameState.landsPlayed g), GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.landsPlayed = Map.insertWith (+) p 1 (GameState.landsPlayed g), GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               Action.Type.Cast oid name facing -> do
@@ -1467,7 +1495,7 @@ priorityLoop = do
                                 -- CR 601.3 offer and Pawl.Engine.Resolve's -- spend
                                 -- the same grant this one does.
                                 Cast.castSpell Resolve.performManaAbility p oid name facing
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2b / 702.37e / 701.40b: a special action, so
@@ -1477,7 +1505,7 @@ priorityLoop = do
                               -- succession" meaning without actions in between.
                               Action.Type.TurnFaceUp oid procedure -> do
                                 FaceDown.turnFaceUp Resolve.performManaAbility p procedure oid
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2m / 709.5e: a special action too, the
@@ -1486,7 +1514,7 @@ priorityLoop = do
                               -- gathers like any other.
                               Action.Type.Unlock oid half -> do
                                 Room.unlock Resolve.performManaAbility p oid half
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2e: a special action too, the TurnFaceUp
@@ -1497,20 +1525,20 @@ priorityLoop = do
                               -- cause being a cycling ability's cost.
                               Action.Type.DiscardFromHand oid -> do
                                 Event.discard DiscardCause.Ordinary p oid
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2k / 702.170b: a special action too, the
                               -- TurnFaceUp arm's shape.
                               Action.Type.Plot oid -> do
                                 Plot.plot Resolve.performManaAbility p oid
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2h / 702.143b: a special action too.
                               Action.Type.Foretell oid -> do
                                 Foretell.foretell Resolve.performManaAbility p oid
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2f / 702.62a: a special action too, and
@@ -1518,7 +1546,7 @@ priorityLoop = do
                               -- castability rather than a phase.
                               Action.Type.Suspend oid -> do
                                 Suspend.suspend Resolve.performManaAbility p oid
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2g / 702.139a: a special action too, and
@@ -1527,7 +1555,7 @@ priorityLoop = do
                               -- object to name it with (CR 400.11).
                               Action.Type.PutCompanionIntoHand -> do
                                 Companion.take Resolve.performManaAbility p
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2c: a special action too, and the one whose
@@ -1536,13 +1564,13 @@ priorityLoop = do
                               -- what makes the ending visible; nothing is undone.
                               Action.Type.EndEffect oid -> do
                                 EndEffect.endEffect p oid
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 116.2d: a special action too.
                               Action.Type.Ignore oid name -> do
                                 Ignore.ignore p oid name
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               -- CR 605.3a's first window, and CR 605.3b's
@@ -1555,12 +1583,12 @@ priorityLoop = do
                               -- nothing (CR 601.2h).
                               Action.Type.ActivateManaAbility oid -> do
                                 Monad.void (Cost.tapForMana Resolve.performManaAbility oid)
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                               Action.Type.Activate oid ability -> do
                                 Activate.activateAbility p oid ability
-                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
                       else do
@@ -1570,7 +1598,7 @@ priorityLoop = do
                         -- anything. Departure.depart does not touch
                         -- GameState.priority, so the stale `Just p` would
                         -- otherwise survive to the Concede prompt.
-                        State.modify' (\g -> g {GameState.priority = Just (nextStillPlaying g p)})
+                        State.modify' (\g -> g {GameState.priority = Just (passPriorityFrom g p)})
                         loop
   settleForPriority
   loop

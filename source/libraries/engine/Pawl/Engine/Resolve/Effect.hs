@@ -4860,7 +4860,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 121.2c: the active player draws first, then each other player in turn
         -- order. Observable rather than cosmetic: each draw records a zone change
         -- the trigger scan reads (CR 603.2). Not implemented: CR 121.2d's order within
-        -- the active team, which that team chooses (#4001). An intersection: apnapOrder supplies the ORDER and `named`
+        -- the active team, which that team chooses (#4014). An intersection: apnapOrder supplies the ORDER and `named`
         -- the MEMBERSHIP, which matters for a seat apnapOrder names and `named`
         -- does not -- a departure leaves the roster (CR 800.4k) but takes the
         -- library (CR 800.4a), so drawing would write drewFromEmpty.
