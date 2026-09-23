@@ -121,6 +121,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   nightShiftSpec s registry
   deckSpec s registry
   deckOwnerSpec s registry
+  deckExactBandSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -1296,9 +1297,9 @@ nightShiftRun rolls rerolls shifts index spell board =
 -- instruction's sum before the shift reads max 0 (-1) + 1 = 1, keeps the hand
 -- and returns the graveyard card on top of it.
 --
--- No roll here reaches 20, the Deck's other striation (Pawl.CardSpec's own
--- "CR 108.3 a bound object's owner is not always its controller" proves that
--- one).
+-- No roll here reaches 20, the Deck's other striation (this file's own
+-- deckOwnerSpec, "CR 108.3 a creature reanimated under another player's
+-- control still makes its OWNER lose the game", proves that one).
 deckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 deckSpec s registry = Spec.describe s "UnclampedShift" $ do
   Spec.it s "CR 706.2 a shift applies to the unclamped sum" $ do
@@ -1379,3 +1380,38 @@ deckOwnerSpec s registry = Spec.describe s "OwnerOfBound" $ do
     -- under alice's control while staying bob's card, and it really did die.
     Spec.assertEqWith s "setup: alice controlled the reanimated creature" (Projection.controllerOf reanimated activated) (Just S.alice)
     Spec.assertEqWith s "setup: the creature really died" (Game.lookupObject reanimated settled) Nothing
+
+-- CR 706.3a: a striation naming a single number means "if the result was N",
+-- not "N or more" -- Oracle prints the Deck's 20 band bare, not "20+". A
+-- natural 20 shifted UP by Night Shift of the Living Dead's own modifier
+-- lands on 21, which is on no band of the table at all, so nothing happens.
+-- The discriminating twin of deckOwnerSpec's board: same reanimation, same
+-- two seats, the die roll the one thing different.
+deckExactBandSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckExactBandSpec s registry = Spec.describe s "ExactBand" $ do
+  Spec.it s "CR 706.3a a natural 20 shifted past 20 reaches no band, so nothing is reanimated" $ do
+    deck <- S.printingOf s registry "The Deck of Many Things"
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+        (_shiftId, withShift) = S.addPermanent shift S.alice withDeck
+        (pikerId, board) = S.addGraveyardCard piker S.bob withShift
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 20
+          Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
+          Prompt.ChooseCardInGraveyard {} -> pikerId
+          _ -> S.identityAnswer p
+        activate = case Face.activatedAbilities (S.combinedFace deck) of
+          ability : _ -> Activate.activateAbility S.alice deckId ability
+          [] -> pure ()
+        after = S.runPure answer board (activate >> Stack.resolveTop)
+    -- THE GAMEPLAY ASSERTION: 21 reaches no striation, so nothing arrived on
+    -- bob's copy of the battlefield -- an AtLeast reading of "20" would put
+    -- his creature there instead.
+    Spec.assertEqWith s "CR 706.3a a shifted 21 reaches no band: nothing entered the battlefield" (Game.zoneMembers Zone.Battlefield S.bob after) []
+    -- The precondition, read after the assertion so it cannot absorb a
+    -- mutation aimed at the comparison: the card really is still where it
+    -- started, unreanimated.
+    Spec.assertEqWith s "setup: bob's creature card is still in his graveyard" (Game.zoneMembers Zone.Graveyard S.bob after) [pikerId]

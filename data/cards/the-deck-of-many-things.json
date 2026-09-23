@@ -210,7 +210,7 @@
                       "type": "Compares",
                       "value": {
                         "comparison": {
-                          "type": "AtLeast"
+                          "type": "Exactly"
                         },
                         "measured": {
                           "type": "InSlot",
