@@ -3461,10 +3461,10 @@ kindredSpec s registry =
 -- against Scryfall.)
 --
 -- The card would break under a reading that pinned it to the graveyard:
--- `Event.functionsIn Zone.Battlefield` would be False, `eventTriggers`'
+-- `Event.functionsIn Zone.Battlefield` would answer Nothing, `eventTriggers`'
 -- `battlefieldAbilitiesOf` filter would drop the ability, and the Aura would sit
--- in the graveyard CR 704.5m put it in. With the clause `zoneFunctionedFrom`
--- answers Nothing, `zonesTriggeredFrom` gives the battlefield, and the trigger
+-- in the graveyard CR 704.5m put it in. With the clause no zone is pinned,
+-- `zonesTriggeredFrom` gives the battlefield, and the trigger
 -- goes on the stack.
 --
 -- The clause is not what CARRIES that here, though, and the legs below do not
@@ -3606,8 +3606,8 @@ screamsFromWithinSpec s registry =
         Spec.it s "CR 113.6m control: an ordinary graveyard-recursion trigger is still pinned to the graveyard" $ do
           squee <- S.printingOf s registry "Squee, Goblin Nabob"
           screams <- S.printingOf s registry "Screams from Within"
-          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine (S.combinedFace squee))) (Face.delayedAbilities (S.combinedFace squee))) (Face.triggeredAbilities (S.combinedFace squee))) [Just Zone.Graveyard]
-          Spec.assertEqWith s "the Aura's names no zone at all" (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine (S.combinedFace screams))) (Face.delayedAbilities (S.combinedFace screams))) (Face.triggeredAbilities (S.combinedFace screams))) [Nothing]
+          Spec.assertEqWith s "Squee's ability functions only in the graveyard" (fmap (Event.zonesFunctionedIn (TypeLine.subtypes (Face.typeLine (S.combinedFace squee))) (Face.delayedAbilities (S.combinedFace squee))) (Face.triggeredAbilities (S.combinedFace squee))) [Set.singleton Zone.Graveyard]
+          Spec.assertEqWith s "the Aura's names no zone, so CR 113.6's battlefield default stands" (fmap (Event.zonesFunctionedIn (TypeLine.subtypes (Face.typeLine (S.combinedFace screams))) (Face.delayedAbilities (S.combinedFace screams))) (Face.triggeredAbilities (S.combinedFace screams))) [Set.singleton Zone.Battlefield]
 
 -- CR 113.6m's Aura clause read the other way round: the exception is granted
 -- "if the object is an Aura", so the SAME trigger condition on a non-Aura gets
@@ -3677,9 +3677,9 @@ widowedBladeSpec s registry =
         Spec.it s "CR 113.6m the same ability answers differently once its bearer is an Aura" $ do
           blade <- S.printingOf s registry "Synthetic Widowed Blade"
           let face = S.combinedFace blade
-              zonesWith subtypes = fmap (Event.zoneFunctionedFrom subtypes (Face.delayedAbilities face)) (Face.triggeredAbilities face)
-          Spec.assertEqWith s "as an Equipment the ability functions only in the graveyard" (zonesWith (TypeLine.subtypes (Face.typeLine face))) [Just Zone.Graveyard]
-          Spec.assertEqWith s "as an Aura the exception applies and it names no zone" (zonesWith (Set.insert Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) [Nothing]
+              zonesWith subtypes = fmap (Event.zonesFunctionedIn subtypes (Face.delayedAbilities face)) (Face.triggeredAbilities face)
+          Spec.assertEqWith s "as an Equipment the ability functions only in the graveyard" (zonesWith (TypeLine.subtypes (Face.typeLine face))) [Set.singleton Zone.Graveyard]
+          Spec.assertEqWith s "as an Aura the exception applies and it functions on the battlefield" (zonesWith (Set.insert Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) [Set.singleton Zone.Battlefield]
           Spec.assertBool s (not (Set.member Subtype.Aura (TypeLine.subtypes (Face.typeLine face)))) "and the printed card really is no Aura"
 
 -- Heirloom Blade: CR 205.3m's comparison against a BOUND slot,
@@ -3817,7 +3817,7 @@ skullclampSpec s registry =
 -- it. (Name, cost, type line and oracle text checked against Scryfall.)
 --
 -- The ability's only zone-relevant content sits INSIDE the delayed ability its
--- arm creates, so without the sentence Event.zoneFunctionedFrom answers Nothing
+-- arm creates, so without the sentence nothing is pinned
 -- off the arm, CR 113.6's own default puts the ability on the battlefield, and
 -- the card gets both halves wrong at once: it never fires from the graveyard,
 -- where all its work is, and it fires from the battlefield, where CR 113.6m says
@@ -3997,7 +3997,7 @@ banewaspAfflictionSpec s registry =
 -- to function to ever be checked at all.
 --
 -- The proving quantity is whether the trigger reaches the stack: without the
--- exception, `functionsIn Zone.Battlefield` is False for this ability,
+-- exception, `functionsIn Zone.Battlefield` answers Nothing for this ability,
 -- `leftBattlefield`'s filter excludes it from the death event's own candidates,
 -- and SelfDies is never checked against the one event that could satisfy it.
 --
@@ -4012,7 +4012,7 @@ banewaspAfflictionSpec s registry =
 -- graveyard card when the end step comes round.
 --
 -- Which is also why the exception above must survive the payload naming that
--- slot: `Event.zoneFunctionedFrom` reads the SELF-NAMING slots for a condition,
+-- slot: `Event.zonesFunctionedIn` reads the SELF-NAMING slots for a condition,
 -- and a condition that puts its own object into a zone makes CR 400.7e's
 -- incarnation one of them.
 ivoryGargoyleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -4058,9 +4058,9 @@ ivoryGargoyleSpec s registry =
           let face = S.combinedFace gargoyle
           Spec.assertEqWith
             s
-            "no zone is pinned once the exception is read"
-            (fmap (Event.zoneFunctionedFrom (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face)) (Face.triggeredAbilities face))
-            [Nothing]
+            "the battlefield once the exception is read"
+            (fmap (Event.zonesFunctionedIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face)) (Face.triggeredAbilities face))
+            [Set.singleton Zone.Battlefield]
         -- The proving leg for CR 400.7e's delayed reader: the card the Gargoyle
         -- became is on the battlefield again when the end step has passed. The
         -- census runs FIRST so no precondition can absorb a mutation, and it is
