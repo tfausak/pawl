@@ -197,15 +197,18 @@ playersInScope perspective gs scope =
 -- than beside it so that Pawl.Engine.Projection goes on never seeing
 -- Pawl.Types.PlayerEffect; the one accessor both share is
 -- Projection.copiableSnapshotOf, which is also where CR 709.5's copied halves
--- are forked out for every reader at once.
+-- are forked out for every reader at once. Read off Projection.textBoxHolderOf
+-- first, for CR 612.5, as staticAbilitiesOf is.
 playerAbilitiesOf :: ObjectId -> GameState -> [PlayerStaticAbility.PlayerStaticAbility]
-playerAbilitiesOf oid gs = case Projection.copiableSnapshotOf oid gs of
-  Just snapshot -> PC.playerAbilities snapshot
-  -- CR 709.5: a copy of a Room reads the copied card's halves against its OWN
-  -- designations, which Game.faceOf already does, so it lands here --
-  -- Projection.copiableSnapshotOf answering Nothing is what puts it here, the
-  -- fork being made once for all six readers rather than per reader.
-  Nothing -> foldMap Face.playerAbilities (Game.faceOf oid gs)
+playerAbilitiesOf carrier gs =
+  let oid = Projection.textBoxHolderOf carrier gs
+   in case Projection.copiableSnapshotOf oid gs of
+        Just snapshot -> PC.playerAbilities snapshot
+        -- CR 709.5: a copy of a Room reads the copied card's halves against its OWN
+        -- designations, which Game.faceOf already does, so it lands here --
+        -- Projection.copiableSnapshotOf answering Nothing is what puts it here, the
+        -- fork being made once for all six readers rather than per reader.
+        Nothing -> foldMap Face.playerAbilities (Game.faceOf oid gs)
 
 -- CR 613.7a: the PRINTED carrier's rows -- printed as opposed to CR 611.2c's
 -- stored one, the list itself being the COPIABLE one above -- one per player
@@ -309,7 +312,7 @@ printedRows gs =
                           gs
                           oid
                           (if null changes then c else Projection.rewriteCondition changes c)
-                 in fmap (\ability -> (Object.timestamp object, Just oid, PlayerStaticAbility.name ability, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
+                 in fmap (\ability -> (Projection.staticTimestampOf oid object gs, Just oid, PlayerStaticAbility.name ability, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
               else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 
