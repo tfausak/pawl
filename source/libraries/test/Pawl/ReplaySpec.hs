@@ -23,6 +23,8 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
@@ -46,6 +48,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LearnMode as LearnMode
@@ -66,6 +69,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideCard as OutsideCard
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
+import qualified Pawl.Types.PermissionLimit as PermissionLimit
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -292,6 +297,18 @@ combatReplaySpec s =
           Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
           Spec.assertEqWith s "declines" (Replay.defaultAnswer p) Nothing
           Spec.assertEqWith s "a copy target's response does not answer it" (Replay.decode p (Replay.encode other answer)) Nothing
+        -- CR 601.3: the permission a play is made under, "none of them"
+        -- included, has to survive a transcript; the enlist answer is the foil
+        -- of the same Maybe-ObjectId head.
+        Spec.it s "ChoosePlayPermission records and replays a permission, and rejects an enlist answer" $ do
+          let grant limit = CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)) (Filter.Type.HasCardType CardType.Creature) limit PermissionVerb.Play
+              paragon = Just (ObjectId.MkObjectId 8, grant PermissionLimit.OnceEachOfYourTurns)
+              will = Just (ObjectId.MkObjectId 9, grant PermissionLimit.Unlimited)
+              p = Prompt.ChoosePlayPermission decider S.alice oid (will NonEmpty.:| [paragon, Nothing])
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p paragon)) (Just paragon)
+          Spec.assertEqWith s "choosing none round trips" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+          Spec.assertEqWith s "the default is the head" (Replay.defaultAnswer p) will
+          Spec.assertEqWith s "an enlist response does not answer it" (Replay.decode p (Response.ChoseEnlist Nothing)) Nothing
         -- CR 208.2b: Primal Plasma is in no deck, so no gameplay-level test
         -- reaches Response.ChoseEntryOption through the record/replay path --
         -- this exercises the transcript codec directly, matching the shape

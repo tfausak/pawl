@@ -11,6 +11,7 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BuybackDecision as BuybackDecision
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.Color as Color
@@ -657,6 +658,10 @@ data Prompt r where
   -- (Pawl.Engine.Cost.announceSubstitutions). The candidates are filtered
   -- by payability at both, and an answer outside them is rejected.
   ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost Keyword.Keyword] -> Prompt (Cost.Cost Keyword.Keyword)
+  -- | CR 601.3 / 305.1: which of the permissions admitting a play of the
+  -- ObjectId it is made under (Nothing = none of them); asked only where two
+  -- would differ in the budget spent or the rider given (CR 400.7h, 400.7i).
+  ChoosePlayPermission :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (Maybe (ObjectId.ObjectId, CastFromZone.CastFromZone)) -> Prompt (Maybe (ObjectId.ObjectId, CastFromZone.CastFromZone))
   -- | CR 601.2h: the order the non-mana components of a total cost are paid in,
   -- a permutation of their printed indices, once per pass
   -- (Pawl.Engine.Cost.paidInSecondPass); asked only where observable

@@ -26,6 +26,7 @@
 -- reach a restriction a resolution stores.
 module Pawl.Engine.PlayerEffect where
 
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Foldable as Foldable
 import qualified Data.Functor.Const as Functor
 import qualified Data.Functor.Identity as Functor
@@ -1858,11 +1859,10 @@ mayCastFrom pid zone oid gs = not (null (castPermissionsFrom pid zone oid gs))
 
 -- The permissions mayCastFrom answers off: every CR 601.3 CastFrom row applying
 -- to `pid` that opens `zone` for `oid` and has a use left, paired with the object
--- that granted it. In `applying`'s timestamp order, so a caller that must pick
--- one picks the oldest.
+-- that granted it, in `applying`'s timestamp order.
 --
 -- A row whose limit is spent is ABSENT rather than flagged, which is what makes
--- one function serve both the gate and the spend: castPermissionSpentBy below
+-- one function serve both the gate and the spend: castPermissionOptions below
 -- reads this same list, so the permission the cast is offered under and the one
 -- it consumes cannot disagree.
 castPermissionsFrom :: PlayerId -> Zone.Zone -> ObjectId -> GameState -> [(Maybe ObjectId, CastFromZone.CastFromZone)]
@@ -1948,57 +1948,52 @@ unspentPermission pid source grant gs =
         PermissionLimit.OnceEachTurn -> unspent
         PermissionLimit.OnceEachOfYourTurns -> Turn.isActive gs pid && unspent
 
--- CR 601.3: the once-each-turn permission a cast of `oid` out of `zone` spends,
--- if it spends one. Asked of the PRE-MOVE state by Pawl.Engine.Cast.castSpellWith
--- -- so the permission read is the one the gate was offered under -- and handed to
--- `spendCastPermission` below only once the announcement has succeeded, so a
--- rejected or reversed cast (CR 601.2e, CR 733.1) spends nothing.
-castPermissionSpentBy :: PlayerId -> Zone.Zone -> ObjectId -> GameState -> Maybe (ObjectId, CastFromZone.CastFromZone)
-castPermissionSpentBy pid zone oid gs = spentAmong (castPermissionsFrom pid zone oid gs)
-
--- CR 400.7h: the objects whose permission a cast of `oid` out of `zone` is made
--- under -- the ones whose riders (Pawl.Engine.Event.permissionRiders) the spell
--- gets. Asked of the pre-move state for castPermissionSpentBy's reason.
-castPermissionSources :: PlayerId -> Zone.Zone -> ObjectId -> GameState -> [ObjectId]
-castPermissionSources pid zone oid gs = usedAmong (castPermissionsFrom pid zone oid gs)
-
--- The permission a play admitted by `usable` spends: nothing where an UNLIMITED
--- permission also admits it -- a player holding Future Sight and Johann,
--- Apprentice Sorcerer casts off the top under the one that costs them nothing,
--- and no rule makes them spend the other.
+-- CR 601.3 / 400.7h: the ways a cast of `oid` out of `zone` can be made, for
+-- Pawl.Engine.Cast.choosePlayPermission. Asked of the PRE-MOVE state by
+-- Pawl.Engine.Cast.castSpellWith, so the permissions offered are the ones the
+-- gate read, and spent only once the announcement has succeeded, so a rejected
+-- or reversed cast (CR 601.2e, CR 733.1) spends nothing.
 --
--- Only the PLAYER-scoped permissions are weighed. A permission the OBJECT
--- carries is Pawl.Engine.Cast's question: where the cost the cast chose is that
--- permission's own (escape, flashback), Pawl.Engine.Cast.castProposed drops
--- what this names, and Pawl.CastPermissionSpec's "CR 702.138a an escaped
--- Chimera takes neither Serra Paragon's use nor its rider" proves it.
+-- Open without any of them only for a card in its owner's hand (CR 601.3's "a
+-- rule"). A permission the OBJECT carries is not weighed here: every one pawl
+-- has is a keyword's, offering its own CR 601.2b candidate (escape, flashback),
+-- so the candidate the cast chose says whether it was made under it --
+-- Pawl.Engine.Cast.castProposed asks nothing then, and
+-- Pawl.CastPermissionSpec's "CR 702.138a an escaped Chimera takes neither Serra
+-- Paragon's use nor its rider" proves it.
+castPermissionOptions :: (ObjectId -> Bool) -> PlayerId -> Zone.Zone -> ObjectId -> GameState -> [Maybe (ObjectId, CastFromZone.CastFromZone)]
+castPermissionOptions rides pid zone oid gs =
+  let owned = fmap Object.owner (Game.lookupObject oid gs) == Just pid
+   in permissionOptions rides (zone == Zone.Hand && owned) (castPermissionsFrom pid zone oid gs)
+
+-- CR 601.3 / 305.1: the ways a play admitted by `usable` can be made, one per
+-- distinguishable outcome -- Nothing, where `open` says the play needs none of
+-- them, then each permission, the unlimited ones before the budgeted ones and
+-- each group in timestamp order. Two ways are ONE where they spend the same
+-- budget and give the same rider (`rides` answers whether a source's
+-- permission gives one, Pawl.Engine.Event.permissionRiders), and the first is
+-- kept: a riderless unlimited permission beside an open zone changes nothing.
+-- So the head spends nothing wherever something admits the play for free.
 --
--- The OLDEST of several, which is CR 613.7's order: two copies of one card
--- print indistinguishable permissions, so there is nothing to ask. Not
--- implemented: asking the player which permission a play is made under when two
--- DIFFERENT ones admit it at the same cost -- Serra Paragon beside Yawgmoth's
--- Will, or beside a card's own costless permission -- so the engine picks, and
--- the rider follows its pick (#3590).
-spentAmong :: [(Maybe ObjectId, CastFromZone.CastFromZone)] -> Maybe (ObjectId, CastFromZone.CastFromZone)
-spentAmong usable =
-  let limited = Maybe.mapMaybe (\(source, grant) -> fmap (\sid -> (sid, grant)) source) (filter (\(_, grant) -> CastFromZone.limit grant /= PermissionLimit.Unlimited) usable)
-   in if any (\(_, grant) -> CastFromZone.limit grant == PermissionLimit.Unlimited) usable
-        then Nothing
-        else Maybe.listToMaybe limited
+-- Every budgeted permission is a way of its own, two copies of one card
+-- included: whose use is spent shows once the other leaves the battlefield.
+permissionOptions :: (ObjectId -> Bool) -> Bool -> [(Maybe ObjectId, CastFromZone.CastFromZone)] -> [Maybe (ObjectId, CastFromZone.CastFromZone)]
+permissionOptions rides open usable =
+  let rows = [(sid, grant) | (Just sid, grant) <- usable]
+      (unlimited, limited) = List.partition ((== PermissionLimit.Unlimited) . CastFromZone.limit . snd) rows
+      key option = (permissionSpent option, option >>= \(sid, _) -> if rides sid then Just sid else Nothing)
+   in ListUtils.nubOrdOn key ([Nothing | open] <> fmap Just (unlimited <> limited))
 
--- The sources a play admitted by `usable` is made under: the one it spends, or
--- where it spends none, every unlimited one admitting it. Not implemented:
--- asking which of several a play is made under, so each unlimited one's rider
--- applies (#3590).
-usedAmong :: [(Maybe ObjectId, CastFromZone.CastFromZone)] -> [ObjectId]
-usedAmong usable = case spentAmong usable of
-  Just (sid, _) -> [sid]
-  Nothing -> [sid | (Just sid, grant) <- usable, CastFromZone.limit grant == PermissionLimit.Unlimited]
+-- The budget a play made under `option` spends: a once-each-turn permission's,
+-- and nothing for an unlimited one or for none.
+permissionSpent :: Maybe (ObjectId, CastFromZone.CastFromZone) -> Maybe (ObjectId, CastFromZone.CastFromZone)
+permissionSpent option = case option of
+  Just (_, grant) | CastFromZone.limit grant /= PermissionLimit.Unlimited -> option
+  _ -> Nothing
 
--- Spend the permission castPermissionSpentBy or landPermissionUse named, once
--- the play it was asked about has happened -- `consume`'s twin one axis over,
--- and cleared at the turn handoff (Pawl.Engine.Engine.beginTurnOf) rather than
--- by any reader.
+-- Spend the permission permissionSpent named, once the play it was asked about
+-- has happened -- `consume`'s twin one axis over, and cleared at the turn
+-- handoff (Pawl.Engine.Engine.beginTurnOf) rather than by any reader.
 spendCastPermission :: Maybe (ObjectId, CastFromZone.CastFromZone) -> GameState -> GameState
 spendCastPermission spent gs = case spent of
   Nothing -> gs
@@ -2023,21 +2018,17 @@ playPermissionPiles pid gs =
     owner <- zoneOwners pid (InZone.player inZone) gs
   ]
 
--- CR 305.1 / 400.7i: the permission a play of the land `oid` spends and the
--- sources whose riders the land gets, asked of the PRE-MOVE state for
--- castPermissionSpentBy's reason. Neither where the land needs no Play-verb
--- permission: it is in its owner's hand, or a PlayLandsFrom grant (Crucible of
--- Worlds) opens its pile at no cost. Not implemented: asking the player whether
--- a land Crucible of Worlds and Serra Paragon both admit is played under the
--- Paragon, for its rider; the engine picks Crucible (#3590).
-landPermissionUse :: PlayerId -> ObjectId -> GameState -> ([ObjectId], Maybe (ObjectId, CastFromZone.CastFromZone))
-landPermissionUse pid oid gs = case Game.lookupObject oid gs of
-  Nothing -> ([], Nothing)
+-- CR 305.1 / 400.7i: the ways a play of the land `oid` can be made, asked of
+-- the PRE-MOVE state for castPermissionOptions' reason. Open without any
+-- Play-verb permission where the land is in its owner's hand or a PlayLandsFrom
+-- grant (Crucible of Worlds) opens its pile at no cost.
+landPermissionOptions :: (ObjectId -> Bool) -> PlayerId -> ObjectId -> GameState -> [Maybe (ObjectId, CastFromZone.CastFromZone)]
+landPermissionOptions rides pid oid gs = case Game.lookupObject oid gs of
+  Nothing -> []
   Just obj ->
     let zone = Object.zone obj
         free = (zone == Zone.Hand && Object.owner obj == pid) || elem (zone, Object.owner obj) (playLandPiles pid gs)
-        usable = landPermissionsFrom pid zone oid gs
-     in if free then ([], Nothing) else (usedAmong usable, spentAmong usable)
+     in permissionOptions rides free (landPermissionsFrom pid zone oid gs)
 
 -- CR 118.9 / Omniscience: may `pid` cast `oid` from their hand without paying
 -- its mana cost, because an EFFECT applies that alternative cost to it?

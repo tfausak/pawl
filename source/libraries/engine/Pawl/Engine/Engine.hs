@@ -1475,12 +1475,13 @@ priorityLoop = do
                                 State.modify' (Cast.turnedUpForPlay oid Facing.FaceUp)
                                 spent <- State.gets (PlayerEffect.spentByLandPlay p oid)
                                 -- CR 305.1 / 400.7i: the Play-verb permission
-                                -- this play spends and the riders it hands the
-                                -- land, both asked of the pre-move board for
+                                -- this play is made under, which says the
+                                -- budget it spends and the riders it hands the
+                                -- land, asked of the pre-move board for
                                 -- `spent`'s reason.
                                 before <- State.get
-                                let (sources, permission) = PlayerEffect.landPermissionUse p oid before
-                                    riders played = concatMap (\src -> Event.permissionRiders src before played) sources
+                                permission <- Cast.choosePlayPermission p oid (PlayerEffect.landPermissionOptions (\src -> not (null (Event.permissionRiders src before oid))) p oid before)
+                                let riders played = foldMap (\(src, _) -> Event.permissionRiders src before played) permission
                                 -- CR 110.2 / 305.1: the permanent enters under
                                 -- the player who PLAYED it, which is not the
                                 -- card's owner once a permission opens somebody
@@ -1488,7 +1489,7 @@ priorityLoop = do
                                 moved <- Event.changeZoneShowing (Just p) oid Zone.Battlefield mName
                                 Monad.unless (Seq.null moved) $ do
                                   State.modify' (PlayerEffect.consume spent)
-                                  State.modify' (PlayerEffect.spendCastPermission permission)
+                                  State.modify' (PlayerEffect.spendCastPermission (PlayerEffect.permissionSpent permission))
                                   State.modify' (\g -> g {GameState.continuousEffects = concatMap riders (filter (`Set.member` GameState.battlefield g) (Foldable.toList moved)) <> GameState.continuousEffects g})
                                 -- CR 305.2a counts the lands played this turn, so
                                 -- this TALLIES rather than flagging. CR 305.4:

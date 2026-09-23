@@ -4,6 +4,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -2137,16 +2138,15 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- move that forgets the card -- and consumed by castProposed only once
           -- the announcement has succeeded, so a rejection spends nothing.
           spent = PlayerEffect.spentByCast pid oid proposed
-          -- CR 601.3: the once-each-turn permission this cast spends, asked of
-          -- the same PROPOSED state and for `spent`'s reason -- the permission
-          -- the gate offered the cast under is the one consumed, and a rejected
-          -- announcement consumes nothing. Nothing where the zone was open
-          -- without a budget, which castPermissionSpentBy answers.
-          permission = castFrom >>= \zone -> PlayerEffect.castPermissionSpentBy pid zone oid proposed
-          -- CR 400.7h / 611.3d: what the permission this cast is made under
-          -- gives the spell it becomes, asked of the same PROPOSED state -- the
-          -- board that source was offering it on.
-          riders spell = concatMap (\src -> Event.permissionRiders src proposed spell) (foldMap (\zone -> PlayerEffect.castPermissionSources pid zone oid proposed) castFrom)
+          -- CR 601.3: the permissions this cast can be made under, asked of the
+          -- same PROPOSED state and for `spent`'s reason -- the ones the gate
+          -- offered the cast under are the ones castProposed chooses among, and
+          -- a rejected announcement spends none.
+          permissions = foldMap (\zone -> PlayerEffect.castPermissionOptions (\src -> not (null (Event.permissionRiders src proposed oid))) pid zone oid proposed) castFrom
+          -- CR 400.7h / 611.3d: what the permission a cast is made under gives
+          -- the spell it becomes, asked of the same PROPOSED state -- the board
+          -- that source was offering it on.
+          riders spell = foldMap (\(src, _) -> Event.permissionRiders src proposed spell)
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -2189,7 +2189,22 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
-          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permission (riders sid) before
+          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) before
+
+-- CR 601.3 / 305.1: which of `options` (PlayerEffect.castPermissionOptions,
+-- PlayerEffect.landPermissionOptions) the play of `oid` is made under. Asked
+-- only where there are two: those already differ in the budget spent or the
+-- rider given. FILTERED, NOT TRUSTED, the ChooseRingBearer posture: an answer
+-- naming something never offered falls back to the first, since a play is
+-- always made under something.
+choosePlayPermission :: PlayerId -> ObjectId -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> Game (Maybe (ObjectId, CastFromZone.CastFromZone))
+choosePlayPermission pid oid options = case options of
+  [] -> pure Nothing
+  [only] -> pure only
+  first : more -> do
+    gs <- State.get
+    answer <- Game.choose (Prompt.ChoosePlayPermission (Decide.deciderFor pid gs) pid oid (first NonEmpty.:| more))
+    pure (if elem answer options then answer else first)
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
 -- effect can find the new object that card becomes after it moves to the stack as
@@ -2447,12 +2462,12 @@ trimModalForCandidate castFor modal = modal {Modal.Type.modes = fmap (trimModeTa
 -- for the same reason and spent beside the CR 601.2i event for `spent`'s: that
 -- rule's own words are "at the time the spell becomes cast".
 --
--- `permission` is CR 601.3's once-each-turn budget the cast spends, asked of the
--- pre-move state for `spent`'s reason and spent beside it, and `riders` is what
--- the permissions the cast is made under give the spell (CR 611.3d), asked there
--- too and stored beside it.
-castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card] -> GameState -> Game ()
-castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permission riders before = do
+-- `permissions` are the CR 601.3 permissions the cast can be made under, asked
+-- of the pre-move state for `spent`'s reason; the one chosen spends its budget
+-- beside `spent`, and `riders` is what it gives the spell (CR 611.3d), asked
+-- there too and stored beside it.
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> (Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card]) -> GameState -> Game ()
+castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permissions riders before = do
   gs <- State.get
   let candidates = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate)) candidateCosts
       decider = Decide.deciderFor pid gs
@@ -2728,8 +2743,6 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- cost, so the cast is made under it -- a player permission's
                   -- budget is not spent and its rider not given.
                   ownPermission = not (all (null . Keyword.permissionsFor (PC.cardTypes (Projection.copiableCharacteristics sid gs))) castFor)
-                  permissionUsed = if ownPermission then Nothing else permission
-                  ridersUsed = if ownPermission then [] else riders
                   -- CR 601.2f's reductions THIS candidate brought, recovered
                   -- beside the tag and by the same match, so the amount rule
                   -- 702.119a states and the sacrifice the chosen cost carries
@@ -2737,6 +2750,10 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- differ in the object their sacrifice component names (CR
                   -- 702.119c), so they are never the tie the note above describes.
                   chosenReductions = foldMap CandidateCost.reductions chosenCandidate
+              -- CR 601.3: otherwise, which of the permissions admitting the cast
+              -- it is made under -- the budget it spends and the rider it gets.
+              permissionUsed <- if ownPermission then pure Nothing else choosePlayPermission pid sid permissions
+              let ridersUsed = riders permissionUsed
               -- CR 702.103b: the announcement has settled on the bestow
               -- candidate, so the spell becomes an Aura enchantment with enchant
               -- creature -- BEFORE CR 601.2c's targets below, which that rule's
@@ -3174,7 +3191,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- spends, for the line above's reason -- nothing past
                           -- here rejects, and CR 733.1's reversal restores the
                           -- whole field (Pawl.Engine.Reversal).
-                          State.modify' (PlayerEffect.spendCastPermission permissionUsed)
+                          State.modify' (PlayerEffect.spendCastPermission (PlayerEffect.permissionSpent permissionUsed))
                           -- CR 601.2c: each chosen object became a target of this
                           -- spell, which is what CR 702.21a's ward watches. Here
                           -- rather than beside `chosen` above for CR 601.2i's
