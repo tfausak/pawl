@@ -15,6 +15,7 @@
               }
             ]
           },
+          "minimumX": 1,
           "modal": {
             "modes": [
               {

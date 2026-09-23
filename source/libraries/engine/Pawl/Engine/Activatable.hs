@@ -416,11 +416,12 @@ loyaltyOk pid srcId ability gs =
 loyaltyActivatedThisTurn :: ObjectId -> GameState -> Bool
 loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcId) (fmap LoggedEvent.event (GameState.events gs))
 
--- CR 602.2b's routing of an activation cost through CR 601.2b, at the X=0 FLOOR:
--- an ability is affordable when its activation cost is payable with X=0, since
--- the activating player may always choose 0. `activatable` conjoins this
--- predicate and `affordableX` climbs it, so what activatability measures and
--- what the bound reports cannot drift apart.
+-- CR 602.2b's routing of an activation cost through CR 601.2b, at X=0. An
+-- ability is affordable when its activation cost is payable at the least X its
+-- activator may announce -- 0, or CR 101.1's printed floor
+-- (ActivatedAbility.minimumX) -- which is this predicate at that value;
+-- `activatable` conjoins it and `affordableX` climbs it, so what activatability
+-- measures and what the bound reports cannot drift apart.
 --
 -- The substitution is not decoration. A ManaSymbol.Variable that reaches payment
 -- demands nothing at all (Mana.waysOf), so leaving it in place would answer the
@@ -429,13 +430,8 @@ loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcI
 payableCost :: [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost aimable = payableCostAt aimable 0
 
--- The same predicate on a board the caller already walked -- see
--- Cost.canPaySomeCompletionGiven.
-payableCostGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostGiven aimable sources pcs = payableCostAtGiven aimable sources pcs 0
-
--- The same question asked at some OTHER value of X -- `payableCost` is this at
--- the floor and `affordableX` is this climbed.
+-- The same question asked at some OTHER value of X -- `activatable` asks it at
+-- the ability's floor and `affordableX` climbs it.
 --
 -- CR 601.2f's TOTALLING against the ACTIVATION adjustments (CR 602.2b routes an
 -- activation cost through rule 601.2b-i), which is Heartstone and Training
@@ -584,7 +580,7 @@ affordableX mCeiling aimable stamp pid srcId gs cost = Cost.greatestPayableX mCe
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability, the whole activation cost is payable
--- at CR 601.2b's X=0 floor (CR 118.3), the {T} sickness gate holds, the
+-- at the least X it permits (CR 118.3, CR 101.1), the {T} sickness gate holds, the
 -- ability's timing rider permits it now (CR 307.5), and enough modes are
 -- fillable to satisfy the selection (CR 700.2a/602.2b). The cost is CR 601.2f's
 -- total of the printed one (payableCostAt).
@@ -684,4 +680,4 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         && ActivationRestriction.restrictionsOk pid srcId (Just ability) (ActivatedAbility.restrictions ability) gs
         && loyaltyOk pid srcId ability gs
         && Modal.selectionPossible fillable (Modal.Type.selection modal)
-        && payableCostGiven aimable sources pcs (ActivatedAbility.keyword ability) pid srcId gs (ActivatedAbility.cost ability)
+        && payableCostAtGiven aimable sources pcs (ActivatedAbility.minimumX ability) (ActivatedAbility.keyword ability) pid srcId gs (ActivatedAbility.cost ability)

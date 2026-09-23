@@ -1,5 +1,6 @@
 module Pawl.Types.ActivatedAbility where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
@@ -30,6 +31,10 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- rather than Naturals, read once at the announcement -- holds here unchanged,
     -- and Pawl.Engine.Cost.ceilingOf is the evaluator both share.
     maximumX :: [Quantity.Quantity],
+    -- | CR 101.1: the least X this ability's own words let its activator announce
+    -- -- Katara, Water Tribe's Hope's "X can't be 0" is 1. Zero for every ability
+    -- that states none.
+    minimumX :: Natural.Natural,
     modal :: Modal.Modal card ability,
     -- | CR 602.5: every clause of the "activate only ..." rider the ability
     -- carries, ALL of which must hold. Empty for an ability without one, which is
