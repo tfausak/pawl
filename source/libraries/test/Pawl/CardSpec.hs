@@ -186,6 +186,7 @@ import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
@@ -620,7 +621,7 @@ objectRefPositions =
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
         ("make-foretold", Effect.MakeForetold (MakeForetold.MkMakeForetold (plantedRef "mf") Nothing), [plantedRef "mf"]),
         ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
-        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty False), [plantedRef "fe"]),
+        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") LoopMembers.Every (SlotName.MkSlotName (Text.pack "each")) Seq.empty False), [plantedRef "fe"]),
         ("heal", Effect.Heal (plantedRef "he"), [plantedRef "he"])
       ]
 
@@ -1291,7 +1292,7 @@ ownCounts effect = case effect of
   Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectCounts body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectCounts body
   Effect.Heal _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
@@ -1518,7 +1519,7 @@ effectNestedEffects effect = case effect of
   -- CR 615.8's shield carries no rider at all.
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body, run once per member of the fold.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> Foldable.toList body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Foldable.toList body
   Effect.Heal _ -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
@@ -2064,7 +2065,7 @@ effectReplacements effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectReplacements body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectReplacements body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics hold no replacement effect (gap #1667).
@@ -2519,7 +2520,7 @@ effectMintedFaces effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectMintedFaces body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectMintedFaces body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
@@ -5511,7 +5512,7 @@ effectFilters effect = case effect of
   Effect.GrantPlayFromExile grant -> frame Unframed (durationFilters (GrantPlayFromExile.duration grant)) <> frame SourceHostFramed (objectRefFilters (GrantPlayFromExile.ref grant))
   -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
   -- list is exactly what this traversal must not stop at.
-  Effect.ForEach (ForEach.MkForEach ref _ body _) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
+  Effect.ForEach (ForEach.MkForEach ref _ _ body _) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so

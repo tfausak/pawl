@@ -156,6 +156,7 @@ encode p answer = case p of
   Prompt.OrderCombatTolls {} -> Response.OrderedCombatTolls answer
   Prompt.OrderComponentCards {} -> Response.OrderedComponentCards answer
   Prompt.OrderForEach {} -> Response.OrderedForEach answer
+  Prompt.ChooseLoopMembers {} -> Response.ChoseLoopMembers answer
   Prompt.OrderTimestamps {} -> Response.OrderedTimestamps answer
   Prompt.OrderManaActivations {} -> Response.OrderedManaActivations answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
@@ -474,6 +475,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OrderForEach {} -> case response of
     Response.OrderedForEach order -> Just order
+    _ -> Nothing
+  Prompt.ChooseLoopMembers {} -> case response of
+    Response.ChoseLoopMembers members -> Just members
     _ -> Nothing
   Prompt.OrderTimestamps {} -> case response of
     Response.OrderedTimestamps order -> Just order
@@ -981,6 +985,10 @@ defaultAnswer p = case p of
   -- order -- what pawl walked in before the intra-seat key became the resolving
   -- controller's to choose.
   Prompt.OrderForEach _ _ _ members -> zipWith const [0 ..] members
+  -- Every candidate, ChooseAnyNumberOfPermanents' maximal subset: CR 608.2d
+  -- admits every subset here, so no answer can be illegal. A deterministic
+  -- fallback, not a recommendation.
+  Prompt.ChooseLoopMembers _ _ _ candidates -> Set.fromList candidates
   -- CR 613.7m: likewise, and it is the engine's own APNAP-then-ascending order --
   -- what pawl stamped in before the intra-seat key became that seat's to choose.
   Prompt.OrderTimestamps _ _ batch -> zipWith const [0 ..] batch

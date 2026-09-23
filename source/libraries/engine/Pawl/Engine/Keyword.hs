@@ -105,6 +105,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
@@ -1724,6 +1725,7 @@ encore cost =
         Effect.ForEach
           ForEach.MkForEach
             { ForEach.ref = ObjectRef.EachOpponent,
+              ForEach.members = LoopMembers.Every,
               ForEach.slot = encoreOpponentSlot,
               ForEach.body = Seq.fromList [copied, required],
               -- CR 608.2f's first sentence: one action over the opponents, so the
@@ -5464,8 +5466,9 @@ myriadExileName = AbilityName.MkAbilityName (Text.pack "myriad")
 -- arming opcode after the loop names the whole batch.
 --
 -- Rule 702.116a's "if one or more tokens are created this way" is myriad's own
--- clause condition rather than anything here: the arming opcode shares a clause
--- with the loop, so an empty loop arms nothing and this ability is never filed.
+-- clause condition rather than anything here: the arming opcode sits in a clause
+-- of its own that counts the minted batch, so a loop that minted nothing arms
+-- nothing and this ability is never filed.
 myriadExile :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 myriadExile =
   let effect =
@@ -5517,18 +5520,18 @@ myriadExile =
 -- the token enters not attacking (CR 508.4a) -- which is what a game not using CR
 -- 802's option leaves.
 --
--- The clause CONDITION is rule 702.116a's loop having a member at all, and it
--- carries that rule's "if one or more tokens are created this way" with it: at
--- two seats the only opponent IS the defending player, so the count is 0, and
--- Pawl.Engine.Resolve.gateHolds runs BEFORE Pawl.Engine.Resolve.exercises -- no
--- CR 603.5 "may" the rule offers nobody, and no delayed ability armed for an
--- exile with nothing to exile. Resolve.clauseIsInert cannot stand in for it:
--- ArmDelayedTrigger reads more than its slots, so it never answers inert.
--- Pawl.AttackKeywordTriggerSpec's two-seat case is what proves it.
+-- Rule 702.116a's "you may" is PER OPPONENT, so it is the loop's own
+-- LoopMembers.AnyNumber rather than a clause's Optionality: the controller picks
+-- which opponents get a token, once, before any is created (CR 608.2d), since
+-- the tokens are one simultaneous action (CR 608.2f). At two seats the loop has
+-- no member and nothing is asked.
 --
--- Not implemented: rule 702.116a's "you may" is PER OPPONENT, and this asks it
--- ONCE over the whole loop, so at four or more seats a controller cannot take a
--- token against one opponent and refuse another (#3663).
+-- The SECOND clause is rule 702.116a's "if one or more tokens are created this
+-- way": its condition counts the batch the loop bound, so a controller who
+-- picked nobody arms no delayed ability for an exile with nothing to exile.
+-- Resolve.clauseIsInert cannot stand in for it: ArmDelayedTrigger reads more
+-- than its slots, so it never answers inert. Pawl.AttackKeywordTriggerSpec's
+-- four-seat "picks nobody" case is what proves it.
 myriad :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 myriad =
   let copy =
@@ -5555,6 +5558,7 @@ myriad =
         Effect.ForEach
           ForEach.MkForEach
             { ForEach.ref = ObjectRef.Players (PlayerRef.EachOpponentExcept Binding.triggerPlayer),
+              ForEach.members = LoopMembers.AnyNumber,
               ForEach.slot = myriadOpponentSlot,
               ForEach.body = Seq.singleton copy,
               -- CR 608.2f's first sentence: one action over the opponents, so rule
@@ -5568,24 +5572,21 @@ myriad =
               ArmDelayedTrigger.onset = Onset.Immediately,
               ArmDelayedTrigger.duration = Nothing
             }
-      anyOpponent =
-        Condition.Compares
-          Compares.MkCompares
-            { Compares.measured =
-                Quantity.Count
-                  ( Count.MkCount
-                      (Scope.OverPlayers (PlayerRef.EachOpponentExcept Binding.triggerPlayer))
-                      (Filter.And [])
-                      Aggregation.Members
-                  ),
-              Compares.comparison = Comparison.AtLeast,
-              Compares.threshold = Quantity.Literal 1
-            }
+      anyToken = atLeastOneMatching (Scope.OverBound myriadTokenSlot) (Filter.And [])
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
           TriggeredAbility.modal =
             Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Just anyOpponent) Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [loop, arm]))) Map.empty))
+              ( Seq.singleton
+                  ( Mode.MkMode
+                      ( Seq.fromList
+                          [ Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton loop),
+                            Clause.MkClause Nothing (Just anyToken) Nothing Optionality.Mandatory Nothing (Seq.singleton arm)
+                          ]
+                      )
+                      Map.empty
+                  )
+              )
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited

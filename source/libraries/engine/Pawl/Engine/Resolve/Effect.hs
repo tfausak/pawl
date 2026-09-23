@@ -212,6 +212,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
@@ -4830,13 +4831,27 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             { GameState.objects =
                 foldr (Map.adjust heal) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
-  Effect.ForEach (ForEach.MkForEach ref slot body individually) -> do
+  Effect.ForEach (ForEach.MkForEach ref membership slot body individually) -> do
     gs0 <- State.get
     -- CR 608.2f: WHICH members, swept ONCE from the pre-loop board and then fixed,
     -- so the body can neither shorten the batch nor add to it. Recipients rather
     -- than objects, since rule 608.2f is about "players and/or objects" and
     -- Soulfire Eruption's targets are both.
-    members <- forEachOrder resolving (const (Just controller)) (objectRefRecipients legal resolving controller source gs0 ref)
+    let swept = objectRefRecipients legal resolving controller source gs0 ref
+    -- CR 608.2d: a "you may" per member is ONE announcement of which members,
+    -- made before the first iteration, since the loop is one action (CR 608.2f)
+    -- and every choice it offers is announced while it is applied. Asked of the
+    -- resolving controller; skipped at no candidate and asked at one, where "any
+    -- number" leaves two answers. FILTERED, not trusted (#222), which also keeps
+    -- the sweep's order.
+    picked <- case membership of
+      LoopMembers.Every -> pure swept
+      LoopMembers.AnyNumber
+        | null swept -> pure []
+        | otherwise -> do
+            answer <- Game.choose (Prompt.ChooseLoopMembers (Decide.deciderFor controller gs0) controller resolving swept)
+            pure (filter (`Set.member` answer) swept)
+    members <- forEachOrder resolving (const (Just controller)) picked
     let -- The slots the BODY defines, computed off the instruction rather than the
         -- board: a body effect binds into the resolving object's live bindings and
         -- the next body effect must see it. Restricted to those names so a target

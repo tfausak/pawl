@@ -2717,6 +2717,7 @@ promptDecider prompt = case prompt of
   Prompt.OrderCombatTolls decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderComponentCards decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderForEach decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseLoopMembers decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderTimestamps decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderManaActivations decider _ _ -> Just (Decider.unwrap decider)
   Prompt.DeclareMulligan decider _ _ -> Just (Decider.unwrap decider)
@@ -2861,6 +2862,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.OrderCombatTolls {} -> "OrderCombatTolls"
   Prompt.OrderComponentCards {} -> "OrderComponentCards"
   Prompt.OrderForEach {} -> "OrderForEach"
+  Prompt.ChooseLoopMembers {} -> "ChooseLoopMembers"
   Prompt.OrderTimestamps {} -> "OrderTimestamps"
   Prompt.OrderManaActivations {} -> "OrderManaActivations"
   Prompt.DeclareMulligan {} -> "DeclareMulligan"
