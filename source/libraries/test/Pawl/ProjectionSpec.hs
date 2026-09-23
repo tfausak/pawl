@@ -4599,6 +4599,30 @@ exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
     Spec.assertBool s (List.notElem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice after)) "and no longer as the Arbiter's"
     Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId searchBan) (Action.legalActions S.alice before)) "which offered it before the exchange"
 
+  -- CR 613.7a: a moved static ability's effect takes the LATER of its new
+  -- host's timestamp and the exchange's, the exchange being the effect that
+  -- gave the host the ability. alice's Ogre Sentry (earliest), Student of
+  -- Warfare ("Level up {W} / LEVEL 2-6 3/3 First strike / LEVEL 7+ 4/4 Double
+  -- strike"), Wings of Velis Vel on the Sentry (base 4/4 until end of turn),
+  -- then Exchange of Words on the Sentry and the Student, and two level counters
+  -- on the Sentry. Both set base P/T in layer 7b; stamped with the Sentry's own
+  -- timestamp the level ability would apply first and the Wings win.
+  Spec.it s "CR 613.7a a levelled Student's text box applies after the Wings on its new host" $ do
+    island <- S.printingOf s registry "Island"
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    student <- S.printingOf s registry "Student of Warfare"
+    wings <- S.printingOf s registry "Wings of Velis Vel"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (sentryId, b0) = S.addPermanent sentry S.alice (S.landsInPlay island 2)
+        (studentId, b1) = S.addPermanent student S.alice b0
+        winged = castAtCreature sentryId wings b1
+        (_, entered) = S.entersWithTrigger exchange S.alice winged
+        staged = S.runPure (exchangeAnswer sentryId studentId) entered Engine.settleForPriority
+        exchanged = S.runPure (exchangeAnswer sentryId studentId) staged Stack.resolveTop
+        levelled = S.addCounter CounterKind.Level 2 sentryId exchanged
+    Spec.assertEqWith s "CR 613.7a the level-2 3/3 overrides the earlier Wings" (S.powerToughnessOf sentryId levelled) (Just (3, 3))
+    Spec.assertEqWith s "the Wings really had made the Sentry a 4/4" (S.powerToughnessOf sentryId winged) (Just (4, 4))
+
   -- CR 707.2a: the text box that moves is the one the copiable values give, so
   -- a Clone that entered as a copy of Akiri hands HER pump to the Sentry --
   -- the Clone's printed face has no static ability for a printed read to find.

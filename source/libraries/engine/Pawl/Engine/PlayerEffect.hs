@@ -312,7 +312,7 @@ printedRows gs =
                           gs
                           oid
                           (if null changes then c else Projection.rewriteCondition changes c)
-                 in fmap (\ability -> (Object.timestamp object, Just oid, PlayerStaticAbility.name ability, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
+                 in fmap (\ability -> (Projection.staticTimestampOf oid object gs, Just oid, PlayerStaticAbility.name ability, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
               else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 

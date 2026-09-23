@@ -1050,6 +1050,20 @@ textBoxHolderOf oid gs =
         | otherwise = x
    in List.foldl' step oid swaps
 
+-- CR 613.7a: the timestamp of the effects `carrier`'s static abilities
+-- generate -- its own, or the later timestamp of the exchange that put another
+-- object's text box on it, since that exchange is the effect that gave it those
+-- abilities. Pawl.ProjectionSpec's "CR 613.7a a levelled Student's text box
+-- applies after the Wings on its new host" proves it.
+staticTimestampOf :: ObjectId -> Object.Object -> GameState -> Timestamp
+staticTimestampOf carrier obj gs
+  | textBoxHolderOf carrier gs == carrier = Object.timestamp obj
+  | otherwise =
+      let touching eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
+            (Modification.ExchangeTextBoxes, Affected.TheseObjects pair) | Set.member carrier pair -> Just (ContinuousEffect.timestamp eff)
+            _ -> Nothing
+       in List.foldl' max (Object.timestamp obj) (Maybe.mapMaybe touching (GameState.continuousEffects gs))
+
 -- CR 707.2a: the static abilities this object's copiable rules text gives it --
 -- its copy snapshot's when it has one, its printed face's otherwise. Equal to
 -- PC.staticAbilities (copiableCharacteristics oid gs) by construction on an
@@ -1701,7 +1715,7 @@ controlGrants gs =
                 MkControlGrant
                   { cgSource = permId,
                     cgAffected = StaticAbility.affected sa,
-                    cgTimestamp = Object.timestamp permObj
+                    cgTimestamp = staticTimestampOf permId permObj gs
                   }
            in fmap toGrant (filter (\sa -> isControl sa && functionsFromZone Zone.Battlefield sa) (staticAbilitiesOf permId gs))
    in concatMap grantsOf (abilitySources gs)

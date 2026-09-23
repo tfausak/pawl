@@ -22,7 +22,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePrintedReplacement, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, hostOf, lastKnownView, staticAbilitiesOf, viewOfCharacteristics)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, hostOf, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCharacteristics)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -1843,7 +1843,7 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
             removed lowest = (lowest > Layer.Ability && stripped permId) || (lowest > Layer.Type && setStripped permId)
             -- One thunk per permanent, shared by all its abilities. Bound
             -- here, OUTSIDE the zipWith, which is what shares it.
-            partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes removed
+            partsOf = gatherStatic (functioning permId) permId (staticTimestampOf permId permObj gs) changes removed
             -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
             -- half of CR 613.6's decision memo and Pawl.Engine.Event's
             -- departure handover indexes the SAME list by it, so an ability
