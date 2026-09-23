@@ -94,7 +94,7 @@ withoutAnnouncement before entry closed = do
   phase <- one GameState.phase
   remaining <- one GameState.remaining
   priority <- one GameState.priority
-  passes <- one GameState.passes
+  passed <- one GameState.passed
   turnNumber <- one GameState.turnNumber
   result <- one GameState.result
   restartSignal <- one GameState.restartSignal
@@ -182,7 +182,7 @@ withoutAnnouncement before entry closed = do
         GameState.phase = phase,
         GameState.remaining = remaining,
         GameState.priority = priority,
-        GameState.passes = passes,
+        GameState.passed = passed,
         GameState.turnNumber = turnNumber,
         GameState.result = result,
         GameState.restartSignal = restartSignal,
