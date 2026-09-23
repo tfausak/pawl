@@ -42,10 +42,10 @@ import qualified Pawl.Types.Timestamp as Timestamp
 --
 -- `timestamp` orders two live rows over one object (CR 613.7): the latest one is
 -- what layer 1a leaves, since a copy effect REPLACES copiable values rather than
--- adding to them. Not implemented: ordering a row against the stamp underneath
--- it, which has no timestamp -- a copy effect stating no duration that resolves
--- while a row stands loses to the row instead of outranking it, as CR 613.7
--- would have it (#3755).
+-- adding to them. A stamp made later drops its object from `objects`
+-- (Pawl.Engine.Game.supersedeStoredCopies), which is how a row is ordered
+-- against a stamp that carries no timestamp -- proved by Pawl.CopySpec's "CR
+-- 613.7 a copy effect made after Mirrorweave's outranks it (Dimir Doppelganger)".
 data ActiveCopy = MkActiveCopy
   { source :: ObjectId.ObjectId,
     timestamp :: Timestamp.Timestamp,

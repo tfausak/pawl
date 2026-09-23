@@ -7472,6 +7472,10 @@ meldable victims gs = do
 --
 -- Not implemented: CR 730.2g's instant or sorcery component, which cannot be
 -- turned face up (#3392).
+--
+-- Not implemented: CR 730.2a's timestamp against a stored copy row already
+-- covering the permanent, which still outranks the merge, and recomputing the
+-- merge once that row ends rather than keeping the row's values (#4033).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get

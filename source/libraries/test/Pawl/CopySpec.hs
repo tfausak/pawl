@@ -1933,6 +1933,60 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the ability was taken once in each loop" (tookFirst, tookSecond) (1, 1)
         Spec.assertEqWith s "and both graveyard cards were exiled" (sum (fmap length (Map.elems (GameState.graveyard afterSecond)))) 0
 
+  -- THE PROVING TEST for CR 613.7 ordering a stored copy effect against a later
+  -- stamped one. Alice activates Dimir Doppelganger at a Hill Giant card and, in
+  -- response, casts Mirrorweave at her Goblin Piker: Mirrorweave's copy (until
+  -- end of turn) is stored first, and the ability's copy (no duration) is made
+  -- after it, so layer 1a leaves the Hill Giant -- now, not just after cleanup.
+  --
+  -- THE CLONE is the tripwire for every other reader of layer 1a: entering after
+  -- both, it copies the Doppelganger's copiable values (CR 707.2), which are the
+  -- Hill Giant's.
+  --
+  -- Distinct printed pairs: the Doppelganger's 0/2, the Piker's 2/1, the Hill
+  -- Giant's 3/3, the Clone's 0/0.
+  Spec.it s "CR 613.7 a copy effect made after Mirrorweave's outranks it (Dimir Doppelganger)" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    doppelganger <- S.printingOf s registry "Dimir Doppelganger"
+    clone <- S.printingOf s registry "Clone"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace doppelganger)) of
+      Nothing -> Spec.assertFailure s "Dimir Doppelganger prints no activated ability"
+      Just ability -> do
+        let (giantCardId, g1) = S.addGraveyardCard hillGiant S.alice (S.landsFor swamp S.alice 2 (S.landsInPlay island 5))
+            (pikerId, g2) = S.addPermanent piker S.alice g1
+            (doppelId, board) = S.addPermanent doppelganger S.alice g2
+            activated = S.runPure (aimByFiltering giantCardId) board (Activate.activateAbility S.alice doppelId ability)
+            (staged, weaveId) = S.handOne mirrorweave activated
+            woven = resolveAndSettle (aimByFiltering pikerId) (S.runPure (aimByFiltering pikerId) staged (S.cast S.alice weaveId))
+            copied = resolveAndSettle S.identityAnswer woven
+            (_, stagedClone) = S.spellOnStack clone S.alice copied
+            withClone = resolveAndSettle (copyNamed doppelId) stagedClone
+            toCleanup =
+              withClone
+                { GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+                }
+            step g = S.runPure S.identityAnswer g Engine.runStep
+            afterEnd = step (step toCleanup)
+            afterCleanup = step afterEnd
+            giantName = Set.singleton . CardName.MkCardName $ Text.pack "Hill Giant"
+        -- THE GAMEPLAY ASSERTION: the later copy effect is what layer 1a leaves
+        -- while Mirrorweave's still stands.
+        Spec.assertEqWith s "CR 613.7 the Doppelganger is the Hill Giant under Mirrorweave" (S.powerToughnessOf doppelId copied) $ Just (3, 3)
+        Spec.assertEqWith s "and the Hill Giant by name" (Projection.namesOf doppelId copied) giantName
+        case cloneOnBattlefield withClone of
+          Nothing -> Spec.assertFailure s "the Clone did not enter"
+          Just cloneId -> do
+            Spec.assertEqWith s "CR 707.2 a Clone of the Doppelganger is the Hill Giant" (S.powerToughnessOf cloneId withClone) $ Just (3, 3)
+            Spec.assertEqWith s "and the Clone is still the Hill Giant after cleanup" (S.powerToughnessOf cloneId afterCleanup) $ Just (3, 3)
+        Spec.assertEqWith s "the Doppelganger is still the Hill Giant after cleanup" (S.powerToughnessOf doppelId afterCleanup) $ Just (3, 3)
+        -- Diagnostics, after the behaviour: Mirrorweave's copy happened first.
+        Spec.assertEqWith s "under Mirrorweave alone the Doppelganger was the Piker" (S.powerToughnessOf doppelId woven) $ Just (2, 1)
+        Spec.assertEqWith s "the cleanup step ran" (GameState.phase afterEnd) (Phase.Ending EndingStep.Cleanup)
+
   -- THE PROVING TEST for CR 305.7's THIRD clause: a land whose subtype is set to a
   -- basic type "loses all abilities generated from its rules text, its old land
   -- types, and any copiable effects affecting that land". Vesuva enters as a copy
