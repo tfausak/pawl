@@ -341,6 +341,12 @@ gameStateRoundTripSpec s registry = do
                 }
          in roundTrips "a spent per-game rider" gs {GameState.triggeredThisGame = Set.singleton spent}
 
+  -- GameState.departedThisTurn, CR 801.2c's seats that still count until the
+  -- next turn begins. Non-empty for the reason the case above gives.
+  Spec.it s "a seat emptied this turn round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    roundTrips "a departure this turn" (S.oneMountainState mountain Phase.PrecombatMain) {GameState.departedThisTurn = Set.singleton S.bob}
+
   Spec.it s "a non-empty stack round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
     bolt <- S.printingOf s registry "Lightning Bolt"

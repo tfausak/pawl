@@ -78,7 +78,9 @@ depart reason pid = do
     State.modify' (nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid)
     remainingControlledExiled pid
   let lose p = p {Player.status = Status.Departed reason}
-  State.modify' (\gs -> gs {GameState.players = Map.adjust lose pid (GameState.players gs)})
+  -- CR 801.2c: the seat keeps counting toward range of influence until the
+  -- next turn begins.
+  State.modify' (\gs -> gs {GameState.players = Map.adjust lose pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)})
   State.modify' (\gs -> Monarch.reassignOnDeparture pid (Game.stillPlayingInOrder gs) gs)
   -- CR 726.4, the same clause one rule over and for the same reason: the active
   -- player takes the initiative at the same time its holder leaves.
