@@ -2295,6 +2295,7 @@ oneEffectActivated mana effect =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.maximumX = [],
+      ActivatedAbility.minimumX = 0,
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -2321,6 +2322,7 @@ modalActivated modes =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
       ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
       ActivatedAbility.maximumX = [],
+      ActivatedAbility.minimumX = 0,
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,

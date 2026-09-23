@@ -1983,7 +1983,7 @@ subChoiceFor :: PlayerId.PlayerId -> Prompt.Prompt r -> Bool
 subChoiceFor pid prompt = case prompt of
   Prompt.ChooseTargets decider _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseModes decider _ _ _ _ -> Decider.unwrap decider == pid
-  Prompt.ChooseX decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseX decider _ _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseCost decider _ _ _ -> Decider.unwrap decider == pid
   Prompt.OrderCostComponents decider _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseManaSource decider _ _ -> Decider.unwrap decider == pid
@@ -2171,9 +2171,9 @@ answerActionChoice key verb choices asked =
                 updateActionChoices (\current -> current {choiceModes = Nothing})
                 pure modes
           _ -> unexpected
-        Prompt.ChooseX _ _ _ maximumX -> case choiceX choices of
+        Prompt.ChooseX _ _ _ minimumX maximumX -> case choiceX choices of
           Just x
-            | x <= maximumX -> do
+            | minimumX <= x && x <= maximumX -> do
                 updateActionChoices (\current -> current {choiceX = Nothing})
                 pure x
           _ -> unexpected
@@ -2663,7 +2663,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseSearchZones decider _ _ -> Just (Decider.unwrap decider)
   Prompt.Search decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.CastWhileSearching decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseX decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseX decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMutateSide decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseForage decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLearn decider _ _ _ -> Just (Decider.unwrap decider)
