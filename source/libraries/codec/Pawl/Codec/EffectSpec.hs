@@ -2027,6 +2027,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Proliferate
       " {\"type\":\"Proliferate\"} "
+  Spec.it s "Reroll" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Reroll
+      " {\"type\":\"Reroll\"} "
   -- CR 201.4's chooser and CR 201.4a's restriction on which names they may
   -- choose. Rule 201.4 fixes the count, so there is no third key.
   Spec.it s "ChooseCardName" $

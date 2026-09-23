@@ -18,6 +18,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import Pawl.CastSpec (aliceOnTurn, isPlaneswalkerTarget, rallyBoard, tapStateOf)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -2814,7 +2815,7 @@ shellBoard island mountain shell piker bolt =
 shellRun :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 shellRun aim shellId boltId board =
   let cast = S.runPure aim board (S.cast S.bob boltId)
-   in case Activate.abilitiesFor shellId cast of
+   in case Activatable.abilitiesFor shellId cast of
         -- The FIRST printed ability: the Shell prints two, and the second one is
         -- ShellSecondAbility's.
         ability : _ -> S.runPure (avenAnswer boltId) cast (Activate.activateAbility S.alice shellId ability >> Engine.priorityLoop)
@@ -2874,7 +2875,7 @@ shellPileRun wanted shellId board =
         -- offers no player at all, so preferring falls back to the creature there.
         Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((== Just S.bob) . Recipient.playerOf) sets)
         _ -> pure (S.identityAnswer p)
-      driven = case drop 1 (Activate.abilitiesFor shellId board) of
+      driven = case drop 1 (Activatable.abilitiesFor shellId board) of
         ability : _ -> Activate.activateAbility S.alice shellId ability >> Engine.priorityLoop
         [] -> pure ()
    in State.runState (fmap snd (Engine.runGame answering board driven)) []

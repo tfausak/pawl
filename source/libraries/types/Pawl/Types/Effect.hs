@@ -607,6 +607,9 @@ data Effect card ability
     -- Pawl.DiceSpec is what proves it. Not implemented: CR 706.3c's "Roll again"
     -- (#2124).
     RollDie RollDie.RollDie
+  | -- | CR 706.2b: throw again the die whose modification step is open, taking
+    -- the new number as its natural result (Goblin Bookie's "reroll any die").
+    Reroll
   | -- | CR 705.1: flip a coin, and bind CR 705.2's outcome at the payload's slot
     -- for a later clause of the same resolution to gate on (Winter Sky). The
     -- call is a choice and the outcome is not, so the two prompts differ in

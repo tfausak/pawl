@@ -129,7 +129,8 @@ data Prompt r where
   -- been matched against it, so it narrows nothing the seat is deciding.
   --
   -- The Cost is CR 706.2a's "associated cost", Nothing where the modifier states
-  -- none. Raised only once the payer can afford it, Prompt.ChooseToPay's posture
+  -- none -- or the activation cost of an ability activated inside the roll
+  -- (Goblin Bookie, ActivationRestriction.DuringDieRoll). Raised only once the payer can afford it, Prompt.ChooseToPay's posture
   -- for CR 118.12 -- so an accepted offer is one that goes through.
   --
   -- Never elided. CR 706.2a's "may" makes one offer a real fork, and the two
@@ -382,7 +383,7 @@ data Prompt r where
   CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, CardName.CardName)] -> Prompt (Maybe (ObjectId.ObjectId, CardName.CardName))
   -- | CR 601.2b / 602.2b: the value of X, before targets. The Natural is the
   -- greatest value legally announceable now (Cast.affordableX,
-  -- Activate.affordableX; Cost.maximumX for CR 101.1's card-stated ceiling).
+  -- Activatable.affordableX; Cost.maximumX for CR 101.1's card-stated ceiling).
   --
   -- Advisory: the answer is filtered against it nowhere. Announcing past what
   -- the player can pay is answered by CR 601.2h's reversal (#741); past what

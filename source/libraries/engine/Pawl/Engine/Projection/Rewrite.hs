@@ -475,6 +475,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination subject) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
+  Effect.Reroll -> effect
   -- CR 612.1: rule 201.4a's restriction is printed card text, so a text-changer
   -- rewrites it exactly as it rewrites a search's filter above.
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref (Filter.rewrite pairs restriction))
@@ -1723,6 +1724,7 @@ rewriteRestriction pairs restriction = case restriction of
   ActivationRestriction.BeforeCombatDamage -> restriction
   ActivationRestriction.OnlyOnce -> restriction
   ActivationRestriction.OnlyOnceEachTurn -> restriction
+  ActivationRestriction.DuringDieRoll -> restriction
 
 -- CR 612.1 through a Duration, which Pawl.Types.Duration holds as the card
 -- prints it: a CR 611.2b "for as long as ..." clause is rules text like any

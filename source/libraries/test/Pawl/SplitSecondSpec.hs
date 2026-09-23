@@ -4,7 +4,7 @@
 -- Covers: CR 702.61 split second -- Pawl.Types.Keyword's SplitSecond arm, the
 -- reader Pawl.Engine.SplitSecond.inForce, and the three gates that ask it
 -- (Pawl.Engine.Cast.castable, Pawl.Engine.Cast.castableWhenOffered and
--- Pawl.Engine.Activate.activatableGiven).
+-- Pawl.Engine.Activatable.activatableGiven).
 --
 -- Gameplay-level throughout, off Pawl.Engine.Action.legalActions: what the rule
 -- takes away is the MENU, so that is what every case reads.
@@ -344,7 +344,7 @@ grantedSpec s registry =
       Spec.assertEqWith s "control: unkicked, the Sorcerer's ability is offered" (length (activationsOf declined)) 1
       Spec.assertEqWith s "kicked, it is gone" (activationsOf kicked) []
       -- CR 702.61b, asked at gameplay level off the MENU rather than through
-      -- Activate.activatable, which answers False for a mana ability on every
+      -- Activatable.activatable, which answers False for a mana ability on every
       -- board (CR 605.3b).
       Spec.assertEqWith s "and CR 702.61b leaves bob all eight Mountains" (length (filter isManaAbility (Action.legalActions S.bob kicked))) 8
     -- The card as printed, so the grant above is not the only thing the file

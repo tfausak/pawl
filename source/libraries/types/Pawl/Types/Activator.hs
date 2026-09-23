@@ -15,7 +15,7 @@ module Pawl.Types.Activator where
 -- as a sorcery" -- and they compose rather than merge: the rider narrows WHEN,
 -- this widens WHO, and every clause of both must hold.
 --
--- The reader is Pawl.Engine.Activate.mayActivateGiven, which is CR 602.2's whole
+-- The reader is Pawl.Engine.Activatable.mayActivateGiven, which is CR 602.2's whole
 -- permission conjunct. Nothing here says who PAYS: CR 602.1a gives the cost to
 -- the player activating the ability whichever arm this is.
 data Activator

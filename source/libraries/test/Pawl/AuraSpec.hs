@@ -33,6 +33,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Card as Card
@@ -67,6 +68,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -836,6 +838,46 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
     -- fold honours the dependency or only the timestamps. It is here to fail a
     -- future fix that reorders by timestamp and calls that CR 613.8b.
     Spec.assertEqWith s "CR 613.7 the other timestamp order leaves the Piker carol's too" (Projection.controllerOf creature yokeFirst) (Just S.carol)
+  -- CR 613.1b's Attached arm reads only whether the source IS attached, never
+  -- the host's own projected type (Pawl.Types.Affected's Attached haddock):
+  -- CR 613.8a's dependency system is same-layer only, so a layer-2 control
+  -- grant cannot formally depend on the layer-4 crew effect that makes a
+  -- Vehicle a creature at all (#3159). So Control Magic keeps controlling a
+  -- crewed Vehicle for exactly as long as the crew lasts -- CR 704.5m's own
+  -- host-legality check reads the FULL projection instead, so it buries the
+  -- Aura, handing control back, the instant cleanup lets the crew wear off.
+  -- One board, one turn apart (#3150).
+  --
+  -- Consulate Dreadnought {1} Artifact -- Vehicle 7/11 "Crew 6" is
+  -- Pawl.CrewSpec's fixture too; Hill Giant (3/3) and Blind-Spot Giant (4/3)
+  -- together clear the threshold the same way that module's board does.
+  Spec.it s "CR 613.1b/704.5m Control Magic keeps a crewed Vehicle and loses it the instant the crew wears off" $ do
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    let base = Setup.emptyGame S.bothPlayers
+        (vehicleId, g1) = S.addPermanent dreadnought S.bob base
+        (giantId, g2) = S.addPermanent hillGiant S.bob g1
+        (blindId, g3) = S.addPermanent blindSpot S.bob g2
+        ready = g3 {GameState.priority = Just S.bob}
+        crewed = case Projection.abilitiesOf vehicleId ready of
+          ability : _ ->
+            let activated = S.runPure S.identityAnswer ready (Activate.activateAbility S.bob vehicleId ability)
+             in S.runPure S.identityAnswer activated Stack.resolveTop
+          [] -> ready
+        (aura, withAura) = S.addPermanent controlMagic S.alice crewed
+        stolen = S.attach aura vehicleId withAura
+        afterCleanup = S.runPure S.identityAnswer stolen (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+        settled = S.settleSba afterCleanup
+    Spec.assertEqWith s "both crewers really tapped, so the crew ability actually resolved" (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid crewed)) [giantId, blindId]) [Just TapState.Tapped, Just TapState.Tapped]
+    Spec.assertBool s (Set.member CardType.Creature (Projection.cardTypesOf vehicleId crewed)) "crewed: the Vehicle is a creature"
+    Spec.assertEqWith s "the Aura landed on the crewed Vehicle and CR 704.3 has not swept yet" (fmap Object.attachedTo (Game.lookupObject aura stolen)) (Just (Just (Recipient.ToCreature vehicleId)))
+    Spec.assertEqWith s "CR 613.1b: while it is a creature, Control Magic controls it" (Projection.controllerOf vehicleId stolen) (Just S.alice)
+    Spec.assertBool s (not (Set.member CardType.Creature (Projection.cardTypesOf vehicleId afterCleanup))) "CR 514.2/301.7b: cleanup ends the crew, so it is no creature"
+    Spec.assertBool s (not (S.onBattlefield aura settled)) "CR 704.5m: 'enchant creature' no longer admits a noncreature host, so the Aura is buried"
+    Spec.assertEqWith s "in its OWNER's graveyard, not destroyed" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 1
+    Spec.assertEqWith s "CR 611.3b: with the source off the battlefield, control reverts to bob" (Projection.controllerOf vehicleId settled) (Just S.bob)
   -- CR 704.5m's remaining clause, and the one only an enchant-player Aura can
   -- reach: CR 303.4c spells it out as "the player it was attached to has left
   -- the game". Three seats, because CR 104.2a ends a two-player game the
@@ -3569,7 +3611,7 @@ licidSpec s registry = Spec.describe s "Licid" $ do
         withRemoval name = S.withEffectAt lic (Timestamp.MkTimestamp 500) (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack name))) ready
         matching = withRemoval "animate"
         mismatched = withRemoval "no ability has this name"
-        activatableOn gs = any (\ability -> Activate.activatable S.alice lic ability gs) (Projection.abilitiesOf lic gs)
+        activatableOn gs = any (\ability -> Activatable.activatable S.alice lic ability gs) (Projection.abilitiesOf lic gs)
     -- The CONTROL first: with no removal at all the ability is there and usable,
     -- so neither board below can be reading a Licid that never had it.
     Spec.assertBool s (activatableOn ready) "CR 602.2: with no removal alice may activate it"

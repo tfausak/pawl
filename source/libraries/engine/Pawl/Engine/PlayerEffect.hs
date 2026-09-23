@@ -1383,7 +1383,7 @@ spellCostAdjustments pid oid gs =
 -- Pawl.Engine.Activate.activateAbility, which gathers once before the targets
 -- exist and again after. A caller that has to MEASURE the cost before that
 -- moment hands one candidate target at a time instead, and takes the best
--- answer (Pawl.Engine.Activate.aimingSomewhere).
+-- answer (Pawl.Engine.Activatable.aimingSomewhere).
 --
 -- The MANA increases are gathered too (Oppressive Rays), and CR 601.2f orders
 -- every one of them before any reduction -- which is Cost.applyAdjustments'

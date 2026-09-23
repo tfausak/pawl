@@ -752,6 +752,7 @@ restrictionConditions restriction = case restriction of
   ActivationRestriction.OnlyIf condition -> [condition]
   ActivationRestriction.OnlyOnce -> []
   ActivationRestriction.OnlyOnceEachTurn -> []
+  ActivationRestriction.DuringDieRoll -> []
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
@@ -1109,6 +1110,7 @@ ownCounts effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> foldMap quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -1535,6 +1537,7 @@ effectNestedEffects effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2008,6 +2011,7 @@ effectReplacements effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2458,6 +2462,7 @@ effectMintedFaces effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -5216,6 +5221,7 @@ effectFilters effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ _ f _ _ _) -> searchFramed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   -- CR 201.4a's restriction, and the WISH's frame: what judges it is
   -- Pawl.Interpreter.legalCardName, on the far side of
   -- Pawl.Engine.Engine.runGameAsked, and it matches a printed FACE
@@ -6462,6 +6468,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (any (any variableCounters . suspendsOf) ps)
       "the pool has a suspend whose N is CR 107.3d's chosen X"
     Spec.assertEqWith s "and every suspend cost agrees with its own N" (fmap (S.nameOf . Printing.card) offenders) []
+  -- Pawl.Engine.Resolve.Effect's die-roll window resolves a DuringDieRoll
+  -- ability at once and asks for it with Prompt.RerollDie, so it announces no
+  -- mode, target or X and does nothing but reroll.
+  Spec.it s "every ability activated inside a die roll is one untargeted reroll" $ do
+    ps <- S.allPrintings s
+    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
+        windowed = concatMap (filter (elem ActivationRestriction.DuringDieRoll . ActivatedAbility.restrictions . snd) . abilitiesOf) ps
+        offends (_, ab) =
+          let modal = ActivatedAbility.modal ab
+           in length (Modal.modes modal) /= 1
+                || not (all (null . Mode.targetSlots) (Modal.modes modal))
+                || declaresVariable (ActivatedAbility.cost ab)
+                || Modal.allEffects modal /= [Effect.Reroll]
+    Spec.assertBool s (not (null windowed)) "the pool has such an ability"
+    Spec.assertEqWith s "an untargeted reroll alone" (fmap fst (filter offends windowed)) []
   Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))

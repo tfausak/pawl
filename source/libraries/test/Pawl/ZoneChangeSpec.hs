@@ -15,6 +15,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
@@ -163,7 +164,7 @@ sindbadBoard sindbad top filler handLand handSpell =
 -- that silently did nothing is how this test would stay green while activating
 -- no ability at all.
 activateSole :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-activateSole oid gs = case Activate.abilitiesFor oid gs of
+activateSole oid gs = case Activatable.abilitiesFor oid gs of
   [ability] ->
     let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability)
      in S.runPure S.identityAnswer activated Stack.resolveTop
@@ -1411,7 +1412,7 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
     -- perspective of the player activating it (CR 109.5), so alice is never a
     -- candidate. Paired with the outcome above rather than asserted alone, since
     -- a candidate list nothing consumed proves nothing.
-    let candidates = case Activate.abilitiesFor mirrorId board of
+    let candidates = case Activatable.abilitiesFor mirrorId board of
           [ability] -> case Seq.lookup 0 (Modal.modes (ActivatedAbility.modal ability)) of
             Just mode -> Map.elems (Target.legalSets (Just S.alice) False Map.empty mirrorId (Mode.targetSlots mode) board)
             Nothing -> []
@@ -1483,7 +1484,7 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
     let (conduitId, board) = soulConduitBoard conduit island 4 27 13
         answer :: Prompt.Prompt r -> r
         answer = conduitAnswer [S.bob, S.carol]
-    case Activate.abilitiesFor conduitId board of
+    case Activatable.abilitiesFor conduitId board of
       [ability] -> do
         let activated = S.runPure answer board (Activate.activateAbility S.alice conduitId ability)
             gone = S.runPure answer activated (Departure.leaveGame Departure.Type.Conceded S.carol)

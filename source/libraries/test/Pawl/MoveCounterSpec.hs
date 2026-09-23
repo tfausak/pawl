@@ -14,6 +14,7 @@ import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
@@ -548,7 +549,7 @@ batchSpec s registry = Spec.describe s "CR 122.5 moving a whole tally of counter
           pure (pantherId, pikerId, landId, staged)
       -- Mine Vibranium, activated once and resolved. Exactly one printed
       -- activated ability, not the first of however many.
-      mine (pantherId, pikerId, landId, staged) = case Activate.abilitiesFor pantherId staged of
+      mine (pantherId, pikerId, landId, staged) = case Activatable.abilitiesFor pantherId staged of
         [only] -> Just (S.runPure (pantherAnswer landId pikerId) staged (Activate.activateAbility S.alice pantherId only >> Stack.resolveTop))
         _ -> Nothing
   -- THE CASE THIS UNIT EXISTS FOR. THREE +1/+1 counters, so a move of one and a
@@ -800,7 +801,7 @@ anyNumberSpec s registry = Spec.describe s "CR 122.5 moving any number of counte
       -- The ability, activated once and resolved, answering the counter question
       -- with `wanted`. Exactly one printed activated ability, not the first of
       -- however many.
-      spend wanted (defenseId, giverId, takerId, ready) = case Activate.abilitiesFor defenseId ready of
+      spend wanted (defenseId, giverId, takerId, ready) = case Activatable.abilitiesFor defenseId ready of
         [only] ->
           let run =
                 Engine.runGame
@@ -1094,7 +1095,7 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
       -- The FIRST of the card's two printed activated abilities, activated once
       -- and resolved. Both are named rather than one taken off the front, so this
       -- group cannot drift onto the other.
-      tap (goldberryId, giverId, ready) = case Activate.abilitiesFor goldberryId ready of
+      tap (goldberryId, giverId, ready) = case Activatable.abilitiesFor goldberryId ready of
         [only, _] ->
           let run =
                 Engine.runGame
@@ -1142,7 +1143,7 @@ absentKindSpec s registry = Spec.describe s "CR 122.5 moving a counter of each k
   -- no counter -- stay on it.
   Spec.it s "CR 602.2b / 601.2c the ability offers every other permanent alice controls and neither Goldberry nor bob's" $ do
     (goldberryId, giverId, ready) <- board (const id)
-    case Activate.abilitiesFor goldberryId ready of
+    case Activatable.abilitiesFor goldberryId ready of
       [only, _] -> do
         let run = Engine.runGame (goldberryOffered giverId) ready (Activate.activateAbility S.alice goldberryId only)
             (_, offered) = State.runState run Set.empty
@@ -1518,7 +1519,7 @@ atLeastOneSpec s registry = Spec.describe s "CR 122.5 moving one or more counter
       -- The SECOND printed activated ability, activated once and resolved. Both
       -- are named, which is itself an assertion: pawl's Goldberry used to carry
       -- the first alone.
-      tap wanted (goldberryId, takerId, ready) = case Activate.abilitiesFor goldberryId ready of
+      tap wanted (goldberryId, takerId, ready) = case Activatable.abilitiesFor goldberryId ready of
         [_, second] ->
           let run =
                 Engine.runGame
