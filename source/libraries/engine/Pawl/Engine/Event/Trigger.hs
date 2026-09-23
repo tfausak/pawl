@@ -866,7 +866,7 @@ eventTriggers events gs =
       -- permanent is read, not a statement about which zone it is being read IN,
       -- so the zone CR 113.6m compares against is the battlefield either way.
       --
-      -- Safe for `leftBattlefield` because `zoneFunctionedFrom`'s
+      -- Safe for `leftBattlefield` because `zonesFunctionedIn`'s
       -- `conditionPutsSelfInto` reads the rule's own exception: a dies trigger
       -- whose effect names the graveyard it just died into is exempted back to
       -- the battlefield default, the same way `enchantedObjectLeaves` exempts an
@@ -888,7 +888,7 @@ eventTriggers events gs =
       -- CR 113.6's battlefield default. Nothing in data/cards/ grants an ability
       -- that arms one; Pawl.Engine.Activatable.abilitiesForGiven carries the same
       -- pairing and the same note.
-      battlefieldAbilitiesOf oid pc = filter (functionsIn (PC.subtypes pc) (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
+      battlefieldAbilitiesOf oid pc = Maybe.mapMaybe (functionsIn (PC.subtypes pc) (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (abilitiesOf pc)
       -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
       -- immediately after the event, with the abilities and the CR 603.3a
       -- controller each of them had THEN. The three readings the live board gets
@@ -1220,7 +1220,7 @@ eventTriggers events gs =
       -- Not deduplicated against the entry above: an id departs at exactly one
       -- group, so the two maps are disjoint, and `leftBattlefield`'s own offer of
       -- the event's own departure wins over this one by Map.unions' left bias.
-      sameGroup = fmap (Map.map (fmap (filter (looksBack . TriggeredAbility.condition)))) perGroup
+      sameGroup = fmap (Map.map (fmap (filter (looksBack . fst)))) perGroup
       -- CR 702.29c: the card that was just cycled, wherever it landed. The
       -- candidate source that is neither on the battlefield nor a permanent that
       -- left it -- which is exactly what that rule asks for:
@@ -1246,7 +1246,7 @@ eventTriggers events gs =
           Nothing -> Map.empty
           Just obj -> case Game.faceOf oid gs of
             Nothing -> Map.empty
-            Just face -> Map.singleton oid (Object.owner obj, Face.triggeredAbilities face)
+            Just face -> Map.singleton oid (Object.owner obj, fmap whole (Face.triggeredAbilities face))
         GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary _) -> Map.empty
         -- A draw names no object either. The card it puts in a hand may well bear
         -- an ability that triggers from there -- CR 702.94a's miracle -- but that
@@ -1359,7 +1359,7 @@ eventTriggers events gs =
       -- sorcery -- which is why it is handed the face's card TYPES as well.
       graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) <> Keyword.graveyardTriggeredAbilitiesOf (TypeLine.types (Face.typeLine face)) (Face.keywordSet face) of
+          case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) <> fmap whole (Keyword.graveyardTriggeredAbilitiesOf (TypeLine.types (Face.typeLine face)) (Face.keywordSet face)) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -1434,7 +1434,7 @@ eventTriggers events gs =
               case Map.lookup (ZoneChange.object zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
                 Just lk ->
-                  case filter (functionsIn (PC.subtypes (LastKnown.characteristics lk)) (Game.delayedAbilitiesOf (ZoneChange.object zc) gs) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
+                  case Maybe.mapMaybe (functionsIn (PC.subtypes (LastKnown.characteristics lk)) (Game.delayedAbilitiesOf (ZoneChange.object zc) gs) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
                     [] -> Map.empty
                     abilities -> Map.singleton (ZoneChange.object zc) (LastKnown.controller lk, abilities)
         _ -> Map.empty
@@ -1479,7 +1479,7 @@ eventTriggers events gs =
       -- madness, whose own first ability is what put its card here.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) | not (Object.exiledFaceDown obj) ->
-          case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> Keyword.exileTriggeredAbilitiesOf (Face.keywordSet face) of
+          case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Exile) (Face.triggeredAbilities face) <> fmap whole (Keyword.exileTriggeredAbilitiesOf (Face.keywordSet face)) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -1512,7 +1512,7 @@ eventTriggers events gs =
       spellCast event = case event of
         GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
-          Just face -> case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) <> Keyword.stackTriggeredAbilitiesOf (Face.keywords face) of
+          Just face -> case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) <> fmap whole (Keyword.stackTriggeredAbilitiesOf (Face.keywords face)) of
             [] -> Map.empty
             abilities -> Map.singleton spell (caster, abilities)
         GameEvent.Discarded {} -> Map.empty
@@ -1629,7 +1629,7 @@ eventTriggers events gs =
               Nothing -> Nothing
               Just face -> case Face.triggeredAbilities face of
                 [] -> Nothing
-                abilities -> Just (oid, (Object.owner obj, abilities))
+                abilities -> Just (oid, (Object.owner obj, fmap whole abilities))
       inCommand =
         Map.fromList
           (Maybe.mapMaybe commandCandidate (Set.toAscList (GameState.command gs)))
@@ -1662,7 +1662,7 @@ eventTriggers events gs =
       revealedInHand event = case event of
         GameEvent.Revealed (Revealed.MkRevealed _ oid RevealCause.ForMiracle _) -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
           (Just obj, Just face) ->
-            case filter (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywordSet face)) of
+            case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywordSet face)) of
               [] -> Map.empty
               abilities -> Map.singleton oid (Object.owner obj, abilities)
           _ -> Map.empty
@@ -1742,8 +1742,11 @@ eventTriggers events gs =
             -- left, there being no object to ask -- whether it arrived here out of
             -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
-            fires ab = matchesTriggerGiven bindings board gs oid ctrl (TriggeredAbility.condition ab) event
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl (TriggeredAbility.condition ab) event) Nothing (Just event)
+            -- Each entry pairs the conditions that function in the bearer's zone
+            -- (`functionsIn`) with the ability as printed, which is what the
+            -- pending trigger carries.
+            fires (cond, _) = matchesTriggerGiven bindings board gs oid ctrl cond event
+            pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event) Nothing (Just event)
             -- CR 603.2c's key, for `oncePerBatch` below: which ability of which
             -- bearer this pending trigger came from, or Nothing when the condition
             -- is per-occurrence and every member of the batch is its own trigger
@@ -1751,8 +1754,8 @@ eventTriggers events gs =
             -- than by the ability itself, so a permanent printing the same batch
             -- condition twice keeps both -- no equality on TriggeredAbility is
             -- needed and none is assumed.
-            key (index, ab) =
-              if batchScoped (TriggeredAbility.condition ab)
+            key (index, (cond, _)) =
+              if batchScoped cond
                 then Just (oid, index :: Natural)
                 else Nothing
             keyed indexed = (key indexed, pend (snd indexed))
@@ -1884,14 +1887,30 @@ eventTriggers events gs =
 -- half by `conditionPutsSelfInto` below -- so an ability whose own condition is
 -- what put the card in the zone its (possibly delayed) effect names is not
 -- pinned there, whether its return is immediate or delayed.
-zoneFunctionedFrom :: Set.Set Subtype.Subtype -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe Zone
-zoneFunctionedFrom subtypes delayed ability =
-  let condition = TriggeredAbility.condition ability
-   in if Set.member Subtype.Aura subtypes && enchantedObjectLeaves condition
-        then Nothing
-        else case Maybe.listToMaybe (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom (selfNamingSlots condition) delayed) (Modal.allEffects (TriggeredAbility.modal ability))) of
-          Nothing -> Nothing
-          Just zone -> if conditionPutsSelfInto condition zone then Nothing else Just zone
+--
+-- PER CONDITION, CR 113.6k's second sentence: each condition of a CR 603.1b
+-- AnyOf is exempted or pinned on its own, and the ability functions in the
+-- union. "When this creature dies or at the beginning of your upkeep, return
+-- this card from your graveyard" functions on the battlefield for the death and
+-- in the graveyard for the upkeep -- Pawl.ZoneTriggerSpec's
+-- `anyOfEffectZoneTriggerSpec` proves it on Synthetic Homing Nabob.
+zonesFunctionedIn :: Set.Set Subtype.Subtype -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Set.Set Zone
+zonesFunctionedIn subtypes delayed ability = conditionZones subtypes delayed ability (TriggeredAbility.condition ability)
+
+-- `zonesFunctionedIn`'s answer for one condition of the ability, which may be
+-- a disjunct of its AnyOf: the effect's pin is the ability's, the exemption
+-- the condition's own.
+conditionZones :: Set.Set Subtype.Subtype -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> TriggerCondition -> Set.Set Zone
+conditionZones subtypes delayed ability =
+  let pinned = Maybe.listToMaybe (Maybe.mapMaybe (EffectZone.zoneFunctionedFrom (selfNamingSlots (TriggeredAbility.condition ability)) delayed) (Modal.allEffects (TriggeredAbility.modal ability)))
+      exempted c zone = (Set.member Subtype.Aura subtypes && enchantedObjectLeaves c) || conditionPutsSelfInto c zone
+      zonesOf c = case c of
+        -- The empty list keeps zonesTriggeredFrom's own reading.
+        TriggerCondition.AnyOf cs@(_ : _) -> Set.unions (fmap zonesOf cs)
+        _ -> case pinned of
+          Just zone | not (exempted c zone) -> Set.singleton zone
+          _ -> zonesTriggeredFrom c
+   in zonesOf
 
 -- Which slots name "the object it's on" for CR 113.6m, given what the ability
 -- watches. CR 113.7a's source slot always; CR 400.7e's `became` as well when the
@@ -1925,7 +1944,7 @@ selfNamingSlots condition =
 -- the ability can be made to watch, and one watching condition is enough.
 --
 -- The rule's "if the object is an Aura" is asked SEPARATELY, by the caller
--- above: this reads the condition alone, and `zoneFunctionedFrom` conjoins the
+-- above: this reads the condition alone, and `zonesFunctionedIn` conjoins the
 -- bearer's projected subtypes (CR 205.3) with it. CR 303.4m is why the split is
 -- not a distinction without a difference -- an Equipment's "equipped creature"
 -- is the same attachment link and the same TriggerCondition, and the exception
@@ -1977,9 +1996,10 @@ enchantedObjectLeaves condition = case condition of
 -- Not implemented: a self condition spelled as a bystander constructor narrowed
 -- by Filter.IsSource (PermanentSacrificed {You, IsSource}, Biolume Egg's shape)
 -- -- the `_` answers False for it, and the ability is pinned to its own
--- graveyard (#3177). Nor the ability-wide reading of an AnyOf: one disjunct's
--- exemption unpins the whole ability, where CR 113.6k's second sentence would
--- let each disjunct function from its own zone (#3178).
+-- graveyard (#3177).
+--
+-- The AnyOf arm serves `selfNamingSlots`; `zonesFunctionedIn` asks each
+-- disjunct on its own.
 --
 -- The `_` is otherwise a decision, `enchantedObjectLeaves`'s reason: every other
 -- condition says nothing about the object's own arrival anywhere, so the rule's
@@ -2009,7 +2029,8 @@ conditionPutsSelfInto condition zone = case condition of
   _ -> False
 
 -- CR 113.6, asked of one zone and one triggered ability: does it function from
--- there? Three sentences of that rule in precedence order.
+-- there? Three sentences of that rule in precedence order, each read per
+-- condition by `zonesFunctionedIn` above.
 --
 -- CR 113.6m first, because it is the only one that can name a zone the condition
 -- knows nothing about -- Squee, Goblin Nabob's "at the beginning of your upkeep"
@@ -2027,10 +2048,31 @@ conditionPutsSelfInto condition zone = case condition of
 -- an ability whose condition already answers CR 113.6k, and if one did they
 -- would both say graveyard. The order is written down so a future card meets a
 -- decision rather than an accident.
-functionsIn :: Set.Set Subtype.Subtype -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> Zone -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Bool
-functionsIn subtypes delayed zone ability = case zoneFunctionedFrom subtypes delayed ability of
-  Just named -> zone == named
-  Nothing -> Set.member zone (zonesTriggeredFrom (TriggeredAbility.condition ability))
+--
+-- The answer is the CONDITION AS IT FUNCTIONS THERE beside the ability as
+-- printed, or Nothing. CR 113.6k's second sentence cuts an AnyOf down to the
+-- disjuncts that function in the zone, so a disjunct functioning only elsewhere
+-- cannot match from it -- Synthetic Homing Nabob's upkeep half on the
+-- battlefield, where its dies half functions. An AnyOf every disjunct of which
+-- functions here is handed back untouched, and a nested AnyOf is kept or
+-- dropped whole. The ability stays whole because it is what goes on the stack,
+-- and CR 707.9a's "except it has this ability" copies it from there.
+functionsIn :: Set.Set Subtype.Subtype -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card)) -> Zone -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> Maybe (TriggerCondition, TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
+functionsIn subtypes delayed zone ability =
+  let here = Set.member zone . conditionZones subtypes delayed ability
+      condition = TriggeredAbility.condition ability
+   in case condition of
+        TriggerCondition.AnyOf cs@(_ : _) -> case filter here cs of
+          [] -> Nothing
+          kept
+            | length kept == length cs -> Just (condition, ability)
+            | otherwise -> Just (TriggerCondition.AnyOf kept, ability)
+        _ -> if here condition then Just (condition, ability) else Nothing
+
+-- A candidate whose every condition functions where it is offered -- a source
+-- that `functionsIn` does not filter -- paired as `functionsIn` pairs.
+whole :: TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card) -> (TriggerCondition, TriggeredAbility.TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
+whole ability = (TriggeredAbility.condition ability, ability)
 
 -- CR 113.6k, both sentences: "a trigger condition that can't trigger from the
 -- battlefield functions in all zones it can trigger from. OTHER TRIGGER
@@ -2086,7 +2128,7 @@ zonesTriggeredFrom cond =
         -- watches from there: completing a dungeon is a condition a battlefield
         -- permanent could watch perfectly well, so CR 113.6k's exception does not
         -- apply. What puts Dungeon Crawler's ability in the graveyard is CR 113.6m,
-        -- read off its effect by `zoneFunctionedFrom` above -- Squee, Goblin Nabob's
+        -- read off its effect by `zonesFunctionedIn` above -- Squee, Goblin Nabob's
         -- road, proved by Pawl.DungeonSpec's "CR 309.7 completing a dungeon triggers
         -- Dungeon Crawler out of the graveyard".
         TriggerCondition.PlayerCompletesDungeon _ -> battlefield
@@ -2136,9 +2178,8 @@ zonesTriggeredFrom cond =
         -- producer -- battlefield for "when this creature enters", exile for "or the
         -- creature it haunts dies" -- and it is the rule's own example.
         --
-        -- Offering the ability in both zones cannot double-fire it: `matchesTrigger`
-        -- still has to admit the bearer, and the two conditions are about different ids
-        -- in different zones, so at most one of them matches any event.
+        -- Offering the ability in both zones cannot double-fire it: `functionsIn`
+        -- hands each zone's scan only the conditions that function there.
         --
         -- The empty list falls to CR 113.6's default rather than to the empty union,
         -- which would say the ability functions nowhere. No card writes one.
@@ -2177,7 +2218,7 @@ zonesTriggeredFrom cond =
         -- leaves an Equipment standing on it, so the bearer watches from there, and CR
         -- 113.6k's exception -- for a condition that cannot trigger from the
         -- battlefield at all -- does not apply. What DOES apply is CR 113.6m's Aura
-        -- clause, read by zoneFunctionedFrom above, which is why this arm is reached
+        -- clause, read by zonesFunctionedIn above, which is why this arm is reached
         -- for Screams from Within and Skullclamp but not for Synthetic Widowed Blade.
         TriggerCondition.AttachedCreatureDies -> battlefield
         -- The same default for the same reason, and more plainly: an Aura enchanting a

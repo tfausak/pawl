@@ -3,7 +3,7 @@
 -- readings that rule defines fold this over an ability's effects, one per kind
 -- of ability: Pawl.Engine.Activatable.zoneFunctionedFrom takes the cost half
 -- (Pawl.Engine.Cost.zoneFunctionedFrom) alongside it, and
--- Pawl.Engine.Event.Trigger.zoneFunctionedFrom has no cost half to take.
+-- Pawl.Engine.Event.Trigger.zonesFunctionedIn has no cost half to take.
 --
 -- Here rather than in Pawl.Engine.Cost because it is a classification of an
 -- EFFECT and that module's whole contract is to be the sole casing home for a
@@ -57,7 +57,7 @@ import Pawl.Types.Zone (Zone)
 -- gives one card two names: a bearer whose own departure is what triggered the
 -- ability is read as CR 113.7's source for its characteristics and as CR
 -- 400.7e's `became` for anything done TO it, and only the caller knows which of
--- those is the same card here. Pawl.Engine.Event.Trigger.zoneFunctionedFrom is
+-- those is the same card here. Pawl.Engine.Event.Trigger.zonesFunctionedIn is
 -- what decides, off the condition; Pawl.Engine.Activatable.zoneFunctionedFrom
 -- passes the source slot alone, an activation binding no event slot.
 --

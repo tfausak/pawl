@@ -1789,20 +1789,21 @@ areOpponents gs = Teams.areOpponents (teams gs)
 -- within that many seats of them, counted either way round the table? Always
 -- for yourself, and always under an unlimited range (CR 801.1).
 --
--- Seats are counted over the players still in the game, so a departed seat
--- closes up. Not implemented: CR 801.2c fixes who is in range as each turn
--- begins, so a seat emptied mid-turn should close only when the next turn
--- begins; this closes it at once (#3995).
+-- CR 801.2c: seats are counted over the players in the game as this turn
+-- began, so a seat emptied mid-turn closes up only when the next turn begins
+-- (GameState.departedThisTurn). A departed player is in nobody's range.
 inRangeOf :: PlayerId -> PlayerId -> GameState -> Bool
 inRangeOf you candidate gs =
   candidate == you || case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
     Nothing -> True
     Just range ->
-      let seats = stillPlayingInOrder gs
+      let playing = stillPlaying gs
+          seats = filter (\pid -> List.elem pid playing || Set.member pid (GameState.departedThisTurn gs)) (GameState.turnOrder gs)
        in case (List.elemIndex you seats, List.elemIndex candidate seats) of
-            (Just mine, Just theirs) ->
-              let apart = abs (mine - theirs)
-               in toInteger (min apart (length seats - apart)) <= toInteger range
+            (Just mine, Just theirs)
+              | List.elem you playing && List.elem candidate playing ->
+                  let apart = abs (mine - theirs)
+                   in toInteger (min apart (length seats - apart)) <= toInteger range
             _ -> False
 
 -- CR 102.3 with CR 104.2a: this player's opponents who are still in the game, in
