@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Subtype as Subtype
@@ -64,4 +65,11 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       Affected.codec
       (Affected.AttachedPlayerControls (Filter.HasCardType CardType.Creature))
       " {\"type\":\"AttachedPlayerControls\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 611.3d: Serra Paragon's rider, which states no duration.
+  Spec.it s "PlayedThisWay" $
+    Common.assertCodec
+      s
+      Affected.codec
+      (Affected.PlayedThisWay Duration.Indefinite)
+      " {\"type\":\"PlayedThisWay\",\"value\":{\"type\":\"Indefinite\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Affected.codec

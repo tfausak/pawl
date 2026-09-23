@@ -36,6 +36,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -280,9 +281,10 @@ data GameState = MkGameState
     -- identically worded twin is the caveat Object.activatedOnce's haddock states
     -- about the same key.
     activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
-    -- | CR 601.3: which once-each-turn cast permissions have been used this
-    -- turn, read by PermissionLimit.OnceEachTurn alone; cleared at turn handoff,
-    -- which is the whole of "each turn". Keyed by the object granting the
+    -- | CR 601.3: which once-each-turn permissions have been used this turn, by
+    -- a cast or (a Play-verb one) a land play, read only for a budgeted
+    -- PermissionLimit; cleared at turn handoff, which is the whole of "each
+    -- turn". Keyed by the object granting the
     -- permission and then by the permission itself, so two copies of one
     -- enchantment grant two budgets and one permanent printing two permissions
     -- spends them separately -- the grain activatedThisTurn above uses for CR
@@ -292,9 +294,14 @@ data GameState = MkGameState
     -- The permission BY VALUE, so a CR 612.1 word swap that changed this
     -- permission's own filter mid-turn would leave a spent budget unfound --
     -- the caveat activatedThisTurn's key carries too. No text change reaches
-    -- one: Pawl.Engine.Projection.Rewrite swaps subtype words, and the pool's
-    -- one budgeted permission narrows by card type.
+    -- one: Pawl.Engine.Projection.Rewrite swaps subtype words, and no budgeted
+    -- permission in data/cards/ names a subtype.
     castPermissionsUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set CastFromZone.CastFromZone),
+    -- | CR 706.2: which budgeted die-roll modifiers have been taken this turn,
+    -- read by a Pawl.Types.ModifiedRoll whose limit is
+    -- PermissionLimit.OnceEachTurn (Night Shift of the Living Dead); cleared at
+    -- turn handoff. Keyed as castPermissionsUsedThisTurn above and for its reason.
+    rollModifiersUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set ModifiedRoll.ModifiedRoll),
     -- | The printed rider "This ability triggers only once"
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
     -- ability carrying that rider, as the same record CR 603.3b's log carries.

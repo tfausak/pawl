@@ -19,6 +19,12 @@ spec s = Spec.describe s "Pawl.Codec.PermissionLimit" $ do
       PermissionLimit.codec
       PermissionLimit.OnceEachTurn
       " {\"type\":\"OnceEachTurn\"} "
+  Spec.it s "OnceEachOfYourTurns" $
+    Common.assertCodec
+      s
+      PermissionLimit.codec
+      PermissionLimit.OnceEachOfYourTurns
+      " {\"type\":\"OnceEachOfYourTurns\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives the
   -- arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

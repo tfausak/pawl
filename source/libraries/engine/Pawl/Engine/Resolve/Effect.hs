@@ -159,6 +159,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Draw as Draw
@@ -286,6 +287,7 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
@@ -3523,14 +3525,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- after -- a d20 answered 20 with a modifier of 5 is a result of 25, past the
   -- die's own top face. CR 107.1b for a sum a negative modifier drove below zero.
   --
-  -- CR 706.2b's first step IS implemented, in `rerolling` below: a source other
-  -- than this instruction may offer the roller a fresh throw of the same die.
-  --
-  -- Not implemented: a modifier reaching this roll from a source other than its
-  -- own instruction that INCREASES or DECREASES the result (#3974), and a
-  -- binding for the natural result beside CR 706.2b's ordering among competing
-  -- modifiers (#3976); with rule 706.2b's second bucket empty there is nothing
-  -- to order.
+  -- CR 706.2b's two steps are taken in the rule's order: `rerolling` below,
+  -- per die on its natural result, and then `adjusting`, once every die is up.
   --
   -- CR 706.1's roll is also the event TriggerCondition.PlayerRollsDice watches
   -- (Feywild Trickster). Recorded under `controller`, not `source`: rule 706.1's
@@ -3606,11 +3602,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- also the roller, and Wall of Fortune's, who need not be. The ROLLER
         -- where the carrier names no object, which CR 611.2a's stored form would
         -- be and no printing of this family is.
-        offerOf gs (stated, offer) =
-          ( Maybe.fromMaybe controller (stated >>= \oid -> Projection.controllerOf oid gs),
-            stated,
-            ModifiedRoll.cost offer
-          )
+        offerOf gs (stated, offer) = (payerOf gs stated, stated, offer)
+        payerOf gs stated = Maybe.fromMaybe controller (stated >>= \oid -> Projection.controllerOf oid gs)
         -- Two FREE offers to the same player are the same question asked twice:
         -- the answers are indistinguishable, and either accepted throws the same
         -- die. So two Clam-I-Ams ask once. Where CR 706.2a's cost is stated the
@@ -3618,8 +3611,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- against, are things the payer can tell apart -- so each is asked.
         distinct seen candidates = case candidates of
           [] -> []
-          candidate@(payer, _, mCost) : rest
-            | Maybe.isJust mCost -> candidate : distinct seen rest
+          candidate@(payer, _, offer) : rest
+            | Maybe.isJust (ModifiedRoll.cost offer) -> candidate : distinct seen rest
             | Set.member payer seen -> distinct seen rest
             | otherwise -> candidate : distinct (Set.insert payer seen) rest
         -- Not implemented: CR 706.2b's pick among COMPETING modifiers, which is
@@ -3627,34 +3620,80 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- timestamp order instead, and the first taken is the one applied.
         offering offers natural = case offers of
           [] -> pure natural
-          (payer, stated, mCost) : rest -> do
+          (payer, stated, offer) : rest -> do
             gs <- State.get
-            -- CR 118.3, Prompt.ChooseToPay's posture for CR 118.12: a cost the
-            -- payer has not the resources to pay fully is not offered. A stated
-            -- cost with no object behind it cannot be paid at all -- every
-            -- component is paid against the permanent that printed it -- and is
-            -- skipped for that reason.
-            let payable = case (stated, mCost) of
-                  (_, Nothing) -> True
-                  (Just oid, Just cost) -> Cost.canPay PaymentSubject.ForNeither payer oid cost gs
-                  (Nothing, Just _) -> False
-            if not payable
+            let mCost = ModifiedRoll.cost offer
+            if not (payable gs payer stated mCost)
               then offering rest natural
               else do
                 answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor payer gs) payer natural mCost)
                 case answer of
                   OptionalDecision.Declines -> offering rest natural
                   OptionalDecision.Exercises -> do
-                    paid <- case (stated, mCost) of
-                      (Just oid, Just cost) -> payForReroll payer oid cost
-                      _ -> pure True
+                    paid <- payModifier payer stated mCost
                     if not paid
                       then offering rest natural
                       else do
                         again <- Game.ask (Prompt.RollDie sides)
                         rerolling (faceOf again)
-        -- CR 706.2a's cost, charged between the offer and the second throw: a
-        -- declined or failed payment leaves the natural result standing.
+        -- CR 118.3, Prompt.ChooseToPay's posture for CR 118.12: a cost the
+        -- payer has not the resources to pay fully is not offered. A stated
+        -- cost with no object behind it cannot be paid at all -- every
+        -- component is paid against the permanent that printed it -- and is
+        -- skipped for that reason.
+        payable gs payer stated mCost = case (stated, mCost) of
+          (_, Nothing) -> True
+          (Just oid, Just cost) -> Cost.canPay PaymentSubject.ForNeither payer oid cost gs
+          (Nothing, Just _) -> False
+        payModifier payer stated mCost = case (stated, mCost) of
+          (Just oid, Just cost) -> payForModifier payer oid cost
+          _ -> pure True
+        -- CR 706.2b's SECOND step, once every die is up and every reroll done:
+        -- a source other than this instruction offers to move one result up or
+        -- down (Night Shift of the Living Dead). After the rerolls, which is
+        -- the rule's order, so a result an adjustment moved onto Clam-I-Am's 3
+        -- is never offered a reroll. Every result is shown before the choice,
+        -- the printed ruling's reading of "after you roll a die", and the answer
+        -- names the die.
+        --
+        -- Each offer is asked AT MOST ONCE per instruction: a modifier applies
+        -- to a roll once, so the list is not re-read after one is taken. The
+        -- budget and the cost are re-read before each question.
+        --
+        -- Not implemented: CR 706.2b's pick among competing modifiers, which is
+        -- the ROLLER's (#3976); the offers go to their payers in timestamp
+        -- order, as `offering`'s do.
+        adjusting results = do
+          modifiers <- Dice.modifiersFor controller
+          adjustingThrough (Dice.adjustOffers sides modifiers) results
+        adjustingThrough offers results = case (offers, NonEmpty.nonEmpty results) of
+          ([], _) -> pure results
+          (_, Nothing) -> pure results
+          ((stated, offer, amount) : rest, Just shown) -> do
+            gs <- State.get
+            let payer = payerOf gs stated
+                mCost = ModifiedRoll.cost offer
+            if not (Dice.withinLimit gs payer stated offer && payable gs payer stated mCost)
+              then adjustingThrough rest results
+              else do
+                answer <- Game.choose (Prompt.AdjustDieRoll (Decide.deciderFor payer gs) payer shown amount mCost)
+                case answer of
+                  Nothing -> adjustingThrough rest results
+                  Just (index, direction) -> do
+                    paid <- payModifier payer stated mCost
+                    if not paid
+                      then adjustingThrough rest results
+                      else do
+                        State.modify' (Dice.spendLimit stated offer)
+                        -- FILTERED, NOT TRUSTED: an index past the end shifts
+                        -- the first die.
+                        let at = if index < List.genericLength results then index else 0
+                            shift n = case direction of
+                              RollAdjustment.Increase -> n + toInteger amount
+                              RollAdjustment.Decrease -> n - toInteger amount
+                        adjustingThrough rest (zipWith (\i n -> if i == at then shift n else n) [0 :: Natural ..] results)
+        -- CR 706.2a's cost, charged between the offer and the modifier's
+        -- application: a declined or failed payment leaves the number standing.
         --
         -- DuringResolution, payGatePaidBy's moment and for its reason -- the
         -- roll is CR 609.1's effect being followed -- so the payment is CR
@@ -3680,7 +3719,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- The bound slots are dropped, payGatePaidBy's elision and its reason:
         -- a permanent this payment tapped cannot be read by a later clause of
         -- the same resolution (#1872).
-        payForReroll payer oid cost = do
+        payForModifier payer oid cost = do
           (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer oid pure cost
           began <- State.get
           outcome <- Cost.pay performManaAbility (Just began) PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
@@ -3702,7 +3741,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               modifier = case RollDie.modifier rollDie of
                 Nothing -> 0
                 Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
-          pure (Integer.toNaturalSaturating (toInteger natural + modifier))
+          -- Left unclamped: CR 706.2's result is the number after EVERY
+          -- modifier, so a shift from another source applies to this sum as it
+          -- stands, negative or not, and only the final figure is clamped below.
+          pure (toInteger natural + modifier)
     -- CR 614.1a over CR 706.1: the instruction's count is offered to the
     -- replacement effects watching this roller's rolls (Pixie Guide) before the
     -- first die is thrown, and what comes back is how many dice to throw and how
@@ -3713,7 +3755,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- runs on the results and not on the count -- and could not run any earlier
     -- in any case, the lowest roll not being known until every die has come up.
     thrown <- traverse (const rollOne) [1 .. dice]
-    let results = Dice.ignoreLowest ignored thrown
+    -- CR 706.6 before the second step: an ignored roll is one "no effects apply
+    -- to", so it is not offered for an adjustment.
+    --
+    -- CR 107.1b once, on the final figure, after every modifier: The Deck of
+    -- Many Things' natural 3, four cards in hand and a shift up is a 0, not a 1
+    -- (Pawl.DiceSpec's "CR 706.2 a shift applies to the unclamped sum").
+    results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (Dice.ignoreLowest ignored thrown))
     Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
       gs <- State.get
       -- CR 706.4: WHICH result the instruction uses, where it threw more than
@@ -3741,6 +3789,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [rest] -> State.modify' (bindAmountSlot source other rest)
           _ -> pure ()
       State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+      -- CR 706.2's final number, one entry per die the instruction kept, for
+      -- "whenever you roll a 6" -- after every modifier, and never for an
+      -- ignored roll (CR 706.6).
+      Foldable.for_ results $ \result ->
+        State.modify' (Event.recordEvent (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = controller, DieResult.result = result}))
   -- CR 705.1's flip, in RollDie's holder and for its reason: bindAmountSlot's
   -- `source` is the resolving object, and on a SPELL -- which Winter Sky is --
   -- `source` and `resolving` are the same object, so the ambiguity the arm above

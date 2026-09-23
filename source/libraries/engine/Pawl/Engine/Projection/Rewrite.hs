@@ -306,9 +306,11 @@ rewriteAffected pairs a = case a of
   Affected.MatchingAnywhere f -> Affected.MatchingAnywhere (Filter.rewrite pairs f)
   Affected.MatchingOffBattlefield f -> Affected.MatchingOffBattlefield (Filter.rewrite pairs f)
   Affected.AttachedPlayerControls f -> Affected.AttachedPlayerControls (Filter.rewrite pairs f)
-  -- A frozen id set names no word (CR 611.2c), and an attachment names none.
+  -- A frozen id set names no word (CR 611.2c), and an attachment or a rider
+  -- names none.
   Affected.TheseObjects _ -> a
   Affected.Attached -> a
+  Affected.PlayedThisWay _ -> a
 
 -- CR 612.1's subtype word swap over a PlayerEffect, rewriteModification's sibling
 -- for the CR 613.10/613.11 axis. An Artificial Evolution resolved at an
@@ -1676,6 +1678,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
+  TriggerCondition.PlayerRollsResult _ -> condition
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
   TriggerCondition.PlayerLosesCoinFlip _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition

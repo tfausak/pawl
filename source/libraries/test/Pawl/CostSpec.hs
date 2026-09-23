@@ -1200,6 +1200,59 @@ fireblastSpec s registry =
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 1 True
       Spec.assertBool s (not (S.castable S.alice fireblast gs)) "not castable"
 
+-- Phyrexian Tribute {2}{B} Sorcery: "As an additional cost to cast this spell,
+-- sacrifice two creatures. Destroy target artifact." Gush {4}{U} Instant: "You
+-- may return two Islands you control to their owner's hand rather than pay this
+-- spell's mana cost. Draw two cards." Both checked against Scryfall 2026-09-22;
+-- neither has rulings.
+--
+-- One cost component moving several permanents is one event, the way delve's
+-- exiles are (Rakshasa Vizier's ruling), so a "one or more" trigger fires once
+-- for the lot. Vengeful Townsfolk reads the sacrifices; Synthetic Return Ledger
+-- reads the returns, since Tameshi, Reality Architect's once-each-turn rider
+-- hides the difference (Pawl.LeavesTriggerSpec's permanentsReturnedToHandSpec).
+costBatchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+costBatchSpec s registry =
+  let mainPhase gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+      resolveAll g = if null (GameState.stack g) then g else resolveAll (S.runPure S.identityAnswer g Stack.resolveTop)
+   in Spec.describe s "a cost moving several permanents" $ do
+        Spec.it s "CR 601.2h Phyrexian Tribute's two sacrifices grow Vengeful Townsfolk once" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          townsfolk <- S.printingOf s registry "Vengeful Townsfolk"
+          solRing <- S.printingOf s registry "Sol Ring"
+          tribute <- S.printingOf s registry "Phyrexian Tribute"
+          let (townsfolkId, g0) = S.addPermanent townsfolk S.alice (S.landsInPlay swamp 3)
+              (piker1, g1) = S.addPermanent piker S.alice g0
+              (piker2, g2) = S.addPermanent piker S.alice g1
+              (_, g3) = S.addPermanent solRing S.bob g2
+              (tributeId, gs) = S.addHandCard tribute S.alice (mainPhase g3)
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseSacrifices {} -> Set.fromList [piker1, piker2]
+                _ -> S.identityAnswer p
+              cast = S.runPure answer gs (S.cast S.alice tributeId)
+              placed = S.runPure answer cast Engine.settleForPriority
+              after = resolveAll placed
+          Spec.assertEqWith s "CR 603.2c one trigger, one counter: the Townsfolk is a 4/4, not the 5/5 two events would leave" (Projection.powerOf townsfolkId after, Projection.toughnessOf townsfolkId after) (Just 4, Just 4)
+          -- The proxies, AFTER the assertion above.
+          Spec.assertEqWith s "one trigger above the Tribute" (length (GameState.stack placed)) 2
+          Spec.assertEqWith s "and only the Townsfolk is left" (S.creaturesInPlay S.alice after) 1
+        Spec.it s "CR 601.2h Gush's two returned Islands draw once for Synthetic Return Ledger" $ do
+          island <- S.printingOf s registry "Island"
+          ledger <- S.printingOf s registry "Synthetic Return Ledger"
+          gush <- S.printingOf s registry "Gush"
+          let (_, g0) = S.addPermanent ledger S.alice (S.landsInPlay island 2)
+              stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) g0 [1 .. 4 :: Int]
+              (gushId, gs) = S.addHandCard gush S.alice (mainPhase stocked)
+              cast = S.runPure S.identityAnswer gs (S.cast S.alice gushId)
+              placed = S.runPure S.identityAnswer cast Engine.settleForPriority
+              after = resolveAll placed
+          Spec.assertEqWith s "CR 603.2c two Islands, Gush's two draws and ONE from the Ledger, not the six two events would leave" (S.handSize S.alice after) 5
+          -- The proxies, AFTER the assertion above.
+          Spec.assertEqWith s "one trigger above Gush" (length (GameState.stack placed)) 2
+          Spec.assertEqWith s "and no Island is left in play" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
+
 -- alice controls one untapped Swamp -- the {B} half of Asmoranomardicadaistinaculdacar's
 -- {B/R} -- and holds the card itself plus a Circling Vultures, with priority in
 -- her own precombat main phase and an empty stack, which is where CR 302.1 lets a
@@ -2758,6 +2811,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   magmaticInsightSpec s registry
   safeholdSentrySpec s registry
   fireblastSpec s registry
+  costBatchSpec s registry
   asmorSpec s registry
   asmorFoodSpec s registry
   crossCheckSpec s registry

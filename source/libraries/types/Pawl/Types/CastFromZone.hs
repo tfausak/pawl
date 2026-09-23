@@ -4,6 +4,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 
 -- | The payload of Pawl.Types.PlayerEffect's CastFrom arm: whose copy of which
 -- zone the permission opens, which cards in it it covers, and how often it may
@@ -24,10 +25,12 @@ import qualified Pawl.Types.PermissionLimit as PermissionLimit
 -- The LIMIT is the permission's own, which is what makes the whole record the
 -- key Pawl.Types.GameState.castPermissionsUsedThisTurn spends: two Assemble the
 -- Players grant two budgets, and the source object beside this value is what
--- tells them apart.
+-- tells them apart. The VERB rides in the same key, so a Play permission's one
+-- budget is spent by a land play or a cast alike (Serra Paragon).
 data CastFromZone = MkCastFromZone
   { from :: InZone.InZone,
     matching :: Filter.Filter Keyword.Keyword,
-    limit :: PermissionLimit.PermissionLimit
+    limit :: PermissionLimit.PermissionLimit,
+    verb :: PermissionVerb.PermissionVerb
   }
   deriving (Eq, Ord, Show)

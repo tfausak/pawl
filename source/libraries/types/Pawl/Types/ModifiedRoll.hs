@@ -3,6 +3,7 @@ module Pawl.Types.ModifiedRoll where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.RollModifier as RollModifier
 
 -- | The payload of Pawl.Types.PlayerEffect's ModifyDieRoll arm (CR 706.2's third
@@ -25,7 +26,8 @@ import qualified Pawl.Types.RollModifier as RollModifier
 -- `natural` is the number the modifier states the die came up, and Nothing
 -- states none: Clam-I-Am's "if you roll a 3". CR 706.2b is what makes reading
 -- the NATURAL result right -- rerolls are considered before any increase or
--- decrease, so nothing has moved the number when this is asked.
+-- decrease, so nothing has moved the number when this is asked. Read by a
+-- Reroll alone; no increase-or-decrease printing states one.
 --
 -- An exact number rather than a Pawl.Types.Comparison, because that is what the
 -- one printing says; a card gating on a range would widen this field rather than
@@ -36,6 +38,11 @@ import qualified Pawl.Types.RollModifier as RollModifier
 -- you control to". Paid by the player the MODIFIER's carrier names as "you" (CR
 -- 109.5), who is not always the roller: Wall of Fortune's scope is every player
 -- and its "you" is the Wall's controller.
+--
+-- `limit` is the printed budget on taking the modifier at all, Night Shift of
+-- the Living Dead's "Do this only once each turn", spent only when it is taken;
+-- Unlimited where the card states none. Read by an IncreaseOrDecrease alone: no
+-- reroll printing states a budget.
 --
 -- Not implemented: a modifier that is MANDATORY (#3981). CR 706.2a allows one
 -- and no printing states one: Scryfall @o:reroll@, 2026-09-22, returns seven
@@ -59,6 +66,7 @@ data ModifiedRoll = MkModifiedRoll
   { sides :: Maybe Natural.Natural,
     natural :: Maybe Natural.Natural,
     modifier :: RollModifier.RollModifier,
-    cost :: Maybe (Cost.Cost Keyword.Keyword)
+    cost :: Maybe (Cost.Cost Keyword.Keyword),
+    limit :: PermissionLimit.PermissionLimit
   }
   deriving (Eq, Ord, Show)

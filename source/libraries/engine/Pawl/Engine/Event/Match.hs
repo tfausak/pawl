@@ -54,6 +54,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
@@ -253,6 +254,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -376,6 +378,7 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.DungeonCompleted _ -> False
   GameEvent.Surveiled _ -> False
   GameEvent.DiceRolled _ -> False
+  GameEvent.DieResultSettled _ -> False
   GameEvent.ClassLevelSet _ -> False
   GameEvent.Plotted _ -> False
   GameEvent.Explored _ -> False
@@ -457,6 +460,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -553,6 +557,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -627,6 +632,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -713,6 +719,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -795,6 +802,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -878,6 +886,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -959,6 +968,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1048,6 +1058,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1143,6 +1154,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1235,6 +1247,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1314,6 +1327,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1392,6 +1406,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1479,6 +1494,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1563,6 +1579,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1647,6 +1664,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1730,6 +1748,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1814,6 +1833,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -1910,6 +1930,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2004,6 +2025,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2089,6 +2111,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2173,6 +2196,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2253,6 +2277,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2367,6 +2392,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2475,6 +2501,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2549,6 +2576,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2634,6 +2662,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2740,6 +2769,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2829,6 +2859,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2921,6 +2952,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -2992,6 +3024,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -3091,6 +3124,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -3169,6 +3203,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -3263,6 +3298,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -3344,6 +3380,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -3436,6 +3473,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -3523,6 +3561,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -3671,6 +3710,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.DiceRolled _ -> False
+          GameEvent.DieResultSettled _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
@@ -3814,6 +3854,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.DiceRolled _ -> False
+          GameEvent.DieResultSettled _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
@@ -3893,6 +3934,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -3972,6 +4014,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4057,6 +4100,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4150,6 +4194,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4267,6 +4312,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.DiceRolled _ -> False
+          GameEvent.DieResultSettled _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
@@ -4348,6 +4394,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4443,6 +4490,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4575,6 +4623,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4675,6 +4724,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4733,6 +4783,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4834,6 +4885,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -4932,6 +4984,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -5010,6 +5063,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -5091,6 +5145,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -5137,6 +5192,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -5223,6 +5279,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.DiceRolled _ -> False
+          GameEvent.DieResultSettled _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
@@ -5319,6 +5376,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.DiceRolled _ -> False
+          GameEvent.DieResultSettled _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
@@ -5445,6 +5503,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -5502,6 +5561,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.DungeonCompleted _ -> False
           GameEvent.Surveiled _ -> False
           GameEvent.DiceRolled _ -> False
+          GameEvent.DieResultSettled _ -> False
           GameEvent.ClassLevelSet _ -> False
           GameEvent.Plotted _ -> False
           GameEvent.Explored _ -> False
@@ -5633,6 +5693,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -5715,6 +5776,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -5819,6 +5881,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -5917,6 +5980,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6009,6 +6073,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6101,6 +6166,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6162,6 +6228,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6252,6 +6319,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
     GameEvent.Connived _ -> False
@@ -6370,6 +6438,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6497,6 +6566,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6597,6 +6667,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6641,6 +6712,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6730,6 +6802,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6832,6 +6905,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -6928,6 +7002,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7010,6 +7085,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7094,6 +7170,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7211,6 +7288,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7311,6 +7389,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7385,6 +7464,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7463,6 +7543,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7536,6 +7617,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7620,6 +7702,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7692,6 +7775,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7770,6 +7854,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7857,6 +7942,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -7934,6 +8020,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8009,6 +8096,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8098,6 +8186,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8194,6 +8283,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8315,6 +8405,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8389,6 +8480,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8466,6 +8558,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8581,6 +8674,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8658,6 +8752,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8734,6 +8829,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted completer -> PlayerRelation.holds (Game.teams gs) relation you completer
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8806,6 +8902,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled surveiller -> PlayerRelation.holds (Game.teams gs) relation you surveiller
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8889,6 +8986,82 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled roller -> PlayerRelation.holds (Game.teams gs) relation you roller
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 706.2: one die's RESULT, after every modifier, was the stated number,
+  -- the roller read against CR 109.5's "you" as PlayerRollsDice above does.
+  -- Per die rather than per instruction, since each die is its own roll.
+  TriggerCondition.PlayerRollsResult watched -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled settled ->
+      DieResult.result settled == DieResult.result watched
+        && PlayerRelation.holds (Game.teams gs) (DieResult.roller watched) you (DieResult.roller settled)
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -8966,6 +9139,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9043,6 +9217,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9120,6 +9295,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted plotted -> plotted == bearer
     GameEvent.Explored _ -> False
@@ -9201,6 +9377,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored explorer -> case Projection.viewWithLastKnown explorer gs explorer of
@@ -9280,6 +9457,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9356,6 +9534,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9446,6 +9625,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9535,6 +9715,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9619,6 +9800,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9697,6 +9879,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9774,6 +9957,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9852,6 +10036,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -9928,6 +10113,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False

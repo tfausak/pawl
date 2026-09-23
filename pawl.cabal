@@ -414,6 +414,7 @@ library codec
     Pawl.Codec.DevourCount
     Pawl.Codec.DevourCountSpec
     Pawl.Codec.DevourSpec
+    Pawl.Codec.DieResult
     Pawl.Codec.DieRollR
     Pawl.Codec.DieRollRewrite
     Pawl.Codec.DieRollRewriteSpec
@@ -754,6 +755,8 @@ library codec
     Pawl.Codec.PermanentWasSacrificedSpec
     Pawl.Codec.PermissionLimit
     Pawl.Codec.PermissionLimitSpec
+    Pawl.Codec.PermissionVerb
+    Pawl.Codec.PermissionVerbSpec
     Pawl.Codec.Phase
     Pawl.Codec.PhasedOut
     Pawl.Codec.PhasedOutSpec
@@ -1799,6 +1802,7 @@ library types
     Pawl.Types.Devour
     Pawl.Types.DevourCount
     Pawl.Types.DiceRoll
+    Pawl.Types.DieResult
     Pawl.Types.DieRollR
     Pawl.Types.DieRollRewrite
     Pawl.Types.Discard
@@ -1994,6 +1998,7 @@ library types
     Pawl.Types.PermanentTappedForMana
     Pawl.Types.PermanentWasSacrificed
     Pawl.Types.PermissionLimit
+    Pawl.Types.PermissionVerb
     Pawl.Types.Phase
     Pawl.Types.PhasedOut
     Pawl.Types.PhasePattern
@@ -2071,6 +2076,7 @@ library types
     Pawl.Types.Reveal
     Pawl.Types.RevealCause
     Pawl.Types.Revealed
+    Pawl.Types.RollAdjustment
     Pawl.Types.RollDie
     Pawl.Types.RollModifier
     Pawl.Types.RoomIndex
