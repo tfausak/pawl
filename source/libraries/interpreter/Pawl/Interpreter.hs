@@ -121,8 +121,8 @@ policingCardNames registry answer asked = case Asked.prompt asked of
 -- interpreter holds; every other prompt goes to the answerer beneath. Installed
 -- beside policingCardNames, whose registry it shares.
 --
--- Pawl.CastProhibitionSpec's Spy Kit boards, where Runed Halo names a card in
--- no zone, are what prove it.
+-- Pawl.CastProhibitionSpec's Spy Kit case, where Runed Halo names a card in
+-- no zone, is what proves it.
 lookingUpCards ::
   Registry.Registry m ->
   (forall r. Asked.Asked r -> m r) ->
