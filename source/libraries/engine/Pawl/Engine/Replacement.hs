@@ -1266,11 +1266,10 @@ matchesController gs src rel oid = relationHolds gs src (Projection.controllerOf
 -- every object that leaves a zone, and Pawl.Engine.Departure for every object of
 -- a departing player.
 --
--- Not implemented: CR 702.16k's damage clause read through CR 108.4's owner
--- fallback, which the last-known view above defeats -- it keeps the controller
--- the source had before it left, so a departed source is judged as one the
--- player who last controlled it controls rather than as one nobody controls
--- (#3202).
+-- Control rides the same view: CR 702.16k judges a departed source by the
+-- controller it last had (CR 113.7a), not by CR 108.4a's owner fallback for the
+-- card it left behind. Proved by Pawl.DamageSpec's "a stolen Fire-Eater sacrificed at a
+-- Nemesis naming its owner still deals its damage".
 matchesDamageSource :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> DamageEvent.DamageEvent -> Bool
 matchesDamageSource gs context filter_ de =
   let oid = DamageEvent.source de
