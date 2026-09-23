@@ -1,6 +1,7 @@
 module Pawl.Types.Affected where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -104,4 +105,6 @@ data Affected
     -- player controls" narrows by card type, where CR 303.4m's phrase names only
     -- whose permanents they are.
     AttachedPlayerControls (Filter.Filter Keyword.Keyword)
+  | -- | CR 611.3d: the card the source's own permission was used for, for this long (Serra Paragon).
+    PlayedThisWay Duration.Duration
   deriving (Eq, Ord, Show)

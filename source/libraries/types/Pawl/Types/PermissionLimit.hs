@@ -19,10 +19,6 @@ module Pawl.Types.PermissionLimit where
 -- budget of two would want a card to state it -- Scryfall
 -- @o:"twice each turn" o:cast@, 2026-09-20, one hit, and it budgets loyalty
 -- abilities rather than a cast (Urza, Planeswalker).
---
--- Not implemented: a budget scoped to a subset of turns. Johann's "once each
--- turn" and Serra Paragon's "once during each of your turns" differ in whose
--- turns they admit, and no arm here carries a Pawl.Types.TurnScope (#3589).
 data PermissionLimit
   = -- | No printed budget: the permission applies whenever it otherwise would
     -- (Future Sight, Garruk's Horde, Yawgmoth's Will).
@@ -33,4 +29,6 @@ data PermissionLimit
     -- object granting the permission for CR 602.5b's reason its activation-side
     -- twin is: the budget is the ability's and survives a change of control.
     OnceEachTurn
+  | -- | "Once during each of your turns" (Serra Paragon): OnceEachTurn, and only on your own turns.
+    OnceEachOfYourTurns
   deriving (Bounded, Enum, Eq, Ord, Show)

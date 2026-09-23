@@ -39,6 +39,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Convoking as Convoking
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
@@ -2116,6 +2117,10 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- announcement consumes nothing. Nothing where the zone was open
           -- without a budget, which castPermissionSpentBy answers.
           permission = castFrom >>= \zone -> PlayerEffect.castPermissionSpentBy pid zone oid proposed
+          -- CR 400.7h / 611.3d: what the permission this cast is made under
+          -- gives the spell it becomes, asked of the same PROPOSED state -- the
+          -- board that source was offering it on.
+          riders spell = concatMap (\src -> Event.permissionRiders src proposed spell) (foldMap (\zone -> PlayerEffect.castPermissionSources pid zone oid proposed) castFrom)
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -2158,7 +2163,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
-          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permission before
+          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permission (riders sid) before
 
 -- CR 400.7h: "if an effect allows a nonland card to be cast, other parts of that
 -- effect can find the new object that card becomes after it moves to the stack as
@@ -2208,9 +2213,11 @@ followIntoSpell permission old new gs = case permission of
 -- rule's own words are "at the time the spell becomes cast".
 --
 -- `permission` is CR 601.3's once-each-turn budget the cast spends, asked of the
--- pre-move state for `spent`'s reason and spent beside it.
-castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> Maybe (ObjectId, CastFromZone.CastFromZone) -> GameState -> Game ()
-castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permission before = do
+-- pre-move state for `spent`'s reason and spent beside it, and `riders` is what
+-- the permissions the cast is made under give the spell (CR 611.3d), asked there
+-- too and stored beside it.
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card] -> GameState -> Game ()
+castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permission riders before = do
   gs <- State.get
   let candidates = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate)) candidateCosts
       decider = Decide.deciderFor pid gs
@@ -2867,6 +2874,11 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                                         )
                                     )
                             )
+                          -- CR 601.2i / 611.3d: the permission's rider is an
+                          -- effect that modifies the spell as it is cast, so it
+                          -- is stored before the event below snapshots the spell.
+                          -- Nothing past the convoke record rejects.
+                          State.modify' (\g -> g {GameState.continuousEffects = riders <> GameState.continuousEffects g})
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement
                           -- records nothing.
