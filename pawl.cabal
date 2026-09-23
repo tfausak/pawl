@@ -608,6 +608,8 @@ library codec
     Pawl.Codec.LoggedEventSpec
     Pawl.Codec.LookAt
     Pawl.Codec.LookAtSpec
+    Pawl.Codec.LoopMembers
+    Pawl.Codec.LoopMembersSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltyKind
     Pawl.Codec.LoyaltyKindSpec
@@ -1912,6 +1914,7 @@ library types
     Pawl.Types.LimitUnless
     Pawl.Types.LoggedEvent
     Pawl.Types.LookAt
+    Pawl.Types.LoopMembers
     Pawl.Types.Loyalty
     Pawl.Types.LoyaltyKind
     Pawl.Types.MakeForetold
