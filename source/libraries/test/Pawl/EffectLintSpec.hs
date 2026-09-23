@@ -228,6 +228,7 @@ ownQuantities effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> Maybe.maybeToList quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -857,7 +858,7 @@ isByDirectionShield effect = case effect of
 
 -- Every PlayerRef a CLAUSE of this face holds: CR 118.12a's payer and CR 603.5's
 -- asker. Both sit on Pawl.Types.Clause rather than inside any effect, so neither
--- effect traversal reaches them; Pawl.Engine.Resolve.modeSlots reads exactly this
+-- effect traversal reaches them; Pawl.Engine.Resolve.Slots.modeSlots reads exactly this
 -- pair, through the same playerRefSlots classification.
 --
 -- Over the GRANTED carriers as well as the printed ones, cardResolutionEffects'
@@ -1236,6 +1237,7 @@ effectObjectRefs effect =
         Effect.Search {} -> []
         Effect.ExileAllGraveyards -> []
         Effect.Proliferate -> []
+        Effect.Reroll -> []
         Effect.ChooseCardName {} -> []
         Effect.FromOutsideTheGame {} -> []
         Effect.ExileThisSpell -> []
@@ -1396,7 +1398,7 @@ effectObjectRefs effect =
         Effect.Shuffle {} -> []
         Effect.OfferCast offer -> read_ [OfferCast.ref offer]
         Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
-        Effect.ForEach (ForEach.MkForEach ref _ _ _) -> read_ [ref]
+        Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> read_ [ref]
         Effect.Heal ref -> read_ [ref]
 
 -- The chooser-shaped refs one effect writes where nothing can ask for them: the
@@ -1839,6 +1841,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Candidate -> True
           -- One seat -- InSlot's answer, one indirection out.
           PlayerRef.ControllerOfBound _ -> True
+          -- One seat -- the arm above's answer, one word over.
+          PlayerRef.OwnerOfBound _ -> True
           -- One seat -- the arm above's answer, one record over.
           PlayerRef.ChosenPlayerOfBound _ -> True
           -- A SET -- Relative Opponent's answer, and for its reason: CR 508.6 is

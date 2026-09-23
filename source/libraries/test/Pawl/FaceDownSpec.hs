@@ -133,6 +133,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Cast as Cast
@@ -1034,7 +1035,7 @@ turnedFaceDownSpec s registry = Spec.describe s "Turned face down" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     witness <- S.printingOf s registry "Synthetic Veiled Witness"
     let (gs, spell, dfc, bystander) = gargoyleBoard island cyber gargoyle piker witness
-    case Activate.abilitiesFor dfc gs of
+    case Activatable.abilitiesFor dfc gs of
       [ability] -> do
         let turned = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice dfc ability >> Engine.priorityLoop)
             control = castAtAndSettle cyber spell bystander turned

@@ -39,23 +39,42 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.SpeedSpec as SpeedSpec
 import qualified Pawl.Support as S
 import qualified Pawl.TurnSpec as TurnSpec
+import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.MulliganDecision as MulliganDecision
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.TriggerEntry as TriggerEntry
+import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- CR 808.1 / CR 808.2: alice and bob against carol and dave, each team in
 -- adjacent seats of the turn order [alice, bob, carol, dave].
@@ -332,6 +351,58 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (S.lifeOf S.bob after, length (S.tokensOf after))
     Spec.assertEqWith s "bob lost 1 life and made a Faerie" (run sharedTurns) (Just 19, 1)
     Spec.assertEqWith s "without the option nothing happened" (run id) (Just 20, 0)
+  -- CR 805.4d: "each player's upkeep" reading "that player" triggers once per
+  -- active player. Carol controls it, so "that player" is neither her nor alone
+  -- the seat the turn began with.
+  --
+  -- Elkin Lair, {3}{R} World Enchantment: "At the beginning of each player's
+  -- upkeep, that player exiles a card at random from their hand. ..." Each hand
+  -- holds one card, so the random pick is forced.
+  Spec.it s "CR 805.4d an each-player's-upkeep trigger fires once per active teammate" $ do
+    island <- S.printingOf s registry "Island"
+    lair <- S.printingOf s registry "Elkin Lair"
+    let run option =
+          let (_, placed) = S.addPermanent lair S.carol (stockedWith island option)
+              board = List.foldl' (\g pid -> snd (S.addHandCard island pid g)) placed [S.alice, S.bob]
+              after = fst (TurnSpec.runTurn S.identityAnswer board)
+           in fmap (\pid -> length (Game.zoneMembers Zone.Exile pid after)) [S.alice, S.bob]
+    Spec.assertEqWith s "alice and bob each exiled their card" (run sharedTurns) [1, 1]
+    Spec.assertEqWith s "without the option only alice did" (run id) [1, 0]
+  -- CR 805.4d / 603.4: the intervening "if" is asked of each opponent in turn.
+  -- Only bob holds seven, so a single trigger naming alice would do nothing.
+  --
+  -- Ebony Owl Netsuke, {2} Artifact: "At the beginning of each opponent's
+  -- upkeep, if that player has seven or more cards in hand, this artifact deals
+  -- 4 damage to that player."
+  Spec.it s "CR 805.4d an each-opponent's-upkeep trigger asks its if of each active opponent" $ do
+    island <- S.printingOf s registry "Island"
+    owl <- S.printingOf s registry "Ebony Owl Netsuke"
+    let run option =
+          let (_, placed) = S.addPermanent owl S.carol (stockedWith island option)
+              hands = List.foldl' (\g _ -> snd (S.addHandCard island S.alice g)) placed [1 :: Int .. 2]
+              board = List.foldl' (\g _ -> snd (S.addHandCard island S.bob g)) hands [1 :: Int .. 8]
+              after = fst (TurnSpec.runTurn S.identityAnswer board)
+           in fmap (`S.lifeOf` after) [S.alice, S.bob]
+    Spec.assertEqWith s "bob took 4, alice nothing" (run sharedTurns) [Just 20, Just 16]
+    Spec.assertEqWith s "without the option bob's upkeep has not come" (run id) [Just 20, Just 20]
+  -- CR 805.4d's other half: an ability that does not refer to "that player"
+  -- triggers once, however many players share the turn.
+  --
+  -- Khabál Ghoul, {2}{B} Creature -- Zombie 1/1: "At the beginning of each end
+  -- step, put a +1/+1 counter on this creature for each creature that died this
+  -- turn."
+  Spec.it s "CR 805.4d an ability not naming that player triggers once for the team" $ do
+    ghoul <- S.printingOf s registry "Khabál Ghoul"
+    let run option =
+          let endStep = Phase.Ending EndingStep.EndStep
+              (_, placed) = S.addPermanent ghoul S.carol (option (twoTeams S.fourPlayerGame))
+              began =
+                S.withEvents
+                  [GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)]
+                  placed {GameState.phase = endStep, GameState.activePlayer = S.alice}
+           in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer began Engine.placePendingTriggers)))
+    Spec.assertEqWith s "one trigger with the option" (run sharedTurns) 1
+    Spec.assertEqWith s "and one without" (run id) 1
   -- CR 702.179d / 805.4: alice and bob are both active players, so one opponent's
   -- life loss raises both their speeds -- each spends their OWN once-each-turn
   -- limit, which Engine.limitKey's controller component is what keeps apart.
@@ -360,3 +431,136 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (S.lifeOf S.carol after, fmap (`SpeedSpec.speedOf` after) [S.alice, S.bob])
     Spec.assertEqWith s "carol took three, and both speeds rose" (run sharedTurns) (Just 17, [Just (Just 2), Just (Just 3)])
     Spec.assertEqWith s "without the option only alice's rose" (run id) (Just 17, [Just (Just 2), Just (Just 2)])
+  -- CR 805.5 / 805.5b: the team holds priority, so once bob casts his Bolt his
+  -- team has it again, and alice -- who passed before he cast -- is asked before
+  -- carol's team is. The sequence of players asked is the engine's own output.
+  Spec.it s "CR 805.5 a teammate who passed is asked again before the team passes" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let bobCastsOnce :: Prompt.Prompt r -> State.State ([PlayerId.PlayerId], Bool) r
+        bobCastsOnce p = case p of
+          Prompt.ChooseAction _ pid actions -> do
+            (asked, spent) <- State.get
+            let casts = [a | a@Action.Cast {} <- actions]
+            case casts of
+              a : _ | pid == S.bob && not spent -> State.put (asked <> [pid], True) >> pure a
+              _ -> State.put (asked <> [pid], spent) >> pure Action.Pass
+          Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Set.singleton (Recipient.ToPlayer S.carol))) sets)
+          _ -> pure (S.identityAnswer p)
+        run option =
+          let lands = S.landsFor mountain S.bob 1 (option (twoTeams S.fourPlayerGame))
+              (_, staged) = S.addHandCard bolt S.bob lands
+              board =
+                staged
+                  { GameState.phase = Phase.PrecombatMain,
+                    GameState.activePlayer = S.alice,
+                    GameState.priority = Just S.alice
+                  }
+              ((_, after), (asked, _)) = State.runState (Engine.runGame bobCastsOnce board Engine.priorityLoop) ([], False)
+           in (asked, S.lifeOf S.carol after)
+    Spec.assertEqWith
+      s
+      "CR 805.5b alice is asked after bob's cast, before carol and dave"
+      (run sharedTurns)
+      ([S.alice, S.bob, S.bob, S.alice, S.carol, S.dave, S.alice, S.bob, S.carol, S.dave], Just 17)
+    Spec.assertEqWith
+      s
+      "without the option priority passes from bob to carol"
+      (run id)
+      ([S.alice, S.bob, S.bob, S.carol, S.dave, S.alice, S.alice, S.bob, S.carol, S.dave], Just 17)
+  -- CR 805.7 / 805.2: the active team's triggers are one set, ordered by its
+  -- primary player, interleaved; the nonactive team's go on after. Dave and alice
+  -- are a team whose seats wrap the turn order [alice, bob, carol, dave], so dave
+  -- is its rightmost seat and primary while alice is the active player, and a
+  -- plain turn-order rotation from alice would put bob between them.
+  --
+  -- Soul Warden, {W} Creature: "Whenever another creature enters, you gain 1
+  -- life." Two are alice's and one each is dave's and bob's; a Goblin Piker
+  -- entering triggers all four.
+  Spec.it s "CR 805.7 the primary player orders the whole team's triggers" $ do
+    warden <- S.printingOf s registry "Soul Warden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let run option =
+          let teamed = option (S.inTeams [[S.dave, S.alice], [S.bob, S.carol]] S.fourPlayerGame)
+              (first, g1) = S.addPermanent warden S.alice teamed
+              (second, g2) = S.addPermanent warden S.alice g1
+              (daves, g3) = S.addPermanent warden S.dave g2
+              (bobs, g4) = S.addPermanent warden S.bob g3
+              (entrant, g5) = S.addPermanent piker S.carol g4
+              entered = ZoneChange.MkZoneChange entrant entrant Zone.Stack Zone.Battlefield
+              began = S.withEvents [GameEvent.Moved (Moved.moved entered (Projection.project entrant g5))] g5
+              -- Dave's between alice's two, which only one choice over all
+              -- three can reach.
+              wanted = fmap TriggerSource.OfObject [first, daves, second]
+              interleave :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+              interleave p = case p of
+                Prompt.OrderTriggers _ pid entries -> do
+                  State.modify' (<> [pid])
+                  pure [i | source <- wanted, (i, entry) <- zip [0 ..] entries, TriggerEntry.source entry == source]
+                _ -> pure (S.identityAnswer p)
+              ((_, placed), asked) = State.runState (Engine.runGame interleave began Engine.placePendingTriggers) []
+              sourceOf oid = case fmap Object.source (Game.lookupObject oid placed) of
+                Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.source triggered)
+                _ -> Nothing
+           in (asked, fmap sourceOf (GameState.stack placed), (first, second, daves, bobs))
+        (sharedAsked, sharedStack, (a1, a2, d, b)) = run sharedTurns
+        (aloneAsked, aloneStack, _) = run id
+    Spec.assertEqWith s "CR 805.7 dave's trigger sits between alice's, under bob's" sharedStack (fmap Just [b, a2, d, a1])
+    Spec.assertEqWith s "CR 805.2 dave, the primary player, was asked" sharedAsked [S.dave]
+    Spec.assertEqWith s "without the option alice orders her own two and dave's goes on last" aloneStack (fmap Just [d, b, a2, a1])
+    Spec.assertEqWith s "and alice is the one asked" aloneAsked [S.alice]
+  -- CR 805.5b / 800.4j: the active TEAM receives priority, so with alice gone her
+  -- teammate dave is asked first, though bob is the next seat after hers. Dave
+  -- and alice are the team whose seats wrap the turn order.
+  Spec.it s "CR 805.5b a departed active player's teammate receives priority" $ do
+    let asking :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+        asking p = case p of
+          Prompt.ChooseAction _ pid _ -> State.modify' (<> [pid]) >> pure Action.Pass
+          _ -> pure (S.identityAnswer p)
+        run option =
+          let teamed = option (S.inTeams [[S.dave, S.alice], [S.bob, S.carol]] S.fourPlayerGame)
+              board =
+                teamed
+                  { GameState.phase = Phase.PrecombatMain,
+                    GameState.activePlayer = S.alice,
+                    GameState.players = Map.adjust (\player -> player {Player.status = Status.Departed Departure.Lost}) S.alice (GameState.players teamed)
+                  }
+           in State.execState (Engine.runGame asking board Engine.priorityLoop) []
+    Spec.assertEqWith s "CR 805.5b dave, then bob's team" (run sharedTurns) [S.dave, S.bob, S.carol]
+    Spec.assertEqWith s "without the option bob, the next seat, is first" (run id) [S.bob, S.carol, S.dave]
+  -- CR 805.3a: the starting team declares its mulligans first, then the other
+  -- team. Alice starts, and her teammate dave's seat wraps the turn order, so a
+  -- plain turn-order walk would ask bob and carol before him.
+  Spec.it s "CR 805.3a the starting team declares its mulligans first" $ do
+    island <- S.printingOf s registry "Island"
+    let keeping :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+        keeping p = case p of
+          Prompt.DeclareMulligan _ pid _ -> State.modify' (<> [pid]) >> pure MulliganDecision.Keep
+          _ -> pure (S.identityAnswer p)
+        seats = [S.alice, S.bob, S.carol, S.dave]
+        run option =
+          let teamed = option (S.inTeams [[S.dave, S.alice], [S.bob, S.carol]] S.fourPlayerGame)
+              stockOne gs pid = List.foldl' (\g _ -> snd (S.addLibraryCard island pid g)) gs [1 :: Int .. 8]
+              board = List.foldl' stockOne teamed seats
+           in State.execState (Engine.runGame keeping board (Mulligan.openingHands S.performer seats)) []
+    Spec.assertEqWith s "CR 805.3a alice and dave, then bob and carol" (run sharedTurns) [S.alice, S.dave, S.bob, S.carol]
+    Spec.assertEqWith s "without the option each seat in turn order" (run id) seats
+  -- CR 803.1a / 803.1b: left and right are SEATS, which CR 805.6's team-grouped
+  -- APNAP order does not preserve. Dave and alice's team wraps the turn order
+  -- [alice, bob, carol, dave], so alice's right-hand seat is her teammate dave
+  -- and she may attack nobody, while her left is bob.
+  Spec.it s "CR 803.1b attack right reads the seat, not the team order" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let run option =
+          let teamed = sharedTurns (S.inTeams [[S.dave, S.alice], [S.bob, S.carol]] S.fourPlayerGame)
+              (mine, staged) = S.addPermanent piker S.alice teamed {GameState.settings = (GameState.settings teamed) {GameSettings.attackOption = Just option}}
+              board =
+                staged
+                  { GameState.activePlayer = S.alice,
+                    GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+                    GameState.remaining = Seq.fromList (drop 5 Turn.allPhases)
+                  }
+              settled = S.runPure S.identityAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+           in fmap (\pid -> Combat.legalAttackDeclarationAs S.alice [(mine, AttackTarget.OfPlayer pid)] settled) [S.bob, S.carol]
+    Spec.assertEqWith s "CR 803.1b attacking right, neither bob nor carol" (run AttackOption.Rightward) [False, False]
+    Spec.assertEqWith s "CR 803.1a attacking left, bob only" (run AttackOption.Leftward) [True, False]

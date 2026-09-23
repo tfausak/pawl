@@ -54,6 +54,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -131,7 +132,7 @@ tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 crewable :: ObjectId.ObjectId -> GameState.GameState -> Bool
 crewable vehicleId gs = case crewAbility vehicleId gs of
   Nothing -> False
-  Just ability -> Activate.activatable S.alice vehicleId ability gs
+  Just ability -> Activatable.activatable S.alice vehicleId ability gs
 
 -- Tap one permanent in place, without paying anything for it.
 tap :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState

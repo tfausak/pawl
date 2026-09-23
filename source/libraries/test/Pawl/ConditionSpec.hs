@@ -13,6 +13,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
@@ -364,7 +365,7 @@ interveningRecheckSpec s registry =
       raiseWith skeleton knight swamp k = do
         let (knightId, base) = board knight swamp
             (gyId, staged) = S.addGraveyardCard skeleton S.alice base
-        case Activate.abilitiesFor gyId staged of
+        case Activatable.abilitiesFor gyId staged of
           [ability] -> k knightId (settle (resolveTop (S.runPure S.identityAnswer staged (Activate.activateAbility S.alice gyId ability))))
           abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
    in Spec.describe s "InterveningRecheck" $ do

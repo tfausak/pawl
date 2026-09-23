@@ -9,6 +9,7 @@ import qualified Pawl.Codec.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.CounterPlacement as CounterPlacement
 import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Codec.DieResult as DieResult
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PermanentBecomesDesignated as PermanentBecomesDesignated
@@ -126,6 +127,7 @@ codec =
           Arm.payload "SelfBecomesTargeted" PlayerRelation.codec TriggerCondition.SelfBecomesTargeted (\x -> case x of TriggerCondition.SelfBecomesTargeted y -> Just y; _ -> Nothing),
           Arm.payload "ControllerBecomesTarget" ControllerBecomesTarget.codec TriggerCondition.ControllerBecomesTarget (\x -> case x of TriggerCondition.ControllerBecomesTarget y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsBecomeTargeted" PermanentsBecomeTargeted.codec TriggerCondition.PermanentsBecomeTargeted (\x -> case x of TriggerCondition.PermanentsBecomeTargeted y -> Just y; _ -> Nothing),
+          Arm.payload "PermanentBecomesTargeted" PermanentsBecomeTargeted.codec TriggerCondition.PermanentBecomesTargeted (\x -> case x of TriggerCondition.PermanentBecomesTargeted y -> Just y; _ -> Nothing),
           Arm.payload "SelfHalfUnlocked" CardName.codec TriggerCondition.SelfHalfUnlocked (\x -> case x of TriggerCondition.SelfHalfUnlocked y -> Just y; _ -> Nothing),
           Arm.payload "RoomFullyUnlocked" PlayerRelation.codec TriggerCondition.RoomFullyUnlocked (\x -> case x of TriggerCondition.RoomFullyUnlocked y -> Just y; _ -> Nothing),
           Arm.payload "AnyOf" (Common.list codec) TriggerCondition.AnyOf (\x -> case x of TriggerCondition.AnyOf y -> Just y; _ -> Nothing),
@@ -154,6 +156,7 @@ codec =
           Arm.payload "PlayerCompletesDungeon" PlayerRelation.codec TriggerCondition.PlayerCompletesDungeon (\x -> case x of TriggerCondition.PlayerCompletesDungeon y -> Just y; _ -> Nothing),
           Arm.payload "PlayerSurveils" PlayerRelation.codec TriggerCondition.PlayerSurveils (\x -> case x of TriggerCondition.PlayerSurveils y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsDice" PlayerRelation.codec TriggerCondition.PlayerRollsDice (\x -> case x of TriggerCondition.PlayerRollsDice y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerRollsResult" (DieResult.codec PlayerRelation.codec) TriggerCondition.PlayerRollsResult (\x -> case x of TriggerCondition.PlayerRollsResult y -> Just y; _ -> Nothing),
           Arm.payload "PlayerWinsCoinFlip" PlayerRelation.codec TriggerCondition.PlayerWinsCoinFlip (\x -> case x of TriggerCondition.PlayerWinsCoinFlip y -> Just y; _ -> Nothing),
           Arm.payload "PlayerLosesCoinFlip" PlayerRelation.codec TriggerCondition.PlayerLosesCoinFlip (\x -> case x of TriggerCondition.PlayerLosesCoinFlip y -> Just y; _ -> Nothing),
           Arm.nullary "SelfBecomesPlotted" TriggerCondition.SelfBecomesPlotted,
@@ -263,6 +266,7 @@ tagOf x = case x of
   TriggerCondition.SelfBecomesTargeted {} -> "SelfBecomesTargeted"
   TriggerCondition.ControllerBecomesTarget {} -> "ControllerBecomesTarget"
   TriggerCondition.PermanentsBecomeTargeted {} -> "PermanentsBecomeTargeted"
+  TriggerCondition.PermanentBecomesTargeted {} -> "PermanentBecomesTargeted"
   TriggerCondition.SelfHalfUnlocked {} -> "SelfHalfUnlocked"
   TriggerCondition.RoomFullyUnlocked {} -> "RoomFullyUnlocked"
   TriggerCondition.AnyOf {} -> "AnyOf"
@@ -290,6 +294,7 @@ tagOf x = case x of
   TriggerCondition.PlayerCompletesDungeon {} -> "PlayerCompletesDungeon"
   TriggerCondition.PlayerSurveils {} -> "PlayerSurveils"
   TriggerCondition.PlayerRollsDice {} -> "PlayerRollsDice"
+  TriggerCondition.PlayerRollsResult {} -> "PlayerRollsResult"
   TriggerCondition.PlayerWinsCoinFlip {} -> "PlayerWinsCoinFlip"
   TriggerCondition.PlayerLosesCoinFlip {} -> "PlayerLosesCoinFlip"
   TriggerCondition.SelfBecomesPlotted {} -> "SelfBecomesPlotted"

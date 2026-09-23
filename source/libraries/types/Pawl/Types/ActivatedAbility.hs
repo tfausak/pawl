@@ -1,5 +1,6 @@
 module Pawl.Types.ActivatedAbility where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activator as Activator
@@ -30,6 +31,10 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- rather than Naturals, read once at the announcement -- holds here unchanged,
     -- and Pawl.Engine.Cost.ceilingOf is the evaluator both share.
     maximumX :: [Quantity.Quantity],
+    -- | CR 101.1: the least X this ability's own words let its activator announce
+    -- -- Katara, Water Tribe's Hope's "X can't be 0" is 1. Zero for every ability
+    -- that states none.
+    minimumX :: Natural.Natural,
     modal :: Modal.Modal card ability,
     -- | CR 602.5: every clause of the "activate only ..." rider the ability
     -- carries, ALL of which must hold. Empty for an ability without one, which is
@@ -80,7 +85,7 @@ data ActivatedAbility card ability = MkActivatedAbility
     -- CR 702.178b's zone clause is why abilitiesGiven is not the only reader: "if
     -- an ability granted by a max speed ability states which zones it functions
     -- from, the max speed ability that grants that ability functions from those
-    -- zones". Pawl.Engine.Activate.zoneAbilitiesOf asks the same gate of a
+    -- zones". Pawl.Engine.Activatable.zoneAbilitiesOf asks the same gate of a
     -- card in a GRAVEYARD, for an ability whose cost or effect names that zone
     -- (CR 113.6m).
     condition :: Maybe Condition.Condition,

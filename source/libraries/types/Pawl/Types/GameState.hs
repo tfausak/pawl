@@ -36,6 +36,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -232,7 +233,9 @@ data GameState = MkGameState
     -- splice them in. Refilled from `Turn.allPhases` at handoff.
     remaining :: Seq.Seq Phase.Phase,
     priority :: Maybe PlayerId.PlayerId,
-    passes :: Natural.Natural,
+    -- | CR 117.4 / 805.5b: the players who have passed in succession since the
+    -- last action, the stack's resolution or the step's first grant.
+    passed :: Set.Set PlayerId.PlayerId,
     turnNumber :: Natural.Natural,
     result :: Maybe Result.Result,
     -- | CR 727.4: raised while a restart has replaced this game underneath the
@@ -270,6 +273,10 @@ data GameState = MkGameState
     -- ordinal onto GameEvent.Drew; cleared for every player at turn handoff,
     -- and after CR 103.3's opening hands.
     drawsThisTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- | CR 801.2c: the players who have left the game since this turn began,
+    -- whose seats still count toward range of influence until the next turn
+    -- begins; cleared at turn handoff.
+    departedThisTurn :: Set.Set PlayerId.PlayerId,
     -- | CR 602.5b: which abilities of which objects have been activated this
     -- turn, read by ActivationRestriction.OnlyOnceEachTurn alone; cleared at turn
     -- handoff, which is the whole of "each turn". Keyed by the SOURCE object and
@@ -294,6 +301,11 @@ data GameState = MkGameState
     -- one: Pawl.Engine.Projection.Rewrite swaps subtype words, and no budgeted
     -- permission in data/cards/ names a subtype.
     castPermissionsUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set CastFromZone.CastFromZone),
+    -- | CR 706.2: which budgeted die-roll modifiers have been taken this turn,
+    -- read by a Pawl.Types.ModifiedRoll whose limit is
+    -- PermissionLimit.OnceEachTurn (Night Shift of the Living Dead); cleared at
+    -- turn handoff. Keyed as castPermissionsUsedThisTurn above and for its reason.
+    rollModifiersUsedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set ModifiedRoll.ModifiedRoll),
     -- | The printed rider "This ability triggers only once"
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
     -- ability carrying that rider, as the same record CR 603.3b's log carries.
@@ -379,6 +391,11 @@ data GameState = MkGameState
     subgamesThisMatch :: Natural.Natural,
     -- | CR 500.7 / 103.1: while an extra turn is under way, the seat the
     -- ordinary turn order resumes from; Nothing on an ordinary turn.
-    turnAnchor :: Maybe PlayerId.PlayerId
+    turnAnchor :: Maybe PlayerId.PlayerId,
+    -- | CR 706.2: the sides of the die whose modification step is open, while
+    -- Pawl.Engine.Resolve.Effect's RollDie arm asks about it; Nothing otherwise.
+    rollingDie :: Maybe Natural.Natural,
+    -- | CR 706.2b: the natural result a reroll made inside that step threw.
+    rerolledTo :: Maybe Natural.Natural
   }
   deriving (Eq, Ord, Show)

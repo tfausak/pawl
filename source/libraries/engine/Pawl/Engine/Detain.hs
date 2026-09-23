@@ -5,7 +5,7 @@
 -- ONE rule and three gates, because pawl has no single "may this permanent act"
 -- funnel: Pawl.Engine.CombatRestriction answers the first two (CR 508.1c / CR
 -- 509.1b) and the third is split across the two independent activation gates
--- (Pawl.Engine.Activate.activatableGiven for CR 602.2, Pawl.Engine.Cost's
+-- (Pawl.Engine.Activatable.activatableGiven for CR 602.2, Pawl.Engine.Cost's
 -- manaActivations for CR 605.3a's mana windows, which the first refuses
 -- outright). Rule 701.35a's third clause says "its activated abilities", with no
 -- carve-out for mana abilities, so both are gated -- unlike CR 702.61b's split

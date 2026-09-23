@@ -32,6 +32,7 @@ module Pawl.StationSpec where
 import qualified Data.List as List
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Game as Game
@@ -112,7 +113,7 @@ stationWith answer frigateId gs = case stationAbility frigateId gs of
 stationable :: ObjectId.ObjectId -> GameState.GameState -> Bool
 stationable frigateId gs = case stationAbility frigateId gs of
   Nothing -> False
-  Just ability -> Activate.activatable S.alice frigateId ability gs
+  Just ability -> Activatable.activatable S.alice frigateId ability gs
 
 tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
 tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)

@@ -414,6 +414,7 @@ library codec
     Pawl.Codec.DevourCount
     Pawl.Codec.DevourCountSpec
     Pawl.Codec.DevourSpec
+    Pawl.Codec.DieResult
     Pawl.Codec.DieRollR
     Pawl.Codec.DieRollRewrite
     Pawl.Codec.DieRollRewriteSpec
@@ -607,6 +608,8 @@ library codec
     Pawl.Codec.LoggedEventSpec
     Pawl.Codec.LookAt
     Pawl.Codec.LookAtSpec
+    Pawl.Codec.LoopMembers
+    Pawl.Codec.LoopMembersSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltyKind
     Pawl.Codec.LoyaltyKindSpec
@@ -1093,6 +1096,7 @@ library engine
   -- cabal-gild: discover source/libraries/engine
   exposed-modules:
     Pawl.Engine.Action
+    Pawl.Engine.Activatable
     Pawl.Engine.Activate
     Pawl.Engine.ActivationProhibition
     Pawl.Engine.ActivationRestriction
@@ -1801,6 +1805,7 @@ library types
     Pawl.Types.Devour
     Pawl.Types.DevourCount
     Pawl.Types.DiceRoll
+    Pawl.Types.DieResult
     Pawl.Types.DieRollR
     Pawl.Types.DieRollRewrite
     Pawl.Types.Discard
@@ -1909,6 +1914,7 @@ library types
     Pawl.Types.LimitUnless
     Pawl.Types.LoggedEvent
     Pawl.Types.LookAt
+    Pawl.Types.LoopMembers
     Pawl.Types.Loyalty
     Pawl.Types.LoyaltyKind
     Pawl.Types.MakeForetold
@@ -2074,6 +2080,7 @@ library types
     Pawl.Types.Reveal
     Pawl.Types.RevealCause
     Pawl.Types.Revealed
+    Pawl.Types.RollAdjustment
     Pawl.Types.RollDie
     Pawl.Types.RollModifier
     Pawl.Types.RoomIndex

@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Pawl.CastProhibitionSpec (equipBoard, flashBoard, flashOnOwnTurn, isActivateOf, isPlay, landDropBoard, nextTurnFor, orreryScopeBoard, playEveryLand)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -1786,7 +1787,7 @@ oppressiveRaysSpec s registry =
       brothers <- S.printingOf s registry "Brothers of Fire"
       mountain <- S.printingOf s registry "Mountain"
       let (taxed, untaxed, gs) = oppressiveRaysBoard rays brothers mountain 6
-          activate oid = case Activate.abilitiesFor oid gs of
+          activate oid = case Activatable.abilitiesFor oid gs of
             [ability] -> Just (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
             _ -> Nothing
       case (activate taxed, activate untaxed) of
@@ -2197,7 +2198,7 @@ serraParagonSpec s registry =
                 Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
                 _ -> S.identityAnswer p
               copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-              ready = copied {GameState.priority = Just S.alice, GameState.passes = 0}
+              ready = copied {GameState.priority = Just S.alice, GameState.passed = Set.empty}
               cast = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) ready Engine.priorityLoop
           case arrivedBetween ready cast of
             [permanent] -> do

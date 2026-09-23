@@ -13,6 +13,7 @@ import qualified Data.Ord as Ord
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -118,7 +119,7 @@ discardTriggerSpec s registry =
       let base = snd (S.addPermanent megrim S.bob (S.landsInPlay forest 2))
           (_, withLibrary) = S.addLibraryCard piker S.alice base
           (gs, maulerId) = S.handOne mauler withLibrary
-      case Activate.abilitiesFor maulerId gs of
+      case Activatable.abilitiesFor maulerId gs of
         [ability] -> do
           let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
               placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
@@ -210,7 +211,7 @@ cyclesTriggerSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (marmosetId, maulerId, gs) = marmosetBoard marmoset mauler forest piker S.alice
       Spec.assertEqWith s "the Marmoset starts a 2/3" (S.powerToughnessOf marmosetId gs) (Just (2, 3))
-      case Activate.abilitiesFor maulerId gs of
+      case Activatable.abilitiesFor maulerId gs of
         [ability] -> do
           let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
               placed = S.runPure S.identityAnswer cycled Engine.settleForPriority
@@ -230,7 +231,7 @@ cyclesTriggerSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let run cycler =
             let (marmosetId, maulerId, gs) = marmosetBoard marmoset mauler forest piker cycler
-             in case Activate.abilitiesFor maulerId gs of
+             in case Activatable.abilitiesFor maulerId gs of
                   [ability] ->
                     let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility cycler maulerId ability)
                         placed = S.runPure S.identityAnswer cycled Engine.settleForPriority

@@ -13,11 +13,13 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Commander as Commander
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
@@ -25,6 +27,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Prepare as Prepare
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Resolve.Slots as Slots
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -39,6 +42,10 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.Compares as Compares
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Convoking as Convoking
 import Pawl.Types.Cost (Cost)
@@ -56,6 +63,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -64,6 +72,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import Pawl.Types.ManaSpending (ManaSpending)
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
@@ -73,19 +82,24 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- CR 117.1a's second sentence: the window a NONINSTANT spell is cast in -- a
 -- main phase of its controller's own turn, with an empty stack. Every noninstant
@@ -321,13 +335,19 @@ targetable :: Maybe Keyword -> PlayerId -> ObjectId -> CardName.CardName -> Game
 targetable castFor pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
-    let -- CR 702.96b: the overload candidate's spell requires no targets, so
-        -- there is nothing here for it to fail to fill -- a board whose only
-        -- nonland permanent has hexproof is one Cyclonic Rift's overload cost is
-        -- castable on and its printed cost is not. The candidate's own tag
-        -- answers it, which is why this gate is asked per candidate
-        -- (candidateFillable below); the MODES are still judged.
-        modal = (if Keyword.castOverloaded castFor then Modal.untargeted else id) (Face.spell face)
+    let -- CR 702.33g/702.113b generalized (CR 702.96b's overload is the
+        -- special case this subsumes): a candidate's own clauses decide which
+        -- of its declared targets it needs, trimModalForCandidate's doc has
+        -- the worked examples. The overload candidate's spell requires no
+        -- targets at all, so there is nothing here for it to fail to fill --
+        -- a board whose only nonland permanent has hexproof is one Cyclonic
+        -- Rift's overload cost is castable on and its printed cost is not;
+        -- Part the Waterveil over a land-less board with six mana from
+        -- Treasures is the awaken analogue, castable for the printed cost
+        -- only. The candidate's own tag answers it, which is why this gate is
+        -- asked per candidate (candidateFillable below); the MODES are still
+        -- judged.
+        modal = trimModalForCandidate castFor (Face.spell face)
         given = Map.union (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) (Card.mutateSlotMapGiven (maybe False Object.mutating (Game.lookupObject oid gs)))
      in Modal.selectionPossible (Target.fillableModes (Just pid) Map.empty oid given modal gs) (Modal.Type.selection modal)
 
@@ -390,7 +410,7 @@ payableCost = payableCostAt 0
 -- incarnation, and the restrictions in the vocabulary read characteristics both
 -- share.
 --
--- BOTH halves of CR 601.2f's totalling, exactly as Activate.payableCostAt asks
+-- BOTH halves of CR 601.2f's totalling, exactly as Activatable.payableCostAt asks
 -- them: the mana arithmetic rides in as a function, and the additional non-mana
 -- components an effect applies to this spell (CR 118.8) are appended to the cost
 -- before it is measured (Cost.plusComponents). Drought's "Sacrifice a Swamp" is
@@ -402,7 +422,7 @@ payableCost = payableCostAt 0
 -- (Cost.readsBoundSlot). Such a cost is asked of every announcement still open
 -- instead -- CR 601.2 makes a casting legal when the player can comply with
 -- every step, so the gate's question is whether SOME aiming complies, exactly
--- as Activate.aimingSomewhere asks it. A cost naming no slot answers the same
+-- as Activatable.aimingSomewhere asks it. A cost naming no slot answers the same
 -- under every aiming and skips the search.
 --
 -- Not implemented: Cost.readsBoundSlot is asked of the PRINTED cost, so a
@@ -416,25 +436,31 @@ payableCost = payableCostAt 0
 -- land, so a gate that measured the mana alone would refuse the cast convoke is
 -- printed to allow. Cost.manaSubstitutions is the offer, and castProposed asks
 -- the payer to pick among the same entries.
+--
+-- CR 702.132a's assisting player is counted the same way, after the totalling
+-- and ahead of the substitutes, which is where castProposed pays them
+-- (Cost.assistable): a caster with one Forest may propose Charging Binox beside a
+-- player holding seven Plains. Off the FACE being cast, as castProposed reads it.
 payableCostAt :: Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x extra spending pid oid gs cost =
   let adjustments = Cost.plusReductions extra (Cost.spellAdjustments pid oid gs)
       substituted = Cost.substituteX x cost
       totalled = Cost.plusComponents adjustments substituted
-      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
+      assisted = Cost.assistable (maybe Set.empty Face.keywordSet (Game.faceOf oid gs)) (PaymentSubject.Casting oid) pid oid gs
+      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
    in if Cost.readsBoundSlot substituted
         then any (any ask . Target.aimings) (castAimable pid oid gs)
         else ask Map.empty
 
 -- What CR 601.2c could still bind for this proposal, one slot map per fillable
--- mode: Activate.candidateSlotsGiven's cast-side twin, and one mode at a time
+-- mode: Activatable.candidateSlotsGiven's cast-side twin, and one mode at a time
 -- for its reason. Read off the SAME board and the same slots `targetable` above
 -- measures, including CR 702.103b's enchant slot, so the gate that offers the
 -- cast and the gate that prices it cannot disagree about what could be aimed at.
 --
 -- CR 601.2b's seed is empty, matching `targetable`: the X is not announced at
 -- any of the moments this is read. `unannounced` is True for exactly that
--- reason, as Activate.candidateSlotsGiven's pre-X map is -- a slot's CR 202.3
+-- reason, as Activatable.candidateSlotsGiven's pre-X map is -- a slot's CR 202.3
 -- computed bound reading the X states NO bound here rather than an unmeetable
 -- one, so the gate is measured against every recipient the announcement could
 -- still reach. False would price the cost against a slot that offers nothing
@@ -472,7 +498,7 @@ castAimable pid oid gs = case Game.faceOf oid gs of
 -- Advisory, and nothing here clamps: see Prompt.ChooseX for why announcing past
 -- this is legal (CR 601.2b) and what it costs the player (#741).
 --
--- The SEARCH is Cost.greatestPayableX, shared with Activate.affordableX; the
+-- The SEARCH is Cost.greatestPayableX, shared with Activatable.affordableX; the
 -- PREDICATE is not, since an activation cost totals against its own adjustments
 -- (Cost.activationAdjustments).
 -- This haddock discharges that search's monotonicity requirement for the spell's
@@ -501,7 +527,7 @@ castAimable pid oid gs = case Game.faceOf oid gs of
 --     becoming a PayEnergy). CR 118.3's >= against a counter total X cannot
 --     move, so the life argument runs verbatim. Sphinx of the Revelation is the
 --     card whose X reaches a cost only this way, and it does so from an
---     ACTIVATION cost, which is Activate.affordableX's climb rather than this
+--     ACTIVATION cost, which is Activatable.affordableX's climb rather than this
 --     one; the monotonicity argument is shared because substituteXInComponent
 --     is.
 --
@@ -2194,6 +2220,215 @@ followIntoSpell permission old new gs = case permission of
           | otherwise = row
      in gs {GameState.replacements = fmap follow (GameState.replacements gs)}
 
+-- CR 702.33g/702.113b's own scope: a Quantity naming a CAST-ANNOUNCEMENT fact
+-- rather than a board or resolution one -- Quantity.WasKicked (CR 702.33d's
+-- "kicked with any of its kicker costs", the only reading of "kicked" a bare
+-- if-clause needs), Quantity.CastUsing (which ALTERNATIVE cost candidate CR
+-- 601.2b's announcement settled on -- awaken, cleave, overload and the other
+-- CR 601.3-listed candidates), and Quantity.Literal, the threshold side of
+-- every such comparison. Nothing else qualifies, on purpose: rule 702.33g/113b
+-- narrow CR 601.2c targets for exactly these two readings, so a clash's coin
+-- flip, a random flip, or a comparison against CR 601.2b's own X (not yet
+-- announced when trimModeTargetSlotsBy runs, see below) must NOT be treated as
+-- already decided here -- ClashSpec's, CoinSpec's and TargetSpec's joint-X
+-- group are what this line fixes over the first cut, which read every
+-- Condition and wrongly collapsed all three to False.
+--
+-- Quantity.TimesPaid -- CR 702.33c's multikicker COUNT and rule 702.33f's "if
+-- kicked with its [A] kicker" -- is deliberately excluded, not merely
+-- unhandled: it answers a per-cost or per-count question this early narrowing
+-- cannot yet ask (kicker's declaration is settled by CR 601.2c, but WHICH of
+-- several named kicker costs, or how many times, is a detail this function
+-- has no board to re-derive), so a clause built from it falls through to the
+-- conservative "applies" default below rather than being misjudged. No card in
+-- the pool conditions a target on it yet.
+isCastAnnouncementQuantity :: Quantity.Quantity -> Bool
+isCastAnnouncementQuantity q = case q of
+  Quantity.Literal _ -> True
+  Quantity.WasKicked -> True
+  Quantity.CastUsing _ -> True
+  _ -> False
+
+-- The Condition built ENTIRELY from such quantities -- Any/All fold the same
+-- way Condition.holds itself does, so a mixed clause (none print one) is not
+-- mistaken for a safe one.
+isCastAnnouncementCondition :: Condition.Type.Condition -> Bool
+isCastAnnouncementCondition condition = case condition of
+  Condition.Type.Compares c -> isCastAnnouncementQuantity (Compares.measured c) && isCastAnnouncementQuantity (Compares.threshold c)
+  Condition.Type.Any conditions -> all isCastAnnouncementCondition conditions
+  Condition.Type.All conditions -> all isCastAnnouncementCondition conditions
+
+-- CR 702.33g/702.113b: does a clause's printed "if" hold ALREADY, at CR
+-- 601.2c's step -- the same question Resolve.gateHolds asks a clause when it is
+-- REACHED, narrowed to what is answerable this early and to what rule 702.33g's
+-- family actually covers (isCastAnnouncementCondition above). Kicker's and
+-- awaken's announcements (stampPaidCosts, stampCastUsing) are both settled above
+-- this step, so a Quantity.WasKicked or Quantity.CastUsing condition reads the
+-- real decision. Anything else -- a board read, a resolution-time random result,
+-- CR 601.2b's own X (announced only AFTER this step) -- is treated as APPLYING,
+-- the same as an unconditioned clause: this function only ever NARROWS the old
+-- "every declared slot" answer, never widens what a clause needs beyond it, so a
+-- condition it cannot yet judge safely defaults to the old behaviour rather than
+-- to a guess. A clause with no condition always applies -- Clause.condition's own
+-- unmarked case.
+clauseAppliesAt :: PlayerId -> ObjectId -> GameState -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+clauseAppliesAt pid sid gs clause = case Clause.condition clause of
+  Nothing -> True
+  Just condition
+    | isCastAnnouncementCondition condition -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just pid) (Just sid)) gs sid condition
+    | otherwise -> True
+
+-- CR 702.33g/702.113b judged BEFORE CR 601.2b's cost is even announced, which is
+-- what Cast.targetable and Cast.castProposed's own CR 700.2a mode gate need: no
+-- board carries a kicker/awaken decision yet, only WHICH alternative-cost
+-- candidate (`castFor`, CandidateCost.keyword) the caller is asking about.
+-- Answered from that candidate alone rather than through Condition.holds/a
+-- GameState, since neither exists at this question's moment.
+--
+--   * Quantity.WasKicked reads 0 UNCONDITIONALLY -- CR 702.33a's kicker is
+--     optional under every candidate (CR 118.9b), so a kicked-only target must
+--     never be REQUIRED to offer a cast at all; the player may always decline
+--     it. Cast.castProposed's own clauseAppliesAt (the live, post-announcement
+--     read) is what judges a kicked-only slot once the choice is in.
+--   * Quantity.CastUsing family reads 1 exactly when `castFor`'s own family
+--     matches, Pawl.Engine.Quantity's CastUsing arm's board read done here
+--     without a board: `familyOf =<< castFor`. This is what SUBSUMES
+--     Keyword.castOverloaded's old special case below -- Cyclonic Rift's two
+--     CastUsing Overload clauses (one at 0, one at >=1) trim the SAME way
+--     castOverloaded did, through the general mechanism rather than a keyword
+--     name.
+holdsForCandidate :: Maybe Keyword -> Condition.Type.Condition -> Bool
+holdsForCandidate castFor condition = case condition of
+  Condition.Type.Compares c -> case (candidateQuantity castFor (Compares.measured c), candidateQuantity castFor (Compares.threshold c)) of
+    (Just n, Just t) -> case Compares.comparison c of
+      Comparison.Exactly -> n == t
+      Comparison.AtLeast -> n >= t
+      Comparison.AtMost -> n <= t
+    _ -> False
+  Condition.Type.Any conditions -> any (holdsForCandidate castFor) conditions
+  Condition.Type.All conditions -> all (holdsForCandidate castFor) conditions
+
+-- holdsForCandidate's per-Quantity read, total only over
+-- isCastAnnouncementQuantity's three constructors -- everything else answers
+-- Nothing, which holdsForCandidate's Compares arm collapses to False exactly
+-- as Condition.holds' own undeterminable-quantity reading does.
+candidateQuantity :: Maybe Keyword -> Quantity.Quantity -> Maybe Integer
+candidateQuantity castFor q = case q of
+  Quantity.Literal n -> Just n
+  Quantity.WasKicked -> Just 0
+  Quantity.CastUsing family -> Just (if (Keyword.familyOf =<< castFor) == Just family then 1 else 0)
+  _ -> Nothing
+
+-- clauseAppliesAt's pre-announcement twin: a clause applies to a CANDIDATE when
+-- its condition either names nothing, or is answerable from that candidate
+-- alone (holdsForCandidate); anything else keeps the conservative "applies"
+-- default clauseAppliesAt documents.
+clauseAppliesForCandidate :: Maybe Keyword -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+clauseAppliesForCandidate castFor clause = case Clause.condition clause of
+  Nothing -> True
+  Just condition
+    | isCastAnnouncementCondition condition -> holdsForCandidate castFor condition
+    | otherwise -> True
+
+-- CR 702.33g's "that part of the ability includes any targets": the target slot
+-- NAMES one clause's own effects read, Slots.slotsOf's ordinary walk narrowed to
+-- a single clause rather than Resolve.modeSlots' whole-mode fold. Payer, asker
+-- and branch-chooser positions are not walked -- no printing in the pool names a
+-- declared target slot from one of those, and CR 702.33g's own text is about the
+-- ability's targets, not its resolution-time riders.
+clauseTargetSlotNames :: Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Set SlotName.SlotName
+clauseTargetSlotNames clause = Map.keysSet (Slots.joinSlots (fmap Slots.slotsOf (Foldable.toList (Clause.effects clause))))
+
+-- One target slot's OWN read of a SIBLING slot -- its pool's ZoneScope (Dwell on
+-- the Past's "their graveyard"), its filter's IsBound and the atoms beside it
+-- (Fall of the Hammer's "another target creature"), and its CR 202.3 computed
+-- bound or count (Venerable Warsinger's X). Resolve.targetSlotSlots' claim
+-- narrowed to NAMES rather than SlotArity and to what this module can already
+-- reach without importing Resolve.hs, which would cycle back through
+-- Resolve.Effect to Cast. Synthetic Borrowed Exhumation's "card" slot naming
+-- "player" through its pool is the witness: trimming "card" in without
+-- following this read would drop "player" out from under it.
+targetSlotSiblingNames :: TargetSlot.TargetSlot -> Set SlotName.SlotName
+targetSlotSiblingNames slot =
+  Set.unions
+    [ poolSiblingName (TargetSlot.pool slot),
+      maybe Set.empty Filter.boundSlots (TargetSlot.filter slot),
+      maybe Set.empty (Map.keysSet . Slots.quantitySlots) (TargetSlot.amount slot),
+      maybe Set.empty (Map.keysSet . Slots.quantitySlots) (SlotCount.quantity (TargetSlot.count slot))
+    ]
+
+-- The sibling slot ONE pool names, Card.instancePool's own two arms: only
+-- CardsInGraveyard and CreaturesAndCardsInGraveyard carry a ZoneScope, and only
+-- ZoneScope.InSlot/ControllerOfBound name a slot within it.
+poolSiblingName :: Pool.Pool -> Set SlotName.SlotName
+poolSiblingName pool = case pool of
+  Pool.CardsInGraveyard scope -> zoneScopeSlotName scope
+  Pool.CreaturesAndCardsInGraveyard scope -> zoneScopeSlotName scope
+  _ -> Set.empty
+
+zoneScopeSlotName :: ZoneScope.ZoneScope -> Set SlotName.SlotName
+zoneScopeSlotName scope = case scope of
+  ZoneScope.Scoped _ -> Set.empty
+  ZoneScope.InSlot name -> Set.singleton name
+  ZoneScope.ControllerOfBound name -> Set.singleton name
+
+-- clauseTargetSlotNames' direct answer, closed under targetSlotSiblingNames
+-- until it stops growing -- a fixpoint over a finite declared set, so it always
+-- terminates. Needed because a slot pulled in by an applying clause may itself
+-- point at a slot no clause's effects mention by name.
+closeTargetSlotNames :: Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Set SlotName.SlotName -> Set SlotName.SlotName
+closeTargetSlotNames declared have =
+  let siblings = Set.unions (Maybe.mapMaybe (fmap targetSlotSiblingNames . (`Map.lookup` declared)) (Set.toList have))
+      have' = Set.union have (Set.intersection siblings (Map.keysSet declared))
+   in if have' == have then have else closeTargetSlotNames declared have'
+
+-- CR 601.2c/700.2c narrowed by CR 702.33g/702.113b: a mode's declared target
+-- slot is filled only if some clause that CURRENTLY applies reads it, or it is
+-- a sibling one of those slots names (closeTargetSlotNames). Burst Lightning's
+-- two clauses read the one slot they share, so nothing here narrows its offer;
+-- Part the Waterveil's counters/type/subtype/P&T/haste clause is the one of its
+-- three that reads "land", so trimming drops that slot on an unawakened cast --
+-- CR 702.113b: "The controller of a spell with awaken chooses the target of
+-- the awaken spell ability only if that player chose to pay the spell's
+-- awaken cost. Otherwise the spell is cast as if it didn't have that target."
+-- (Rule 702.33g states the general case, "kicked" for "chose to pay the
+-- awaken cost".)
+--
+-- A slot read by NO clause and named by no sibling cannot occur here: the
+-- CardSpec D4 lint (`modalSlotsOffend`) holds every declared slot of a mode to
+-- being read by SOME clause of that mode or SOME sibling slot's pool/filter/
+-- bound, union over the whole mode rather than any one clause.
+--
+-- Parametric in HOW a clause's applicability is judged, so this one fold
+-- serves both readers: Cast.castProposed's CR 601.2c step passes
+-- clauseAppliesAt (the live, post-announcement board), and Cast.targetable and
+-- the CR 700.2a mode gate below pass clauseAppliesForCandidate (no board yet,
+-- only which alternative-cost candidate is being asked about).
+trimModeTargetSlotsBy :: (Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool) -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+trimModeTargetSlotsBy applies mode =
+  let applying = filter applies (Foldable.toList (Mode.clauses mode))
+      direct = Set.unions (fmap clauseTargetSlotNames applying)
+      needed = closeTargetSlotNames (Mode.targetSlots mode) direct
+   in mode {Mode.targetSlots = Map.restrictKeys (Mode.targetSlots mode) needed}
+
+trimModeTargetSlots :: PlayerId -> ObjectId -> GameState -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+trimModeTargetSlots pid sid gs = trimModeTargetSlotsBy (clauseAppliesAt pid sid gs)
+
+-- Cast.targetable's and the CR 700.2a mode gate's own reader: trims by WHICH
+-- alternative-cost candidate is being asked about, not by a board.
+trimModeTargetSlotsForCandidate :: Maybe Keyword -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+trimModeTargetSlotsForCandidate castFor = trimModeTargetSlotsBy (clauseAppliesForCandidate castFor)
+
+-- trimModeTargetSlotsForCandidate over a whole Modal, Modal.untargeted's shape
+-- one level up -- CR 700.2a's own generalization: "if one of the modes would
+-- be illegal (due to an inability to choose legal targets, for example), that
+-- mode can't be chosen" is judged per CANDIDATE, since CR 601.2b's modes are
+-- chosen before its cost is, and a mode illegal under the printed cost may be
+-- legal under an alternative one or vice versa (Cyclonic Rift overloaded,
+-- Part the Waterveil awakened).
+trimModalForCandidate :: Maybe Keyword -> Modal.Type.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Modal.Type.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+trimModalForCandidate castFor modal = modal {Modal.Type.modes = fmap (trimModeTargetSlotsForCandidate castFor) (Modal.Type.modes modal)}
+
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
 -- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object
 -- every step below announces for, targets relative to, is projected from and
@@ -2231,10 +2466,17 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- printed cost finds no legal target and CR 601.2e takes the cast back.
       -- Cyclonic Rift over a lone hexproof creature is the board that separates
       -- the two.
-      legal =
-        if any (Keyword.castOverloaded . CandidateCost.keyword) candidateCosts
-          then Set.union (fillable modal) (fillable (Modal.untargeted modal))
-          else fillable modal
+      --
+      -- UNIONED OVER EVERY CANDIDATE's own trimmed reading (trimModalForCandidate,
+      -- CR 702.33g/702.113b generalized), which is what subsumes the overload-only
+      -- union this replaced: Cyclonic Rift's two CastUsing-Overload clauses trim
+      -- the same way under this fold that the old `Keyword.castOverloaded` special
+      -- case did by name. Part the Waterveil over a LAND-LESS board with six mana
+      -- from Treasures is the awaken analogue -- the printed candidate's trimmed
+      -- reading drops "land" and is fillable, so the mode is legal and the cast is
+      -- offered, though the awaken candidate's own reading still requires it and
+      -- falls back to CR 601.2e if chosen where none exists.
+      legal = Set.unions (fmap (\candidate -> fillable (trimModalForCandidate (CandidateCost.keyword candidate) modal)) candidateCosts)
       -- CR 601.2e: an illegal proposal returns the game to the moment before the
       -- casting was proposed, which is the state before CR 601.2a's move. CR
       -- 601.6 says the same for a permission lost after the proposal completes.
@@ -2359,13 +2601,6 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- Carried as the counts per cost rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
       paid <- announceOptionalCosts spending pid sid announcedCandidates optionalOffers gs
-      -- Not implemented: CR 702.33g's and CR 702.113b's targets, which a spell
-      -- whose kicked-only or awaken-only clause names a slot of its own should be
-      -- asked for only on the cast that paid for it (#2833). Part the Waterveil
-      -- prints that shape -- Burst Lightning's two clauses share one slot, but
-      -- rule 702.113a's land is the awaken clause's alone -- so the CR 601.2c step
-      -- below fills every slot the chosen modes declare and its land is targeted
-      -- on an unawakened cast too.
       --
       -- CR 702.33d: "if a spell's controller declares the intention to pay any of
       -- that spell's kicker costs, that spell has been kicked" -- the DECLARATION
@@ -2541,7 +2776,12 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- filter one step up, which runs before the stamp exists, stamps a
               -- copy of its own per candidate (proposedFor).
               bestowedGs <- State.get
-              let -- CR 702.96b: the overload candidate's spell "won't require any
+              let -- CR 702.33g/702.113b: the face CR 601.2c reads its slots off,
+                  -- each mode's declared targets narrowed to the ones some
+                  -- currently-applying clause reads -- trimModeTargetSlots'
+                  -- doc has the worked example (Part the Waterveil).
+                  faceForTargets = face {Face.spell = (Face.spell face) {Modal.Type.modes = fmap (trimModeTargetSlots pid sid bestowedGs) (Modal.Type.modes (Face.spell face))}}
+                  -- CR 702.96b: the overload candidate's spell "won't require any
                   -- targets", so CR 601.2c announces none -- read off the tag
                   -- stamped one step up rather than off the face, which prints
                   -- the word "target" either way (Pawl.Types.Keyword's
@@ -2554,7 +2794,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                         -- CR 702.47d: the spliced text's targets are chosen here
                         -- beside the spell's own.
                         Map.union
-                          (Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes face)
+                          (Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes faceForTargets)
                           (maybe Map.empty (`Game.splicedTargetSlots` bestowedGs) (Game.lookupObject sid bestowedGs))
                   -- CR 101.1: the ceiling this card's own words put on the value
                   -- about to be announced -- "X can't be greater than the
@@ -2573,9 +2813,12 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- narrowed to what the card permits. The affordable half rides the
               -- CHOSEN cost, and nothing filters the answer against it: an
               -- unaffordable announcement still reverses the whole cast (#417).
+              --
+              -- Not implemented: a spell's printed floor ("X can't be 0"), so the
+              -- least value offered is always 0 (#4027).
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX mCeiling chosenReductions spending pid sid bestowedGs chosenCost)))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid 0 (affordableX mCeiling chosenReductions spending pid sid bestowedGs chosenCost)))
                   else pure Nothing
               -- CR 101.1, and CR 101.2 for its direction: the card's sentence
               -- overrides the rule that would otherwise leave X free, and a
@@ -2636,10 +2879,15 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- announcement says why it matters to the announcement itself:
                   -- a Phyrexian symbol offered without the added "Sacrifice a
                   -- Swamp" in view would be offered against a board that has one
-                  -- Swamp too many.
+                  -- Swamp too many. CR 702.132a's assisting player likewise
+                  -- (Cost.assistable), which payableCost counts. A fence, not a
+                  -- proof: no printing states assist beside a hybrid or
+                  -- Phyrexian symbol (Scryfall keyword:assist, 2026-09-23), so
+                  -- no announcement here has a choice it could change.
                   let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments pid sid bestowedGs)
                   let totalledCost = Cost.plusComponents gathered announcedAtX
-                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid bestowedGs) (Cost.totalManas gathered)) totalledCost
+                      assistedTotal = Cost.assistable (maybe Set.empty Face.keywordSet (Game.faceOf sid bestowedGs)) (PaymentSubject.Casting sid) pid sid bestowedGs
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid bestowedGs) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.paidCosts`'s
@@ -2933,8 +3181,9 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- reason one line up -- everything between the two can
                           -- still reject the cast and rewind, and rule 601.2c
                           -- holds the trigger off the stack "until the spell has
-                          -- finished being cast" anyway.
-                          Event.becameTarget sid StackObjectKind.Spell pid chosen
+                          -- finished being cast" anyway. The board it samples
+                          -- is `pricedGs`, taken before CR 601.2g/h's payment.
+                          Event.becameTarget pricedGs sid StackObjectKind.Spell pid chosen
                           Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid keywordsBefore castFor sid)
                           -- CR 903.8: the cast is now announced, so this is a
                           -- "previous time they cast it from the command zone"

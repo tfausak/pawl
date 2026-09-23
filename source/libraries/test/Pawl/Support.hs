@@ -1983,7 +1983,7 @@ subChoiceFor :: PlayerId.PlayerId -> Prompt.Prompt r -> Bool
 subChoiceFor pid prompt = case prompt of
   Prompt.ChooseTargets decider _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseModes decider _ _ _ _ -> Decider.unwrap decider == pid
-  Prompt.ChooseX decider _ _ _ -> Decider.unwrap decider == pid
+  Prompt.ChooseX decider _ _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseCost decider _ _ _ -> Decider.unwrap decider == pid
   Prompt.OrderCostComponents decider _ _ _ -> Decider.unwrap decider == pid
   Prompt.ChooseManaSource decider _ _ -> Decider.unwrap decider == pid
@@ -2171,9 +2171,9 @@ answerActionChoice key verb choices asked =
                 updateActionChoices (\current -> current {choiceModes = Nothing})
                 pure modes
           _ -> unexpected
-        Prompt.ChooseX _ _ _ maximumX -> case choiceX choices of
+        Prompt.ChooseX _ _ _ minimumX maximumX -> case choiceX choices of
           Just x
-            | x <= maximumX -> do
+            | minimumX <= x && x <= maximumX -> do
                 updateActionChoices (\current -> current {choiceX = Nothing})
                 pure x
           _ -> unexpected
@@ -2614,6 +2614,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseFateseal decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExplore decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.RerollDie decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.AdjustDieRoll decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDefender decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseManaSource decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExtraManaSource decider _ _ -> Just (Decider.unwrap decider)
@@ -2662,7 +2663,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseSearchZones decider _ _ -> Just (Decider.unwrap decider)
   Prompt.Search decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.CastWhileSearching decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseX decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseX decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMutateSide decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseForage decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLearn decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2716,6 +2717,7 @@ promptDecider prompt = case prompt of
   Prompt.OrderCombatTolls decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderComponentCards decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderForEach decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseLoopMembers decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderTimestamps decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderManaActivations decider _ _ -> Just (Decider.unwrap decider)
   Prompt.DeclareMulligan decider _ _ -> Just (Decider.unwrap decider)
@@ -2757,6 +2759,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseFateseal {} -> "ChooseFateseal"
   Prompt.ChooseExplore {} -> "ChooseExplore"
   Prompt.RerollDie {} -> "RerollDie"
+  Prompt.AdjustDieRoll {} -> "AdjustDieRoll"
   Prompt.ChooseDefender {} -> "ChooseDefender"
   Prompt.ChooseManaSource {} -> "ChooseManaSource"
   Prompt.ChooseExtraManaSource {} -> "ChooseExtraManaSource"
@@ -2859,6 +2862,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.OrderCombatTolls {} -> "OrderCombatTolls"
   Prompt.OrderComponentCards {} -> "OrderComponentCards"
   Prompt.OrderForEach {} -> "OrderForEach"
+  Prompt.ChooseLoopMembers {} -> "ChooseLoopMembers"
   Prompt.OrderTimestamps {} -> "OrderTimestamps"
   Prompt.OrderManaActivations {} -> "OrderManaActivations"
   Prompt.DeclareMulligan {} -> "DeclareMulligan"
@@ -3375,7 +3379,7 @@ oneMountainState mountain ph =
           GameState.phase = ph,
           GameState.remaining = Turn.laterPhases,
           GameState.priority = Just alice,
-          GameState.passes = 0,
+          GameState.passed = Set.empty,
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
@@ -3389,8 +3393,10 @@ oneMountainState mountain ph =
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
           GameState.drawsThisTurn = mempty,
+          GameState.departedThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
           GameState.castPermissionsUsedThisTurn = mempty,
+          GameState.rollModifiersUsedThisTurn = mempty,
           GameState.triggeredThisGame = mempty,
           GameState.pendingControl = Map.empty,
           GameState.control = Map.empty,
@@ -3406,7 +3412,9 @@ oneMountainState mountain ph =
           GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],
           GameState.subgamesThisMatch = 0,
-          GameState.turnAnchor = Nothing
+          GameState.turnAnchor = Nothing,
+          GameState.rollingDie = Nothing,
+          GameState.rerolledTo = Nothing
         }
 
 drawStep :: Game.Type.Game ()

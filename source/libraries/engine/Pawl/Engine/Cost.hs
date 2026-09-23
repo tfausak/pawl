@@ -1748,7 +1748,7 @@ isLoyaltyCost cost = any isLoyaltyComponent (Cost.components cost)
 -- Asked of the PRINTED cost, never of the total: Carth the Lion's own addition
 -- is a loyalty component, so a reading taken after CR 601.2f folded the
 -- adjustments in would make every ability it touched a loyalty ability and tax
--- itself into applying. Pawl.Engine.Activate.loyaltyOk reads CR 606.3 off the
+-- itself into applying. Pawl.Engine.Activatable.loyaltyOk reads CR 606.3 off the
 -- printed cost for that reason too.
 loyaltyKindOf :: Cost Keyword.Type.Keyword -> LoyaltyKind.LoyaltyKind
 loyaltyKindOf cost = if isLoyaltyCost cost then LoyaltyKind.LoyaltyAbility else LoyaltyKind.NonLoyaltyAbility
@@ -1834,7 +1834,7 @@ combineLoyalty components = case break isLoyaltyComponent components of
 
 -- CR 113.6m's COST half: an ability whose cost moves the object it's on out of a
 -- particular zone functions only in that zone. The "or effect" half is
--- Pawl.Engine.EffectZone, and Activate.zoneFunctionedFrom joins them.
+-- Pawl.Engine.EffectZone, and Activatable.zoneFunctionedFrom joins them.
 --
 -- Nothing means the cost names no zone, leaving the effect half to answer and CR
 -- 113.6's battlefield default otherwise -- SacrificeThis' answer too, CR 701.21a
@@ -2029,41 +2029,13 @@ countersOn :: CounterKind.CounterKind Keyword.Type.Keyword -> ObjectId -> GameSt
 countersOn kind oid gs =
   maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
 
--- CR 601.2a: is this object the card whose cast is being PROPOSED right now? The
--- card is put onto the stack before CR 601.2f determines the total cost and CR
--- 601.2h pays it, so no pool a payability gate reads may count it -- neither the
--- hand a mana source's own cost would spend nor the graveyard the spell's own
--- cost would exile.
---
--- Read off the STAMP rather than taken as an argument, which is what lets one
--- reading serve both: Pawl.Engine.Cast.asProposed writes castFrom one step ahead
--- of the move and every offer gate measures the board it returns, so an object
--- whose stamp names the zone it is STILL IN is exactly one CR 601.2a has yet to
--- move -- whether the cost being measured is the spell's own or some mana
--- source's. Nothing else in a game satisfies it: after the move the stack
--- incarnation's zone is Stack and its stamp is the zone it left, and CR 400.7
--- mints every other arrival a fresh incarnation with the field cleared.
---
--- An ACTIVATION stamps nothing, which is what keeps CR 602.2a's source in the
--- pool its own cost draws on: an ability activated from a graveyard leaves its
--- source there, a legal candidate for its own cost, and no reading of this can
--- reach it.
---
--- Pawl.CostSpec's "CR 601.2a the cast is not offered: the Arbiter is not fuel for
--- the Bloom" and Pawl.CastSpec's "CR 601.2a with two other cards the cast is not
--- offered" are the two that prove it.
-beingCast :: GameState -> ObjectId -> Bool
-beingCast gs candidate = case Game.lookupObject candidate gs of
-  Nothing -> False
-  Just object -> Object.castFrom object == Just (Object.zone object)
-
 -- The cards this player may discard to pay a cost on `oid`: their hand, in its
 -- own order, narrowed by the criterion and minus `oid` itself -- see
 -- canPayComponent's DiscardCards arm for why that exclusion is CR 601.2a.
 --
 -- And minus the card being CAST, which is the same rule reaching an object this
 -- cost is not on: a mana source paying for a spell may not spend the spell
--- (`beingCast`).
+-- (Game.beingCast).
 --
 -- `slots` is what the announcement bound (announcedSlots), which every pool
 -- below takes for the same reason: CR 601.2c chooses the targets before CR
@@ -2081,7 +2053,7 @@ discardCandidates slots pid oid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
-   in filter (\candidate -> candidate /= oid && not (beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
+   in filter (\candidate -> candidate /= oid && not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
 
 -- The cards this player may put onto the battlefield to pay a CR 118.12
 -- PutCardFromHandOntoBattlefield component on `oid`: discardCandidates' pool,
@@ -2152,7 +2124,7 @@ beholdCandidates slots pid oid criterion gs =
 --
 -- No `oid` exclusion, unlike discardCandidates above: CR 602.2a leaves an ability
 -- activated FROM a graveyard with its source still there, a legal candidate for
--- its own cost. What is excluded instead is the card being CAST (`beingCast`),
+-- its own cost. What is excluded instead is the card being CAST (Game.beingCast),
 -- which is the exclusion the callers asking BEFORE CR 601.2a's move need and the
 -- only one CR 601.2a states -- Loathsome Chimera is not among the cards its own
 -- escape cost can exile.
@@ -2161,7 +2133,7 @@ exileCandidates slots pid criterion gs =
   let context = Filter.contextWithSlots (Game.teams gs) (Just pid) Nothing slots
       viewOf = Projection.viewsOf gs
       matches candidate = Filter.matches context (viewOf candidate) criterion
-   in filter (\candidate -> not (beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Graveyard pid gs)
+   in filter (\candidate -> not (Game.beingCast gs candidate) && matches candidate) (Game.zoneMembers Zone.Graveyard pid gs)
 
 -- The objects this player may exile to pay an ExileMaterials component on `oid`:
 -- CR 702.167a's "from among permanents you control and\/or cards in your
@@ -2199,7 +2171,7 @@ topExileCandidate slots pid criterion gs =
 -- The cards this player may exile to collect evidence: their WHOLE graveyard,
 -- `exileCandidates` under rule 701.59a's absent criterion -- "any number of
 -- cards from your graveyard" names no quality, so the trivial predicate is the
--- criterion rather than a stand-in for one. `beingCast`'s exclusion rides along
+-- criterion rather than a stand-in for one. Game.beingCast's exclusion rides along
 -- from there, and is CR 601.2a for the offer paths that ask before the card
 -- moves.
 evidenceCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> GameState -> [ObjectId]
@@ -2393,7 +2365,7 @@ claimOf slots pid oid component gs =
         -- many times the ability can be activated, which is the hand's size.
         --
         -- The pool excludes the card being CAST as well as the object the cost is on
-        -- (`beingCast`), so a spell being offered is not fuel for the source that would
+        -- (Game.beingCast), so a spell being offered is not fuel for the source that would
         -- pay for it: CR 601.2a has it on the stack by the time CR 601.2h pays.
         CostComponent.ExileCardFromHand criterion ->
           claim (ClaimAxis.Removal Zone.Hand) (Set.fromList (exileFromHandCandidates slots pid oid criterion gs)) 1
@@ -2586,7 +2558,7 @@ canPay subject pid oid cost gs = case Cost.mana cost of
 
 -- How many times may this player activate this mana ability, right now, and what
 -- does one activation spend? CR 605.3b keeps a mana ability off the stack, so
--- nothing here comes from Activate.activatable and every restriction that window
+-- nothing here comes from Activatable.activatable and every restriction that window
 -- applies has to be applied here instead.
 --
 -- Two of them are read off the ability's OWN activation cost (CR 602.2b):
@@ -3477,7 +3449,7 @@ announcedSlots announced gs = case announced >>= \a -> Game.lookupObject a gs of
 -- names no slot answers the same against every slot map, so a gate measuring
 -- such a cost may read the empty one and be exact; one that names a slot may
 -- not, and its gate owes the lookahead over the announcements still open
--- (Pawl.Engine.Cast.payableCostAt, Pawl.Engine.Activate.aimingSomewhere).
+-- (Pawl.Engine.Cast.payableCostAt, Pawl.Engine.Activatable.aimingSomewhere).
 --
 -- The classification is a Filter's, never a component's identity: every
 -- criterion a component carries goes through Filter.boundSlots.
@@ -4616,11 +4588,6 @@ genericOf symbol = case symbol of
 -- Not implemented: rule 733.1's option to keep the mana abilities this window
 -- activated when the cast is reversed -- its undo is discarded and the cast
 -- unwinds whole, `paySubstituting`'s reason (#3119).
---
--- Not implemented: a cast this keyword ENABLES. CR 601.2's announcement runs
--- whether or not the caster can pay, where Pawl.Engine.Cast gates it on
--- `payableCost` over the caster's own sources -- so an assisted cast can save
--- the caster mana and never afford them a spell (#3959).
 offerAssist :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set Keyword.Type.Keyword -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Maybe PlayerId)
 offerAssist perform keywords subject pid sid cost
   | not (Set.member Keyword.Type.Assist keywords) = pure Nothing
@@ -4640,6 +4607,27 @@ offerAssist perform keywords subject pid sid cost
                 Monad.void (payManaWindow perform Set.empty Nothing subject ManaSpending.AsProduced helper (\mc -> pure (mc, [])) (ManaCost.MkManaCost []))
             )
           pure chosen
+
+-- CR 702.132a at the castability gate: a totalled mana cost less the generic
+-- mana the best-placed other player could pay of it. CR 601.2 lets a player
+-- propose a cast whatever they can pay, so a gate on payability has to count
+-- what the chosen player COULD add; whether they do is theirs to answer at
+-- `payAssist`, and a cast they decline to help fails CR 601.2h and unwinds
+-- (CR 733.1).
+--
+-- The HELPER's supply is measured apart from the caster's, which is exact: each
+-- pays from their own pool and the mana abilities of what they control, so
+-- neither payment can spend what the other's needs, and paying more of the
+-- generic only makes the caster's residual easier.
+assistable :: Set.Set Keyword.Type.Keyword -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
+assistable keywords subject pid oid gs manaCost
+  | not (Set.member Keyword.Type.Assist keywords) = manaCost
+  | otherwise =
+      let generic = sum (fmap genericOf (ManaCost.unwrap manaCost))
+          pays helper n = canPaySomeCompletion Map.empty subject ManaSpending.AsProduced helper oid pure (\mc -> [(mc, [])]) (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) gs
+          capacity helper = Natural.length (takeWhile (pays helper) [1 .. generic])
+          best = maximum (0 : fmap capacity (filter (/= pid) (Game.stillPlaying gs)))
+       in withoutMana (ManaSymbol.Generic 0) best manaCost
 
 -- CR 702.132a's last sentence: before the caster begins to pay the total cost,
 -- the player they chose may pay for any amount of the generic mana in it.

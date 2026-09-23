@@ -18,6 +18,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -818,6 +819,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted {PermanentsBecomeTargeted.filter = Filter.ControlledBy PlayerRelation.You, PermanentsBecomeTargeted.kind = Just StackObjectKind.ActivatedAbility}))
       " {\"type\":\"PermanentsBecomeTargeted\",\"value\":{\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"kind\":{\"type\":\"ActivatedAbility\"}}} "
+  Spec.it s "PermanentBecomesTargeted round-trips with its Filter and its kind" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentBecomesTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted {PermanentsBecomeTargeted.filter = Filter.ControlledBy PlayerRelation.You, PermanentsBecomeTargeted.kind = Just StackObjectKind.Spell}))
+      " {\"type\":\"PermanentBecomesTargeted\",\"value\":{\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"kind\":{\"type\":\"Spell\"}}} "
   Spec.it s "SelfCast" $
     Common.assertCodec
       s
@@ -1118,6 +1125,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerRollsDice PlayerRelation.Opponent)
       " {\"type\":\"PlayerRollsDice\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 706.2: Night Shift of the Living Dead's "whenever you roll a 6".
+  Spec.it s "PlayerRollsResult" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6})
+      " {\"type\":\"PlayerRollsResult\",\"value\":{\"roller\":{\"type\":\"You\"},\"result\":6}} "
   -- CR 705.2. Both relations, PlayerRollsDice's shape: Tavern Scoundrel is the
   -- You form.
   Spec.it s "PlayerWinsCoinFlip round-trips both relations" $ do

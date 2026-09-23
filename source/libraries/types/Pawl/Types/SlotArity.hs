@@ -15,7 +15,7 @@ module Pawl.Types.SlotArity where
 -- Not two answers but three, because Pawl.Types.SlotName is one flat namespace:
 -- a read may be of the slot's amount rather than of the objects it names, and
 -- that read is not an arity claim about this slot at all. Presence and arity are
--- one map -- Pawl.Engine.Resolve.modeSlots' keys are the D4 dataflow lint's read
+-- one map -- Pawl.Engine.Resolve.Slots.modeSlots' keys are the D4 dataflow lint's read
 -- side and its values are the count lint's -- so the third answer is how the map
 -- reports a read while claiming nothing about how many recipients it sees.
 data SlotArity

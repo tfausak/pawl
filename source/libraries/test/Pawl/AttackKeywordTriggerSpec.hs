@@ -1588,13 +1588,14 @@ myriadSpec s registry =
       plan :: Prompt.Prompt r -> r
       plan p = case p of
         Prompt.ChooseAttackTarget {} -> S.attackTo S.bob p
-        -- CR 603.5's printed "may", taken.
-        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        -- Rule 702.116a's per-opponent "may", taken against every opponent.
+        Prompt.ChooseLoopMembers _ _ _ offered -> Set.fromList offered
         Prompt.DeclareBlockers {} -> Map.empty
         _ -> S.aggressiveAnswer p
-      declining :: Prompt.Prompt r -> r
-      declining p = case p of
-        Prompt.ChooseOptional {} -> OptionalDecision.Declines
+      -- The same answerer taking only `wanted` out of the loop's members.
+      picking :: Set.Set Recipient.Recipient -> Prompt.Prompt r -> r
+      picking wanted p = case p of
+        Prompt.ChooseLoopMembers {} -> wanted
         _ -> plan p
       attackedBy oid gs = Map.lookup oid (Combat.Type.attackers (GameState.combat gs))
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
@@ -1603,6 +1604,19 @@ myriadSpec s registry =
         piker <- S.printingOf s registry "Goblin Piker"
         let (gs0, mine, _, _) = S.threePlayerCombat [patrol, piker] [] []
         pure (mine, gs0)
+      -- threePlayerCombat's board with dave seated too.
+      fourSeats = do
+        patrol <- S.printingOf s registry "Wyrm's Crossing Patrol"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (_, gs1) = S.addPermanent patrol S.alice S.fourPlayerGame
+            (_, gs2) = S.addPermanent piker S.alice gs1
+            gs0 =
+              gs2
+                { GameState.activePlayer = S.alice,
+                  GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+                  GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.BeginningOfCombat)
+                }
+        pure gs0
    in Spec.describe s "Myriad (CR 702.116)" $ do
         Spec.it s "CR 702.116a a token copy enters tapped and attacking the opponent the Patrol did not" $ do
           (mine, gs0) <- board
@@ -1677,17 +1691,38 @@ myriadSpec s registry =
                 other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
               Spec.assertBool s (S.onBattlefield bobsPatrol after) "while bob's printed Patrol never attacked"
             (_, other) -> Spec.assertFailure s ("expected alice to control exactly the Clone, got " <> show (length other))
-        -- THE PAIR. Same board and the same declarations; only the answer to CR
-        -- 603.5's "may" differs, so a token that appeared anyway would not be
-        -- myriad's.
-        Spec.it s "CR 603.5 a declined may mints no token" $ do
+        -- THE PAIR. Same board and the same declarations; only the answer to
+        -- rule 702.116a's "may" differs, so a token that appeared anyway would not
+        -- be myriad's.
+        Spec.it s "CR 702.116a picking no opponent mints no token" $ do
           (mine, gs0) <- board
-          let after = atBlockers declining gs0
+          let after = atBlockers (picking Set.empty) gs0
           case mine of
             [patrolId, _] -> do
               Spec.assertEqWith s "no token was created" (S.tokensOf after) []
               Spec.assertEqWith s "though the Patrol did attack bob" (attackedBy patrolId after) (Just (AttackTarget.OfPlayer S.bob))
             _ -> Spec.assertFailure s "fixture should give alice a Patrol and a Piker"
+        -- FOUR SEATS, the board where rule 702.116a's loop has two members:
+        -- alice attacks bob, so carol and dave are each a separate "may". The
+        -- answerer takes dave alone; one question over the whole loop could only
+        -- mint two tokens or none.
+        Spec.it s "CR 702.116a at four seats a token is minted against the chosen opponent alone" $ do
+          gs0 <- fourSeats
+          let after = atBlockers (picking (Set.singleton (Recipient.ToPlayer S.dave))) gs0
+          Spec.assertEqWith
+            s
+            "CR 702.116a one token, attacking dave"
+            (fmap (`attackedBy` after) (S.tokensOf after))
+            [Just (AttackTarget.OfPlayer S.dave)]
+          Spec.assertEqWith s "CR 702.116a and its exile is armed" (length (GameState.delayedTriggers after)) 1
+        -- THE PAIR of the case above, picking nobody: rule 702.116a's "if one or
+        -- more tokens are created this way" then arms nothing, which the clause
+        -- counting the minted batch is what holds.
+        Spec.it s "CR 702.116a at four seats picking nobody arms no exile" $ do
+          gs0 <- fourSeats
+          let after = atBlockers (picking Set.empty) gs0
+          Spec.assertEqWith s "CR 702.116a no delayed exile is armed" (length (GameState.delayedTriggers after)) 0
+          Spec.assertEqWith s "CR 702.116a and no token was minted" (S.tokensOf after) []
         -- TWO SEATS, the default game size, where rule 702.116a's loop has NO
         -- member: bob is alice's only opponent and bob is the defending player.
         -- The rule then offers no "may" and creates no token, so its "if one or
@@ -1706,9 +1741,9 @@ myriadSpec s registry =
           piker <- S.printingOf s registry "Goblin Piker"
           let counting :: Prompt.Prompt r -> State.State Int r
               counting p = case p of
-                Prompt.ChooseOptional {} -> do
+                Prompt.ChooseLoopMembers {} -> do
                   State.modify' (+ 1)
-                  pure OptionalDecision.Exercises
+                  pure (plan p)
                 _ -> pure (plan p)
               stepTo :: Phase.Phase -> Int -> GameState.GameState -> State.State Int GameState.GameState
               stepTo target n g =
@@ -1726,11 +1761,11 @@ myriadSpec s registry =
           -- ability is what CR 511.2 would put on the stack, and rule 702.116a
           -- creates none here.
           Spec.assertEqWith s "CR 702.116a at two seats no delayed exile is armed" (length (GameState.delayedTriggers afterTwo)) 0
-          Spec.assertEqWith s "CR 603.5 and its may is never asked" askedTwo 0
+          Spec.assertEqWith s "CR 608.2d and its may is never asked" askedTwo 0
           Spec.assertEqWith s "CR 702.116a and no token was minted" (S.tokensOf afterTwo) []
           -- The control: one seat more, and every one of the three flips.
           Spec.assertEqWith s "CR 702.116a at three seats the exile IS armed" (length (GameState.delayedTriggers afterThree)) 1
-          Spec.assertEqWith s "CR 603.5 and the may is asked once" askedThree 1
+          Spec.assertEqWith s "CR 608.2d and the may is asked once" askedThree 1
           Spec.assertEqWith s "CR 702.116a and one token was minted" (length (S.tokensOf afterThree)) 1
 
 -- CR 702.181a's mobilize: an attack trigger minting N tapped-and-attacking 1/1

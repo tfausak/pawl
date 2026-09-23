@@ -475,6 +475,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination subject) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
+  Effect.Reroll -> effect
   -- CR 612.1: rule 201.4a's restriction is printed card text, so a text-changer
   -- rewrites it exactly as it rewrites a search's filter above.
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref (Filter.rewrite pairs restriction))
@@ -877,8 +878,8 @@ rewriteEffect pairs effect = case effect of
         { GrantPlayFromExile.duration = rewriteDuration pairs (GrantPlayFromExile.duration grant),
           GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant)
         }
-  Effect.ForEach (ForEach.MkForEach ref slot body individually) ->
-    Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) slot (fmap (rewriteEffect pairs) body) individually)
+  Effect.ForEach (ForEach.MkForEach ref membership slot body individually) ->
+    Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually)
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
 
 -- CR 612.2 over one word whose family a card's text names rather than a
@@ -1580,6 +1581,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfBecomesTargeted _ -> condition
   TriggerCondition.ControllerBecomesTarget {} -> condition
   TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted f kind) -> TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted (Filter.rewrite pairs f) kind)
+  TriggerCondition.PermanentBecomesTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted f kind) -> TriggerCondition.PermanentBecomesTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted (Filter.rewrite pairs f) kind)
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerCycles _ -> condition
   TriggerCondition.PlayerDrawsNthCard {} -> condition
@@ -1678,6 +1680,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
+  TriggerCondition.PlayerRollsResult _ -> condition
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
   TriggerCondition.PlayerLosesCoinFlip _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition
@@ -1722,6 +1725,7 @@ rewriteRestriction pairs restriction = case restriction of
   ActivationRestriction.BeforeCombatDamage -> restriction
   ActivationRestriction.OnlyOnce -> restriction
   ActivationRestriction.OnlyOnceEachTurn -> restriction
+  ActivationRestriction.DuringDieRoll -> restriction
 
 -- CR 612.1 through a Duration, which Pawl.Types.Duration holds as the card
 -- prints it: a CR 611.2b "for as long as ..." clause is rules text like any

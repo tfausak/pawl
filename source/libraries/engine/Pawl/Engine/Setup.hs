@@ -232,7 +232,7 @@ emptyGame order =
           GameState.phase = Turn.firstPhase,
           GameState.remaining = Turn.laterPhases,
           GameState.priority = Nothing,
-          GameState.passes = 0,
+          GameState.passed = Set.empty,
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
@@ -246,8 +246,10 @@ emptyGame order =
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
           GameState.drawsThisTurn = mempty,
+          GameState.departedThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
           GameState.castPermissionsUsedThisTurn = mempty,
+          GameState.rollModifiersUsedThisTurn = mempty,
           GameState.triggeredThisGame = mempty,
           GameState.pendingControl = Map.empty,
           GameState.control = Map.empty,
@@ -266,7 +268,9 @@ emptyGame order =
           -- CR 100.6a: pawl models no match around this game, so the match it
           -- belongs to has had no subgame yet.
           GameState.subgamesThisMatch = 0,
-          GameState.turnAnchor = Nothing
+          GameState.turnAnchor = Nothing,
+          GameState.rollingDie = Nothing,
+          GameState.rerolledTo = Nothing
         }
 
 createCard :: PlayerId -> PrintingId.PrintingId -> Game ObjectId
@@ -784,7 +788,7 @@ restartGame perform exempt starter = do
             GameState.phase = Turn.firstPhase,
             GameState.remaining = Turn.laterPhases,
             GameState.priority = Nothing,
-            GameState.passes = 0,
+            GameState.passed = Set.empty,
             GameState.turnNumber = 1,
             GameState.result = Nothing,
             -- CR 727.4: the game the caller was running has been replaced.
@@ -801,8 +805,10 @@ restartGame perform exempt starter = do
             GameState.drewFromEmpty = mempty,
             GameState.landsPlayed = mempty,
             GameState.drawsThisTurn = mempty,
+            GameState.departedThisTurn = mempty,
             GameState.activatedThisTurn = mempty,
             GameState.castPermissionsUsedThisTurn = mempty,
+            GameState.rollModifiersUsedThisTurn = mempty,
             GameState.triggeredThisGame = mempty,
             GameState.pendingControl = Map.empty,
             GameState.control = Map.empty,
@@ -835,7 +841,9 @@ restartGame perform exempt starter = do
             -- other per-game record above is cleared, for the reason
             -- nextTimestamp is preserved: the question is not about this game.
             GameState.subgamesThisMatch = GameState.subgamesThisMatch gs,
-            GameState.turnAnchor = Nothing
+            GameState.turnAnchor = Nothing,
+            GameState.rollingDie = Nothing,
+            GameState.rerolledTo = Nothing
           }
   startGameFromCards perform exempt
 
@@ -1010,7 +1018,7 @@ subgameStateFrom starter parent =
           GameState.phase = Turn.firstPhase,
           GameState.remaining = Turn.laterPhases,
           GameState.priority = Nothing,
-          GameState.passes = 0,
+          GameState.passed = Set.empty,
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
@@ -1024,8 +1032,10 @@ subgameStateFrom starter parent =
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
           GameState.drawsThisTurn = mempty,
+          GameState.departedThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
           GameState.castPermissionsUsedThisTurn = mempty,
+          GameState.rollModifiersUsedThisTurn = mempty,
           GameState.triggeredThisGame = mempty,
           GameState.pendingControl = Map.empty,
           GameState.control = Map.empty,
@@ -1051,7 +1061,9 @@ subgameStateFrom starter parent =
           -- itself, Engine.playSubgame having raised it before building this
           -- state. CR 729.6's nested subgame therefore counts them all.
           GameState.subgamesThisMatch = GameState.subgamesThisMatch parent,
-          GameState.turnAnchor = Nothing
+          GameState.turnAnchor = Nothing,
+          GameState.rollingDie = Nothing,
+          GameState.rerolledTo = Nothing
         }
 
 -- CR 729.4a: the cards the subgame brought in have left the main game, so the

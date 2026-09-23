@@ -19,6 +19,7 @@ import qualified Data.List as List
 import qualified Data.Sequence as Seq
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
@@ -77,10 +78,10 @@ cloaked s registry mode = do
   let (noteId, g1) = S.addPermanent note S.alice (S.landsFor mountain S.alice 6 (Setup.emptyGame S.bothPlayers))
       (_, g2) = S.addLibraryCard piker S.alice g1
       (_, before) = S.addLibraryCard giant S.alice g2
-      after = case Activate.abilitiesFor noteId before of
+      after = case Activatable.abilitiesFor noteId before of
         [ability] -> S.runPure (choosingMode mode) before (Activate.activateAbility S.alice noteId ability >> Stack.resolveTop)
         _ -> before
-  Spec.assertEqWith s "Ransom Note states exactly one activated ability" (length (Activate.abilitiesFor noteId before)) 1
+  Spec.assertEqWith s "Ransom Note states exactly one activated ability" (length (Activatable.abilitiesFor noteId before)) 1
   pure (before, after)
 
 -- How many of alice's objects in this zone are copies of a card with this name.

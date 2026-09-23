@@ -186,6 +186,7 @@ import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
@@ -620,7 +621,7 @@ objectRefPositions =
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
         ("make-foretold", Effect.MakeForetold (MakeForetold.MkMakeForetold (plantedRef "mf") Nothing), [plantedRef "mf"]),
         ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
-        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") (SlotName.MkSlotName (Text.pack "each")) Seq.empty False), [plantedRef "fe"]),
+        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") LoopMembers.Every (SlotName.MkSlotName (Text.pack "each")) Seq.empty False), [plantedRef "fe"]),
         ("heal", Effect.Heal (plantedRef "he"), [plantedRef "he"])
       ]
 
@@ -752,6 +753,7 @@ restrictionConditions restriction = case restriction of
   ActivationRestriction.OnlyIf condition -> [condition]
   ActivationRestriction.OnlyOnce -> []
   ActivationRestriction.OnlyOnceEachTurn -> []
+  ActivationRestriction.DuringDieRoll -> []
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
@@ -1016,6 +1018,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
+  TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
@@ -1079,6 +1082,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Nor does the bystander batch reading, which carries a Filter and a
   -- StackObjectKind.
   TriggerCondition.PermanentsBecomeTargeted {} -> []
+  TriggerCondition.PermanentBecomesTargeted {} -> []
 
 -- Every Count reachable from one effect: the Quantities nested in its
 -- ObjectRefs, its own Quantity/Duration fields, and -- for Create/CreateEmblem
@@ -1108,6 +1112,7 @@ ownCounts effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> foldMap quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -1287,7 +1292,7 @@ ownCounts effect = case effect of
   Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectCounts body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectCounts body
   Effect.Heal _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
@@ -1514,7 +1519,7 @@ effectNestedEffects effect = case effect of
   -- CR 615.8's shield carries no rider at all.
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body, run once per member of the fold.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> Foldable.toList body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Foldable.toList body
   Effect.Heal _ -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
@@ -1534,6 +1539,7 @@ effectNestedEffects effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2007,6 +2013,7 @@ effectReplacements effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2058,7 +2065,7 @@ effectReplacements effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectReplacements body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectReplacements body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics hold no replacement effect (gap #1667).
@@ -2289,6 +2296,7 @@ oneEffectActivated mana effect =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.maximumX = [],
+      ActivatedAbility.minimumX = 0,
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -2315,6 +2323,7 @@ modalActivated modes =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
       ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
       ActivatedAbility.maximumX = [],
+      ActivatedAbility.minimumX = 0,
       ActivatedAbility.restrictions = [],
       ActivatedAbility.activator = Activator.Controller,
       ActivatedAbility.condition = Nothing,
@@ -2457,6 +2466,7 @@ effectMintedFaces effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -2510,7 +2520,7 @@ effectMintedFaces effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> concatMap effectMintedFaces body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectMintedFaces body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
@@ -3931,6 +3941,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
+  TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
@@ -4004,6 +4015,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- The bystander batch reading DOES carry one, and it is card text like any
   -- other: Professor Hojo's "creatures you control".
   TriggerCondition.PermanentsBecomeTargeted payload -> unframed [PermanentsBecomeTargeted.filter payload]
+  TriggerCondition.PermanentBecomesTargeted payload -> unframed [PermanentsBecomeTargeted.filter payload]
 
 -- Every SlotName a TriggerCondition names OUTRIGHT. Exhaustive with no
 -- fallthrough, triggerConditionCounts' shape and for its reason: a condition
@@ -4108,6 +4120,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfBecomesTargeted _ -> []
   TriggerCondition.ControllerBecomesTarget _ -> []
   TriggerCondition.PermanentsBecomeTargeted _ -> []
+  TriggerCondition.PermanentBecomesTargeted _ -> []
   TriggerCondition.SelfHalfUnlocked _ -> []
   TriggerCondition.RoomFullyUnlocked _ -> []
   -- Recursive, for triggerConditionCounts' reason: a branch of an AnyOf may be
@@ -4151,6 +4164,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
+  TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.PlayerWinsCoinFlip _ -> []
   TriggerCondition.PlayerLosesCoinFlip _ -> []
   TriggerCondition.SelfBecomesPlotted -> []
@@ -5213,6 +5227,7 @@ effectFilters effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ _ f _ _ _) -> searchFramed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   -- CR 201.4a's restriction, and the WISH's frame: what judges it is
   -- Pawl.Interpreter.legalCardName, on the far side of
   -- Pawl.Engine.Engine.runGameAsked, and it matches a printed FACE
@@ -5497,7 +5512,7 @@ effectFilters effect = case effect of
   Effect.GrantPlayFromExile grant -> frame Unframed (durationFilters (GrantPlayFromExile.duration grant)) <> frame SourceHostFramed (objectRefFilters (GrantPlayFromExile.ref grant))
   -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
   -- list is exactly what this traversal must not stop at.
-  Effect.ForEach (ForEach.MkForEach ref _ body _) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
+  Effect.ForEach (ForEach.MkForEach ref _ _ body _) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
@@ -6459,6 +6474,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (any (any variableCounters . suspendsOf) ps)
       "the pool has a suspend whose N is CR 107.3d's chosen X"
     Spec.assertEqWith s "and every suspend cost agrees with its own N" (fmap (S.nameOf . Printing.card) offenders) []
+  -- Pawl.Engine.Resolve.Effect's die-roll window resolves a DuringDieRoll
+  -- ability at once and asks for it with Prompt.RerollDie, so it announces no
+  -- mode, target or X and does nothing but reroll.
+  Spec.it s "every ability activated inside a die roll is one untargeted reroll" $ do
+    ps <- S.allPrintings s
+    let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
+        windowed = concatMap (filter (elem ActivationRestriction.DuringDieRoll . ActivatedAbility.restrictions . snd) . abilitiesOf) ps
+        offends (_, ab) =
+          let modal = ActivatedAbility.modal ab
+           in length (Modal.modes modal) /= 1
+                || not (all (null . Mode.targetSlots) (Modal.modes modal))
+                || declaresVariable (ActivatedAbility.cost ab)
+                || Modal.allEffects modal /= [Effect.Reroll]
+    Spec.assertBool s (not (null windowed)) "the pool has such an ability"
+    Spec.assertEqWith s "an untargeted reroll alone" (fmap fst (filter offends windowed)) []
   Spec.it s "CR 602.2b every activated ability that reads X declares {X} in its own cost" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))

@@ -6,7 +6,7 @@
 -- roll is externalised through. The transcript legs live in Pawl.ReplaySpec
 -- with the other randomness prompts.
 --
--- SIX FIXTURES. Ancient Copper Dragon ("Flying /
+-- EIGHT FIXTURES. Ancient Copper Dragon ("Flying /
 -- Whenever this creature deals combat damage to a player, roll a d20. You create
 -- a number of Treasure tokens equal to the result") is CR 706.4's, the result
 -- read straight into a count; Djinni Windseer ("Flying / When this creature
@@ -28,9 +28,11 @@
 -- nothing about. CR 706.2a's cost on such a modifier is the SEVENTH, Wall of
 -- Fortune, below it -- the only printing whose reroll charges anything and the
 -- only one reaching a roll its own controller did not make.
--- Left out: no modifier from another source that increases or decreases the
--- result (#3974), no "Roll again" (#2124), and no reading that takes the results
--- as a set (#3243). CR 706.1's roll does record its event, but the trigger
+-- CR 706.2b's second step is the EIGHTH, Night Shift of the Living Dead, at the
+-- very bottom -- a modifier from another source that increases or decreases the
+-- result, with a life cost and a once-each-turn budget.
+-- Left out: no "Roll again" (#2124), and no reading that takes the results as a
+-- set (#3243). CR 706.1's roll does record its event, but the trigger
 -- reading it lives in Pawl.EventTriggerSpec beside the other condition cases.
 --
 -- THE ASSERTED QUANTITY on the DRAGON's boards is how many Treasure tokens alice
@@ -76,25 +78,40 @@
 -- performs moves the library, so the top card is what separates the bands.
 module Pawl.DiceSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activatable as Activatable
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Game as Game.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.RollAdjustment as RollAdjustment
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -106,6 +123,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   dieRollRSpec s registry
   rerollSpec s registry
   costedRerollSpec s registry
+  activatedRerollSpec s registry
+  nightShiftSpec s registry
+  deckSpec s registry
+  deckOwnerSpec s registry
+  deckExactBandSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -250,12 +272,12 @@ resultsTableSpec s registry = Spec.describe s "ResultsTable" $ do
         -- FENCE on this striation's own shape rather than a proof of it: 20 is a
         -- d20's top face, so a `20+` reading agrees with the printed `20` on
         -- every outcome, and swapping the card's Exactly for an AtLeast leaves
-        -- this assertion green. Windseer's own instruction prints no modifier, so
-        -- it becomes discriminable here only alongside one reaching the roll from
-        -- ANOTHER source (#3974); the single-endpoint form itself is proved on
-        -- Diviner's Portent below, whose printed modifier pushes a natural 20
-        -- past the face count. What the assertion DOES prove is that 20 selects
-        -- this striation and not the 10-19 band above it.
+        -- this assertion green. Windseer's own instruction prints no modifier;
+        -- the IncreaseOrDecrease group's "a result shifted past the die's top
+        -- face" case proves the exact form under Night Shift of the Living
+        -- Dead's 21, and the single-endpoint form is proved on Diviner's Portent
+        -- below. What the assertion DOES prove is that 20 selects this striation
+        -- and not the 10-19 band above it.
         Spec.assertEqWith s "CR 706.3a: a roll of 20 is the 20 striation, so scry 3" (Maybe.listToMaybe (tableLibrary (runTable 20 board))) (Just fourth)
       _ -> Spec.assertFailure s "expected six library cards"
   -- Both endpoints of a printed N1-N2 belong to it (CR 706.3a). 9 and 10 above
@@ -1052,6 +1074,18 @@ costedRerollSpec s registry = Spec.describe s "Costed reroll" $ do
       "CR 109.5: bob is the seat the offer was put to"
       (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell withWall)
       [S.bob]
+  Spec.it s "CR 706.2b a reroll is a roll by the player who throws it" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (_, withWall) = S.addPermanent wall S.bob board
+        rolls p after = length (filter (== GameEvent.DiceRolled p) (S.eventsOf after))
+    -- Pippa, Duchess of Dice's ruling makes a reroll trigger "whenever you roll
+    -- a die". Bob's Wall has ALICE reroll, so alice has rolled twice -- the
+    -- instruction's roll and the reroll -- and bob not at all. The paired run
+    -- declines, and leaves the one roll.
+    Spec.assertEqWith s "the reroll is alice's second roll" (rolls S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall)) 2
+    Spec.assertEqWith s "and bob, who paid, did not roll" (rolls S.bob (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall)) 0
+    Spec.assertEqWith s "a declined reroll is no roll" (rolls S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell withWall)) 1
   Spec.it s "CR 706.2a each costed modifier is its own offer" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     wall <- S.printingOf s registry "Wall of Fortune"
@@ -1097,3 +1131,396 @@ rerollSeats rolls decisions spell board =
         pure answer
       (seats, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], (rolls, decisions))
    in reverse seats
+
+-- Goblin Bookie's "{R}, {T}: Reflip any coin or reroll any die. (Activate only
+-- any time it makes sense.)", read as a window inside CR 706.2's modification
+-- step where the ability is activated and resolves at once. The Endeavor
+-- fixture and the 3-6-2 script of the Wall group above: six Knights means the
+-- reroll happened, three that it did not.
+--
+-- BOB's Bookie over ALICE's roll, since "any die" reaches another player's,
+-- and a Mountain beside it for the {R}. The paired boards each take away one
+-- thing an ACTIVATED ability needs and a static modifier would not: the mana
+-- (CR 602.2b), and a creature's settle before paying {T} (CR 302.6).
+--
+-- Not transcribed: the "reflip any coin" half (#4017). Stricter than printed:
+-- bob can reflip nothing.
+activatedRerollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+activatedRerollSpec s registry = Spec.describe s "Activated reroll" $ do
+  Spec.it s "CR 706.2b Goblin Bookie rerolls another player's die" $ do
+    (spell, _, _, board, bookie, mountain) <- bookieBoard s registry
+    let after = runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell board
+    -- THE GAMEPLAY ASSERTION: bob activated the Bookie inside alice's roll and
+    -- the 3 came back a 6.
+    Spec.assertEqWith
+      s
+      "CR 706.2b: the Bookie's reroll turns the 3 into a 6"
+      (S.countOnBattlefieldByName knight S.alice after)
+      6
+    Spec.assertBool s (Game.isTapped bookie after && Game.isTapped mountain after) "CR 602.2b: bob paid {R} and {T}"
+    Spec.assertEqWith s "CR 109.5: bob is the seat the offer was put to" (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell board) [S.bob]
+    -- Pippa, Duchess of Dice's ruling: the reroll is the rerolling player's roll.
+    Spec.assertEqWith
+      s
+      "a reroll of alice's die is bob's roll"
+      (length (filter (== GameEvent.DiceRolled S.bob) (S.eventsOf after)))
+      1
+    -- The paired run: the same board with the offer declined.
+    Spec.assertEqWith
+      s
+      "and a declined offer leaves the 3"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell board))
+      3
+  Spec.it s "CR 706.2b the rerolling player rolled the final result" $ do
+    (spell, _, _, board, _, _) <- bookieBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.bob board)
+        (after, _) = nightShiftRun [3, 6, 2] [OptionalDecision.Exercises] [] 1 spell shifted
+        (declined, _) = nightShiftRun [3, 6, 2] [OptionalDecision.Declines] [] 1 spell shifted
+    -- THE GAMEPLAY ASSERTION: bob's Bookie rerolled alice's 3 into a 6, so
+    -- BOB rolled the 6 (Pippa, Duchess of Dice's ruling) and bob's Night Shift
+    -- of the Living Dead's "whenever you roll a 6" mints bob a Zombie.
+    Spec.assertEqWith s "the reroller's \"whenever you roll a 6\" fires" (S.countOnBattlefieldByName zombieEmployee S.bob after) 1
+    Spec.assertEqWith s "CR 706.2b: the 6 is the other result" (S.countOnBattlefieldByName knight S.alice after) 6
+    -- The paired run, declined: alice's 3 stands, the 6 is alice's second die,
+    -- and bob rolled nothing.
+    Spec.assertEqWith s "and bob's Night Shift sees no roll of his without the reroll" (S.countOnBattlefieldByName zombieEmployee S.bob declined) 0
+  Spec.it s "CR 602.2b the window asks what a priority activation asks" $ do
+    (spell, _, _, board, bookie, mountain) <- bookieBoard s registry
+    let unpaid = S.tapObject mountain board
+        sick = board {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) bookie (GameState.objects board)}
+    -- THE GAMEPLAY ASSERTIONS: every Exercises in the script is accepted, so an
+    -- engine that offered the Bookie anyway mints six. The sick Bookie is the
+    -- gate's proof; the tapped Mountain would also be refused by the payment.
+    Spec.assertEqWith
+      s
+      "CR 118.3: no {R} to pay, so no reroll"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell unpaid))
+      3
+    Spec.assertEqWith
+      s
+      "CR 302.6: a summoning-sick Bookie cannot pay {T}"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell sick))
+      3
+    Spec.assertEqWith s "and neither was offered" (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell unpaid <> rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell sick) []
+  Spec.it s "CR 117.1b the Bookie cannot be activated at priority" $ do
+    (_, _, _, board, bookie, _) <- bookieBoard s registry
+    -- No die is being rolled, so it never makes sense; with the mana and the
+    -- untapped Bookie that the first case paid with.
+    Spec.assertBool
+      s
+      (not (any (\ability -> Activatable.activatable S.bob bookie ability board) (Activatable.abilitiesFor bookie board)))
+      "the Bookie's ability is not activatable outside a roll"
+    Spec.assertBool s (not (null (Activatable.abilitiesFor bookie board))) "and the Bookie has the ability"
+
+-- The Endeavor board plus bob's Goblin Bookie and a Mountain to pay its {R}.
+bookieBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+bookieBoard s registry = do
+  (spell, weak, strong, board) <- endeavorBoard s registry
+  bookiePrinting <- S.printingOf s registry "Goblin Bookie"
+  mountainPrinting <- S.printingOf s registry "Mountain"
+  let (bookie, withBookie) = S.addPermanent bookiePrinting S.bob board
+      (mountain, withBoth) = S.addPermanent mountainPrinting S.bob withBookie
+  pure (spell, weak, strong, withBoth, bookie, mountain)
+
+-- CR 706.2's third sentence, "Modifiers may also come from other sources", in
+-- rule 706.2b's SECOND bucket: Night Shift of the Living Dead ("After you roll a
+-- die, you may pay 1 life. If you do, increase or decrease the result by 1. Do
+-- this only once each turn. / Whenever you roll a 6, create a 2/2 black Zombie
+-- Employee creature token."). Its first ability is the modifier, with CR
+-- 706.2a's optional cost; its second reads the RESULT, which CR 706.2's last
+-- sentence makes the number after every modifier -- so a 5 shifted up mints a
+-- Zombie and a 6 shifted down does not.
+--
+-- THE SAME ENDEAVOR FIXTURE as the reroll groups above: two d6, the roller
+-- picks the destroying result and "the other result" counts Knights. Two
+-- readings, then: the Knights say which number the unchosen die ended on, and
+-- the Zombie Employee tokens say whether a 6 was among the final results.
+--
+-- CR 603.3 is why nightShiftRun drains the stack after the Endeavor resolves:
+-- "whenever you roll a 6" triggers during that resolution and reaches the stack
+-- only at the next placement.
+nightShiftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nightShiftSpec s registry = Spec.describe s "IncreaseOrDecrease" $ do
+  Spec.it s "CR 706.2 an increase from another source is part of the result" $ do
+    (spell, weak, strong, board) <- endeavorBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.alice board)
+        (after, shown) = nightShiftRun [5, 2] [] [Just (0, RollAdjustment.Increase)] 1 spell shifted
+    -- THE GAMEPLAY ASSERTIONS, first so nothing ahead of them can absorb a
+    -- mutation: the first die's 5 was pushed to 6, so the other result is six
+    -- Knights and "whenever you roll a 6" mints a Zombie Employee. An engine that
+    -- never offered the modifier reads 5 and mints no Zombie.
+    Spec.assertEqWith s "CR 706.2: the shifted 6 is the other result" (S.countOnBattlefieldByName knight S.alice after) 6
+    Spec.assertEqWith s "CR 706.2: the result after the modifier is a 6, so the Zombie arrives" (S.countOnBattlefieldByName zombieEmployee S.alice after) 1
+    Spec.assertEqWith s "CR 706.2a: the modifier cost 1 life" (S.lifeOf S.alice after) (Just 19)
+    Spec.assertBool s (not (S.onBattlefield strong after)) "the chosen 2 still destroys power 4"
+    Spec.assertBool s (S.onBattlefield weak after) "and power 1 survives it"
+    -- Supporting: both results were shown before the choice (the printed
+    -- ruling), and only once.
+    Spec.assertEqWith s "CR 706.2b: one offer, showing both dice" shown [[5, 2]]
+    -- The paired board, one thing different: no Night Shift.
+    let (bare, _) = nightShiftRun [5, 2] [] [Just (0, RollAdjustment.Increase)] 1 spell board
+    Spec.assertEqWith s "CR 706.1: without it the 5 stands" (S.countOnBattlefieldByName knight S.alice bare) 5
+  Spec.it s "CR 706.2a the modifier is the roller's to decline" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.alice board)
+        (after, _) = nightShiftRun [5, 2] [] [Nothing] 1 spell shifted
+    Spec.assertEqWith s "CR 706.2a: a declined modifier leaves the 5" (S.countOnBattlefieldByName knight S.alice after) 5
+    Spec.assertEqWith s "and no 6 was rolled" (S.countOnBattlefieldByName zombieEmployee S.alice after) 0
+    Spec.assertEqWith s "and no life was paid" (S.lifeOf S.alice after) (Just 20)
+  Spec.it s "CR 706.2 a decrease moves a 6 off the number the trigger reads" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.alice board)
+        (lowered, _) = nightShiftRun [6, 2] [] [Just (0, RollAdjustment.Decrease)] 1 spell shifted
+        (kept, _) = nightShiftRun [6, 2] [] [Nothing] 1 spell shifted
+    -- The natural 6 is not what "whenever you roll a 6" reads: the result is.
+    Spec.assertEqWith s "CR 706.2: a natural 6 decreased to 5 mints no Zombie" (S.countOnBattlefieldByName zombieEmployee S.alice lowered) 0
+    Spec.assertEqWith s "and the other result is the 5" (S.countOnBattlefieldByName knight S.alice lowered) 5
+    Spec.assertEqWith s "CR 706.2: the same 6 left alone mints one" (S.countOnBattlefieldByName zombieEmployee S.alice kept) 1
+  Spec.it s "CR 706.2 the roller picks which die to shift" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.alice board)
+        (after, _) = nightShiftRun [2, 5] [] [Just (1, RollAdjustment.Increase)] 0 spell shifted
+    -- The SECOND die is named, so the 5 becomes the 6; an engine that shifted
+    -- the first die whatever the answer makes the 2 a 3 and mints five Knights.
+    Spec.assertEqWith s "CR 706.2: the second die's 6 is the other result" (S.countOnBattlefieldByName knight S.alice after) 6
+    Spec.assertEqWith s "and it is a 6 for the trigger" (S.countOnBattlefieldByName zombieEmployee S.alice after) 1
+  Spec.it s "CR 706.2a the modifier is taken only once each turn" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    endeavor <- S.printingOf s registry "Valiant Endeavor"
+    plains <- S.printingOf s registry "Plains"
+    -- Six more Plains, so the second Endeavor is paid for as the first was.
+    let mana = List.foldl' (\gs _ -> snd (S.addPermanent plains S.alice gs)) (snd (S.addPermanent shift S.alice board)) [1 .. 6 :: Int]
+        (twice, second) = S.handOne endeavor mana
+        answers = [Just (0 :: Natural.Natural, RollAdjustment.Increase), Just (0, RollAdjustment.Increase)]
+        (once, shownOnce) = nightShiftRun [5, 2] [] answers 1 spell twice
+        -- The second Endeavor rolls 5 and 3 and destroys with the 3, so the
+        -- first cast's 2/2 Knights and Zombie survive it.
+        (sameTurn, shownSame) = nightShiftRun [5, 3] [] answers 1 second once
+        (nextTurn, shownNext) = nightShiftRun [5, 3] [] answers 1 second (Engine.beginTurnOf S.alice (Engine.beginTurnOf S.bob once))
+    -- THE GAMEPLAY ASSERTION: the budget is spent, so the second roll's 5
+    -- stands: five more Knights on top of the first six, and still one Zombie.
+    Spec.assertEqWith s "CR 706.2a: the same turn's second roll is not shifted" (S.countOnBattlefieldByName knight S.alice sameTurn) 11
+    Spec.assertEqWith s "and mints no second Zombie" (S.countOnBattlefieldByName zombieEmployee S.alice sameTurn) 1
+    Spec.assertEqWith s "the first roll was offered" shownOnce [[5, 2]]
+    Spec.assertEqWith s "and the second was not" shownSame []
+    -- The next turn's roll has its budget back: its shifted 6 mints a second
+    -- Zombie, and the offer was raised.
+    Spec.assertEqWith s "a new turn's shifted 6 mints a second Zombie" (S.countOnBattlefieldByName zombieEmployee S.alice nextTurn) 2
+    Spec.assertEqWith s "a new turn offers it again" shownNext [[5, 3]]
+  -- CR 706.3a's single-number striation against a result the die cannot
+  -- show: Djinni Windseer's "20 | Scry 3." under a natural 20 shifted to 21. The
+  -- table's `20` is an exact number, so 21 fires nothing and alice's top card
+  -- is the first; a `20+` reading scries 3. The decrease leg is the pair: 19 is
+  -- in 10-19 and scries 2.
+  Spec.it s "CR 706.3a a result shifted past the die's top face fires no single-number striation" $ do
+    (ids, board) <- tableBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.alice board)
+        shiftAnswer :: RollAdjustment.RollAdjustment -> Prompt.Prompt r -> r
+        shiftAnswer direction p = case p of
+          Prompt.AdjustDieRoll {} -> Just (0, direction)
+          _ -> tableAnswer 20 p
+        run direction = S.runPure (shiftAnswer direction) (S.runPure (shiftAnswer direction) shifted Engine.placePendingTriggers) Stack.resolveTop
+    case ids of
+      [first, _, third, _, _, _] -> do
+        Spec.assertEqWith s "CR 706.3a: 21 is not 20, so nothing is scried" (Maybe.listToMaybe (tableLibrary (run RollAdjustment.Increase))) (Just first)
+        Spec.assertEqWith s "CR 706.3a: 19 is in 10-19, so scry 2" (Maybe.listToMaybe (tableLibrary (run RollAdjustment.Decrease))) (Just third)
+      _ -> Spec.assertFailure s "the fixture library is six cards"
+  -- CR 706.2b's two steps in order, on the pair of producers: Clam-I-Am's
+  -- reroll ("If you roll a 3 on a six-sided die, you may reroll that die") is
+  -- the first step, Night Shift's shift the second. Every reroll offer in this
+  -- script is ACCEPTED.
+  Spec.it s "CR 706.2b rerolls come before increases and decreases" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    clam <- S.printingOf s registry "Clam-I-Am"
+    let both = snd (S.addPermanent clam S.alice (snd (S.addPermanent shift S.alice board)))
+        -- A natural 2 shifted UP to 3 lands on the Clam's number after step
+        -- one is over, so it is NOT rerolled: the other result is the 3. An
+        -- engine that ran the rerolls again after the shift throws the 1
+        -- waiting in the script and mints one Knight.
+        (shiftedOnto, _) = nightShiftRun [2, 5, 1] [OptionalDecision.Exercises] [Just (0, RollAdjustment.Increase)] 1 spell both
+        -- A natural 3 IS rerolled, before the shift is offered: the shift sees
+        -- the rerolled 1, not the 3.
+        (_, shownAfterReroll) = nightShiftRun [3, 1, 5] [OptionalDecision.Exercises] [Nothing] 1 spell both
+    Spec.assertEqWith s "CR 706.2b: a 3 made by the shift is not rerolled" (S.countOnBattlefieldByName knight S.alice shiftedOnto) 3
+    Spec.assertEqWith s "CR 706.2b: the shift is offered over the rerolled die" shownAfterReroll [[1, 5]]
+
+zombieEmployee :: CardName.CardName
+zombieEmployee = CardName.MkCardName (Text.pack "Zombie Employee Token")
+
+-- Answers every question one Endeavor under Night Shift asks, rerollAnswer's
+-- script extended by the shift: each die comes up the next of `rolls`, each
+-- reroll offer takes the next of `rerolls`, each shift offer the next of
+-- `shifts`, and the roller chooses the result at `index`. Records the results
+-- each shift offer SHOWED, which the board cannot say.
+--
+-- Declines for an unplanned shift offer, and six for an unplanned throw,
+-- rerollAnswer's reasons.
+nightShiftAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [OptionalDecision.OptionalDecision], [Maybe (Natural.Natural, RollAdjustment.RollAdjustment)], [[Integer]]) r
+nightShiftAnswer index p = case p of
+  Prompt.RollDie _ -> do
+    (rolls, rerolls, shifts, shown) <- State.get
+    case rolls of
+      h : t -> State.put (t, rerolls, shifts, shown) >> pure h
+      [] -> pure 6
+  Prompt.RerollDie {} -> do
+    (rolls, rerolls, shifts, shown) <- State.get
+    case rerolls of
+      h : t -> State.put (rolls, t, shifts, shown) >> pure h
+      [] -> pure OptionalDecision.Declines
+  Prompt.AdjustDieRoll _ _ results _ _ -> do
+    (rolls, rerolls, shifts, shown) <- State.get
+    case shifts of
+      h : t -> State.put (rolls, rerolls, t, NonEmpty.toList results : shown) >> pure h
+      [] -> State.put (rolls, rerolls, [], NonEmpty.toList results : shown) >> pure Nothing
+  Prompt.ChooseDieResult {} -> pure index
+  _ -> pure (S.identityAnswer p)
+
+-- Cast the Endeavor, resolve it, then place and drain whatever triggered (CR
+-- 603.3) under the same script. Returns the board and the results each shift
+-- offer showed, in order.
+nightShiftRun :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> [Maybe (Natural.Natural, RollAdjustment.RollAdjustment)] -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [[Integer]])
+nightShiftRun rolls rerolls shifts index spell board =
+  let drain :: Int -> Game.Type.Game ()
+      drain n = do
+        gs <- State.get
+        Monad.unless (n <= 0 || null (GameState.stack gs)) (Stack.resolveTop >> drain (n - 1))
+      script = S.cast S.alice spell >> Stack.resolveTop >> Engine.placePendingTriggers >> drain 8
+      ((_, after), (_, _, _, shown)) = State.runState (Engine.runGame (nightShiftAnswer index) board script) (rolls, rerolls, shifts, [])
+   in (after, reverse shown)
+
+-- CR 706.2's last sentence against a NEGATIVE instruction modifier: The Deck of
+-- Many Things ("{2}, {T}: Roll a d20 and subtract the number of cards in your
+-- hand. If the result is 0 or less, discard your hand. / 1-9 | Return a card at
+-- random from your graveyard to your hand. / 10-19 | Draw two cards.") under
+-- Night Shift of the Living Dead. The result is the number after EVERY
+-- modifier, so a natural 3 with four cards in hand, shifted up, is 3 - 4 + 1 =
+-- 0: the hand is discarded and no striation fires. An engine that clamped the
+-- instruction's sum before the shift reads max 0 (-1) + 1 = 1, keeps the hand
+-- and returns the graveyard card on top of it.
+--
+-- No roll here reaches 20, the Deck's other striation (this file's own
+-- deckOwnerSpec, "CR 108.3 a creature reanimated under another player's
+-- control still makes its OWNER lose the game", proves that one).
+deckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckSpec s registry = Spec.describe s "UnclampedShift" $ do
+  Spec.it s "CR 706.2 a shift applies to the unclamped sum" $ do
+    zeroed <- deckBoard s registry 4
+    paired <- deckBoard s registry 2
+    -- THE GAMEPLAY ASSERTION: four cards in hand, 3 - 4 + 1 = 0, so the hand is
+    -- discarded and nothing comes back from the graveyard.
+    Spec.assertEqWith s "CR 706.2: 3 - 4 + 1 is 0, so the hand is discarded" (length (Game.zoneMembers Zone.Hand S.alice (runDeck zeroed))) 0
+    Spec.assertEqWith s "CR 706.2a: the shift was paid for" (S.lifeOf S.alice (runDeck zeroed)) (Just 19)
+    -- The paired board, one thing different: two cards in hand, so 3 - 2 + 1 =
+    -- 2 lands in 1-9 and the graveyard card joins the two kept.
+    Spec.assertEqWith s "CR 706.3a: 3 - 2 + 1 is 2, so a card returns" (length (Game.zoneMembers Zone.Hand S.alice (runDeck paired))) 3
+
+-- The Deck and Night Shift under alice, two Plains to pay {2}, `held` cards
+-- in hand and one in the graveyard.
+deckBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)], GameState.GameState)
+deckBoard s registry held = do
+  deck <- S.printingOf s registry "The Deck of Many Things"
+  shift <- S.printingOf s registry "Night Shift of the Living Dead"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+      shifted = snd (S.addPermanent shift S.alice withDeck)
+      stocked = snd (S.addGraveyardCard piker S.alice shifted)
+      dealt = List.foldl' (\gs _ -> snd (S.addHandCard piker S.alice gs)) stocked [1 .. held]
+  pure (deckId, Face.activatedAbilities (S.combinedFace deck), dealt)
+
+-- Activate the Deck and resolve it: the d20 comes up 3 and every shift offer
+-- takes the first die up.
+runDeck :: (ObjectId.ObjectId, [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)], GameState.GameState) -> GameState.GameState
+runDeck (deckId, abilities, board) =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.RollDie _ -> 3
+        Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
+        _ -> S.identityAnswer p
+   in S.runPure answer board (mapM_ (Activate.activateAbility S.alice deckId) (take 1 abilities) >> Stack.resolveTop)
+
+-- CR 108.3, PlayerRef.OwnerOfBound's producer: The Deck of Many Things' 20
+-- band, "Put a creature card from any graveyard onto the battlefield under
+-- your control. When that creature dies, its owner loses the game." alice
+-- activates and so CONTROLS the reanimated creature; it is bob's own card, so
+-- he OWNS it. The two seats come apart, which is exactly what
+-- PlayerRef.ControllerOfBound could not have named -- that reference would
+-- have alice, the controller, lose instead of bob.
+deckOwnerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckOwnerSpec s registry = Spec.describe s "OwnerOfBound" $ do
+  Spec.it s "CR 108.3 a creature reanimated under another player's control still makes its OWNER lose the game" $ do
+    deck <- S.printingOf s registry "The Deck of Many Things"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+        (pikerId, board) = S.addGraveyardCard piker S.bob withDeck
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 20
+          Prompt.ChooseCardInGraveyard {} -> pikerId
+          _ -> S.identityAnswer p
+        activate = case Face.activatedAbilities (S.combinedFace deck) of
+          ability : _ -> Activate.activateAbility S.alice deckId ability
+          [] -> pure ()
+        activated = S.runPure answer board (activate >> Stack.resolveTop)
+        -- CR 108.3: the battlefield is shared and Game.zoneMembers indexes it
+        -- by OWNER, so bob's copy is where the reanimated creature is found
+        -- even though alice controls it.
+        reanimated = case Game.zoneMembers Zone.Battlefield S.bob activated of
+          [oid] -> oid
+          _ -> pikerId
+        marked = S.markDamage reanimated 1 activated
+        settled = S.runPure S.identityAnswer marked Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Stack.resolveTop
+    -- THE GAMEPLAY ASSERTION: bob, the owner, loses the game and alice, the
+    -- controller, wins -- readable only through CR 104.2a's two-player
+    -- decision, since neither status field alone says who WON.
+    Spec.assertEqWith s "CR 108.3 / 104.2a bob owned the reanimated creature, so its death is bob's loss" (GameState.result after) (Just (Result.Won S.alice))
+    -- The preconditions that assertion rests on, read after it so neither can
+    -- absorb a mutation aimed at the reference: the creature really did enter
+    -- under alice's control while staying bob's card, and it really did die.
+    Spec.assertEqWith s "setup: alice controlled the reanimated creature" (Projection.controllerOf reanimated activated) (Just S.alice)
+    Spec.assertEqWith s "setup: the creature really died" (Game.lookupObject reanimated settled) Nothing
+
+-- CR 706.3a: a striation naming a single number means "if the result was N",
+-- not "N or more" -- Oracle prints the Deck's 20 band bare, not "20+". A
+-- natural 20 shifted UP by Night Shift of the Living Dead's own modifier
+-- lands on 21, which is on no band of the table at all, so nothing happens.
+-- The discriminating twin of deckOwnerSpec's board: same reanimation, same
+-- two seats, the die roll the one thing different.
+deckExactBandSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckExactBandSpec s registry = Spec.describe s "ExactBand" $ do
+  Spec.it s "CR 706.3a a natural 20 shifted past 20 reaches no band, so nothing is reanimated" $ do
+    deck <- S.printingOf s registry "The Deck of Many Things"
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+        (_shiftId, withShift) = S.addPermanent shift S.alice withDeck
+        (pikerId, board) = S.addGraveyardCard piker S.bob withShift
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 20
+          Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
+          Prompt.ChooseCardInGraveyard {} -> pikerId
+          _ -> S.identityAnswer p
+        activate = case Face.activatedAbilities (S.combinedFace deck) of
+          ability : _ -> Activate.activateAbility S.alice deckId ability
+          [] -> pure ()
+        after = S.runPure answer board (activate >> Stack.resolveTop)
+    -- THE GAMEPLAY ASSERTION: 21 reaches no striation, so nothing arrived on
+    -- bob's copy of the battlefield -- an AtLeast reading of "20" would put
+    -- his creature there instead.
+    Spec.assertEqWith s "CR 706.3a a shifted 21 reaches no band: nothing entered the battlefield" (Game.zoneMembers Zone.Battlefield S.bob after) []
+    -- The precondition, read after the assertion so it cannot absorb a
+    -- mutation aimed at the comparison: the card really is still where it
+    -- started, unreanimated.
+    Spec.assertEqWith s "setup: bob's creature card is still in his graveyard" (Game.zoneMembers Zone.Graveyard S.bob after) [pikerId]

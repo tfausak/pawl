@@ -200,7 +200,7 @@ spec s registry = Spec.describe s "Support" $ do
             actionPrompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
             mode = ModeIndex.MkModeIndex 1
             modePrompt = Prompt.ChooseModes (Decider.MkDecider S.alice) S.alice spellId (Set.singleton mode) (ModeSelection.ChooseExactly 1)
-            xPrompt = Prompt.ChooseX (Decider.MkDecider S.alice) S.alice spellId 9
+            xPrompt = Prompt.ChooseX (Decider.MkDecider S.alice) S.alice spellId 0 9
             cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}
             costPrompt = Prompt.ChooseCost (Decider.MkDecider S.alice) S.alice spellId [cost]
             slot = SlotName.MkSlotName (Text.pack "target")
@@ -269,7 +269,7 @@ spec s registry = Spec.describe s "Support" $ do
       Just oid -> do
         let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
             actionPrompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
-            xPrompt = Prompt.ChooseX (Decider.MkDecider S.bob) S.bob oid 9
+            xPrompt = Prompt.ChooseX (Decider.MkDecider S.bob) S.bob oid 0 9
         case S.runScript script built (Game.ask actionPrompt *> Game.ask xPrompt) of
           Left (S.MkUnusedActionChoices _ failed _) ->
             Spec.assertEqWith s "the unfinished verb" failed verb

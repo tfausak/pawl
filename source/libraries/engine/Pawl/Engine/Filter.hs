@@ -3503,7 +3503,7 @@ overBoundSlots f predicate = case predicate of
   Filter.HasAttached g -> fmap Filter.HasAttached (overBoundSlots f g)
   _ -> pure predicate
 
--- The slots a Filter READS. Pawl.Engine.Resolve.modeSlots folds this over a
+-- The slots a Filter READS. Pawl.Engine.Resolve.Slots.modeSlots folds this over a
 -- mode's target slots, which is what makes the card dataflow lint see a slot
 -- named in a FILTER rather than in an effect: a card reading "that player" under
 -- a condition that never binds one is then a failing test rather than a slot that

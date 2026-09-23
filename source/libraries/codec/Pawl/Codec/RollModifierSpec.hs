@@ -14,4 +14,11 @@ spec s = Spec.describe s "Pawl.Codec.RollModifier" $ do
       RollModifier.codec
       RollModifier.Reroll
       " {\"type\":\"Reroll\"} "
+  -- CR 706.2b's second step: Night Shift of the Living Dead.
+  Spec.it s "IncreaseOrDecrease" $
+    Common.assertCodec
+      s
+      RollModifier.codec
+      (RollModifier.IncreaseOrDecrease 1)
+      " {\"type\":\"IncreaseOrDecrease\",\"value\":1} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RollModifier.codec

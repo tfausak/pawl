@@ -39,6 +39,7 @@ import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -139,6 +140,10 @@ data Response
   | -- | CR 706.2b: whether the seat CR 109.5's "you" names on the modifier took
     -- a reroll it offered (Clam-I-Am, Wall of Fortune).
     ChoseReroll OptionalDecision.OptionalDecision
+  | -- | CR 706.2b: the die an increase-or-decrease modifier was taken on and
+    -- its direction, or Nothing for declining it (Night Shift of the Living
+    -- Dead).
+    ChoseRollAdjustment (Maybe (Natural.Natural, RollAdjustment.RollAdjustment))
   | -- | CR 507.1: the opponent the active player chose to attack.
     ChoseDefender PlayerId.PlayerId
   | -- | CR 601.2g: the mana source the player chose to tap, or Nothing for CR
@@ -522,6 +527,9 @@ data Response
     -- reason: replaying a transcript against the wrong one would reorder a sweep
     -- instead of a trigger batch.
     OrderedForEach [Natural.Natural]
+  | -- | CR 608.2d: the members of a per-member loop a resolving spell's
+    -- controller chose for its body to run for.
+    ChoseLoopMembers (Set.Set Recipient.Recipient)
   | -- | CR 613.7m: the relative order a player chose for the timestamps their own
     -- objects receive at one moment, as a permutation of the offered indices. A
     -- separate constructor from the ones above for their reason: replaying a

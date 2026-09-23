@@ -58,6 +58,7 @@ encode p answer = case p of
   Prompt.RollDie _ -> Response.RolledDie answer
   Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
   Prompt.RerollDie {} -> Response.ChoseReroll answer
+  Prompt.AdjustDieRoll {} -> Response.ChoseRollAdjustment answer
   Prompt.FlipCoin -> Response.FlippedCoin answer
   Prompt.CallCoin {} -> Response.CalledCoin answer
   Prompt.ChooseCoinResult {} -> Response.ChoseCoinResult answer
@@ -155,6 +156,7 @@ encode p answer = case p of
   Prompt.OrderCombatTolls {} -> Response.OrderedCombatTolls answer
   Prompt.OrderComponentCards {} -> Response.OrderedComponentCards answer
   Prompt.OrderForEach {} -> Response.OrderedForEach answer
+  Prompt.ChooseLoopMembers {} -> Response.ChoseLoopMembers answer
   Prompt.OrderTimestamps {} -> Response.OrderedTimestamps answer
   Prompt.OrderManaActivations {} -> Response.OrderedManaActivations answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
@@ -224,6 +226,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RerollDie {} -> case response of
     Response.ChoseReroll d -> Just d
+    _ -> Nothing
+  Prompt.AdjustDieRoll {} -> case response of
+    Response.ChoseRollAdjustment d -> Just d
     _ -> Nothing
   Prompt.FlipCoin -> case response of
     Response.FlippedCoin face -> Just face
@@ -471,6 +476,9 @@ decode p response = case p of
   Prompt.OrderForEach {} -> case response of
     Response.OrderedForEach order -> Just order
     _ -> Nothing
+  Prompt.ChooseLoopMembers {} -> case response of
+    Response.ChoseLoopMembers members -> Just members
+    _ -> Nothing
   Prompt.OrderTimestamps {} -> case response of
     Response.OrderedTimestamps order -> Just order
     _ -> Nothing
@@ -655,6 +663,8 @@ defaultAnswer p = case p of
   -- the answer that throws no further die -- Prompt.ChooseExplore's posture
   -- below and for its reason.
   Prompt.RerollDie {} -> OptionalDecision.Declines
+  -- The same "may", and the same answer: declining leaves the result standing.
+  Prompt.AdjustDieRoll {} -> Nothing
   -- CR 705.1 designates the two sides, so either is a legal answer and neither
   -- is "least eventful" -- which branch of a card's flip is quieter is the
   -- CARD's business, not this function's. FIXED for the reason RandomObject
@@ -868,8 +878,9 @@ defaultAnswer p = case p of
   Prompt.Search {} -> []
   -- Declining the re-entrant cast is always legal.
   Prompt.CastWhileSearching {} -> Nothing
-  -- CR 601.2b: X=0 is always payable.
-  Prompt.ChooseX {} -> 0
+  -- CR 601.2b: the least X the card permits, which the gate that offered the
+  -- action measured payable (CR 101.1).
+  Prompt.ChooseX _ _ _ least _ -> least
   -- CR 107.14's payment is "any amount", zero included, and paying nothing is
   -- how a transcript that ran out declines it.
   Prompt.ChoosePaidEnergy {} -> 0
@@ -974,6 +985,10 @@ defaultAnswer p = case p of
   -- order -- what pawl walked in before the intra-seat key became the resolving
   -- controller's to choose.
   Prompt.OrderForEach _ _ _ members -> zipWith const [0 ..] members
+  -- Every candidate, ChooseAnyNumberOfPermanents' maximal subset: CR 608.2d
+  -- admits every subset here, so no answer can be illegal. A deterministic
+  -- fallback, not a recommendation.
+  Prompt.ChooseLoopMembers _ _ _ candidates -> Set.fromList candidates
   -- CR 613.7m: likewise, and it is the engine's own APNAP-then-ascending order --
   -- what pawl stamped in before the intra-seat key became that seat's to choose.
   Prompt.OrderTimestamps _ _ batch -> zipWith const [0 ..] batch

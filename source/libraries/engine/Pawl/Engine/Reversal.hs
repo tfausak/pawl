@@ -94,7 +94,7 @@ withoutAnnouncement before entry closed = do
   phase <- one GameState.phase
   remaining <- one GameState.remaining
   priority <- one GameState.priority
-  passes <- one GameState.passes
+  passed <- one GameState.passed
   turnNumber <- one GameState.turnNumber
   result <- one GameState.result
   restartSignal <- one GameState.restartSignal
@@ -108,8 +108,10 @@ withoutAnnouncement before entry closed = do
   drewFromEmpty <- setOf GameState.drewFromEmpty
   landsPlayed <- mapOf GameState.landsPlayed
   drawsThisTurn <- mapOf GameState.drawsThisTurn
+  departedThisTurn <- setOf GameState.departedThisTurn
   activatedThisTurn <- mapOfSets GameState.activatedThisTurn
   castPermissionsUsedThisTurn <- mapOfSets GameState.castPermissionsUsedThisTurn
+  rollModifiersUsedThisTurn <- mapOfSets GameState.rollModifiersUsedThisTurn
   triggeredThisGame <- setOf GameState.triggeredThisGame
   pendingControl <- mapOf GameState.pendingControl
   control <- mapOf GameState.control
@@ -128,6 +130,8 @@ withoutAnnouncement before entry closed = do
   -- nextTimestamp's treatment. Nothing a CR 733.1 reversal undoes can reach it.
   subgamesThisMatch <- newest GameState.subgamesThisMatch
   turnAnchor <- one GameState.turnAnchor
+  rollingDie <- one GameState.rollingDie
+  rerolledTo <- one GameState.rerolledTo
   pure
     GameState.MkGameState
       { GameState.settings = settings,
@@ -179,7 +183,7 @@ withoutAnnouncement before entry closed = do
         GameState.phase = phase,
         GameState.remaining = remaining,
         GameState.priority = priority,
-        GameState.passes = passes,
+        GameState.passed = passed,
         GameState.turnNumber = turnNumber,
         GameState.result = result,
         GameState.restartSignal = restartSignal,
@@ -193,8 +197,10 @@ withoutAnnouncement before entry closed = do
         GameState.drewFromEmpty = drewFromEmpty,
         GameState.landsPlayed = landsPlayed,
         GameState.drawsThisTurn = drawsThisTurn,
+        GameState.departedThisTurn = departedThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
         GameState.castPermissionsUsedThisTurn = castPermissionsUsedThisTurn,
+        GameState.rollModifiersUsedThisTurn = rollModifiersUsedThisTurn,
         GameState.triggeredThisGame = triggeredThisGame,
         GameState.pendingControl = pendingControl,
         GameState.control = control,
@@ -210,7 +216,9 @@ withoutAnnouncement before entry closed = do
         GameState.exilePiles = exilePiles,
         GameState.extraTurns = extraTurns,
         GameState.subgamesThisMatch = subgamesThisMatch,
-        GameState.turnAnchor = turnAnchor
+        GameState.turnAnchor = turnAnchor,
+        GameState.rollingDie = rollingDie,
+        GameState.rerolledTo = rerolledTo
       }
   where
     -- A whole value, compared as one leaf.

@@ -10,6 +10,7 @@ import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
@@ -402,6 +403,9 @@ data TriggerCondition
     -- "whenever one or more creatures you control become the target of an
     -- activated ability" (Professor Hojo), once for the whole announcement.
     PermanentsBecomeTargeted PermanentsBecomeTargeted.PermanentsBecomeTargeted
+  | -- | CR 601.2c per permanent: "whenever a creature you control becomes the
+    -- target of a spell" (Venerated Rotpriest), once per creature targeted.
+    PermanentBecomesTargeted PermanentsBecomeTargeted.PermanentsBecomeTargeted
   | -- | CR 709.5h: "when you unlock this door", however the named half was
     -- unlocked. Self-scoped plus the half, which is what separates a Room's two
     -- doors.
@@ -521,10 +525,13 @@ data TriggerCondition
     -- event and not the result, which is what lets CR 706.7's planar die fire it.
     --
     -- The printed "one or more" is the whole of one instruction's throw:
-    -- Pawl.Engine.Resolve records one GameEvent.DiceRolled per roll
-    -- instruction, however many dice it named, so the batch and per-occurrence
-    -- readings coincide. See #934 for the planar die.
+    -- Pawl.Engine.Resolve records one GameEvent.DiceRolled per throw, however
+    -- many dice it named, and a reroll is a separate later throw, so the batch
+    -- and per-occurrence readings coincide. See #934 for the planar die.
     PlayerRollsDice PlayerRelation.PlayerRelation
+  | -- | CR 706.2: "whenever you roll a 6" (Night Shift of the Living Dead), once
+    -- per die whose result, after every modifier, is the stated number.
+    PlayerRollsResult (DieResult.DieResult PlayerRelation.PlayerRelation)
   | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), reading the
     -- event's win where PlayerRollsDice ignores what the die showed.
     --

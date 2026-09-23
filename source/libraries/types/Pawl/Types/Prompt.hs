@@ -51,6 +51,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
+import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -128,12 +129,26 @@ data Prompt r where
   -- been matched against it, so it narrows nothing the seat is deciding.
   --
   -- The Cost is CR 706.2a's "associated cost", Nothing where the modifier states
-  -- none. Raised only once the payer can afford it, Prompt.ChooseToPay's posture
+  -- none -- or the activation cost of an ability activated inside the roll
+  -- (Goblin Bookie, ActivationRestriction.DuringDieRoll). Raised only once the payer can afford it, Prompt.ChooseToPay's posture
   -- for CR 118.12 -- so an accepted offer is one that goes through.
   --
   -- Never elided. CR 706.2a's "may" makes one offer a real fork, and the two
   -- answers are two different numbers on the board.
   RerollDie :: Decider.Decider -> PlayerId.PlayerId -> Natural.Natural -> Maybe (Cost.Cost Keyword.Keyword) -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 706.2b's second step: whether an increase-or-decrease modifier a
+  -- permanent offers is taken, on which die, and which way (Night Shift of the
+  -- Living Dead's "you may pay 1 life. If you do, increase or decrease the
+  -- result by 1"). Nothing declines; the Natural in the answer indexes the
+  -- results.
+  --
+  -- Asked once the instruction's every die has come up, with all the results
+  -- in roll order, since the printed ruling lets the roller see them all before
+  -- picking the one to shift. The results are Integers, unclamped: the
+  -- instruction's own modifier may have taken one below zero, and CR 706.2
+  -- clamps nothing before the last modifier. RerollDie's seat and cost, for its
+  -- reasons; the lone Natural is the amount.
+  AdjustDieRoll :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty Integer -> Natural.Natural -> Maybe (Cost.Cost Keyword.Keyword) -> Prompt (Maybe (Natural.Natural, RollAdjustment.RollAdjustment))
   -- | CR 705.1: which face a flipped coin came up, asked after CallCoin (CR
   -- 705.2). RandomObject's reasons for carrying neither Decider nor PlayerId.
   FlipCoin :: Prompt CoinFace.CoinFace
@@ -366,14 +381,15 @@ data Prompt r where
   -- offered in a loop before the find; one entry per castable half with the
   -- name CR 709.3 needs.
   CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, CardName.CardName)] -> Prompt (Maybe (ObjectId.ObjectId, CardName.CardName))
-  -- | CR 601.2b / 602.2b: the value of X, before targets. The Natural is the
-  -- greatest value legally announceable now (Cast.affordableX,
-  -- Activate.affordableX; Cost.maximumX for CR 101.1's card-stated ceiling).
+  -- | CR 601.2b / 602.2b: the value of X, before targets. The Naturals are the
+  -- least value the card permits (CR 101.1's "X can't be 0") and the greatest
+  -- legally announceable now (Cast.affordableX, Activatable.affordableX;
+  -- Cost.maximumX for CR 101.1's card-stated ceiling).
   --
-  -- Advisory: the answer is filtered against it nowhere. Announcing past what
-  -- the player can pay is answered by CR 601.2h's reversal (#741); past what
-  -- the card permits, by Cast's own gate (CR 101.1, CR 101.2).
-  ChooseX :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
+  -- Advisory: the answer is filtered against neither. Announcing past what the
+  -- player can pay is answered by CR 601.2h's reversal (#741); outside what the
+  -- card permits, by the caller's own gate (CR 101.1, CR 101.2).
+  ChooseX :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 702.42a: whether the modal spell is entwined, before ChooseModes; the
   -- Cost is what entwining adds (CR 601.2f).
   ChooseEntwine :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt EntwineDecision.EntwineDecision
@@ -661,6 +677,11 @@ data Prompt r where
   -- controller. Groups are asked in APNAP order (CR 101.4), each for two or
   -- more members.
   OrderForEach :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt [Natural.Natural]
+  -- | CR 608.2d: any number of the members a per-member loop swept, the ones
+  -- its body then runs for (Pawl.Types.LoopMembers' AnyNumber); asked at one
+  -- candidate, skipped at zero. ChooseAnyNumberOfPermanents' shape over the
+  -- loop's own member type. Answers as Response.ChoseLoopMembers.
+  ChooseLoopMembers :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt (Set.Set Recipient.Recipient)
   -- | CR 613.7m: the relative order of the timestamps one player's objects
   -- receive at one moment, first named stamped earlier; asked by
   -- Pawl.Engine.Restamp.order, per group in APNAP order, for two or more.

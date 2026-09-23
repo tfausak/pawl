@@ -14,6 +14,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
@@ -107,6 +108,50 @@ poolOf pid gs = Map.findWithDefault (Mana.MkMana []) pid (GameState.manaPool gs)
 
 lookupObject :: ObjectId -> GameState -> Maybe Object
 lookupObject oid gs = Map.lookup oid (GameState.objects gs)
+
+-- CR 601.2a: is this object the card whose cast is being PROPOSED right now? The
+-- card is put onto the stack before CR 601.2f determines the total cost and CR
+-- 601.2h pays it, so no pool a payability gate reads may count it -- neither the
+-- hand a mana source's own cost would spend nor the graveyard the spell's own
+-- cost would exile.
+--
+-- Read off the STAMP rather than taken as an argument, which is what lets one
+-- reading serve both: Pawl.Engine.Cast.asProposed writes castFrom one step ahead
+-- of the move and every offer gate measures the board it returns, so an object
+-- whose stamp names the zone it is STILL IN is exactly one CR 601.2a has yet to
+-- move -- whether the cost being measured is the spell's own or some mana
+-- source's. Nothing else in a game satisfies it: after the move the stack
+-- incarnation's zone is Stack and its stamp is the zone it left, and CR 400.7
+-- mints every other arrival a fresh incarnation with the field cleared.
+--
+-- An ACTIVATION stamps nothing, which is what keeps CR 602.2a's source in the
+-- pool its own cost draws on: an ability activated from a graveyard leaves its
+-- source there, a legal candidate for its own cost, and no reading of this can
+-- reach it.
+--
+-- Pawl.CostSpec's "CR 601.2a the cast is not offered: the Arbiter is not fuel for
+-- the Bloom" and Pawl.CastSpec's "CR 601.2a with two other cards the cast is not
+-- offered" are the two that prove it. withoutBeingCast below is the same
+-- reading lifted onto the whole board, for a condition rather than a pool.
+beingCast :: GameState -> ObjectId -> Bool
+beingCast gs candidate = case lookupObject candidate gs of
+  Nothing -> False
+  Just object -> Object.castFrom object == Just (Object.zone object)
+
+-- CR 601.2a's move, as far as a board condition can see it: the state a cast
+-- gate was handed, with every object `beingCast` taken out of the zone it is
+-- leaving. The same state unchanged wherever nothing is stamped -- CR 605.3a's
+-- priority window, every activation (CR 602.2a moves no card) and the payment
+-- itself, which runs after the move.
+--
+-- NOT put on GameState.stack: no mana ability prints a rider reading the stack
+-- beyond CR 307.5's, which ActivationRestriction.needsEmptyStack owns.
+withoutBeingCast :: GameState -> GameState
+withoutBeingCast gs =
+  Map.foldrWithKey
+    (\oid object acc -> if Object.castFrom object == Just (Object.zone object) then removeFromZones (Object.owner object) oid acc else acc)
+    gs
+    (GameState.objects gs)
 
 objectCount :: GameState -> Int
 objectCount gs = Map.size (GameState.objects gs)
@@ -1744,25 +1789,26 @@ areOpponents gs = Teams.areOpponents (teams gs)
 -- within that many seats of them, counted either way round the table? Always
 -- for yourself, and always under an unlimited range (CR 801.1).
 --
--- Seats are counted over the players still in the game, so a departed seat
--- closes up. Not implemented: CR 801.2c fixes who is in range as each turn
--- begins, so a seat emptied mid-turn should close only when the next turn
--- begins; this closes it at once (#3995).
+-- CR 801.2c: seats are counted over the players in the game as this turn
+-- began, so a seat emptied mid-turn closes up only when the next turn begins
+-- (GameState.departedThisTurn). A departed player is in nobody's range.
 inRangeOf :: PlayerId -> PlayerId -> GameState -> Bool
 inRangeOf you candidate gs =
   candidate == you || case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
     Nothing -> True
     Just range ->
-      let seats = stillPlayingInOrder gs
+      let playing = stillPlaying gs
+          seats = filter (\pid -> List.elem pid playing || Set.member pid (GameState.departedThisTurn gs)) (GameState.turnOrder gs)
        in case (List.elemIndex you seats, List.elemIndex candidate seats) of
-            (Just mine, Just theirs) ->
-              let apart = abs (mine - theirs)
-               in toInteger (min apart (length seats - apart)) <= toInteger range
+            (Just mine, Just theirs)
+              | List.elem you playing && List.elem candidate playing ->
+                  let apart = abs (mine - theirs)
+                   in toInteger (min apart (length seats - apart)) <= toInteger range
             _ -> False
 
 -- CR 102.3 with CR 104.2a: this player's opponents who are still in the game, in
 -- stillPlaying's PlayerId order -- which is the order the offers built from it
--- were already in. A caller wanting CR 101.4's seating order filters apnapOrder
+-- were already in. A caller wanting the seating order filters turnOrderFrom
 -- through areOpponents instead, as Pawl.Engine.Combat.attackableOpponents does.
 opponentsOf :: PlayerId -> GameState -> [PlayerId]
 opponentsOf you gs = filter (areOpponents gs you) (stillPlaying gs)
@@ -1775,8 +1821,30 @@ opponentsOf you gs = filter (areOpponents gs you) (stillPlaying gs)
 -- departed seat is still named here, and a caller that must not name one
 -- filters with stillPlaying. An active player somehow absent from the roster
 -- degrades to the roster itself rather than to nobody.
+--
+-- CR 805.6: under the shared team turns option the whole active team comes
+-- first, then each nonactive team in turn order, each team's players together.
+--
+-- Not implemented: CR 805.6's "in whatever order they like" -- a team's players
+-- come in seat order from the active player's, not an order the team chooses
+-- (#4014).
 apnapOrder :: GameState -> [PlayerId]
-apnapOrder gs = turnOrderFrom (GameState.activePlayer gs) gs
+apnapOrder gs =
+  let rotated = turnOrderFrom (GameState.activePlayer gs) gs
+   in List.sortOn (\pid -> List.findIndex (Turn.sharesTurn gs pid) rotated) rotated
+
+-- CR 805.2: the primary player of this player's team -- the still-playing
+-- teammate in the team's rightmost seat, which is the one turn order (CR 101.4,
+-- to the left) reaches first from outside the team. Without the shared team
+-- turns option every player is their own.
+primaryOf :: GameState -> PlayerId -> PlayerId
+primaryOf gs pid =
+  let seats = filter (\p -> List.elem p (stillPlaying gs)) (GameState.turnOrder gs)
+      mate = Turn.sharesTurn gs pid
+      before = drop (length seats - 1) seats <> seats
+   in case [seat | (previous, seat) <- zip before seats, mate seat, not (mate previous)] of
+        primary : _ -> primary
+        [] -> pid
 
 -- apnapOrder's generalisation: the seating roster rotated to start with the
 -- player NAMED rather than with the active player. CR 701.38a's vote is the
@@ -1894,6 +1962,7 @@ castOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -1970,6 +2039,7 @@ activatedAbilityResolved event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2056,6 +2126,7 @@ discardOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2170,6 +2241,7 @@ movedChange event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2275,6 +2347,7 @@ damageDealt event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2544,6 +2617,7 @@ lifeGainOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing

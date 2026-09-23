@@ -102,11 +102,11 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- ability already has -- CR 109.5's "you" is Shizuko's controller, and CR
   -- 603.2b's step is each player's in turn.
   --
-  -- Bound for EVERY TurnScope, not only EachTurn. Under ControllersTurn the
-  -- active player IS the controller, which makes the slot a redundant second name
-  -- rather than a wrong one -- the posture the PlayerBecomesMonarch arm below
-  -- takes for its own You case, and what eventBindingSlots' unconditional promise
-  -- for this condition needs.
+  -- Bound for EVERY TurnScope, not only EachTurn, which is what
+  -- eventBindingSlots' unconditional promise for this condition needs. It names
+  -- the seat the turn began with; under the shared team turns option an ability that
+  -- reads the slot is re-bound once per player whose step it is (CR 805.4d,
+  -- Pawl.Engine.Event.Trigger.stepTriggerPlayers).
   --
   -- Unconditional given a match: every GameEvent.StepBegan carries a PlayerId,
   -- CR 500.1 giving every step exactly one turn to belong to.
@@ -1119,6 +1119,7 @@ eventBindingSlots cond = case cond of
   -- Pawl.Engine.Resolve binds it at Pawl.Types.RollDie's own slot, during the
   -- roller's own resolution, for a later effect of THAT ability to read.
   TriggerCondition.PlayerRollsDice _ -> Set.empty
+  TriggerCondition.PlayerRollsResult _ -> Set.empty
   TriggerCondition.PlayerWinsCoinFlip _ -> Set.empty
   TriggerCondition.PlayerLosesCoinFlip _ -> Set.empty
   -- Empty for the same reason, and CR 701.43d is what settles it: the linked
@@ -1725,6 +1726,7 @@ eventBindingSlots cond = case cond of
   -- lint would reject it -- no member of eventBindingSlotsSometimes for
   -- PermanentsDie's reason.
   TriggerCondition.PermanentsBecomeTargeted {} -> Set.empty
+  TriggerCondition.PermanentBecomesTargeted {} -> Set.empty
   -- CR 603.3b's second class names two things and binds both: CR 113.7's Saga,
   -- which the chapter ability hangs on, under CR 400.7e's slot for the reason
   -- eventBindings' arm gives, and CR 603.3a's controller of that chapter ability

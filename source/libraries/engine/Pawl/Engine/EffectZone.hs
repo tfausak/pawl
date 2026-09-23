@@ -1,9 +1,9 @@
 -- CR 113.6m's "or effect" half, asked of an EFFECT: does it move the object the
 -- ability is on out of a particular zone, and which zone? The ABILITY-level
 -- readings that rule defines fold this over an ability's effects, one per kind
--- of ability: Pawl.Engine.Activate.zoneFunctionedFrom takes the cost half
+-- of ability: Pawl.Engine.Activatable.zoneFunctionedFrom takes the cost half
 -- (Pawl.Engine.Cost.zoneFunctionedFrom) alongside it, and
--- Pawl.Engine.Event.Trigger.zoneFunctionedFrom has no cost half to take.
+-- Pawl.Engine.Event.Trigger.zonesFunctionedIn has no cost half to take.
 --
 -- Here rather than in Pawl.Engine.Cost because it is a classification of an
 -- EFFECT and that module's whole contract is to be the sole casing home for a
@@ -57,8 +57,8 @@ import Pawl.Types.Zone (Zone)
 -- gives one card two names: a bearer whose own departure is what triggered the
 -- ability is read as CR 113.7's source for its characteristics and as CR
 -- 400.7e's `became` for anything done TO it, and only the caller knows which of
--- those is the same card here. Pawl.Engine.Event.Trigger.zoneFunctionedFrom is
--- what decides, off the condition; Pawl.Engine.Activate.zoneFunctionedFrom
+-- those is the same card here. Pawl.Engine.Event.Trigger.zonesFunctionedIn is
+-- what decides, off the condition; Pawl.Engine.Activatable.zoneFunctionedFrom
 -- passes the source slot alone, an activation binding no event slot.
 --
 -- The origin is only ever consulted here, so a card file that states one on a
@@ -129,6 +129,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
+  Effect.Reroll -> Nothing
   Effect.ChooseCardName _ -> Nothing
   Effect.FromOutsideTheGame _ -> Nothing
   -- CR 608.2n: the spell exiles ITSELF, so this says nothing about where an
@@ -296,5 +297,5 @@ zoneFunctionedFrom itself delayed effect = case effect of
   -- states, and CR 113.6m reads it. The loop's own reference names the members
   -- and is never "the object it's on", so only the body can answer at all. No
   -- card in the pool writes such a body.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.Heal _ -> Nothing

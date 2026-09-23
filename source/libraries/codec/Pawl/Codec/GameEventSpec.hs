@@ -39,6 +39,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
@@ -522,6 +523,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.DiceRolled (PlayerId.MkPlayerId 3))
       " {\"type\":\"DiceRolled\",\"value\":3} "
+  -- CR 706.2. The roller and one die's result, distinct numbers so a codec that
+  -- swapped them would not round-trip.
+  Spec.it s "DieResultSettled" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = PlayerId.MkPlayerId 3, DieResult.result = 6})
+      " {\"type\":\"DieResultSettled\",\"value\":{\"roller\":3,\"result\":6}} "
   -- CR 716.2a. The object then the level BEFORE then the level AFTER, and the two
   -- levels deliberately differ by more than one: a level bar can only step N-1 to
   -- N, so a fixture crossing one threshold would round-trip a codec that dropped

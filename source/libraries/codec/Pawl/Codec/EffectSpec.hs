@@ -96,6 +96,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -955,6 +956,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       ( Effect.ForEach
           ForEach.MkForEach
             { ForEach.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victims")),
+              ForEach.members = LoopMembers.Every,
               ForEach.slot = SlotName.MkSlotName (Text.pack "victim"),
               ForEach.body =
                 Seq.singleton (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victim"))) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot (SlotName.MkSlotName (Text.pack "exiled")) Quantity.ManaValue)))) Nothing Nothing)),
@@ -2027,6 +2029,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Proliferate
       " {\"type\":\"Proliferate\"} "
+  Spec.it s "Reroll" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Reroll
+      " {\"type\":\"Reroll\"} "
   -- CR 201.4's chooser and CR 201.4a's restriction on which names they may
   -- choose. Rule 201.4 fixes the count, so there is no third key.
   Spec.it s "ChooseCardName" $

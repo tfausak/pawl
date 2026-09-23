@@ -77,6 +77,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -150,7 +151,7 @@ combatReplaySpec s =
         -- the board can pay. A codec that folded the bound into the response
         -- would replay a different game (#417).
         Spec.it s "ChooseX records and replays a Natural" $ do
-          let p = Prompt.ChooseX decider S.alice oid 2
+          let p = Prompt.ChooseX decider S.alice oid 0 2
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 4)) (Just (4 :: Natural.Natural))
         -- CR 601.2b / 700.2a: a modal choice (Response.ChoseModes, a Seq
         -- ModeIndex) round-trips through the DecisionLog exactly like every
@@ -1150,6 +1151,12 @@ combatReplaySpec s =
           let p = Prompt.ChooseExplore decider S.alice (ObjectId.MkObjectId 7) (ObjectId.MkObjectId 9)
           Spec.assertEqWith s "binning it round trips" (Replay.decode p (Replay.encode p OptionalDecision.Exercises)) (Just OptionalDecision.Exercises)
           Spec.assertEqWith s "so does leaving it on top" (Replay.decode p (Replay.encode p OptionalDecision.Declines)) (Just OptionalDecision.Declines)
+        -- CR 706.2b: which die a shift took, and which way, is a decision.
+        Spec.it s "AdjustDieRoll round-trips through the transcript" $ do
+          let p = Prompt.AdjustDieRoll decider S.alice (5 NonEmpty.:| [2]) 1 Nothing
+          Spec.assertEqWith s "shifting the second die down round trips" (Replay.decode p (Replay.encode p (Just (1, RollAdjustment.Decrease)))) (Just (Just (1, RollAdjustment.Decrease)))
+          Spec.assertEqWith s "so does declining" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+          Spec.assertEqWith s "a short transcript declines" (Replay.defaultAnswer p) Nothing
         Spec.it s "an explore choice does not decode as a riot choice" $ do
           -- Discriminating: this fails if ChooseExplore reuses another
           -- OptionalDecision response instead of getting its own constructor.

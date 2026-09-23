@@ -81,6 +81,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural.Type
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Damage as Damage
@@ -2235,7 +2236,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- The same question on the ACTIVATION road, which CR 602.2b routes through CR
   -- 601.2b-i and CR 700.2a gates the same way it gates a spell's. Fall of the
   -- Hammer above reaches `fillableModesGiven` through Pawl.Engine.Cast; this
-  -- reaches it through Pawl.Engine.Activate.activatableGiven, so the cross-slot
+  -- reaches it through Pawl.Engine.Activatable.activatableGiven, so the cross-slot
   -- search is proved on both.
   --
   -- Resourceful Defense {2}{W} Enchantment (data/cards/resourceful-defense.json):
@@ -3626,7 +3627,7 @@ crescendoSpec s registry = Spec.describe s "A computed target count's object (CR
         (_, threeForests) = S.addPermanent forest S.bob twoForests
         (crescendoId, staged) = S.addPermanent crescendo S.alice (S.landsFor mountain S.alice 1 threeForests)
         board = mainPhase (S.addCounter verseCounter 2 crescendoId staged)
-        abilities = Activate.abilitiesFor crescendoId board
+        abilities = Activatable.abilitiesFor crescendoId board
         after = case abilities of
           [ability] -> S.runPure (aimingCrescendo [first_, second_]) board (Activate.activateAbility S.alice crescendoId ability >> Stack.resolveTop)
           _ -> board

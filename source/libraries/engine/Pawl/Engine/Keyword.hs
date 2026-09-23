@@ -105,6 +105,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
@@ -576,7 +577,7 @@ mintedBy keyword ability = ability {ActivatedAbility.keyword = Just keyword}
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
 -- owner's hand. Named for the ZONE rather than for cycling, because that is the
--- classification its reader wants: Activate.abilitiesFor asks "what can be
+-- classification its reader wants: Activatable.abilitiesFor asks "what can be
 -- activated from here" rather than which rule produced any of them, which each
 -- ability carries for itself once `mintedBy` has stamped it.
 --
@@ -851,6 +852,7 @@ cycling cost searchFor =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
           ActivatedAbility.activator = Activator.Controller,
           -- CR 702.29a gives the card this ability outright, with no "as long as".
@@ -893,6 +895,7 @@ reinforce n cost =
           -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
           -- default, and gives the ability outright with no "as long as".
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -979,6 +982,7 @@ craft spec =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.167a's "Activate only as a sorcery" -- scavenge's
           -- restriction.
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -1038,6 +1042,7 @@ searchForSameManaValue cost filter_ destination =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           -- Both rules give the ability outright, with no "as long as".
@@ -1132,6 +1137,7 @@ ninjutsu cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- Rule 702.49a states no timing restriction, which leaves CR 117.1b's
           -- default: a ninja may arrive after blockers are declared.
           ActivatedAbility.restrictions = [],
@@ -1371,7 +1377,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
 --
 -- THE RETURN names Zone.Graveyard as its `origin`, which is what confines the
 -- whole ability to a graveyard: CR 113.6m reads that field (Reassembling
--- Skeleton's reading, Pawl.Engine.Activate.zoneAbilitiesOf), so the ability a
+-- Skeleton's reading, Pawl.Engine.Activatable.zoneAbilitiesOf), so the ability a
 -- creature with unearth carries on the battlefield cannot be activated there.
 --
 -- THE SLOT is what the three later effects read. Rule 702.84a's "it" is the
@@ -1458,6 +1464,7 @@ unearth cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.84a's "Activate only as a sorcery" -- levelUp's
           -- restriction.
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -1589,6 +1596,7 @@ graveyardTokenCopy exceptions cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton copied))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, the rules' "Activate only as a sorcery".
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
@@ -1632,6 +1640,7 @@ scavenge cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton scavengeTarget slot)))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.97a's "Activate only as a sorcery".
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
@@ -1716,6 +1725,7 @@ encore cost =
         Effect.ForEach
           ForEach.MkForEach
             { ForEach.ref = ObjectRef.EachOpponent,
+              ForEach.members = LoopMembers.Every,
               ForEach.slot = encoreOpponentSlot,
               ForEach.body = Seq.fromList [copied, required],
               -- CR 608.2f's first sentence: one action over the opponents, so the
@@ -1743,6 +1753,7 @@ encore cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [loop, hasted, armed]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.141a's "Activate only as a sorcery".
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
@@ -2070,6 +2081,7 @@ crew n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
           ActivatedAbility.activator = Activator.Controller,
           -- CR 702.122a gives the permanent this ability outright, with no "as long
@@ -2125,6 +2137,7 @@ saddle n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Designate (Designate.MkDesignate Designation.Saddled Binding.triggerSource Nothing))))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2195,6 +2208,7 @@ station =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton load))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2240,6 +2254,7 @@ levelUp cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2270,6 +2285,7 @@ outlast cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2321,6 +2337,7 @@ equip payload =
               (ModeSelection.ChooseExactly 1),
           -- CR 702.6a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2363,6 +2380,7 @@ equipPlaneswalker cost =
               (ModeSelection.ChooseExactly 1),
           -- CR 702.6e's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2405,6 +2423,7 @@ fortify cost =
               (ModeSelection.ChooseExactly 1),
           -- CR 702.67a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2454,6 +2473,7 @@ reconfigure cost =
               (ModeSelection.ChooseExactly 1),
           -- CR 702.151a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -5446,8 +5466,9 @@ myriadExileName = AbilityName.MkAbilityName (Text.pack "myriad")
 -- arming opcode after the loop names the whole batch.
 --
 -- Rule 702.116a's "if one or more tokens are created this way" is myriad's own
--- clause condition rather than anything here: the arming opcode shares a clause
--- with the loop, so an empty loop arms nothing and this ability is never filed.
+-- clause condition rather than anything here: the arming opcode sits in a clause
+-- of its own that counts the minted batch, so a loop that minted nothing arms
+-- nothing and this ability is never filed.
 myriadExile :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 myriadExile =
   let effect =
@@ -5499,18 +5520,18 @@ myriadExile =
 -- the token enters not attacking (CR 508.4a) -- which is what a game not using CR
 -- 802's option leaves.
 --
--- The clause CONDITION is rule 702.116a's loop having a member at all, and it
--- carries that rule's "if one or more tokens are created this way" with it: at
--- two seats the only opponent IS the defending player, so the count is 0, and
--- Pawl.Engine.Resolve.gateHolds runs BEFORE Pawl.Engine.Resolve.exercises -- no
--- CR 603.5 "may" the rule offers nobody, and no delayed ability armed for an
--- exile with nothing to exile. Resolve.clauseIsInert cannot stand in for it:
--- ArmDelayedTrigger reads more than its slots, so it never answers inert.
--- Pawl.AttackKeywordTriggerSpec's two-seat case is what proves it.
+-- Rule 702.116a's "you may" is PER OPPONENT, so it is the loop's own
+-- LoopMembers.AnyNumber rather than a clause's Optionality: the controller picks
+-- which opponents get a token, once, before any is created (CR 608.2d), since
+-- the tokens are one simultaneous action (CR 608.2f). At two seats the loop has
+-- no member and nothing is asked.
 --
--- Not implemented: rule 702.116a's "you may" is PER OPPONENT, and this asks it
--- ONCE over the whole loop, so at four or more seats a controller cannot take a
--- token against one opponent and refuse another (#3663).
+-- The SECOND clause is rule 702.116a's "if one or more tokens are created this
+-- way": its condition counts the batch the loop bound, so a controller who
+-- picked nobody arms no delayed ability for an exile with nothing to exile.
+-- Resolve.clauseIsInert cannot stand in for it: ArmDelayedTrigger reads more
+-- than its slots, so it never answers inert. Pawl.AttackKeywordTriggerSpec's
+-- four-seat "picks nobody" case is what proves it.
 myriad :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 myriad =
   let copy =
@@ -5537,6 +5558,7 @@ myriad =
         Effect.ForEach
           ForEach.MkForEach
             { ForEach.ref = ObjectRef.Players (PlayerRef.EachOpponentExcept Binding.triggerPlayer),
+              ForEach.members = LoopMembers.AnyNumber,
               ForEach.slot = myriadOpponentSlot,
               ForEach.body = Seq.singleton copy,
               -- CR 608.2f's first sentence: one action over the opponents, so rule
@@ -5550,24 +5572,21 @@ myriad =
               ArmDelayedTrigger.onset = Onset.Immediately,
               ArmDelayedTrigger.duration = Nothing
             }
-      anyOpponent =
-        Condition.Compares
-          Compares.MkCompares
-            { Compares.measured =
-                Quantity.Count
-                  ( Count.MkCount
-                      (Scope.OverPlayers (PlayerRef.EachOpponentExcept Binding.triggerPlayer))
-                      (Filter.And [])
-                      Aggregation.Members
-                  ),
-              Compares.comparison = Comparison.AtLeast,
-              Compares.threshold = Quantity.Literal 1
-            }
+      anyToken = atLeastOneMatching (Scope.OverBound myriadTokenSlot) (Filter.And [])
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
           TriggeredAbility.modal =
             Modal.MkModal
-              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing (Just anyOpponent) Nothing (Optionality.Optional (PlayerRef.Relative PlayerRelation.You)) Nothing (Seq.fromList [loop, arm]))) Map.empty))
+              ( Seq.singleton
+                  ( Mode.MkMode
+                      ( Seq.fromList
+                          [ Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton loop),
+                            Clause.MkClause Nothing (Just anyToken) Nothing Optionality.Mandatory Nothing (Seq.singleton arm)
+                          ]
+                      )
+                      Map.empty
+                  )
+              )
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
           TriggeredAbility.limit = TriggerLimit.Unlimited
@@ -8725,7 +8744,7 @@ madnessCast cost =
       -- Rule 702.35a's last sentence. No riders and no slot: the destination is
       -- a graveyard, which CR 400.3 makes the owner's, and nothing reads the
       -- arrival. `origin` is Nothing because that field is
-      -- Pawl.Engine.Activate.zoneAbilitiesOf's question about where an ability
+      -- Pawl.Engine.Activatable.zoneAbilitiesOf's question about where an ability
       -- may be ACTIVATED from, and this is a trigger.
       toGraveyard =
         Effect.MoveToZone

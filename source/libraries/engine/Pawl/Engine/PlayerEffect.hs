@@ -1383,7 +1383,7 @@ spellCostAdjustments pid oid gs =
 -- Pawl.Engine.Activate.activateAbility, which gathers once before the targets
 -- exist and again after. A caller that has to MEASURE the cost before that
 -- moment hands one candidate target at a time instead, and takes the best
--- answer (Pawl.Engine.Activate.aimingSomewhere).
+-- answer (Pawl.Engine.Activatable.aimingSomewhere).
 --
 -- The MANA increases are gathered too (Oppressive Rays), and CR 601.2f orders
 -- every one of them before any reduction -- which is Cost.applyAdjustments'
@@ -1774,8 +1774,8 @@ choiceCouldApply src criterion oid gs =
 --
 -- Exhaustive over PlayerRef, since a new arm has to say what a zone scope makes
 -- of it. Three arms answer, and the rest name NOBODY: the slot-reading ones
--- (InSlot, EachInSlot, ControllerOfBound, ChosenPlayerOfBound, Attacking) read
--- the RESOLUTION's
+-- (InSlot, EachInSlot, ControllerOfBound, OwnerOfBound, ChosenPlayerOfBound,
+-- Attacking) read the RESOLUTION's
 -- bindings, which are gone by the time a stored row is read and which
 -- Pawl.Engine.Resolve bakes to Specific while they are still there, and Candidate
 -- names whichever player a fold is aimed at with no fold running here. A
@@ -1800,6 +1800,7 @@ zoneOwners pid ref gs = case ref of
   PlayerRef.EachOpponentExcept _ -> []
   PlayerRef.Candidate -> []
   PlayerRef.ControllerOfBound _ -> []
+  PlayerRef.OwnerOfBound _ -> []
   PlayerRef.ChosenPlayerOfBound _ -> []
   PlayerRef.Attacking _ -> []
 
@@ -1928,7 +1929,7 @@ castPermissionsFrom pid zone oid gs =
 -- CR 601.3: has this permission a use left this turn? Unlimited always; a
 -- once-each-turn one only while GameState.castPermissionsUsedThisTurn does not
 -- already record it under the object that granted it, and a once-each-of-your-
--- turns one only on `pid`'s own turn as well.
+-- turns one only on `pid`'s own turn as well, its team's under CR 805.4a.
 --
 -- A row carrying NO source answers True and is never spent. Unreachable rather
 -- than a policy: `applying` stamps every printed row with its permanent and
@@ -1942,7 +1943,7 @@ unspentPermission pid source grant gs =
    in case CastFromZone.limit grant of
         PermissionLimit.Unlimited -> True
         PermissionLimit.OnceEachTurn -> unspent
-        PermissionLimit.OnceEachOfYourTurns -> GameState.activePlayer gs == pid && unspent
+        PermissionLimit.OnceEachOfYourTurns -> Turn.isActive gs pid && unspent
 
 -- CR 601.3: the once-each-turn permission a cast of `oid` out of `zone` spends,
 -- if it spends one. Asked of the PRE-MOVE state by Pawl.Engine.Cast.castSpellWith
@@ -3308,8 +3309,8 @@ statedFlips pid gs =
    in Maybe.mapMaybe (says . snd) (applying pid gs)
 
 -- CR 706.2's third sentence: every modifier in force right now over a die roll
--- `pid` is about to make from an instruction that knows nothing about it.
--- Clam-I-Am is the whole producer.
+-- `pid` is about to make from an instruction that knows nothing about it
+-- (Clam-I-Am, Wall of Fortune, Night Shift of the Living Dead).
 --
 -- `statedFlips` above one rule over, and the same division of labour: a LIST
 -- rather than a first or a last, because rule 706.2 puts no limit on how many

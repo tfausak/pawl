@@ -31,6 +31,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -882,6 +883,18 @@ lastKnownOf oid gs =
     then Nothing
     else Map.lookup oid (GameState.lastKnown gs)
 
+-- CR 603.10's first sentence: a permanent as a trigger event's own board sample
+-- (Event.Trigger.battlefieldAt) shows it -- the characteristics and controller it
+-- had immediately after the event -- whether it still stands or has since left,
+-- in which case CR 608.2h's record supplies what the sample does not carry.
+sampledView :: ObjectId -> BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics -> GameState -> Filter.View
+sampledView oid candidate gs =
+  let pc = BattlefieldCandidate.characteristics candidate
+      controller = BattlefieldCandidate.controller candidate
+   in case lastKnownOf oid gs of
+        Just lk -> lastKnownView (viewWithLastKnownAnywhere gs) oid gs lk {LastKnown.characteristics = pc, LastKnown.controller = controller}
+        Nothing -> viewOfCharacteristics (viewWithLastKnownAnywhere gs) oid pc (Just controller) (countersOf oid gs) gs
+
 -- keywordsOf with CR 608.2h's fallback (CR 702.2e, CR 702.15c, CR 702.90d); toxic
 -- (rule 702.164) has no such clause and rides this by uniformity.
 keywordsWithLastKnown :: ObjectId -> GameState -> Map Keyword Natural
@@ -896,6 +909,16 @@ controllerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> Just (LastKnown.controller lk)
   Nothing -> controllerOf oid gs
+
+-- CR 108.3's owner, with the same fallback -- unlike control (CR 110.2) an
+-- owner never moves, so the live half is Object.owner straight off the
+-- object rather than a projection. PlayerRef.OwnerOfBound's reader
+-- (Pawl.Engine.Resolve.Slots.playerRefPlayers); The Deck of Many Things' 20
+-- band is the producer.
+ownerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
+ownerWithLastKnown oid gs = case lastKnownOf oid gs of
+  Just lk -> Just (LastKnown.owner lk)
+  Nothing -> fmap Object.owner (Game.lookupObject oid gs)
 
 -- subtypesOf with the same fallback (CR 702.76a and CR 702.173a for why the
 -- types are wanted; CR 608.2h for the authority) -- a creature that dealt combat

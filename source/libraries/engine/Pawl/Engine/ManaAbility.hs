@@ -60,7 +60,7 @@ import qualified Pawl.Types.Zone as Zone
 -- loyalty ability in the pool adds mana, so the clause is inert rather than
 -- checked here). Read at three sites:
 -- Mana.manaRoutesOfGiven includes a mana ability as a source,
--- Activate.activatableGiven refuses to put one on the stack (CR 605.3b), and
+-- Activatable.activatableGiven refuses to put one on the stack (CR 605.3b), and
 -- Projection's view builders answer Filter.HasNonManaActivatedAbility with its
 -- negation. What Action.legalActions offers instead is
 -- Action.ActivateManaAbility, one per Mana.manaSourcesGiven, which is CR 605.3a's
@@ -302,6 +302,7 @@ manaProduced effect = case effect of
   Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
+  Effect.Reroll -> Nothing
   Effect.ChooseCardName _ -> Nothing
   Effect.FromOutsideTheGame _ -> Nothing
   Effect.ExileThisSpell -> Nothing
@@ -440,7 +441,7 @@ manaProduced effect = case effect of
   -- addition: a body holding several is a shape no printing writes, "add one
   -- mana for each ..." being the ManaAddition COUNT rather than a repeated body
   -- (Pawl.Types.ManaAddition).
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.Heal _ -> Nothing
 
 -- CR 605.1a's fourth clause, asked of one effect: does it move a card to or from
@@ -512,6 +513,7 @@ movesLibraryCard effect = case effect of
   Effect.ChangeText {} -> False
   Effect.ExileAllGraveyards -> False
   Effect.Proliferate -> False
+  Effect.Reroll -> False
   Effect.ChooseCardName _ -> False
   -- CR 400.11: the card comes from OUTSIDE THE GAME, which is not a zone at all
   -- and so is not a library. CR 605.1a's fourth clause asks about libraries, and
@@ -679,7 +681,7 @@ movesLibraryCard effect = case effect of
   Effect.GrantPlayFromExile {} -> False
   -- Descended into for `manaProduced`'s reason: rule 608.2f's body runs as part
   -- of THIS effect.
-  Effect.ForEach (ForEach.MkForEach _ _ body _) -> any movesLibraryCard body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> any movesLibraryCard body
   Effect.Heal _ -> False
 
 -- Which zone an ObjectRef reaches, asked of libraries alone: does the ref name

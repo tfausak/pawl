@@ -17,6 +17,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cost as Cost
@@ -71,6 +72,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
@@ -173,7 +175,7 @@ cyclingTriggerSpec s registry =
           (g1, avenId) = S.handOne aven g0
           gs = g1 {GameState.priority = Just S.alice}
       Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Flying creature gs)) "the Piker does not start with flying"
-      case Activate.abilitiesFor avenId gs of
+      case Activatable.abilitiesFor avenId gs of
         [ability] -> do
           let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice avenId ability)
               -- The settle PLACES the trigger and stamps its target (CR
@@ -197,7 +199,7 @@ cyclingTriggerSpec s registry =
       let (_, g0) = S.addPermanent piker S.alice (S.landsInPlay island 1)
           (g1, avenId) = S.handOne aven g0
           gs = g1 {GameState.priority = Just S.alice}
-      case Activate.abilitiesFor avenId gs of
+      case Activatable.abilitiesFor avenId gs of
         [ability] -> do
           let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice avenId ability)
               placed = S.runPure S.identityAnswer cycled Engine.placePendingTriggers
@@ -231,7 +233,7 @@ cyclingTriggerSpec s registry =
       let (_, g0) = S.addPermanent piker S.alice (S.landsInPlay forest 2)
           (g1, maulerId) = S.handOne mauler g0
           gs = g1 {GameState.priority = Just S.alice}
-      case Activate.abilitiesFor maulerId gs of
+      case Activatable.abilitiesFor maulerId gs of
         [ability] -> do
           let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice maulerId ability)
               placed = S.runPure S.identityAnswer cycled Engine.placePendingTriggers
@@ -695,6 +697,64 @@ graveyardEffectZoneTriggerSpec s registry =
           let (_, gs) = S.addPermanent squee S.alice (Setup.emptyGame S.bothPlayers)
               begun = beginUpkeep gs
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered begun)) []
+
+-- CR 113.6m's exemption and CR 113.6k's second sentence, per trigger condition:
+-- data/cards/synthetic-homing-nabob.json, "When this creature dies or at the
+-- beginning of your upkeep, return this card from your graveyard to your hand."
+-- Synthetic: Scryfall `o:"dies or" o:"from your graveyard"`, 2026-09-23, finds
+-- only Kaya the Inexorable, whose "return it" names no origin; a printing of
+-- that shape with an origin would replace this card.
+--
+-- The dies half names the graveyard card through `became` and the upkeep half
+-- through the source slot, so the payload moves it under either.
+--
+-- The dies half is exempted to the battlefield; the upkeep half is not, and
+-- functions only in the graveyard. The graveyard leg is the one an
+-- ability-wide exemption loses.
+anyOfEffectZoneTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+anyOfEffectZoneTriggerSpec s registry =
+  let nabobName = CardName.MkCardName (Text.pack "Synthetic Homing Nabob")
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
+      resolveTop gs = S.runPure S.identityAnswer gs Stack.resolveTop
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+   in Spec.describe s "AnyOfEffectZoneTrigger" $ do
+        Spec.it s "CR 113.6m the upkeep half triggers from the graveyard and returns the card" $ do
+          nabob <- S.printingOf s registry "Synthetic Homing Nabob"
+          let (_, g1) = S.addGraveyardCard nabob S.alice (Setup.emptyGame S.bothPlayers)
+              placed = settle (beginUpkeep g1)
+              after = resolveTop placed
+          Spec.assertBool s (Set.member nabobName (namesIn Zone.Hand S.alice after)) "the Nabob is in alice's hand"
+          Spec.assertBool s (not (Set.member nabobName (namesIn Zone.Graveyard S.alice after))) "and no longer in her graveyard"
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+        -- The pair, one zone away: the upkeep half functions ONLY in the
+        -- graveyard, so the same upkeep triggers nothing for a Nabob on the
+        -- battlefield.
+        Spec.it s "CR 113.6m the upkeep half does not trigger from the battlefield" $ do
+          nabob <- S.printingOf s registry "Synthetic Homing Nabob"
+          let (_, g1) = S.addPermanent nabob S.alice (Setup.emptyGame S.bothPlayers)
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered (beginUpkeep g1))) []
+        -- Only the MATCH is narrowed to the upkeep half: the pending trigger
+        -- carries the printed ability, which CR 707.9a's "except it has this
+        -- ability" copies off the stack.
+        Spec.it s "CR 113.6k the trigger carries the whole printed ability" $ do
+          nabob <- S.printingOf s registry "Synthetic Homing Nabob"
+          let (_, g1) = S.addGraveyardCard nabob S.alice (Setup.emptyGame S.bothPlayers)
+          Spec.assertEqWith
+            s
+            "both halves of the AnyOf"
+            (fmap (TriggeredAbility.condition . PendingTrigger.ability) (gathered (beginUpkeep g1)))
+            (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.combinedFace nabob)))
+        Spec.it s "CR 113.6m the dies half is exempted, triggers once from the battlefield, and returns the card" $ do
+          nabob <- S.printingOf s registry "Synthetic Homing Nabob"
+          let (victim, g1) = S.addPermanent nabob S.alice (Setup.emptyGame S.bothPlayers)
+              placed = settle (S.runPure S.identityAnswer g1 (Event.destroy Regenerability.Regenerable [victim]))
+              after = resolveTop placed
+          Spec.assertEqWith s "exactly one trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertBool s (Set.member nabobName (namesIn Zone.Hand S.alice after)) "the Nabob is in alice's hand"
+          Spec.assertEqWith s "the creature really died first" (Game.lookupObject victim placed) Nothing
 
 -- CR 114.4: "abilities of emblems function in the command zone" -- the third zone
 -- Pawl.Engine.Event.Trigger.eventTriggers scans, and the only one whose membership is
@@ -2407,6 +2467,7 @@ representativeEvents cond =
         -- ActivatedAbility. It binds nothing, CR 603.2c's batch naming no one
         -- permanent, and the floor below pins that.
         TriggerCondition.PermanentsBecomeTargeted c -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived (Maybe.fromMaybe StackObjectKind.Spell (PermanentsBecomeTargeted.kind c)) S.bob))
+        TriggerCondition.PermanentBecomesTargeted c -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToObject departed) arrived (Maybe.fromMaybe StackObjectKind.Spell (PermanentsBecomeTargeted.kind c)) S.bob))
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
@@ -2589,6 +2650,8 @@ representativeEvents cond =
         -- the floor for the wrong keyword action.
         TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
         TriggerCondition.PlayerRollsDice _ -> one (GameEvent.DiceRolled S.bob)
+        -- CR 706.2's per-die event, carrying the number the condition states.
+        TriggerCondition.PlayerRollsResult watched -> one (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = DieResult.result watched})
         -- CR 705.2's own event, and the only one this condition admits. A WON
         -- flip, since neither a lost one nor rule 705.2's winnerless one matches
         -- at all -- and bob rather than the perspective player, on the
@@ -2750,6 +2813,8 @@ everyTriggerCondition =
     -- Professor Hojo's own, the only inhabitant in the pool: a Filter and a kind
     -- where the sibling above carries a relation and a kind.
     TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted Filter.Type.IsSource (Just StackObjectKind.ActivatedAbility)),
+    -- Venerated Rotpriest's per-creature twin.
+    TriggerCondition.PermanentBecomesTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted Filter.Type.IsSource (Just StackObjectKind.Spell)),
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
     -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds
@@ -2829,6 +2894,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsDice PlayerRelation.You,
     TriggerCondition.PlayerRollsDice PlayerRelation.Opponent,
+    TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6},
+    TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.Opponent, DieResult.result = 6},
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.You,
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.Opponent,
     TriggerCondition.PlayerLosesCoinFlip PlayerRelation.You,
@@ -2904,6 +2971,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   graveyardTriggerSpec s registry
   gaeasBlessingSpec s registry
   graveyardEffectZoneTriggerSpec s registry
+  anyOfEffectZoneTriggerSpec s registry
   droughtUpkeepSpec s registry
   commandZoneTriggerSpec s registry
   serraAvatarSpec s registry

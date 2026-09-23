@@ -25,6 +25,8 @@ codec cardCodec abilityCodec = Fields.object $ do
   -- CR 101.1: the ceilings this ability's own words put on CR 602.2b's announced
   -- X (Pawl.Types.ActivatedAbility), emitted only for an ability that states one.
   maximumX <- Fields.defaulted "maximumX" [] (Common.list Quantity.codec) ActivatedAbility.maximumX
+  -- CR 101.1: the floor on that X, emitted only for an ability that states one.
+  minimumX <- Fields.defaulted "minimumX" 0 Common.natural ActivatedAbility.minimumX
   modal <- Fields.required "modal" (Modal.codec cardCodec abilityCodec) ActivatedAbility.modal
   -- CR 602.5: emitted only for a restricted ability, so the absence of the key
   -- is CR 602.2's default -- no "activate only ..." rider at all.
@@ -51,6 +53,7 @@ codec cardCodec abilityCodec = Fields.object $ do
     ActivatedAbility.MkActivatedAbility
       { ActivatedAbility.cost = cost,
         ActivatedAbility.maximumX = maximumX,
+        ActivatedAbility.minimumX = minimumX,
         ActivatedAbility.modal = modal,
         ActivatedAbility.restrictions = restrictions,
         ActivatedAbility.activator = activator,

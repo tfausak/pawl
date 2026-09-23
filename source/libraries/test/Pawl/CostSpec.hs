@@ -26,6 +26,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -116,7 +117,7 @@ import qualified Pawl.Types.Zone as Zone
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing Nothing
 
 doorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 doorSpec s registry =
@@ -174,7 +175,7 @@ doorSpec s registry =
     -- gives a card in a hand no controller for a control-shaped gate to read.
     --
     -- Tested directly rather than only through cycling, because the two gates
-    -- an activation passes -- this one and Activate.abilitiesFor's -- would
+    -- an activation passes -- this one and Activatable.abilitiesFor's -- would
     -- otherwise cover for each other, and either alone would look correct.
     Spec.it s "CR 702.29a DiscardThis needs the card in this player's hand" $ do
       piker <- S.printingOf s registry "Goblin Piker"
@@ -248,7 +249,7 @@ doorSpec s registry =
           (_, gs2) = S.addPermanent thalia S.alice gs1
       Spec.assertBool
         s
-        (Activate.activatable S.alice slaver (theAbility mindslaver) gs2)
+        (Activatable.activatable S.alice slaver (theAbility mindslaver) gs2)
         "four Mountains still pay {4}"
     -- Departure 2: an Unpaid payment is a complete no-op, never a partial one.
     Spec.it s "CR 118.6 paying an unpayable cost changes nothing" $ do
@@ -350,7 +351,7 @@ greedSpec s registry =
       let (greedId, gs) = greedBoard swamp greed piker 1
       Spec.assertBool
         s
-        (not (Activate.activatable S.alice greedId (theAbility greed) gs))
+        (not (Activatable.activatable S.alice greedId (theAbility greed) gs))
         "not activatable"
       Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no Activate action offered"
     Spec.it s "CR 119.4b at 2 life the ability IS offered" $ do
@@ -360,7 +361,7 @@ greedSpec s registry =
       let (greedId, gs) = greedBoard swamp greed piker 2
       Spec.assertBool
         s
-        (Activate.activatable S.alice greedId (theAbility greed) gs)
+        (Activatable.activatable S.alice greedId (theAbility greed) gs)
         "activatable"
     -- CR 704.5a: "If a player has 0 or less life, that player loses the
     -- game." Paying life is a real life-total change, and a cost may
@@ -782,7 +783,7 @@ spitefulSpec s registry =
       Spec.assertBool s (not (any (S.isCastOf aloneId) (Action.legalActions S.alice alone))) "with the target the only creature no announcement pays, so the cast is not offered"
       Spec.assertBool s (any (S.isCastOf pairedId) (Action.legalActions S.alice paired)) "and one more creature makes some announcement pay, so it is"
     -- CR 602.2b sends an activation through the same steps, and
-    -- Activate.aimingSomewhere is the gate. The same pair of boards with the
+    -- Activatable.aimingSomewhere is the gate. The same pair of boards with the
     -- Altar on the battlefield in the Rite's place.
     Spec.it s "CR 602.2b the activation is offered only where some target choice leaves the cost payable" $ do
       swamp <- S.printingOf s registry "Swamp"
@@ -940,7 +941,7 @@ headlessSkaabSpec s registry =
 -- bar a second activation -- two FUEL cards in hand are two activations and
 -- {B}{B}{B}{B}. Goblin Piker is the fuel: it is never cast, so nothing but the
 -- exile can move it. The Arbiter is in that hand too and is not fuel, CR 601.2a
--- putting it on the stack before the Bloom is asked to pay (Cost.beingCast).
+-- putting it on the stack before the Bloom is asked to pay (Game.beingCast).
 cadaverousBloomSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cadaverousBloomSpec s registry =
   Spec.describe s "Cadaverous Bloom" $ do
@@ -1515,8 +1516,8 @@ asmorFoodSpec s registry =
       Spec.assertEqWith s "and alice has priority on both" (GameState.priority three, GameState.priority one) (Just S.alice, Just S.alice)
       Spec.assertBool s (Cost.canPayComponent Map.empty S.alice asmorThree component three) "three Foods pay the component"
       Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice asmorOne component one)) "one Food beside two non-Foods does not"
-      Spec.assertBool s (Activate.activatable S.alice asmorThree ability three) "so the ability is activatable with three"
-      Spec.assertBool s (not (Activate.activatable S.alice asmorOne ability one)) "and is not with one"
+      Spec.assertBool s (Activatable.activatable S.alice asmorThree ability three) "so the ability is activatable with three"
+      Spec.assertBool s (not (Activatable.activatable S.alice asmorOne ability one)) "and is not with one"
       Spec.assertBool s (any (isActivateOf asmorThree) (Action.legalActions S.alice three)) "and it is menued with three"
       Spec.assertBool s (not (any (isActivateOf asmorOne) (Action.legalActions S.alice one))) "and not menued with one"
 
@@ -1615,8 +1616,8 @@ longtuskCubSpec s registry =
           withOne = S.addPlayerCounter PlayerCounterKind.Energy 1 S.alice base
           activated = S.runPure S.identityAnswer withTwo (Activate.activateAbility S.alice cubId ability)
           resolved = S.runPure S.identityAnswer activated Stack.resolveTop
-      Spec.assertBool s (Activate.activatable S.alice cubId ability withTwo) "payable at two"
-      Spec.assertBool s (not (Activate.activatable S.alice cubId ability withOne)) "unpayable at one"
+      Spec.assertBool s (Activatable.activatable S.alice cubId ability withTwo) "payable at two"
+      Spec.assertBool s (not (Activatable.activatable S.alice cubId ability withOne)) "unpayable at one"
       Spec.assertEqWith s "energy spent" (S.playerCounterOf PlayerCounterKind.Energy S.alice activated) 0
       Spec.assertEqWith s "Cub grew a +1/+1 counter" (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject cubId resolved)) (Just 1)
     Spec.it s "CR 603.2 Longtusk Cub gains two energy when it connects" $ do
@@ -1875,7 +1876,7 @@ answerHatredXOf n p = case p of
 -- what the mana-cost-only reading of CR 601.2b leaves behind on this card.
 answerHatredAtBound :: Prompt.Prompt r -> State.State [Natural.Natural] r
 answerHatredAtBound p = case p of
-  Prompt.ChooseX _ _ _ bound -> do
+  Prompt.ChooseX _ _ _ _ bound -> do
     State.modify' (\seen -> seen <> [bound])
     pure bound
   _ -> pure (S.identityAnswer p)
@@ -3537,7 +3538,7 @@ magmaticInsightSpec s registry =
 -- visible.
 --
 -- Gameplay-level throughout, through Pawl.Engine.Cost.tapForMana: CR 605.3b
--- keeps a mana ability off the stack, so Activate.activatable answers False for
+-- keeps a mana ability off the stack, so Activatable.activatable answers False for
 -- this ability on every board and no case may route through it.
 springleafBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 springleafBoard drum first second =
@@ -3666,7 +3667,7 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
 -- prompt a real choice.
 --
 -- Not a mana ability, so unlike the Drum this one is legitimately asked of
--- Activate.activatable (CR 605.3b is what bars that for the Drum).
+-- Activatable.activatable (CR 605.3b is what bars that for the Drum).
 morcantBoard :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
 morcantBoard morcant elves =
   let (morcantId, gs0) = S.addPermanent morcant S.alice (Setup.emptyGame S.bothPlayers)
@@ -3700,8 +3701,8 @@ morcantSpec s registry = Spec.describe s "High Perfect Morcant" $ do
         (shortId, _, short) = morcantBoard morcant [glistener]
     -- Morcant is an Elf and the cost does not say "another", so it counts
     -- itself: two other Elves make three candidates.
-    Spec.assertBool s (Activate.activatable S.alice enoughId (theAbility morcant) enough) "Morcant and two Elves: activatable"
-    Spec.assertBool s (not (Activate.activatable S.alice shortId (theAbility morcant) short)) "Morcant and one Elf: not"
+    Spec.assertBool s (Activatable.activatable S.alice enoughId (theAbility morcant) enough) "Morcant and two Elves: activatable"
+    Spec.assertBool s (not (Activatable.activatable S.alice shortId (theAbility morcant) short)) "Morcant and one Elf: not"
   -- The payment: four candidates, three tapped, and the payer says which three.
   -- Morcant itself is a candidate and is the one left untapped here, so a case
   -- that tapped "the first three" would still pass -- which is why the twin
@@ -3935,8 +3936,8 @@ melokuSpec s registry = Spec.describe s "Meloku the Clouded Mirror" $ do
     let (payableId, landIds, payable) = melokuBoard meloku elves [(island, S.alice)]
         unpayable = S.giveControl (firstOf landIds) S.bob payable
         component = CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents 1 (Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.ControlledBy PlayerRelation.You]))
-    Spec.assertBool s (Activate.activatable S.alice payableId (theAbility meloku) payable) "a land alice controls: activatable"
-    Spec.assertBool s (not (Activate.activatable S.alice payableId (theAbility meloku) unpayable)) "the same land under bob: not"
+    Spec.assertBool s (Activatable.activatable S.alice payableId (theAbility meloku) payable) "a land alice controls: activatable"
+    Spec.assertBool s (not (Activatable.activatable S.alice payableId (theAbility meloku) unpayable)) "the same land under bob: not"
     Spec.assertBool s (Cost.canPayComponent Map.empty S.alice payableId component payable) "and the component itself is payable on the one board"
     Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice payableId component unpayable)) "and not on the other"
   -- CR 400.3: the destination is the OWNER's hand, not the payer's. alice
@@ -3997,7 +3998,7 @@ everbarkShamanSpec s registry =
       let (shamanId, gs) = everbarkBoard shaman nexus True [piker]
           ability = theAbility shaman
       Spec.assertEqWith s "the cost has no mana in it at all" (Cost.Type.mana (ActivatedAbility.cost ability)) (Just (ManaCost.MkManaCost []))
-      Spec.assertBool s (Activate.activatable S.alice shamanId ability gs) "activatable"
+      Spec.assertBool s (Activatable.activatable S.alice shamanId ability gs) "activatable"
       Spec.assertBool s (any (isActivateOf shamanId) (Action.legalActions S.alice gs)) "and menued"
       let after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice shamanId ability)
       Spec.assertEqWith s "CR 602.2b the Piker was exiled to pay" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
@@ -4009,7 +4010,7 @@ everbarkShamanSpec s registry =
       nexus <- S.printingOf s registry "Maskwood Nexus"
       piker <- S.printingOf s registry "Goblin Piker"
       let (shamanId, gs) = everbarkBoard shaman nexus False [piker]
-      Spec.assertBool s (not (Activate.activatable S.alice shamanId (theAbility shaman) gs)) "not activatable"
+      Spec.assertBool s (not (Activatable.activatable S.alice shamanId (theAbility shaman) gs)) "not activatable"
       Spec.assertBool s (not (any (isActivateOf shamanId) (Action.legalActions S.alice gs))) "and not menued"
     -- The other discriminator, differing from the positive case in exactly one
     -- buried card: Maskwood Nexus's set is CREATURE cards, so a Lightning Bolt in
@@ -4020,7 +4021,7 @@ everbarkShamanSpec s registry =
       nexus <- S.printingOf s registry "Maskwood Nexus"
       bolt <- S.printingOf s registry "Lightning Bolt"
       let (shamanId, gs) = everbarkBoard shaman nexus True [bolt]
-      Spec.assertBool s (not (Activate.activatable S.alice shamanId (theAbility shaman) gs)) "not activatable"
+      Spec.assertBool s (not (Activatable.activatable S.alice shamanId (theAbility shaman) gs)) "not activatable"
       Spec.assertEqWith s "and the Bolt is still buried" (length (Game.zoneMembers Zone.Graveyard S.alice gs)) 1
 
 -- alice with a face-down Putrid Raptor on the battlefield, `held` in hand, and
@@ -4173,7 +4174,7 @@ barkhideTrollSpec s registry =
       troll <- S.printingOf s registry "Barkhide Troll"
       forest <- S.printingOf s registry "Forest"
       let (trollId, gs) = trollBoard troll forest
-      Spec.assertBool s (Activate.activatable S.alice trollId (theAbility troll) gs) "activatable"
+      Spec.assertBool s (Activatable.activatable S.alice trollId (theAbility troll) gs) "activatable"
       Spec.assertEqWith s "and menued exactly once" (length (filter (isActivateOf trollId) (Action.legalActions S.alice gs))) 1
     -- The card's OTHER printed line, which the fixture above sets by hand: cast
     -- the Troll and it arrives already carrying the counter (CR 614.1c through
@@ -4489,7 +4490,7 @@ brittleEffigySpec s registry = Spec.describe s "Brittle Effigy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (effigyId, _, _, gs) = brittleEffigyBoard effigy plains giant piker
     Spec.assertBool s (any (isActivateOf effigyId) (Action.legalActions S.alice gs)) "the activation is a legal action"
-    Spec.assertEqWith s "and the Effigy offers exactly one ability" (length (Activate.abilitiesFor effigyId gs)) 1
+    Spec.assertEqWith s "and the Effigy offers exactly one ability" (length (Activatable.abilitiesFor effigyId gs)) 1
   -- CR 601.2h: the cost is paid as the ability is activated, so the Effigy is in
   -- exile with the ability still waiting on the stack. THE assertion this
   -- component exists for -- read before the tap and the stack, which a payment
@@ -5079,10 +5080,10 @@ shufflingReversalSpec s registry = Spec.describe s "Reversal keeps a shuffle" $ 
 -- goes through Pawl.Engine.Cost.pay's OutsideResolution moment directly rather
 -- than through reverseIllegal above, proving `pay`'s own comment.
 --
--- alice holds TWO cards so Activate.payableCost's pre-gate sees a legal
+-- alice holds TWO cards so Activatable.payableCost's pre-gate sees a legal
 -- discard and opens the mana window at all (an empty hand is refused before
 -- the window ever runs, which SpringleafDrumSpec's posture and
--- Activate.activatable's CR 605.3b elision both warn against skipping) --
+-- Activatable.activatable's CR 605.3b elision both warn against skipping) --
 -- the discard is then refused AT the interactive prompt (`Prompt.ChooseDiscard`
 -- answered with the wrong count, `tappingNothing`'s reject-not-repair posture
 -- one component over) once the {1} half is already paid off the Synthetic
@@ -5618,7 +5619,7 @@ geyserLeaperSpec s registry = Spec.describe s "Geyser Leaper" $ do
 
 -- alice activates the Leaper's sole activated ability, taking the substitution
 -- that leaves `wanted` to pay with mana and tapping `tapped` for the rest, and
--- the ability resolves. The Activate.activatable answer rides back beside the
+-- the ability resolves. The Activatable.activatable answer rides back beside the
 -- state rather than being asserted here, and every caller asserts it AFTER the
 -- gameplay assertions: it is a proxy, and a proxy ahead of the behaviour absorbs
 -- a mutation and reports itself.
@@ -5628,12 +5629,12 @@ activatingLeaper s wanted tapped leaperId gs = case Projection.abilitiesOf leape
     let answer :: Prompt.Prompt r -> r
         answer = waterbending wanted tapped
         activated = S.runPure answer gs (Activate.activateAbility S.alice leaperId ability)
-     in pure (Activate.activatable S.alice leaperId ability gs, S.runPure answer activated Stack.resolveTop)
+     in pure (Activatable.activatable S.alice leaperId ability gs, S.runPure answer activated Stack.resolveTop)
   [] -> Spec.assertFailure s "expected the Leaper to carry an activated ability"
 
 -- The negative: alice tries the same activation as greedily as the board allows,
 -- and nothing happens. Asserted at GAMEPLAY level rather than off
--- Activate.activatable -- an unpayable cost is rewound by
+-- Activatable.activatable -- an unpayable cost is rewound by
 -- Activate.activateAbility, so an empty graveyard is the whole of what a player
 -- would see.
 unpaidLeaper :: (Monad m) => Spec.Spec m n -> ObjectId.ObjectId -> GameState.GameState -> m ()
@@ -5658,8 +5659,8 @@ unpaidLeaper s leaperId gs = case Projection.abilitiesOf leaperId gs of
 -- read off -- a Goblin Piker is printed 2/1, so neither number the assertions
 -- read can be its own.
 --
--- Not implemented: "X can't be 0", so alice may announce a value the printed card
--- refuses (#3943).
+-- "X can't be 0" is ActivatedAbility.minimumX (CR 101.1): the floor pair below
+-- proves the announcement side and the offer pair the gate.
 --
 -- Every board is LANDLESS, geyserLeaperSpec's posture above: an activation that
 -- succeeds can only have been paid by tapping. The pair below varies the value
@@ -5697,6 +5698,38 @@ kataraSpec s registry = Spec.describe s "Katara, Water Tribe's Hope" $ do
     Spec.assertEqWith s "the ability was never paid for: the Piker's power is its printed 2" (Projection.powerOf pikerId resolved) (Just 2)
     Spec.assertEqWith s "and its toughness the printed 1" (Projection.toughnessOf pikerId resolved) (Just 1)
     Spec.assertEqWith s "and nothing of hers is tapped" (S.tappedCount S.alice resolved) 0
+  -- The floor, as a pair varying the ANNOUNCED value alone: 0 is what the card
+  -- forbids and 1 the least it permits. Reject-not-repair, so the refused 0
+  -- leaves the Piker at its printed size rather than a base 0/0.
+  Spec.it s "CR 101.1 an announced waterbend X of 0 is refused, and 1 is not" $ do
+    katara <- S.printingOf s registry "Katara, Water Tribe's Hope"
+    piker <- S.printingOf s registry "Goblin Piker"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    mountain <- S.printingOf s registry "Mountain"
+    let (kataraId, pikerId, tappable, gs) = kataraBoard mountain katara piker [crawlspace, crawlspace, crawlspace]
+    zero <- activatingKatara s 0 (ManaCost.MkManaCost []) [] kataraId gs
+    one <- activatingKatara s 1 (ManaCost.MkManaCost []) (take 1 tappable) kataraId gs
+    Spec.assertEqWith s "CR 101.1 at X=0 the Piker keeps its printed base power 2, not the 0 alice announced" (Projection.powerOf pikerId zero) (Just 2)
+    Spec.assertEqWith s "and its printed toughness 1" (Projection.toughnessOf pikerId zero) (Just 1)
+    Spec.assertEqWith s "at X=1 the Piker's base power and toughness are 1/1" (Projection.powerOf pikerId one, Projection.toughnessOf pikerId one) (Just 1, Just 1)
+    Spec.assertEqWith s "and the one Crawlspace she tapped for it is tapped" (S.tappedCount S.alice one) 1
+  -- The gate's side of the floor: CR 101.1 leaves X=1 the cheapest announcement,
+  -- so the ability is offered only where {1} can be waterbent. A pair differing
+  -- in whether Katara, the one permanent that could tap for it, is tapped.
+  Spec.it s "CR 101.1/602.2 Katara's ability is not offered when no X of 1 or more is payable" $ do
+    katara <- S.printingOf s registry "Katara, Water Tribe's Hope"
+    mountain <- S.printingOf s registry "Mountain"
+    let (kataraId, untapped) = soleKatara mountain katara
+        tapped = S.tapObject kataraId untapped
+    Spec.assertBool s (not (any (isActivateOf kataraId) (Action.legalActions S.alice tapped))) "with Katara tapped nothing can waterbend {1}, so no activation is offered"
+    Spec.assertBool s (any (isActivateOf kataraId) (Action.legalActions S.alice untapped)) "and untapped she can tap for it herself, so one is"
+
+-- Katara alone on alice's landless battlefield, alice holding priority in her
+-- own precombat main phase.
+soleKatara :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+soleKatara mountain katara =
+  let (kataraId, gs) = S.addPermanent katara S.alice (S.landsInPlay mountain 0)
+   in (kataraId, gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
 
 -- alice announces `x` for Katara's ability, takes the substitution that leaves
 -- `wanted` to pay with mana, taps `tapped` for the rest, and the ability
@@ -5705,7 +5738,7 @@ activatingKatara :: (Monad m) => Spec.Spec m n -> Natural.Natural -> ManaCost.Ma
 activatingKatara s x wanted tapped = resolvingKatara s (waterbendingX x wanted tapped)
 
 -- The negative: alice announces `x` and pays as greedily as the board allows.
--- Asserted at GAMEPLAY level rather than off Activate.activatable, unpaidLeaper's
+-- Asserted at GAMEPLAY level rather than off Activatable.activatable, unpaidLeaper's
 -- reason above -- an unpayable cost is rewound by Activate.activateAbility, so a
 -- Piker at its printed size is the whole of what a player would see.
 greedyKatara :: (Monad m) => Spec.Spec m n -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
@@ -5758,22 +5791,20 @@ kataraBoard mountain katara piker others =
           }
       )
 
--- alice holds `card`, controls one Forest and seven Mountains, and bob controls
--- seven Plains; she has priority in her own precombat main phase so a creature
--- spell is castable (CR 302.1). Returns the spell, the Forest, bob's Plains and
--- that state.
+-- alice holds `card`, controls one Forest and `mountains` Mountains, and bob
+-- controls `plainses` Plains; she has priority in her own precombat main phase so
+-- a creature spell is castable (CR 302.1). Returns the spell, the Forest, bob's
+-- Plains and that state.
 --
--- EIGHT sources for alice, where the cast below spends one: CR 601.2's
--- announcement is gated on what the CASTER can pay (#3959), so the assist has to
--- save her mana rather than afford her the spell. Her other seven are Mountains
--- and bob's are Plains, so each window's answer is named by its printing and no
--- counting is needed to keep the two apart.
-assistBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-assistBoard forest mountain plains card =
+-- Her Mountains and bob's Plains are different printings, so each window's
+-- answer is named by its printing and no counting is needed to keep the two
+-- apart.
+assistBoard :: Int -> Int -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+assistBoard mountains plainses forest mountain plains card =
   let place printing who n gs = List.foldl' (\(ids, acc) _ -> let (oid, next) = S.addPermanent printing who acc in (ids <> [oid], next)) ([], gs) (replicate n ())
       (forestId, gs1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
-      (_, gs2) = place mountain S.alice 7 gs1
-      (plainsIds, gs3) = place plains S.bob 7 gs2
+      (_, gs2) = place mountain S.alice mountains gs1
+      (plainsIds, gs3) = place plains S.bob plainses gs2
       (spell, gs4) = S.addHandCard card S.alice gs3
    in ( spell,
         forestId,
@@ -5800,7 +5831,7 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     forest <- S.printingOf s registry "Forest"
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
-    let (spell, forestId, plainsIds, gs) = assistBoard forest mountain plains binox
+    let (spell, forestId, plainsIds, gs) = assistBoard 7 7 forest mountain plains binox
         answer :: Prompt.Prompt r -> r
         answer = assisting (Just S.bob) 7 forestId plainsIds
         cast = S.runPure answer gs (S.cast S.alice spell)
@@ -5821,13 +5852,52 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     forest <- S.printingOf s registry "Forest"
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
-    let (spell, forestId, plainsIds, gs) = assistBoard forest mountain plains binox
+    let (spell, forestId, plainsIds, gs) = assistBoard 7 7 forest mountain plains binox
         answer :: Prompt.Prompt r -> r
         answer = assisting Nothing 7 forestId plainsIds
         cast = S.runPure answer gs (S.cast S.alice spell)
         resolved = S.runPure answer cast Stack.resolveTop
     Spec.assertEqWith s "the Binox is nowhere: CR 601.2h's payment failed and CR 601.2e took the cast back" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Charging Binox")) S.alice resolved) 0
     Spec.assertEqWith s "and bob's Plains were never offered a window" (S.tappedCount S.bob resolved) 0
+  -- CR 601.2 lets a player propose a cast they cannot pay alone, and rule
+  -- 702.132a's chosen player pays at CR 601.2h: alice's one Forest and bob's
+  -- seven Plains are {7}{G} between them.
+  Spec.it s "CR 702.132a alice, with one Forest, casts the Binox bob pays seven of" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, forestId, plainsIds, gs) = assistBoard 0 7 forest mountain plains binox
+        answer :: Prompt.Prompt r -> r
+        answer = assisting (Just S.bob) 7 forestId plainsIds
+        cast = S.runPure answer gs (S.cast S.alice spell)
+        resolved = S.runPure answer cast Stack.resolveTop
+    Spec.assertEqWith s "the Binox resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Charging Binox")) S.alice resolved) 1
+    Spec.assertEqWith s "the cast was offered to alice" (S.castable S.alice spell gs) True
+    Spec.assertEqWith s "bob's seven Plains paid the generic mana" (S.tappedCount S.bob resolved) 7
+  -- The negative, one Plains fewer: {7}{G} is out of reach of both players
+  -- together, so the cast is not offered.
+  Spec.it s "CR 702.132a alice is not offered the Binox when bob could pay only six" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, _, _, gs) = assistBoard 0 6 forest mountain plains binox
+    Spec.assertEqWith s "the cast is not offered" (S.castable S.alice spell gs) False
+  -- The engine does not answer for bob: a caster offered the cast on his
+  -- account who then names nobody fails CR 601.2h, and CR 733.1 unwinds it.
+  Spec.it s "CR 702.132a the same cast unwinds when alice names nobody" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, forestId, plainsIds, gs) = assistBoard 0 7 forest mountain plains binox
+        answer :: Prompt.Prompt r -> r
+        answer = assisting Nothing 7 forestId plainsIds
+        cast = S.runPure answer gs (S.cast S.alice spell)
+    Spec.assertEqWith s "the stack is empty" (null (GameState.stack cast)) True
+    Spec.assertEqWith s "the Binox is back in alice's hand" (S.handSize S.alice cast) 1
+    Spec.assertEqWith s "and her Forest is untapped" (S.tappedCount S.alice cast) 0
 
 -- Answer CR 702.132a's two prompts with `helper` and `amount`, and each mana
 -- window with the lands that window's player is meant to tap -- alice the one

@@ -37,6 +37,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LastKnown as LastKnown
 import qualified Pawl.Codec.LoggedEvent as LoggedEvent
 import qualified Pawl.Codec.Mana as Mana
+import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Codec.MonarchWatch as MonarchWatch
 import qualified Pawl.Codec.Object as Object
 import qualified Pawl.Codec.ObjectId as ObjectId
@@ -152,7 +153,7 @@ codec resolve = Fields.object $ do
   phase <- Fields.required "phase" Phase.codec GameState.phase
   remaining <- Fields.required "remaining" (Common.seq Phase.codec) GameState.remaining
   priority <- Fields.defaulted "priority" Nothing (Common.maybe PlayerId.codec) GameState.priority
-  passes <- Fields.defaulted "passes" 0 Common.natural GameState.passes
+  passed <- Fields.defaulted "passed" Set.empty (Common.set PlayerId.codec) GameState.passed
   turnNumber <- Fields.required "turnNumber" Common.natural GameState.turnNumber
   result <- Fields.defaulted "result" Nothing (Common.maybe Result.codec) GameState.result
   restartSignal <- Fields.defaulted "restartSignal" RestartSignal.Type.Playing RestartSignal.codec GameState.restartSignal
@@ -165,8 +166,10 @@ codec resolve = Fields.object $ do
   drewFromEmpty <- Fields.defaulted "drewFromEmpty" Set.empty (Common.set PlayerId.codec) GameState.drewFromEmpty
   landsPlayed <- Fields.defaulted "landsPlayed" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.landsPlayed
   drawsThisTurn <- Fields.defaulted "drawsThisTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.drawsThisTurn
+  departedThisTurn <- Fields.defaulted "departedThisTurn" Set.empty (Common.set PlayerId.codec) GameState.departedThisTurn
   activatedThisTurn <- Fields.defaulted "activatedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec)))) GameState.activatedThisTurn
   castPermissionsUsedThisTurn <- Fields.defaulted "castPermissionsUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set CastFromZone.codec)) GameState.castPermissionsUsedThisTurn
+  rollModifiersUsedThisTurn <- Fields.defaulted "rollModifiersUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set ModifiedRoll.codec)) GameState.rollModifiersUsedThisTurn
   triggeredThisGame <- Fields.defaulted "triggeredThisGame" Set.empty (Common.set AbilityTriggered.codec) GameState.triggeredThisGame
   pendingControl <- Fields.defaulted "pendingControl" Map.empty (Common.naturalMap PlayerId.codec Decider.codec) GameState.pendingControl
   control <- Fields.defaulted "control" Map.empty (Common.naturalMap PlayerId.codec (Common.nonEmpty PlayerControl.codec)) GameState.control
@@ -183,6 +186,8 @@ codec resolve = Fields.object $ do
   extraTurns <- Fields.defaulted "extraTurns" [] (Common.list ExtraTurn.codec) GameState.extraTurns
   subgamesThisMatch <- Fields.defaulted "subgamesThisMatch" 0 Common.natural GameState.subgamesThisMatch
   turnAnchor <- Fields.defaulted "turnAnchor" Nothing (Common.maybe PlayerId.codec) GameState.turnAnchor
+  rollingDie <- Fields.defaulted "rollingDie" Nothing (Common.maybe Common.natural) GameState.rollingDie
+  rerolledTo <- Fields.defaulted "rerolledTo" Nothing (Common.maybe Common.natural) GameState.rerolledTo
   pure
     GameState.MkGameState
       { GameState.settings = settings,
@@ -234,7 +239,7 @@ codec resolve = Fields.object $ do
         GameState.phase = phase,
         GameState.remaining = remaining,
         GameState.priority = priority,
-        GameState.passes = passes,
+        GameState.passed = passed,
         GameState.turnNumber = turnNumber,
         GameState.result = result,
         GameState.restartSignal = restartSignal,
@@ -247,8 +252,10 @@ codec resolve = Fields.object $ do
         GameState.drewFromEmpty = drewFromEmpty,
         GameState.landsPlayed = landsPlayed,
         GameState.drawsThisTurn = drawsThisTurn,
+        GameState.departedThisTurn = departedThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
         GameState.castPermissionsUsedThisTurn = castPermissionsUsedThisTurn,
+        GameState.rollModifiersUsedThisTurn = rollModifiersUsedThisTurn,
         GameState.triggeredThisGame = triggeredThisGame,
         GameState.pendingControl = pendingControl,
         GameState.control = control,
@@ -265,6 +272,8 @@ codec resolve = Fields.object $ do
         GameState.extraTurns = extraTurns,
         GameState.subgamesThisMatch = subgamesThisMatch,
         GameState.turnAnchor = turnAnchor,
+        GameState.rollingDie = rollingDie,
+        GameState.rerolledTo = rerolledTo,
         -- Derived rather than written: see the note above.
         GameState.printingIds = invert printings
       }
