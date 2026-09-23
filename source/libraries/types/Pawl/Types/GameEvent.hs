@@ -20,6 +20,7 @@ import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Exploited as Exploited
@@ -433,14 +434,18 @@ data GameEvent
   | -- | CR 706.1: a player rolled a die -- the resolving ability's controller,
     -- recorded by Pawl.Engine.Resolve's Effect.RollDie arm after CR 706.2's
     -- result is settled and bound. No result and no die kind: a reader wanting
-    -- the number takes it from Pawl.Types.RollDie's own slot, CR 706.7's planar
-    -- die being ignored by every effect reading a numerical result while still
-    -- firing this trigger (#934).
+    -- the number takes it from Pawl.Types.RollDie's own slot or DieResultSettled
+    -- below, CR 706.7's planar die being ignored by every effect reading a
+    -- numerical result while still firing this trigger (#934).
     --
     -- ONE ENTRY PER INSTRUCTION and not per die, however many CR 706.1's count
     -- threw, where CoinFlipped records one per coin: the condition reading this
     -- event is worded "one or more dice", which scopes it to the instruction.
     DiceRolled PlayerId.PlayerId
+  | -- | CR 706.2: one die's result, after every modifier, recorded per die the
+    -- instruction left unignored (CR 706.6) -- what "whenever you roll a 6"
+    -- reads, where DiceRolled above is one entry per instruction.
+    DieResultSettled (DieResult.DieResult PlayerId.PlayerId)
   | -- | CR 716.2a: a permanent's class level BECAME something -- the level BEFORE
     -- and the level AFTER, CountersPut's shape and for CR 714.2b's reason, since
     -- "becomes level N" is a threshold crossing. Recorded by Pawl.Engine.Resolve's

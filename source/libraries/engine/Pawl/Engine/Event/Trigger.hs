@@ -178,6 +178,7 @@ movedOf event = case event of
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -248,6 +249,7 @@ looksBack condition = case condition of
   -- Not on CR 603.10a's list, and CR 706.1's roll is no zone change: it moves
   -- no object at all, so CR 603.10's first sentence governs.
   TriggerCondition.PlayerRollsDice _ -> False
+  TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- The same answer once more, and the most plainly: CR 701.43c can only exert a
@@ -524,6 +526,7 @@ batchScoped condition = case condition of
   -- ability fires at most once either way. What would make the two readings
   -- differ is an event per DIE, which the printed words do not ask for.
   TriggerCondition.PlayerRollsDice _ -> False
+  TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   TriggerCondition.SelfExerted -> False
@@ -970,6 +973,7 @@ eventTriggers events gs =
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
+        GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -1294,6 +1298,7 @@ eventTriggers events gs =
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
+        GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -1554,6 +1559,7 @@ eventTriggers events gs =
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
+        GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -1705,6 +1711,7 @@ eventTriggers events gs =
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
+        GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -2084,6 +2091,7 @@ zonesTriggeredFrom cond =
         -- about rolling a die is a condition that cannot trigger from the
         -- battlefield.
         TriggerCondition.PlayerRollsDice _ -> battlefield
+        TriggerCondition.PlayerRollsResult _ -> battlefield
         TriggerCondition.PlayerWinsCoinFlip _ -> battlefield
         TriggerCondition.PlayerLosesCoinFlip _ -> battlefield
         -- CR 113.6's default, and CR 701.43c makes it the only possible answer rather
@@ -2521,6 +2529,7 @@ stateTriggers gs
               -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
               -- entry, never a CR 603.8 state that could be true standing still.
               TriggerCondition.PlayerRollsDice _ -> False
+              TriggerCondition.PlayerRollsResult _ -> False
               TriggerCondition.PlayerWinsCoinFlip _ -> False
               TriggerCondition.PlayerLosesCoinFlip _ -> False
               -- CR 603.2 again: being exerted is something that happens, with its

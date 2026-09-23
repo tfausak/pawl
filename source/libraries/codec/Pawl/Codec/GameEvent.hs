@@ -26,6 +26,7 @@ import qualified Pawl.Codec.Countering as Countering
 import qualified Pawl.Codec.Crewing as Crewing
 import qualified Pawl.Codec.DamageEvent as DamageEvent
 import qualified Pawl.Codec.DamagePrevented as DamagePrevented
+import qualified Pawl.Codec.DieResult as DieResult
 import qualified Pawl.Codec.Discarded as Discarded
 import qualified Pawl.Codec.Drew as Drew
 import qualified Pawl.Codec.Exploited as Exploited
@@ -110,6 +111,7 @@ codec =
       Arm.payload "DungeonCompleted" PlayerId.codec GameEvent.DungeonCompleted (\x -> case x of GameEvent.DungeonCompleted y -> Just y; _ -> Nothing),
       Arm.payload "Surveiled" PlayerId.codec GameEvent.Surveiled (\x -> case x of GameEvent.Surveiled y -> Just y; _ -> Nothing),
       Arm.payload "DiceRolled" PlayerId.codec GameEvent.DiceRolled (\x -> case x of GameEvent.DiceRolled y -> Just y; _ -> Nothing),
+      Arm.payload "DieResultSettled" (DieResult.codec PlayerId.codec) GameEvent.DieResultSettled (\x -> case x of GameEvent.DieResultSettled y -> Just y; _ -> Nothing),
       Arm.payload "ClassLevelSet" ClassLevelChange.codec GameEvent.ClassLevelSet (\x -> case x of GameEvent.ClassLevelSet y -> Just y; _ -> Nothing),
       Arm.payload "Plotted" ObjectId.codec GameEvent.Plotted (\x -> case x of GameEvent.Plotted y -> Just y; _ -> Nothing),
       Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing),
@@ -191,6 +193,7 @@ tagOf x = case x of
   GameEvent.DungeonCompleted {} -> "DungeonCompleted"
   GameEvent.Surveiled {} -> "Surveiled"
   GameEvent.DiceRolled {} -> "DiceRolled"
+  GameEvent.DieResultSettled {} -> "DieResultSettled"
   GameEvent.ClassLevelSet {} -> "ClassLevelSet"
   GameEvent.Plotted {} -> "Plotted"
   GameEvent.Explored {} -> "Explored"

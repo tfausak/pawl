@@ -10,6 +10,7 @@ import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
@@ -525,6 +526,9 @@ data TriggerCondition
     -- instruction, however many dice it named, so the batch and per-occurrence
     -- readings coincide. See #934 for the planar die.
     PlayerRollsDice PlayerRelation.PlayerRelation
+  | -- | CR 706.2: "whenever you roll a 6" (Night Shift of the Living Dead), once
+    -- per die whose result, after every modifier, is the stated number.
+    PlayerRollsResult (DieResult.DieResult PlayerRelation.PlayerRelation)
   | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), reading the
     -- event's win where PlayerRollsDice ignores what the die showed.
     --

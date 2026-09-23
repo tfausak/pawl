@@ -1928,7 +1928,7 @@ castPermissionsFrom pid zone oid gs =
 -- CR 601.3: has this permission a use left this turn? Unlimited always; a
 -- once-each-turn one only while GameState.castPermissionsUsedThisTurn does not
 -- already record it under the object that granted it, and a once-each-of-your-
--- turns one only on `pid`'s own turn as well.
+-- turns one only on `pid`'s own turn as well, its team's under CR 805.4a.
 --
 -- A row carrying NO source answers True and is never spent. Unreachable rather
 -- than a policy: `applying` stamps every printed row with its permanent and
@@ -1942,7 +1942,7 @@ unspentPermission pid source grant gs =
    in case CastFromZone.limit grant of
         PermissionLimit.Unlimited -> True
         PermissionLimit.OnceEachTurn -> unspent
-        PermissionLimit.OnceEachOfYourTurns -> GameState.activePlayer gs == pid && unspent
+        PermissionLimit.OnceEachOfYourTurns -> Turn.isActive gs pid && unspent
 
 -- CR 601.3: the once-each-turn permission a cast of `oid` out of `zone` spends,
 -- if it spends one. Asked of the PRE-MOVE state by Pawl.Engine.Cast.castSpellWith
@@ -3308,8 +3308,8 @@ statedFlips pid gs =
    in Maybe.mapMaybe (says . snd) (applying pid gs)
 
 -- CR 706.2's third sentence: every modifier in force right now over a die roll
--- `pid` is about to make from an instruction that knows nothing about it.
--- Clam-I-Am is the whole producer.
+-- `pid` is about to make from an instruction that knows nothing about it
+-- (Clam-I-Am, Wall of Fortune, Night Shift of the Living Dead).
 --
 -- `statedFlips` above one rule over, and the same division of labour: a LIST
 -- rather than a first or a last, because rule 706.2 puts no limit on how many

@@ -30,11 +30,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- `slot` binds the result the roller USES. With one die that is the only result
 -- there is; with more the roller chooses among them (CR 706.4, "roll two d6 and
 -- choose one result" -- the whole Endeavor cycle), which is what
--- Pawl.Types.Prompt's ChooseDieResult asks. Not implemented: a binding for the
--- natural result (#3976). CR 706.3a's striations and CR 706.4's text both read
--- the result, and the only reader of the natural result anywhere in rule 706 is
--- CR 706.2b's competing modifiers, which pawl does not build, so a second slot
--- would be a capability no card exercises.
+-- Pawl.Types.Prompt's ChooseDieResult asks. No slot binds the natural result:
+-- CR 706.3a's striations and CR 706.4's text both read the result, and the only
+-- reader of the natural result in rule 706 is CR 706.2b's reroll step, which
+-- Pawl.Engine.Dice.rerollOffers reads internally (Clam-I-Am's "if you roll a
+-- 3"), so a second slot would be a capability no card exercises.
 --
 -- `other` binds "the other result" -- the one result the roller did not choose,
 -- for a card that reads both from one instruction (Valiant Endeavor's "create a

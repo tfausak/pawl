@@ -2614,6 +2614,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseFateseal decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExplore decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.RerollDie decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.AdjustDieRoll decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDefender decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseManaSource decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseExtraManaSource decider _ _ -> Just (Decider.unwrap decider)
@@ -2757,6 +2758,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseFateseal {} -> "ChooseFateseal"
   Prompt.ChooseExplore {} -> "ChooseExplore"
   Prompt.RerollDie {} -> "RerollDie"
+  Prompt.AdjustDieRoll {} -> "AdjustDieRoll"
   Prompt.ChooseDefender {} -> "ChooseDefender"
   Prompt.ChooseManaSource {} -> "ChooseManaSource"
   Prompt.ChooseExtraManaSource {} -> "ChooseExtraManaSource"
@@ -3391,6 +3393,7 @@ oneMountainState mountain ph =
           GameState.drawsThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
           GameState.castPermissionsUsedThisTurn = mempty,
+          GameState.rollModifiersUsedThisTurn = mempty,
           GameState.triggeredThisGame = mempty,
           GameState.pendingControl = Map.empty,
           GameState.control = Map.empty,
