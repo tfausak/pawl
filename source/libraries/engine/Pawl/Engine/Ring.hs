@@ -439,7 +439,7 @@ theRingDrainsOnCombatDamage =
 -- so the Ring-bearer keeps whatever supertypes it already had. Unconditional, since
 -- CR 701.54c gates the two-, three- and four-temptation abilities on a temptation
 -- count and this one on nothing.
-theRingIsLegendary :: StaticAbility.StaticAbility Card.Card
+theRingIsLegendary :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Card)
 theRingIsLegendary =
   StaticAbility.MkStaticAbility
     { StaticAbility.affected = Affected.Matching yourRingBearer,

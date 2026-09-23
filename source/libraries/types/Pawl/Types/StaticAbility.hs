@@ -5,7 +5,6 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Duration as Duration
-import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Zone as Zone
 
@@ -28,10 +27,11 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- Its order is the card's PRINTED order, not the application order --
 -- Projection.layer decides that, per CR 613.1.
--- Parametric in `card` only so that a modification can grant a whole quoted
--- ability -- see the note on Pawl.Types.Modification. Pawl.Types.Face ties the
--- knot at `StaticAbility card` alongside its own.
-data StaticAbility card = MkStaticAbility
+-- Parametric in the `ability` a modification can grant, so that a static
+-- ability can itself be granted: Pawl.Types.GrantedAbility imports this module
+-- and ties the knot at `StaticAbility (GrantedAbility card)`, which is the cycle
+-- the variable opens.
+data StaticAbility ability = MkStaticAbility
   { affected :: Affected.Affected,
     -- | The ability's "as long as" clause -- Kird Ape's "as long as you control
     -- a Forest" -- or Nothing for an ability that functions unconditionally,
@@ -96,6 +96,6 @@ data StaticAbility card = MkStaticAbility
     -- Duration.UntilEndOfTurn, the same value a spell would print. A card
     -- naming a different one needs no new field.
     lingers :: Maybe Duration.Duration,
-    modifications :: NonEmpty.NonEmpty (Modification.Modification (GrantedAbility.GrantedAbility card))
+    modifications :: NonEmpty.NonEmpty (Modification.Modification ability)
   }
   deriving (Eq, Ord, Show)

@@ -1103,7 +1103,7 @@ staticTimestampOf carrier obj gs
 -- CR 612.5 reads the list off textBoxHolderOf above, so a text box an exchange
 -- moved brings its static abilities with it. Pawl.ProjectionSpec's "CR 612.5
 -- Akiri's pump moves with her text box" proves it.
-staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
+staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card)]
 staticAbilitiesOf carrier gs =
   let oid = textBoxHolderOf carrier gs
    in case carriedSnapshotOf carrier oid gs of
@@ -1112,6 +1112,21 @@ staticAbilitiesOf carrier gs =
         -- above answers Nothing for one, and Game.faceOf answers with the copied card's
         -- halves subtracted by THIS object's designations (CR 709.5).
         Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywordSet face)) (Game.faceOf oid gs)
+
+-- CR 613.1f / 113.3d: the static abilities stored layer-6 grants give `oid`
+-- (Streetwise Negotiator's backup), each with the timestamp of the grant, oldest
+-- first. Stored effects alone, which keeps this PROJECTION-FREE for
+-- staticAbilitiesOf's reason: every stored effect's set is CR 611.2c's
+-- TheseObjects, fixed as it began, so no layer has to decide who holds one.
+--
+-- Read off `oid` itself and never off textBoxHolderOf: a granted ability is not
+-- rules text (CR 612.3), so an exchange of text boxes leaves it where it is.
+grantedStaticAbilitiesOf :: ObjectId -> GameState -> [(Timestamp, StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card))]
+grantedStaticAbilitiesOf oid gs =
+  let grant eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
+        (Modification.GainAbility (GrantedAbility.Static sa), Affected.TheseObjects held) | Set.member oid held -> Just (ContinuousEffect.timestamp eff, sa)
+        _ -> Nothing
+   in List.sortOn fst (Maybe.mapMaybe grant (GameState.continuousEffects gs))
 
 -- CR 116.2: the special actions this object's copiable rules text grants -- its
 -- copy snapshot's when it has one, its printed face's otherwise.
@@ -1721,13 +1736,17 @@ controlGrants gs =
               isControlOp m = case m of
                 Modification.SetControllerToSource -> True
                 _ -> False
-              toGrant sa =
+              toGrant ts sa =
                 MkControlGrant
                   { cgSource = permId,
                     cgAffected = StaticAbility.affected sa,
-                    cgTimestamp = staticTimestampOf permId permObj gs
+                    cgTimestamp = ts
                   }
-           in fmap toGrant (filter (\sa -> isControl sa && functionsFromZone Zone.Battlefield sa) (staticAbilitiesOf permId gs))
+              keeps sa = isControl sa && functionsFromZone Zone.Battlefield sa
+           in -- A granted ability too, at CR 613.7a's later of the two timestamps,
+              -- for the reason permanentParts gathers one.
+              fmap (toGrant (staticTimestampOf permId permObj gs)) (filter keeps (staticAbilitiesOf permId gs))
+                <> fmap (\(ts, sa) -> toGrant (max (Object.timestamp permObj) ts) sa) (filter (keeps . snd) (grantedStaticAbilitiesOf permId gs))
    in concatMap grantsOf (abilitySources gs)
 
 -- CR 303.4b: WHICH object this one is attached to -- what an Aura "enchants".

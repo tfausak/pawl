@@ -400,7 +400,7 @@ youDraw n = Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Qu
 
 -- "This object has [keyword]" as a static ability (CR 604.1), the smallest
 -- carrier Face.staticAbilities takes.
-grantsItself :: Keyword.Keyword -> StaticAbility.StaticAbility Card.Type.Card
+grantsItself :: Keyword.Keyword -> StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card)
 grantsItself keyword =
   StaticAbility.MkStaticAbility
     (Affected.Matching Filter.Type.IsSource)
@@ -820,6 +820,7 @@ modificationCounts modification = case modification of
   Modification.GainAbility granted -> case granted of
     GrantedAbility.Activated ability -> activatedAbilityCounts ability
     GrantedAbility.Triggered ability -> triggeredAbilityCounts ability
+    GrantedAbility.Static ability -> staticAbilityCounts ability
   -- Payload-free: rule 702.165a's grant names the source and carries no text of
   -- its own, so there is nothing here to sweep.
   Modification.GainAbilitiesOfSource -> []
@@ -862,7 +863,7 @@ modificationCounts modification = case modification of
 -- plus CR 604.2's "as long as" gate, which is a Condition and so a pair of
 -- Quantities -- and the leaves-the-battlefield duration beside it, which is a
 -- Duration and so another Condition when it is a CR 611.2b "for as long as".
-staticAbilityCounts :: StaticAbility.StaticAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
+staticAbilityCounts :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card) -> [Count.Type.Count Quantity.Type.Quantity]
 staticAbilityCounts ability =
   concatMap conditionCounts (Maybe.maybeToList (StaticAbility.condition ability))
     <> concatMap durationCounts (Maybe.maybeToList (StaticAbility.lingers ability))
@@ -3698,8 +3699,8 @@ modificationFilters modification = case modification of
   -- Filter at all, LoseKeywordFamily's payload-free family included.
   Modification.GainEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
-  -- by grantedActivatedAbilities and grantedTriggeredAbilities below, at the
-  -- outer level, so they keep the Framing that a printed ability's do. Answering
+  -- by grantedActivatedAbilities, grantedTriggeredAbilities and
+  -- grantedStaticAbilities below, at the outer level, so they keep the Framing that a printed ability's do. Answering
   -- here would flatten them to unframed and lose CR 701.3a's attach-destination
   -- distinction.
   Modification.GainAbility _ -> []
@@ -3748,7 +3749,7 @@ modificationFilters modification = case modification of
 -- Tagged rather than flat, because one of the four is framed: CR 604.2's clause is
 -- answered by Pawl.Engine.Projection.conditionHolds, which supplies the source's
 -- host, and the affected set beside it is not.
-staticAbilityFilters :: StaticAbility.StaticAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+staticAbilityFilters :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 staticAbilityFilters ability =
   frame
     Unframed
@@ -4507,8 +4508,8 @@ copyExceptionFilters exception = case exception of
   -- card prints it.
   CopyException.GainThisAbility -> []
   -- Nothing HERE, for modificationFilters' GainAbility reason: a quoted ability
-  -- is swept by grantedActivatedAbilities and grantedTriggeredAbilities, which
-  -- keep its Framing (copyQuotedAbilities).
+  -- is swept by grantedActivatedAbilities, grantedTriggeredAbilities and
+  -- grantedStaticAbilities, which keep its Framing (copyQuotedAbilities).
   CopyException.GainAbility _ -> []
 
 -- CR 208.2b's entry option. The P/T pair narrows nothing; the keywords reach a
@@ -5560,7 +5561,17 @@ grantedTriggeredAbilities card =
     )
     (grantedModifications card)
 
--- Every modification this face carries, the shared walk both grant sweeps above
+-- The STATIC kind of the same grant, swept for the same reason.
+grantedStaticAbilities :: Face.Face Card.Type.Card -> [StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card)]
+grantedStaticAbilities card =
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.Static ability) -> Just ability
+        _ -> Nothing
+    )
+    (grantedModifications card)
+
+-- Every modification this face carries, the shared walk the grant sweeps above
 -- index into. TWO sources, not one: a PRINTED static ability's modifications (CR
 -- 613.1f as card text), and the modifications a RESOLUTION stores through
 -- Effect.ModifyTarget (CR 611.2) -- Retraction Helix's quoted "{T}: Return
@@ -5600,10 +5611,13 @@ grantedModifications card =
       effectsOf modifications =
         concatMap (Modal.allEffects . ActivatedAbility.modal) (Maybe.mapMaybe (\modification -> case modification of Modification.GainAbility (GrantedAbility.Activated a) -> Just a; _ -> Nothing) modifications)
           <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Maybe.mapMaybe (\modification -> case modification of Modification.GainAbility (GrantedAbility.Triggered t) -> Just t; _ -> Nothing) modifications)
+      -- A granted static ability's own parts are card text too, and may grant.
+      staticsIn modifications =
+        concatMap (Foldable.toList . StaticAbility.modifications) (Maybe.mapMaybe (\modification -> case modification of Modification.GainAbility (GrantedAbility.Static sa) -> Just sa; _ -> Nothing) modifications)
       deeper modifications =
         if null modifications
           then []
-          else modifications <> deeper (storedIn (effectsOf modifications))
+          else modifications <> deeper (storedIn (effectsOf modifications) <> staticsIn modifications)
    in deeper (printed <> concatMap (copyQuotedAbilities . replacementCopyExceptions . PrintedReplacement.effect) (Face.replacementEffects card) <> storedIn (printedCarrierEffects card))
 
 -- CR 707.9a: the abilities a copy exception QUOTES, as the grant they amount to.
@@ -5803,6 +5817,7 @@ cardFilters card =
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap activatedAbilityFilters (grantedActivatedAbilities card)
     <> concatMap triggeredAbilityFilters (grantedTriggeredAbilities card)
+    <> concatMap staticAbilityFilters (grantedStaticAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)

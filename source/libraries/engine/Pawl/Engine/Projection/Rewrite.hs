@@ -1009,7 +1009,7 @@ rewriteFace pairs face =
 
 -- A whole static ability under CR 612.1, for the defined-card walk above. A
 -- permanent's own statics are reached piecemeal instead, being read per layer.
-rewriteStaticAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> StaticAbility.StaticAbility Card.Type.Card -> StaticAbility.StaticAbility Card.Type.Card
+rewriteStaticAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card) -> StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteStaticAbility pairs sa =
   sa
     { StaticAbility.affected = rewriteAffected pairs (StaticAbility.affected sa),
@@ -1096,13 +1096,14 @@ rewriteActivatedAbility pairs ability =
       ActivatedAbility.maximumX = fmap (rewriteQuantity pairs) (ActivatedAbility.maximumX ability)
     }
 
--- CR 612.1 over a GRANTED ability (CR 613.1f), whichever of CR 113.3's two kinds
--- it is. The words are printed on the GRANTER, so a text change affecting that
+-- CR 612.1 over a GRANTED ability (CR 613.1f), whichever of CR 113.3's kinds it
+-- is. The words are printed on the GRANTER, so a text change affecting that
 -- permanent rewrites them before layer 6 hands them over.
 rewriteGrantedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> GrantedAbility.GrantedAbility Card.Type.Card -> GrantedAbility.GrantedAbility Card.Type.Card
 rewriteGrantedAbility pairs granted = case granted of
   GrantedAbility.Activated a -> GrantedAbility.Activated (rewriteActivatedAbility pairs a)
   GrantedAbility.Triggered t -> GrantedAbility.Triggered (rewriteTriggeredAbility pairs t)
+  GrantedAbility.Static sa -> GrantedAbility.Static (rewriteStaticAbility pairs sa)
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
 -- just the payload: the CR 603.8 condition is where the word usually is, and CR

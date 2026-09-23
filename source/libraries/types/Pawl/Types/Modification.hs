@@ -148,12 +148,8 @@ data Modification ability
     -- gave the creature with backup is not granted. Pawl.KeywordTriggerSpec's Backup group
     -- proves the first half.
     --
-    -- Not implemented: a static ability, a player static ability or a special
-    -- action of the source. Those three are gathered from the object's copiable
-    -- characteristics rather than from the projection
-    -- (Pawl.Engine.Projection.View's staticAbilitiesOf), so a granted one would
-    -- go on generating its effect from the source instead (#4040). Streetwise
-    -- Negotiator is the card with backup that needs it.
+    -- Not implemented: the source's rule abilities, a combat restriction among
+    -- them (#4048).
     GainAbilitiesOfSource
   | LoseAllAbilities -- layer 6 (Humility)
   | -- | layer 6, CR 613.1f: this object loses the abilities carrying this name

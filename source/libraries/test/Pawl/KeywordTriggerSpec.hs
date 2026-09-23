@@ -58,10 +58,12 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -3372,6 +3374,14 @@ graftSpec s registry =
 --
 -- Hill Giant ({3}{R} Creature -- Giant 3/3, no abilities) waits in alice's
 -- graveyard as the thing the granted trigger returns.
+--
+-- Streetwise Negotiator ({1}{G} Creature -- Cat Citizen 0/2, "Backup 1 / This
+-- creature assigns combat damage equal to its toughness rather than its
+-- power", checked against api.scryfall.com 2026-09-23) grants a STATIC
+-- ability. The backed-up Piker is a 3/2, so its toughness and its power are
+-- different amounts of damage. Turn to Frog ({1}{U} Instant, loses all
+-- abilities until end of turn) is the CR 613.1f removal whose timestamp,
+-- before or after the grant's, decides whether the Piker keeps it.
 backupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 backupSpec s registry =
   let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
@@ -3563,6 +3573,92 @@ backupSpec s registry =
                   Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Deathtouch selfId woven)) "the Mirrorweave really did make the Archpriest a Piker before its trigger resolved"
                   Spec.assertEqWith s "with rule 702.165a's one +1/+1 counter on the Piker" (plusOnes pikerId backed) 1
             _ -> Spec.assertFailure s "fixture should give alice a Piker"
+        -- THE STATIC HALF, at gameplay level, and CR 113.7 with it: "this
+        -- creature" in the granted ability is the Piker, whose toughness of 2
+        -- is what reaches bob rather than its power of 3.
+        Spec.it s "CR 702.165a the backed-up creature assigns combat damage equal to its toughness" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          negotiator <- S.printingOf s registry "Streetwise Negotiator"
+          case S.combatBoardOf [piker] [] of
+            (gs0, [pikerId], _) -> do
+              let (card, staged) = S.addHandCard negotiator S.alice gs0
+                  backed = entersTargeting pikerId card staged
+                  after = S.runCombat S.aggressiveAnswer backed
+              Spec.assertEqWith s "CR 702.165a the Piker dealt bob its toughness of 2" (S.lifeOf S.bob after) (Just 18)
+              Spec.assertEqWith s "where its power was 3" (Projection.powerOf pikerId backed) (Just 3)
+              Spec.assertEqWith s "and its toughness 2" (Projection.toughnessOf pikerId backed) (Just 2)
+            _ -> Spec.assertFailure s "fixture should give alice a Piker"
+        -- THE PROJECTION TRIPWIRE for the static half: the ability granted is
+        -- the one the Clone COPIED (CR 702.165b), so a printed read answers
+        -- "Clone" and grants nothing.
+        Spec.it s "CR 702.165b a Clone of Streetwise Negotiator grants the static ability it copied" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          jedit <- S.printingOf s registry "Jedit Ojanen"
+          negotiator <- S.printingOf s registry "Streetwise Negotiator"
+          clone <- S.printingOf s registry "Clone"
+          let cloneCopying printing = case S.combatBoardOf [piker] [printing] of
+                (gs0, [pikerId], [modelId]) ->
+                  let (_, staged) = S.spellOnStack clone S.alice gs0
+                   in Just (pikerId, S.runPure (copying modelId pikerId) staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop))
+                _ -> Nothing
+          case (cloneCopying negotiator, cloneCopying jedit) of
+            (Just (pikerId, copied), Just (otherPiker, vanilla)) -> do
+              Spec.assertEqWith s "CR 702.165b the Piker assigns its toughness of 2 as combat damage" (Projection.combatDamageAmountOf pikerId copied) (Just 2)
+              Spec.assertEqWith s "rather than its power of 3" (Projection.powerOf pikerId copied) (Just 3)
+              -- THE PAIR: a Clone of a card with no backup grants nothing.
+              Spec.assertBool s (not (PC.assignsCombatDamageWithToughness (Projection.project otherPiker vanilla))) "where a Clone of the 5/5 grants nothing"
+            _ -> Spec.assertFailure s "fixture should give alice a Piker"
+        -- CR 613.1f in CR 613.7 timestamp order, as a pair differing only in
+        -- which resolves first. A removal applied BEFORE the grant has nothing
+        -- to remove yet, so the Piker has the ability; one applied after takes
+        -- it away. Turn to Frog's 1/1 plus the counter is a 2/2, so the pair is
+        -- read off the projected flag rather than the damage.
+        Spec.it s "CR 613.1f only a removal later than the grant takes the granted static ability away" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          negotiator <- S.printingOf s registry "Streetwise Negotiator"
+          frog <- S.printingOf s registry "Turn to Frog"
+          island <- S.printingOf s registry "Island"
+          case S.combatBoardOf [piker] [] of
+            (gs0, [pikerId], _) -> do
+              let (card, staged) = S.addHandCard negotiator S.alice (S.landsFor island S.alice 2 gs0)
+                  (frogId, armed) = S.addHandCard frog S.alice staged
+                  frogged g = S.runPure (targeting pikerId) g (S.cast S.alice frogId >> Stack.resolveTop)
+                  frogFirst = entersTargeting pikerId card (frogged armed)
+                  frogLast = frogged (entersTargeting pikerId card armed)
+                  toughnessFlag g = PC.assignsCombatDamageWithToughness (Projection.project pikerId g)
+              Spec.assertBool s (toughnessFlag frogFirst) "CR 613.1f the grant after Turn to Frog left the Piker holding it"
+              Spec.assertBool s (not (toughnessFlag frogLast)) "CR 613.1f Turn to Frog after the grant took it away"
+              Spec.assertEqWith s "the Frog really resolved first, leaving a 1/1 with the counter" (Projection.powerOf pikerId frogFirst) (Just 2)
+              Spec.assertEqWith s "and last" (Projection.powerOf pikerId frogLast) (Just 2)
+            _ -> Spec.assertFailure s "fixture should give alice a Piker"
+        -- CR 305.7's last clause: Blood Moon makes the nonbasic Dryad Arbor a
+        -- Mountain and strips its rules text, but not an ability another
+        -- effect granted. Aspirant's Ascent makes the backed-up Arbor a 3/5
+        -- flier, so its toughness and power are different damage.
+        Spec.it s "CR 305.7 a Blood Moon'd Dryad Arbor keeps the static ability backup granted it" $ do
+          arbor <- S.printingOf s registry "Dryad Arbor"
+          negotiator <- S.printingOf s registry "Streetwise Negotiator"
+          bloodMoon <- S.printingOf s registry "Blood Moon"
+          ascent <- S.printingOf s registry "Aspirant's Ascent"
+          island <- S.printingOf s registry "Island"
+          case S.combatBoardOf [arbor] [] of
+            (gs0, [arborId], _) -> do
+              let (_, mooned) = S.addPermanent bloodMoon S.bob (S.landsFor island S.alice 1 gs0)
+                  (card, staged) = S.addHandCard negotiator S.alice mooned
+                  (ascentId, armed) = S.addHandCard ascent S.alice staged
+                  backed = entersTargeting arborId card armed
+                  -- The Island pays; the Arbor is left untapped to attack.
+                  sparing :: Prompt.Prompt r -> r
+                  sparing p = case p of
+                    Prompt.ChooseManaSource _ _ candidates -> List.find (/= arborId) (NonEmpty.toList candidates)
+                    Prompt.ChooseExtraManaSource {} -> Nothing
+                    _ -> targeting arborId p
+                  pumped = S.runPure sparing backed (S.cast S.alice ascentId >> Stack.resolveTop)
+                  after = S.runCombat S.aggressiveAnswer pumped
+              Spec.assertEqWith s "CR 305.7 the Arbor dealt bob its toughness of 5" (S.lifeOf S.bob after) (Just 15)
+              Spec.assertEqWith s "where its power was 3" (Projection.powerOf arborId pumped) (Just 3)
+              Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf arborId pumped)) "and Blood Moon really had made it a Mountain"
+            _ -> Spec.assertFailure s "fixture should give alice a Dryad Arbor"
 
 -- CR 702.101a: "Extort is a triggered ability. 'Extort' means 'Whenever you cast
 -- a spell, you may pay {W/B}. If you do, each opponent loses 1 life and you gain

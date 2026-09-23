@@ -168,7 +168,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     --
     -- Pawl.Engine.Projection.View.staticAbilitiesOf is the reader, and it answers
     -- this field without building the rest of the record.
-    staticAbilities :: [StaticAbility.StaticAbility Card.Card],
+    staticAbilities :: [StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Card)],
     -- | CR 613.10 / 613.11: the object's player-affecting static abilities --
     -- the axis Pawl.Types.Face.playerAbilities carries, applied AFTER the seven
     -- layers by Pawl.Engine.PlayerEffect. Seeded and untouched by any layer but
