@@ -267,10 +267,12 @@ to agents as written. What it doesn't say:
 
     A NEW READ OF A PERMANENT'S CARD goes through the projection
     (`Pawl.Engine.Projection.View`) or the copiable record it stamps
-    (`Binding.copyOf`), never `Game.cardOf` or `Game.faceOf`, which answer the
-    PRINTED card: a permanent that is a copy of the card, and a merged
+    (`Game.copyStampOf`), never `Game.cardOf` or `Game.faceOf`, which answer
+    the PRINTED card: a permanent that is a copy of the card, and a merged
     permanent (`Source.OfMerge`), then silently read the wrong thing. A Clone
-    of the producer is the tripwire; put that board in the test.
+    of the producer is the tripwire; put that board in the test. A bare
+    `Binding.copyOf` of an object's bindings misses a conjured duplicate's
+    values (`Object.duplicate`).
 
     A new field or disjunct on `Pawl.Types.ProjectedCharacteristics` or
     `Pawl.Engine.Filter`'s `View` must be filled in EVERY builder ---

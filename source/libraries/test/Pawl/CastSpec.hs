@@ -721,6 +721,7 @@ handInPlay printing board =
             Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
+            Object.duplicate = Nothing,
             Object.paired = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
