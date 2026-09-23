@@ -1167,6 +1167,20 @@ activatedRerollSpec s registry = Spec.describe s "Activated reroll" $ do
       "and a declined offer leaves the 3"
       (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell board))
       3
+  Spec.it s "CR 706.2b the rerolling player rolled the final result" $ do
+    (spell, _, _, board, _, _) <- bookieBoard s registry
+    shift <- S.printingOf s registry "Night Shift of the Living Dead"
+    let shifted = snd (S.addPermanent shift S.bob board)
+        (after, _) = nightShiftRun [3, 6, 2] [OptionalDecision.Exercises] [] 1 spell shifted
+        (declined, _) = nightShiftRun [3, 6, 2] [OptionalDecision.Declines] [] 1 spell shifted
+    -- THE GAMEPLAY ASSERTION: bob's Bookie rerolled alice's 3 into a 6, so
+    -- BOB rolled the 6 (Pippa, Duchess of Dice's ruling) and bob's Night Shift
+    -- of the Living Dead's "whenever you roll a 6" mints bob a Zombie.
+    Spec.assertEqWith s "the reroller's \"whenever you roll a 6\" fires" (S.countOnBattlefieldByName zombieEmployee S.bob after) 1
+    Spec.assertEqWith s "CR 706.2b: the 6 is the other result" (S.countOnBattlefieldByName knight S.alice after) 6
+    -- The paired run, declined: alice's 3 stands, the 6 is alice's second die,
+    -- and bob rolled nothing.
+    Spec.assertEqWith s "and bob's Night Shift sees no roll of his without the reroll" (S.countOnBattlefieldByName zombieEmployee S.bob declined) 0
   Spec.it s "CR 602.2b the window asks what a priority activation asks" $ do
     (spell, _, _, board, bookie, mountain) <- bookieBoard s registry
     let unpaid = S.tapObject mountain board

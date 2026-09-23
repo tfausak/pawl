@@ -3599,10 +3599,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- player who throws it -- Pippa, Duchess of Dice's ruling, which has a
         -- reroll trigger "whenever you roll a die". The discarded number is not
         -- CR 706.6's ignored roll: it happened, and its event stands.
-        rerolling natural = do
+        --
+        -- Answers the natural result with the player who THREW it: the roller,
+        -- or whoever activated a reroll in `window` below.
+        rerolling thrower natural = do
           gs <- State.get
           modifiers <- Dice.modifiersFor controller
-          offering (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers))) natural
+          offering (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers))) thrower natural
         -- CR 109.5's "you" on the modifier, which is the player its "may" and
         -- its CR 706.2a cost belong to -- Clam-I-Am's own controller, who is
         -- also the roller, and Wall of Fortune's, who need not be. The ROLLER
@@ -3624,28 +3627,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Not implemented: CR 706.2b's pick among COMPETING modifiers, which is
         -- the ROLLER's (#3976). The offers are put to their own payers in
         -- timestamp order instead, and the first taken is the one applied.
-        offering offers natural = case offers of
-          [] -> window natural
+        offering offers thrower natural = case offers of
+          [] -> window thrower natural
           (payer, stated, offer) : rest -> do
             gs <- State.get
             let mCost = ModifiedRoll.cost offer
             if not (payable gs payer stated mCost)
-              then offering rest natural
+              then offering rest thrower natural
               else do
                 answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor payer gs) payer natural mCost)
                 case answer of
-                  OptionalDecision.Declines -> offering rest natural
+                  OptionalDecision.Declines -> offering rest thrower natural
                   OptionalDecision.Exercises -> do
                     paid <- payModifier payer stated mCost
                     if not paid
-                      then offering rest natural
+                      then offering rest thrower natural
                       else do
                         again <- Game.ask (Prompt.RollDie sides)
                         -- The roller throws it: Clam-I-Am's "you may reroll
                         -- it", Wall of Fortune's "have any player reroll a die
                         -- that player rolled".
                         State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
-                        rerolling (faceOf again)
+                        rerolling controller (faceOf again)
         -- CR 118.3, Prompt.ChooseToPay's posture for CR 118.12: a cost the
         -- payer has not the resources to pay fully is not offered. A stated
         -- cost with no object behind it cannot be paid at all -- every
@@ -3752,7 +3755,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Not implemented: CR 706.2b's pick among competing modifiers, the
         -- roller's (#3976). Players are asked in APNAP order, and within a
         -- player in object order.
-        window natural = do
+        window thrower natural = do
           previous <- State.get
           State.modify' (\g -> g {GameState.rollingDie = Just sides, GameState.rerolledTo = Nothing})
           opened <- State.get
@@ -3766,8 +3769,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           rerolled <- windowOffering candidates natural
           State.modify' (\g -> g {GameState.rollingDie = GameState.rollingDie previous, GameState.rerolledTo = GameState.rerolledTo previous})
           case rerolled of
-            Nothing -> pure natural
-            Just face -> rerolling face
+            Nothing -> pure (thrower, natural)
+            Just (pid, face) -> rerolling pid face
         windowOffering candidates natural = case candidates of
           [] -> pure Nothing
           (pid, oid, ability) : rest -> do
@@ -3782,11 +3785,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     activated <- activateWhileRolling pid oid ability
                     after <- State.get
                     case (activated, GameState.rerolledTo after) of
-                      (True, Just face) -> pure (Just face)
+                      (True, Just face) -> pure (Just (pid, face))
                       _ -> windowOffering rest natural
         rollOne = do
           rolled <- Game.ask (Prompt.RollDie sides)
-          natural <- rerolling (faceOf rolled)
+          (thrower, natural) <- rerolling controller (faceOf rolled)
           gs <- State.get
           let viewOf = effectViewOf source legal gs
               context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -3804,7 +3807,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- Left unclamped: CR 706.2's result is the number after EVERY
           -- modifier, so a shift from another source applies to this sum as it
           -- stands, negative or not, and only the final figure is clamped below.
-          pure (toInteger natural + modifier)
+          pure (toInteger natural + modifier, thrower)
     -- CR 614.1a over CR 706.1: the instruction's count is offered to the
     -- replacement effects watching this roller's rolls (Pixie Guide) before the
     -- first die is thrown, and what comes back is how many dice to throw and how
@@ -3821,7 +3824,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 107.1b once, on the final figure, after every modifier: The Deck of
     -- Many Things' natural 3, four cards in hand and a shift up is a 0, not a 1
     -- (Pawl.DiceSpec's "CR 706.2 a shift applies to the unclamped sum").
-    results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (Dice.ignoreLowest ignored thrown))
+    --
+    -- Each die keeps the player who threw its final natural result, paired by
+    -- position so CR 706.6's tie still drops the first of the lowest.
+    let kept = Dice.ignoreLowest ignored (zip (fmap fst thrown) [0 :: Int ..])
+        throwers = fmap (\(_, i) -> maybe controller snd (Maybe.listToMaybe (drop i thrown))) kept
+    results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (fmap fst kept))
     Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
       gs <- State.get
       -- CR 706.4: WHICH result the instruction uses, where it threw more than
@@ -3851,9 +3859,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
       -- CR 706.2's final number, one entry per die the instruction kept, for
       -- "whenever you roll a 6" -- after every modifier, and never for an
-      -- ignored roll (CR 706.6).
-      Foldable.for_ results $ \result ->
-        State.modify' (Event.recordEvent (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = controller, DieResult.result = result}))
+      -- ignored roll (CR 706.6). Recorded under the player who threw the die's
+      -- final natural result: Pippa, Duchess of Dice's ruling gives a reroll of
+      -- another player's die to the rerolling player's "whenever you roll"
+      -- triggers.
+      Foldable.for_ (zip throwers results) $ \(thrower, result) ->
+        State.modify' (Event.recordEvent (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = thrower, DieResult.result = result}))
   -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
   -- the RollDie arm's window above: the same die, the new face filtered back to
   -- CR 706.1a's range, and handed back through GameState.rerolledTo. No window

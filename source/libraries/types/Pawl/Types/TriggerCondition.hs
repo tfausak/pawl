@@ -522,9 +522,9 @@ data TriggerCondition
     -- event and not the result, which is what lets CR 706.7's planar die fire it.
     --
     -- The printed "one or more" is the whole of one instruction's throw:
-    -- Pawl.Engine.Resolve records one GameEvent.DiceRolled per roll
-    -- instruction, however many dice it named, so the batch and per-occurrence
-    -- readings coincide. See #934 for the planar die.
+    -- Pawl.Engine.Resolve records one GameEvent.DiceRolled per throw, however
+    -- many dice it named, and a reroll is a separate later throw, so the batch
+    -- and per-occurrence readings coincide. See #934 for the planar die.
     PlayerRollsDice PlayerRelation.PlayerRelation
   | -- | CR 706.2: "whenever you roll a 6" (Night Shift of the Living Dead), once
     -- per die whose result, after every modifier, is the stated number.

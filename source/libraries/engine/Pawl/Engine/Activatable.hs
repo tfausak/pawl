@@ -621,9 +621,10 @@ affordableX mCeiling aimable stamp pid srcId gs cost = Cost.greatestPayableX mCe
 -- that line -- an allocation ceiling held it until measuring bytes was judged
 -- too compiler-specific to keep (gap #578).
 --
--- `activatable` keeps Map.empty deliberately. It has no engine caller -- only
--- tests -- so the slower per-object Projection.projectGiven fallback costs
--- nothing, and it makes the plain path a genuinely independent computation a
+-- `activatable` keeps Map.empty deliberately. Its one engine caller is
+-- Pawl.Engine.Resolve.Effect's die-roll window, which asks about a handful of
+-- abilities once per roll, so the slower per-object Projection.projectGiven
+-- fallback costs little, and it makes the plain path a genuinely independent computation a
 -- differential test could hold the threaded one against -- its `sources` is
 -- built off that same Map.empty for the same reason.
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
