@@ -103,8 +103,8 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- 603.2b's step is each player's in turn.
   --
   -- Bound for EVERY TurnScope, not only EachTurn, which is what
-  -- eventBindingSlots' unconditional promise for this condition needs. The seat
-  -- the turn began with; under the shared team turns option an ability that
+  -- eventBindingSlots' unconditional promise for this condition needs. It names
+  -- the seat the turn began with; under the shared team turns option an ability that
   -- reads the slot is re-bound once per player whose step it is (CR 805.4d,
   -- Pawl.Engine.Event.Trigger.stepTriggerPlayers).
   --
