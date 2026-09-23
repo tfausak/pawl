@@ -332,7 +332,17 @@ candidateCostsGiven permitted pid name oid gs =
         Nothing -> []
         Just card ->
           let face = Game.resolveFace (Just name) card
-              printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
+              -- CR 707.2: mana cost is a copiable value, so a card carrying a
+              -- copy stamp or a conjured duplicate's values (Game.copyStampOf)
+              -- is priced off those. Pawl.ConjureSpec's "CR 707.2 a duplicate of
+              -- a Clone costs what the Clone copies" proves it. Not implemented:
+              -- the other cast-time reads of the copiable face -- additional and
+              -- alternative costs, self-reductions, the half a stamp with halves
+              -- names -- which still take the printed card (#4044).
+              stampedCost = case Game.copyStampOf obj of
+                Just stamp | Maybe.isNothing (PC.halves stamp) -> Just (PC.manaCost stamp)
+                _ -> Nothing
+              printed = Cost.MkCost {Cost.mana = Maybe.fromMaybe (Face.manaCost face) stampedCost, Cost.components = Face.additionalCosts face}
               -- CR 118.9d: an alternative replaces only the MANA cost; every
               -- additional cost still applies. CR 702.34a's last sentence sends
               -- flashback through the same rules, so its cost is wrapped the same.

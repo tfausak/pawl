@@ -272,7 +272,7 @@ to agents as written. What it doesn't say:
     permanent (`Source.OfMerge`), then silently read the wrong thing. A Clone
     of the producer is the tripwire; put that board in the test. A bare
     `Binding.copyOf` of an object's bindings misses a conjured duplicate's
-    values (`Object.duplicate`) after its first zone change.
+    values (`Object.duplicate`).
 
     A new field or disjunct on `Pawl.Types.ProjectedCharacteristics` or
     `Pawl.Engine.Filter`'s `View` must be filled in EVERY builder ---

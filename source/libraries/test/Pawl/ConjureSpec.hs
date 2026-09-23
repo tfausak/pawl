@@ -16,7 +16,7 @@
 -- SPELLBOOK rather than one card; the eighth casts a printed Follow the Tracks,
 -- the same spellbook shape with the other question asked of it; the ninth enters
 -- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
--- take; the tenth to twelfth cast a printed Sinister Reflections, whose
+-- take; the tenth to thirteenth cast a printed Sinister Reflections, whose
 -- conjure names an object already in the game rather than writing its card out;
 -- the last two begin alice's second main phase under a printed Pearl Collector,
 -- the one conjure in the corpus behind CR 603.4's intervening "if".
@@ -33,7 +33,8 @@
 -- once the originals are in the graveyard, which is what tells a card from CR
 -- 707.1's token, and the second points the conjure at a Clone, which is where
 -- the printed card under an object and its CR 707.2 copiable values disagree.
--- The third carries that duplicate through three zone changes (CR 400.7).
+-- The third carries that duplicate through three zone changes (CR 400.7), and
+-- the fourth prices it off its copiable mana cost.
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
@@ -635,6 +636,38 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "and a Goblin Piker again in the graveyard, beside the original Clone's own name"
           (List.sort (fmap (\oid -> Set.toList (Projection.namesOf oid died)) (namedIn cloneName Zone.Graveyard died)))
           (List.sort [[cloneName], [goblinPiker]])
+  -- CR 707.2 lists mana cost among the copiable values, so the duplicate in
+  -- hand costs the Piker's {1}{R} and not the printed Clone's {3}{U}. Two
+  -- Islands and two Mountains: whatever pays Sinister Reflections' {1}{U}
+  -- leaves {1}{R} payable and {3}{U} not.
+  Spec.it s "CR 707.2 a duplicate of a Clone costs what the Clone copies" $ do
+    islandPrinting <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    let board0 = S.landsFor mountain S.alice 2 (S.landsInPlay islandPrinting 2)
+        (pikerId, board1) = S.addPermanent piker S.alice board0
+        (_, staged) = S.spellOnStack clone S.alice board1
+        entered = S.settleSba (copyingPiker pikerId staged)
+    case clonesOnBattlefield entered of
+      [] -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      cloneId : _ -> do
+        let (spell, board2) = S.addHandCard reflections S.alice entered
+            board = board2 {GameState.phase = Phase.PrecombatMain}
+            resolved = S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop)
+            inHand = namedIn cloneName Zone.Hand resolved
+            played = S.settleSba (S.runPure S.identityAnswer resolved (Monad.mapM_ (\oid -> S.cast S.alice oid >> Stack.resolveTop) inHand))
+        Spec.assertEqWith
+          s
+          "CR 707.2 the duplicate is castable off two lands, at the Piker's {1}{R}"
+          (fmap (\oid -> S.castable S.alice oid resolved) inHand)
+          [True]
+        Spec.assertEqWith
+          s
+          "and resolves into a second Goblin Piker beside the Clone"
+          (fmap (\oid -> Set.toList (Projection.namesOf oid played)) (clonesOnBattlefield played))
+          [[goblinPiker], [goblinPiker]]
   -- Pearl Collector ({2}{B} Creature -- Human Warlock 3/3, "Deathtouch,
   -- Lifelink. At the beginning of your second main phase, if you gained 4 or
   -- more life this turn, conjure a card named Mox Pearl into your hand. This
