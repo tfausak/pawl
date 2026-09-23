@@ -152,11 +152,12 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     cardTypes :: Set.Set CardType.CardType,
     subtypes :: Set.Set Subtype.Subtype,
     -- | CR 604.1 / 613 layer 6: the object's static abilities. Seeded from the
-    -- card and touched by NO layer, unlike the three ability lists below: a
-    -- static ability's continuous effect is what the layers apply, so the fold
-    -- reads this field rather than writing it, and CR 613.1f's removal and CR
-    -- 305.7's strip are asked of the GATHER (Pawl.Engine.Projection.gather) at
-    -- CR 613.6's per-ability decision point instead of by emptying a list here.
+    -- card and touched by no layer but CR 612.5's exchange, unlike the three
+    -- ability lists below: a static ability's continuous effect is what the
+    -- layers apply, so the fold reads this field rather than writing it, and CR
+    -- 613.1f's removal and CR 305.7's strip are asked of the GATHER
+    -- (Pawl.Engine.Projection.gather) at CR 613.6's per-ability decision point
+    -- instead of by emptying a list here.
     --
     -- Here at all because CR 707.2 names rules text among the copiable values:
     -- without it Pawl.Engine.Projection.View.copiableCharacteristics has nowhere to
@@ -170,16 +171,16 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     staticAbilities :: [StaticAbility.StaticAbility Card.Card],
     -- | CR 613.10 / 613.11: the object's player-affecting static abilities --
     -- the axis Pawl.Types.Face.playerAbilities carries, applied AFTER the seven
-    -- layers by Pawl.Engine.PlayerEffect. Seeded and untouched by any layer for
-    -- staticAbilities' reason above, copiable for the same one, and read by
+    -- layers by Pawl.Engine.PlayerEffect. Seeded and untouched by any layer but
+    -- CR 612.5's exchange, for staticAbilities' reason above, copiable for the same one, and read by
     -- Pawl.Engine.Projection.playerAbilitiesOf.
     playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
     -- | CR 116.2: the special actions this object's rules text grants -- the
     -- axis Pawl.Types.Face.specialActions carries. Copiable because CR 707.2
     -- names rules text among the copiable values and CR 707.2a copies the
     -- abilities derived from it, so a copy of Leonin Arbiter offers the {2} its
-    -- own printed face never mentions. Seeded and touched by no layer, exactly
-    -- as playerAbilities above is, and read by
+    -- own printed face never mentions. Seeded and touched by no layer but CR
+    -- 612.5's exchange, exactly as playerAbilities above is, and read by
     -- Pawl.Engine.Projection.View.specialActionsOf.
     specialActions :: [SpecialAction.SpecialAction],
     -- | CR 602 / 613 layer 6: the object's activated abilities after the layer
@@ -222,9 +223,9 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Pawl.Types.RuleAbilities says why the thirteen ride one field.
     --
     -- Here for playerAbilities' reason exactly: CR 613.11 applies them outside
-    -- the layer system, so no layer writes this, but CR 707.2 names rules text
-    -- among the copiable values and CR 707.2a copies the abilities derived from
-    -- it -- so a permanent that became a copy of Silent Arbiter limits attackers
+    -- the layer system, so no layer but CR 612.5's exchange writes this, but CR
+    -- 707.2 names rules text among the copiable values and CR 707.2a copies the
+    -- abilities derived from it -- so a permanent that became a copy of Silent Arbiter limits attackers
     -- and its own printed face is never consulted. CR 702.140e's union rides the
     -- same field (Pawl.Engine.Projection.View.withMergedAbilities), which is
     -- what gives a mutated permanent every component's.

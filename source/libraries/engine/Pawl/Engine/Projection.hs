@@ -22,7 +22,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePrintedReplacement, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, hostOf, lastKnownView, staticAbilitiesOf, viewOfCharacteristics)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, hostOf, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCharacteristics)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -574,11 +574,10 @@ exchangePartner oid a = case a of
 -- from the ones layer 6 grants afterwards, and after this arm the ones layer 3
 -- left behind are exactly these.
 --
--- Not implemented: PC.staticAbilities, PC.playerAbilities and PC.specialActions
--- stay where they were printed. Each is gathered from the object's COPIABLE
--- characteristics rather than from the projection (Pawl.Engine.Projection.View's
--- staticAbilitiesOf and specialActionsOf), so a static ability moved here would
--- appear in the list and still generate its effect on the old host (#3748).
+-- The four ability lists no layer writes move here too, though nothing reads
+-- them off the projection: each is gathered from the copiable characteristics
+-- of Pawl.Engine.Projection.View.textBoxHolderOf, which answers the same
+-- exchange from the stored effects, so the record agrees with the gather.
 exchangeTextBoxFrom :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
 exchangeTextBoxFrom from pc =
   pc
@@ -591,7 +590,11 @@ exchangeTextBoxFrom from pc =
       -- so it moves with it. A regression fence rather than a proved behaviour:
       -- the one producer's test board uses two literal power/toughness boxes.
       PC.characteristicPT = PC.characteristicPT from,
-      PC.textChangedKeywords = PC.keywords from
+      PC.textChangedKeywords = PC.keywords from,
+      PC.staticAbilities = PC.staticAbilities from,
+      PC.playerAbilities = PC.playerAbilities from,
+      PC.specialActions = PC.specialActions from,
+      PC.ruleAbilities = PC.ruleAbilities from
     }
 
 -- CR 305.7's strip, shared by both modifications that set a land's subtype. It
@@ -1840,7 +1843,7 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
             removed lowest = (lowest > Layer.Ability && stripped permId) || (lowest > Layer.Type && setStripped permId)
             -- One thunk per permanent, shared by all its abilities. Bound
             -- here, OUTSIDE the zipWith, which is what shares it.
-            partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes removed
+            partsOf = gatherStatic (functioning permId) permId (staticTimestampOf permId permObj gs) changes removed
             -- CR 113.6b, applied WITHOUT disturbing the index: `n` is the key
             -- half of CR 613.6's decision memo and Pawl.Engine.Event's
             -- departure handover indexes the SAME list by it, so an ability
