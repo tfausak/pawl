@@ -127,7 +127,7 @@ skipEmptyCombat gs =
 -- APNAP order (CR 101.4), not player-id order, so the first entry is the next
 -- seat rather than the lowest id -- and so that designateDefenders can hand the
 -- list to Combat.defenders unchanged, CR 802.4 and CR 802.5 both reading it in
--- that order. Game.apnapOrder is the SEATING roster rotated, so it still names
+-- that order. Game.turnOrderFrom is the SEATING roster rotated, so it still names
 -- a departed seat; stillPlaying is what drops one.
 --
 -- CR 803.1a and CR 803.1b are that same list cut to ONE SEAT: under attack left
@@ -142,7 +142,7 @@ skipEmptyCombat gs =
 -- if the nearest opponent to the left is more than one seat away the player
 -- can't attack, so the adjacent SEAT being empty is no attack rather than a
 -- fallback to whoever is beyond it. That is what filtering the neighbouring seat
--- through the still-playing list expresses -- Game.apnapOrder keeps a departed
+-- through the still-playing list expresses -- Game.turnOrderFrom keeps a departed
 -- seat, so it is the emptied seat itself that is named and then dropped.
 --
 -- CR 801.3 cuts the same list to the opponents within the active player's range
@@ -152,13 +152,14 @@ skipEmptyCombat gs =
 -- Left is the next seat in turn order and right is the previous one, which is CR
 -- 101.4's identification of the two ("the next player in turn order (usually the
 -- player seated to the active player's left)"); GameState.turnOrder is the
--- seating roster, so those are the two ends of Game.apnapOrder with the active
--- player's own seat removed.
+-- seating roster, so those are the two ends of it rotated to the active player,
+-- with their own seat removed. Game.turnOrderFrom rather than Game.apnapOrder,
+-- which under CR 805.6 regroups the seats by team.
 attackableOpponents :: GameState -> [PlayerId]
 attackableOpponents gs =
   let playing = Game.stillPlaying gs
       active = GameState.activePlayer gs
-      seats = Game.apnapOrder gs
+      seats = Game.turnOrderFrom active gs
       others = drop 1 seats
       opponents = filter (\pid -> Game.areOpponents gs active pid && List.elem pid playing && Game.inRangeOf active pid gs) seats
       seatedAt neighbour = filter (\pid -> Just pid == neighbour) opponents

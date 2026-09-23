@@ -42,12 +42,14 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.SpeedSpec as SpeedSpec
 import qualified Pawl.Support as S
 import qualified Pawl.TurnSpec as TurnSpec
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -490,3 +492,22 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in State.execState (Engine.runGame keeping board (Mulligan.openingHands S.performer seats)) []
     Spec.assertEqWith s "CR 805.3a alice and dave, then bob and carol" (run sharedTurns) [S.alice, S.dave, S.bob, S.carol]
     Spec.assertEqWith s "without the option each seat in turn order" (run id) seats
+  -- CR 803.1a / 803.1b: left and right are SEATS, which CR 805.6's team-grouped
+  -- APNAP order does not preserve. Dave and alice's team wraps the turn order
+  -- [alice, bob, carol, dave], so alice's right-hand seat is her teammate dave
+  -- and she may attack nobody, while her left is bob.
+  Spec.it s "CR 803.1b attack right reads the seat, not the team order" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let run option =
+          let teamed = sharedTurns (S.inTeams [[S.dave, S.alice], [S.bob, S.carol]] S.fourPlayerGame)
+              (mine, staged) = S.addPermanent piker S.alice teamed {GameState.settings = (GameState.settings teamed) {GameSettings.attackOption = Just option}}
+              board =
+                staged
+                  { GameState.activePlayer = S.alice,
+                    GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+                    GameState.remaining = Seq.fromList (drop 5 Turn.allPhases)
+                  }
+              settled = S.runPure S.identityAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+           in fmap (\pid -> Combat.legalAttackDeclarationAs S.alice [(mine, AttackTarget.OfPlayer pid)] settled) [S.bob, S.carol]
+    Spec.assertEqWith s "CR 803.1b attacking right, neither bob nor carol" (run AttackOption.Rightward) [False, False]
+    Spec.assertEqWith s "CR 803.1a attacking left, bob only" (run AttackOption.Leftward) [True, False]
