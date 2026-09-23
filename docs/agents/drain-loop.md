@@ -16,8 +16,10 @@ Two lanes.
   is the BUILD, not the merge. Dispatch the next unit when the current one's PR
   is ready --- CI is no longer the ceiling, so nothing but scheduling paces it.
 - **The audit lane** runs read-only agents alongside. It does NOT brief the
-  next unit --- see "Do not brief ahead". Its standing jobs are the cross-unit
-  audit and the clustering pass.
+  next unit --- see "Do not brief ahead". Its standing job is the cross-unit
+  audit; the blocker-consumer scan that used to be a clustering-agent pass is
+  now a scripted `gh` query run inline before each dispatch (see
+  "Procedure").
 
 Measured 2026-08-16: ~25 min from dispatch to PR-ready, ~5 of them compiling
 (cold build ~2.5 min, incremental ~2); ~12 min from ready to merged; the CI
@@ -73,18 +75,31 @@ Re-read it whenever a merged PR touches it. Derive everything against
 ## Procedure
 
 **Dispatch.** Pick an unassigned issue with no `needs-planning` label,
-preferring `priority-high`. Below that tier, **rank by card demand**: the
-backlog is a treadmill of gaps each found by the last card tried, and the
-loop ends not at zero but at "every remaining gap unblocks one card", so the
-descent has to be by marginal value. Before dispatching, count the real cards
-the gap unblocks --- a `grep -c` of the Oracle phrase over
-`_scratch/AllPrintings.json`, or a Scryfall `/cards/search` with a
-`User-Agent` header when the dump is absent --- and take the largest count
-that is file-disjoint from the build. Put the count in the brief; the
-implementer picks the producer from those cards. **Do not rank by open
-dependents.** The dependency graph is a shallow forest: the overwhelming
-majority of merged units unblock nothing, so "a capability that unblocks three
-issues" describes almost no issue in the backlog.
+preferring `priority-high`. Below that tier, rank by dispatch shape, measured
+2026-08-18/09-22 in net closes per PR:
+
+(i) **Blocker-consumer pairs** (+1.40), found by a scripted scan, not an
+agent: for every open issue, `gh api
+repos/tfausak/pawl/issues/N/dependencies/blocked_by`, and keep the pair when
+the blocker is open, itself unblocked, and its only open dependent is the
+consumer. Run it inline before dispatching.
+
+(ii) **Single `bug` or `rules-correctness` issues** (+0.49), picked by hand.
+
+(iii) **Card-demand singles** (+0.07): count the real cards the gap unblocks
+--- a `grep -c` of the Oracle phrase over `_scratch/AllPrintings.json`, or a
+Scryfall `/cards/search` with a `User-Agent` header when the dump is absent
+--- and take the largest count that is file-disjoint from the build. Put the
+count in the brief; the implementer picks the producer from those cards.
+
+Take the highest-ranked option that is file-disjoint from the build. A
+**subsystem root** (an unblocked issue with many open dependents) is
+dispatched only when the owner wants that subsystem opened, expecting it to
+spawn slices --- picked on its own merits it measured ~-1 net closes per PR.
+**Do not rank by open dependents otherwise.** The dependency graph is a
+shallow forest: the overwhelming majority of merged units unblock nothing, so
+"a capability that unblocks three issues" describes almost no issue in the
+backlog.
 
 `needs-planning` covers two things: an issue-to-issue blocker, and an issue
 awaiting a design call from the owner (#146, #1828, #2167 carry the label with
@@ -93,7 +108,10 @@ no linked blocker). Neither is dispatchable unattended.
 Dispatch an implementation agent, with `isolation: "worktree"`, to work it end
 to end and open a PR. Its brief must open with: read
 `docs/agents/implementing.md` first, then `CLAUDE.md` and `CONTRIBUTING.md`.
-Everything else is specific to the unit.
+Everything else is specific to the unit. **Model, on trial**: opus for
+blocker-consumer pairs, subsystem roots and audit rounds; sonnet for
+send-backs, existing-vocabulary card transcriptions, and bug fixes under
+~200 lines.
 
 **Dispatch on ready, not on merge.** The moment a unit's PR is marked ready,
 dispatch the next one. The lane is agent-bound, so an idle build lane is the
@@ -111,19 +129,17 @@ mutations against the merged state. This worked twice in one run on
 `Projection.hs` and on `Game.hs`. Prefer a disjoint issue where one exists;
 stack when the alternative is an idle lane.
 
-**A cluster is the default dispatch shape, a single issue the fallback.**
-Half of a dispatch's tokens are fixed cost paid once per worktree, so every
-dispatch starts from the clustering pass's current list, and a lone issue goes
-out only when no cluster on the list is file-disjoint from the build. A cluster
-is one dispatch, one worktree, one PR closing every issue in it. What makes
-one is one issue's edit sites containing the others'; a shared TOPIC is not a
-cluster: the eleven topic trackers #2190--#2200 each assert shared machinery
-in the body, and every one of them split into unrelated units under triage.
-Two issues qualify when they share an edit site OR take the SAME fix shape in
-adjacent code: #2534 and #2535 were one bracket around two neighbouring folds,
-dispatched an hour apart as two units, and should have been one PR. Closing two
-or three issues from one PR is the good case, not a liberty. What does not
-qualify is a shared topic with no shared shape.
+**A blocker-consumer pair from the scan is the default dispatch shape; a
+single issue is the fallback.** The clustering-agent pass this replaced
+grouped by shared TOPIC as often as shared code, and topic isn't enough: the
+eleven topic trackers #2190--#2200 each asserted shared machinery in the body
+and every one split into unrelated units under triage. Two issues still
+qualify as one dispatch outside the scan's own pairs when they visibly share
+an edit site or take the SAME fix shape in adjacent code (#2534 and #2535
+were one bracket around two neighbouring folds, dispatched an hour apart as
+two units and should have been one PR) --- verify that against the tree
+before dispatching, never take it on an issue body's word. Closing two or
+three issues from one PR is the good case, not a liberty.
 
 **Do not brief ahead.** A pre-implementation brief does not buy throughput:
 with and without one the lane landed 1--2 PRs an hour (2026-08-16, when the
@@ -133,10 +149,10 @@ unnecessary `GameState` field, a producer that proved nothing. Dispatch
 straight off the issue, and tell the agent the issue body is the artefact most
 often wrong.
 
-**Audit on a SIGNAL, not on a merge count, for correctness only.** This is one
-of the audit lane's two standing jobs, and the only mechanism that looks ACROSS
-units. Two units each correct alone can compose wrong and no single unit's
-mutations see it: three consecutive rounds each found a real defect (#2505,
+**Audit on a SIGNAL, not on a merge count, for correctness only.** This is the
+audit lane's standing job, and the only mechanism that looks ACROSS units. Two
+units each correct alone can compose wrong and no single unit's mutations see
+it: three consecutive rounds each found a real defect (#2505,
 #2529, and #2555 --- a regression the run itself had introduced five units
 earlier). Read the merged diffs, not the tests. Its brief must open with: read
 `docs/agents/researching.md` first.
@@ -170,6 +186,13 @@ re-dispatching: a send-back costs 5k to 120k against ~200k for a fresh unit
 (re-measured 2026-09-07), and catches the defect before the merge rather than
 after.
 
+**A follow-up a unit files in its own files, while still under the size
+signal, is a send-back too.** Hold its worktree past the merge instead of
+reaping it, and send the same agent back on a new branch to fold it in once
+`origin/main` has the merge --- don't dispatch it fresh. A fresh dispatch pays
+the ~80--100k fixed cost of a new worktree again for work the agent already
+has the context for.
+
 **A unit past the size signal gets its own round, BEFORE auto-merge is
 armed.** Measured 2026-09-06/07 over 33 units: every unit past ~300k subagent
 tokens or ~300 tool uses carried a defect the audit found, and no unit under
@@ -181,32 +204,19 @@ so hold the arm and the worktree until it reports. Cut subsystem "first
 slices" so they stay under the signal: a brief that needs more than three
 proving assertions is two units.
 
-**Run a clustering pass whenever the cluster list runs dry.** The audit
-lane's other standing job, and how the fixed cost above gets recovered: one
-read-only agent groups the dispatchable backlog by the code each issue names,
-and what it returns is the list every dispatch draws from under "A cluster is
-the default dispatch shape" above. Its output is a ranked list, card demand
-first; a pass that returns no cluster at all is a convergence signal worth
-reporting, not a reason to fall back to single issues quietly.
-`docs/agents/researching.md` has the method. Measured 2026-08-31: 172k tokens
-for thirteen high-confidence clusters and seven medium, plus stale issues found
-on the way; its first cluster closed two issues for 193k, about one unit's
-spend recovered at once. The backlog turns over, so re-run the pass rather than
-working an old list.
+**Re-run the scan before every dispatch, not from a stale list**; the backlog
+turns over. The clustering-agent pass this replaced cost 172k tokens a round
+and its "issue X unblocks issue Y" reasoning about OTHER issues was still
+wrong twice in its first five clusters --- once on a comment citation a later
+commit had re-pointed, once on a blocker that had never been the real one.
+The scan reads the dependency graph directly instead of reasoning about it, so
+it has nothing to get wrong the same way, but confirm the blocker is actually
+open and unblocked before dispatching --- the API can lag a just-closed issue.
 
-Weight its claims unequally. Shared edit sites and containment held; "issue X
-unblocks issue Y" is a lead to verify, not a fact. Of the first five clusters
-dispatched three held, and both failures came from the pass's reasoning about
-OTHER issues --- one rested on a comment citation a later commit had
-re-pointed, the other on a blocker that was closed and had never been the real
-blocker. Two of the three that held held for a different reason than the pass
-gave, so tell the implementer to verify the cluster itself and to split it back
-out if it is not one unit.
-
-Sweeps that do not need an agent: fired `expires:card-driven` triggers (a
-closed seam --- two independent passes found none), and re-checking whether a
-claimed missing capability still is missing. Both are `gh` queries; run them
-inline rather than spending a lane on them.
+Sweeps that do not need an agent: the blocker-consumer scan above, fired
+`expires:card-driven` triggers (a closed seam --- two independent passes found
+none), and re-checking whether a claimed missing capability still is missing.
+All are `gh` queries; run them inline rather than spending a lane on them.
 
 **Expect research to change the unit, not just describe it.** In one nine-unit
 run it changed the scope or verdict of every issue it touched: one had no
