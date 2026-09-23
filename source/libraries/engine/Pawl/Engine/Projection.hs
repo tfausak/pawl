@@ -22,7 +22,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePrintedReplacement, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, hostOf, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCharacteristics)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCharacteristics)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -222,13 +222,20 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         -- printed abilities, which is what makes it the RECEIVER's (CR 113.7, CR
         -- 602.2, CR 603.3a, CR 303.4e) and lets two grants stack in CR 613.7
         -- timestamp order. The case is on CR 113.3's ability KIND, which decides
-        -- only which of the two lists the ability joins -- nothing here reads what
-        -- the ability does.
+        -- only which list the ability joins -- nothing here reads what the
+        -- ability does.
+        --
+        -- A STATIC ability joins none: its effect is gathered before this fold
+        -- runs, which is permanentParts' reading of a stored grant through
+        -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf. Not implemented:
+        -- a static granted by another static ability rather than by a
+        -- resolution, whose recipients only this fold knows (#1942).
         Modification.GainAbility g -> case g of
           GrantedAbility.Activated a ->
             pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
           GrantedAbility.Triggered t ->
             pc {PC.triggeredAbilities = PC.triggeredAbilities pc <> [t]}
+          GrantedAbility.Static _ -> pc
         -- CR 702.165a's grant never reaches a STORED effect: Resolve.Effect's
         -- expandGrant turns it into the ordinary GainKeyword and GainAbility arms
         -- above as the ability resolves, so nothing with this modification is ever
@@ -1252,7 +1259,7 @@ setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
   let functioning =
         if anyConditional gs
-          then conditionHolds (gatherGiven (const False) alwaysFunctioning Nothing gs) gs
+          then conditionHolds (gatherGiven (\_ _ -> False) alwaysFunctioning Nothing gs) gs
           else alwaysFunctioning
    in setLandSubtypeEffectsGiven functioning gs
 
@@ -1278,8 +1285,11 @@ setLandSubtypeEffectsGiven functioning gs =
             -- CR 604.2's clause, asked exactly as gatherStatic asks it. Free for
             -- an unconditional ability, since staticLives answers first.
             lives sa = staticLives (functioning permId) changes (minimum (fmap layer (staticParts changes sa))) sa
-         in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
-              filter (\sa -> any isSet (StaticAbility.modifications sa) && functionsFromZone Zone.Battlefield sa && lives sa) (staticAbilitiesOf permId gs)
+            -- A granted ability is asked unrewritten, CR 612.3 being why
+            -- permanentParts gathers it with no word pairs.
+            grantedLives sa = staticLives (functioning permId) [] (minimum (fmap layer (staticParts [] sa))) sa
+         in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) (filter (\sa -> any isSet (StaticAbility.modifications sa) && functionsFromZone Zone.Battlefield sa && lives sa) (staticAbilitiesOf permId gs))
+              <> fmap (\sa -> (permId, StaticAbility.affected sa)) (filter (\sa -> any isSet (StaticAbility.modifications sa) && functionsFromZone Zone.Battlefield sa && grantedLives sa) (fmap snd (grantedStaticAbilitiesOf permId gs)))
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (abilitySources gs)
 
@@ -1437,12 +1447,12 @@ textChangesAffecting oid gs =
 -- built with every gate open -- nothing here re-enters gather.
 gather :: GameState -> [Gathered]
 gather gs =
-  let ungated = gatherGiven (const False) alwaysFunctioning Nothing gs
+  let ungated = gatherGiven (\_ _ -> False) alwaysFunctioning Nothing gs
    in -- Almost every board has no ability-removing effect, no conditional static
       -- ability and nothing setting a land's subtype, and then the gathered list
       -- IS the ungated one.
       if any (removesAbilities . gModification) ungated || anyConditional gs || any (setsLandSubtype . gModification) ungated
-        then gatherGiven (abilitiesRemoved ungated gs) (conditionHolds ungated gs) (Just ungated) gs
+        then gatherGiven (\keep -> abilitiesRemovedBy keep ungated gs) (conditionHolds ungated gs) (Just ungated) gs
         else ungated
 
 -- The open CR 604.2 gate: every "as long as" clause answered true without being
@@ -1473,7 +1483,8 @@ anyConditional gs =
       -- alwaysFunctioning on a board whose only conditional static ability is
       -- the copy's, which Pawl.ClassSpec's "CR 604.2 a copy's own as-long-as
       -- clause is still gated once the original is exiled" proves.
-      conditionalPermanent oid = any (Maybe.isJust . StaticAbility.condition) (staticAbilitiesOf oid gs)
+      -- The granted list too, which permanentParts gathers beside the copiable one.
+      conditionalPermanent oid = any (Maybe.isJust . StaticAbility.condition) (staticAbilitiesOf oid gs <> fmap snd (grantedStaticAbilitiesOf oid gs))
       conditional oid = case Game.faceOf oid gs of
         Nothing -> False
         Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
@@ -1564,7 +1575,7 @@ boardAsEntering gs =
 
 -- gather's body with both ability gates left open. Called twice by gather --
 -- once wired shut to build the list the gates read, once with the real answers.
-gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> Maybe [Gathered] -> GameState -> [Gathered]
+gatherGiven :: ((Gathered -> Bool) -> ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> Maybe [Gathered] -> GameState -> [Gathered]
 gatherGiven stripped functioning seed gs =
   let setEffs = setLandSubtypeEffectsGiven functioning gs
       -- CR 305.7's post-layer-4 half, wired open in the seed pass for the reason
@@ -1823,7 +1834,11 @@ spellStaticTypes = Set.fromList [CardType.Instant, CardType.Sorcery]
 -- frozenStaticParts gathers a permanent's parts by exactly the walk the fold
 -- uses, gates and CR 612 rewrite included; a second copy of this body would
 -- freeze a set the fold never applied.
-permanentParts :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> (ObjectId -> Bool) -> GameState -> ObjectId -> [(Natural, Gathered)]
+--
+-- `stripped keep` is CR 613.1f's answer for the permanent, counting only the
+-- removers `keep` admits (abilitiesRemovedBy): every one for a printed ability,
+-- and for a granted one only those applied after the grant.
+permanentParts :: ((Gathered -> Bool) -> ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> (ObjectId -> Bool) -> GameState -> ObjectId -> [(Natural, Gathered)]
 permanentParts stripped functioning setEffs setStripped gs permId = case Game.lookupObject permId gs of
   Nothing -> []
   Just permObj ->
@@ -1840,7 +1855,7 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
             -- gone. An ability deciding AT layer 4 is spared here and left to
             -- the base-characteristics gate above, which is CR 613.8's order
             -- for it -- see liveGiven.
-            removed lowest = (lowest > Layer.Ability && stripped permId) || (lowest > Layer.Type && setStripped permId)
+            removed lowest = (lowest > Layer.Ability && stripped (const True) permId) || (lowest > Layer.Type && setStripped permId)
             -- One thunk per permanent, shared by all its abilities. Bound
             -- here, OUTSIDE the zipWith, which is what shares it.
             partsOf = gatherStatic (functioning permId) permId (staticTimestampOf permId permObj gs) changes removed
@@ -1852,7 +1867,27 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
             -- it must: the moment the two walks index different lists, `n`
             -- means two different things and the join is silently wrong.
             tagged n sa = if functionsFromZone Zone.Battlefield sa then fmap ((,) n) (partsOf n sa) else []
-         in concat (zipWith tagged [0 ..] (staticAbilitiesOf permId gs))
+            printed = staticAbilitiesOf permId gs
+            -- CR 613.1f / 113.3d: a static ability a stored grant gave this
+            -- permanent generates its effect from HERE, so "this creature" in it
+            -- is this permanent (CR 113.7). Indexed after the printed list, so
+            -- no printed ability's `n` moves.
+            --
+            -- CR 613.7a's timestamp: the permanent's or the grant's, whichever
+            -- is later, a regression fence: the pool's one granted static is a
+            -- CR 613.11 marker, which no order can change. CR 612.3: no text
+            -- change reaches it, so no word pairs.
+            -- CR 613.1f in timestamp order: only a removal applied AFTER the
+            -- grant takes it away, and CR 305.7's strip never does.
+            -- Pawl.KeywordTriggerSpec's Backup group proves the grant and the
+            -- removal order through Streetwise Negotiator.
+            granted n (grantTs, sa) =
+              let removedAfter lowest = lowest > Layer.Ability && stripped ((> grantTs) . gTimestamp) permId
+               in if functionsFromZone Zone.Battlefield sa
+                    then fmap ((,) n) (gatherStatic (functioning permId) permId (max (Object.timestamp permObj) grantTs) [] removedAfter n sa)
+                    else []
+         in concat (zipWith tagged [0 ..] printed)
+              <> concat (zipWith granted [List.genericLength printed ..] (grantedStaticAbilitiesOf permId gs))
       else []
 
 -- CR 611.2c, applied to a static ability's effect: the parts `src`'s own static
@@ -1872,11 +1907,11 @@ frozenStaticParts :: ObjectId -> GameState -> [(Natural, Timestamp, Modification
 frozenStaticParts src gs =
   let cands = gather gs
       -- gather's own seed list, and the same one it feeds its two gates.
-      ungated = gatherGiven (const False) alwaysFunctioning Nothing gs
+      ungated = gatherGiven (\_ _ -> False) alwaysFunctioning Nothing gs
       -- gather's CR 604.2 gate, shared by the two readers that must agree on it.
       functioning = conditionHolds ungated gs
       setEffs = setLandSubtypeEffectsGiven functioning gs
-      parts = permanentParts (abilitiesRemoved ungated gs) functioning setEffs (setSubtypeStripped ungated setEffs gs) gs src
+      parts = permanentParts (\keep -> abilitiesRemovedBy keep ungated gs) functioning setEffs (setSubtypeStripped ungated setEffs gs) gs src
       grants = controlGrants gs
       applies c oid =
         let lyr = gLowest c
@@ -1948,9 +1983,9 @@ abilityRemoval gs =
 -- well-founded for gather's reason, since the seed is built with every gate open.
 gatedGather :: GameState -> [Gathered]
 gatedGather gs =
-  let ungated = gatherGiven (const False) alwaysFunctioning Nothing gs
+  let ungated = gatherGiven (\_ _ -> False) alwaysFunctioning Nothing gs
    in if anyConditional gs
-        then gatherGiven (const False) (conditionHolds ungated gs) Nothing gs
+        then gatherGiven (\_ _ -> False) (conditionHolds ungated gs) Nothing gs
         else ungated
 
 -- abilityRemoval asked AT A TIMESTAMP: "were this object's abilities removed by a
@@ -2127,7 +2162,7 @@ grantedDefiningParts m = case m of
 -- `functioning` is CR 604.2's "as long as" gate, answered by conditionHolds at
 -- the ability's lowest layer, and costs the ability all its parts
 -- unconditionally: a clause that is false never let the effect start to apply.
-gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> (Layer -> Bool) -> Natural -> StaticAbility.StaticAbility Card.Type.Card -> [Gathered]
+gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> (Layer -> Bool) -> Natural -> StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card) -> [Gathered]
 gatherStatic functioning src ts changes removed n sa =
   let ms = staticParts changes sa
       key = case ms of
@@ -2162,14 +2197,14 @@ gatherStatic functioning src ts changes removed n sa =
 -- The parts one printed static ability contributes. CR 612 rewrites each printed
 -- modification first, since grantedDefiningParts then emits engine-minted parts
 -- that are not card text for CR 612 to reach.
-staticParts :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> StaticAbility.StaticAbility Card.Type.Card -> NonEmpty.NonEmpty Modification
+staticParts :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card) -> NonEmpty.NonEmpty Modification
 staticParts changes sa = StaticAbility.modifications sa >>= grantedDefiningParts . rewriteModification changes
 
 -- CR 604.2's "as long as" gate for ONE printed static ability, asked at CR
 -- 613.6's decision point -- the minimum layer over its parts. Shared so
 -- gatherStatic and setLandSubtypeEffects agree. CR 612.1: the clause is printed
 -- text like the affected clause beside it, so the same word swap reaches it.
-staticLives :: (Layer -> Condition.Type.Condition -> Bool) -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Layer -> StaticAbility.StaticAbility Card.Type.Card -> Bool
+staticLives :: (Layer -> Condition.Type.Condition -> Bool) -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Layer -> StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 staticLives functioning changes lowest sa =
   maybe True (\c -> functioning lowest (if null changes then c else rewriteCondition changes c)) (StaticAbility.condition sa)
 
@@ -4599,6 +4634,17 @@ elsewhereGrants p gs =
         || anyZoneCard GameState.library (grantsStating Zone.Library) gs
         || any (grantsStating Zone.Exile) (Set.toList (GameState.exile gs))
 
+-- Does a granted ability write a modification satisfying `p` once its new host
+-- holds it? Only a STATIC one writes anything (CR 113.3d); the gates asking
+-- this widen what is gathered, so a stored grant of one is read as its parts.
+-- A regression fence: no card in the pool grants a static ability that grants
+-- a keyword or a type.
+grantedStaticWrites :: (Modification -> Bool) -> GrantedAbility.GrantedAbility Card.Type.Card -> Bool
+grantedStaticWrites p g = case g of
+  GrantedAbility.Static sa -> any p (StaticAbility.modifications sa)
+  GrantedAbility.Activated _ -> False
+  GrantedAbility.Triggered _ -> False
+
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands
 -- out abilities would otherwise answer False and take its grantee out of the
@@ -4624,8 +4670,9 @@ grantsKeywordWhere p m = case m of
   -- Hands out CR 702.5a's enchant, which is not a Pawl.Types.Keyword at all, so
   -- there is nothing here for `p` to be asked about.
   Modification.GainEnchant _ -> False
-  -- Hands out an ability but never a KEYWORD, which is all the callers ask about.
-  Modification.GainAbility _ -> False
+  -- Hands out an ability, which is a keyword grant only when it is a static
+  -- one whose own modifications grant one.
+  Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
   Modification.GainAbilitiesOfSource -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False
@@ -4699,7 +4746,8 @@ grantsMintingType m = case m of
   Modification.GainKeyword _ -> False
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
-  Modification.GainAbility _ -> False
+  -- A granted static ability's own parts, grantsKeywordWhere's reason.
+  Modification.GainAbility g -> grantedStaticWrites grantsMintingType g
   Modification.GainAbilitiesOfSource -> False
   Modification.LoseAllAbilities -> False
   Modification.LoseNamedAbility _ -> False

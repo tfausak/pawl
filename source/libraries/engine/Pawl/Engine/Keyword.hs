@@ -3967,7 +3967,7 @@ madnessDiscardExile =
 -- rule means, named after the rule rather than after the shape. A keyword whose
 -- meaning is a static ability is rare enough that a hundred-arm case would say
 -- nothing a reader could not get from the rule number.
-mintedStaticAbilitiesOf :: Set Keyword -> [StaticAbility.StaticAbility Card]
+mintedStaticAbilitiesOf :: Set Keyword -> [StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card)]
 mintedStaticAbilitiesOf =
   let staticsOf keyword = case keyword of
         Keyword.LivingMetal -> [livingMetal]
@@ -3982,7 +3982,7 @@ mintedStaticAbilitiesOf =
 -- Quantity.CastUsing reads Object.castUsing, which CR 400.7 clears on any other
 -- zone change and CR 707.2 does not copy, so a flickered permanent and a Clone of
 -- this one both fail it. Pawl.CastSpec's "Dash" group proves both.
-whilePaid :: KeywordFamily.KeywordFamily -> NonEmpty.NonEmpty (Modification.Modification (GrantedAbility.GrantedAbility Card)) -> StaticAbility.StaticAbility Card
+whilePaid :: KeywordFamily.KeywordFamily -> NonEmpty.NonEmpty (Modification.Modification (GrantedAbility.GrantedAbility Card)) -> StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card)
 whilePaid family modifications =
   StaticAbility.MkStaticAbility
     { StaticAbility.affected = Affected.Matching Filter.IsSource,
@@ -4025,7 +4025,7 @@ blitzDraw =
 --
 -- No functionsFrom, leaving CR 113.6's battlefield default standing: rule
 -- 702.161a says "this permanent".
-livingMetal :: StaticAbility.StaticAbility Card
+livingMetal :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card)
 livingMetal =
   StaticAbility.MkStaticAbility
     { StaticAbility.affected = Affected.Matching Filter.IsSource,
@@ -4068,7 +4068,7 @@ livingMetal =
 -- No functionsFrom, leaving CR 113.6's battlefield default standing: rule
 -- 702.151b speaks of an Equipment that is attached, which only the battlefield
 -- has.
-reconfigured :: StaticAbility.StaticAbility Card
+reconfigured :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card)
 reconfigured =
   StaticAbility.MkStaticAbility
     { StaticAbility.affected = Affected.Matching (Filter.And [Filter.IsSource, Filter.AttachedTo (Filter.And [])]),

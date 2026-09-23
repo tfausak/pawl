@@ -8923,12 +8923,17 @@ bindEarthbentLand resolving land gs =
 -- already takes: a card printing a keyword twice grants it twice. Backup's own
 -- family is dropped, rule 702.165a's "non-backup".
 --
--- Not implemented: the source's static abilities, player static abilities and
--- special actions, which are gathered from the copiable characteristics rather
--- than from the projection (#4040). Streetwise Negotiator is the card with
--- backup that needs them. A printed REPLACEMENT ability is out of reach for a
--- different reason and no card asks: Pawl.Types.GrantedAbility holds CR 113.3's
--- activated and triggered kinds alone, and no printing with backup prints one.
+-- A STATIC ability travels the same way, as a GainAbility that the projection
+-- gathers from its new host (Pawl.Engine.Projection.View's
+-- grantedStaticAbilitiesOf); Streetwise Negotiator's is the one in the pool.
+-- The copiable list holds no ability rule 702 mints from a keyword
+-- (Keyword.mintedStaticAbilitiesOf), so none is granted twice.
+--
+-- Not implemented: the source's rule abilities (PC.ruleAbilities), Chomping
+-- Kavu's "can't be blocked by creatures with power 2 or less" among them, which
+-- have no Pawl.Types.GrantedAbility arm to travel in (#4048). No printing with
+-- backup prints a player static ability, a special action or a replacement
+-- ability, the other kinds with no arm.
 expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
 expandGrant resolving source gs modification = case modification of
   Modification.GainAbilitiesOfSource ->
@@ -8939,6 +8944,7 @@ expandGrant resolving source gs modification = case modification of
      in concatMap (uncurry granted) (Map.toAscList (PC.keywords pc))
           <> fmap (Modification.GainAbility . GrantedAbility.Activated) (PC.activatedAbilities pc)
           <> fmap (Modification.GainAbility . GrantedAbility.Triggered) (PC.triggeredAbilities pc)
+          <> fmap (Modification.GainAbility . GrantedAbility.Static) (PC.staticAbilities pc)
   _ -> [modification]
 
 -- The no-subgame executor (the ability path and every direct caller): a

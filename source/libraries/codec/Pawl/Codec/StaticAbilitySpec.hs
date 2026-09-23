@@ -3,6 +3,7 @@ module Pawl.Codec.StaticAbilitySpec where
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.GrantedAbility as GrantedAbility.Codec
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -16,6 +17,7 @@ import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
@@ -30,8 +32,8 @@ import qualified Pawl.Types.Zone as Zone
 -- | The `card` parameter is instantiated at 'Text.Text', the posture
 -- 'Pawl.Codec.ActivatedAbilitySpec' takes: it is reached only through the
 -- supplied card codec, so any type proves the shape.
-codec :: Codec.Codec (StaticAbility.StaticAbility Text.Text)
-codec = StaticAbility.codec Common.text
+codec :: Codec.Codec (StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Text.Text))
+codec = StaticAbility.codec (GrantedAbility.Codec.codec Common.text)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
