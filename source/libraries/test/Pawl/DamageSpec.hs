@@ -2843,7 +2843,7 @@ protectionSpec s registry = Spec.describe s "Protection" $ do
 -- lets the Nemesis (3/1) take a lethal 2 without a state-based pass deciding the
 -- case: the MARKS are what discriminate, and CR 615.6 leaves none where the
 -- shield fired.
-trueNameNemesisSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+trueNameNemesisSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 trueNameNemesisSpec s registry =
   let noncombat src target amount = DamageEvent.MkDamageEvent src (Recipient.ToCreature target) amount False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
       -- alice casts the Nemesis off three Islands on a three-seat board and
@@ -2890,6 +2890,34 @@ trueNameNemesisSpec s registry =
                 (Game.lookupObject chosenBobId chosenBob >>= Object.chosenPlayer, Game.lookupObject chosenCarolId chosenCarol >>= Object.chosenPlayer)
                 (Just S.bob, Just S.carol)
             _ -> Spec.assertFailure s "the Nemesis did not reach the battlefield"
+
+        -- CR 702.16k's damage clause against a DEPARTED source. bob owns the
+        -- Fire-Eater, carol has stolen it, and its cost sacrifices it. CR 113.7a
+        -- and 608.2h make the source the object as it most recently existed --
+        -- carol's -- so the owner clause does not reach it, as CR 702.15b pays
+        -- the thief in "a stolen Fire-Eater's lifelink pays the THIEF" above. The
+        -- falsifier is a shield reading the card in bob's graveyard, where CR
+        -- 108.4a would answer bob.
+        Spec.it s "CR 702.16k/113.7a a stolen Fire-Eater sacrificed at a Nemesis naming its owner still deals its damage" $ do
+          nemesis <- S.printingOf s registry "True-Name Nemesis"
+          island <- S.printingOf s registry "Island"
+          ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
+          case (castNemesis nemesis island S.bob, Face.activatedAbilities (S.combinedFace ghituFireEater)) of
+            (Just (gs, nemesisId), ability : _) -> do
+              let (srcId, owned) = S.addPermanent ghituFireEater S.bob gs
+                  stolen = (S.giveControl srcId S.carol owned) {GameState.priority = Just S.carol}
+                  atNemesis :: Prompt.Prompt r -> r
+                  atNemesis p = case p of
+                    Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just nemesisId) sets
+                    _ -> S.identityAnswer p
+                  after = S.runPure atNemesis stolen (Activate.activateAbility S.carol srcId ability Monad.>> Stack.resolveTop)
+                  dealt = [DamageEvent.amount ev | ev <- S.damageEventsOf after, DamageEvent.source ev == srcId, Recipient.objectOf (DamageEvent.target ev) == Just nemesisId]
+              Spec.assertEqWith s "bob owns it" (fmap Object.owner (Game.lookupObject srcId stolen)) (Just S.bob)
+              Spec.assertEqWith s "carol controls it as it is sacrificed" (Projection.controllerOf srcId stolen) (Just S.carol)
+              Spec.assertEqWith s "and the Nemesis named bob" (Game.lookupObject nemesisId stolen >>= Object.chosenPlayer) (Just S.bob)
+              Spec.assertBool s (Maybe.isNothing (Game.lookupObject srcId after)) "by resolution the source's id names nothing"
+              Spec.assertEqWith s "CR 113.7a the thief's departed Fire-Eater dealt its 2 to the Nemesis" dealt [2]
+            _ -> Spec.assertFailure s "the Nemesis did not reach the battlefield, or the Fire-Eater has no ability"
 
 -- Fill every target slot with whichever of the two named permanents that slot's
 -- own filter admits. Prey Upon's slots are disjointly filtered by controller, so
