@@ -203,7 +203,7 @@ playersInScope perspective gs scope =
 playerAbilitiesOf :: ObjectId -> GameState -> [PlayerStaticAbility.PlayerStaticAbility]
 playerAbilitiesOf carrier gs =
   let oid = Projection.textBoxHolderOf carrier gs
-   in case Projection.copiableSnapshotOf oid gs of
+   in case Projection.carriedSnapshotOf carrier oid gs of
         Just snapshot -> PC.playerAbilities snapshot
         -- CR 709.5: a copy of a Room reads the copied card's halves against its OWN
         -- designations, which Game.faceOf already does, so it lands here --
