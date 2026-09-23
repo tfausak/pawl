@@ -3638,6 +3638,30 @@ drainPowerSpec s registry = Spec.describe s "Drain Power" $ do
     -- bob CR 605.3a's ordering, which `aimedAt` does not record; the group below
     -- is where that is the subject.)
     Spec.assertEqWith s "CR 602.2 the choice of ability is the targeted player's" asked [S.bob]
+  -- CR 106.13 names the move a LOSS ("causes one player to lose unspent mana"),
+  -- and so does Drain Power's Oracle text, which is the word Yurlok of Scorch
+  -- Thrash's middle line reads. A PAIR of boards differing only in carol's
+  -- Yurlok: bob, who does not control it, is the one charged, and carol's own
+  -- untouched {W} costs her nothing, so the charge is for what crossed.
+  Spec.it s "CR 106.13 the targeted player loses life for the mana Drain Power takes" $ do
+    drainPower <- S.printingOf s registry "Drain Power"
+    island <- S.printingOf s registry "Island"
+    bayou <- S.printingOf s registry "Bayou"
+    snowCoveredMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    forest <- S.printingOf s registry "Forest"
+    yurlok <- S.printingOf s registry "Yurlok of Scorch Thrash"
+    let (gs, spellId) = drainPowerBoard drainPower island bayou snowCoveredMountain forest
+        (_, withYurlok) = S.addPermanent yurlok S.carol gs
+        resolved board =
+          let ((_, cast), _) = State.runState (Engine.runGame (aimedAt S.bob Color.Black) board (S.cast S.alice spellId)) []
+              ((_, after), _) = State.runState (Engine.runGame (aimedAt S.bob Color.Black) cast Stack.resolveTop) []
+           in after
+        charged = resolved withYurlok
+        uncharged = resolved gs
+        lives board = fmap (\pid -> S.lifeOf pid board) [S.alice, S.bob, S.carol]
+    Spec.assertEqWith s "the fixture: the three crossed to alice" (poolTypes S.alice charged) [ManaType.Colored Color.Black, ManaType.Colored Color.Red, ManaType.Colored Color.Green]
+    Spec.assertEqWith s "CR 119.3 bob pays 3 life for the three he lost, and nobody else pays" (lives charged) [Just 20, Just 17, Just 20]
+    Spec.assertEqWith s "CR 103.4 and with no Yurlok the same move costs nobody anything" (lives uncharged) [Just 20, Just 20, Just 20]
   -- CR 106.13's parenthetical: "note that these may be the same player".
   Spec.it s "CR 106.13 a self-targeted transfer nets the mana once" $ do
     drainPower <- S.printingOf s registry "Drain Power"

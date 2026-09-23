@@ -681,14 +681,25 @@ addMana pid units gs =
 -- side (rule 106.13 closes the category at one card), so nothing reaches the
 -- reading where that would mint mana.
 --
--- Not implemented: the life a player-axis static charges for losing unspent mana
--- (PlayerEffect.LoseLifeForUnspentMana), which rule 106.13's own wording makes
--- this a road to. Only emptyManaPools below asks (#3775).
-moveMana :: [PlayerId] -> [PlayerId] -> GameState -> GameState
-moveMana losers gainers gs =
+-- Pure; moveMana below is the road that also charges for the loss.
+movedMana :: [PlayerId] -> [PlayerId] -> GameState -> GameState
+movedMana losers gainers gs =
   let moved = concatMap (\pid -> unitsOf (Game.poolOf pid gs)) losers
       emptied = List.foldl' (\g pid -> setPool pid (Mana.MkMana []) g) gs losers
    in List.foldl' (\g pid -> addMana pid moved g) emptied gainers
+
+-- CR 106.13's move whole: the transfer above, and the life a player-axis static
+-- charges for it. The rule and Drain Power's Oracle text both say the targeted
+-- player LOSES that mana, which is the word Yurlok of Scorch Thrash reads, so
+-- this is emptyManaPools' charge, of the whole pool, read on the state the move
+-- happens in. A self-targeted Drain Power still charges: the mana is lost
+-- before it is added back.
+moveMana :: [PlayerId] -> [PlayerId] -> Game ()
+moveMana losers gainers = do
+  gs <- State.get
+  let losses = Map.fromList (fmap (\pid -> (pid, Natural.length (Mana.unwrap (Game.poolOf pid gs)))) losers)
+  State.put (movedMana losers gainers gs)
+  chargeForLostMana gs losses
 
 -- CR 500.5: as a step or phase ends, any unspent mana left in a player's mana
 -- pool empties -- a turn-based action that does not use the stack (CR 703.4q).
@@ -763,9 +774,15 @@ emptyManaPools = do
   let swept = emptiedManaPools gs
       sizeOf pool = Natural.length (Mana.unwrap pool)
       lostBy pid before = Natural.minusSaturating (sizeOf before) (maybe 0 sizeOf (Map.lookup pid (GameState.manaPool swept)))
-      losses = Map.filter (/= 0) (Map.mapWithKey lostBy (GameState.manaPool gs))
   State.put swept
-  Event.simultaneously . Monad.forM_ (Map.toList losses) $ \(pid, lost) ->
+  chargeForLostMana gs (Map.mapWithKey lostBy (GameState.manaPool gs))
+
+-- The charge both roads share: each player who lost a nonzero amount, and on
+-- whom `gs` (the state the loss happened in) has the static, loses that much
+-- life.
+chargeForLostMana :: GameState -> Map.Map PlayerId Natural -> Game ()
+chargeForLostMana gs losses =
+  Event.simultaneously . Monad.forM_ (Map.toList (Map.filter (/= 0) losses)) $ \(pid, lost) ->
     Monad.when (PlayerEffect.losesLifeForUnspentMana pid gs) $ do
       settled <- Event.resolveLifeLoss LifeLossCause.ByEffect pid lost
       Event.changeLife pid (negate (toInteger settled))

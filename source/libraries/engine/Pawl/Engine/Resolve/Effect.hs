@@ -3132,7 +3132,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- on both sides nets the mana once.
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
-    State.modify' (Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs))
+    Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
   Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination subject) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
@@ -6090,8 +6090,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
            in case duration of
                 -- CR 707.3: the card states no ending, so the copiable values go
                 -- onto the subject itself (Binding.setCopy) and nothing has to
-                -- remember them.
-                Nothing -> gs {GameState.objects = foldr write (GameState.objects gs) subjects}
+                -- remember them. CR 613.7 puts them over any stored row already
+                -- covering the subject (Game.supersedeStoredCopies).
+                Nothing -> Game.supersedeStoredCopies (Set.fromList subjects) gs {GameState.objects = foldr write (GameState.objects gs) subjects}
                 Just stated -> case Expiry.arm legal controller source stated gs of
                   -- CR 611.2b: the duration never started, so nothing is stored.
                   Nothing -> gs
