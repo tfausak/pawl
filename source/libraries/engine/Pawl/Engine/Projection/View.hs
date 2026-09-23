@@ -1033,9 +1033,7 @@ stampedSnapshotOf oid gs = do
 -- 612 word change on one of the pair. The word changes a moved static ability
 -- is rewritten by are its NEW host's (Pawl.Engine.Projection.textChangesAffecting),
 -- so a Magical Hack that resolved on the old host before the exchange stays
--- behind (#4038). Nor is the text box a partner leaves behind: one that left
--- the battlefield is a new object (CR 400.7), so its old id carries nothing
--- and the survivor is read as holding an empty text box (#4039).
+-- behind (#4038).
 textBoxHolderOf :: ObjectId -> GameState -> ObjectId
 textBoxHolderOf oid gs =
   let swapOf eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
@@ -1049,6 +1047,17 @@ textBoxHolderOf oid gs =
         | x == b = a
         | otherwise = x
    in List.foldl' step oid swaps
+
+-- CR 612.5 / 608.2h: the copy snapshot `carrier`'s rules text is read from,
+-- `holder` being textBoxHolderOf's answer. copiableSnapshotOf's, except for a
+-- holder an exchange moved onto `carrier` that has since LEFT: Exchange of
+-- Words' ruling keeps the survivor's text box, so it is read off the copiable
+-- values the holder left with. Pawl.ProjectionSpec's "CR 612.5 the Sentry keeps
+-- Akiri's pump after she dies" proves it.
+carriedSnapshotOf :: ObjectId -> ObjectId -> GameState -> Maybe ProjectedCharacteristics
+carriedSnapshotOf carrier holder gs
+  | holder /= carrier && not (Map.member holder (GameState.objects gs)) = fmap LastKnown.copiable (Map.lookup holder (GameState.lastKnown gs))
+  | otherwise = copiableSnapshotOf holder gs
 
 -- CR 613.7a: the timestamp of the effects `carrier`'s static abilities
 -- generate -- its own, or the later timestamp of the exchange that put another
@@ -1096,7 +1105,7 @@ staticTimestampOf carrier obj gs
 staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
 staticAbilitiesOf carrier gs =
   let oid = textBoxHolderOf carrier gs
-   in case copiableSnapshotOf oid gs of
+   in case carriedSnapshotOf carrier oid gs of
         Just snapshot -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
         -- The printed read reaches a copied Room too, and has to: copiableSnapshotOf
         -- above answers Nothing for one, and Game.faceOf answers with the copied card's
@@ -1121,7 +1130,7 @@ staticAbilitiesOf carrier gs =
 specialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
 specialActionsOf carrier gs =
   let oid = textBoxHolderOf carrier gs
-   in case copiableSnapshotOf oid gs of
+   in case carriedSnapshotOf carrier oid gs of
         Just snapshot -> PC.specialActions snapshot
         -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
         Nothing -> foldMap Face.specialActions (Game.faceOf oid gs)
@@ -1146,7 +1155,7 @@ specialActionsOf carrier gs =
 ruleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
 ruleAbilitiesOf carrier gs =
   let oid = textBoxHolderOf carrier gs
-   in case copiableSnapshotOf oid gs of
+   in case carriedSnapshotOf carrier oid gs of
         Just snapshot -> PC.ruleAbilities snapshot
         -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
         Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)

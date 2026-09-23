@@ -4658,6 +4658,38 @@ exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
     -- the board this one advanced from.
     Spec.assertBool s (not (null (Projection.abilitiesOf sentryId after))) "which it did not have while the enchantment was on the battlefield"
 
+  -- Exchange of Words' ruling (2022-10-07): "Once the exchange has happened,
+  -- either of the two creatures leaving the battlefield has no effect on the
+  -- other creature's text box." CR 400.7 makes the departed Sorcerer a new
+  -- object, so the ping the Sentry received is read off CR 608.2h's record of
+  -- it rather than off a live id that names nothing.
+  Spec.it s "CR 612.5 the Sentry keeps the ping after the Sorcerer dies" $ do
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (sentryId, sorcererId, wordsId, _, after) = exchangeOfWordsBoard sentry sorcerer piker exchange
+        gone = S.runPure S.identityAnswer after (Event.changeZone sorcererId Zone.Graveyard)
+        swept = S.runPure S.identityAnswer gone Engine.settleForPriority
+        pinged = S.runPure (pingFrom sentryId) swept S.priorityGame
+    Spec.assertEqWith s "CR 612.5 the Sentry still deals 1 damage to bob" (S.lifeOf S.bob pinged) (fmap (subtract 1) (S.lifeOf S.bob swept))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Defender sentryId swept)) "and still lacks its printed defender"
+    Spec.assertBool s (Maybe.isJust (Game.lookupObject wordsId swept)) "the enchantment still being on the battlefield"
+
+  -- The same ruling through the gather: Akiri's pump stays on the Sentry once
+  -- she has died, still counting alice's two Sol Rings.
+  Spec.it s "CR 612.5 the Sentry keeps Akiri's pump after she dies" $ do
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    sentry <- S.printingOf s registry "Ogre Sentry"
+    ring <- S.printingOf s registry "Sol Ring"
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (akiriId, sentryId, _, _, after) = akiriExchangeBoard akiri sentry ring piker exchange
+        gone = S.runPure S.identityAnswer after (Event.changeZone akiriId Zone.Graveyard)
+        swept = S.runPure S.identityAnswer gone Engine.settleForPriority
+    Spec.assertEqWith s "CR 612.5 the Sentry is still a 5/3" (S.powerToughnessOf sentryId swept) (Just (5, 3))
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject akiriId swept)) "Akiri having left"
+
   -- CR 707.2 / 613.1c: the exchange is a layer-3 text change, so it never
   -- reaches the copiable values. A Clone entering as a copy of the exchanged
   -- Ogre Sentry therefore gets the PRINTED text box -- defender, and no ping --
