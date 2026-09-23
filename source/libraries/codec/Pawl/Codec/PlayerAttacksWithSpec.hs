@@ -1,6 +1,9 @@
 module Pawl.Codec.PlayerAttacksWithSpec where
 
+import qualified Data.Either as Either
+import qualified Data.Text as Text
 import qualified Pawl.Codec.PlayerAttacksWith as PlayerAttacksWith
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
@@ -38,4 +41,11 @@ spec s = Spec.describe s "Pawl.Codec.PlayerAttacksWith" $ do
           }
       )
       " {\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"attackers\":2} "
+  -- A zero floor fires on any declaration whatever the filter, since
+  -- AttackersDeclared only fires non-empty, and no printing means that.
+  Spec.it s "rejects a zero floor" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Codec.decode PlayerAttacksWith.codec =<< Common.parse (Text.pack "{\"player\":{\"type\":\"You\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"attackers\":0}")))
+      "expected a decode failure"
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerAttacksWith.codec
