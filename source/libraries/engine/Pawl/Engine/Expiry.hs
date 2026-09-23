@@ -202,6 +202,10 @@ seatOf targets gs ref = case ref of
   PlayerRef.EachInSlot _ -> Nothing
   PlayerRef.Specific _ -> Nothing
   PlayerRef.Candidate -> Nothing
+  -- Not implemented: the same absence as every other arm below, which this
+  -- module's own comment above covers (#3950); no duration writes CR 108.3's
+  -- owner.
+  PlayerRef.OwnerOfBound _ -> Nothing
   PlayerRef.ChosenPlayerOfBound _ -> Nothing
   PlayerRef.Attacking _ -> Nothing
 

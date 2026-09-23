@@ -528,6 +528,8 @@ overPlayerRefSlots f ref = case ref of
   -- same way.
   PlayerRef.EachOpponentExcept slot -> fmap PlayerRef.EachOpponentExcept (f slot)
   PlayerRef.ControllerOfBound slot -> fmap PlayerRef.ControllerOfBound (f slot)
+  -- The arm above's namespace, one word over.
+  PlayerRef.OwnerOfBound slot -> fmap PlayerRef.OwnerOfBound (f slot)
   -- The arm above's namespace, one record over.
   PlayerRef.ChosenPlayerOfBound slot -> fmap PlayerRef.ChosenPlayerOfBound (f slot)
   PlayerRef.Attacking attacking -> fmap (\slot -> PlayerRef.Attacking attacking {AttackingPlayers.attacked = slot}) (f (AttackingPlayers.attacked attacking))
