@@ -157,10 +157,12 @@ to agents as written. What it doesn't say:
 - Verify Oracle text with `curl -s
   'https://api.scryfall.com/cards/named?fuzzy=<name>'`; WebFetch gets 403s.
   `/cards/search` answers 400 to every regex query unless a `User-Agent`
-  header is sent. `_scratch/AllPrintings.json` is a dated MTGJSON dump: sound
-  for FINDING a card, unsound for ruling one out. When grepping it there is no
-  space after the colon (`"name":"Foo"`), and `rulings` sorts before `text`, so
-  a hit near a name is usually ruling boilerplate.
+  header is sent, and it rate-limits a loop of queries into empty bodies. For
+  bulk or repeated querying, download MTGJSON's `AllPrintings.json` from
+  mtgjson.com into `_scratch/`. A dump is dated: sound for FINDING a card,
+  unsound for ruling one out. When grepping it there is no space after the
+  colon (`"name":"Foo"`), and `rulings` sorts before `text`, so a hit near a
+  name is usually ruling boilerplate.
 
 - `_scratch/` also holds permissively licensed prior art --- `phase`, `mtgish`,
   `argentum-engine`; `docs/agents/implementing.md` says what each is good for.
