@@ -55,6 +55,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
@@ -89,6 +90,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Teams as Teams
@@ -771,10 +773,8 @@ spec s registry = Spec.describe s "Meld" $ do
   -- the life total is the gameplay reading of the count. The pool's printed
   -- producers cannot stand here: Dimir Strandcatcher counts cards put into a
   -- graveyard "from anywhere other than the battlefield", which is the one origin
-  -- a melded permanent can leave from, and the pool's CREATURE-card counts cannot
-  -- discriminate with the only meld pair -- Hanweir Battlements is a land card,
-  -- so Raphael, Fiendish Savior's "a creature card" is met on either reading and
-  -- Case of the Gorgon's Kiss' three-or-more is met on neither (#3152).
+  -- a melded permanent can leave from. What each component's card IS is the
+  -- case after this one.
   --
   -- The object half is read off the SAME board through the other shape, which is
   -- what makes the pair discriminating: an engine folding the arrivals under
@@ -810,6 +810,38 @@ spec s registry = Spec.describe s "Meld" $ do
         Spec.assertEqWith s "setup: the token was on the battlefield to be destroyed" (fmap Object.zone (Game.lookupObject tokenId withToken)) (Just Zone.Battlefield)
       (Nothing, _) -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
       (_, other) -> Spec.assertFailure s ("expected one ability on Synthetic Grave Census, got " <> show (length other))
+  -- CR 712.21e with CR 400.7: each of the two cards is an object of its own,
+  -- with its own card's characteristics, so Hanweir the Writhing Township's
+  -- death is ONE creature card (Hanweir Garrison) and one land card (Hanweir
+  -- Battlements). Case of the Gorgon's Kiss solves on three or more creature
+  -- cards put into graveyards this turn (CR 719.3a), and a Goblin Piker dying
+  -- beside the Township makes two under the rule and three under a reading that
+  -- gives both cards the melded permanent's characteristics. The second board
+  -- adds one more Piker, so the negative is not a Case that never solves.
+  Spec.it s "CR 712.21e each card of a melded permanent is counted as its own card type" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    mountain <- S.printingOf s registry "Mountain"
+    gorgonsKiss <- S.printingOf s registry "Case of the Gorgon's Kiss"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (caseId, withCase) = S.addPermanent gorgonsKiss S.alice (Setup.emptyGame S.bothPlayers)
+        (mMelded, withTownship) = meldedThrough withCase battlements garrison mountain
+        (firstPiker, withOne) = S.addPermanent piker S.alice withTownship
+        (secondPiker, board) = S.addPermanent piker S.alice withOne
+        dead victims = S.runPure S.identityAnswer board (Event.destroy Regenerability.Regenerable victims)
+        atEndStep gs =
+          S.runPure S.identityAnswer (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)) (gs {GameState.phase = Phase.Ending EndingStep.EndStep})) (Engine.settleForPriority >> Engine.priorityLoop)
+    case mMelded of
+      Nothing -> Spec.assertFailure s "expected the melding ability to put one permanent onto the battlefield"
+      Just meldedId -> do
+        let two = atEndStep (dead [meldedId, firstPiker])
+            three = atEndStep (dead [meldedId, firstPiker, secondPiker])
+        Spec.assertEqWith s "CR 712.21e Garrison and one Piker are two creature cards, so the Case stays unsolved and is no creature" (Projection.isCreatureOf caseId two) False
+        Spec.assertEqWith s "CR 719.3a a second Piker makes three, so the Case is solved into a 4/4" (S.powerToughnessOf caseId three) (Just (4, 4))
+        -- The proxies, after both behaviours: three cards and four reached the
+        -- graveyard, so the Township really did split into two.
+        Spec.assertEqWith s "setup: the Township and one Piker are three cards in the graveyard" (length (graveyardNames two)) 3
+        Spec.assertEqWith s "setup: and with the second Piker, four" (length (graveyardNames three)) 4
   -- CR 712.21c: "If an effect can find the new object that a melded permanent
   -- becomes as it leaves the battlefield, it finds both cards. (See rule 400.7.)
   -- If that effect causes actions to be taken upon those cards, the same actions
