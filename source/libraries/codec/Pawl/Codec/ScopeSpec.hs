@@ -43,4 +43,12 @@ spec s = Spec.describe s "Pawl.Codec.Scope" $ do
       Scope.codec
       (Scope.OverBound (SlotName.MkSlotName (Text.pack "discarded")))
       " {\"type\":\"OverBound\",\"value\":\"discarded\"} "
+  -- CR 404.1's domain: one POSITION in each named graveyard, rather than the
+  -- whole pile the InZone arm above reads.
+  Spec.it s "TopOfGraveyard" $
+    Common.assertCodec
+      s
+      Scope.codec
+      (Scope.TopOfGraveyard (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player"))))
+      " {\"type\":\"TopOfGraveyard\",\"value\":{\"type\":\"InSlot\",\"value\":\"player\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Scope.codec

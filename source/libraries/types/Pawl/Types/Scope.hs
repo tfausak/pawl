@@ -6,12 +6,13 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | What a Pawl.Types.Count folds over: a zone's current residents, the event
--- log, the players themselves, or the objects one of the surrounding
--- announcement's slots names. Four domains rather than one because the second
--- reads CR 608.2h last-known information from a stored snapshot, not a live
--- object, the third folds over candidates CR 109.1 says are not objects at all,
--- and the fourth takes its candidates from the resolution's bindings rather
--- than from the board.
+-- log, the players themselves, the objects one of the surrounding
+-- announcement's slots names, or one POSITION in a zone. Five domains rather
+-- than one because the second reads CR 608.2h last-known information from a
+-- stored snapshot, not a live object, the third folds over candidates CR 109.1
+-- says are not objects at all, the fourth takes its candidates from the
+-- resolution's bindings rather than from the board, and the fifth narrows the
+-- first's candidates before the Filter is asked rather than after.
 --
 -- A MANA POOL is deliberately not an arm of its own: the pool is none of CR 400.1's
 -- zones (CR 106.4 attaches it to a player instead), and a Count's Filter and
@@ -74,4 +75,6 @@ data Scope
     -- where the object landed either way; what the fold then reads for a
     -- departure is CR 608.2h's last known information.
     OverBound SlotName.SlotName
+  | -- | CR 404.1 / Guiding Spirit: the top card of each graveyard the PlayerRef names.
+    TopOfGraveyard PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)

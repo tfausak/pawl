@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -922,6 +923,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   damageDealtToItSpec s registry
   wasBlockedThisTurnSpec s registry
   ashlingSpec s registry
+  guidingSpiritSpec s registry
 
 -- CR 608.2n / 608.2i: how many times an ABILITY has resolved this turn, which
 -- Quantity.TimesResolvedThisTurn folds off GameEvent.ActivatedAbilityResolved.
@@ -1002,3 +1004,127 @@ activateAshling :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.C
 activateAshling ashlingId pump gs =
   let activated = S.runPure S.identityAnswer gs {GameState.priority = Just S.alice} (Activate.activateAbility S.alice ashlingId pump)
    in snd (Engine.runGamePure S.identityAnswer activated (Stack.resolveTop >> Engine.settleForPriority))
+
+-- CR 404.1 read from inside a CONDITION: Scope.TopOfGraveyard, which names ONE
+-- position in a graveyard so that a Filter over it TESTS that card rather than
+-- sweeping the pile.
+--
+-- Guiding Spirit {1}{W}{U} Creature -- Angel Spirit 1/2 -- "Flying. {T}: If the
+-- top card of target player's graveyard is a creature card, put that card on top
+-- of that player's library." (name, cost, type line, power, toughness and Oracle
+-- text checked against api.scryfall.com, 2026-09-21). The flying is inert here;
+-- the one activated ability is what these assertions read.
+--
+-- The board is built so that the readings of the clause are told apart, since a
+-- board that cannot distinguish them proves nothing:
+--
+--   * THE TOP CARD versus ANY card. bob's graveyard is stocked with a creature
+--     card UNDER a noncreature one in the second case, so a Count over the whole
+--     zone filtered to creature cards holds where this one must not -- and the
+--     effect would then move the noncreature card, which nothing about the
+--     printed sentence permits.
+--   * THE TOP CARD versus the OLDEST. A graveyard's top is its LAST member (CR
+--     404.1), so each pile is asserted in its stored order and the card that
+--     moved is named.
+--   * TARGET PLAYER'S versus YOUR own. alice's own graveyard is topped by a
+--     creature card and must be untouched -- Soldevi Digger's self-scoped read
+--     of the same position is what this one is not.
+--   * The TOP of the library versus its bottom. bob's library already holds a
+--     card, so the two ends are different positions.
+guidingSpiritSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+guidingSpiritSpec s registry =
+  let -- alice's Guiding Spirit, settled so CR 302.6 leaves its {T} payable, with
+      -- `buried` OLDEST FIRST in bob's graveyard (S.addGraveyardCard puts each
+      -- on top, so the last name given is the top card). bob's library holds one
+      -- Benalish Hero and alice's graveyard one Hill Giant, a creature card on
+      -- top of a graveyard the ability never names.
+      board buried = do
+        spirit <- S.printingOf s registry "Guiding Spirit"
+        giant <- S.printingOf s registry "Hill Giant"
+        hero <- S.printingOf s registry "Benalish Hero"
+        stocked <- mapM (S.printingOf s registry) buried
+        let (spiritId, g1) = S.addPermanent spirit S.alice (Setup.emptyGame S.bothPlayers)
+            g2 = List.foldl' (\g p -> snd (S.addGraveyardCard p S.bob g)) g1 stocked
+            g3 = snd (S.addGraveyardCard giant S.alice g2)
+            g4 = snd (S.addLibraryCard hero S.bob g3)
+        pure (spirit, spiritId, g4 {GameState.priority = Just S.alice})
+      named = CardName.MkCardName . Text.pack
+      -- Both piles in their own stored order: a graveyard reads OLDEST FIRST (CR
+      -- 404.1's arrival end is the last member) and a library TOP FIRST, which is
+      -- why an arriving card is expected at opposite ends of the two lists.
+      pilesOf pid gs = (zoneNames Zone.Graveyard pid gs, zoneNames Zone.Library pid gs)
+      -- One activation of the Spirit's ability by alice, aimed at bob, resolved.
+      activate spirit spiritId gs = case Maybe.listToMaybe (Face.activatedAbilities (S.combinedFace spirit)) of
+        Nothing -> Nothing
+        Just ability ->
+          let activated = snd (Engine.runGamePure (aimAtPlayer S.bob) gs (Activate.activateAbility S.alice spiritId ability))
+           in Just (snd (Engine.runGamePure (aimAtPlayer S.bob) activated Stack.resolveTop))
+   in Spec.describe s "Guiding Spirit (CR 404.1)" $ do
+        Spec.it s "CR 404.1 a creature card on top of the targeted graveyard goes on top of that player's library" $ do
+          (spirit, spiritId, before) <- board ["Forest", "Goblin Piker"]
+          case activate spirit spiritId before of
+            Nothing -> Spec.assertFailure s "Guiding Spirit should print exactly one activated ability"
+            Just after -> do
+              Spec.assertEqWith
+                s
+                "the fixture really buried the Goblin Piker last, on top of the Forest"
+                (fst (pilesOf S.bob before))
+                [named "Forest", named "Goblin Piker"]
+              Spec.assertEqWith
+                s
+                "the Goblin Piker is on top of bob's library, above the Benalish Hero, and the Forest is left behind"
+                (pilesOf S.bob after)
+                ([named "Forest"], [named "Goblin Piker", named "Benalish Hero"])
+              Spec.assertEqWith
+                s
+                "alice's own graveyard is untouched, so the reference is the TARGETED player's rather than her own"
+                (pilesOf S.alice after)
+                ([named "Hill Giant"], [])
+        -- THE discriminating case, and the one a Count over the whole graveyard
+        -- gets wrong: a creature card is in the pile but is not on top, so the
+        -- printed "if" is false and nothing moves.
+        Spec.it s "CR 404.1 a creature card UNDER the top card does not satisfy the condition" $ do
+          (spirit, spiritId, before) <- board ["Goblin Piker", "Forest"]
+          case activate spirit spiritId before of
+            Nothing -> Spec.assertFailure s "Guiding Spirit should print exactly one activated ability"
+            Just after -> do
+              Spec.assertEqWith
+                s
+                "the fixture really buried the Forest last, on top of the Goblin Piker"
+                (fst (pilesOf S.bob before))
+                [named "Goblin Piker", named "Forest"]
+              Spec.assertEqWith
+                s
+                "both cards are still in bob's graveyard and his library still holds only the Benalish Hero"
+                (pilesOf S.bob after)
+                ([named "Goblin Piker", named "Forest"], [named "Benalish Hero"])
+              Spec.assertEqWith
+                s
+                "the Spirit is alice's one permanent and it is tapped, so the ability was activated and resolved and the CONDITION is what stopped the move"
+                (S.tappedCount S.alice after)
+                1
+        -- CR 404.1's empty pile has no top card, so the count is 0 and the clause
+        -- is skipped -- the same answer as the case above by a different road.
+        Spec.it s "CR 404.1 an empty graveyard has no top card, so nothing moves" $ do
+          (spirit, spiritId, before) <- board []
+          case activate spirit spiritId before of
+            Nothing -> Spec.assertFailure s "Guiding Spirit should print exactly one activated ability"
+            Just after ->
+              Spec.assertEqWith
+                s
+                "bob's graveyard is still empty and his library is untouched"
+                (pilesOf S.bob after)
+                ([], [named "Benalish Hero"])
+
+-- A zone's members as names, in the zone's own STORED order -- the sorted
+-- readings elsewhere would hide which end of a graveyard or a library a card is
+-- at, which is the whole question here.
+zoneNames :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+zoneNames zone pid gs = Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs)
+
+-- Answers every target slot with that player. Guiding Spirit's one slot is
+-- Pool.Players, so this is the whole announcement.
+aimAtPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimAtPlayer who p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
+  _ -> S.identityAnswer p

@@ -141,6 +141,14 @@ evaluate viewOf quantityOf context gs count =
           let ids = Set.toList (Map.findWithDefault Set.empty slot (Filter.slotObjects context))
               kept = Maybe.mapMaybe (\oid -> if findableAfterMove gs oid then fmap ((,) (Just oid)) (keep predicate context (viewOf oid)) else Nothing) ids
            in aggregate quantityOf aggregation kept
+        -- CR 404.1: one card per named graveyard, narrowed by POSITION before the
+        -- Filter is asked -- the zone arm above answers "any matching card"
+        -- instead. Order-insensitive like every Aggregation, so no APNAP walk.
+        Scope.TopOfGraveyard ref -> do
+          pids <- playersFor viewOf context gs ref
+          let ids = Maybe.mapMaybe (`Game.topOfGraveyard` gs) pids
+              kept = Maybe.mapMaybe (\oid -> fmap ((,) (Just oid)) (keep predicate context (viewOf oid))) ids
+          aggregate quantityOf aggregation kept
 
 -- CR 400.7j / CR 400.2: may a later part of the effect that moved this object
 -- FIND it? Where it landed in a public zone, which is what Game.isHiddenZone
