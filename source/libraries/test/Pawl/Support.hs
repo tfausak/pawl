@@ -2722,6 +2722,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseAttachment decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseTurnUpAttachment decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCost decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChoosePlayPermission decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderCostComponents decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderCombatTolls decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderComponentCards decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2867,6 +2868,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseAttachment {} -> "ChooseAttachment"
   Prompt.ChooseTurnUpAttachment {} -> "ChooseTurnUpAttachment"
   Prompt.ChooseCost {} -> "ChooseCost"
+  Prompt.ChoosePlayPermission {} -> "ChoosePlayPermission"
   Prompt.OrderCostComponents {} -> "OrderCostComponents"
   Prompt.OrderCombatTolls {} -> "OrderCombatTolls"
   Prompt.OrderComponentCards {} -> "OrderComponentCards"

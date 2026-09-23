@@ -174,6 +174,7 @@ encode p answer = case p of
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
   Prompt.ChooseTurnUpAttachment {} -> Response.ChoseTurnUpAttachment answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
+  Prompt.ChoosePlayPermission {} -> Response.ChosePlayPermission answer
   Prompt.DeclareMulligan {} -> Response.DeclaredMulligan answer
   Prompt.Bottom {} -> Response.PutOnBottom answer
   Prompt.MulliganAction {} -> Response.TookMulliganAction answer
@@ -529,6 +530,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCost {} -> case response of
     Response.ChoseCost cost -> Just cost
+    _ -> Nothing
+  Prompt.ChoosePlayPermission {} -> case response of
+    Response.ChosePlayPermission permission -> Just permission
     _ -> Nothing
   Prompt.DeclareMulligan {} -> case response of
     Response.DeclaredMulligan decision -> Just decision
@@ -1055,6 +1059,9 @@ defaultAnswer p = case p of
   -- candidate and this prompt is not raised at all. Cost.firstOffered keeps
   -- this total for the empty list the engine never produces.
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
+  -- The head is the permission that spends no budget where one admits the play
+  -- (Pawl.Engine.PlayerEffect.permissionOptions orders them so).
+  Prompt.ChoosePlayPermission _ _ _ options -> NonEmpty.head options
   -- CR 103.5: keeping is always legal.
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   -- A legal ordered subset of the redrawn hand: deterministically the first
