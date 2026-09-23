@@ -24,6 +24,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Pairing as Pairing
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
+import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
@@ -833,7 +834,12 @@ data Object = MkObject
     -- ProjectedCharacteristics rather than an Object. Per-incarnation: cleared by
     -- newIncarnation, which is CR 702.95e's "leaves the battlefield" for the
     -- leaver, the sweep supplying it for the creature left behind.
-    paired :: Maybe Pairing.Pairing
+    paired :: Maybe Pairing.Pairing,
+    -- | Alchemy's conjured duplicate (Pawl.Types.ConjureCards.Duplicate): the
+    -- copiable values the card was conjured with. They are the card's own, so
+    -- NOT per-incarnation: newIncarnation keeps them, as it keeps `source`.
+    -- Read through Pawl.Engine.Game.copyStampOf, beneath any copy stamp.
+    duplicate :: Maybe ProjectedCharacteristics.ProjectedCharacteristics
   }
   deriving (Eq, Ord, Show)
 
@@ -843,9 +849,9 @@ data Object = MkObject
 -- goes back to its no-memory value here, and nothing else is touched, so a field
 -- added to Object is reset everywhere exactly when it is added HERE.
 --
--- Leaves `owner` and `source` alone, which are not per-incarnation at all (CR
--- 108.3), and `zone` and `timestamp`, which the caller is DECIDING rather than
--- forgetting. A caller overrides the rest the same way -- CR 110.5b's "enters
+-- Leaves `owner`, `source` and `duplicate` alone, which are not per-incarnation
+-- at all (CR 108.3), and `zone` and `timestamp`, which the caller is DECIDING
+-- rather than forgetting. A caller overrides the rest the same way -- CR 110.5b's "enters
 -- tapped", CR 708.4's face-down status and CR 701.3's attach-on-entry are
 -- choices the move makes about the new object.
 newIncarnation :: Object -> Object

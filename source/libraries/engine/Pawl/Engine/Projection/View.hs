@@ -979,8 +979,9 @@ derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
       && fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
 
 -- CR 707.3's raw stamp: what Pawl.Engine.Resolve and Pawl.Engine.Event wrote to
--- Binding.copyOf, before rule 709.5's question is asked of it. The projection's
--- ONE read of that binding, and only copiableSnapshotOf and derivesFromCopiedHalves
+-- Binding.copyOf, or a conjured duplicate carries (Game.copyStampOf), before
+-- rule 709.5's question is asked of it. The projection's ONE read of that
+-- binding, and only copiableSnapshotOf and derivesFromCopiedHalves
 -- above call it; Pawl.Engine.Game.halvesCardOf makes the other read in the
 -- engine, off the object it already holds.
 --
@@ -1009,7 +1010,7 @@ stampedSnapshotOf oid gs = do
   let bindings = Object.bindings object
       stamped = case Game.storedCopyOf oid gs of
         Just stored -> Just stored
-        Nothing -> Binding.copyOf bindings
+        Nothing -> Game.copyStampOf object
   if Object.flipped object
     then case Binding.flippedCopyOf bindings of
       Just flipped -> Just flipped

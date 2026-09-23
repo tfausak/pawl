@@ -1,5 +1,6 @@
 module Pawl.Engine.Game where
 
+import qualified Control.Applicative as Applicative
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
@@ -841,9 +842,16 @@ namesFor mObj card = case mObj of
 -- to the printed card: CR 707.2 leaves a copy with the copied object's values,
 -- so a Room that became a copy of a Blood Moon has stopped having doors.
 halvesCardOf :: Object.Object -> Card -> Maybe Card
-halvesCardOf obj card = case Binding.copyOf (Object.bindings obj) of
+halvesCardOf obj card = case copyStampOf obj of
   Just snapshot -> PC.halves snapshot
   Nothing -> if Card.hasSharedTypeLine card then Just card else Nothing
+
+-- CR 707.2: the copiable record stamped on this object -- a copy effect's
+-- (Binding.copyOf) over the values a conjured duplicate was minted with
+-- (Object.duplicate), which outlive CR 400.7 where a stamp does not. Every read
+-- of an object's stamp goes through here, so the two cannot drift.
+copyStampOf :: Object.Object -> Maybe PC.ProjectedCharacteristics
+copyStampOf obj = Binding.copyOf (Object.bindings obj) Applicative.<|> Object.duplicate obj
 
 -- CR 722.2a / 722.2b: the PREPARE SPELL this object has -- the copy snapshot's
 -- when the object is copying something, and its own printed card's otherwise.
@@ -865,7 +873,7 @@ halvesCardOf obj card = case Binding.copyOf (Object.bindings obj) of
 -- object's values, so a preparation card that became a copy of a Grizzly Bears
 -- has stopped having an inset frame.
 prepareCardOf :: Object.Object -> Card -> Maybe (Face Card)
-prepareCardOf obj card = case Binding.copyOf (Object.bindings obj) of
+prepareCardOf obj card = case copyStampOf obj of
   Just snapshot -> PC.prepare snapshot
   Nothing -> Card.prepareFace card
 
@@ -1369,7 +1377,7 @@ hasFlipHalf oid gs = case lookupObject oid gs of
         let bindings = Object.bindings obj
             stamped = case storedCopyOf oid gs of
               Just stored -> Just stored
-              Nothing -> Binding.copyOf bindings
+              Nothing -> copyStampOf obj
          in case stamped of
               Just snapshot -> Maybe.isJust (Binding.flippedCopyOf bindings) || Maybe.isJust (PC.flipped snapshot)
               Nothing -> maybe False (Maybe.isJust . Card.flippedFace) (cardOf oid gs)

@@ -16,7 +16,7 @@
 -- SPELLBOOK rather than one card; the eighth casts a printed Follow the Tracks,
 -- the same spellbook shape with the other question asked of it; the ninth enters
 -- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
--- take; the tenth and eleventh cast a printed Sinister Reflections, whose
+-- take; the tenth to twelfth cast a printed Sinister Reflections, whose
 -- conjure names an object already in the game rather than writing its card out;
 -- the last two begin alice's second main phase under a printed Pearl Collector,
 -- the one conjure in the corpus behind CR 603.4's intervening "if".
@@ -29,10 +29,11 @@
 -- graveyard arrival's SHAPE rather than its cardness, read off a printed Planar
 -- Void that watches the graveyard.
 --
--- The DUPLICATE pair is the other axis: the first of them reads the duplicates
+-- The DUPLICATE cases are the other axis: the first of them reads the duplicates
 -- once the originals are in the graveyard, which is what tells a card from CR
 -- 707.1's token, and the second points the conjure at a Clone, which is where
 -- the printed card under an object and its CR 707.2 copiable values disagree.
+-- The third carries that duplicate through three zone changes (CR 400.7).
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
@@ -561,9 +562,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- duplicate rather than CreateCopy's token: a snapshot is a value (CR 707.2b)
   -- and does not go looking for the object it came from.
   --
-  -- Not asserted: the duplicate CAST out of that hand. CR 400.7's next
-  -- incarnation carries no binding, so the copiable values do not survive the
-  -- zone change (#3979).
+  -- The next case casts the duplicate out of that hand.
   Spec.it s "CR 707.2 a duplicate of a Clone is a duplicate of what the Clone copies" $ do
     islandPrinting <- S.printingOf s registry "Island"
     mountain <- S.printingOf s registry "Mountain"
@@ -595,6 +594,47 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "and it reads the Piker's 2/1 with the Piker itself in the graveyard"
           (fmap (\oid -> S.powerToughnessOf oid gone) duplicates, List.sort (namesIn Zone.Graveyard gone))
           ([Just (2, 1)], List.sort [cloneName, goblinPiker, sinisterReflections])
+  -- The same duplicate across THREE zone changes, each a new object (CR 400.7):
+  -- cast out of the hand, resolved onto the battlefield, destroyed into the
+  -- graveyard. The copiable values are the card's own, so every incarnation is
+  -- the Piker. A duplicate that forgot them would be a Clone spell that
+  -- resolves into a Clone choosing its CR 614.12 copy afresh -- and with
+  -- nothing answered it enters as the 0/0 CR 704.5f sweeps up.
+  --
+  -- Islands and Mountains both, so the cast is affordable at the Clone's
+  -- {3}{U} as well as the Piker's {1}{R}, and the assertion on the permanent
+  -- is what goes red rather than the cast.
+  Spec.it s "a duplicate of a Clone cast and resolved is the Piker" $ do
+    islandPrinting <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    let board0 = S.landsFor mountain S.alice 4 (S.landsInPlay islandPrinting 4)
+        (pikerId, board1) = S.addPermanent piker S.alice board0
+        (_, staged) = S.spellOnStack clone S.alice board1
+        entered = S.settleSba (copyingPiker pikerId staged)
+    case clonesOnBattlefield entered of
+      [] -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      cloneId : _ -> do
+        let (spell, board2) = S.addHandCard reflections S.alice entered
+            board = board2 {GameState.phase = Phase.PrecombatMain}
+            resolved = S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop)
+            gone = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [pikerId, cloneId]))
+            inHand = namedIn cloneName Zone.Hand gone
+            played = S.settleSba (S.runPure S.identityAnswer gone (Monad.mapM_ (\oid -> S.cast S.alice oid >> Stack.resolveTop) inHand))
+            permanents = clonesOnBattlefield played
+            died = S.settleSba (S.runPure S.identityAnswer played (Event.destroy Regenerability.Regenerable permanents))
+        Spec.assertEqWith
+          s
+          "CR 400.7 the resolved duplicate is a Goblin Piker on the battlefield, printed Clone beneath"
+          (fmap (\oid -> (Set.toList (Projection.namesOf oid played), S.powerToughnessOf oid played)) permanents)
+          [([goblinPiker], Just (2, 1))]
+        Spec.assertEqWith
+          s
+          "and a Goblin Piker again in the graveyard, beside the original Clone's own name"
+          (List.sort (fmap (\oid -> Set.toList (Projection.namesOf oid died)) (namedIn cloneName Zone.Graveyard died)))
+          (List.sort [[cloneName], [goblinPiker]])
   -- Pearl Collector ({2}{B} Creature -- Human Warlock 3/3, "Deathtouch,
   -- Lifelink. At the beginning of your second main phase, if you gained 4 or
   -- more life this turn, conjure a card named Mox Pearl into your hand. This
