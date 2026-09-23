@@ -2311,12 +2311,11 @@ closeTargetSlotNames declared have =
 -- slot is filled only if some clause that CURRENTLY applies reads it, or it is
 -- a sibling one of those slots names (closeTargetSlotNames). Burst Lightning's
 -- two clauses read the one slot they share, so nothing here narrows its offer;
--- Part the Waterveil's
--- counters/type/subtype/P&T/haste clause is the one of its three that reads
--- "land", so trimming drops that slot on an unawakened cast, which is CR
--- 702.113b's own words ("its controller will need to choose that target only
--- if the creature was kicked" -- rule 702.113b's "awaken" reading of 702.33g's
--- kicker sentence).
+-- Part the Waterveil's counters/type/subtype/P&T/haste clause is the one of its
+-- three that reads "land", so trimming drops that slot on an unawakened cast,
+-- which is CR 702.113b's own words ("its controller will need to choose that
+-- target only if the creature was kicked" -- rule 702.113b's "awaken" reading
+-- of 702.33g's kicker sentence).
 --
 -- A slot read by NO clause and named by no sibling cannot occur here: the
 -- CardSpec D4 lint (`modalSlotsOffend`) holds every declared slot of a mode to
