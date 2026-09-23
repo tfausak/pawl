@@ -4033,15 +4033,16 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
 -- The spell ability rule 702.113a's second half states rides the CARD as a
 -- clause gated on Quantity.CastUsing, cleave's shape; Pawl.Types.Keyword's
 -- Awaken says why. Rule 702.113b's "cast as if it didn't have that target" is
--- not implemented, so the Forest is targeted on the unawakened cast too
--- (#2833) -- which is why both casts here are given a land to aim at.
+-- what the second Spec.it below proves (#2833): the target is asked only on the
+-- awakened cast, so this group's own cast still hands the printed-cost case a
+-- land to aim at, in case a regression brings the prompt back.
 --
 -- That clause is written ABOVE the card's own "Exile Part the Waterveil" rather
 -- than in printed order: CR 400.7 makes the exiled card a new object with no
 -- memory of the spell, so Object.castUsing is gone by the time a clause below
 -- the move reads it, and the gate answers false. Nothing happens between the
 -- two, so the orders are observably the same.
-awakenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+awakenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 awakenSpec s registry = Spec.describe s "Awaken" $ do
   Spec.it s "CR 702.113a awakened, the Forest becomes a 6/6 Elemental creature land with haste; cast for {4}{U}{U} it stays a plain land" $ do
     island <- S.printingOf s registry "Island"
@@ -4063,8 +4064,32 @@ awakenSpec s registry = Spec.describe s "Awaken" $ do
     Spec.assertEqWith s "CR 702.113a the printed cost was paid, so the Forest gains nothing at all" (reading (cast waterveilCost)) (Nothing, 0, False, False, True, False)
     Spec.assertEqWith s "the control: both casts exiled the Waterveil and gave alice an extra turn" (fmap (\gs -> (S.onBattlefield waterveilId gs, length (GameState.extraTurns gs))) [cast awakenCost, cast waterveilCost]) [(False, 1), (False, 1)]
 
--- payingFor with every target slot aimed at `victim`, which Part the Waterveil
--- needs because rule 702.113b's target is chosen on both casts (#2833).
+  -- CR 702.113b/601.2c/700.2c: "its controller will need to choose that target
+  -- only if the creature [Part the Waterveil, awaken's general case] was
+  -- awakened" -- proved by COUNTING the CR 601.2c prompt rather than by reading
+  -- resolution, which the group above already covers and which stays silent
+  -- either way (the awaken clause is gated again at CR 608.2c). ONE board, the
+  -- same nine Islands and Forest as above, so the only difference between the
+  -- two counts is which cost was announced.
+  Spec.it s "CR 702.113b the awaken-only land target is asked only on the awakened cast" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    waterveil <- S.printingOf s registry "Part the Waterveil"
+    let (forestId, gs0) = S.addPermanent forest S.alice (S.landsInPlay island 9)
+        (waterveilId, gs1) = S.addHandCard waterveil S.alice gs0
+        board = aliceOnTurn gs1
+        countingAnswer :: [ManaSymbol.ManaSymbol] -> Prompt.Prompt r -> State.State Int r
+        countingAnswer cost p = case p of
+          Prompt.ChooseTargets {} -> State.modify' (+ 1) >> pure (aimedAt forestId p)
+          _ -> pure (payingFor cost p)
+        targetAsks cost = State.execState (Engine.runGame (countingAnswer cost) board (S.cast S.alice waterveilId)) 0
+    Spec.assertEqWith s "CR 702.113b cast for the printed {4}{U}{U}, the land is never asked for" (targetAsks waterveilCost) 0
+    Spec.assertEqWith s "CR 702.113a cast for the {6}{U}{U}{U} awaken cost, it is asked once" (targetAsks awakenCost) 1
+
+-- payingFor with every target slot aimed at `victim`. Still needed by the group
+-- above's awakened case (CR 702.113a) -- the printed-cost case no longer raises
+-- the prompt at all (#2833, this file's other Spec.it), so `aimedAt` there is
+-- simply never reached.
 payingAimedAt :: [ManaSymbol.ManaSymbol] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 payingAimedAt wanted victim p = case p of
   Prompt.ChooseTargets {} -> aimedAt victim p

@@ -13,11 +13,13 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Commander as Commander
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
@@ -25,6 +27,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Prepare as Prepare
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Resolve.Slots as Slots
 import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -39,6 +42,9 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
+import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.Compares as Compares
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Convoking as Convoking
 import Pawl.Types.Cost (Cost)
@@ -56,6 +62,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -64,6 +71,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import Pawl.Types.ManaSpending (ManaSpending)
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
@@ -73,19 +81,24 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.SlotCount as SlotCount
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Splice as Splice
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- CR 117.1a's second sentence: the window a NONINSTANT spell is cast in -- a
 -- main phase of its controller's own turn, with an empty stack. Every noninstant
@@ -2194,6 +2207,128 @@ followIntoSpell permission old new gs = case permission of
           | otherwise = row
      in gs {GameState.replacements = fmap follow (GameState.replacements gs)}
 
+-- CR 702.33g/702.113b's own scope: a Quantity naming a CAST-ANNOUNCEMENT fact
+-- rather than a board or resolution one -- Quantity.WasKicked (kicker,
+-- multikicker), Quantity.CastUsing (awaken, cleave, overload, squad, offspring,
+-- every OTHER alternative/additional-cost tag CR 601.2b settles), and
+-- Quantity.Literal, the threshold side of every such comparison. Nothing else
+-- qualifies, on purpose: rule 702.33g/113b narrow CR 601.2c targets for exactly
+-- these costs and no others, so a clash's coin flip, a random flip, or a
+-- comparison against CR 601.2b's own X (not yet announced when trimModeTargetSlots
+-- runs, see below) must NOT be treated as already decided here -- ClashSpec's,
+-- CoinSpec's and TargetSpec's joint-X group are what this line fixes over the
+-- first cut, which read every Condition and wrongly collapsed all three to
+-- False.
+isCastAnnouncementQuantity :: Quantity.Quantity -> Bool
+isCastAnnouncementQuantity q = case q of
+  Quantity.Literal _ -> True
+  Quantity.WasKicked -> True
+  Quantity.CastUsing _ -> True
+  _ -> False
+
+-- The Condition built ENTIRELY from such quantities -- Any/All fold the same
+-- way Condition.holds itself does, so a mixed clause (none print one) is not
+-- mistaken for a safe one.
+isCastAnnouncementCondition :: Condition.Type.Condition -> Bool
+isCastAnnouncementCondition condition = case condition of
+  Condition.Type.Compares c -> isCastAnnouncementQuantity (Compares.measured c) && isCastAnnouncementQuantity (Compares.threshold c)
+  Condition.Type.Any conditions -> all isCastAnnouncementCondition conditions
+  Condition.Type.All conditions -> all isCastAnnouncementCondition conditions
+
+-- CR 702.33g/702.113b: does a clause's printed "if" hold ALREADY, at CR
+-- 601.2c's step -- the same question Resolve.gateHolds asks a clause when it is
+-- REACHED, narrowed to what is answerable this early and to what rule 702.33g's
+-- family actually covers (isCastAnnouncementCondition above). Kicker's and
+-- awaken's announcements (stampPaidCosts, stampCastUsing) are both settled above
+-- this step, so a Quantity.WasKicked or Quantity.CastUsing condition reads the
+-- real decision. Anything else -- a board read, a resolution-time random result,
+-- CR 601.2b's own X (announced only AFTER this step) -- is treated as APPLYING,
+-- the same as an unconditioned clause: this function only ever NARROWS the old
+-- "every declared slot" answer, never widens what a clause needs beyond it, so a
+-- condition it cannot yet judge safely defaults to the old behaviour rather than
+-- to a guess. A clause with no condition always applies -- Clause.condition's own
+-- unmarked case.
+clauseAppliesAt :: PlayerId -> ObjectId -> GameState -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+clauseAppliesAt pid sid gs clause = case Clause.condition clause of
+  Nothing -> True
+  Just condition
+    | isCastAnnouncementCondition condition -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just pid) (Just sid)) gs sid condition
+    | otherwise -> True
+
+-- CR 702.33g's "that part of the ability includes any targets": the target slot
+-- NAMES one clause's own effects read, Slots.slotsOf's ordinary walk narrowed to
+-- a single clause rather than Resolve.modeSlots' whole-mode fold. Payer, asker
+-- and branch-chooser positions are not walked -- no printing in the pool names a
+-- declared target slot from one of those, and CR 702.33g's own text is about the
+-- ability's targets, not its resolution-time riders.
+clauseTargetSlotNames :: Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Set SlotName.SlotName
+clauseTargetSlotNames clause = Map.keysSet (Slots.joinSlots (fmap Slots.slotsOf (Foldable.toList (Clause.effects clause))))
+
+-- One target slot's OWN read of a SIBLING slot -- its pool's ZoneScope (Dwell on
+-- the Past's "their graveyard"), its filter's IsBound and the atoms beside it
+-- (Fall of the Hammer's "another target creature"), and its CR 202.3 computed
+-- bound or count (Venerable Warsinger's X). Resolve.targetSlotSlots' claim
+-- narrowed to NAMES rather than SlotArity and to what this module can already
+-- reach without importing Resolve.hs, which would cycle back through
+-- Resolve.Effect to Cast. Synthetic Borrowed Exhumation's "card" slot naming
+-- "player" through its pool is the witness: trimming "card" in without
+-- following this read would drop "player" out from under it.
+targetSlotSiblingNames :: TargetSlot.TargetSlot -> Set SlotName.SlotName
+targetSlotSiblingNames slot =
+  Set.unions
+    [ poolSiblingName (TargetSlot.pool slot),
+      maybe Set.empty Filter.boundSlots (TargetSlot.filter slot),
+      maybe Set.empty (Map.keysSet . Slots.quantitySlots) (TargetSlot.amount slot),
+      maybe Set.empty (Map.keysSet . Slots.quantitySlots) (SlotCount.quantity (TargetSlot.count slot))
+    ]
+
+-- The sibling slot ONE pool names, Card.instancePool's own two arms: only
+-- CardsInGraveyard and CreaturesAndCardsInGraveyard carry a ZoneScope, and only
+-- ZoneScope.InSlot/ControllerOfBound name a slot within it.
+poolSiblingName :: Pool.Pool -> Set SlotName.SlotName
+poolSiblingName pool = case pool of
+  Pool.CardsInGraveyard scope -> zoneScopeSlotName scope
+  Pool.CreaturesAndCardsInGraveyard scope -> zoneScopeSlotName scope
+  _ -> Set.empty
+
+zoneScopeSlotName :: ZoneScope.ZoneScope -> Set SlotName.SlotName
+zoneScopeSlotName scope = case scope of
+  ZoneScope.Scoped _ -> Set.empty
+  ZoneScope.InSlot name -> Set.singleton name
+  ZoneScope.ControllerOfBound name -> Set.singleton name
+
+-- clauseTargetSlotNames' direct answer, closed under targetSlotSiblingNames
+-- until it stops growing -- a fixpoint over a finite declared set, so it always
+-- terminates. Needed because a slot pulled in by an applying clause may itself
+-- point at a slot no clause's effects mention by name.
+closeTargetSlotNames :: Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Set SlotName.SlotName -> Set SlotName.SlotName
+closeTargetSlotNames declared have =
+  let siblings = Set.unions (Maybe.mapMaybe (fmap targetSlotSiblingNames . (`Map.lookup` declared)) (Set.toList have))
+      have' = Set.union have (Set.intersection siblings (Map.keysSet declared))
+   in if have' == have then have else closeTargetSlotNames declared have'
+
+-- CR 601.2c/700.2c narrowed by CR 702.33g/702.113b: a mode's declared target
+-- slot is filled only if some clause that CURRENTLY applies reads it, or it is
+-- a sibling one of those slots names (closeTargetSlotNames). Burst Lightning's
+-- two clauses read the one slot they share, so nothing here narrows its offer;
+-- Part the Waterveil's
+-- counters/type/subtype/P&T/haste clause is the one of its three that reads
+-- "land", so trimming drops that slot on an unawakened cast, which is CR
+-- 702.113b's own words ("its controller will need to choose that target only
+-- if the creature was kicked" -- rule 702.113b's "awaken" reading of 702.33g's
+-- kicker sentence).
+--
+-- A slot read by NO clause and named by no sibling cannot occur here: the
+-- CardSpec D4 lint (`modalSlotsOffend`) holds every declared slot of a mode to
+-- being read by SOME clause of that mode or SOME sibling slot's pool/filter/
+-- bound, union over the whole mode rather than any one clause.
+trimModeTargetSlots :: PlayerId -> ObjectId -> GameState -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+trimModeTargetSlots pid sid gs mode =
+  let applying = filter (clauseAppliesAt pid sid gs) (Foldable.toList (Mode.clauses mode))
+      direct = Set.unions (fmap clauseTargetSlotNames applying)
+      needed = closeTargetSlotNames (Mode.targetSlots mode) direct
+   in mode {Mode.targetSlots = Map.restrictKeys (Mode.targetSlots mode) needed}
+
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
 -- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object
 -- every step below announces for, targets relative to, is projected from and
@@ -2359,13 +2494,6 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
       -- Carried as the counts per cost rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
       paid <- announceOptionalCosts spending pid sid announcedCandidates optionalOffers gs
-      -- Not implemented: CR 702.33g's and CR 702.113b's targets, which a spell
-      -- whose kicked-only or awaken-only clause names a slot of its own should be
-      -- asked for only on the cast that paid for it (#2833). Part the Waterveil
-      -- prints that shape -- Burst Lightning's two clauses share one slot, but
-      -- rule 702.113a's land is the awaken clause's alone -- so the CR 601.2c step
-      -- below fills every slot the chosen modes declare and its land is targeted
-      -- on an unawakened cast too.
       --
       -- CR 702.33d: "if a spell's controller declares the intention to pay any of
       -- that spell's kicker costs, that spell has been kicked" -- the DECLARATION
@@ -2541,7 +2669,12 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- filter one step up, which runs before the stamp exists, stamps a
               -- copy of its own per candidate (proposedFor).
               bestowedGs <- State.get
-              let -- CR 702.96b: the overload candidate's spell "won't require any
+              let -- CR 702.33g/702.113b: the face CR 601.2c reads its slots off,
+                  -- each mode's declared targets narrowed to the ones some
+                  -- currently-applying clause reads -- trimModeTargetSlots'
+                  -- doc has the worked example (Part the Waterveil).
+                  faceForTargets = face {Face.spell = (Face.spell face) {Modal.Type.modes = fmap (trimModeTargetSlots pid sid bestowedGs) (Modal.Type.modes (Face.spell face))}}
+                  -- CR 702.96b: the overload candidate's spell "won't require any
                   -- targets", so CR 601.2c announces none -- read off the tag
                   -- stamped one step up rather than off the face, which prints
                   -- the word "target" either way (Pawl.Types.Keyword's
@@ -2554,7 +2687,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                         -- CR 702.47d: the spliced text's targets are chosen here
                         -- beside the spell's own.
                         Map.union
-                          (Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes face)
+                          (Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes faceForTargets)
                           (maybe Map.empty (`Game.splicedTargetSlots` bestowedGs) (Game.lookupObject sid bestowedGs))
                   -- CR 101.1: the ceiling this card's own words put on the value
                   -- about to be announced -- "X can't be greater than the
