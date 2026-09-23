@@ -4606,8 +4606,7 @@ replacementsAffecting gs =
 -- affected set is deliberately NOT consulted: deciding which permanents an
 -- effect reaches means building the projection this gate exists to skip, so a
 -- stored effect writing a minting modification gathers the whole board however
--- narrow its set. That over-trips and can never drop a
--- row.
+-- narrow its set. That over-trips and can never drop a row.
 storedWrites :: (Modification -> Bool) -> GameState -> Bool
 storedWrites p gs = any (any p . grantedDefiningParts . ContinuousEffect.modification) (GameState.continuousEffects gs)
 
