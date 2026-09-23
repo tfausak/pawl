@@ -96,6 +96,7 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -955,6 +956,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       ( Effect.ForEach
           ForEach.MkForEach
             { ForEach.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victims")),
+              ForEach.members = LoopMembers.Every,
               ForEach.slot = SlotName.MkSlotName (Text.pack "victim"),
               ForEach.body =
                 Seq.singleton (Effect.DealDamage (DealDamage.MkDealDamage (Seq.singleton (DamagePart.MkDamagePart (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victim"))) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot (SlotName.MkSlotName (Text.pack "exiled")) Quantity.ManaValue)))) Nothing Nothing)),

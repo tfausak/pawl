@@ -1,6 +1,7 @@
 module Pawl.Types.ForEach where
 
 import qualified Data.Sequence as Seq
+import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -21,6 +22,12 @@ data ForEach effect = MkForEach
     -- objects" half, the same read every other ObjectRef-taking opcode makes.
     -- Nothing the body does adds to or removes from it.
     ref :: ObjectRef.ObjectRef,
+    -- | Whether the body runs for every swept member or for the ones the
+    -- resolving controller picks out of them, asked once before the first
+    -- iteration (CR 608.2d). Proved by Pawl.AttackKeywordTriggerSpec's "CR
+    -- 702.116a at four seats a token is minted against the chosen opponent
+    -- alone".
+    members :: LoopMembers.LoopMembers,
     -- | The name this iteration's member is bound under, for the body to read
     -- as an ObjectRef.InSlot or a PlayerRef.InSlot. A DEFINITION, never a
     -- target (CR 115.10a): the ref above may well have been filled by targeting
