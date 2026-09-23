@@ -620,6 +620,16 @@ playersFor viewOf context gs ref =
         -- unanswered rather than answered off some other seat.
         PlayerRef.ControllerOfBound slot ->
           fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.controller)
+        -- CR 108.3's owner, ControllerOfBound's arm one field over: the OWNER
+        -- of the object a slot names, off the same injected view. The Deck of
+        -- Many Things' 20 band is the producer (Pawl.CardSpec) -- reanimating
+        -- an opponent's creature and having that opponent lose the game is
+        -- exactly the case where owner and controller come apart.
+        --
+        -- Nothing for the same reasons the arm above is: no object, several,
+        -- or one the view cannot describe.
+        PlayerRef.OwnerOfBound slot ->
+          fmap pure (Filter.slotOneObject slot context >>= viewOf >>= Filter.owner)
         -- CR 614.1c / CR 702.174b: the player the object a slot names chose, read
         -- off Object.chosenPlayer rather than off the view -- a choice is a
         -- record, not a characteristic (CR 707.2), so no projection answers it.

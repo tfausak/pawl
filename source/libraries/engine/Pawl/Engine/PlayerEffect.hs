@@ -1774,8 +1774,8 @@ choiceCouldApply src criterion oid gs =
 --
 -- Exhaustive over PlayerRef, since a new arm has to say what a zone scope makes
 -- of it. Three arms answer, and the rest name NOBODY: the slot-reading ones
--- (InSlot, EachInSlot, ControllerOfBound, ChosenPlayerOfBound, Attacking) read
--- the RESOLUTION's
+-- (InSlot, EachInSlot, ControllerOfBound, OwnerOfBound, ChosenPlayerOfBound,
+-- Attacking) read the RESOLUTION's
 -- bindings, which are gone by the time a stored row is read and which
 -- Pawl.Engine.Resolve bakes to Specific while they are still there, and Candidate
 -- names whichever player a fold is aimed at with no fold running here. A
@@ -1800,6 +1800,7 @@ zoneOwners pid ref gs = case ref of
   PlayerRef.EachOpponentExcept _ -> []
   PlayerRef.Candidate -> []
   PlayerRef.ControllerOfBound _ -> []
+  PlayerRef.OwnerOfBound _ -> []
   PlayerRef.ChosenPlayerOfBound _ -> []
   PlayerRef.Attacking _ -> []
 
