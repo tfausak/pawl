@@ -3132,7 +3132,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- on both sides nets the mana once.
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
-    State.modify' (Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs))
+    Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
   Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination subject) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
