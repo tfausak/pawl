@@ -23,6 +23,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
@@ -2088,7 +2089,7 @@ withMenace oid gs =
 -- resolved. Its FIRST ability is "{T}: Add {R}.", so the removal is the second of
 -- the two the projection hands out.
 --
--- Projection.abilitiesOf rather than Activate.abilitiesFor: CR 605.3b keeps a
+-- Projection.abilitiesOf rather than Activatable.abilitiesFor: CR 605.3b keeps a
 -- mana ability off the activatable list, so the pair here is the printed pair.
 removingLandwalk :: (Monad m) => Spec.Spec m n -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
 removingLandwalk s hammerheimId victim board = case Projection.abilitiesOf hammerheimId board of
@@ -4605,7 +4606,7 @@ keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestri
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gyId, attacker, theirs, gs) = renewBoard rakshasa swamp piker
-    case (Activate.abilitiesFor gyId gs, theirs) of
+    case (Activatable.abilitiesFor gyId gs, theirs) of
       ([ability], [first_, second, spared]) -> do
         let resolved = S.runPure (renewing 2 [first_, second]) gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
             board = declaringAttackers resolved
@@ -4638,7 +4639,7 @@ keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestri
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gyId, attacker, theirs, gs) = renewBoard rakshasa swamp piker
-    case (Activate.abilitiesFor gyId gs, theirs) of
+    case (Activatable.abilitiesFor gyId gs, theirs) of
       ([ability], [first_, second, spared]) -> do
         let resolved = S.runPure (renewing 1 [first_]) gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
             board = declaringAttackers resolved
@@ -4662,7 +4663,7 @@ keywordCounterRestrictionSpec s registry = Spec.describe s "KeywordCounterRestri
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gyId, attacker, theirs, gs) = renewBoard rakshasa swamp piker
-    case (Activate.abilitiesFor gyId gs, theirs) of
+    case (Activatable.abilitiesFor gyId gs, theirs) of
       ([ability], [first_, _, _]) -> do
         -- FIVE, against the four creatures the board holds -- bob's three and
         -- alice's attacker, since "X target creatures" names no controller -- and
@@ -4761,7 +4762,7 @@ zirdaResolved s registry pick = do
             GameState.phase = Phase.PrecombatMain,
             GameState.priority = Just S.alice
           }
-      abilities = Activate.abilitiesFor zirdaId board
+      abilities = Activatable.abilitiesFor zirdaId board
       resolved = activatingZirda zirdaId (pick attacker victim twin) board
   Spec.assertEqWith s "Zirda states exactly one activated ability" (length abilities) 1
   pure (attacker, victim, twin, resolved)
@@ -4787,7 +4788,7 @@ zirdaScreenBoards s registry = do
       (attacker, withAttacker) = S.addPermanent piker S.alice withZirda
       (wall, placed) = S.addPermanent screen S.bob withAttacker
       board = mainPhaseFor placed
-      abilities = Activate.abilitiesFor zirdaId board
+      abilities = Activatable.abilitiesFor zirdaId board
       run named = declaringAttackers (activatingZirda zirdaId named board)
   Spec.assertEqWith s "Zirda states exactly one activated ability" (length abilities) 1
   pure (run wall, run attacker, wall, attacker)
@@ -4796,7 +4797,7 @@ zirdaScreenBoards s registry = do
 -- `named` -- activatingNetter's twin, and the only thing the boards either Zirda
 -- fixture builds differ in.
 activatingZirda :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-activatingZirda zirdaId named board = case Activate.abilitiesFor zirdaId board of
+activatingZirda zirdaId named board = case Activatable.abilitiesFor zirdaId board of
   [ability] -> S.runPure (namingTarget named) board (Activate.activateAbility S.alice zirdaId ability >> Stack.resolveTop)
   _ -> board
 
@@ -4886,7 +4887,7 @@ netterResolved s registry pick = do
       (twin, withTwin) = S.addPermanent piker S.alice withVictim
       (elsewhere, placed) = S.addPermanent piker S.bob withTwin
       board = mainPhaseFor placed
-      abilities = Activate.abilitiesFor netterId board
+      abilities = Activatable.abilitiesFor netterId board
       resolved = activatingNetter netterId (pick victim twin elsewhere) board
   Spec.assertEqWith s "Netter en-Dal states exactly one activated ability" (length abilities) 1
   pure (victim, twin, elsewhere, resolved)
@@ -4911,7 +4912,7 @@ cursedNetterBoards s registry = do
       (elsewhere, withBob) = S.addPermanent piker S.bob withPiker
       (aura, withAura) = S.addPermanent curse S.alice withBob
       board = mainPhaseFor (S.attachTo aura (Recipient.ToPlayer S.alice) withAura)
-      abilities = Activate.abilitiesFor netterId board
+      abilities = Activatable.abilitiesFor netterId board
       run named = activatingNetter netterId named board
   Spec.assertEqWith s "Netter en-Dal states exactly one activated ability" (length abilities) 1
   pure (facingBob (run piker1), facingBob (run elsewhere), piker1)
@@ -5180,7 +5181,7 @@ mainPhaseFor gs =
 -- Netter en-Dal's one ability, activated and resolved with its target slot aimed
 -- at `named`.
 activatingNetter :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-activatingNetter netterId named board = case Activate.abilitiesFor netterId board of
+activatingNetter netterId named board = case Activatable.abilitiesFor netterId board of
   [ability] -> S.runPure (namingTarget named) board (Activate.activateAbility S.alice netterId ability >> Stack.resolveTop)
   _ -> board
 

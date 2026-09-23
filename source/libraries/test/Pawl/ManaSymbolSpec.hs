@@ -12,6 +12,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -165,7 +166,7 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     let seated = Mana.setPool S.alice (Mana.Type.MkMana (replicate 7 (plainOf (ManaType.Colored Color.White)))) (Setup.emptyGame S.bothPlayers)
         (aspId, without) = S.addPermanent asp S.alice seated
         with = snd (S.addPermanent dawn S.alice without)
-        canActivate gs = any (\ability -> Activate.activatable S.alice aspId ability gs) (Activate.abilitiesFor aspId gs)
+        canActivate gs = any (\ability -> Activatable.activatable S.alice aspId ability gs) (Activatable.abilitiesFor aspId gs)
     Spec.assertBool s (canActivate with) "under Celestial Dawn seven white mana pay the {6}{G}"
     Spec.assertBool s (not (canActivate without)) "and without it the same seven cannot"
 

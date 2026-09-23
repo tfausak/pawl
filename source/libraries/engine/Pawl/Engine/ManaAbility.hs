@@ -60,7 +60,7 @@ import qualified Pawl.Types.Zone as Zone
 -- loyalty ability in the pool adds mana, so the clause is inert rather than
 -- checked here). Read at three sites:
 -- Mana.manaRoutesOfGiven includes a mana ability as a source,
--- Activate.activatableGiven refuses to put one on the stack (CR 605.3b), and
+-- Activatable.activatableGiven refuses to put one on the stack (CR 605.3b), and
 -- Projection's view builders answer Filter.HasNonManaActivatedAbility with its
 -- negation. What Action.legalActions offers instead is
 -- Action.ActivateManaAbility, one per Mana.manaSourcesGiven, which is CR 605.3a's
@@ -302,6 +302,7 @@ manaProduced effect = case effect of
   Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
+  Effect.Reroll -> Nothing
   Effect.ChooseCardName _ -> Nothing
   Effect.FromOutsideTheGame _ -> Nothing
   Effect.ExileThisSpell -> Nothing
@@ -512,6 +513,7 @@ movesLibraryCard effect = case effect of
   Effect.ChangeText {} -> False
   Effect.ExileAllGraveyards -> False
   Effect.Proliferate -> False
+  Effect.Reroll -> False
   Effect.ChooseCardName _ -> False
   -- CR 400.11: the card comes from OUTSIDE THE GAME, which is not a zone at all
   -- and so is not a library. CR 605.1a's fourth clause asks about libraries, and

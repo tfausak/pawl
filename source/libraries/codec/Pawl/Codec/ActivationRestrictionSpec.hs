@@ -141,4 +141,11 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       ActivationRestriction.codec
       ActivationRestriction.OnlyOnceEachTurn
       " {\"type\":\"OnlyOnceEachTurn\"} "
+  -- Goblin Bookie's "Activate only any time it makes sense".
+  Spec.it s "DuringDieRoll" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      ActivationRestriction.DuringDieRoll
+      " {\"type\":\"DuringDieRoll\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

@@ -15,6 +15,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Engine as Engine
@@ -680,7 +681,7 @@ portOfKarfellSpec s registry =
       returnAbility portId gs =
         filter
           (elem CostComponent.SacrificeThis . Cost.Type.components . ActivatedAbility.cost)
-          (Activate.abilitiesFor portId gs)
+          (Activatable.abilitiesFor portId gs)
       -- Activate the ability and resolve it, keeping the RESPONSES beside the
       -- board so the same call answers both "what happened" and "who was asked".
       run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Maybe (GameState.GameState, [Response.Response])

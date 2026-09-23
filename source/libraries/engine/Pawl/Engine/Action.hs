@@ -3,7 +3,7 @@ module Pawl.Engine.Action where
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Companion as Companion
@@ -276,7 +276,7 @@ legalActions pid gs =
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
       -- this card from your graveyard: Draw a card" functions only there. Which
-      -- abilities an object offers from where is Activate.abilitiesFor's
+      -- abilities an object offers from where is Activatable.abilitiesFor's
       -- question; this list only says where to look, and the three zones are
       -- pairwise disjoint.
       --
@@ -329,11 +329,11 @@ legalActions pid gs =
       pools = Target.poolsGiven pcs gs
       activations =
         let forObject oid =
-              fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pools supplySources pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
-         in concatMap forObject (Activate.activationSourcesGiven grants pcs pid gs)
+              fmap (Action.Activate oid) (filter (\ab -> Activatable.activatableGiven grants pcs pools supplySources pid oid ab gs) (Activatable.abilitiesForGiven pcs oid gs))
+         in concatMap forObject (Activatable.activationSourcesGiven grants pcs pid gs)
       -- CR 605.3a's first window -- "a player may activate an activated mana
       -- ability whenever they have priority" -- which the activation list above
-      -- cannot serve: Activate.activatableGiven refuses a mana ability outright,
+      -- cannot serve: Activatable.activatableGiven refuses a mana ability outright,
       -- because CR 605.3b keeps it off the stack and that is the only thing an
       -- Action.Activate does with one.
       --

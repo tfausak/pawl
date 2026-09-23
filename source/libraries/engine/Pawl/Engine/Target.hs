@@ -222,7 +222,7 @@ inRangeGiven grants you recipient gs = case (Recipient.playerOf recipient, Recip
 
 -- CR 801.2d: is this object within @you@'s range of influence -- controlled by a
 -- player within range, or a battle protected by one? CR 801.4 (inRangeGiven
--- above) and CR 801.6 (Pawl.Engine.Activate.activatableGiven) read it.
+-- above) and CR 801.6 (Pawl.Engine.Activatable.activatableGiven) read it.
 --
 -- Nothing is asked under an unlimited range, so a game without CR 801's option
 -- never takes the control fold. An object's controller is CR 108.4a's owner off

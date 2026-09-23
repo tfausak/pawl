@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import Pawl.CrewSpec (crewWith)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
@@ -275,13 +276,13 @@ arborColossusSpec s registry =
         _ -> S.identityAnswer p
       -- One activation of the one monstrosity ability, its trigger settled onto
       -- the stack and resolved, with `victim` aimed at.
-      monstrosity colossus victim gs = case Activate.abilitiesFor colossus gs of
+      monstrosity colossus victim gs = case Activatable.abilitiesFor colossus gs of
         [ability]
           -- CR 701.37a's condition is the CLAUSE's, not an activation
           -- restriction, so a monstrous permanent's ability stays activatable --
           -- which is what makes the second case below a real activation rather
           -- than an unpaid one.
-          | Activate.activatable S.alice colossus ability gs ->
+          | Activatable.activatable S.alice colossus ability gs ->
               Right . snd . Engine.runGamePure (aimed victim) gs $ do
                 Activate.activateAbility S.alice colossus ability
                 Stack.resolveTop
@@ -396,9 +397,9 @@ hydraBroodmasterSpec s registry =
         _ -> S.identityAnswer p
       -- One activation announcing `x`, its trigger settled onto the stack and
       -- resolved -- Arbor Colossus' `monstrosity` above with a value to announce.
-      monstrosity x broodmaster gs = case Activate.abilitiesFor broodmaster gs of
+      monstrosity x broodmaster gs = case Activatable.abilitiesFor broodmaster gs of
         [ability]
-          | Activate.activatable S.alice broodmaster ability gs ->
+          | Activatable.activatable S.alice broodmaster ability gs ->
               Right . snd . Engine.runGamePure (announcing x) gs $ do
                 Activate.activateAbility S.alice broodmaster ability
                 Stack.resolveTop

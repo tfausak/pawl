@@ -129,6 +129,8 @@ withoutAnnouncement before entry closed = do
   -- nextTimestamp's treatment. Nothing a CR 733.1 reversal undoes can reach it.
   subgamesThisMatch <- newest GameState.subgamesThisMatch
   turnAnchor <- one GameState.turnAnchor
+  rollingDie <- one GameState.rollingDie
+  rerolledTo <- one GameState.rerolledTo
   pure
     GameState.MkGameState
       { GameState.settings = settings,
@@ -212,7 +214,9 @@ withoutAnnouncement before entry closed = do
         GameState.exilePiles = exilePiles,
         GameState.extraTurns = extraTurns,
         GameState.subgamesThisMatch = subgamesThisMatch,
-        GameState.turnAnchor = turnAnchor
+        GameState.turnAnchor = turnAnchor,
+        GameState.rollingDie = rollingDie,
+        GameState.rerolledTo = rerolledTo
       }
   where
     -- A whole value, compared as one leaf.

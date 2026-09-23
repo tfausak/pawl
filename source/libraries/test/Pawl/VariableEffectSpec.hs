@@ -17,6 +17,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -1034,7 +1035,7 @@ perCreatureCountersSpec s registry =
               board = g4 {GameState.priority = Just S.alice}
           activated <- case Projection.abilitiesOf dissidentId board of
             _ : exile : _ -> do
-              Spec.assertBool s (Activate.activatable S.alice dissidentId exile board) "the blight 2 ability is activatable"
+              Spec.assertBool s (Activatable.activatable S.alice dissidentId exile board) "the blight 2 ability is activatable"
               pure (S.runPure (blighting wallId) board (Activate.activateAbility S.alice dissidentId exile))
             _ -> Spec.assertFailure s "expected the Dissident to carry two activated abilities"
           let after = resolveEverything activated
@@ -1336,7 +1337,7 @@ dissidentOnBoard swamp dissident piker wall pid =
 
 -- alice activates the Dissident's FIRST projected ability -- "{T}, Blight 1:
 -- Surveil 1" -- naming `wanted` for the blight, and the stack is left alone. The
--- Activate.activatable assertion is what keeps the case honest: without it, a
+-- Activatable.activatable assertion is what keeps the case honest: without it, a
 -- board where the ability could not legally have been activated at all would still
 -- show the counters, since Activate.activateAbility trusts its caller.
 activateBlighting ::
@@ -1348,7 +1349,7 @@ activateBlighting ::
   m GameState.GameState
 activateBlighting s wanted oid gs = case Projection.abilitiesOf oid gs of
   surveil : _ -> do
-    Spec.assertBool s (Activate.activatable S.alice oid surveil gs) "the ability is activatable"
+    Spec.assertBool s (Activatable.activatable S.alice oid surveil gs) "the ability is activatable"
     pure (S.runPure (blighting wanted) gs (Activate.activateAbility S.alice oid surveil))
   [] -> Spec.assertFailure s "expected the permanent to carry an activated ability"
 
@@ -1469,7 +1470,7 @@ supportSpec s registry = Spec.describe s "Support" $ do
         board = g4 {GameState.priority = Just S.alice}
         answer :: Prompt.Prompt r -> r
         answer = takingTargets 2 [auxId, pikerId, ratsId]
-    case Activate.abilitiesFor auxId board of
+    case Activatable.abilitiesFor auxId board of
       [ability] -> do
         let after = S.runPure answer board (Activate.activateAbility S.alice auxId ability >> Stack.resolveTop)
         Spec.assertEqWith s "the Auxiliary itself, which support excludes, took none" (plusCountersOn auxId after) (Just 0)
@@ -1939,7 +1940,7 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
           Activate.activateAbility S.alice baubleId ability
           Stack.resolveTop
         graveyardSize gs = Seq.length (Map.findWithDefault Seq.empty S.alice (GameState.graveyard gs))
-    case Activate.abilitiesFor baubleId board of
+    case Activatable.abilitiesFor baubleId board of
       [ability] -> do
         let declined = activate decliningTargets ability
             taken = activate S.identityAnswer ability

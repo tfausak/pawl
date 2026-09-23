@@ -36,7 +36,7 @@ data Pool
     -- A MANA ability is never a candidate, and nothing filters for one, because
     -- no mana ability is ever on the stack: CR 605.3b and CR 605.4a resolve one
     -- immediately rather than putting it there, and
-    -- Pawl.Engine.Activate.activatable already excludes it (CR 605.1a).
+    -- Pawl.Engine.Activatable.activatable already excludes it (CR 605.1a).
     Abilities
   | SpellsAndPermanents -- CR 115: spells on the stack + battlefield permanents (ToObject).
   | -- | CR 115.2's own two halves in one slot -- the rule's default (a permanent

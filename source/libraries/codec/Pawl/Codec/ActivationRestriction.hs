@@ -26,7 +26,8 @@ codec =
       Arm.nullary "BeforeCombatDamage" ActivationRestriction.BeforeCombatDamage,
       Arm.payload "OnlyIf" Condition.codec ActivationRestriction.OnlyIf (\x -> case x of ActivationRestriction.OnlyIf y -> Just y; _ -> Nothing),
       Arm.nullary "OnlyOnce" ActivationRestriction.OnlyOnce,
-      Arm.nullary "OnlyOnceEachTurn" ActivationRestriction.OnlyOnceEachTurn
+      Arm.nullary "OnlyOnceEachTurn" ActivationRestriction.OnlyOnceEachTurn,
+      Arm.nullary "DuringDieRoll" ActivationRestriction.DuringDieRoll
     ]
 
 tagOf :: ActivationRestriction.ActivationRestriction -> String
@@ -40,3 +41,4 @@ tagOf x = case x of
   ActivationRestriction.OnlyIf {} -> "OnlyIf"
   ActivationRestriction.OnlyOnce {} -> "OnlyOnce"
   ActivationRestriction.OnlyOnceEachTurn {} -> "OnlyOnceEachTurn"
+  ActivationRestriction.DuringDieRoll {} -> "DuringDieRoll"

@@ -42,6 +42,7 @@ module Pawl.UntapRestrictionSpec where
 
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -271,7 +272,7 @@ existenceSpec s registry = Spec.describe s "Existence" $ do
   -- mana, the timing or an empty target pool.
   --
   -- The two OFFER assertions are a fence rather than a proof, and the ABILITY
-  -- LIST below is what discriminates: deleting Activate.abilitiesForGiven's
+  -- LIST below is what discriminates: deleting Activatable.abilitiesForGiven's
   -- functionsIn filter leaves the offers exactly as they are, because CR 118.3
   -- then refuses the activation anyway -- a DiscardThis cost is unpayable by a
   -- permanent (Cost.canPayComponent asks the zone). Two rules answer here, and
@@ -292,10 +293,10 @@ existenceSpec s registry = Spec.describe s "Existence" $ do
     -- the only one that functions on the battlefield, so the ability the
     -- projection just reported as EXISTING there is not on it. CR 605.3b is why
     -- the mana ability is no Action.Activate either.
-    Spec.assertEqWith s "one ability functions on the battlefield" (length (Activate.abilitiesFor fieldId onField)) 1
+    Spec.assertEqWith s "one ability functions on the battlefield" (length (Activatable.abilitiesFor fieldId onField)) 1
     Spec.assertBool
       s
-      (not (any (elem (CostComponent.DiscardThis DiscardCause.Ordinary) . Cost.components . ActivatedAbility.cost) (Activate.abilitiesFor fieldId onField)))
+      (not (any (elem (CostComponent.DiscardThis DiscardCause.Ordinary) . Cost.components . ActivatedAbility.cost) (Activatable.abilitiesFor fieldId onField)))
       "and it is not the one whose cost discards the card"
 
 -- Was an activation of THIS source offered? `any isActivate` cannot say, and both

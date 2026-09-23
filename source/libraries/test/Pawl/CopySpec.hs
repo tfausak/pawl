@@ -97,6 +97,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
@@ -3859,7 +3860,7 @@ graveyardCopyBoard card land lands twins =
 -- is matched on exactly one ability, so a board that offered none or two comes
 -- back unchanged and fails the token match rather than passing elsewhere.
 activateFromGraveyard :: ObjectId -> GameState.GameState -> GameState.GameState
-activateFromGraveyard gyId gs = case Activate.abilitiesFor gyId gs of
+activateFromGraveyard gyId gs = case Activatable.abilitiesFor gyId gs of
   [ability] -> S.runPure S.identityAnswer gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
   _ -> gs
 

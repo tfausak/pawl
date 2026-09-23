@@ -18,6 +18,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
@@ -2141,7 +2142,7 @@ matoyaTriggerSpec s registry =
       -- any trigger it raised is placed and resolved in the same round. A board
       -- offering any other number of abilities activates none, which fails every
       -- assertion rather than passing one for a reason the case did not choose.
-      runBall who ballId gs = case Activate.abilitiesFor ballId gs of
+      runBall who ballId gs = case Activatable.abilitiesFor ballId gs of
         [ability] ->
           let activated = S.runPure keepAll gs (Activate.activateAbility who ballId ability)
            in S.runPure keepAll activated Engine.priorityLoop
@@ -2439,7 +2440,7 @@ tavernScoundrelSpec s registry =
                 then g
                 else drain (n - 1) (S.runPure (flipAnswer face called) g Stack.resolveTop)
             cycleOnce g = drain 8 (S.runPure (flipAnswer face called) g Engine.placePendingTriggers)
-         in case Activate.abilitiesFor scoundrelId gs of
+         in case Activatable.abilitiesFor scoundrelId gs of
               [ability] -> Right (cycleOnce (cycleOnce (S.runPure (flipAnswer face called) gs (Activate.activateAbility who scoundrelId ability))))
               other -> Left (length other)
       oneAbility n = "expected exactly one activated ability, got " <> show n

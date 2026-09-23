@@ -24,6 +24,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -87,7 +88,7 @@ tappingFor tappers p = case p of
 saddleable :: ObjectId.ObjectId -> GameState.GameState -> Bool
 saddleable mountId gs = case saddleAbility mountId gs of
   Nothing -> False
-  Just ability -> Activate.activatable S.alice mountId ability gs
+  Just ability -> Activatable.activatable S.alice mountId ability gs
 
 isSaddled :: ObjectId.ObjectId -> GameState.GameState -> Bool
 isSaddled oid gs = maybe False (Set.member Designation.Saddled . Object.designations) (Game.lookupObject oid gs)
