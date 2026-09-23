@@ -877,11 +877,8 @@ snapshotView viewOf gs shape event = case event of
     -- answers, the honest blank for a card whose characteristics as it moved
     -- cannot be recovered.
     --
-    -- The melded half of that is not driven by a board that can tell the two
-    -- readings apart: the pool's Hanweir pair answers the same 2 cards either
-    -- way, and the count that would separate them is Case of the Gorgon's Kiss'
-    -- three-or-more CREATURE cards (#3152). Pawl.CountSpec's Raphael group proves
-    -- the reading itself.
+    -- Pawl.CountSpec's Raphael group proves the reading, and Pawl.MeldSpec's
+    -- Case of the Gorgon's Kiss case proves its melded half.
     EventShape.CardArrivedIn arrival ->
       if arrivalMatches arrival zc
         then case arrivedView viewOf gs (ZoneChange.object zc) of

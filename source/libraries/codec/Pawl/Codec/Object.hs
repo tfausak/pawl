@@ -26,6 +26,7 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Pairing as Pairing
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PrintingId as PrintingId
+import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.Sickness as Sickness
@@ -114,6 +115,7 @@ codec = Fields.object $ do
   preparedCopyOf <- Fields.defaulted "preparedCopyOf" Nothing (Common.maybe ObjectId.codec) Object.preparedCopyOf
   ringBearerFor <- Fields.defaulted "ringBearerFor" Nothing (Common.maybe PlayerId.codec) Object.ringBearerFor
   paired <- Fields.defaulted "paired" Nothing (Common.maybe Pairing.codec) Object.paired
+  duplicate <- Fields.defaulted "duplicate" Nothing (Common.maybe ProjectedCharacteristics.codec) Object.duplicate
   protector <- Fields.defaulted "protector" Nothing (Common.maybe PlayerId.codec) Object.protector
   ventureRoom <- Fields.defaulted "ventureRoom" Nothing (Common.maybe RoomIndex.codec) Object.ventureRoom
   classLevel <- Fields.defaulted "classLevel" Nothing (Common.maybe ClassLevel.codec) Object.classLevel
@@ -171,6 +173,7 @@ codec = Fields.object $ do
         Object.warped = warped,
         Object.preparedCopyOf = preparedCopyOf,
         Object.ringBearerFor = ringBearerFor,
+        Object.duplicate = duplicate,
         Object.paired = paired,
         Object.protector = protector,
         Object.ventureRoom = ventureRoom,
