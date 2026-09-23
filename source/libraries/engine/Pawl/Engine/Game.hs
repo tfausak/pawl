@@ -1334,6 +1334,9 @@ flipsOver oid gs = Set.member oid (GameState.battlefield gs) && hasFlipHalf oid 
 -- The LATEST row wins (CR 613.7), because a copy effect REPLACES copiable values
 -- rather than adding to them -- so nothing below the newest one is observable
 -- while it stands, and a row that ends first reveals an older one still running.
+-- A row still covering an object is always newer than that object's stamp, since
+-- `supersedeStoredCopies` below takes the object out of every row as a later
+-- stamp is written.
 --
 -- HERE rather than beside its main caller
 -- (Pawl.Engine.Projection.View.stampedSnapshotOf) so that `hasFlipHalf` below
@@ -1351,6 +1354,15 @@ storedCopyOf oid gs =
     . Maybe.listToMaybe
     . List.sortOn (Ord.Down . ActiveCopy.timestamp)
     $ filter (Set.member oid . ActiveCopy.objects) (GameState.copyEffects gs)
+
+-- CR 613.7: a copy effect stamped now is later than every stored row covering
+-- these objects, and a copy effect replaces copiable values rather than adding
+-- to them, so no such row is observable on them again. Taken out of each row's
+-- `objects` rather than ordered at the read, because a stamp carries no
+-- timestamp; the rows stand for whatever else they cover.
+supersedeStoredCopies :: Set.Set ObjectId -> GameState -> GameState
+supersedeStoredCopies oids gs =
+  gs {GameState.copyEffects = fmap (\row -> row {ActiveCopy.objects = Set.difference (ActiveCopy.objects row) oids}) (GameState.copyEffects gs)}
 
 -- | CR 710.1b / 707.3: do this object's COPIABLE values include a flip card's
 -- alternative half? Its copy snapshot's answer when it has one -- the merge's
