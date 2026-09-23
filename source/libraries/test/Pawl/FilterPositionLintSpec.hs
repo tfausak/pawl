@@ -2268,7 +2268,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- than CR 702.39a's: a PlayerId that only a resolution can know, round-tripped
   -- by a total codec, so nothing but this keeps card JSON from naming a seat
   -- (#199). The UNBAKED atom beside it is card data and is not swept -- Trygon
-  -- Predator writes it, and Pawl.Engine.Resolve.modeSlots is what checks the slot
+  -- Predator writes it, and Pawl.Engine.Resolve.Slots.modeSlots is what checks the slot
   -- it names is one the ability's condition binds.
   Spec.it s "CR 603.2 no card writes ControlledByPlayer" $ do
     ps <- S.allPrintings s

@@ -197,6 +197,19 @@ turnScopeAdmits gs scope active own = case scope of
   TurnScope.ControllersTurn -> Turn.sharesTurn gs active own
   TurnScope.OpponentsTurn -> Teams.areOpponents (Game.teams gs) own active
 
+-- CR 805.4d: the players whose step this is, among those the scope names, read
+-- against `own` as turnScopeAdmits reads it. Every active player for "each
+-- player's", each active opponent for "each opponent's", and `own` alone for
+-- "your" -- one seat outside the shared team turns option, where
+-- Turn.activePlayers is the active player alone.
+stepPlayers :: GameState -> TurnScope.TurnScope -> PlayerId -> [PlayerId]
+stepPlayers gs scope own =
+  let admits player = case scope of
+        TurnScope.EachTurn -> True
+        TurnScope.ControllersTurn -> player == own
+        TurnScope.OpponentsTurn -> Teams.areOpponents (Game.teams gs) own player
+   in filter admits (Turn.activePlayers gs)
+
 -- CR 505.1b: how many main phases have begun this turn, counting the one whose
 -- beginning is being matched. GameState.events is cleared at the turn handoff
 -- (Pawl.Engine.Engine.handoffTurn), so the log is already scoped to the turn the
