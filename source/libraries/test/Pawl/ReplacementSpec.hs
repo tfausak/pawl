@@ -686,7 +686,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- but what a PLAYER gets for the 3 life: Soul Warden, a {W} creature, sits in
   -- the hand beside the land, and the land's "{T}: Add {W}" is the only mana in
   -- the game. So declining leaves the Warden uncast and paying gets it onto the
-  -- battlefield -- Activate.activatable is deliberately NOT asked, since CR
+  -- battlefield -- Activatable.activatable is deliberately NOT asked, since CR
   -- 605.3b keeps a mana ability off the stack and it answers False for one on
   -- every board.
   --
@@ -831,7 +831,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- Mosquito Guard ({W} 1/1 Kithkin Soldier) and Benalish Hero ({W} 1/1 Human
   -- Soldier) are the pair. Neither has an enters trigger, and the Clachan's
   -- "{T}: Add {W}" is the only mana in the game, so what the reveal buys is read
-  -- off whether the creature gets cast -- Activate.activatable is deliberately not
+  -- off whether the creature gets cast -- Activatable.activatable is deliberately not
   -- asked, since CR 605.3b keeps a mana ability off the stack.
   --
   -- The reveal is asserted through S.revealsOf, CR 701.20a's public log, and not

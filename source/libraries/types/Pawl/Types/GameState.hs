@@ -379,6 +379,11 @@ data GameState = MkGameState
     subgamesThisMatch :: Natural.Natural,
     -- | CR 500.7 / 103.1: while an extra turn is under way, the seat the
     -- ordinary turn order resumes from; Nothing on an ordinary turn.
-    turnAnchor :: Maybe PlayerId.PlayerId
+    turnAnchor :: Maybe PlayerId.PlayerId,
+    -- | CR 706.2: the sides of the die whose modification step is open, while
+    -- Pawl.Engine.Resolve.Effect's RollDie arm asks about it; Nothing otherwise.
+    rollingDie :: Maybe Natural.Natural,
+    -- | CR 706.2b: the natural result a reroll made inside that step threw.
+    rerolledTo :: Maybe Natural.Natural
   }
   deriving (Eq, Ord, Show)

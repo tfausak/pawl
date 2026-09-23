@@ -3,7 +3,7 @@
 -- Covers: CR 701.35 DETAIN -- Pawl.Engine.Detain, the Object.detainedUntil field
 -- it writes, Effect.Detain's arm in Pawl.Engine.Resolve, and the three gates that
 -- read it: Pawl.Engine.CombatRestriction's `detained` (CR 508.1c / CR 509.1b),
--- Pawl.Engine.Activate.activatableGiven (CR 602.2) and Pawl.Engine.Cost's
+-- Pawl.Engine.Activatable.activatableGiven (CR 602.2) and Pawl.Engine.Cost's
 -- manaActivations (CR 605.3a). The duration is Pawl.Engine.Expiry's
 -- clearedDetentions, in dropAtTurnOf.
 --
@@ -187,7 +187,7 @@ activateSpec s registry = Spec.describe s "Activate" $ do
     let offered = activatableIds (Action.legalActions S.bob resolved)
     Spec.assertBool s (notElem victim offered) "the detained Prodigal Sorcerer's ability is withheld"
     Spec.assertEqWith s "and its twin's is the one offer left" offered [control]
-  -- CR 605.3b keeps a mana ability off Activate.activatableGiven entirely, so
+  -- CR 605.3b keeps a mana ability off Activatable.activatableGiven entirely, so
   -- this half is a different gate answering the same rule, and needs its own
   -- board: rule 701.35a writes no CR 702.61b-style exemption.
   Spec.it s "CR 701.35a/605.3a a detained creature's MANA ability is not offered either" $ do

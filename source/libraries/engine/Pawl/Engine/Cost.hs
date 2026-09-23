@@ -1748,7 +1748,7 @@ isLoyaltyCost cost = any isLoyaltyComponent (Cost.components cost)
 -- Asked of the PRINTED cost, never of the total: Carth the Lion's own addition
 -- is a loyalty component, so a reading taken after CR 601.2f folded the
 -- adjustments in would make every ability it touched a loyalty ability and tax
--- itself into applying. Pawl.Engine.Activate.loyaltyOk reads CR 606.3 off the
+-- itself into applying. Pawl.Engine.Activatable.loyaltyOk reads CR 606.3 off the
 -- printed cost for that reason too.
 loyaltyKindOf :: Cost Keyword.Type.Keyword -> LoyaltyKind.LoyaltyKind
 loyaltyKindOf cost = if isLoyaltyCost cost then LoyaltyKind.LoyaltyAbility else LoyaltyKind.NonLoyaltyAbility
@@ -1834,7 +1834,7 @@ combineLoyalty components = case break isLoyaltyComponent components of
 
 -- CR 113.6m's COST half: an ability whose cost moves the object it's on out of a
 -- particular zone functions only in that zone. The "or effect" half is
--- Pawl.Engine.EffectZone, and Activate.zoneFunctionedFrom joins them.
+-- Pawl.Engine.EffectZone, and Activatable.zoneFunctionedFrom joins them.
 --
 -- Nothing means the cost names no zone, leaving the effect half to answer and CR
 -- 113.6's battlefield default otherwise -- SacrificeThis' answer too, CR 701.21a
@@ -2586,7 +2586,7 @@ canPay subject pid oid cost gs = case Cost.mana cost of
 
 -- How many times may this player activate this mana ability, right now, and what
 -- does one activation spend? CR 605.3b keeps a mana ability off the stack, so
--- nothing here comes from Activate.activatable and every restriction that window
+-- nothing here comes from Activatable.activatable and every restriction that window
 -- applies has to be applied here instead.
 --
 -- Two of them are read off the ability's OWN activation cost (CR 602.2b):
@@ -3477,7 +3477,7 @@ announcedSlots announced gs = case announced >>= \a -> Game.lookupObject a gs of
 -- names no slot answers the same against every slot map, so a gate measuring
 -- such a cost may read the empty one and be exact; one that names a slot may
 -- not, and its gate owes the lookahead over the announcements still open
--- (Pawl.Engine.Cast.payableCostAt, Pawl.Engine.Activate.aimingSomewhere).
+-- (Pawl.Engine.Cast.payableCostAt, Pawl.Engine.Activatable.aimingSomewhere).
 --
 -- The classification is a Filter's, never a component's identity: every
 -- criterion a component carries goes through Filter.boundSlots.

@@ -1093,6 +1093,7 @@ library engine
   -- cabal-gild: discover source/libraries/engine
   exposed-modules:
     Pawl.Engine.Action
+    Pawl.Engine.Activatable
     Pawl.Engine.Activate
     Pawl.Engine.ActivationProhibition
     Pawl.Engine.ActivationRestriction

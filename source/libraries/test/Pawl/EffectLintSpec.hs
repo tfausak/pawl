@@ -228,6 +228,7 @@ ownQuantities effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> Maybe.maybeToList quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName _ -> []
   Effect.FromOutsideTheGame _ -> []
   Effect.ExileThisSpell -> []
@@ -1236,6 +1237,7 @@ effectObjectRefs effect =
         Effect.Search {} -> []
         Effect.ExileAllGraveyards -> []
         Effect.Proliferate -> []
+        Effect.Reroll -> []
         Effect.ChooseCardName {} -> []
         Effect.FromOutsideTheGame {} -> []
         Effect.ExileThisSpell -> []

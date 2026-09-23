@@ -183,6 +183,8 @@ codec resolve = Fields.object $ do
   extraTurns <- Fields.defaulted "extraTurns" [] (Common.list ExtraTurn.codec) GameState.extraTurns
   subgamesThisMatch <- Fields.defaulted "subgamesThisMatch" 0 Common.natural GameState.subgamesThisMatch
   turnAnchor <- Fields.defaulted "turnAnchor" Nothing (Common.maybe PlayerId.codec) GameState.turnAnchor
+  rollingDie <- Fields.defaulted "rollingDie" Nothing (Common.maybe Common.natural) GameState.rollingDie
+  rerolledTo <- Fields.defaulted "rerolledTo" Nothing (Common.maybe Common.natural) GameState.rerolledTo
   pure
     GameState.MkGameState
       { GameState.settings = settings,
@@ -265,6 +267,8 @@ codec resolve = Fields.object $ do
         GameState.extraTurns = extraTurns,
         GameState.subgamesThisMatch = subgamesThisMatch,
         GameState.turnAnchor = turnAnchor,
+        GameState.rollingDie = rollingDie,
+        GameState.rerolledTo = rerolledTo,
         -- Derived rather than written: see the note above.
         GameState.printingIds = invert printings
       }

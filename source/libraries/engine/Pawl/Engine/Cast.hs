@@ -390,7 +390,7 @@ payableCost = payableCostAt 0
 -- incarnation, and the restrictions in the vocabulary read characteristics both
 -- share.
 --
--- BOTH halves of CR 601.2f's totalling, exactly as Activate.payableCostAt asks
+-- BOTH halves of CR 601.2f's totalling, exactly as Activatable.payableCostAt asks
 -- them: the mana arithmetic rides in as a function, and the additional non-mana
 -- components an effect applies to this spell (CR 118.8) are appended to the cost
 -- before it is measured (Cost.plusComponents). Drought's "Sacrifice a Swamp" is
@@ -402,7 +402,7 @@ payableCost = payableCostAt 0
 -- (Cost.readsBoundSlot). Such a cost is asked of every announcement still open
 -- instead -- CR 601.2 makes a casting legal when the player can comply with
 -- every step, so the gate's question is whether SOME aiming complies, exactly
--- as Activate.aimingSomewhere asks it. A cost naming no slot answers the same
+-- as Activatable.aimingSomewhere asks it. A cost naming no slot answers the same
 -- under every aiming and skips the search.
 --
 -- Not implemented: Cost.readsBoundSlot is asked of the PRINTED cost, so a
@@ -427,14 +427,14 @@ payableCostAt x extra spending pid oid gs cost =
         else ask Map.empty
 
 -- What CR 601.2c could still bind for this proposal, one slot map per fillable
--- mode: Activate.candidateSlotsGiven's cast-side twin, and one mode at a time
+-- mode: Activatable.candidateSlotsGiven's cast-side twin, and one mode at a time
 -- for its reason. Read off the SAME board and the same slots `targetable` above
 -- measures, including CR 702.103b's enchant slot, so the gate that offers the
 -- cast and the gate that prices it cannot disagree about what could be aimed at.
 --
 -- CR 601.2b's seed is empty, matching `targetable`: the X is not announced at
 -- any of the moments this is read. `unannounced` is True for exactly that
--- reason, as Activate.candidateSlotsGiven's pre-X map is -- a slot's CR 202.3
+-- reason, as Activatable.candidateSlotsGiven's pre-X map is -- a slot's CR 202.3
 -- computed bound reading the X states NO bound here rather than an unmeetable
 -- one, so the gate is measured against every recipient the announcement could
 -- still reach. False would price the cost against a slot that offers nothing
@@ -472,7 +472,7 @@ castAimable pid oid gs = case Game.faceOf oid gs of
 -- Advisory, and nothing here clamps: see Prompt.ChooseX for why announcing past
 -- this is legal (CR 601.2b) and what it costs the player (#741).
 --
--- The SEARCH is Cost.greatestPayableX, shared with Activate.affordableX; the
+-- The SEARCH is Cost.greatestPayableX, shared with Activatable.affordableX; the
 -- PREDICATE is not, since an activation cost totals against its own adjustments
 -- (Cost.activationAdjustments).
 -- This haddock discharges that search's monotonicity requirement for the spell's
@@ -501,7 +501,7 @@ castAimable pid oid gs = case Game.faceOf oid gs of
 --     becoming a PayEnergy). CR 118.3's >= against a counter total X cannot
 --     move, so the life argument runs verbatim. Sphinx of the Revelation is the
 --     card whose X reaches a cost only this way, and it does so from an
---     ACTIVATION cost, which is Activate.affordableX's climb rather than this
+--     ACTIVATION cost, which is Activatable.affordableX's climb rather than this
 --     one; the monotonicity argument is shared because substituteXInComponent
 --     is.
 --

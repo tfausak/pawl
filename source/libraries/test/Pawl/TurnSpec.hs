@@ -25,6 +25,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -491,7 +492,7 @@ assaultAbility assault = case Face.activatedAbilities (S.combinedFace assault) o
 -- {3}{R}{R} is genuinely paid off the board. The CR 307.5 rider is NOT checked
 -- here: ActivationRestriction.restrictionsOk gates Action.legalActions, and a direct
 -- activateAbility call goes around it, so the test that cares asks
--- Activate.activatable itself.
+-- Activatable.activatable itself.
 activateAssault :: ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> ObjectId -> GameState.GameState -> GameState.GameState
 activateAssault ability enchantment gs =
   let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice enchantment ability))
@@ -631,12 +632,12 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
       Just ability -> do
         -- CR 307.5: "Activate only as a sorcery" is a real gate, not decoration
         -- -- offered in alice's main phase with an empty stack, withheld in her
-        -- combat phase. Asked of Activate.activatable, because that is what
+        -- combat phase. Asked of Activatable.activatable, because that is what
         -- Action.legalActions consults; activateAbility itself goes around it.
-        Spec.assertBool s (Activate.activatable S.alice enchantment ability gs) "offered in the main phase"
+        Spec.assertBool s (Activatable.activatable S.alice enchantment ability gs) "offered in the main phase"
         Spec.assertBool
           s
-          (not (Activate.activatable S.alice enchantment ability gs {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}))
+          (not (Activatable.activatable S.alice enchantment ability gs {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}))
           "withheld in the combat phase"
         let after = activateAssault ability enchantment gs
         -- CR 701.26b over the swept set: alice's creature, and only it.

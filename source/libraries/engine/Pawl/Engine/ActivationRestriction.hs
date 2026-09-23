@@ -22,6 +22,7 @@
 module Pawl.Engine.ActivationRestriction where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Event.Match as Event
@@ -107,7 +108,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- rider names no turn (EachTurn, and the step alone decides), while Llanowar
   -- Augur's "only during your upkeep" names alice's upkeep and not bob's. CR
   -- 109.5 is why `pid` answers "your" -- for an activated ability that is the
-  -- player who activated it, which Activate.activatable has already pinned to
+  -- player who activated it, which Activatable.activatable has already pinned to
   -- activatorOf and which CR 109.4a pins to the permanent's controller for a
   -- mana ability -- so a stolen permanent's rider follows the thief.
   ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
@@ -136,7 +137,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- CR 602.5's prohibition over a fact about the board rather than a window:
   -- Barbarian Ring's "Activate only if there are seven or more cards in your
   -- graveyard". Projection.fullView because nothing here is inside a layer fold
-  -- and no object is missing -- Pawl.Engine.Activate.zoneAbilitiesOf takes the
+  -- and no object is missing -- Pawl.Engine.Activatable.zoneAbilitiesOf takes the
   -- same view for ActivatedAbility.condition, for the same reason.
   --
   -- CR 109.5's "your" is `pid`, the same player every arm above answers "your"
@@ -159,7 +160,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- 602.5b the permanent that returns may activate it again" is what proves it.
   --
   -- An object that is GONE answers True: CR 602.5b's restriction is a fact about
-  -- an object, and Activate.activatable has already required this one to be
+  -- an object, and Activatable.activatable has already required this one to be
   -- somewhere it offers abilities from.
   --
   -- CR 605.3a's mana window asks this too, off the ability
@@ -181,11 +182,15 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- Nothing is CR 305.6's intrinsic route, which prints no rider, exactly as
   -- OnlyOnce above. No object is looked up: the record is keyed by the id, so a
   -- source that has left keeps whatever it spent until the turn ends, and
-  -- Activate.activatable has already required the source of an OFFER to be
+  -- Activatable.activatable has already required the source of an OFFER to be
   -- somewhere it offers abilities from.
   ActivationRestriction.OnlyOnceEachTurn -> case ability of
     Nothing -> False
     Just this -> Set.notMember this (Map.findWithDefault Set.empty srcId (GameState.activatedThisTurn gs))
+  -- Goblin Bookie's "any time it makes sense", read as CR 706.2's modification
+  -- step: open only while Pawl.Engine.Resolve.Effect's RollDie arm is asking
+  -- about a die, so never at priority (CR 117.1b).
+  ActivationRestriction.DuringDieRoll -> Maybe.isJust (GameState.rollingDie gs)
 
 -- CR 602.5b: record that THIS ability of this source has now been activated,
 -- for whichever counted rider it prints. The writer both readers above are
@@ -255,3 +260,6 @@ needsEmptyStack restriction = case restriction of
   -- The same record, timed per turn, and the same argument: CR 601.2a's and CR
   -- 602.2a's move ends no turn and spends no activation.
   ActivationRestriction.OnlyOnceEachTurn -> False
+  -- A die roll's modification step opens inside a resolution, never at a
+  -- payment's gate, so no move between the two can close it.
+  ActivationRestriction.DuringDieRoll -> False

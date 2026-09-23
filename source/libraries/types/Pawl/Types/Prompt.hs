@@ -368,7 +368,7 @@ data Prompt r where
   CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, CardName.CardName)] -> Prompt (Maybe (ObjectId.ObjectId, CardName.CardName))
   -- | CR 601.2b / 602.2b: the value of X, before targets. The Natural is the
   -- greatest value legally announceable now (Cast.affordableX,
-  -- Activate.affordableX; Cost.maximumX for CR 101.1's card-stated ceiling).
+  -- Activatable.affordableX; Cost.maximumX for CR 101.1's card-stated ceiling).
   --
   -- Advisory: the answer is filtered against it nowhere. Announcing past what
   -- the player can pay is answered by CR 601.2h's reversal (#741); past what

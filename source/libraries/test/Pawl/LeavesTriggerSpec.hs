@@ -17,6 +17,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Engine as Engine
@@ -506,7 +507,7 @@ kishlaSkimmerSpec s registry =
         swamp <- S.printingOf s registry "Swamp"
         forest <- S.printingOf s registry "Forest"
         let (gyId, staged) = board skimmer skeleton swamp forest active owner
-        case Activate.abilitiesFor gyId staged of
+        case Activatable.abilitiesFor gyId staged of
           [ability] ->
             let returned = resolveTop (S.runPure S.identityAnswer staged (Activate.activateAbility owner gyId ability))
              in k returned (resolveTop (settle returned))
@@ -2812,7 +2813,7 @@ professorHojoSpec s registry =
       -- reaches the stack, then resolve everything. The answerer is written out
       -- at each use rather than bound once: it is polymorphic in the prompt's
       -- answer type, and a let-bound copy would be pinned to one.
-      activatedAt wanted joragaId gs = case Activate.abilitiesFor joragaId gs of
+      activatedAt wanted joragaId gs = case Activatable.abilitiesFor joragaId gs of
         [ability] ->
           let announced = S.runPure (aiming wanted) gs (Activate.activateAbility S.alice joragaId ability)
            in Just (S.runPure (aiming wanted) (S.runPure (aiming wanted) announced Engine.settleForPriority) drain)
@@ -2829,7 +2830,7 @@ professorHojoSpec s registry =
           (joragaId, firstPiker, _, _, _, gs) <- board
           Spec.assertEqWith s "alice's hand starts at the Juggler alone" (S.handSize S.alice gs) 1
           case activatedAt (Set.singleton (Recipient.ToCreature firstPiker)) joragaId gs of
-            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activate.abilitiesFor joragaId gs)) 1
+            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
             Just after -> do
               Spec.assertEqWith s "CR 601.2c the Hojo's trigger drew a card" (S.handSize S.alice after) 2
               -- The control: the ability really resolved onto the Piker, so a
@@ -2866,7 +2867,7 @@ professorHojoSpec s registry =
         Spec.it s "CR 603.2c one activation naming two of your creatures draws once" $ do
           (joragaId, firstPiker, secondPiker, _, _, gs) <- boardBearing "Synthetic Target Scryer"
           case activatedAt (Set.fromList [Recipient.ToCreature firstPiker, Recipient.ToCreature secondPiker]) joragaId gs of
-            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activate.abilitiesFor joragaId gs)) 1
+            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
             Just after -> do
               Spec.assertEqWith s "one card drawn, not two" (S.handSize S.alice after) 2
               -- The control: BOTH really were targeted, which is what makes the
@@ -2878,7 +2879,7 @@ professorHojoSpec s registry =
         Spec.it s "CR 109.2 an activated ability naming a creature you do not control draws nothing" $ do
           (joragaId, _, _, bobsPiker, _, gs) <- board
           case activatedAt (Set.singleton (Recipient.ToCreature bobsPiker)) joragaId gs of
-            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activate.abilitiesFor joragaId gs)) 1
+            Nothing -> Spec.assertEqWith s "exactly one ability to activate" (length (Activatable.abilitiesFor joragaId gs)) 1
             Just after -> do
               Spec.assertEqWith s "alice's hand is still the Juggler alone" (S.handSize S.alice after) 1
               Spec.assertEqWith s "and the counter landed on bob's Piker" (S.powerToughnessOf bobsPiker after) (Just (3, 2))
@@ -3871,7 +3872,7 @@ prizedAmalgamSpec s registry =
       -- CR 603.3 has placed whatever the entry triggered.
       raiseWith place amalgam skeleton swamp k =
         let (gyId, staged) = board place amalgam skeleton swamp
-         in case Activate.abilitiesFor gyId staged of
+         in case Activatable.abilitiesFor gyId staged of
               [ability] -> k (settle (resolveTop (S.runPure S.identityAnswer staged (Activate.activateAbility S.alice gyId ability))))
               abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
       -- Into the end step and all the way down: the delayed ability triggers, is

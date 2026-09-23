@@ -708,6 +708,7 @@ effectObjectRefs effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName {} -> []
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -880,6 +881,7 @@ effectPlayerRefs effect = case effect of
   Effect.FlipCoin {} -> []
   Effect.ExileHandThenDraw -> []
   Effect.Proliferate -> []
+  Effect.Reroll -> []
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref _) -> [ref]
   Effect.Bolster {} -> []
   Effect.Amass {} -> []
@@ -977,6 +979,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
       (maybe Map.empty oneSlot subject)
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
+  Effect.Reroll -> Map.empty
   -- CR 201.4's name is not an object, so the choice binds no slot of its own and
   -- the restriction Filter names none either -- a Filter reads a slot only
   -- through Filter.boundSlots, and no card writes one of those atoms here. The
@@ -1643,6 +1646,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> all Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
+  Effect.Reroll -> True
   Effect.ChooseCardName _ -> True
   Effect.FromOutsideTheGame _ -> True
   Effect.ExileThisSpell -> True
@@ -1883,6 +1887,7 @@ readsX =
         Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> any Quantity.readsX quantity
         Effect.ExileAllGraveyards -> False
         Effect.Proliferate -> False
+        Effect.Reroll -> False
         -- No Quantity: rule 201.4 chooses one name and states no count.
         Effect.ChooseCardName _ -> False
         Effect.FromOutsideTheGame _ -> False
@@ -2098,6 +2103,7 @@ boundSlots effect = case effect of
   Effect.Search {} -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
+  Effect.Reroll -> Set.empty
   -- Binds nothing: the name goes on the SOURCE (Object.chosenNames) and is read
   -- back off it by Filter.HasChosenName, so no slot carries it.
   Effect.ChooseCardName _ -> Set.empty

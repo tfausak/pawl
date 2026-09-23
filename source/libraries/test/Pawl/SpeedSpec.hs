@@ -6,7 +6,7 @@
 -- Pawl.Engine.Quantity's Speed arm (CR 702.179e/702.179f), CR 702.178a's max
 -- speed gate -- Pawl.Types.ActivatedAbility's condition, applied by
 -- Pawl.Engine.Projection.abilitiesGiven -- and CR 702.178b's zone clause, applied
--- by Pawl.Engine.Activate.zoneAbilitiesOf. Also Pawl.Types.Effect's
+-- by Pawl.Engine.Activatable.zoneAbilitiesOf. Also Pawl.Types.Effect's
 -- DecreaseSpeed arm and its Pawl.Types.SpeedDecrease payload, and the two
 -- references Spikeshell Harrier reaches "that opponent" through --
 -- Pawl.Types.PlayerRef's ControllerOfBound and Pawl.Types.Filter's
@@ -38,6 +38,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -207,7 +208,7 @@ maxSpeedZoneSpec s registry = Spec.describe s "MaxSpeedZone" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gyId, gs) = surveyorBoard surveyor swamp piker 4
     Spec.assertEqWith s "the card really is in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice gs) [gyId]
-    Spec.assertEqWith s "and it offers one ability from there" (length (Activate.abilitiesFor gyId gs)) 1
+    Spec.assertEqWith s "and it offers one ability from there" (length (Activatable.abilitiesFor gyId gs)) 1
     Spec.assertBool s (any (isActivateOf gyId) (Action.legalActions S.alice gs)) "and the activation is a legal action"
   -- The same gate above 4, which is the second half of pawl's ruling on CR
   -- 702.179e (Pawl.Engine.Speed.maxSpeed carries it): a player at 5 has max
@@ -222,7 +223,7 @@ maxSpeedZoneSpec s registry = Spec.describe s "MaxSpeedZone" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gyId, gs) = surveyorBoard surveyor swamp piker 5
     Spec.assertBool s (any (isActivateOf gyId) (Action.legalActions S.alice gs)) "the activation is a legal action at speed 5"
-    Spec.assertEqWith s "and one ability is offered from the graveyard" (length (Activate.abilitiesFor gyId gs)) 1
+    Spec.assertEqWith s "and one ability is offered from the graveyard" (length (Activatable.abilitiesFor gyId gs)) 1
   -- The other direction, and the whole reason the gate is re-asked outside the
   -- battlefield: one less speed and the same graveyard card offers nothing. The
   -- board is identical in every other respect -- same three Swamps, same library,
@@ -233,7 +234,7 @@ maxSpeedZoneSpec s registry = Spec.describe s "MaxSpeedZone" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gyId, gs) = surveyorBoard surveyor swamp piker 3
     Spec.assertEqWith s "the card is still in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice gs) [gyId]
-    Spec.assertEqWith s "but it offers no ability" (Activate.abilitiesFor gyId gs) []
+    Spec.assertEqWith s "but it offers no ability" (Activatable.abilitiesFor gyId gs) []
     Spec.assertBool s (not (any (isActivateOf gyId) (Action.legalActions S.alice gs))) "and no activation is offered"
   -- End to end through the real engine: the activation is announced, the {3} is
   -- paid off the three Swamps, CR 406.2's exile pays the rest of the cost, and the
@@ -244,7 +245,7 @@ maxSpeedZoneSpec s registry = Spec.describe s "MaxSpeedZone" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gyId, gs) = surveyorBoard surveyor swamp piker 4
-    case Activate.abilitiesFor gyId gs of
+    case Activatable.abilitiesFor gyId gs of
       [ability] -> do
         let after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
         Spec.assertEqWith s "the graveyard is empty" (Game.zoneMembers Zone.Graveyard S.alice after) []

@@ -68,6 +68,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -408,7 +409,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertBool s (not (isOffered minusTen)) "the -10 is NOT offered"
     Spec.assertBool
       s
-      (not (any (\ab -> Activate.activatable S.alice jaceId ab board) (abilityAt minusTen jace)))
+      (not (any (\ab -> Activatable.activatable S.alice jaceId ab board) (abilityAt minusTen jace)))
       "and it is not activatable either"
 
   Spec.it s "CR 606.3 a second loyalty ability is not offered in the same turn" $ do

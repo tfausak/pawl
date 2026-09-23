@@ -33,6 +33,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Card as Card
@@ -3569,7 +3570,7 @@ licidSpec s registry = Spec.describe s "Licid" $ do
         withRemoval name = S.withEffectAt lic (Timestamp.MkTimestamp 500) (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack name))) ready
         matching = withRemoval "animate"
         mismatched = withRemoval "no ability has this name"
-        activatableOn gs = any (\ability -> Activate.activatable S.alice lic ability gs) (Projection.abilitiesOf lic gs)
+        activatableOn gs = any (\ability -> Activatable.activatable S.alice lic ability gs) (Projection.abilitiesOf lic gs)
     -- The CONTROL first: with no removal at all the ability is there and usable,
     -- so neither board below can be reading a Licid that never had it.
     Spec.assertBool s (activatableOn ready) "CR 602.2: with no removal alice may activate it"

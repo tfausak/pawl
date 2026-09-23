@@ -76,6 +76,7 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -330,7 +331,7 @@ spec s registry = Spec.describe s "Transform" $ do
     island <- S.printingOf s registry "Island"
     let (oid, g0) = S.addPermanent gargoyle S.alice (S.landsInPlay island 6)
         gs = g0 {GameState.priority = Just S.alice}
-    case Activate.abilitiesFor oid gs of
+    case Activatable.abilitiesFor oid gs of
       [ability] -> do
         let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
             after = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
@@ -365,7 +366,7 @@ spec s registry = Spec.describe s "Transform" $ do
     island <- S.printingOf s registry "Island"
     let (oid, g0) = S.addPermanent gargoyle S.alice (S.landsInPlay island 12)
         gs = g0 {GameState.priority = Just S.alice}
-        activate g = case Activate.abilitiesFor oid g of
+        activate g = case Activatable.abilitiesFor oid g of
           [ability] -> Right (snd (Engine.runGamePure S.identityAnswer g (Activate.activateAbility S.alice oid ability)))
           abilities -> Left (length abilities)
     case activate gs >>= activate of
@@ -393,7 +394,7 @@ spec s registry = Spec.describe s "Transform" $ do
     island <- S.printingOf s registry "Island"
     let (oid, g0) = S.addPermanent gargoyle S.alice (S.landsInPlay island 6)
         gs = g0 {GameState.priority = Just S.alice}
-    case Activate.abilitiesFor oid gs of
+    case Activatable.abilitiesFor oid gs of
       [ability] -> do
         let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
             byItsOwnAbility = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
@@ -778,7 +779,7 @@ thallidBoard thallid forest n =
 
 -- Activate the Thallid's one ability, or say how many it offered instead.
 activateThallid :: ObjectId.ObjectId -> GameState.GameState -> Either Int GameState.GameState
-activateThallid oid gs = case Activate.abilitiesFor oid gs of
+activateThallid oid gs = case Activatable.abilitiesFor oid gs of
   [ability] -> Right (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
   abilities -> Left (length abilities)
 

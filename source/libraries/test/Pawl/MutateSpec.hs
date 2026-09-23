@@ -52,6 +52,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -1097,7 +1098,7 @@ transformedMerge plains forest thallid cubwarden =
   let (host, board, spellId) = mutateBoard plains thallid cubwarden
       merged = merging MutateSide.Under host board spellId
       armed = (S.landsFor forest S.alice 4 merged) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-   in case Activate.abilitiesFor host armed of
+   in case Activatable.abilitiesFor host armed of
         [ability] ->
           let activated = S.runPure S.identityAnswer armed (Activate.activateAbility S.alice host ability)
            in Just (host, merged, S.runPure S.identityAnswer activated (Monad.replicateM_ 4 (Stack.resolveTop >> Engine.settleForPriority)))

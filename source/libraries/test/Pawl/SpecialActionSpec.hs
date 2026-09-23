@@ -2038,7 +2038,7 @@ volrathsCurse s registry = Spec.describe s "CR 116.2d Volrath's Curse" $ do
   --
   -- The Kami's ability costs no mana -- its whole cost is sacrificing itself --
   -- and it is not a mana ability, so neither an empty mana pool nor
-  -- Pawl.Engine.Activate.activatable's blanket False for a mana ability can be
+  -- Pawl.Engine.Activatable.activatable's blanket False for a mana ability can be
   -- why an activation is missing.
   Spec.it s "CR 116.2d after the enchanted creature's controller pays, it can attack and block and its ability can be activated" $ do
     curse <- S.printingOf s registry "Volrath's Curse"

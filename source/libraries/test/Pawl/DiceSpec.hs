@@ -79,9 +79,11 @@ module Pawl.DiceSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
@@ -90,11 +92,14 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -106,6 +111,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   dieRollRSpec s registry
   rerollSpec s registry
   costedRerollSpec s registry
+  activatedRerollSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -1052,6 +1058,18 @@ costedRerollSpec s registry = Spec.describe s "Costed reroll" $ do
       "CR 109.5: bob is the seat the offer was put to"
       (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell withWall)
       [S.bob]
+  Spec.it s "CR 706.2b a reroll is a roll by the player who throws it" $ do
+    (spell, _, _, board) <- endeavorBoard s registry
+    wall <- S.printingOf s registry "Wall of Fortune"
+    let (_, withWall) = S.addPermanent wall S.bob board
+        rolls p after = length (filter (== GameEvent.DiceRolled p) (S.eventsOf after))
+    -- Pippa, Duchess of Dice's ruling makes a reroll trigger "whenever you roll
+    -- a die". Bob's Wall has ALICE reroll, so alice has rolled twice -- the
+    -- instruction's roll and the reroll -- and bob not at all. The paired run
+    -- declines, and leaves the one roll.
+    Spec.assertEqWith s "the reroll is alice's second roll" (rolls S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall)) 2
+    Spec.assertEqWith s "and bob, who paid, did not roll" (rolls S.bob (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell withWall)) 0
+    Spec.assertEqWith s "a declined reroll is no roll" (rolls S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell withWall)) 1
   Spec.it s "CR 706.2a each costed modifier is its own offer" $ do
     (spell, _, _, board) <- endeavorBoard s registry
     wall <- S.printingOf s registry "Wall of Fortune"
@@ -1097,3 +1115,79 @@ rerollSeats rolls decisions spell board =
         pure answer
       (seats, _) = State.execState (Engine.runGame logging board (S.cast S.alice spell >> Stack.resolveTop)) ([], (rolls, decisions))
    in reverse seats
+
+-- Goblin Bookie's "{R}, {T}: Reflip any coin or reroll any die. (Activate only
+-- any time it makes sense.)", read as a window inside CR 706.2's modification
+-- step where the ability is activated and resolves at once. The Endeavor
+-- fixture and the 3-6-2 script of the Wall group above: six Knights means the
+-- reroll happened, three that it did not.
+--
+-- BOB's Bookie over ALICE's roll, since "any die" reaches another player's,
+-- and a Mountain beside it for the {R}. The paired boards each take away one
+-- thing an ACTIVATED ability needs and a static modifier would not: the mana
+-- (CR 602.2b), and a creature's settle before paying {T} (CR 302.6).
+--
+-- Not transcribed: the "reflip any coin" half (#4017). Stricter than printed:
+-- bob can reflip nothing.
+activatedRerollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+activatedRerollSpec s registry = Spec.describe s "Activated reroll" $ do
+  Spec.it s "CR 706.2b Goblin Bookie rerolls another player's die" $ do
+    (spell, _, _, board, bookie, mountain) <- bookieBoard s registry
+    let after = runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell board
+    -- THE GAMEPLAY ASSERTION: bob activated the Bookie inside alice's roll and
+    -- the 3 came back a 6.
+    Spec.assertEqWith
+      s
+      "CR 706.2b: the Bookie's reroll turns the 3 into a 6"
+      (S.countOnBattlefieldByName knight S.alice after)
+      6
+    Spec.assertBool s (Game.isTapped bookie after && Game.isTapped mountain after) "CR 602.2b: bob paid {R} and {T}"
+    Spec.assertEqWith s "CR 109.5: bob is the seat the offer was put to" (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell board) [S.bob]
+    -- Pippa, Duchess of Dice's ruling: the reroll is the rerolling player's roll.
+    Spec.assertEqWith
+      s
+      "a reroll of alice's die is bob's roll"
+      (length (filter (== GameEvent.DiceRolled S.bob) (S.eventsOf after)))
+      1
+    -- The paired run: the same board with the offer declined.
+    Spec.assertEqWith
+      s
+      "and a declined offer leaves the 3"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Declines] 1 spell board))
+      3
+  Spec.it s "CR 602.2b the window asks what a priority activation asks" $ do
+    (spell, _, _, board, bookie, mountain) <- bookieBoard s registry
+    let unpaid = S.tapObject mountain board
+        sick = board {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) bookie (GameState.objects board)}
+    -- THE GAMEPLAY ASSERTIONS: every Exercises in the script is accepted, so an
+    -- engine that offered the Bookie anyway mints six.
+    Spec.assertEqWith
+      s
+      "CR 118.3: no {R} to pay, so no reroll"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell unpaid))
+      3
+    Spec.assertEqWith
+      s
+      "CR 302.6: a summoning-sick Bookie cannot pay {T}"
+      (S.countOnBattlefieldByName knight S.alice (runReroll [3, 6, 2] [OptionalDecision.Exercises] 1 spell sick))
+      3
+    Spec.assertEqWith s "and neither was offered" (rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell unpaid <> rerollSeats [3, 6, 2] [OptionalDecision.Exercises] spell sick) []
+  Spec.it s "CR 117.1b the Bookie cannot be activated at priority" $ do
+    (_, _, _, board, bookie, _) <- bookieBoard s registry
+    -- No die is being rolled, so it never makes sense; with the mana and the
+    -- untapped Bookie that the first case paid with.
+    Spec.assertBool
+      s
+      (not (any (\ability -> Activatable.activatable S.bob bookie ability board) (Activatable.abilitiesFor bookie board)))
+      "the Bookie's ability is not activatable outside a roll"
+    Spec.assertBool s (not (null (Activatable.abilitiesFor bookie board))) "and the Bookie has the ability"
+
+-- The Endeavor board plus bob's Goblin Bookie and a Mountain to pay its {R}.
+bookieBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+bookieBoard s registry = do
+  (spell, weak, strong, board) <- endeavorBoard s registry
+  bookiePrinting <- S.printingOf s registry "Goblin Bookie"
+  mountainPrinting <- S.printingOf s registry "Mountain"
+  let (bookie, withBookie) = S.addPermanent bookiePrinting S.bob board
+      (mountain, withBoth) = S.addPermanent mountainPrinting S.bob withBookie
+  pure (spell, weak, strong, withBoth, bookie, mountain)
