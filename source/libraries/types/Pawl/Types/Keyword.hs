@@ -750,9 +750,6 @@ data Keyword
     -- Pawl.Types.Face keeps the keywords in a Set beside the ability lists, so
     -- every non-backup printed ability is granted whether it was printed above
     -- or below (gap #3938). Cragsmasher Yeti is the card that needs it.
-    --
-    -- Not implemented: CR 702.165d's determination as the ability is put on the
-    -- stack; the grant is baked as the ability RESOLVES instead (#3939).
     Backup Natural.Natural
   | -- | 702.166a: bargain -- an optional additional cost of sacrificing an
     -- artifact, enchantment or token, minted by Pawl.Engine.Keyword.bargainCost.

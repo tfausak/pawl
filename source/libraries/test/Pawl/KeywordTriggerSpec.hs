@@ -60,6 +60,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -3484,6 +3485,83 @@ backupSpec s registry =
               -- so a Piker that gained deathtouch here would have gained it from
               -- something other than rule 702.165a.
               Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Deathtouch otherPiker vanilla)) "where a Clone of the 5/5 grants nothing"
+            _ -> Spec.assertFailure s "fixture should give alice a Piker"
+        -- CR 702.165d, the source GONE: Murder kills the Archpriest with its
+        -- trigger on the stack. The grant was fixed as the trigger was put there,
+        -- so the Piker still gains deathtouch and still kills the 5/5.
+        Spec.it s "CR 702.165d the Archpriest killed in response still grants what it had as its trigger was put on the stack" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          jedit <- S.printingOf s registry "Jedit Ojanen"
+          archpriest <- S.printingOf s registry "Archpriest of Shadows"
+          murder <- S.printingOf s registry "Murder"
+          swamp <- S.printingOf s registry "Swamp"
+          case S.combatBoardOf [piker] [jedit] of
+            (gs0, [pikerId], [jeditId]) -> do
+              let (card, staged) = S.addHandCard archpriest S.alice (S.landsFor swamp S.alice 3 gs0)
+                  (murderId, armed) = S.addHandCard murder S.alice staged
+                  before = Game.zoneMembers Zone.Battlefield S.alice armed
+                  placed = S.runPure (targeting pikerId) armed (Event.changeZone card Zone.Battlefield >> Engine.settleForPriority)
+                  archId = List.find (`notElem` before) (Game.zoneMembers Zone.Battlefield S.alice placed)
+              case archId of
+                Nothing -> Spec.assertFailure s "the Archpriest did not reach the battlefield"
+                Just selfId -> do
+                  let killed = S.runPure (targeting selfId) placed (S.cast S.alice murderId >> Stack.resolveTop)
+                      backed = S.runPure S.identityAnswer killed Stack.resolveTop
+                      after = S.runCombat S.aggressiveAnswer backed
+                  Spec.assertBool s (not (S.onBattlefield jeditId after)) "CR 702.165d the 5/5 blocker was destroyed by the deathtouch the dead Archpriest granted"
+                  Spec.assertBool s (Projection.hasKeyword Keyword.Type.Deathtouch pikerId backed) "and the Piker did hold deathtouch before damage"
+                  Spec.assertBool s (not (S.onBattlefield selfId killed)) "the Murder really did kill the Archpriest before its trigger resolved"
+                  Spec.assertEqWith s "with rule 702.165a's one +1/+1 counter on the Piker" (plusOnes pikerId backed) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Jedit Ojanen"
+        -- CR 113.7a, the source gone BEFORE the trigger is put on the stack: the
+        -- Archpriest is destroyed after it enters but before CR 603.3 places its
+        -- trigger (a destruction later in the same resolution stands for it), so
+        -- the values fixed are its last known information.
+        Spec.it s "CR 113.7a an Archpriest gone before its trigger is put on the stack grants off its last known information" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          jedit <- S.printingOf s registry "Jedit Ojanen"
+          archpriest <- S.printingOf s registry "Archpriest of Shadows"
+          case S.combatBoardOf [piker] [jedit] of
+            (gs0, [pikerId], [jeditId]) -> do
+              let (card, staged) = S.addHandCard archpriest S.alice gs0
+                  before = Game.zoneMembers Zone.Battlefield S.alice staged
+                  entered = S.runPure S.identityAnswer staged (Event.changeZone card Zone.Battlefield)
+                  archId = List.find (`notElem` before) (Game.zoneMembers Zone.Battlefield S.alice entered)
+              case archId of
+                Nothing -> Spec.assertFailure s "the Archpriest did not reach the battlefield"
+                Just selfId -> do
+                  let backed = S.runPure (targeting pikerId) entered (Event.destroy Regenerability.Regenerable [selfId] >> Engine.settleForPriority >> Stack.resolveTop)
+                      after = S.runCombat S.aggressiveAnswer backed
+                  Spec.assertBool s (not (S.onBattlefield jeditId after)) "CR 113.7a the 5/5 blocker was destroyed by the deathtouch granted off the Archpriest's last known information"
+                  Spec.assertBool s (Projection.hasKeyword Keyword.Type.Deathtouch pikerId backed) "and the Piker did hold deathtouch before damage"
+                  Spec.assertBool s (not (S.onBattlefield selfId backed)) "the Archpriest really was gone"
+                  Spec.assertEqWith s "with rule 702.165a's one +1/+1 counter on the Piker" (plusOnes pikerId backed) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Jedit Ojanen"
+        -- CR 702.165d, the source COPIED: Mirrorweave turns every other
+        -- creature, the Archpriest among them, into a Goblin Piker with the
+        -- trigger on the stack. The Archpriest's copiable values no longer carry
+        -- deathtouch, but the grant was fixed before they changed.
+        Spec.it s "CR 702.165d the Archpriest becoming a copy in response still grants what it had as its trigger was put on the stack" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          jedit <- S.printingOf s registry "Jedit Ojanen"
+          archpriest <- S.printingOf s registry "Archpriest of Shadows"
+          mirrorweave <- S.printingOf s registry "Mirrorweave"
+          plains <- S.printingOf s registry "Plains"
+          case S.combatBoardOf [piker] [jedit] of
+            (gs0, [pikerId], _) -> do
+              let (card, staged) = S.addHandCard archpriest S.alice (S.landsFor plains S.alice 5 gs0)
+                  (weaveId, armed) = S.addHandCard mirrorweave S.alice staged
+                  before = Game.zoneMembers Zone.Battlefield S.alice armed
+                  placed = S.runPure (targeting pikerId) armed (Event.changeZone card Zone.Battlefield >> Engine.settleForPriority)
+                  archId = List.find (`notElem` before) (Game.zoneMembers Zone.Battlefield S.alice placed)
+              case archId of
+                Nothing -> Spec.assertFailure s "the Archpriest did not reach the battlefield"
+                Just selfId -> do
+                  let woven = S.runPure (targeting pikerId) placed (S.cast S.alice weaveId >> Stack.resolveTop)
+                      backed = S.runPure S.identityAnswer woven Stack.resolveTop
+                  Spec.assertBool s (Projection.hasKeyword Keyword.Type.Deathtouch pikerId backed) "CR 702.165d the Piker gained the deathtouch the Archpriest had as its trigger was put on the stack"
+                  Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Deathtouch selfId woven)) "the Mirrorweave really did make the Archpriest a Piker before its trigger resolved"
+                  Spec.assertEqWith s "with rule 702.165a's one +1/+1 counter on the Piker" (plusOnes pikerId backed) 1
             _ -> Spec.assertFailure s "fixture should give alice a Piker"
 
 -- CR 702.101a: "Extort is a triggered ability. 'Extort' means 'Whenever you cast

@@ -2918,7 +2918,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                                 ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
                               }
                        in g1 {GameState.continuousEffects = eff : GameState.continuousEffects g1}
-                 in List.foldl' store gs (expandGrant source gs frozen)
+                 in List.foldl' store gs (expandGrant resolving source gs frozen)
   -- CR 608.2d: a subtype word swap is not among CR 601.2b-d's announcements, so
   -- the choice is made here, as the effect applies. Observable: a countered
   -- Magical Hack is never asked.
@@ -8809,6 +8809,13 @@ bindEarthbentLand resolving land gs =
 -- 702.165b grants what a permanent that entered as a copy of a card with backup
 -- copied, and CR 702.165c keeps out every ability a later effect gave it.
 --
+-- And read as they were when the ability was put on the stack, which is CR
+-- 702.165d: Pawl.Engine.Engine.placeBorne stamped them on the resolving object
+-- (Binding.placedSourceCopyOf), so a source destroyed or turned into a copy of
+-- something else in response still grants what it had. The live read is the
+-- fallback for an object that carries no stamp. Pawl.KeywordTriggerSpec's
+-- Backup group's two CR 702.165d cases prove it.
+--
 -- The KEYWORDS are granted one modification per written instance, CR 613.1f's
 -- reading that Pawl.Engine.Projection.applyModification's GainKeyword arm
 -- already takes: a card printing a keyword twice grants it twice. Backup's own
@@ -8820,10 +8827,10 @@ bindEarthbentLand resolving land gs =
 -- backup that needs them. A printed REPLACEMENT ability is out of reach for a
 -- different reason and no card asks: Pawl.Types.GrantedAbility holds CR 113.3's
 -- activated and triggered kinds alone, and no printing with backup prints one.
-expandGrant :: ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
-expandGrant source gs modification = case modification of
+expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
+expandGrant resolving source gs modification = case modification of
   Modification.GainAbilitiesOfSource ->
-    let pc = Projection.copiableCharacteristics source gs
+    let pc = Maybe.fromMaybe (Projection.copiableCharacteristics source gs) (Binding.placedSourceCopyOf (slotBindings resolving gs))
         granted keyword count
           | Keyword.familyOf keyword == Just KeywordFamily.Backup = []
           | otherwise = List.genericReplicate count (Modification.GainKeyword keyword)

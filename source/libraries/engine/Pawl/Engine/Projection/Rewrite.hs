@@ -230,9 +230,9 @@ rewriteModification pairs m =
         -- GRANTER, so a text change affecting it rewrites them before the grant.
         Modification.GainAbility a -> Modification.GainAbility (rewriteGrantedAbility [(from, to)] a)
         -- Carries no word: rule 702.165a's grant names the SOURCE, and the
-        -- abilities it will hand over are read off that object as the ability
-        -- resolves (Pawl.Engine.Resolve.Effect's expandGrant) -- after CR 612.1
-        -- has already rewritten the source's own text.
+        -- abilities it will hand over are that object's copiable values as the
+        -- ability was put on the stack (CR 702.165d, Pawl.Engine.Resolve.Effect's
+        -- expandGrant).
         Modification.GainAbilitiesOfSource -> acc
         -- Carries no word: the type is read off the source at projection time.
         Modification.SetLandSubtypeToChosen -> acc
