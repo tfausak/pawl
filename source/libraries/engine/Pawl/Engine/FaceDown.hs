@@ -40,7 +40,9 @@ module Pawl.Engine.FaceDown where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -296,15 +298,24 @@ turnFaceUp perform pid procedure oid = do
 -- nothing in pawl hides a face-down permanent's card from a reader, so there is
 -- no concealment for it to lift (#1412). What is left of the rule is the second
 -- half of its first sentence, and its second sentence.
+--
+-- CR 730.2g is the same replacement for a face-down MERGED permanent, asked of
+-- every card component (Game.componentsOf) with no reason at all, and read off
+-- each card's own characteristics (Card.combined) rather than the permanent's.
 revealsInsteadOfTurningUp :: ObjectId -> GameState -> Bool
 revealsInsteadOfTurningUp oid gs =
   let instantOrSorcery = Set.fromList [CardType.Instant, CardType.Sorcery]
-      reason = fmap (Facing.reasonOf . Object.facing) (Game.lookupObject oid gs)
-   in (reason == Just (Just FaceDownReason.Manifested) || reason == Just (Just FaceDownReason.Cloaked))
-        && maybe
-          False
-          (not . Set.null . Set.intersection instantOrSorcery . TypeLine.types . Face.typeLine)
-          (Game.faceUpFaceOf oid gs)
+      isInstantOrSorcery = not . Set.null . Set.intersection instantOrSorcery . TypeLine.types . Face.typeLine
+      object = Game.lookupObject oid gs
+      reason = fmap (Facing.reasonOf . Object.facing) object
+      manifested =
+        (reason == Just (Just FaceDownReason.Manifested) || reason == Just (Just FaceDownReason.Cloaked))
+          && maybe False isInstantOrSorcery (Game.faceUpFaceOf oid gs)
+      components = foldMap (Seq.filter Game.componentIsCard . Game.componentsOf . Object.source) object
+      merged =
+        maybe False (Facing.isFaceDown . Object.facing) object
+          && any (maybe False (isInstantOrSorcery . Card.combined) . (`Game.cardOfPrinting` gs) . Game.printingOfComponent) components
+   in manifested || merged
 
 -- The turning-over itself, once whatever allowed it has allowed it: the status
 -- write, CR 708.11's replacement loop, and CR 708.7's event, in that order and
@@ -343,7 +354,7 @@ performTurnFaceUp procedure oid = do
   gs <- State.get
   if revealsInsteadOfTurningUp oid gs
     then
-      -- CR 701.40g: it stays face down, and NOTHING below runs. The rule's second
+      -- CR 701.40g / 730.2g: it stays face down, and NOTHING below runs. The rule's second
       -- sentence -- "abilities that trigger whenever a permanent is turned face
       -- up won't trigger" -- is exactly the GameEvent.TurnedFaceUp that is never
       -- recorded, and CR 614.1e's loop is skipped with it, since a permanent that

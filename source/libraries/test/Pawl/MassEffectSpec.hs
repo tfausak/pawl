@@ -1087,6 +1087,25 @@ midnightTillingSpec s registry =
           let after = cast S.identityAnswer gs
           Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
           Spec.assertEqWith s "and the mill still happened" (List.sort (namesIn Zone.Graveyard S.alice after)) allBuried
+        -- CR 608.2d: four milled Murders leave no permanent card among them, so
+        -- the return is impossible and the "may" is not put -- though the
+        -- graveyard holds the Benalish Hero buried before the mill, which a pool
+        -- read ignoring "from among them" would count. The cases above, which
+        -- take the "may", are the control.
+        Spec.it s "CR 608.2d the return is not offered when no permanent card was milled" $ do
+          forest <- S.printingOf s registry "Forest"
+          tilling <- S.printingOf s registry "Midnight Tilling"
+          hero <- S.printingOf s registry "Benalish Hero"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          island <- S.printingOf s registry "Island"
+          murder <- S.printingOf s registry "Murder"
+          let (spellId, gs) = board forest tilling hero sentry [island, murder, murder, murder, murder]
+              answer :: Prompt.Prompt r -> r
+              answer = taking 0
+              ((_, after), asked) = Replay.record answer gs (S.cast S.alice spellId >> Stack.resolveTop)
+          Spec.assertEqWith s "CR 608.2d the may was never put" [d | Response.ChoseOptional d <- asked] []
+          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith s "and the four Murders were milled" (length (filter (== named "Murder") (namesIn Zone.Graveyard S.alice after))) 4
 
 -- CR 701.20e's "from among them" over a group that never left the LIBRARY, which
 -- is the read no zone-keyed ObjectRef can do: ObjectRef.ChosenCardFromAmong.
@@ -1188,17 +1207,20 @@ communeWithTheGodsSpec s registry =
           Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
           Spec.assertEqWith s "and every revealed card is in the graveyard" (List.sort (namesIn Zone.Graveyard S.alice after)) allBuried
           Spec.assertEqWith s "the sixth card is still the library" (namesIn Zone.Library S.alice after) [named "Swamp"]
-        -- CR 609.3 and CR 101.3: a group holding no matching card offers nothing,
-        -- so the taken half is skipped and the rest is all of it. The pair with
-        -- the case above differs in exactly one thing -- which cards are stocked.
-        Spec.it s "CR 609.3 a group with no matching card takes nothing and buries all five" $ do
+        -- CR 608.2d: a group holding no matching card makes the move impossible,
+        -- so the "may" is not put and the rest is all of it. The pair with the
+        -- headline differs in exactly one thing -- which cards are stocked.
+        Spec.it s "CR 608.2d a group with no matching card is not offered and buries all five" $ do
           forest <- S.printingOf s registry "Forest"
           commune <- S.printingOf s registry "Commune with the Gods"
           island <- S.printingOf s registry "Island"
           swamp <- S.printingOf s registry "Swamp"
           murder <- S.printingOf s registry "Murder"
-          let gs = board forest commune [swamp, murder, island, murder, island, murder]
-              after = cast (taking 0) gs
+          let (spellId, gs) = board forest commune [swamp, murder, island, murder, island, murder]
+              answer :: Prompt.Prompt r -> r
+              answer = taking 0
+              ((_, after), asked) = Replay.record answer gs (S.cast S.alice spellId >> Stack.resolveTop)
+          Spec.assertEqWith s "CR 608.2d the may was never put" [d | Response.ChoseOptional d <- asked] []
           Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
           Spec.assertEqWith
             s
@@ -2117,6 +2139,21 @@ carthTheLionSpec s registry =
               after = S.runPure answer placed Stack.resolveTop
           Spec.assertEqWith s "the first planeswalker card comes to hand instead" (namesIn Zone.Hand S.alice after) [named "Jace Beleren"]
           Spec.assertEqWith s "and that is the object revealed" (revealed after) [idOf ids "Jace Beleren"]
+        -- CR 608.2d: no planeswalker card among the seven, so the reveal is
+        -- impossible and the move hanging on it with it; the "may" is not put.
+        -- The headline, which takes the "may", is the control.
+        Spec.it s "CR 608.2d Carth the Lion's reveal is not offered without a planeswalker among them" $ do
+          carth <- S.printingOf s registry "Carth the Lion"
+          printings <- Monad.mapM (S.printingOf s registry) ["Swamp", "Bird Maiden", "Forest", "Murder", "Goblin Piker", "Murder", "Island", "Island"]
+          let (stocked, _) = stock printings (Setup.emptyGame S.bothPlayers)
+              (_, entered) = S.entersWithTrigger carth S.alice stocked
+              answer :: Prompt.Prompt r -> r
+              answer = answering (Just 0) Nothing
+              placed = S.runPure answer entered Engine.placePendingTriggers
+              ((_, after), asked) = Replay.record answer placed Stack.resolveTop
+          Spec.assertEqWith s "CR 608.2d the may was never put" [d | Response.ChoseOptional d <- asked] []
+          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith s "and nothing was revealed" (revealed after) []
         -- CR 603.5: the printed "may" is a real choice. Declining reveals nothing
         -- and sends all seven to the bottom -- the look still ran, so this cannot
         -- pass because the trigger never resolved.
