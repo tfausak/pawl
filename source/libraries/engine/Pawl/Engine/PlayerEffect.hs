@@ -1964,16 +1964,17 @@ castPermissionSources pid zone oid gs = usedAmong (castPermissionsFrom pid zone 
 -- and no rule makes them spend the other.
 --
 -- Only the PLAYER-scoped permissions are weighed. A permission the OBJECT
--- carries (flashback, CR 903.8's commander, CR 715.3d's Adventure exile) and CR
--- 304.1's own allowance for a card in its owner's hand are Pawl.Engine.Cast's
--- questions and are not read here, so a cast one of them already allowed would
--- still spend a once-each-turn permission that covered it, and take its rider.
+-- carries is Pawl.Engine.Cast's question: where the cost the cast chose is that
+-- permission's own (escape, flashback), Pawl.Engine.Cast.castProposed drops
+-- what this names, and Pawl.CastPermissionSpec's "CR 702.138a an escaped
+-- Chimera takes neither Serra Paragon's use nor its rider" proves it.
 --
 -- The OLDEST of several, which is CR 613.7's order: two copies of one card
 -- print indistinguishable permissions, so there is nothing to ask. Not
--- implemented: asking which permission a play is made under when two DIFFERENT
--- ones admit it -- a once-each-turn one beside an object's own, or beside
--- another with a different rider (#3590).
+-- implemented: asking the player which permission a play is made under when two
+-- DIFFERENT ones admit it at the same cost -- Serra Paragon beside Yawgmoth's
+-- Will, or beside a card's own costless permission -- so the engine picks, and
+-- the rider follows its pick (#3590).
 spentAmong :: [(Maybe ObjectId, CastFromZone.CastFromZone)] -> Maybe (ObjectId, CastFromZone.CastFromZone)
 spentAmong usable =
   let limited = Maybe.mapMaybe (\(source, grant) -> fmap (\sid -> (sid, grant)) source) (filter (\(_, grant) -> CastFromZone.limit grant /= PermissionLimit.Unlimited) usable)
@@ -1983,8 +1984,8 @@ spentAmong usable =
 
 -- The sources a play admitted by `usable` is made under: the one it spends, or
 -- where it spends none, every unlimited one admitting it. Not implemented:
--- asking which of several a play is made under, so each one's rider applies
--- (#3590).
+-- asking which of several a play is made under, so each unlimited one's rider
+-- applies (#3590).
 usedAmong :: [(Maybe ObjectId, CastFromZone.CastFromZone)] -> [ObjectId]
 usedAmong usable = case spentAmong usable of
   Just (sid, _) -> [sid]
@@ -2022,7 +2023,9 @@ playPermissionPiles pid gs =
 -- sources whose riders the land gets, asked of the PRE-MOVE state for
 -- castPermissionSpentBy's reason. Neither where the land needs no Play-verb
 -- permission: it is in its owner's hand, or a PlayLandsFrom grant (Crucible of
--- Worlds) opens its pile at no cost.
+-- Worlds) opens its pile at no cost. Not implemented: asking the player whether
+-- a land Crucible of Worlds and Serra Paragon both admit is played under the
+-- Paragon, for its rider; the engine picks Crucible (#3590).
 landPermissionUse :: PlayerId -> ObjectId -> GameState -> ([ObjectId], Maybe (ObjectId, CastFromZone.CastFromZone))
 landPermissionUse pid oid gs = case Game.lookupObject oid gs of
   Nothing -> ([], Nothing)

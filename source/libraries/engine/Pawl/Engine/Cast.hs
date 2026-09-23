@@ -2488,6 +2488,13 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- this tag, so the tie changes no answer.
                   chosenCandidate = List.find ((== chosenCost) . CandidateCost.cost) payableCandidates
                   castFor = CandidateCost.keyword =<< chosenCandidate
+                  -- CR 601.3 / 702.138a: a candidate the card's OWN zone
+                  -- permission offered (escape, flashback) is that permission's
+                  -- cost, so the cast is made under it -- a player permission's
+                  -- budget is not spent and its rider not given.
+                  ownPermission = not (all (null . Keyword.permissionsFor (PC.cardTypes (Projection.copiableCharacteristics sid gs))) castFor)
+                  permissionUsed = if ownPermission then Nothing else permission
+                  ridersUsed = if ownPermission then [] else riders
                   -- CR 601.2f's reductions THIS candidate brought, recovered
                   -- beside the tag and by the same match, so the amount rule
                   -- 702.119a states and the sacrifice the chosen cost carries
@@ -2878,7 +2885,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- effect that modifies the spell as it is cast, so it
                           -- is stored before the event below snapshots the spell.
                           -- Nothing past the convoke record rejects.
-                          State.modify' (\g -> g {GameState.continuousEffects = riders <> GameState.continuousEffects g})
+                          State.modify' (\g -> g {GameState.continuousEffects = ridersUsed <> GameState.continuousEffects g})
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement
                           -- records nothing.
@@ -2919,7 +2926,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- spends, for the line above's reason -- nothing past
                           -- here rejects, and CR 733.1's reversal restores the
                           -- whole field (Pawl.Engine.Reversal).
-                          State.modify' (PlayerEffect.spendCastPermission permission)
+                          State.modify' (PlayerEffect.spendCastPermission permissionUsed)
                           -- CR 601.2c: each chosen object became a target of this
                           -- spell, which is what CR 702.21a's ward watches. Here
                           -- rather than beside `chosen` above for CR 601.2i's

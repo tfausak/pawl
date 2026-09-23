@@ -2028,6 +2028,15 @@ takeFirst wanted p = case p of
     [] -> Action.Type.Pass
   _ -> S.identityAnswer p
 
+-- takeFirst casting `oid`, paying for it with a cost carrying components (an
+-- escape cost's exile) when `escape` holds and with a bare mana cost otherwise.
+payingFor :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+payingFor escape oid p = case p of
+  Prompt.ChooseCost _ _ _ costs -> case filter ((== escape) . not . null . Cost.Type.components) costs of
+    c : _ -> c
+    [] -> S.identityAnswer p
+  _ -> takeFirst [S.isCastOf oid] p
+
 -- The objects that arrived on the battlefield between two boards.
 arrivedBetween :: GameState.GameState -> GameState.GameState -> [ObjectId.ObjectId]
 arrivedBetween before after = Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before))
@@ -2196,6 +2205,34 @@ serraParagonSpec s registry =
               Spec.assertEqWith s "the Elves' card was exiled" (namesIn Zone.Exile S.alice after) ["Llanowar Elves"]
               Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice ready))
             arrived -> Spec.assertFailure s ("expected the Elves to arrive under the Clone's permission, got " <> show arrived)
+
+        -- CR 702.138a: Loathsome Chimera {2}{G} escapes for {4}{G} and three
+        -- other graveyard cards, a permission of its own. Paid for its escape
+        -- cost, the cast is made under escape and not under the Paragon: no
+        -- rider, and the Paragon's use is left for a graveyard land. Paid for
+        -- its mana cost on the same board, it is the Paragon's cast, and takes
+        -- both.
+        Spec.it s "CR 702.138a an escaped Chimera takes neither Serra Paragon's use nor its rider" $ do
+          b <- board "Loathsome Chimera" "Forest" True
+          forest <- S.printingOf s registry "Forest"
+          let fodder g _ = snd (S.addGraveyardCard forest S.alice g)
+              gs = S.landsFor forest S.alice 2 (List.foldl' fodder (pbState b) [1 :: Int .. 4])
+              chimera = pbBuried b
+              outcome escape =
+                let cast = S.runPure (payingFor escape chimera) gs Engine.priorityLoop
+                 in case arrivedBetween gs cast of
+                      [permanent] -> Just (cast, diesAndResolves permanent cast)
+                      _ -> Nothing
+              graveLandPlayable g = any (\oid -> elem (oid, Nothing) (Action.playableLands S.alice g)) (Game.zoneMembers Zone.Graveyard S.alice g)
+          case (outcome True, outcome False) of
+            (Just (escaped, escapedDied), Just (hard, hardDied)) -> do
+              Spec.assertBool s (notElem "Loathsome Chimera" (namesIn Zone.Exile S.alice escapedDied)) "the escaped Chimera was not exiled as it died"
+              Spec.assertEqWith s "and alice gained no life" (S.lifeOf S.alice escapedDied) (S.lifeOf S.alice gs)
+              Spec.assertBool s (graveLandPlayable escaped) "and a graveyard Forest is still playable under the Paragon"
+              Spec.assertEqWith s "the escape cost exiled three cards" (length (namesIn Zone.Exile S.alice escaped)) 3
+              Spec.assertBool s (elem "Loathsome Chimera" (namesIn Zone.Exile S.alice hardDied)) "cast for its mana cost, the Chimera took the rider"
+              Spec.assertBool s (not (graveLandPlayable hard)) "and spent the Paragon's use"
+            _ -> Spec.assertFailure s "expected the Chimera to resolve on both boards"
 
         -- The linkage: the same Elves cast from her HAND, with the Paragon on
         -- the battlefield, were not cast "this way" and gain nothing.
