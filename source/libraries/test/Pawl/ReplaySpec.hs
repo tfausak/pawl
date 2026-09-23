@@ -2183,6 +2183,15 @@ replaySpec s registry =
           Spec.assertEqWith s "legal modes are 0 and 2 (bounce self-excluded)" legal (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2])
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         _ -> Spec.assertFailure s "Aether Channeler must have exactly one triggered ability"
+    -- CR 108.1: the reference's answer to a name is recorded like a die roll,
+    -- so a replay reproduces what the reference said when it was asked.
+    Spec.it s "LookUpCard round-trips through the transcript" $ do
+      piker <- S.cardOf s registry "Goblin Piker"
+      let p = Prompt.LookUpCard (CardName.MkCardName (Text.pack "Goblin Piker"))
+      Spec.assertEqWith s "a card round trips" (Replay.decode p (Replay.encode p (Just piker))) (Just (Just piker))
+      Spec.assertEqWith s "no card round trips" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+      Spec.assertEqWith s "a chosen name does not decode as a lookup" (Replay.decode p (Response.ChoseCardName (CardName.MkCardName (Text.pack "Goblin Piker")))) Nothing
+      Spec.assertEqWith s "a short transcript answers no card" (Replay.defaultAnswer p) Nothing
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replay" $ do

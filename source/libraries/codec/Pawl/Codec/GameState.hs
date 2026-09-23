@@ -160,6 +160,7 @@ codec resolve = Fields.object $ do
   endTurnSignal <- Fields.defaulted "endTurnSignal" EndTurnSignal.Type.Running EndTurnSignal.codec GameState.endTurnSignal
   nextObjectId <- Fields.required "nextObjectId" ObjectId.codec GameState.nextObjectId
   printings <- Fields.defaulted "printings" Map.empty (Common.naturalMap PrintingId.codec (Printing.reference resolve)) GameState.printings
+  lookedUp <- Fields.defaulted "lookedUp" Set.empty (Common.set PrintingId.codec) GameState.lookedUp
   nextPrintingId <- Fields.required "nextPrintingId" PrintingId.codec GameState.nextPrintingId
   nextTimestamp <- Fields.required "nextTimestamp" Timestamp.codec GameState.nextTimestamp
   lastChoice <- Fields.required "lastChoice" Timestamp.codec GameState.lastChoice
@@ -246,6 +247,7 @@ codec resolve = Fields.object $ do
         GameState.endTurnSignal = endTurnSignal,
         GameState.nextObjectId = nextObjectId,
         GameState.printings = printings,
+        GameState.lookedUp = lookedUp,
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,

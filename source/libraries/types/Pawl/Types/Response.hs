@@ -7,6 +7,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BuybackDecision as BuybackDecision
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -104,6 +105,9 @@ data Response
     -- point -- a transcript of a player ANNOUNCING a number must not satisfy a
     -- prompt that asked randomness, which is CR 701.9b's distinction.
     RolledDie Natural.Natural
+  | -- | CR 108.1: the card the Oracle card reference answered a name with,
+    -- for Pawl.Types.Prompt's LookUpCard.
+    LookedUpCard (Maybe Card.Card)
   | -- | CR 705.1: the face a flipped coin came up, for Pawl.Types.Effect's
     -- FlipCoin (Winter Sky's "Flip a coin").
     --

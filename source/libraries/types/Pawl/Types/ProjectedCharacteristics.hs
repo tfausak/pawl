@@ -45,22 +45,13 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     --
     -- A SET, because an object does not have one name. CR 709.4a: "Each split
     -- card has two names ... An object has the chosen name if one of its names
-    -- is the chosen name" -- so the only question the rules ever ask of this
-    -- field is MEMBERSHIP, and every reader goes through
-    -- Pawl.Engine.Projection.hasName rather than comparing to a string. A Room
-    -- permanent has one name per unlocked door (CR 709.5), a split card off the
-    -- stack has both halves' (CR 709.4), a spell on the stack has the cast
-    -- half's alone (CR 709.3b), and a face-down object has NONE (CR 708.2a) --
-    -- an empty set rather than an empty name.
+    -- is the chosen name". A Room permanent has one name per unlocked door (CR
+    -- 709.5), a split card off the stack has both halves' (CR 709.4), a spell on
+    -- the stack has the cast half's alone (CR 709.3b), and a face-down object
+    -- has NONE (CR 708.2a) -- an empty set rather than an empty name.
     --
-    -- Set and not a predicate, which CR 612.7's Spy Kit will eventually want
-    -- (#887): a Set keeps Eq/Ord/Show and a codec, and since every reader asks
-    -- membership the representation can widen behind them without a caller
-    -- changing.
-    --
-    -- Carried, not folded: rule 613's layer 3 could change them (a text-changing
-    -- effect naming a name) but nothing in the pool does, so no layer touches
-    -- them after the seed.
+    -- Layer 3 adds to it: CR 612.7's Spy Kit unions in every name of the game's
+    -- reference that its filter matches (Modification.AddNamesMatching).
     names :: Set.Set CardName.CardName,
     -- | CR 205.4a: the object's supertypes after the layer fold -- the third part
     -- of the layer-4 type line. Copiable for name's reason: a Clone of a legend

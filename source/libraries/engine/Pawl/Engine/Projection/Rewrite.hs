@@ -226,6 +226,9 @@ rewriteModification pairs m =
         -- printed on the GRANTER (CR 612.3) exactly as the keyword above is.
         -- rewriteTargetSlot is the same descent a mode's target slots take.
         Modification.GainEnchant slot -> Modification.GainEnchant (rewriteTargetSlot [(from, to)] slot)
+        -- CR 612.1 through the names' own Filter, printed on the granter (CR
+        -- 612.3) as the enchant's is.
+        Modification.AddNamesMatching f -> Modification.AddNamesMatching (Filter.rewrite [(from, to)] f)
         -- CR 612.1 over the whole quoted ability: the words are printed on the
         -- GRANTER, so a text change affecting it rewrites them before the grant.
         Modification.GainAbility a -> Modification.GainAbility (rewriteGrantedAbility [(from, to)] a)
@@ -1307,7 +1310,8 @@ rewriteCopyException pairs exception = case exception of
   CopyException.RemoveSupertypes _ -> exception
   -- CR 201.1's name is the one CR 612.2 rules out in so many words: "an effect
   -- that changes a color word or a subtype can't change a card name". CR 612.7's
-  -- Spy Kit is the effect that does change one, and it is unimplemented (#887).
+  -- Spy Kit is the effect that does, and it adds names in layer 3
+  -- (Modification.AddNamesMatching) rather than rewriting this clause.
   CopyException.SetName _ -> exception
   -- CR 612.2 names colour words, but the only text changer that supplies a WORD
   -- PAIR here swaps subtypes -- CR 612.5's exchange of text boxes names no word

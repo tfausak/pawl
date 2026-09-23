@@ -294,6 +294,28 @@ choose p = do
   State.modify' (\gs -> gs {GameState.lastChoice = GameState.nextTimestamp gs})
   ask p
 
+-- CR 108.1: a name a player just chose (CR 201.4), looked up in the Oracle card
+-- reference and the card it names remembered in GameState.lookedUp, then handed
+-- back. Every Prompt.ChooseCardName answer goes through here.
+--
+-- Asked, not chosen: nobody decides what the reference says, so CR 104.4b's
+-- lastChoice does not move. Filtered, not trusted: a card with no face of that
+-- name is not the card the name belongs to, and is dropped. A regression fence
+-- rather than a proved behaviour: any card the reference answers with is a
+-- legitimate member of referenceFaces' domain, so no board tells the guard's
+-- absence apart.
+lookUpChosenName :: CardName.CardName -> Game CardName.CardName
+lookUpChosenName name = do
+  found <- ask (Prompt.LookUpCard name)
+  case found of
+    Just card
+      | Maybe.isJust (Card.faceNamed name card) ->
+          State.modify' $ \gs ->
+            let (pid, gs1) = intern (Printing.MkPrinting card) gs
+             in gs1 {GameState.lookedUp = Set.insert pid (GameState.lookedUp gs1)}
+    _ -> pure ()
+  pure name
+
 -- CR 400.2: a property of the ZONE and never of the card -- a hand every one of
 -- whose cards is currently revealed is still a hidden zone.
 --
@@ -1091,6 +1113,43 @@ meldComponentsOf source = case source of
   Source.OfSpellCopy _ -> Seq.empty
   Source.OfCardCopy _ -> Seq.empty
   Source.OfInherentTrigger _ -> Seq.empty
+
+-- CR 108.1's Oracle card reference, as far as this game knows it: every face of
+-- every card an object is or is represented by (CR 108.2, 712.21, 730.2), every
+-- card a player holds outside the game (CR 400.11a), and every card
+-- Prompt.LookUpCard answered with (GameState.lookedUp). Keyed by face name, so a
+-- double-faced card's back face is a name of its own (CR 201.4d).
+--
+-- A token, an emblem and a copy are no card (CR 108.2), so their printings are
+-- left out. A melded permanent brings its combined back face too: it is an
+-- object represented by Magic cards (CR 108.2, 712.4a).
+referenceFaces :: GameState -> Map.Map CardName.CardName (Face Card)
+referenceFaces gs =
+  let ofSource source = case source of
+        Source.OfCard pid -> Seq.singleton pid
+        Source.OfMeld meld -> MeldSource.result meld Seq.<| cardPrintings source
+        Source.OfMerge _ -> cardPrintings source
+        Source.OfToken _ -> Seq.empty
+        Source.OfAbility _ -> Seq.empty
+        Source.OfTrigger _ -> Seq.empty
+        Source.OfEmblem _ -> Seq.empty
+        Source.OfSpellCopy _ -> Seq.empty
+        Source.OfCardCopy _ -> Seq.empty
+        Source.OfInherentTrigger _ -> Seq.empty
+      cardPrintings source = foldMap cardPrinting (componentsOf source)
+      cardPrinting component = case component of
+        MergeComponent.OfCard pid -> Seq.singleton pid
+        MergeComponent.OfMeld meld -> Seq.fromList (NonEmpty.toList (MeldSource.components meld))
+        MergeComponent.OfToken _ -> Seq.empty
+        MergeComponent.OfSpellCopy _ -> Seq.empty
+      pids =
+        Set.unions
+          [ Set.fromList (foldMap (Foldable.toList . ofSource . Object.source) (Map.elems (GameState.objects gs))),
+            foldMap (Map.keysSet . Player.outsideTheGame) (GameState.players gs),
+            GameState.lookedUp gs
+          ]
+      faces = foldMap (\pid -> foldMap (NonEmpty.toList . Card.Type.faces) (cardOfPrinting pid gs)) (Set.toList pids)
+   in Map.fromList (fmap (\f -> (Face.name f, f)) faces)
 
 -- CR 202.3c's "the front faces of each card that represents it", one card at a
 -- time. Empty rather than an error for a printing the game does not know, the

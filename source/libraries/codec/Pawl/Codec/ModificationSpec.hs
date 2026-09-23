@@ -17,6 +17,7 @@ import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -269,6 +270,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       Modification.ExchangeTextBoxes
       " {\"type\":\"ExchangeTextBoxes\"} "
+  -- layer 3, CR 612.7: Spy Kit's "all names of nonlegendary creature cards".
+  Spec.it s "AddNamesMatching carries its filter" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.AddNamesMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not (Filter.HasSupertype Supertype.Legendary)]))
+      " {\"type\":\"AddNamesMatching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Legendary\"}}}]}} "
   -- layer 7d, CR 613.4d: switches power and toughness. Payload-free.
   Spec.it s "SwitchPowerToughness" $
     Common.assertCodec
