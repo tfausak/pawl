@@ -833,6 +833,7 @@ mintCard pid under printingId dest position tapped gs =
             Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
+            Object.duplicate = Nothing,
             Object.paired = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -897,8 +898,10 @@ mintCard pid under printingId dest position tapped gs =
 -- in the card file is its own copiable values. A DUPLICATE hands one over
 -- (Pawl.Types.ConjureCards.Duplicate), because what is duplicated is the named
 -- object's copiable values rather than the card printed under it -- a Clone
--- copying an Ornithopter duplicates as an Ornithopter. Stamped through
--- Binding.setCopy, which is where every other copy road writes, so the two
+-- copying an Ornithopter duplicates as an Ornithopter. Written to
+-- Object.duplicate rather than stamped through Binding.setCopy: they are the
+-- card's own values, so every incarnation keeps them (CR 400.7 forgets a
+-- stamp), and Game.copyStampOf reads them wherever a stamp is read, so the two
 -- cannot disagree about what a copy is.
 conjure :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Zone -> LibraryPosition.LibraryPosition -> Game (Maybe ObjectId)
 conjure pid card copied dest position = do
@@ -908,17 +911,17 @@ conjure pid card copied dest position = do
     else do
       printingId <- State.state (Game.intern (Printing.MkPrinting card))
       oid <- State.state (mintCard pid Nothing printingId dest position TapState.Untapped)
-      Monad.forM_ copied (stampCopy oid)
+      Monad.forM_ copied (markDuplicate oid)
       pure (Just oid)
 
--- Write a CR 707.2 snapshot onto an object already minted, the one line
--- `conjure` above and `conjureOntoBattlefield` below share. Between the mint and
--- the entry for the battlefield road, so CR 616.1's loop and CR 603.6a's trigger
--- scan read the duplicated values rather than the printed ones.
-stampCopy :: ObjectId -> PC.ProjectedCharacteristics -> Game ()
-stampCopy oid snapshot =
+-- Write a duplicate's CR 707.2 snapshot onto an object already minted, the one
+-- line `conjure` above and `conjureOntoBattlefield` below share. Between the
+-- mint and the entry for the battlefield road, so CR 616.1's loop and CR
+-- 603.6a's trigger scan read the duplicated values rather than the printed ones.
+markDuplicate :: ObjectId -> PC.ProjectedCharacteristics -> Game ()
+markDuplicate oid snapshot =
   State.modify' $ \g ->
-    g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setCopy snapshot (Object.bindings o)}) oid (GameState.objects g)}
+    g {GameState.objects = Map.adjust (\o -> o {Object.duplicate = Just snapshot}) oid (GameState.objects g)}
 
 -- The same keyword action with the BATTLEFIELD as its destination, which is the
 -- one arrival that is an entry: `conjure` above puts the card into a zone and
@@ -982,7 +985,7 @@ conjureOntoBattlefield controller card copied count tapped = do
     else do
       printingId <- State.state (Game.intern (Printing.MkPrinting card))
       ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue tapped))
-      Monad.forM_ copied (\snapshot -> Monad.mapM_ (`stampCopy` snapshot) ids)
+      Monad.forM_ copied (\snapshot -> Monad.mapM_ (`markDuplicate` snapshot) ids)
       let siblingsOf oid = Set.delete oid (Set.fromList ids)
       Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
       Monad.mapM_ recordMintedEntry ids
@@ -1067,6 +1070,7 @@ createEmblem pid card = do
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
+                Object.duplicate = Nothing,
                 Object.paired = Nothing,
                 Object.protector = Nothing,
                 Object.ventureRoom = Nothing,
@@ -5383,7 +5387,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 (Source.OfSpellCopy printingId, Zone.Battlefield) ->
                   (Object.newIncarnation obj)
                     { Object.source = Source.OfToken printingId,
-                      Object.bindings = foldMap (\pc -> Binding.setCopy pc Map.empty) (Binding.copyOf (Object.bindings obj))
+                      Object.bindings = foldMap (\pc -> Binding.setCopy pc Map.empty) (Game.copyStampOf obj)
                     }
                 _ -> Object.newIncarnation obj
               mkObj entrySeed ts =
@@ -5793,7 +5797,11 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
-                        Just component -> (mkObj entrySeed ts) {Object.source = Game.sourceOfComponent component}
+                        -- Object.duplicate is the merged object's, not each
+                        -- component's, so no component keeps it. Not implemented:
+                        -- a conjured duplicate's values as a merge component
+                        -- (#4037).
+                        Just component -> (mkObj entrySeed ts) {Object.source = Game.sourceOfComponent component, Object.duplicate = Nothing}
                     )
                       { Object.zone = zone
                       }
@@ -7027,6 +7035,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.warped = Nothing,
                       Object.preparedCopyOf = Nothing,
                       Object.ringBearerFor = Nothing,
+                      Object.duplicate = Nothing,
                       Object.paired = Nothing,
                       Object.protector = Nothing,
                       Object.ventureRoom = Nothing,
@@ -7260,6 +7269,7 @@ meld controller victims resultCard = do
                 Object.warped = Nothing,
                 Object.preparedCopyOf = Nothing,
                 Object.ringBearerFor = Nothing,
+                Object.duplicate = Nothing,
                 Object.paired = Nothing,
                 Object.protector = Nothing,
                 Object.ventureRoom = Nothing,
@@ -7459,9 +7469,6 @@ meldable victims gs = do
 -- sides read again through Projection.copiableCharacteristicsTurned, which
 -- Game.turnFaceOver swaps in when the merged permanent transforms -- for the
 -- flipped reading's reason.
---
--- Not implemented: CR 730.2g's instant or sorcery component, which cannot be
--- turned face up (#3392).
 --
 -- Not implemented: CR 730.2a's timestamp against a stored copy row already
 -- covering the permanent, which still outranks the merge, and recomputing the

@@ -317,6 +317,41 @@ spec s registry = Spec.describe s "Mutate" $ do
     Spec.assertEqWith s "CR 730.2j and still Cubwarden" (Projection.namesOf dfcHost dfcAfter) (Set.singleton (CardName.MkCardName (Text.pack "Cubwarden")))
     Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject plainHost plainAfter)) "the same merge over a one-faced card turns face down"
     Spec.assertEqWith s "setup: Cubwarden over the Thallid" (componentNames dfcHost dfcMerged) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Blightreaper Thallid")]
+  -- CR 730.2g: Soul Summons manifests `under`, Cubwarden mutates over it (face
+  -- up, CR 730.2e), Cyber Conversion turns the merged permanent face down, and
+  -- Showstopping Surprise asks it to turn face up. The status's reason is no
+  -- longer Manifested and the topmost card is Cubwarden, so CR 701.40g cannot
+  -- answer; only the sorcery card under it can. The control manifests Thragtusk.
+  Spec.it s "CR 730.2g a face-down merged permanent with a sorcery card in it stays face down" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    summons <- S.printingOf s registry "Soul Summons"
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    surprise <- S.printingOf s registry "Showstopping Surprise"
+    let casting printing host gs =
+          let (armed, spell) = S.handOne printing gs
+           in S.runPure (mutatingAt MutateSide.Over host) armed (Cast.castSpell S.manaPerformer S.alice spell (S.printingName printing) Facing.FaceUp >> Stack.resolveTop)
+        surprised under = do
+          let (g1, summonsId) = S.handOne summons (S.landsFor plains S.alice 6 (Setup.emptyGame S.bothPlayers))
+              (_, g2) = S.addLibraryCard plains S.alice g1
+              (_, before) = S.addLibraryCard under S.alice g2
+              manifested = S.runPure S.identityAnswer before (S.cast S.alice summonsId >> Stack.resolveTop)
+          host <- Maybe.listToMaybe (Set.toList (Set.difference (GameState.battlefield manifested) (GameState.battlefield before)))
+          let (board, spellId) = S.handOne cubwarden manifested
+              merged = merging MutateSide.Over host board spellId
+              converted = casting cyber host (S.landsFor island S.alice 2 merged)
+          pure (host, converted, casting surprise host (S.landsFor mountain S.alice 5 converted))
+        facingOf host gs = fmap Object.facing (Game.lookupObject host gs)
+    case (surprised summons, surprised thragtusk) of
+      (Just (host, converted, after), Just (plainHost, plainConverted, plainAfter)) -> do
+        Spec.assertBool s (maybe False Facing.isFaceDown (facingOf host after)) "CR 730.2g the merged permanent is still face down"
+        Spec.assertEqWith s "the same board with a creature card under it turns face up as Cubwarden" (facingOf plainHost plainAfter, Projection.namesOf plainHost plainAfter) (Just Facing.FaceUp, Set.singleton (CardName.MkCardName (Text.pack "Cubwarden")))
+        Spec.assertBool s (maybe False Facing.isFaceDown (facingOf host converted) && maybe False Facing.isFaceDown (facingOf plainHost plainConverted)) "setup: Cyber Conversion turned both face down"
+        Spec.assertEqWith s "setup: Cubwarden over the Soul Summons" (componentNames host converted) [CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Soul Summons")]
+      _ -> Spec.assertFailure s "Soul Summons did not manifest a permanent"
   -- CR 730.2i: Cubwarden merged UNDER Blightreaper Thallid, and the Thallid's own
   -- "{3}{G/P}: Transform this creature" turns its card over. The merged
   -- permanent's characteristics come off the merge's stamp, so a transform that

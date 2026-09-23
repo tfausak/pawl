@@ -311,6 +311,7 @@ createCard pid printingId = do
             Object.warped = Nothing,
             Object.preparedCopyOf = Nothing,
             Object.ringBearerFor = Nothing,
+            Object.duplicate = Nothing,
             Object.paired = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -491,7 +492,10 @@ newGame perform matchup = do
 --
 -- Object.newIncarnation is CR 400.7's forgetting, the same one `toLibraryCard`
 -- performs below; only Object.source differs between the two cards, since each
--- represents itself again and not the permanent they were. A merged permanent's
+-- represents itself again and not the permanent they were. Object.duplicate is
+-- the merged object's and not a component's, so no component keeps it. Not
+-- implemented: a conjured duplicate's values as a merge component (#4037).
+-- A merged permanent's
 -- TOKEN component (CR 730.2d) is minted as the token it is, and its copy
 -- component (CR 730.2, CR 707.10) as the copy it is, which the funnel below then
 -- drops for CR 727.2's own reason: neither is a card. CR 712.21a's
@@ -501,7 +505,7 @@ splitComponents :: ObjectId -> Map.Map ObjectId Object.Object -> (Map.Map Object
 splitComponents next objects =
   let bump (ObjectId.MkObjectId n) = ObjectId.MkObjectId (n + 1)
       mint obj (acc, oid) component =
-        (Map.insert oid ((Object.newIncarnation obj) {Object.source = Game.sourceOfComponent component}) acc, bump oid)
+        (Map.insert oid ((Object.newIncarnation obj) {Object.source = Game.sourceOfComponent component, Object.duplicate = Nothing}) acc, bump oid)
       step (acc, oid) (key, obj) =
         let components = Game.componentsOf (Object.source obj)
          in if Seq.null components

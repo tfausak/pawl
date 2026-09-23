@@ -1111,7 +1111,7 @@ castableCopy caster original = do
                   Object.owner = caster,
                   Object.zone = Object.zone obj,
                   Object.timestamp = ts,
-                  Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (Binding.copyOf (Object.bindings obj))
+                  Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (Game.copyStampOf obj)
                 }
         State.put (Game.insertIntoZone (Object.zone obj) LibraryPosition.Top caster copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
         pure (Just copyId)
@@ -6020,12 +6020,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- values themselves -- and both take CR 608.2h's last-known branch, since
         -- the object a trigger named can be gone by the time it resolves
         -- (Sinister Reflections is an instant and its targets can be killed in
-        -- response to it).
-        --
-        -- Not implemented: the duplicate keeps those copiable values only as the
-        -- incarnation this mints. CR 400.7 gives the next one no memory, so a
-        -- duplicate of a Clone that is cast from the hand it landed in resolves
-        -- as a Clone (#3979).
+        -- response to it). Every later incarnation keeps those values
+        -- (Object.duplicate); Pawl.ConjureSpec's "a duplicate of a Clone cast
+        -- and resolved is the Piker" proves it.
         duplicatesOf ref = Maybe.mapMaybe (\oid -> fmap (\card -> (card, Just (Event.copiedSnapshotWithLastKnown oid gs))) (Game.cardOfWithLastKnown oid gs)) (objectRefObjects legal resolving controller source gs ref)
         answered written answer = Maybe.fromMaybe (NonEmpty.head written) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList written))
         pickWritten written = case written of
@@ -6313,7 +6310,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- proved line: no road to the archive states an exception --
                   -- rule 702.50a's epic does not, and neither does a copy-this-spell
                   -- keyword trigger (Pawl.Engine.Keyword.copiesOf).
-                  StackObjectKind.Spell -> maybe id (Binding.setCopy . except) (Binding.copyOf (Object.bindings obj))
+                  StackObjectKind.Spell -> maybe id (Binding.setCopy . except) (Game.copyStampOf obj)
                   StackObjectKind.ActivatedAbility -> id
                   StackObjectKind.TriggeredAbility -> id
                 -- CR 201.5's slot, and the one place the two nouns CR 707.10
