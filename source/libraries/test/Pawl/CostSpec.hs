@@ -117,7 +117,7 @@ import qualified Pawl.Types.Zone as Zone
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Face.spell (S.combinedFace p)) [] Activator.Controller Nothing Nothing Nothing
 
 doorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 doorSpec s registry =
@@ -941,7 +941,7 @@ headlessSkaabSpec s registry =
 -- bar a second activation -- two FUEL cards in hand are two activations and
 -- {B}{B}{B}{B}. Goblin Piker is the fuel: it is never cast, so nothing but the
 -- exile can move it. The Arbiter is in that hand too and is not fuel, CR 601.2a
--- putting it on the stack before the Bloom is asked to pay (Cost.beingCast).
+-- putting it on the stack before the Bloom is asked to pay (Game.beingCast).
 cadaverousBloomSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cadaverousBloomSpec s registry =
   Spec.describe s "Cadaverous Bloom" $ do
@@ -1876,7 +1876,7 @@ answerHatredXOf n p = case p of
 -- what the mana-cost-only reading of CR 601.2b leaves behind on this card.
 answerHatredAtBound :: Prompt.Prompt r -> State.State [Natural.Natural] r
 answerHatredAtBound p = case p of
-  Prompt.ChooseX _ _ _ bound -> do
+  Prompt.ChooseX _ _ _ _ bound -> do
     State.modify' (\seen -> seen <> [bound])
     pure bound
   _ -> pure (S.identityAnswer p)
@@ -5659,8 +5659,8 @@ unpaidLeaper s leaperId gs = case Projection.abilitiesOf leaperId gs of
 -- read off -- a Goblin Piker is printed 2/1, so neither number the assertions
 -- read can be its own.
 --
--- Not implemented: "X can't be 0", so alice may announce a value the printed card
--- refuses (#3943).
+-- "X can't be 0" is ActivatedAbility.minimumX (CR 101.1): the floor pair below
+-- proves the announcement side and the offer pair the gate.
 --
 -- Every board is LANDLESS, geyserLeaperSpec's posture above: an activation that
 -- succeeds can only have been paid by tapping. The pair below varies the value
@@ -5698,6 +5698,38 @@ kataraSpec s registry = Spec.describe s "Katara, Water Tribe's Hope" $ do
     Spec.assertEqWith s "the ability was never paid for: the Piker's power is its printed 2" (Projection.powerOf pikerId resolved) (Just 2)
     Spec.assertEqWith s "and its toughness the printed 1" (Projection.toughnessOf pikerId resolved) (Just 1)
     Spec.assertEqWith s "and nothing of hers is tapped" (S.tappedCount S.alice resolved) 0
+  -- The floor, as a pair varying the ANNOUNCED value alone: 0 is what the card
+  -- forbids and 1 the least it permits. Reject-not-repair, so the refused 0
+  -- leaves the Piker at its printed size rather than a base 0/0.
+  Spec.it s "CR 101.1 an announced waterbend X of 0 is refused, and 1 is not" $ do
+    katara <- S.printingOf s registry "Katara, Water Tribe's Hope"
+    piker <- S.printingOf s registry "Goblin Piker"
+    crawlspace <- S.printingOf s registry "Crawlspace"
+    mountain <- S.printingOf s registry "Mountain"
+    let (kataraId, pikerId, tappable, gs) = kataraBoard mountain katara piker [crawlspace, crawlspace, crawlspace]
+    zero <- activatingKatara s 0 (ManaCost.MkManaCost []) [] kataraId gs
+    one <- activatingKatara s 1 (ManaCost.MkManaCost []) (take 1 tappable) kataraId gs
+    Spec.assertEqWith s "CR 101.1 at X=0 the Piker keeps its printed base power 2, not the 0 alice announced" (Projection.powerOf pikerId zero) (Just 2)
+    Spec.assertEqWith s "and its printed toughness 1" (Projection.toughnessOf pikerId zero) (Just 1)
+    Spec.assertEqWith s "at X=1 the Piker's base power and toughness are 1/1" (Projection.powerOf pikerId one, Projection.toughnessOf pikerId one) (Just 1, Just 1)
+    Spec.assertEqWith s "and the one Crawlspace she tapped for it is tapped" (S.tappedCount S.alice one) 1
+  -- The gate's side of the floor: CR 101.1 leaves X=1 the cheapest announcement,
+  -- so the ability is offered only where {1} can be waterbent. A pair differing
+  -- in whether Katara, the one permanent that could tap for it, is tapped.
+  Spec.it s "CR 101.1/602.2 Katara's ability is not offered when no X of 1 or more is payable" $ do
+    katara <- S.printingOf s registry "Katara, Water Tribe's Hope"
+    mountain <- S.printingOf s registry "Mountain"
+    let (kataraId, untapped) = soleKatara mountain katara
+        tapped = S.tapObject kataraId untapped
+    Spec.assertBool s (not (any (isActivateOf kataraId) (Action.legalActions S.alice tapped))) "with Katara tapped nothing can waterbend {1}, so no activation is offered"
+    Spec.assertBool s (any (isActivateOf kataraId) (Action.legalActions S.alice untapped)) "and untapped she can tap for it herself, so one is"
+
+-- Katara alone on alice's landless battlefield, alice holding priority in her
+-- own precombat main phase.
+soleKatara :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+soleKatara mountain katara =
+  let (kataraId, gs) = S.addPermanent katara S.alice (S.landsInPlay mountain 0)
+   in (kataraId, gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
 
 -- alice announces `x` for Katara's ability, takes the substitution that leaves
 -- `wanted` to pay with mana, taps `tapped` for the rest, and the ability

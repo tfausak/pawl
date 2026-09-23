@@ -116,7 +116,7 @@ chooseNoModes p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -346,6 +346,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
                   },
               ActivatedAbility.modal = singleModeAbility [] Map.empty,
               ActivatedAbility.maximumX = [],
+              ActivatedAbility.minimumX = 0,
               ActivatedAbility.restrictions = [],
               ActivatedAbility.activator = Activator.Controller,
               ActivatedAbility.condition = Nothing,
@@ -1121,6 +1122,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             []
+            0
             ( Modal.MkModal
                 (Seq.fromList [Mode.MkMode Seq.empty Map.empty, Mode.MkMode Seq.empty Map.empty])
                 (ModeSelection.ChooseExactly 1)
@@ -2382,7 +2384,7 @@ tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge"
 shownAbility :: ObjectId.ObjectId -> GameState.GameState -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
 shownAbility oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
   Just ab -> ab
-  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
+  Nothing -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (singleModeAbility [] Map.empty) [] Activator.Controller Nothing Nothing Nothing
 
 -- alice controls Tovolar showing his BACK face -- "{X}{R}{G}: Target Wolf or
 -- Werewolf you control gets +X/+0 and gains trample until end of turn" -- a
@@ -2446,7 +2448,7 @@ answerXTargeting x oid p = case p of
 -- WITH it is what proves the bound is payable rather than merely reported.
 answerAtBound :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State [Natural] r
 answerAtBound who p = case p of
-  Prompt.ChooseX _ _ _ bound -> do
+  Prompt.ChooseX _ _ _ _ bound -> do
     State.modify' (\seen -> seen <> [bound])
     pure bound
   _ -> pure (aimAt who p)
@@ -2455,7 +2457,7 @@ answerAtBound who p = case p of
 -- construction, whatever the board is.
 answerAboveBound :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 answerAboveBound who p = case p of
-  Prompt.ChooseX _ _ _ bound -> bound + 1
+  Prompt.ChooseX _ _ _ _ bound -> bound + 1
   _ -> aimAt who p
 
 -- answerAtBound and answerAboveBound in one, COUNTING the CR 601.2c target
@@ -2465,7 +2467,7 @@ answerAboveBound who p = case p of
 -- one reversed earlier.
 answerAtBoundOffsetCounting :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> State.State Int r
 answerAtBoundOffsetCounting offset who p = case p of
-  Prompt.ChooseX _ _ _ bound -> pure (bound + offset)
+  Prompt.ChooseX _ _ _ _ bound -> pure (bound + offset)
   Prompt.ChooseTargets {} -> do
     State.modify' (+ 1)
     pure (aimAt who p)
@@ -5067,7 +5069,7 @@ answerBlightXTargeting x blighted wanted p = case p of
 -- treatment for a cost whose X is a blight.
 answerBlightAtBound :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [Natural] r
 answerBlightAtBound blighted p = case p of
-  Prompt.ChooseX _ _ _ bound -> do
+  Prompt.ChooseX _ _ _ _ bound -> do
     State.modify' (\seen -> seen <> [bound])
     pure bound
   Prompt.ChooseBlight {} -> pure blighted

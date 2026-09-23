@@ -165,7 +165,7 @@ suspend perform pid oid = do
       -- floor and no maximum.
       mAmount <-
         if Cost.hasVariable printed
-          then fmap Just (Game.choose (Prompt.ChooseX (Decide.deciderFor pid before) pid oid (Cost.greatestPayableX Nothing (\x -> payableAtX x pid oid ability before) printed)))
+          then fmap Just (Game.choose (Prompt.ChooseX (Decide.deciderFor pid before) pid oid (SuspendCounters.leastX (Suspend.counters ability)) (Cost.greatestPayableX Nothing (\x -> payableAtX x pid oid ability before) printed)))
           else pure Nothing
       let announcedX = Maybe.fromMaybe 0 mAmount
           -- Rule 107.3i: one announcement, both halves of "Suspend X--{X}...".

@@ -851,6 +851,7 @@ cycling cost searchFor =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
           ActivatedAbility.activator = Activator.Controller,
           -- CR 702.29a gives the card this ability outright, with no "as long as".
@@ -893,6 +894,7 @@ reinforce n cost =
           -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
           -- default, and gives the ability outright with no "as long as".
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -979,6 +981,7 @@ craft spec =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.167a's "Activate only as a sorcery" -- scavenge's
           -- restriction.
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -1038,6 +1041,7 @@ searchForSameManaValue cost filter_ destination =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           -- Both rules give the ability outright, with no "as long as".
@@ -1132,6 +1136,7 @@ ninjutsu cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- Rule 702.49a states no timing restriction, which leaves CR 117.1b's
           -- default: a ninja may arrive after blockers are declared.
           ActivatedAbility.restrictions = [],
@@ -1458,6 +1463,7 @@ unearth cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.84a's "Activate only as a sorcery" -- levelUp's
           -- restriction.
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
@@ -1589,6 +1595,7 @@ graveyardTokenCopy exceptions cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton copied))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, the rules' "Activate only as a sorcery".
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
@@ -1632,6 +1639,7 @@ scavenge cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton scavengeTarget slot)))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.97a's "Activate only as a sorcery".
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
@@ -1743,6 +1751,7 @@ encore cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [loop, hasted, armed]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           -- CR 602.5d, rule 702.141a's "Activate only as a sorcery".
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
@@ -2070,6 +2079,7 @@ crew n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [],
           ActivatedAbility.activator = Activator.Controller,
           -- CR 702.122a gives the permanent this ability outright, with no "as long
@@ -2125,6 +2135,7 @@ saddle n =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Designate (Designate.MkDesignate Designation.Saddled Binding.triggerSource Nothing))))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2195,6 +2206,7 @@ station =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton load))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2240,6 +2252,7 @@ levelUp cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton gain))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2270,6 +2283,7 @@ outlast cost =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2321,6 +2335,7 @@ equip payload =
               (ModeSelection.ChooseExactly 1),
           -- CR 702.6a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2363,6 +2378,7 @@ equipPlaneswalker cost =
               (ModeSelection.ChooseExactly 1),
           -- CR 702.6e's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2405,6 +2421,7 @@ fortify cost =
               (ModeSelection.ChooseExactly 1),
           -- CR 702.67a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
@@ -2454,6 +2471,7 @@ reconfigure cost =
               (ModeSelection.ChooseExactly 1),
           -- CR 702.151a's "Activate only as a sorcery", which CR 307.5 spells out.
           ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
           ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
           ActivatedAbility.activator = Activator.Controller,
           ActivatedAbility.condition = Nothing,
