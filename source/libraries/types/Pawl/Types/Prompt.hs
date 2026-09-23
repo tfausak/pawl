@@ -129,7 +129,8 @@ data Prompt r where
   -- been matched against it, so it narrows nothing the seat is deciding.
   --
   -- The Cost is CR 706.2a's "associated cost", Nothing where the modifier states
-  -- none. Raised only once the payer can afford it, Prompt.ChooseToPay's posture
+  -- none -- or the activation cost of an ability activated inside the roll
+  -- (Goblin Bookie, ActivationRestriction.DuringDieRoll). Raised only once the payer can afford it, Prompt.ChooseToPay's posture
   -- for CR 118.12 -- so an accepted offer is one that goes through.
   --
   -- Never elided. CR 706.2a's "may" makes one offer a real fork, and the two

@@ -1172,7 +1172,8 @@ activatedRerollSpec s registry = Spec.describe s "Activated reroll" $ do
     let unpaid = S.tapObject mountain board
         sick = board {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) bookie (GameState.objects board)}
     -- THE GAMEPLAY ASSERTIONS: every Exercises in the script is accepted, so an
-    -- engine that offered the Bookie anyway mints six.
+    -- engine that offered the Bookie anyway mints six. The sick Bookie is the
+    -- gate's proof; the tapped Mountain would also be refused by the payment.
     Spec.assertEqWith
       s
       "CR 118.3: no {R} to pay, so no reroll"

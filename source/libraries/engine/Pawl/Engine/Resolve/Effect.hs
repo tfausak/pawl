@@ -3737,7 +3737,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Goblin Bookie's "Activate only any time it makes sense", read as a
         -- window inside CR 706.2's modification step, once the static offers
         -- above are spent. No rule grants one: CR 117.1b ties activation to
-        -- priority, and a resolution gives none (CR 608.2). Each ability
+        -- priority, which CR 117.3b hands out only after a resolution. Each ability
         -- ActivationRestriction.DuringDieRoll marks is offered to the player
         -- who may activate it, through the same gate a priority activation
         -- takes (Activatable.activatable), and it resolves at once, as CR
