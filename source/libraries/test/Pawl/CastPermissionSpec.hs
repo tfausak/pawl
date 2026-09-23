@@ -2197,7 +2197,7 @@ serraParagonSpec s registry =
                 Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
                 _ -> S.identityAnswer p
               copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-              ready = copied {GameState.priority = Just S.alice, GameState.passes = 0}
+              ready = copied {GameState.priority = Just S.alice, GameState.passed = Set.empty}
               cast = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) ready Engine.priorityLoop
           case arrivedBetween ready cast of
             [permanent] -> do

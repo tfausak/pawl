@@ -233,7 +233,9 @@ data GameState = MkGameState
     -- splice them in. Refilled from `Turn.allPhases` at handoff.
     remaining :: Seq.Seq Phase.Phase,
     priority :: Maybe PlayerId.PlayerId,
-    passes :: Natural.Natural,
+    -- | CR 117.4 / 805.5b: the players who have passed in succession since the
+    -- last action, the stack's resolution or the step's first grant.
+    passed :: Set.Set PlayerId.PlayerId,
     turnNumber :: Natural.Natural,
     result :: Maybe Result.Result,
     -- | CR 727.4: raised while a restart has replaced this game underneath the
