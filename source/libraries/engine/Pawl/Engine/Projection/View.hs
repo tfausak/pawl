@@ -1016,10 +1016,59 @@ stampedSnapshotOf oid gs = do
       Nothing -> fmap (\stamp -> Maybe.fromMaybe stamp (PC.flipped stamp)) stamped
     else stamped
 
+-- CR 612.5: the object whose copiable rules text `oid` carries -- `oid` itself
+-- unless a stored ExchangeTextBoxes effect moved another's text box onto it.
+-- The ability-list readers below ask it first, which is what moves a static
+-- ability, a player static ability, a special action and a rule-affecting
+-- ability with the text box they are printed in: those lists are gathered from
+-- the copiable characteristics rather than read off the layer-3 fold that
+-- moves the rest (Pawl.Engine.Projection.exchangeTextBoxFrom).
+--
+-- CR 613.7 orders two exchanges by timestamp, and the later one moves what the
+-- earlier one left, so the swaps compose latest-first. Stored effects alone,
+-- which keeps this PROJECTION-FREE for staticAbilitiesOf's reason: a static
+-- ability's affected set is never a TheseObjects pair, so none can exchange.
+--
+-- Not implemented: CR 613.8's dependency order between an exchange and a CR
+-- 612 word change on one of the pair. The word changes a moved static ability
+-- is rewritten by are its NEW host's (Pawl.Engine.Projection.textChangesAffecting),
+-- so a Magical Hack that resolved on the old host before the exchange stays
+-- behind (#4038). Nor is the text box a partner leaves behind: one that left
+-- the battlefield is a new object (CR 400.7), so its old id carries nothing
+-- and the survivor is read as holding an empty text box (#4039).
+textBoxHolderOf :: ObjectId -> GameState -> ObjectId
+textBoxHolderOf oid gs =
+  let swapOf eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
+        (Modification.ExchangeTextBoxes, Affected.TheseObjects pair) -> case Set.toList pair of
+          [a, b] -> Just (ContinuousEffect.timestamp eff, a, b)
+          _ -> Nothing
+        _ -> Nothing
+      swaps = List.sortOn (\(ts, _, _) -> Ord.Down ts) (Maybe.mapMaybe swapOf (GameState.continuousEffects gs))
+      step x (_, a, b)
+        | x == a = b
+        | x == b = a
+        | otherwise = x
+   in List.foldl' step oid swaps
+
+-- CR 613.7a: the timestamp of the effects `carrier`'s static abilities
+-- generate -- its own, or the later timestamp of the exchange that put another
+-- object's text box on it, since that exchange is the effect that gave it those
+-- abilities. Pawl.ProjectionSpec's "CR 613.7a a levelled Student's text box
+-- applies after the Wings on its new host" proves it.
+staticTimestampOf :: ObjectId -> Object.Object -> GameState -> Timestamp
+staticTimestampOf carrier obj gs
+  | textBoxHolderOf carrier gs == carrier = Object.timestamp obj
+  | otherwise =
+      let touching eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
+            (Modification.ExchangeTextBoxes, Affected.TheseObjects pair) | Set.member carrier pair -> Just (ContinuousEffect.timestamp eff)
+            _ -> Nothing
+       in List.foldl' max (Object.timestamp obj) (Maybe.mapMaybe touching (GameState.continuousEffects gs))
+
 -- CR 707.2a: the static abilities this object's copiable rules text gives it --
 -- its copy snapshot's when it has one, its printed face's otherwise. Equal to
--- PC.staticAbilities (copiableCharacteristics oid gs) by construction, since
--- that is what both arms of baseCharacteristics seed the field from.
+-- PC.staticAbilities (copiableCharacteristics oid gs) by construction on an
+-- object no exchange touches, since that is what both arms of
+-- baseCharacteristics seed the field from.
 --
 -- Written as its own read rather than through copiableCharacteristics for two
 -- reasons, both structural. It stays PROJECTION-FREE, which controlGrants below
@@ -1040,13 +1089,19 @@ stampedSnapshotOf oid gs = do
 -- Devoid and changeling take the other road out of that -- grantedDefiningParts
 -- emits their defining half as a second PART of whatever grants the keyword, so
 -- neither needs an ability minted here.
+--
+-- CR 612.5 reads the list off textBoxHolderOf above, so a text box an exchange
+-- moved brings its static abilities with it. Pawl.ProjectionSpec's "CR 612.5
+-- Akiri's pump moves with her text box" proves it.
 staticAbilitiesOf :: ObjectId -> GameState -> [StaticAbility.StaticAbility Card.Type.Card]
-staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
-  -- The printed read reaches a copied Room too, and has to: copiableSnapshotOf
-  -- above answers Nothing for one, and Game.faceOf answers with the copied card's
-  -- halves subtracted by THIS object's designations (CR 709.5).
-  Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywordSet face)) (Game.faceOf oid gs)
+staticAbilitiesOf carrier gs =
+  let oid = textBoxHolderOf carrier gs
+   in case copiableSnapshotOf oid gs of
+        Just snapshot -> PC.staticAbilities snapshot <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+        -- The printed read reaches a copied Room too, and has to: copiableSnapshotOf
+        -- above answers Nothing for one, and Game.faceOf answers with the copied card's
+        -- halves subtracted by THIS object's designations (CR 709.5).
+        Nothing -> foldMap (\face -> Face.staticAbilities face <> Keyword.mintedStaticAbilitiesOf (Face.keywordSet face)) (Game.faceOf oid gs)
 
 -- CR 116.2: the special actions this object's copiable rules text grants -- its
 -- copy snapshot's when it has one, its printed face's otherwise.
@@ -1064,10 +1119,12 @@ staticAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
 -- HAND (Pawl.Engine.Action.discardableCards, off Pawl.Engine.Card.combined), a
 -- zone in which nothing in data/cards/ can make an object a copy.
 specialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
-specialActionsOf oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot -> PC.specialActions snapshot
-  -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
-  Nothing -> foldMap Face.specialActions (Game.faceOf oid gs)
+specialActionsOf carrier gs =
+  let oid = textBoxHolderOf carrier gs
+   in case copiableSnapshotOf oid gs of
+        Just snapshot -> PC.specialActions snapshot
+        -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
+        Nothing -> foldMap Face.specialActions (Game.faceOf oid gs)
 
 -- CR 613.11: the twelve rule-affecting ability families this object's copiable
 -- rules text gives it -- its copy snapshot's when it has one, its printed face's
@@ -1087,10 +1144,12 @@ specialActionsOf oid gs = case copiableSnapshotOf oid gs of
 -- Pawl.MutateSpec's "CR 702.140e a Silent Arbiter under a Cubwarden still holds
 -- alice to one attacker" is what proves the merged read.
 ruleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
-ruleAbilitiesOf oid gs = case copiableSnapshotOf oid gs of
-  Just snapshot -> PC.ruleAbilities snapshot
-  -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
-  Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)
+ruleAbilitiesOf carrier gs =
+  let oid = textBoxHolderOf carrier gs
+   in case copiableSnapshotOf oid gs of
+        Just snapshot -> PC.ruleAbilities snapshot
+        -- The printed read reaches a copied Room too, for staticAbilitiesOf's reason.
+        Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)
 
 -- The thirteen lists a printed face declares. Its own function so that the seed
 -- above and ruleAbilitiesOf's fallback cannot drift on what a face contributes.
@@ -1656,7 +1715,7 @@ controlGrants gs =
                 MkControlGrant
                   { cgSource = permId,
                     cgAffected = StaticAbility.affected sa,
-                    cgTimestamp = Object.timestamp permObj
+                    cgTimestamp = staticTimestampOf permId permObj gs
                   }
            in fmap toGrant (filter (\sa -> isControl sa && functionsFromZone Zone.Battlefield sa) (staticAbilitiesOf permId gs))
    in concatMap grantsOf (abilitySources gs)
