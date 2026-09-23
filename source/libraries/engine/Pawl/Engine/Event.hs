@@ -2218,7 +2218,7 @@ apply batch candidate event =
             -- order. Both names are chosen as one event, so the order is the
             -- rule's and not the card's reading order.
             let choosers = filter (\pid -> pid == controller || Just pid == opponent) (Game.apnapOrder gs)
-                ask pid = Game.choose (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction)
+                ask pid = Game.choose (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction) >>= Game.lookUpChosenName
             fmap Set.fromList (Monad.mapM ask choosers)
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
@@ -2236,7 +2236,7 @@ apply batch candidate event =
           -- Oracle card reference.
           Nothing -> pure Set.empty
           Just controller ->
-            fmap Set.singleton (Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller oid restriction))
+            fmap Set.singleton (Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller oid restriction) >>= Game.lookUpChosenName)
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
           let stamp o = o {Object.chosenNames = picked}

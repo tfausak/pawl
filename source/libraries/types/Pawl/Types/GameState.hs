@@ -255,6 +255,9 @@ data GameState = MkGameState
     -- too (CR 903.5b forbids it; #940 means pawl does not enforce it) behaves
     -- like a well-formed one.
     printingIds :: Map.Map Printing.Printing PrintingId.PrintingId,
+    -- | CR 108.1: the printings the Oracle card reference answered a chosen
+    -- name with (Prompt.LookUpCard), part of the names CR 612.7 enumerates.
+    lookedUp :: Set.Set PrintingId.PrintingId,
     nextPrintingId :: PrintingId.PrintingId,
     -- | CR 613.7: the monotonic source of timestamps for objects and stored
     -- continuous effects. See Timestamp.

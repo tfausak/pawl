@@ -10,6 +10,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BuybackDecision as BuybackDecision
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -109,6 +110,11 @@ data Prompt r where
   -- instruction's modifier added afterwards. RandomObject's reasons for
   -- carrying neither Decider nor PlayerId.
   RollDie :: Natural.Natural -> Prompt Natural.Natural
+  -- | CR 108.1 / 201.4: which card in the Oracle card reference a name
+  -- belongs to, Nothing where the reference holds none. Asked of the
+  -- interpreter after every Prompt.ChooseCardName answer, since the engine holds
+  -- no reference. RollDie's reasons for carrying neither Decider nor PlayerId.
+  LookUpCard :: CardName.CardName -> Prompt (Maybe Card.Card)
   -- | CR 706.4: which result of one roll instruction the roller uses (Valiant
   -- Endeavor's "roll two d6 and choose one result"); the answer indexes the
   -- results, which are in roll order and may compare equal. A choice and not a

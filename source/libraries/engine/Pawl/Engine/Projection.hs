@@ -22,7 +22,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePrintedReplacement, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCharacteristics)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -150,6 +150,7 @@ layer m = case m of
   -- the subtype-word swap above. Answering any other layer leaves the suite
   -- green, since nothing else in this unit reads the layer directly.
   Modification.ExchangeTextBoxes -> Layer.Text
+  Modification.AddNamesMatching _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
   Modification.SetControllerToSource -> Layer.Control
   Modification.SetColor _ -> Layer.Color
@@ -430,6 +431,17 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         Modification.ExchangeTextBoxes -> case exchangePartner oid affected of
           Nothing -> pc
           Just other -> exchangeTextBoxFrom (textBoxOf other) pc
+        -- CR 612.7: every name in the Oracle card reference whose card face
+        -- matches, in addition to the object's own. Each face is judged off its
+        -- printed characteristics, so a token's name and a noncreature card
+        -- that has become a creature stay out.
+        --
+        -- Not implemented: a name the game has never seen -- a card-data HasName
+        -- literal or a CR 206.3 list naming a card in no zone and never looked
+        -- up -- is not enumerated; Game.referenceFaces is the reference (#4057).
+        Modification.AddNamesMatching f ->
+          let matching = Map.keysSet (Map.filter (\face -> Filter.matches context (viewOfCard face) f) (Game.referenceFaces gs))
+           in pc {PC.names = Set.union matching (PC.names pc)}
         -- CR 613.1b layer 2: controllerOf reads GameState.continuousEffects
         -- directly. Identity here to keep gather/project's walk total.
         Modification.SetController _ -> pc
@@ -542,6 +554,7 @@ cardTypesAfter m types = case m of
   Modification.ChangeSubtypeWord {} -> types
   -- CR 612.1 / 612.5: the text box moves and the type line does not.
   Modification.ExchangeTextBoxes -> types
+  Modification.AddNamesMatching _ -> types
   Modification.AddSupertype _ -> types
   Modification.RemoveSupertype _ -> types
   Modification.SetColor _ -> types
@@ -1142,6 +1155,8 @@ freezeQuantities gs announcedOn source context m =
         Modification.SwitchPowerToughness -> Just m
         -- Payload-free: the two sides are object ids, not quantities.
         Modification.ExchangeTextBoxes -> Just m
+        -- The filter is judged against card faces, not quantities.
+        Modification.AddNamesMatching _ -> Just m
         -- No quantity to freeze: two bare markers.
         Modification.AssignCombatDamageWithToughness -> Just m
         Modification.GrantsStationToughness -> Just m
@@ -1187,6 +1202,7 @@ quantitiesOf m = case m of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
   Modification.ExchangeTextBoxes -> []
+  Modification.AddNamesMatching _ -> []
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
 
@@ -1241,6 +1257,7 @@ setsLandSubtype m = case m of
   Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
   Modification.ExchangeTextBoxes -> False
+  Modification.AddNamesMatching _ -> False
   Modification.AssignCombatDamageWithToughness -> False
   Modification.SetColor _ -> False
   Modification.AddColor _ -> False
@@ -2066,6 +2083,7 @@ removesAbilities m = case m of
   -- CR 612.5 REPLACES a text box rather than removing abilities, and does it
   -- at layer 3, so CR 613.1f's strip is not what it is.
   Modification.ExchangeTextBoxes -> False
+  Modification.AddNamesMatching _ -> False
   -- CR 613.11 rules-modifying marker rather than a layer-6 ability change.
   Modification.AssignCombatDamageWithToughness -> False
   -- A grant, GainKeyword's answer above: not a removal.
@@ -3095,6 +3113,9 @@ modificationWrites m = case m of
   -- has no finer grain for than Keywords. Not Subtypes: the type line stays
   -- where it was (CR 612.1).
   Modification.ExchangeTextBoxes -> Set.singleton Keywords
+  -- Writes PC.names, which no Aspect covers: dependency is within a layer (CR
+  -- 613.8a), and no layer-3 effect's affected set reads a name.
+  Modification.AddNamesMatching _ -> Set.empty
   Modification.AddCardType _ -> Set.singleton Types
   -- CR 205.1a's set writes BOTH: the card types it replaces, and the subtypes it
   -- strips along with the types that carried them.
@@ -3162,6 +3183,8 @@ modificationReads m = case m of
   -- being the effect that is depended ON there, so Set.empty here leaves the
   -- suite green.
   Modification.ExchangeTextBoxes -> Set.singleton Keywords
+  -- Its filter is put to card faces outside the fold, never to this object.
+  Modification.AddNamesMatching _ -> Set.empty
   -- Carries no Quantity: two bare markers.
   Modification.AssignCombatDamageWithToughness -> Set.empty
   Modification.GrantsStationToughness -> Set.empty
@@ -4725,6 +4748,7 @@ grantsKeywordWhere p m = case m of
   -- handing out one this arm could name, so no predicate over a Keyword can
   -- be answered here.
   Modification.ExchangeTextBoxes -> False
+  Modification.AddNamesMatching _ -> False
   -- Neither marker hands out a Keyword, whatever the station one's name says.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
@@ -4792,6 +4816,7 @@ grantsMintingType m = case m of
   Modification.SwitchPowerToughness -> False
   -- CR 612.1: the exchange leaves the type line alone.
   Modification.ExchangeTextBoxes -> False
+  Modification.AddNamesMatching _ -> False
   -- Neither marker writes a card type or subtype.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False

@@ -1255,7 +1255,7 @@ nullChamberSpec s registry =
     -- characteristics, the player must choose the name of a card whose Oracle
     -- text matches those characteristics." Null Chamber's characteristics are
     -- "other than a basic land card name". The engine hands them to the prompt
-    -- and does not judge the answer -- it cannot resolve a name at all -- so this
+    -- and does not judge the answer -- it holds no reference to judge it by -- so this
     -- case proves the half the engine owns: the restriction reaches the player
     -- being asked, unaltered, for BOTH choosers. The two cases after it prove the
     -- half the interpreter owns.
@@ -1797,6 +1797,42 @@ recordingCastHalo name gs oid =
         _ -> pure (S.identityAnswer p)
    in State.execState (Engine.runGame answer gs (S.cast S.alice oid >> Stack.resolveTop)) []
 
+-- castHalo through Pawl.Interpreter.lookingUpCards over the suite's registry, so
+-- Prompt.LookUpCard is answered the way an interpreter holding the reference
+-- answers it. castHalo is the same cast with the reference never consulted.
+lookedUpHalo :: (Monad m) => Registry.Registry m -> CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> m GameState.GameState
+lookedUpHalo registry name gs oid = do
+  (_, after) <- Engine.runGameAsked (Interpreter.lookingUpCards registry (namingAnswer name)) gs (S.cast S.alice oid >> Stack.resolveTop)
+  pure after
+
+-- Names `name` whenever a card name is asked for, and otherwise S.identityAnswer.
+namingAnswer :: (Monad m) => CardName.CardName -> Asked.Asked r -> m r
+namingAnswer name asked = case Asked.prompt asked of
+  Prompt.ChooseCardName {} -> pure name
+  p -> pure (S.identityAnswer p)
+
+-- A Hill Giant of bob's, carrying `kit` when there is one, attacks alice alone
+-- off a board the Halo has already entered; the pair (before, after) comes back
+-- for the life it cost. runedHaloCombat's shape, with an attacker that is no
+-- Goblin Piker.
+spyKitCombat :: Printing.Printing -> Maybe Printing.Printing -> GameState.GameState -> (GameState.GameState, GameState.GameState)
+spyKitCombat giant kit haloed =
+  let (giantId, withGiant) = S.addPermanent giant S.bob haloed
+      equipped = case kit of
+        Nothing -> withGiant
+        Just k ->
+          let (kitId, g) = S.addPermanent k S.bob withGiant
+           in S.attachTo kitId (Recipient.ToObject giantId) g
+      before =
+        equipped
+          { GameState.activePlayer = S.bob,
+            GameState.priority = Just S.bob,
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice]}
+          }
+      fight = Combat.declareAttackers S.manaPerformer S.bob >> Combat.declareBlockers S.manaPerformer >> Damage.dealCombatDamage
+   in (before, S.settleSba (S.runPure (S.attackTo S.alice) before fight))
+
 runedHaloSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 runedHaloSpec s registry =
   Spec.describe s "RunedHalo" $ do
@@ -1883,6 +1919,34 @@ runedHaloSpec s registry =
       Spec.assertEqWith s "with the Piker named, alice takes none of its 2" (S.lifeOf S.alice named) (S.lifeOf S.alice beforeNamed)
       Spec.assertEqWith s "carol takes the whole 2 with the same name chosen -- the Halo protects its controller alone" (S.lifeOf S.carol atCarol) (fmap (subtract 2) (S.lifeOf S.carol beforeCarol))
       Spec.assertEqWith s "and with the Curse named instead, so does alice" (S.lifeOf S.alice other) (fmap (subtract 2) (S.lifeOf S.alice beforeOther))
+    -- CR 612.7 with CR 108.1: Spy Kit's host has every nonlegendary creature
+    -- card's name in the Oracle card reference, not just the game's. The Halo
+    -- names Goblin Piker, which is in no zone, so only Prompt.LookUpCard's answer
+    -- puts it in reach; the attacker is a Hill Giant.
+    --
+    -- FOUR combats differing in one thing each: no Kit, a legendary creature
+    -- card named instead (the filter, not "every name"), and the reference never
+    -- consulted (the lookup is load-bearing).
+    Spec.it s "CR 612.7 / 702.16e a Spy Kit host has the chosen name of a card in no zone, and its damage is prevented" $ do
+      plains <- S.printingOf s registry "Plains"
+      halo <- S.printingOf s registry "Runed Halo"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      kit <- S.printingOf s registry "Spy Kit"
+      giant <- S.printingOf s registry "Hill Giant"
+      jedit <- S.printingOf s registry "Jedit Ojanen"
+      let (haloId, _, board) = runedHaloBoard plains halo curse
+          pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      namedPiker <- lookedUpHalo registry pikerName board haloId
+      namedJedit <- lookedUpHalo registry (S.printingName jedit) board haloId
+      let (beforeKit, withKit) = spyKitCombat giant (Just kit) namedPiker
+          (beforeBare, bare) = spyKitCombat giant Nothing namedPiker
+          (beforeLegend, legend) = spyKitCombat giant (Just kit) namedJedit
+          (beforeUnasked, unasked) = spyKitCombat giant (Just kit) (castHalo pikerName board haloId)
+      Spec.assertEqWith s "the Kit's host is named Goblin Piker, so alice takes none of its 4" (S.lifeOf S.alice withKit) (S.lifeOf S.alice beforeKit)
+      Spec.assertEqWith s "unequipped, the Giant is no Goblin Piker and deals its 3" (S.lifeOf S.alice bare) (fmap (subtract 3) (S.lifeOf S.alice beforeBare))
+      Spec.assertEqWith s "a legendary creature card's name is not the host's, so alice takes 4" (S.lifeOf S.alice legend) (fmap (subtract 4) (S.lifeOf S.alice beforeLegend))
+      Spec.assertEqWith s "with the reference never asked, alice takes 4" (S.lifeOf S.alice unasked) (fmap (subtract 4) (S.lifeOf S.alice beforeUnasked))
+      Spec.assertBool s (not (Map.member pikerName (Game.referenceFaces board))) "no Goblin Piker card is anywhere in the game before the Halo names it"
 
 -- The Stasis Coffin {3} Legendary Artifact: "{2}, {T}, Exile The Stasis Coffin:
 -- You gain protection from everything until your next turn." The pool's one card

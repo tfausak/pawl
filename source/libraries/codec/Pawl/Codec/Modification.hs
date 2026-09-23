@@ -5,6 +5,7 @@ import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.ModifyPowerToughness as ModifyPowerToughness
@@ -61,6 +62,7 @@ codec abilityCodec =
           Arm.payload "AddColor" colors Modification.AddColor (\x -> case x of Modification.AddColor y -> Just y; _ -> Nothing),
           Arm.nullary "AddChosenColor" Modification.AddChosenColor,
           Arm.nullary "ExchangeTextBoxes" Modification.ExchangeTextBoxes,
+          Arm.payload "AddNamesMatching" (Filter.codec Keyword.codec) Modification.AddNamesMatching (\x -> case x of Modification.AddNamesMatching y -> Just y; _ -> Nothing),
           Arm.nullary "SwitchPowerToughness" Modification.SwitchPowerToughness,
           Arm.nullary "AssignCombatDamageWithToughness" Modification.AssignCombatDamageWithToughness,
           Arm.nullary "GrantsStationToughness" Modification.GrantsStationToughness
@@ -99,6 +101,7 @@ tagOf x = case x of
   Modification.AddColor {} -> "AddColor"
   Modification.AddChosenColor {} -> "AddChosenColor"
   Modification.ExchangeTextBoxes {} -> "ExchangeTextBoxes"
+  Modification.AddNamesMatching {} -> "AddNamesMatching"
   Modification.SwitchPowerToughness {} -> "SwitchPowerToughness"
   Modification.AssignCombatDamageWithToughness {} -> "AssignCombatDamageWithToughness"
   Modification.GrantsStationToughness {} -> "GrantsStationToughness"

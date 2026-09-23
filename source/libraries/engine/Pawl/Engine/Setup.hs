@@ -240,6 +240,7 @@ emptyGame order =
           GameState.nextObjectId = ObjectId.MkObjectId 0,
           GameState.printings = Map.empty,
           GameState.printingIds = Map.empty,
+          GameState.lookedUp = Set.empty,
           GameState.nextPrintingId = PrintingId.MkPrintingId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
@@ -1442,6 +1443,7 @@ funnelBack finalSub parent =
           -- two tables never disagree about an id.
           GameState.printings = Map.union (GameState.printings finalSub) (GameState.printings parent),
           GameState.printingIds = Map.union (GameState.printingIds finalSub) (GameState.printingIds parent),
+          GameState.lookedUp = Set.union (GameState.lookedUp finalSub) (GameState.lookedUp parent),
           GameState.nextPrintingId = max (GameState.nextPrintingId parent) (GameState.nextPrintingId finalSub),
           GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub),
           -- CR 104.4b: the subgame's events are not a stretch during which the

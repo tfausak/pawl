@@ -102,6 +102,7 @@ withoutAnnouncement before entry closed = do
   nextObjectId <- newest GameState.nextObjectId
   printings <- newest GameState.printings
   printingIds <- newest GameState.printingIds
+  lookedUp <- newest GameState.lookedUp
   nextPrintingId <- newest GameState.nextPrintingId
   nextTimestamp <- newest GameState.nextTimestamp
   lastChoice <- newest GameState.lastChoice
@@ -191,6 +192,7 @@ withoutAnnouncement before entry closed = do
         GameState.nextObjectId = nextObjectId,
         GameState.printings = printings,
         GameState.printingIds = printingIds,
+        GameState.lookedUp = lookedUp,
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,

@@ -7561,7 +7561,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- apply here.
   --
   -- The answer is not filtered HERE, the posture the entry twin already takes:
-  -- the engine holds no Oracle card reference, so it cannot resolve a name.
+  -- the engine holds no Oracle card reference to judge it against, and
+  -- Game.lookUpChosenName asks for the card behind it only once it is in.
   -- Pawl.Interpreter.policingCardNames judges it on the far side of
   -- Pawl.Engine.Engine.runGameAsked, where the registry is, and covers this arm
   -- and the entry twin alike by covering the one Prompt they share.
@@ -7593,7 +7594,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let ask chooser = do
           g <- State.get
-          Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction)
+          Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction) >>= Game.lookUpChosenName
     picked <- fmap Set.fromList (Monad.mapM ask (apnapPlayersOf ref legal controller gs))
     -- CR 101.3: a reference naming NOBODY leaves nothing to do, so the write is
     -- skipped rather than assigning the empty set -- which would clear a name an

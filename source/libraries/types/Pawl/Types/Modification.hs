@@ -5,6 +5,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -371,6 +372,9 @@ data Modification ability
     -- self-reference re-binds to it -- the same posture GainAbility takes, and
     -- for the same reason.
     ExchangeTextBoxes
+  | -- | layer 3, CR 613.1c / 612.7: this object also has the name of every card
+    -- whose face matches the Filter (Spy Kit).
+    AddNamesMatching (Filter.Filter Keyword.Keyword)
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect, never chosen: the
     -- effect's source's controller for GainControl, the OTHER permanent's

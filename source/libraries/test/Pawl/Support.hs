@@ -2613,6 +2613,7 @@ promptDecider prompt = case prompt of
   Prompt.RandomCard {} -> Nothing
   Prompt.ChooseConjuredCard decider _ _ -> Just (Decider.unwrap decider)
   Prompt.RollDie {} -> Nothing
+  Prompt.LookUpCard {} -> Nothing
   Prompt.ChooseDieResult decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.FlipCoin {} -> Nothing
   Prompt.CallCoin decider _ -> Just (Decider.unwrap decider)
@@ -2759,6 +2760,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.RandomCard {} -> "RandomCard"
   Prompt.ChooseConjuredCard {} -> "ChooseConjuredCard"
   Prompt.RollDie {} -> "RollDie"
+  Prompt.LookUpCard {} -> "LookUpCard"
   Prompt.ChooseDieResult {} -> "ChooseDieResult"
   Prompt.FlipCoin {} -> "FlipCoin"
   Prompt.CallCoin {} -> "CallCoin"
@@ -3399,6 +3401,7 @@ oneMountainState mountain ph =
           GameState.nextObjectId = ObjectId.MkObjectId 1,
           GameState.printings = Map.singleton printingId mountain,
           GameState.printingIds = Map.singleton mountain printingId,
+          GameState.lookedUp = Set.empty,
           GameState.nextPrintingId = PrintingId.MkPrintingId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
           GameState.lastChoice = Timestamp.MkTimestamp 0,

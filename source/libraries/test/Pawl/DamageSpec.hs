@@ -995,6 +995,14 @@ unlockDoors :: Set.Set CardName.CardName -> ObjectId.ObjectId -> GameState.GameS
 unlockDoors doors oid gs =
   gs {GameState.objects = Map.adjust (\o -> o {Object.unlockedHalves = doors}) oid (GameState.objects gs)}
 
+-- Keeps the first candidate CR 704.5j offers, recording each offer.
+recordingLegend :: Prompt.Prompt r -> State.State [Set.Set ObjectId.ObjectId] r
+recordingLegend p = case p of
+  Prompt.ChooseLegend _ _ candidates -> do
+    State.modify' (<> [Set.fromList (NonEmpty.toList candidates)])
+    pure (NonEmpty.head candidates)
+  _ -> pure (S.identityAnswer p)
+
 -- Answers Prompt.ChooseLegend with a DIFFERENT candidate each time it is asked,
 -- and counts the asks. Two identical prompts cannot be told apart by a pure
 -- answerer, so this is what shows that asking twice about one set of legends
@@ -1155,6 +1163,33 @@ legendRuleSpec s registry =
       Spec.assertBool s (inPlay a after) "the Piker alice chose stays"
       Spec.assertBool s (not (inPlay b after)) "the other Piker is gone"
       Spec.assertEqWith s "and it is in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+    -- CR 612.7 / 704.5j: Spy Kit's host has the name of every nonlegendary
+    -- creature card, so under Leyline of Singularity it and a Goblin Piker are
+    -- two same-named legends. Three boards differing in one thing each: the Kit
+    -- attached, the Kit left unattached, and a legendary creature card (Jedit
+    -- Ojanen) in the Piker's place, whose name no host gains.
+    Spec.it s "CR 612.7/704.5j a Spy Kit host under Leyline of Singularity shares a Goblin Piker's name, and the legend rule buries one" $ do
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      jedit <- S.printingOf s registry "Jedit Ojanen"
+      kit <- S.printingOf s registry "Spy Kit"
+      leyline <- S.printingOf s registry "Leyline of Singularity"
+      let run other attached =
+            let (host, g0) = S.addPermanent giant S.alice (Setup.emptyGame S.bothPlayers)
+                (b, g1) = S.addPermanent other S.alice g0
+                (k, g2) = S.addPermanent kit S.alice g1
+                board = if attached then S.attachTo k (Recipient.ToObject host) g2 else g2
+                (_, staged) = S.spellOnStack leyline S.alice board
+                ((_, after), asked) = State.runState (Engine.runGame recordingLegend staged (Stack.resolveTop >> Engine.settleForPriority)) []
+             in (length (filter (`inPlay` after) [host, b]), asked, Set.fromList [host, b])
+          (equipped, offered, pair) = run piker True
+          (unequipped, _, _) = run piker False
+          (legendary, _, _) = run jedit True
+      Spec.assertEqWith s "equipped, one of the two creatures is left" equipped 1
+      Spec.assertEqWith s "and the legend rule offered exactly the host and the Piker" offered [pair]
+      Spec.assertEqWith s "with the Kit unattached both stay" unequipped 2
+      Spec.assertEqWith s "beside a legendary creature card both stay" legendary 2
 
     -- The other half of Leyline of Singularity's affected set: "All NONLAND
     -- permanents". Two Forests share a name and would be a legend rule pair if

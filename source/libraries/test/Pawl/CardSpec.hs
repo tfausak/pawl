@@ -855,6 +855,9 @@ modificationCounts modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
   Modification.ExchangeTextBoxes -> []
+  -- Its Filter's Counts are reached through modificationFilters, GainEnchant's
+  -- answer.
+  Modification.AddNamesMatching _ -> []
   -- Payload-free, both of them, so there is no Count to sweep.
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
@@ -3694,9 +3697,10 @@ modificationFilters modification = case modification of
   -- Payload-free, so there is no Filter to sweep -- see modificationCounts.
   Modification.GainFlashbackAtManaCost -> []
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
-  -- other and has to be swept. NOT [] -- this, GainKeyword above and LoseKeyword
-  -- below are the arms that answer with something, and every other one carries no
-  -- Filter at all, LoseKeywordFamily's payload-free family included.
+  -- other and has to be swept. NOT [] -- this, GainKeyword above, LoseKeyword
+  -- and AddNamesMatching below are the arms that answer with something, and every
+  -- other one carries no Filter at all, LoseKeywordFamily's payload-free family
+  -- included.
   Modification.GainEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities, grantedTriggeredAbilities and
@@ -3738,6 +3742,8 @@ modificationFilters modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
   Modification.ExchangeTextBoxes -> []
+  -- CR 612.7's filter is card text like GainEnchant's slot, and is swept.
+  Modification.AddNamesMatching f -> unframed [f]
   -- Payload-free, both of them, so there is no Filter to sweep.
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []

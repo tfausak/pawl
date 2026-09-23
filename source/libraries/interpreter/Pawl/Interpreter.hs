@@ -5,10 +5,10 @@
 -- the rules engine deliberately cannot supply itself.
 --
 -- The engine's dependency list has no pawl:registry edge, so nothing inside it
--- can answer "what card is this name?"; see #3047. An interpreter holds a
--- registry by construction, which is why a question about the Oracle card
--- reference is settled here rather than there: this module depends on both
--- halves, and neither half depends on it.
+-- can answer "what card is this name?"; it asks Prompt.LookUpCard instead. An
+-- interpreter holds a registry by construction, which is why a question about
+-- the Oracle card reference is settled here rather than there: this module
+-- depends on both halves, and neither half depends on it.
 module Pawl.Interpreter where
 
 import qualified Pawl.Engine.Card as Card
@@ -88,7 +88,9 @@ legalCardName registry gs chooser restriction name = do
 -- be wrapped, its own arm saying why it answers rule 201.4 illegally on purpose.
 --
 -- A wrapper an interpreter installs rather than a check inside the engine: the
--- engine cannot resolve a name at all. Both roads to a chosen name --
+-- engine holds no reference to judge a name against, and asks one
+-- (Prompt.LookUpCard) only for the card behind a name already chosen. Both
+-- roads to a chosen name --
 -- Pawl.Engine.Resolve's Effect.ChooseCardName arm (CR 608.2c) and
 -- Pawl.Engine.Event's EntryRewrite.ChooseCardNames arm (CR 614.1c) -- raise this
 -- one Prompt, so covering the Prompt covers both.
@@ -113,4 +115,19 @@ policingCardNames registry answer asked = case Asked.prompt asked of
           legal <- legalCardName registry (Asked.game asked) chooser restriction name
           if legal then pure name else again
      in again
+  _ -> answer asked
+
+-- CR 108.1: Prompt.LookUpCard answered from the registry, the reference an
+-- interpreter holds; every other prompt goes to the answerer beneath. Installed
+-- beside policingCardNames, whose registry it shares.
+--
+-- Pawl.CastProhibitionSpec's Spy Kit boards, where Runed Halo names a card in
+-- no zone, are what prove it.
+lookingUpCards ::
+  Registry.Registry m ->
+  (forall r. Asked.Asked r -> m r) ->
+  Asked.Asked a ->
+  m a
+lookingUpCards registry answer asked = case Asked.prompt asked of
+  Prompt.LookUpCard name -> Registry.fetchCard registry name
   _ -> answer asked
