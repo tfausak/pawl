@@ -39,6 +39,7 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActiveActivationProhibition as ActiveActivationProhibition
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
@@ -246,7 +247,7 @@ follows expiry = case expiry of
 begun :: GameState -> Expiry -> Bool
 begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->
-    AfterTurn.player afterTurn == GameState.activePlayer gs
+    Turn.isActive gs (AfterTurn.player afterTurn)
       && GameState.turnNumber gs > AfterTurn.turn afterTurn
   Expiry.AtCleanup -> True
   Expiry.Never -> True
@@ -282,7 +283,7 @@ dropAtCleanup gs =
         -- this cleanup belongs to that player, and its number is above the one
         -- the duration began on, so it is not the duration's own turn.
         Expiry.AtEndOfTurnOf afterTurn ->
-          AfterTurn.player afterTurn /= GameState.activePlayer gs
+          not (Turn.isActive gs (AfterTurn.player afterTurn))
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
         -- CR 611.2a: "during that player's next turn" ends where the arm above
         -- ends, off the same pair and by the same reading -- the window it
@@ -291,7 +292,7 @@ dropAtCleanup gs =
         -- here: a row swept before it ever began is a row whose turn came and
         -- went, which is the cleanup this arm reaches.
         Expiry.DuringTurnOf afterTurn ->
-          AfterTurn.player afterTurn /= GameState.activePlayer gs
+          not (Turn.isActive gs (AfterTurn.player afterTurn))
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
         Expiry.AtEndOf _ -> True
         -- CR 116.2c: only a payment ends this, and the cleanup step is not one.

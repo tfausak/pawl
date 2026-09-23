@@ -1072,6 +1072,7 @@ continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.MatchingOffBattlefield _ -> False
   Affected.Attached -> False
   Affected.AttachedPlayerControls _ -> False
+  Affected.PlayedThisWay _ -> False
 
 -- Append a stored continuous effect affecting exactly `oid`, at timestamp `ts`.
 -- Object id 998 is a stand-in source: nothing in these tests reads the
@@ -3327,7 +3328,7 @@ oneMountainState mountain ph =
             Object.activatedOnce = Set.empty
           }
    in GameState.MkGameState
-        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited},
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited},
           GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),

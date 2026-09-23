@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -183,15 +184,17 @@ castOrdinal context predicate fromZone spell gs =
 -- its own: CR 109.5's "you" for a triggered ability (CR 603.3a), the CR 602.2
 -- activator for an activated one.
 --
--- OpponentsTurn is CR 102.3's relation rather than an enumeration of opponents:
--- the active player is one, which in a two-player game (CR 102.2) and a
--- Free-for-All (CR 806.1) is any other seat, and in a game between teams is a
--- seat on another team. Teams.areOpponents is the one predicate.
-turnScopeAdmits :: Teams.Teams -> TurnScope.TurnScope -> PlayerId -> PlayerId -> Bool
-turnScopeAdmits teams scope active own = case scope of
+-- ControllersTurn is Turn.sharesTurn, so under CR 805.4 the active team's turn is
+-- each of its members' turn. OpponentsTurn is CR 102.3's relation rather than an
+-- enumeration of opponents: the active player is one, which in a two-player game
+-- (CR 102.2) and a Free-for-All (CR 806.1) is any other seat, and in a game
+-- between teams is a seat on another team. Teams.areOpponents is the one
+-- predicate.
+turnScopeAdmits :: GameState -> TurnScope.TurnScope -> PlayerId -> PlayerId -> Bool
+turnScopeAdmits gs scope active own = case scope of
   TurnScope.EachTurn -> True
-  TurnScope.ControllersTurn -> active == own
-  TurnScope.OpponentsTurn -> Teams.areOpponents teams own active
+  TurnScope.ControllersTurn -> Turn.sharesTurn gs active own
+  TurnScope.OpponentsTurn -> Teams.areOpponents (Game.teams gs) own active
 
 -- CR 505.1b: how many main phases have begun this turn, counting the one whose
 -- beginning is being matched. GameState.events is cleared at the turn handoff
@@ -581,7 +584,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.StepBegan (StepBegan.MkStepBegan began active) ->
       began == wanted
         && Maybe.maybe True (== mainPhasesBegun gs) ordinal
-        && turnScopeAdmits (Game.teams gs) scope active you
+        && turnScopeAdmits gs scope active you
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast {} -> False
@@ -5549,7 +5552,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           GameEvent.Moved m
             | ZoneChange.from (Moved.change m) == CardLeavesZone.from p,
               maybe True (== ZoneChange.to (Moved.change m)) (CardLeavesZone.to p) ->
-                turnScopeAdmits (Game.teams gs) (CardLeavesZone.scope p) (GameState.activePlayer gs) you
+                turnScopeAdmits gs (CardLeavesZone.scope p) (GameState.activePlayer gs) you
                   && not (Seq.null (admitted m))
           GameEvent.Moved {} -> False
           GameEvent.LeftTheGame _ -> False
@@ -6525,7 +6528,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
-        turnScopeAdmits (Game.teams gs) scope (GameState.activePlayer gs) you
+        turnScopeAdmits gs scope (GameState.activePlayer gs) you
           -- CR 601.2a's zone, read off the EVENT and not off the spell: rule
           -- 400.7 left the stack incarnation with no memory of it. A condition
           -- that names no zone admits every cast, which is what almost every

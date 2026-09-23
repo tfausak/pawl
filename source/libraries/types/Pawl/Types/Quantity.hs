@@ -188,7 +188,7 @@ data Quantity
     -- WHO attacked is not recorded and does not need to be: CR 506.2 makes the
     -- attacking player the active player, so one combat phase's record can only
     -- be that player's attacks. CR 805.10a's several attacking players are what
-    -- would break that (#2848).
+    -- would break that (#4002).
     OpponentsAttacked PlayerRef.PlayerRef
   | -- | CR 508.1a / 608.2i: how many creatures that player declared as attackers
     -- this turn, folded from the turn-scoped GameEvent.AttackerDeclared log.
@@ -204,7 +204,7 @@ data Quantity
     -- WHO declared is not on the event and does not need to be, OpponentsAttacked's
     -- reason: CR 506.2 makes the attacking player the active player, and the log's
     -- extent is one turn, so every declaration in it is the active player's. CR
-    -- 805.10a's several attacking players are what would break that (#2848).
+    -- 805.10a's several attacking players are what would break that (#4002).
     AttackersDeclaredThisTurn PlayerRef.PlayerRef
   | -- | CR 701.9a / 608.2i: how many cards that player discarded this turn,
     -- folded from the turn-scoped GameEvent.Discarded log.

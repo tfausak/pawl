@@ -1746,6 +1746,9 @@ controlNames grants visited gs source a = case a of
   Affected.Matching f -> Set.filter (matchesLeanly grants visited gs source f) (GameState.battlefield gs)
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.MatchingOffBattlefield _ -> Set.empty
+  -- A rider is stored against the object it names (Event.permissionRiders), and
+  -- the template names nothing.
+  Affected.PlayedThisWay _ -> Set.empty
   -- CR 303.4b / 303.4m through a PLAYER: what the enchanted player controls,
   -- read as Matching's battlefield walk narrowed by the candidate's own
   -- controller. Both halves are dynamic (CR 611.3a), and the controller half is

@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaCount as ManaCount
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
@@ -458,7 +459,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- posture about.
         Quantity.IsActivePlayer ref -> case playersOf ref of
           Nothing -> Nothing
-          Just pids -> Just (if any (\pid -> GameState.activePlayer gs == pid) pids then 1 else 0)
+          Just pids -> Just (if any (Turn.isActive gs) pids then 1 else 0)
         -- CR 122.1: how many counters of a kind that player has. The third arm on
         -- LifeTotal's and Speed's terms -- live, one player only, through the same
         -- playersOf.

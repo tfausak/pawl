@@ -31,6 +31,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
@@ -193,20 +194,24 @@ ability =
 -- Engine.placePendingTriggers merge it into the one batch CR 603.3b orders, and
 -- Pawl.Engine.Monarch.placeInherent put it on the stack.
 --
--- AT MOST ONE. A precombat main phase begins once (CR 505.1a), and the ability
--- belongs to the player whose phase it is.
+-- AT MOST ONE PER ACTIVE PLAYER. A precombat main phase begins once (CR
+-- 505.1a), and the ability belongs to the player whose phase it is.
 --
--- Only the ACTIVE player's, which is that same rule and not a shortcut: no other
+-- Only an ACTIVE player's, which is that same rule and not a shortcut: no other
 -- player has a precombat main phase on this turn, so rule 728.1's "that player"
--- can be nobody else. An opponent's rad counters wait for their own turn.
+-- can be nobody else. An opponent's rad counters wait for their own turn. Under
+-- the shared team turns option each member of the active team has one, so each
+-- triggers (CR 805.4d).
 inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
-inherentPending events gs =
-  let you = GameState.activePlayer gs
-      -- A PARTIAL case with a wildcard, Pawl.Engine.Speed.inherentPending's
+inherentPending events gs = concatMap (pendingFor events gs) (Turn.activePlayers gs)
+
+pendingFor :: [GameEvent] -> GameState -> PlayerId -> [PendingTrigger]
+pendingFor events gs you =
+  let -- A PARTIAL case with a wildcard, Pawl.Engine.Speed.inherentPending's
       -- posture: this matcher answers about one event shape, and a new GameEvent
       -- constructor is not an event rule 728.1 names.
       precombatMainBegan event = case event of
-        GameEvent.StepBegan (StepBegan.MkStepBegan Phase.PrecombatMain active) -> active == you
+        GameEvent.StepBegan (StepBegan.MkStepBegan Phase.PrecombatMain active) -> Turn.sharesTurn gs active you
         _ -> False
       -- CR 603.4: the intervening "if" is checked here, as the event occurs. A
       -- player with no rad counters does not trigger at all, which is the

@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -108,7 +109,7 @@ canForetell :: PlayerId -> ObjectId -> GameState -> Bool
 canForetell pid oid gs =
   Maybe.isJust (foretellCostOf oid gs)
     && elem oid (Game.zoneMembers Zone.Hand pid gs)
-    && GameState.activePlayer gs == pid
+    && Turn.isActive gs pid
     && Cost.canPay PaymentSubject.ForNeither pid oid actionCost gs
 
 -- Every card this player may foretell right now -- what Action.Foretell is built

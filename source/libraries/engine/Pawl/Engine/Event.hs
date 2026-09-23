@@ -59,6 +59,7 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype.Engine
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -6112,14 +6113,20 @@ arrangeComponents pid dest components =
 -- Called INSIDE changeZoneAttaching, before the CR 614.1c entry loop and only
 -- where the settled destination is the battlefield, and Pawl.Types.CarryOver is
 -- how the move says whether CR 400.7's exception is the one it is making. Scoped
--- to Pawl.Engine.Stack's two permanent-spell branches. Not implemented: CR
--- 400.7b's static-ability ability grants (CR
--- 611.3d), which this carrier cannot reach at all -- a static grant is derived
--- on every projection rather than stored, so there is no row here to re-key
--- (#2425). CR 400.7i is unimplemented too, on a carrier this one never sees --
--- the land-play path (gap #2398). CR 400.7g is implemented, on
--- Pawl.Engine.Cast.keywordsBefore and Pawl.Types.Object.castGrant rather than
--- here.
+-- to Pawl.Engine.Stack's two permanent-spell branches.
+--
+-- CR 400.7b rides it too where a permission's rider granted the ability: that
+-- grant is STORED against the spell as it is cast (permissionRiders), so this
+-- re-keys it like any other row. Pawl.CastPermissionSpec's "CR 400.7b / 611.3d
+-- the permanent a graveyard cast became keeps the rider past the Paragon"
+-- proves it.
+--
+-- Not implemented: CR 400.7b for a static grant to spells that is no
+-- permission's rider (Zinnia, Valley's Voice's offspring): nothing stores one,
+-- so there is no row here to re-key (gap #3635). CR 400.7i for an exile
+-- permission's rider is unimplemented too, on the land-play path (gap #2398).
+-- CR 400.7g is implemented, on Pawl.Engine.Cast.keywordsBefore and
+-- Pawl.Types.Object.castGrant rather than here.
 carryOver :: CarryOver.CarryOver -> ObjectId -> ObjectId -> Game ()
 carryOver carrying oldId newId = case carrying of
   CarryOver.NotCarried -> pure ()
@@ -6294,6 +6301,48 @@ lingeringHandover oid lastController gs =
                 ContinuousEffect.expiry = expiry,
                 ContinuousEffect.modification = modification,
                 ContinuousEffect.affected = Affected.TheseObjects frozen
+              }
+
+-- CR 611.3d, with CR 400.7h / 400.7i to find the object: the effects `src`'s
+-- Affected.PlayedThisWay abilities store against `played`, the card its play
+-- permission was just used for -- Serra Paragon's "if you do, it gains". Asked
+-- of `gs`, the board the permission was offered on, so a source that a cost of
+-- the same cast took off the battlefield still hands its rider over.
+--
+-- STORED rather than derived, which is CR 611.3d's own exception to CR 611.3a:
+-- the ability lasts as long as the rider says, or to the end of the game, and
+-- neither the source leaving nor the spell becoming a permanent ends it. The
+-- spell-to-permanent half is carryOver's re-keying of a TheseObjects row (CR
+-- 400.7b).
+--
+-- The timestamp is the source's, lingeringHandover's reason: CR 613.7a gave this
+-- effect that timestamp, and nothing resolved to give it a fresh one.
+--
+-- Short-circuited on the copiable read for lingeringHandover's reason, and
+-- indexed through it for the same one.
+permissionRiders :: ObjectId -> GameState -> ObjectId -> [ContinuousEffect.ContinuousEffect Card]
+permissionRiders src gs played =
+  let riders :: [(Natural, Duration.Duration)]
+      riders = do
+        (n, sa) <- zip [0 ..] (Projection.staticAbilitiesOf src gs)
+        case StaticAbility.affected sa of
+          Affected.PlayedThisWay duration -> pure (n, duration)
+          _ -> []
+      controller = Projection.controllerOf src gs
+   in if null riders
+        then []
+        else do
+          (n, ts, modification, _) <- Projection.frozenStaticParts src gs
+          duration <- fmap snd (filter ((== n) . fst) riders)
+          you <- Maybe.maybeToList controller
+          expiry <- Maybe.maybeToList (Expiry.arm Map.empty you src duration gs)
+          pure
+            ContinuousEffect.MkContinuousEffect
+              { ContinuousEffect.source = src,
+                ContinuousEffect.timestamp = ts,
+                ContinuousEffect.expiry = expiry,
+                ContinuousEffect.modification = modification,
+                ContinuousEffect.affected = Affected.TheseObjects (Set.singleton played)
               }
 
 -- The single destruction funnel (CR 701.8 / 702.12b): the Destroy opcode and the
@@ -8410,7 +8459,7 @@ settleOnsets gs =
         -- The turn that is beginning IS the one the printed phrase named exactly
         -- when it belongs to the entry's controller (CR 603.7d-f).
         TurnWindow.ControllersNextTurn
-          | DelayedTrigger.controller entry == GameState.activePlayer gs ->
+          | Turn.isActive gs (DelayedTrigger.controller entry) ->
               entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
         -- Anyone else's turn, including an intervening opponent's: still waiting.
         TurnWindow.ControllersNextTurn -> entry

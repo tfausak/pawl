@@ -19,6 +19,7 @@ import Pawl.CastProhibitionSpec (equipBoard, flashBoard, flashOnOwnTurn, isActiv
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -53,6 +54,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
@@ -910,6 +912,14 @@ garruksHordeSpec s registry =
           Spec.assertBool s (not (S.castable S.alice herTop without)) "nor castable"
           Spec.assertBool s (not (PlayerEffect.mayCastFrom S.alice Zone.Library herTop without)) "and the typed question says no"
           Spec.assertBool s (any (S.isCastOf herHand) (Action.legalActions S.alice without)) "though her hand is offered on the same board"
+
+        -- PermissionVerb.Cast: the Filter admits Dryad Arbor, a land creature,
+        -- and the permission still plays no land (CR 305.1: a land is never
+        -- cast). Serra Paragon's Play verb is the one that would.
+        Spec.it s "CR 305.1 a creature land on top is not playable under a cast permission" $ do
+          (herTop, _, _, _, _, gs) <- board "Dryad Arbor" True
+          Spec.assertBool s (notElem (herTop, Nothing) (Action.playableLands S.alice gs)) "Dryad Arbor on top is not playable"
+          Spec.assertBool s (PlayerEffect.mayCastFrom S.alice Zone.Library herTop gs) "though the permission's Filter matches it"
 
         -- The Filter half: "creature spells". The refusal is not cost or timing,
         -- which the identical card in her HAND on the same board shows.
@@ -2009,6 +2019,296 @@ scoutsWarningSpec s registry =
       Spec.assertEqWith s "CR 708.2a the grant is spent by the face-down creature spell" (GameState.playerEffects after) []
       Spec.assertEqWith s "and the spell really is on the stack" (length (GameState.stack after)) 1
 
+-- The first action any of `wanted` admits, in the order `wanted` lists them, or
+-- a pass -- castAnyOf above widened to a land play.
+takeFirst :: [Action.Type.Action -> Bool] -> Prompt.Prompt r -> r
+takeFirst wanted p = case p of
+  Prompt.ChooseAction _ _ actions -> case [action | admits <- wanted, action <- actions, admits action] of
+    h : _ -> h
+    [] -> Action.Type.Pass
+  _ -> S.identityAnswer p
+
+-- takeFirst casting `oid`, paying for it with a cost carrying components (an
+-- escape cost's exile) when `escape` holds and with a bare mana cost otherwise.
+payingFor :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+payingFor escape oid p = case p of
+  Prompt.ChooseCost _ _ _ costs -> case filter ((== escape) . not . null . Cost.Type.components) costs of
+    c : _ -> c
+    [] -> S.identityAnswer p
+  _ -> takeFirst [S.isCastOf oid] p
+
+-- The objects that arrived on the battlefield between two boards.
+arrivedBetween :: GameState.GameState -> GameState.GameState -> [ObjectId.ObjectId]
+arrivedBetween before after = Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before))
+
+-- CR 700.4: `oid` dies, and the ability that triggered goes on the stack and
+-- resolves.
+diesAndResolves :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+diesAndResolves oid gs =
+  let killed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [oid])
+      placed = S.runPure S.identityAnswer killed Engine.settleForPriority
+   in S.runPure S.identityAnswer placed Stack.resolveTop
+
+-- The names of the cards in one of `pid`'s zones.
+namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [String]
+namesIn zone pid gs = Maybe.mapMaybe (\oid -> fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs)
+
+-- paragonBoard's objects, named.
+data ParagonBoard = MkParagonBoard
+  { pbGraveForest :: ObjectId.ObjectId,
+    pbBuried :: ObjectId.ObjectId,
+    pbHandForest :: ObjectId.ObjectId,
+    pbHeld :: ObjectId.ObjectId,
+    pbParagon :: Maybe ObjectId.ObjectId,
+    pbState :: GameState.GameState
+  }
+
+-- alice's precombat main at two seats: three Forests, `paragon` on her
+-- battlefield when given, a Forest and `buried` in her graveyard, and `held` and
+-- a Forest in her hand. `remaining` is emptied for johannBoard's reason.
+paragonBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Maybe Printing.Printing -> ParagonBoard
+paragonBoard forest buried held paragon =
+  let lands = S.landsFor forest S.bob 3 (S.landsFor forest S.alice 3 (Setup.emptyGame S.bothPlayers))
+      (_, g1) = S.addLibraryCard forest S.alice lands
+      (_, g2) = S.addLibraryCard forest S.bob g1
+      (graveForest, g3) = S.addGraveyardCard forest S.alice g2
+      (buriedId, g4) = S.addGraveyardCard buried S.alice g3
+      (handForest, g5) = S.addHandCard forest S.alice g4
+      (heldId, g6) = S.addHandCard held S.alice g5
+      (paragonId, g7) = case paragon of
+        Nothing -> (Nothing, g6)
+        Just printing -> let (oid, g) = S.addPermanent printing S.alice g6 in (Just oid, g)
+   in MkParagonBoard
+        { pbGraveForest = graveForest,
+          pbBuried = buriedId,
+          pbHandForest = handForest,
+          pbHeld = heldId,
+          pbParagon = paragonId,
+          pbState =
+            g7
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice,
+                GameState.remaining = Seq.empty
+              }
+        }
+
+-- Serra Paragon {2}{W}{W} Creature -- Angel 3/4: "Flying / Once during each of
+-- your turns, you may play a land from your graveyard or cast a permanent spell
+-- with mana value 3 or less from your graveyard. If you do, it gains 'When this
+-- permanent is put into a graveyard from the battlefield, exile it and you gain
+-- 2 life.'"
+--
+-- The producer of PermissionVerb.Play and PermissionLimit.OnceEachOfYourTurns,
+-- and of CR 611.3d's rider through Affected.PlayedThisWay. Llanowar Elves is the
+-- permanent spell and a Forest the land, both under the mana value.
+serraParagonSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+serraParagonSpec s registry =
+  let board buried held withParagon = do
+        forest <- S.printingOf s registry "Forest"
+        buriedCard <- S.printingOf s registry buried
+        heldCard <- S.printingOf s registry held
+        paragon <- S.printingOf s registry "Serra Paragon"
+        pure (paragonBoard forest buriedCard heldCard (if withParagon then Just paragon else Nothing))
+      playOf oid = (== Action.Type.Play oid Nothing)
+   in Spec.describe s "SerraParagon" $ do
+        -- The shared budget, from the land side. alice plays the graveyard
+        -- Forest whenever it is offered and casts the buried Elves whenever
+        -- THEY are, land first; the one use goes on the land, so the Elves
+        -- never are.
+        Spec.it s "CR 601.3 / 305.1 a land played from the graveyard spends the one use the cast needed" $ do
+          b <- board "Llanowar Elves" "Forest" True
+          let gs = pbState b
+              after = S.runPure (takeFirst [playOf (pbGraveForest b), S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
+          Spec.assertBool s (elem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice after)) "the Llanowar Elves are still in alice's graveyard"
+          Spec.assertBool s (notElem (pbGraveForest b) (Game.zoneMembers Zone.Graveyard S.alice after)) "because the Forest left it"
+          Spec.assertEqWith s "and one land arrived" (length (arrivedBetween gs after)) 1
+
+        -- The pair's other half: WITHOUT the land play the same Elves are cast,
+        -- so the refusal above was the budget and not the mana or the card.
+        Spec.it s "CR 601.3 the same Elves are cast from the graveyard when nothing else spent the use" $ do
+          b <- board "Llanowar Elves" "Forest" True
+          let gs = pbState b
+              after = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
+          Spec.assertBool s (notElem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice after)) "the Elves left alice's graveyard"
+          Spec.assertEqWith s "and one creature arrived" (length (arrivedBetween gs after)) 1
+
+        -- The shared budget, from the cast side: once the Elves are cast, the
+        -- graveyard Forest is not playable, though her land drop is unspent --
+        -- the Forest in her hand still is.
+        Spec.it s "CR 601.3 / 305.1 a spell cast from the graveyard spends the one use the land play needed" $ do
+          b <- board "Llanowar Elves" "Forest" True
+          let gs = pbState b
+              after = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
+          Spec.assertBool s (notElem (pbGraveForest b, Nothing) (Action.playableLands S.alice after)) "the graveyard Forest is not playable once the Elves are cast"
+          Spec.assertBool s (elem (pbHandForest b, Nothing) (Action.playableLands S.alice after)) "while the Forest in her hand is"
+          Spec.assertBool s (elem (pbGraveForest b, Nothing) (Action.playableLands S.alice gs)) "and the graveyard Forest was, before the cast"
+
+        -- The budget comes back at the turn handoff, CR 601.3's "each of your
+        -- turns".
+        Spec.it s "CR 601.3 the use comes back on her next turn" $ do
+          b <- board "Llanowar Elves" "Forest" True
+          let after = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) (pbState b) Engine.priorityLoop
+              next = nextTurnOfAliceAfter after
+          Spec.assertBool s (elem (pbGraveForest b, Nothing) (Action.playableLands S.alice next)) "the graveyard Forest is playable again"
+
+        -- Without the Paragon nothing in the graveyard is playable.
+        Spec.it s "CR 305.1 without Serra Paragon the graveyard Forest is not playable" $ do
+          b <- board "Llanowar Elves" "Forest" False
+          Spec.assertBool s (notElem (pbGraveForest b, Nothing) (Action.playableLands S.alice (pbState b))) "the graveyard Forest is not offered"
+
+        -- "Once during each of YOUR turns": on bob's turn, with alice holding
+        -- priority, Pouncing Cheetah's flash lets the one in her hand be cast,
+        -- and the one in her graveyard is not offered.
+        Spec.it s "CR 601.3 the permission does not apply on another player's turn" $ do
+          b <- board "Pouncing Cheetah" "Pouncing Cheetah" True
+          let gs = pbState b
+              bobs = gs {GameState.activePlayer = S.bob}
+          Spec.assertBool s (not (any (S.isCastOf (pbBuried b)) (Action.legalActions S.alice bobs))) "the graveyard Cheetah is not offered on bob's turn"
+          Spec.assertBool s (any (S.isCastOf (pbHeld b)) (Action.legalActions S.alice bobs)) "though flash offers the one in her hand"
+          Spec.assertBool s (any (S.isCastOf (pbBuried b)) (Action.legalActions S.alice gs)) "and the graveyard one is offered on her own turn"
+
+        -- The rider (CR 400.7b / 611.3d). The Elves cast from the graveyard
+        -- resolve into a permanent that keeps the granted trigger after the
+        -- Paragon itself is gone -- no duration is stated, so it lasts the game
+        -- -- and dying exiles them and gains alice 2 life.
+        Spec.it s "CR 400.7b / 611.3d the permanent a graveyard cast became keeps the rider past the Paragon" $ do
+          b <- board "Llanowar Elves" "Forest" True
+          let gs = pbState b
+              cast = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
+          case (arrivedBetween gs cast, pbParagon b) of
+            ([permanent], Just paragon) -> do
+              let after = diesAndResolves permanent (diesAndResolves paragon cast)
+              Spec.assertEqWith s "the Elves' card was exiled" (namesIn Zone.Exile S.alice after) ["Llanowar Elves"]
+              Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
+            (arrived, _) -> Spec.assertFailure s ("expected one arrival and a Paragon, got " <> show arrived)
+
+        -- THE PROJECTION TRIPWIRE: alice's Serra Paragon is a Clone (CR 707.2),
+        -- and the printed Paragon on the board is bob's. The permission and the
+        -- rider both come off the copiable values; a read of the printed card
+        -- answers "Clone" and offers nothing.
+        Spec.it s "CR 707.2 a Clone of Serra Paragon grants the permission and the rider" $ do
+          b <- board "Llanowar Elves" "Forest" False
+          paragon <- S.printingOf s registry "Serra Paragon"
+          clone <- S.printingOf s registry "Clone"
+          let (_, withBobs) = S.addPermanent paragon S.bob (pbState b)
+              (_, staged) = S.spellOnStack clone S.alice withBobs
+              copying p = case p of
+                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
+                _ -> S.identityAnswer p
+              copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
+              ready = copied {GameState.priority = Just S.alice, GameState.passes = 0}
+              cast = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) ready Engine.priorityLoop
+          case arrivedBetween ready cast of
+            [permanent] -> do
+              let after = diesAndResolves permanent cast
+              Spec.assertEqWith s "the Elves' card was exiled" (namesIn Zone.Exile S.alice after) ["Llanowar Elves"]
+              Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice ready))
+            arrived -> Spec.assertFailure s ("expected the Elves to arrive under the Clone's permission, got " <> show arrived)
+
+        -- CR 702.138a: Loathsome Chimera {2}{G} escapes for {4}{G} and three
+        -- other graveyard cards, a permission of its own. Paid for its escape
+        -- cost, the cast is made under escape and not under the Paragon: no
+        -- rider, and the Paragon's use is left for a graveyard land. Paid for
+        -- its mana cost on the same board, it is the Paragon's cast, and takes
+        -- both.
+        Spec.it s "CR 702.138a an escaped Chimera takes neither Serra Paragon's use nor its rider" $ do
+          b <- board "Loathsome Chimera" "Forest" True
+          forest <- S.printingOf s registry "Forest"
+          let fodder g _ = snd (S.addGraveyardCard forest S.alice g)
+              gs = S.landsFor forest S.alice 2 (List.foldl' fodder (pbState b) [1 :: Int .. 4])
+              chimera = pbBuried b
+              outcome escape =
+                let cast = S.runPure (payingFor escape chimera) gs Engine.priorityLoop
+                 in case arrivedBetween gs cast of
+                      [permanent] -> Just (cast, diesAndResolves permanent cast)
+                      _ -> Nothing
+              graveLandPlayable g = any (\oid -> elem (oid, Nothing) (Action.playableLands S.alice g)) (Game.zoneMembers Zone.Graveyard S.alice g)
+          case (outcome True, outcome False) of
+            (Just (escaped, escapedDied), Just (hard, hardDied)) -> do
+              Spec.assertBool s (notElem "Loathsome Chimera" (namesIn Zone.Exile S.alice escapedDied)) "the escaped Chimera was not exiled as it died"
+              Spec.assertEqWith s "and alice gained no life" (S.lifeOf S.alice escapedDied) (S.lifeOf S.alice gs)
+              Spec.assertBool s (graveLandPlayable escaped) "and a graveyard Forest is still playable under the Paragon"
+              Spec.assertEqWith s "the escape cost exiled three cards" (length (namesIn Zone.Exile S.alice escaped)) 3
+              Spec.assertBool s (elem "Loathsome Chimera" (namesIn Zone.Exile S.alice hardDied)) "cast for its mana cost, the Chimera took the rider"
+              Spec.assertBool s (not (graveLandPlayable hard)) "and spent the Paragon's use"
+            _ -> Spec.assertFailure s "expected the Chimera to resolve on both boards"
+
+        -- The linkage: the same Elves cast from her HAND, with the Paragon on
+        -- the battlefield, were not cast "this way" and gain nothing.
+        Spec.it s "CR 611.3d a spell cast from the hand is not given the rider" $ do
+          b <- board "Forest" "Llanowar Elves" True
+          let gs = pbState b
+              cast = S.runPure (takeFirst [S.isCastOf (pbHeld b)]) gs Engine.priorityLoop
+          case arrivedBetween gs cast of
+            [permanent] -> do
+              let after = diesAndResolves permanent cast
+              Spec.assertEqWith s "nothing was exiled" (namesIn Zone.Exile S.alice after) []
+              Spec.assertEqWith s "and alice's life is unchanged" (S.lifeOf S.alice after) (S.lifeOf S.alice gs)
+            arrived -> Spec.assertFailure s ("expected one arrival, got " <> show arrived)
+
+        -- CR 400.7i: the land played this way gains the rider too.
+        Spec.it s "CR 400.7i / 611.3d the land played from the graveyard keeps the rider" $ do
+          b <- board "Llanowar Elves" "Forest" True
+          let gs = pbState b
+              played = S.runPure (takeFirst [playOf (pbGraveForest b)]) gs Engine.priorityLoop
+          case arrivedBetween gs played of
+            [permanent] -> do
+              let after = diesAndResolves permanent played
+              Spec.assertEqWith s "the Forest was exiled" (namesIn Zone.Exile S.alice after) ["Forest"]
+              Spec.assertEqWith s "and alice gained 2 life" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
+            arrived -> Spec.assertFailure s ("expected one arrival, got " <> show arrived)
+
+-- alice's precombat main with three Mountains, `granting` on her battlefield,
+-- and Giant Cindermaw {2}{R} 4/3 on top of her library.
+thundermaneBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+thundermaneBoard mountain cindermaw filler granting =
+  let lands = S.landsFor mountain S.bob 3 (S.landsFor mountain S.alice 3 (Setup.emptyGame S.bothPlayers))
+      (_, g1) = S.addLibraryCard filler S.alice lands
+      (top, g2) = S.addLibraryCard cindermaw S.alice g1
+      (_, g3) = S.addLibraryCard filler S.bob g2
+      (_, g4) = S.addPermanent granting S.alice g3
+   in ( top,
+        g4
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.empty
+          }
+      )
+
+-- Thundermane Dragon {3}{R} Creature -- Dragon 4/4: "Flying / You may look at
+-- the top card of your library any time. / You may cast creature spells with
+-- power 4 or greater from the top of your library. If you cast a creature spell
+-- this way, it gains haste until end of turn."
+--
+-- CR 611.3d's own sentence, and the rider with a stated duration. The look
+-- clause is omitted under johannSpec's precedent (#1412). Garruk's Horde grants
+-- the same cast with no rider, so the pair differs in the haste alone.
+thundermaneSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+thundermaneSpec s registry =
+  let board granting = do
+        mountain <- S.printingOf s registry "Mountain"
+        cindermaw <- S.printingOf s registry "Giant Cindermaw"
+        forest <- S.printingOf s registry "Forest"
+        printing <- S.printingOf s registry granting
+        pure (thundermaneBoard mountain cindermaw forest printing)
+      castAndResolve (top, gs) =
+        let after = S.runPure (takeFirst [S.isCastOf top]) gs Engine.priorityLoop
+         in (arrivedBetween gs after, after)
+   in Spec.describe s "ThundermaneDragon" $ do
+        Spec.it s "CR 400.7b / 611.3d the creature cast off the top can attack the turn it resolves" $ do
+          (arrived, after) <- fmap castAndResolve (board "Thundermane Dragon")
+          (arrivedH, afterH) <- fmap castAndResolve (board "Garruk's Horde")
+          case (arrived, arrivedH) of
+            ([cindermaw], [cindermawH]) -> do
+              Spec.assertBool s (Combat.canAttack S.alice cindermaw after) "under Thundermane Dragon the Cindermaw can attack"
+              Spec.assertBool s (not (Combat.canAttack S.alice cindermawH afterH)) "while under Garruk's Horde it is summoning sick"
+              let ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+              Spec.assertBool s (Projection.hasKeyword Keyword.Haste cindermaw after) "CR 611.3d the Cindermaw has haste this turn"
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste cindermaw ended)) "CR 514.2 and loses it at cleanup, the rider's stated duration"
+            _ -> Spec.assertFailure s ("expected one arrival on each board, got " <> show (arrived, arrivedH))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   extraLandDropsSpec s registry
@@ -2019,6 +2319,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   garruksHordeSpec s registry
   futureSightSpec s registry
   johannSpec s registry
+  serraParagonSpec s registry
+  thundermaneSpec s registry
   voidWinnowerSpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry

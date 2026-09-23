@@ -112,7 +112,7 @@ inherentMatch monarch cond gs logged =
       -- inherent abilities "controlled by the player who was the monarch at the
       -- time the abilities triggered", so they are the "you" CR 109.5 would give a
       -- printed one.
-      scopeOk s a = Event.turnScopeAdmits (Game.teams gs) s a monarch
+      scopeOk s a = Event.turnScopeAdmits gs s a monarch
    in case (cond, LoggedEvent.event logged) of
         (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active))
           | began == wanted && scopeOk scope active -> Just Map.empty
@@ -362,6 +362,9 @@ returnExiledForMonarch = do
 -- directly, and rightly: it crowns nobody, so it records no event and marks no
 -- watch. "An opponent becomes the monarch" is never satisfied by there being no
 -- monarch.
+--
+-- Not implemented: which active player "the active player" is under the shared
+-- team turns option (#4003).
 reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
 reassignOnDeparture leaving playing gs =
   if GameState.monarch gs /= Just leaving

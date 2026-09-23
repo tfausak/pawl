@@ -1,5 +1,6 @@
 module Pawl.Codec.Affected where
 
+import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
@@ -20,7 +21,8 @@ codec =
           Arm.payload "MatchingAnywhere" filterCodec Affected.MatchingAnywhere (\x -> case x of Affected.MatchingAnywhere y -> Just y; _ -> Nothing),
           Arm.payload "MatchingOffBattlefield" filterCodec Affected.MatchingOffBattlefield (\x -> case x of Affected.MatchingOffBattlefield y -> Just y; _ -> Nothing),
           Arm.nullary "Attached" Affected.Attached,
-          Arm.payload "AttachedPlayerControls" filterCodec Affected.AttachedPlayerControls (\x -> case x of Affected.AttachedPlayerControls y -> Just y; _ -> Nothing)
+          Arm.payload "AttachedPlayerControls" filterCodec Affected.AttachedPlayerControls (\x -> case x of Affected.AttachedPlayerControls y -> Just y; _ -> Nothing),
+          Arm.payload "PlayedThisWay" Duration.codec Affected.PlayedThisWay (\x -> case x of Affected.PlayedThisWay y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: Affected.Affected -> String
@@ -31,3 +33,4 @@ tagOf x = case x of
   Affected.MatchingOffBattlefield {} -> "MatchingOffBattlefield"
   Affected.Attached {} -> "Attached"
   Affected.AttachedPlayerControls {} -> "AttachedPlayerControls"
+  Affected.PlayedThisWay {} -> "PlayedThisWay"

@@ -181,6 +181,9 @@ nextStillPlaying gs pid =
 -- GameState.activePlayer is deliberately NOT widened to a Maybe -- the turn still
 -- BELONGS to that seat, CR 800.4m's durations and CR 101.4's APNAP anchor both
 -- referencing it.
+--
+-- Not implemented: CR 805.5's team priority -- under the shared team turns option
+-- priority still passes player by player (#4001).
 priorityHolder :: GameState -> PlayerId
 priorityHolder gs =
   let active = GameState.activePlayer gs
@@ -424,8 +427,7 @@ discardToHandSize pid = do
 -- players, and turnOrder is the permanent roster, so a three-player game down to
 -- two survivors still does not skip.
 --
--- Not implemented: CR 103.8b's same skip for a TEAM in Two-Headed Giant, pawl
--- having no variant that shares a turn between teammates (#2849).
+-- Not implemented: CR 103.8b's same skip for a TEAM in Two-Headed Giant (#2849).
 skipsDraw :: GameState -> Bool
 skipsDraw gs =
   GameState.turnNumber gs == 1
@@ -454,33 +456,44 @@ runTurnBasedActions phase = do
   -- no choice at all. Combat.designateDefenders is where the one that is left
   -- gets reassigned, which is why the beginning of combat arm below takes no
   -- guard.
+  --
+  -- CR 805.4 / 805.9: under the shared team turns option every member of the
+  -- active team is an active player, so each still playing (`live`) takes the
+  -- actions that are the active player's own.
+  --
+  -- Not implemented: CR 805.6's order -- the team does not choose the order its
+  -- members untap, draw (CR 805.6a) and discard in (#4001).
   hasActive <- State.gets (List.elem active . Game.stillPlaying)
+  live <- State.gets (\gs -> filter (\pid -> List.elem pid (Game.stillPlaying gs)) (Turn.activePlayers gs))
   case phase of
     Phase.Beginning BeginningStep.Untap -> do
       -- CR 502.1 / 703.4a: phasing, immediately after the step begins. Inside the
       -- CR 800.4j guard, rule 502.1 ranging over what THE ACTIVE PLAYER controls;
       -- a row keyed to a player who left EARLIER never reaches it, CR 800.4k
       -- giving that seat no turn, so CR 702.26n's reschedule is at the walk.
-      Monad.when hasActive (State.modify' (Phasing.phasingEvent active))
+      Monad.forM_ live (State.modify' . Phasing.phasingEvent)
       -- CR 502.2 / 703.4b: the day/night check, second in the step and BEFORE the
       -- untap itself (CR 502.3 / 703.4c). Outside the CR 800.4j guard, rule 703.4b
       -- making it the GAME's action.
       _ <- Daytime.untapCheck Event.recordTransformed
-      Monad.when hasActive $ do
-        untapAll active
-        settleAll active
+      Monad.forM_ live $ \pid -> do
+        untapAll pid
+        settleAll pid
         State.modify' $ \gs ->
           -- CR 305.2: the allowance is per TURN. DELETED rather than set to 0, so
           -- "has played none" has one representation.
-          gs {GameState.landsPlayed = Map.delete active (GameState.landsPlayed gs)}
-    Phase.Beginning BeginningStep.DrawStep -> Monad.when hasActive $ do
+          gs {GameState.landsPlayed = Map.delete pid (GameState.landsPlayed gs)}
+    -- CR 805.4b: each player on the active team draws.
+    Phase.Beginning BeginningStep.DrawStep -> do
       skip <- State.gets skipsDraw
-      Monad.unless skip (Event.drawCard active)
+      Monad.unless skip (Monad.mapM_ Event.drawCard live)
     -- CR 703.4h: choose the defending player. The active player's action (CR
     -- 507.1), and the one item on the list CR 800.4h hands to another seat rather
     -- than dropping, so it is NOT guarded here -- designateDefenders asks
     -- Game.ruleChooser who makes the choice.
     Phase.Combat CombatStep.BeginningOfCombat -> Combat.designateDefenders
+    -- Not implemented: CR 805.10b's combined attack -- only the active player
+    -- declares attackers, not the active team as one (#4002).
     Phase.Combat CombatStep.DeclareAttackers -> Monad.when hasActive (Combat.declareAttackers Resolve.performManaAbility active)
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers Resolve.performManaAbility
     Phase.Combat CombatStep.CombatDamage -> do
@@ -502,11 +515,11 @@ runTurnBasedActions phase = do
     -- it lives here and not in the gatherer; the active player's, so it takes the
     -- CR 800.4j guard. Not implemented: CR 703.4g's Attraction roll, which that
     -- rule puts immediately after this and which has no producer (#871).
-    Phase.PrecombatMain -> Monad.when hasActive (advanceSagas active)
+    Phase.PrecombatMain -> Monad.mapM_ advanceSagas live
     -- CR 511.1: the end of combat step has no turn-based actions, so no arm here.
     -- CR 511.3's removal from combat is an end-of-STEP action; runStep does it.
     Phase.Ending EndingStep.Cleanup -> do
-      Monad.when hasActive (discardToHandSize active)
+      Monad.mapM_ discardToHandSize live
       -- CR 514.2's second action, the same one CR 500.11's skipped ending phase
       -- takes the other road to. NOT guarded: CR 703.4p is the game's action, so
       -- it runs with no active player. Mana.endManaRetention only ENDS the
@@ -725,10 +738,9 @@ withinTriggerLimit gs =
 -- object to tell them apart, where an object-borne ability is CR 113.7's one
 -- instance whoever controls it.
 --
--- The controller component is a REGRESSION FENCE rather than a proven behaviour:
--- rule 702.179d's is the only sourceless ability printing the rider and it fires
--- for the active player alone, so no board can have two players spend it in one
--- turn, and dropping the component leaves the suite green.
+-- The controller component is proved by Pawl.TeamSpec's "CR 702.179d each
+-- active teammate's speed rises once": under the shared team turns option two
+-- active players each spend their own instance of rule 702.179d's ability.
 --
 -- Not implemented: two VALUE-IDENTICAL limited abilities on one source are one
 -- instance here, so one spends the other's turn (#3198).
@@ -1402,12 +1414,14 @@ priorityLoop = do
                                 -- turns a put-onto-the-battlefield instruction
                                 -- away: playing a land is a special action.
                                 --
-                                -- Not implemented: CR 400.7i, the land half of the
-                                -- sentence Pawl.Engine.Cast.followIntoSpell keeps
-                                -- for spells (CR 400.7h) -- the rest of the effect
-                                -- that allowed this play cannot find the permanent
-                                -- the land card became, so a rider on the
-                                -- permission has nothing to attach to (gap #2398).
+                                -- Not implemented: CR 400.7i for an exile
+                                -- permission, the land half of the sentence
+                                -- Pawl.Engine.Cast.followIntoSpell keeps for
+                                -- spells (CR 400.7h) -- the rest of that effect
+                                -- cannot find the permanent the land card became,
+                                -- so a rider on it has nothing to attach to (gap
+                                -- #2398). A player permission's rider is
+                                -- `riders` below.
                                 --
                                 -- CR 611.2a / 601.1a: the one-shot flash grants
                                 -- this play spends, asked on the PRE-MOVE id while
@@ -1424,12 +1438,22 @@ priorityLoop = do
                                 -- rule's characteristicless object.
                                 State.modify' (Cast.turnedUpForPlay oid Facing.FaceUp)
                                 spent <- State.gets (PlayerEffect.spentByLandPlay p oid)
+                                -- CR 305.1 / 400.7i: the Play-verb permission
+                                -- this play spends and the riders it hands the
+                                -- land, both asked of the pre-move board for
+                                -- `spent`'s reason.
+                                before <- State.get
+                                let (sources, permission) = PlayerEffect.landPermissionUse p oid before
+                                    riders played = concatMap (\src -> Event.permissionRiders src before played) sources
                                 -- CR 110.2 / 305.1: the permanent enters under
                                 -- the player who PLAYED it, which is not the
                                 -- card's owner once a permission opens somebody
                                 -- else's hand (Sen Triplets); see #2169.
                                 moved <- Event.changeZoneShowing (Just p) oid Zone.Battlefield mName
-                                Monad.unless (Seq.null moved) (State.modify' (PlayerEffect.consume spent))
+                                Monad.unless (Seq.null moved) $ do
+                                  State.modify' (PlayerEffect.consume spent)
+                                  State.modify' (PlayerEffect.spendCastPermission permission)
+                                  State.modify' (\g -> g {GameState.continuousEffects = concatMap riders (filter (`Set.member` GameState.battlefield g) (Foldable.toList moved)) <> GameState.continuousEffects g})
                                 -- CR 305.2a counts the lands played this turn, so
                                 -- this TALLIES rather than flagging. CR 305.4:
                                 -- the only tally, an effect that PUTS a land onto
@@ -1581,16 +1605,19 @@ turnAnchorOf gs = Maybe.fromMaybe (GameState.activePlayer gs) (GameState.turnAnc
 -- an ordinary turn: it does not begin, the entry is still SPENT, and both "would
 -- have begun" rules still fire.
 --
--- Not implemented: CR 805.8's shared team turns (#2848) and CR 807.4i/j's Grand
--- Melee turn markers (#3003), each of which rewrites this rule for an option pawl
--- does not carry.
+-- CR 805.8: under the shared team turns option the taker's team takes the extra
+-- turn, which beginTurnOf's CR 805.4 answer gives it with no arm here.
+--
+-- Not implemented: CR 805.8's one turn for a team two of whose members one
+-- effect gives the same turn (#4003), and CR 807.4i/j's Grand Melee turn
+-- markers (#3003).
 takeNextTurn :: GameState -> GameState
 takeNextTurn gs = case GameState.extraTurns gs of
-  [] -> walkToNextTurn (length (GameState.turnOrder gs)) (turnAnchorOf gs) gs
+  [] -> walkToNextTurn (length (GameState.turnOrder gs)) (turnAnchorOf gs) (turnAnchorOf gs) gs
   entry : rest ->
     let pid = ExtraTurn.taker entry
         anchor = turnAnchorOf gs
-        swept = Expiry.dropAtTurnOf pid gs {GameState.extraTurns = rest}
+        swept = dropAtTurnOfTeam pid gs {GameState.extraTurns = rest}
         anchored = swept {GameState.turnAnchor = Just anchor}
      in if List.elem pid (Game.stillPlaying swept)
           then -- CR 500.11: this turn's OWN skips (Savor the Moment) come into
@@ -1610,24 +1637,37 @@ takeNextTurn gs = case GameState.extraTurns gs of
 -- turn, keeping the sweeps already applied. Written as an explicit bounded
 -- recursion rather than `cycle`/`head` so it is total; unreachable while the game
 -- is running, a game with no survivors already having a Result (CR 104.2a).
-walkToNextTurn :: Int -> PlayerId -> GameState -> GameState
-walkToNextTurn seatsLeft seat gs =
+--
+-- CR 805.4: a seat whose player shares the turn the walk starts from has just
+-- taken it, so it is passed with no sweep -- that player's next turn is still to
+-- come.
+walkToNextTurn :: Int -> PlayerId -> PlayerId -> GameState -> GameState
+walkToNextTurn seatsLeft anchor seat gs =
   if seatsLeft <= 0
     then gs
     else
       let next = nextInOrder (GameState.turnOrder gs) seat
-          swept = Expiry.dropAtTurnOf next gs
+          swept = dropAtTurnOfTeam next gs
           -- CR 702.26n: the phasing analogue of the sweep above, on the same line
           -- for the same reason -- this is the moment the turn WOULD have begun.
           -- A row keyed to a seat this walk passes is rescheduled and phases in at
           -- the untap step of whichever seat the walk lands on. This branch only:
           -- a seat that does begin a turn is nobody's orphan.
           orphaned = Phasing.orphanSchedule next swept
-       in if List.elem next (Game.stillPlaying swept)
-            then -- CR 500.7 / 103.1: this turn IS the ordinary rotation, so there
-            -- is nothing left to remember.
-              beginTurnOf next swept {GameState.turnAnchor = Nothing}
-            else walkToNextTurn (seatsLeft - 1) next orphaned
+       in if next /= anchor && Turn.sharesTurn gs anchor next
+            then walkToNextTurn (seatsLeft - 1) anchor next gs
+            else
+              if List.elem next (Game.stillPlaying swept)
+                then -- CR 500.7 / 103.1: this turn IS the ordinary rotation, so
+                -- there is nothing left to remember.
+                  beginTurnOf next swept {GameState.turnAnchor = Nothing}
+                else walkToNextTurn (seatsLeft - 1) anchor next orphaned
+
+-- CR 611.2a / 800.4m's sweep for a turn that begins or would have begun: every
+-- player who takes it, which under CR 805.4 is the whole team.
+dropAtTurnOfTeam :: PlayerId -> GameState -> GameState
+dropAtTurnOfTeam pid gs =
+  List.foldl' (flip Expiry.dropAtTurnOf) gs (filter (Turn.sharesTurn gs pid) (GameState.turnOrder gs))
 
 -- The turn actually begins for `pid`, split out so the CR 800.4k seat walk has
 -- exactly one place to land.
@@ -1640,13 +1680,17 @@ beginTurnOf pid gs =
       -- CR 800.4b: a player who would be controlled by a departed player isn't, so
       -- a pending Decider naming one is not promoted. CR 800.4a's second clause
       -- clears the entry at the departure itself; this guard answers otherwise.
-      promoted = case Map.lookup pid (GameState.pendingControl gs) of
+      promotedFor taker = case Map.lookup taker (GameState.pendingControl gs) of
         Nothing -> Nothing
         Just decider -> case decider of
           Decider.MkDecider d ->
             if List.elem d (Game.stillPlaying gs)
               then Just decider
               else Nothing
+      -- CR 805.4: every player whose turn this is, `pid` alone without the
+      -- shared team turns option.
+      takers = filter (Turn.sharesTurn gs pid) (GameState.turnOrder gs)
+      outgoing = Turn.activePlayers gs
    in -- CR 603.7a: the one moment a delayed ability armed for "your next turn"
       -- can learn which turn that is, and an entry whose turn has passed be
       -- retired. Applied to the UPDATED state, both answers being read off this
@@ -1680,7 +1724,12 @@ beginTurnOf pid gs =
             GameState.rollModifiersUsedThisTurn = Map.empty,
             -- CR 502.2 / 731.2: the count the NEXT turn's untap step asks about
             -- "the previous turn's active player".
-            GameState.spellsCastLastTurn = Map.findWithDefault 0 (GameState.activePlayer gs) casts,
+            --
+            -- CR 502.2a / 731.2a: under the shared team turns option the rule asks
+            -- whether NO player on the previous active team cast a spell and
+            -- whether ANY cast two or more, and the most any one of them cast
+            -- answers both.
+            GameState.spellsCastLastTurn = List.foldl' max 0 (fmap (\p -> Map.findWithDefault 0 p casts) outgoing),
             -- CR 601.2i / 608.2i: the same fold, kept per seat, because a CARD
             -- asks about every player ("if no spells were cast last turn") and
             -- about any one of them ("if a player cast two or more spells last
@@ -1702,27 +1751,29 @@ beginTurnOf pid gs =
             -- CR 723.1/723.1b: the new active player's pending control becomes
             -- this turn's control, and REPLACING the whole map every turn is
             -- what ends a prior control at the next turn's start -- unless CR
-            -- 800.4b stops the promotion (`promoted`, above). Replacing rather
+            -- 800.4b stops the promotion (`promotedFor`, above). Replacing rather
             -- than inserting is also what retires a CR 723.2 row a resolution
             -- somehow left behind; no resolution spans a turn boundary, so that
-            -- is a belt on top of Pawl.Engine.Stack's braces.
+            -- is a belt on top of Pawl.Engine.Stack's braces. Each taker's own
+            -- row under CR 805.4.
+            --
+            -- Not implemented: CR 805.8's last sentence, a player controlling a
+            -- teammate controlling the whole team (#4003).
             GameState.control =
-              maybe
-                Map.empty
-                ( \decider ->
-                    Map.singleton
-                      pid
-                      ( pure
-                          PlayerControl.MkPlayerControl
-                            { PlayerControl.decider = decider,
-                              PlayerControl.duration = ControlDuration.UntilTurnEnds,
-                              -- CR 723.7: Mindslaver prints no restriction.
-                              PlayerControl.manaFromLandsOnly = False
-                            }
-                      )
-                )
-                promoted,
-            GameState.pendingControl = Map.delete pid (GameState.pendingControl gs)
+              Map.fromList
+                [ ( taker,
+                    pure
+                      PlayerControl.MkPlayerControl
+                        { PlayerControl.decider = decider,
+                          PlayerControl.duration = ControlDuration.UntilTurnEnds,
+                          -- CR 723.7: Mindslaver prints no restriction.
+                          PlayerControl.manaFromLandsOnly = False
+                        }
+                  )
+                | taker <- takers,
+                  Just decider <- [promotedFor taker]
+                ],
+            GameState.pendingControl = List.foldl' (flip Map.delete) (GameState.pendingControl gs) takers
           }
 
 -- Consume the schedule: the next step becomes current. An empty schedule means
@@ -1774,6 +1825,9 @@ runStep = do
   -- only at a stepped phase's FIRST step, and a main phase raises only the step
   -- question (CR 505.2). Both are asked even when the phase says yes -- Stasis
   -- skipping an untap step must still take it in an unskipped phase.
+  --
+  -- Not implemented: CR 805.8's skip by a teammate of the active player, which
+  -- is asked of `active` alone (#4003).
   phaseBegins <- case Turn.phaseBeginningAt phase of
     Nothing -> pure True
     Just selector -> Event.beginsPhase selector active
@@ -1935,6 +1989,10 @@ runStepThatBegan phase = do
   -- the first priority boundary of this step scans it. No player receives priority
   -- during the untap step (CR 502.4), so an ability that triggers then is held
   -- until upkeep, where CR 503.1a puts it on the stack first.
+  --
+  -- Not implemented: CR 805.4d -- one beginning is recorded, naming the active
+  -- player, so an "each player's" trigger reading "that player" fires once for a
+  -- whole team's turn (#4004).
   State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan phase (GameState.activePlayer gs))) gs)
   -- CR 702.30a's clock, advanced HERE and not in `runTurnBasedActions`: CR 503.1
   -- gives the upkeep step no turn-based actions, and this is bookkeeping rather
@@ -1945,7 +2003,7 @@ runStepThatBegan phase = do
   -- so a permanent that arrived there has no Gained entry yet.
   Monad.when (phase == Phase.Beginning BeginningStep.Upkeep) $ do
     _ <- sampleControl
-    State.gets GameState.activePlayer >>= advanceControlClock
+    State.gets Turn.activePlayers >>= Monad.mapM_ advanceControlClock
   runTurnBasedActions phase
   -- Asked BEFORE the CR 704.3 check below. For every step but one the order is
   -- free -- this line is pure there -- and for the cleanup step it is forced: CR
