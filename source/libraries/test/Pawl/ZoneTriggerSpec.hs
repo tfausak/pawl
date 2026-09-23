@@ -736,6 +736,17 @@ anyOfEffectZoneTriggerSpec s registry =
           nabob <- S.printingOf s registry "Synthetic Homing Nabob"
           let (_, g1) = S.addPermanent nabob S.alice (Setup.emptyGame S.bothPlayers)
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (gathered (beginUpkeep g1))) []
+        -- Only the MATCH is narrowed to the upkeep half: the pending trigger
+        -- carries the printed ability, which CR 707.9a's "except it has this
+        -- ability" copies off the stack.
+        Spec.it s "CR 113.6k the trigger carries the whole printed ability" $ do
+          nabob <- S.printingOf s registry "Synthetic Homing Nabob"
+          let (_, g1) = S.addGraveyardCard nabob S.alice (Setup.emptyGame S.bothPlayers)
+          Spec.assertEqWith
+            s
+            "both halves of the AnyOf"
+            (fmap (TriggeredAbility.condition . PendingTrigger.ability) (gathered (beginUpkeep g1)))
+            (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.combinedFace nabob)))
         Spec.it s "CR 113.6m the dies half is exempted, triggers once from the battlefield, and returns the card" $ do
           nabob <- S.printingOf s registry "Synthetic Homing Nabob"
           let (victim, g1) = S.addPermanent nabob S.alice (Setup.emptyGame S.bothPlayers)
