@@ -2492,7 +2492,7 @@ conjuredName card = Face.name (NonEmpty.head (Card.Type.faces card))
 -- An instruction acting only on what an EARLIER instruction of the same clause
 -- binds is left out of that test, its fate being its definer's: Carth the
 -- Lion's "you may reveal a planeswalker card from among them and put it into
--- your hand" moves nothing when the reveal found nothing. Pawl.ResolveSpec's
+-- your hand" moves nothing when the reveal found nothing. Pawl.MassEffectSpec's
 -- "CR 608.2d Carth the Lion's reveal is not offered without a planeswalker among
 -- them" proves it.
 --
