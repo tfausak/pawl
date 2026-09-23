@@ -13,6 +13,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -74,7 +75,8 @@ adjustOffers sides modifiers =
 -- | Whether a modifier's printed budget still admits it: Night Shift of the
 -- Living Dead's "Do this only once each turn", read against
 -- GameState.rollModifiersUsedThisTurn; a once-each-of-your-turns budget only on
--- `payer`'s own turn as well, `payer` being the modifier's "you" (CR 109.5). A
+-- `payer`'s own turn as well (CR 805.4a's team turn included), `payer` being
+-- the modifier's "you" (CR 109.5). A
 -- budgeted modifier with no object behind it has nowhere to be spent and is not
 -- offered; no printing has one.
 withinLimit :: GameState -> PlayerId -> Maybe ObjectId -> ModifiedRoll.ModifiedRoll -> Bool
@@ -85,7 +87,7 @@ withinLimit gs payer stated modifier =
    in case ModifiedRoll.limit modifier of
         PermissionLimit.Unlimited -> True
         PermissionLimit.OnceEachTurn -> unspent
-        PermissionLimit.OnceEachOfYourTurns -> GameState.activePlayer gs == payer && unspent
+        PermissionLimit.OnceEachOfYourTurns -> Turn.isActive gs payer && unspent
 
 -- | Spend a modifier's budget once it is taken; a no-op for an unbudgeted one.
 spendLimit :: Maybe ObjectId -> ModifiedRoll.ModifiedRoll -> GameState -> GameState
@@ -117,7 +119,7 @@ spendLimit stated modifier gs = case stated of
 -- instruction then binds nothing and reads an unbound slot. Unreachable from card
 -- data -- every ignore comes from a row that added the die it ignores -- and so
 -- defensive.
-ignoreLowest :: Natural.Natural -> [Natural.Natural] -> [Natural.Natural]
+ignoreLowest :: (Ord a) => Natural.Natural -> [a] -> [a]
 ignoreLowest n rolls =
   if n == 0
     then rolls
@@ -128,7 +130,7 @@ ignoreLowest n rolls =
 -- | CR 706.6's singular "the lowest roll": the FIRST roll holding the least
 -- number, dropped. Total on the empty list, which `ignoreLowest` above never
 -- reaches it with.
-dropOneLowest :: [Natural.Natural] -> [Natural.Natural]
+dropOneLowest :: (Ord a) => [a] -> [a]
 dropOneLowest rolls = case rolls of
   [] -> []
   _ -> case List.elemIndex (minimum rolls) rolls of

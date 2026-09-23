@@ -143,9 +143,11 @@ data Prompt r where
   --
   -- Asked once the instruction's every die has come up, with all the results
   -- in roll order, since the printed ruling lets the roller see them all before
-  -- picking the one to shift. RerollDie's seat and cost, for its reasons; the
-  -- lone Natural is the amount.
-  AdjustDieRoll :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty Natural.Natural -> Natural.Natural -> Maybe (Cost.Cost Keyword.Keyword) -> Prompt (Maybe (Natural.Natural, RollAdjustment.RollAdjustment))
+  -- picking the one to shift. The results are Integers, unclamped: the
+  -- instruction's own modifier may have taken one below zero, and CR 706.2
+  -- clamps nothing before the last modifier. RerollDie's seat and cost, for its
+  -- reasons; the lone Natural is the amount.
+  AdjustDieRoll :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty Integer -> Natural.Natural -> Maybe (Cost.Cost Keyword.Keyword) -> Prompt (Maybe (Natural.Natural, RollAdjustment.RollAdjustment))
   -- | CR 705.1: which face a flipped coin came up, asked after CallCoin (CR
   -- 705.2). RandomObject's reasons for carrying neither Decider nor PlayerId.
   FlipCoin :: Prompt CoinFace.CoinFace

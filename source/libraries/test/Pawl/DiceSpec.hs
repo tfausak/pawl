@@ -85,6 +85,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
@@ -92,9 +93,13 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -112,6 +117,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   rerollSpec s registry
   costedRerollSpec s registry
   nightShiftSpec s registry
+  deckSpec s registry
 
 treasure :: CardName.CardName
 treasure = CardName.MkCardName (Text.pack "Treasure Token")
@@ -1244,7 +1250,7 @@ zombieEmployee = CardName.MkCardName (Text.pack "Zombie Employee Token")
 --
 -- Declines for an unplanned shift offer, and six for an unplanned throw,
 -- rerollAnswer's reasons.
-nightShiftAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [OptionalDecision.OptionalDecision], [Maybe (Natural.Natural, RollAdjustment.RollAdjustment)], [[Natural.Natural]]) r
+nightShiftAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [OptionalDecision.OptionalDecision], [Maybe (Natural.Natural, RollAdjustment.RollAdjustment)], [[Integer]]) r
 nightShiftAnswer index p = case p of
   Prompt.RollDie _ -> do
     (rolls, rerolls, shifts, shown) <- State.get
@@ -1267,7 +1273,7 @@ nightShiftAnswer index p = case p of
 -- Cast the Endeavor, resolve it, then place and drain whatever triggered (CR
 -- 603.3) under the same script. Returns the board and the results each shift
 -- offer showed, in order.
-nightShiftRun :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> [Maybe (Natural.Natural, RollAdjustment.RollAdjustment)] -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [[Natural.Natural]])
+nightShiftRun :: [Natural.Natural] -> [OptionalDecision.OptionalDecision] -> [Maybe (Natural.Natural, RollAdjustment.RollAdjustment)] -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [[Integer]])
 nightShiftRun rolls rerolls shifts index spell board =
   let drain :: Int -> Game.Type.Game ()
       drain n = do
@@ -1276,3 +1282,53 @@ nightShiftRun rolls rerolls shifts index spell board =
       script = S.cast S.alice spell >> Stack.resolveTop >> Engine.placePendingTriggers >> drain 8
       ((_, after), (_, _, _, shown)) = State.runState (Engine.runGame (nightShiftAnswer index) board script) (rolls, rerolls, shifts, [])
    in (after, reverse shown)
+
+-- CR 706.2's last sentence against a NEGATIVE instruction modifier: The Deck of
+-- Many Things ("{2}, {T}: Roll a d20 and subtract the number of cards in your
+-- hand. If the result is 0 or less, discard your hand. / 1-9 | Return a card at
+-- random from your graveyard to your hand. / 10-19 | Draw two cards.") under
+-- Night Shift of the Living Dead. The result is the number after EVERY
+-- modifier, so a natural 3 with four cards in hand, shifted up, is 3 - 4 + 1 =
+-- 0: the hand is discarded and no striation fires. An engine that clamped the
+-- instruction's sum before the shift reads max 0 (-1) + 1 = 1, keeps the hand
+-- and returns the graveyard card on top of it.
+--
+-- Not implemented: the Deck's 20 striation, which the card file leaves out
+-- (#4015). Stricter than printed, and no roll here reaches 20.
+deckSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deckSpec s registry = Spec.describe s "UnclampedShift" $ do
+  Spec.it s "CR 706.2 a shift applies to the unclamped sum" $ do
+    zeroed <- deckBoard s registry 4
+    paired <- deckBoard s registry 2
+    -- THE GAMEPLAY ASSERTION: four cards in hand, 3 - 4 + 1 = 0, so the hand is
+    -- discarded and nothing comes back from the graveyard.
+    Spec.assertEqWith s "CR 706.2: 3 - 4 + 1 is 0, so the hand is discarded" (length (Game.zoneMembers Zone.Hand S.alice (runDeck zeroed))) 0
+    Spec.assertEqWith s "CR 706.2a: the shift was paid for" (S.lifeOf S.alice (runDeck zeroed)) (Just 19)
+    -- The paired board, one thing different: two cards in hand, so 3 - 2 + 1 =
+    -- 2 lands in 1-9 and the graveyard card joins the two kept.
+    Spec.assertEqWith s "CR 706.3a: 3 - 2 + 1 is 2, so a card returns" (length (Game.zoneMembers Zone.Hand S.alice (runDeck paired))) 3
+
+-- The Deck and Night Shift under alice, two Plains to pay {2}, `held` cards
+-- in hand and one in the graveyard.
+deckBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)], GameState.GameState)
+deckBoard s registry held = do
+  deck <- S.printingOf s registry "The Deck of Many Things"
+  shift <- S.printingOf s registry "Night Shift of the Living Dead"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (deckId, withDeck) = S.addPermanent deck S.alice (S.landsInPlay plains 2)
+      shifted = snd (S.addPermanent shift S.alice withDeck)
+      stocked = snd (S.addGraveyardCard piker S.alice shifted)
+      dealt = List.foldl' (\gs _ -> snd (S.addHandCard piker S.alice gs)) stocked [1 .. held]
+  pure (deckId, Face.activatedAbilities (S.combinedFace deck), dealt)
+
+-- Activate the Deck and resolve it: the d20 comes up 3 and every shift offer
+-- takes the first die up.
+runDeck :: (ObjectId.ObjectId, [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)], GameState.GameState) -> GameState.GameState
+runDeck (deckId, abilities, board) =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.RollDie _ -> 3
+        Prompt.AdjustDieRoll {} -> Just (0, RollAdjustment.Increase)
+        _ -> S.identityAnswer p
+   in S.runPure answer board (mapM_ (Activate.activateAbility S.alice deckId) (take 1 abilities) >> Stack.resolveTop)

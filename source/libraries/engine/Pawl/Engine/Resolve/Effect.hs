@@ -3686,11 +3686,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       else do
                         State.modify' (Dice.spendLimit stated offer)
                         -- FILTERED, NOT TRUSTED: an index past the end shifts
-                        -- the first die. CR 107.1b for a decrease below zero.
+                        -- the first die.
                         let at = if index < List.genericLength results then index else 0
                             shift n = case direction of
-                              RollAdjustment.Increase -> n + amount
-                              RollAdjustment.Decrease -> if n < amount then 0 else n - amount
+                              RollAdjustment.Increase -> n + toInteger amount
+                              RollAdjustment.Decrease -> n - toInteger amount
                         adjustingThrough rest (zipWith (\i n -> if i == at then shift n else n) [0 :: Natural ..] results)
         -- CR 706.2a's cost, charged between the offer and the modifier's
         -- application: a declined or failed payment leaves the number standing.
@@ -3741,7 +3741,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               modifier = case RollDie.modifier rollDie of
                 Nothing -> 0
                 Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
-          pure (Integer.toNaturalSaturating (toInteger natural + modifier))
+          -- Left unclamped: CR 706.2's result is the number after EVERY
+          -- modifier, so a shift from another source applies to this sum as it
+          -- stands, negative or not, and only the final figure is clamped below.
+          pure (toInteger natural + modifier)
     -- CR 614.1a over CR 706.1: the instruction's count is offered to the
     -- replacement effects watching this roller's rolls (Pixie Guide) before the
     -- first die is thrown, and what comes back is how many dice to throw and how
@@ -3754,7 +3757,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     thrown <- traverse (const rollOne) [1 .. dice]
     -- CR 706.6 before the second step: an ignored roll is one "no effects apply
     -- to", so it is not offered for an adjustment.
-    results <- adjusting (Dice.ignoreLowest ignored thrown)
+    --
+    -- CR 107.1b once, on the final figure, after every modifier: The Deck of
+    -- Many Things' natural 3, four cards in hand and a shift up is a 0, not a 1
+    -- (Pawl.DiceSpec's "CR 706.2 a shift applies to the unclamped sum").
+    results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (Dice.ignoreLowest ignored thrown))
     Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
       gs <- State.get
       -- CR 706.4: WHICH result the instruction uses, where it threw more than
