@@ -64,6 +64,11 @@ costsOn blocker gs =
       -- read against the FULL projection rather than a partial one.
       view = Projection.project blocker gs
       grants = Projection.controlGrants gs
+      -- CR 613.1f: what a stored grant gave the permanent, whose gates
+      -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
+      -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
+      grantedRules = Projection.grantedRuleAbilities gs
+      fromGrant source = concatMap (fromCost source) (RuleAbilities.blockCosts (grantedRules source))
       fromPermanent source = case RuleAbilities.blockCosts (Projection.ruleAbilitiesOf source gs) of
         -- Every permanent in almost every game.
         [] -> []
@@ -99,7 +104,7 @@ costsOn blocker gs =
         if Projection.affectsUnder grants source blocker (BlockCost.subject bc) view gs
           then fmap ((,) source) (shareOf source bc)
           else []
-   in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+   in concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs))
 
 -- CR 509.1d: every printed cost in force on every creature this declaration
 -- chooses as a blocker, determined together. Charged once per CREATURE and not

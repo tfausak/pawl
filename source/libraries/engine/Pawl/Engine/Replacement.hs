@@ -2398,6 +2398,8 @@ applyCopyException this own snapshot exception = case exception of
       snapshot {PC.triggeredAbilities = PC.triggeredAbilities snapshot <> [triggered]}
     GrantedAbility.Static static ->
       snapshot {PC.staticAbilities = PC.staticAbilities snapshot <> [static]}
+    GrantedAbility.Rules rules ->
+      snapshot {PC.ruleAbilities = PC.ruleAbilities snapshot <> rules}
     -- Not implemented: a copy exception granting a quoted replacement
     -- ability (#1942).
     GrantedAbility.Replacement _ -> snapshot

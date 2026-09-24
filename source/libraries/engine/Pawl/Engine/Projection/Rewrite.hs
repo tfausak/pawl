@@ -1116,6 +1116,11 @@ rewriteGrantedAbility pairs granted = case granted of
   GrantedAbility.Activated a -> GrantedAbility.Activated (rewriteActivatedAbility pairs a)
   GrantedAbility.Triggered t -> GrantedAbility.Triggered (rewriteTriggeredAbility pairs t)
   GrantedAbility.Static sa -> GrantedAbility.Static (rewriteStaticAbility pairs sa)
+  -- Left as written: a printed rule ability is rewritten where its gatherer
+  -- reads it, off its source's text changes, and no card in data/cards quotes
+  -- one in a grant this walk reaches. Backup's is expanded at resolution
+  -- (Pawl.Engine.Resolve.Effect.expandGrant) and stored, where no rewrite runs.
+  GrantedAbility.Rules rules -> GrantedAbility.Rules rules
   GrantedAbility.Replacement r -> GrantedAbility.Replacement (rewritePrintedReplacement pairs r)
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
