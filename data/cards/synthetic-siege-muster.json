@@ -1,0 +1,285 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Siege Muster",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": {
+                      "card": {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "White"
+                              }
+                            ],
+                            "name": "Soldier Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Soldier"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "riders": {
+                        "attacking": {
+                          "type": "Chosen"
+                        },
+                        "tapped": {
+                          "type": "Tapped"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": {
+                      "card": {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "White"
+                              }
+                            ],
+                            "defense": 3,
+                            "name": "Soldier Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Soldier"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Battle"
+                                },
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "riders": {
+                        "attacking": {
+                          "type": "Chosen"
+                        },
+                        "tapped": {
+                          "type": "Tapped"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": {
+                      "card": {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "White"
+                              }
+                            ],
+                            "name": "Soldier Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Soldier"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "riders": {
+                        "blocking": "soldierBlocked"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "soldierBlocked": {
+                "filter": {
+                  "type": "IsAttackingPlayer",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          },
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": {
+                      "card": {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "White"
+                              }
+                            ],
+                            "defense": 3,
+                            "name": "Soldier Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Soldier"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Battle"
+                                },
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "riders": {
+                        "blocking": "battleBlocked"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "battleBlocked": {
+                "filter": {
+                  "type": "IsAttackingPlayer",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
