@@ -22,7 +22,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePrintedReplacement, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -728,25 +728,30 @@ affectsGiven peers source oid a partial gs = affectsWith (controlGrants gs) peer
 -- otherwise take two controlGrants walks per pair.
 affectsWith :: [ControlGrant] -> Count.ViewOf -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affectsWith grants peers source oid a partial gs = case a of
+  -- Not implemented: CR 801.10's cut on this stored set, which is owed as the
+  -- resolution that fixes it (CR 611.2c) chooses its members (#3073).
   Affected.TheseObjects s -> Set.member oid s
   -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
   -- source, or one attached to a player, names no object (CR 702.5d's
   -- enchant-player Auras go through AttachedPlayerControls below).
-  Affected.Attached -> hostOf source gs == Just oid
+  Affected.Attached -> hostOf source gs == Just oid && inReach
   Affected.Matching f ->
     let -- CR 109.5: "you" is the SOURCE's controller. Safe to force: controlGrants
         -- consults no liveness gate and so cannot re-enter this function.
         perspective = controllerOfGiven grants Set.empty source gs
      in Set.member oid (GameState.battlefield gs)
+          && inReach
           && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct.
   Affected.MatchingAnywhere f ->
     let perspective = controllerOfGiven grants Set.empty source gs
-     in Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
+     in inReach
+          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- Matching's body with that conjunct NEGATED rather than dropped.
   Affected.MatchingOffBattlefield f ->
     let perspective = controllerOfGiven grants Set.empty source gs
      in not (Set.member oid (GameState.battlefield gs))
+          && inReach
           && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. The Filter's perspective stays the source's controller (CR 109.5), not
@@ -765,11 +770,18 @@ affectsWith grants peers source oid a partial gs = case a of
       let controller = controllerOfGiven grants Set.empty oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
+            && inReach
             && Filter.matches (affectedContext source (controllerOfGiven grants Set.empty source gs) gs) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
     Nothing -> False
   -- CR 611.3d: a rider, applied by storing it (Event.permissionRiders) and never
   -- derived, so a projection's own read of the template names nothing.
   Affected.PlayedThisWay _ -> False
+  where
+    -- CR 801.10: a static ability's effect reaches only objects within its
+    -- controller's range of influence. Pawl.RangeOfInfluenceSpec's "CR 801.10 a
+    -- static ability does not reach a permanent outside its controller's range"
+    -- proves it.
+    inReach = inSourceRangeGiven grants source oid gs
 
 -- The Filter.Context an affected set is matched through: CR 109.5's "you" is the
 -- source's controller, and CR 607.2d's link puts the SOURCE's entry choice (CR
