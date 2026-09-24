@@ -9284,7 +9284,7 @@ activateWhileRolling pid oid ability = do
       totalled = Cost.plusComponents gathered (ActivatedAbility.cost ability)
   (announced, _) <- Cost.announce (PaymentSubject.Activating oid) ManaSpending.AsProduced pid oid (Cost.substitutedManas (Cost.activationManaSubstitutions (Cost.Type.components totalled) Map.empty pid oid before) (Cost.totalManas gathered)) totalled
   adjustments <- Cost.announceReductions pid oid before announced gathered
-  (payment, _) <- Cost.paySubstituting performManaAbility before PaymentMoment.OutsideResolution (PaymentSubject.Activating oid) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.activationManaSubstitutions pid oid) (Cost.totalWith adjustments announced)
+  (payment, _) <- Cost.paySubstituting performManaAbility before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating oid) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.activationManaSubstitutions pid oid) (Cost.totalWith adjustments announced)
   case payment of
     -- CR 733.1: the payment reversed the activation back to `before` itself.
     Payment.Unpaid -> pure False

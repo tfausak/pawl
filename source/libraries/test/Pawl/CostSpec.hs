@@ -5056,7 +5056,7 @@ attemptLeakShuffling decision tombId cast =
 
 -- CR 733.1's last sentence at CR 118.12's moment: reversing bob's illegal
 -- payment does not undo the shuffle the mana ability he activated performed,
--- proving Pawl.Engine.Cost.reverseIllegal's Exercises arm.
+-- proving the arm of Pawl.Engine.Cost.composeReversal where nothing is kept.
 shufflingReversalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 shufflingReversalSpec s registry = Spec.describe s "Reversal keeps a shuffle" $ do
   Spec.it s "CR 733.1 reversing the payment does not undo the Tomb's own shuffle" $ do
@@ -6035,6 +6035,35 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     Spec.assertEqWith s "the Binox is back in alice's hand" (S.handSize S.alice cast) 1
     Spec.assertEqWith s "and her Forest is untapped" (S.tappedCount S.alice cast) 0
 
+  -- CR 733.1's "each player may also reverse", with two players who activated
+  -- something: alice taps her Forest, bob taps three of his seven Plains and
+  -- pays three of the generic, and {G} plus three leaves four unpaid, so CR
+  -- 601.2h refuses the cast. One board, the four combinations of answers.
+  Spec.it s "CR 733.1 a refused assisted cast asks the helper too, and each keeps only their own" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, forestId, plainsIds, gs) = assistBoard 0 7 forest mountain plains binox
+        run alice bob = State.runState (Engine.runGame (reversingAssist alice bob forestId (take 3 plainsIds)) gs (S.cast S.alice spell)) []
+        ((_, bobKeeps), asked) = run OptionalDecision.Exercises OptionalDecision.Declines
+        ((_, aliceKeeps), _) = run OptionalDecision.Declines OptionalDecision.Exercises
+        ((_, bothKeep), _) = run OptionalDecision.Declines OptionalDecision.Declines
+        ((_, neither), _) = run OptionalDecision.Exercises OptionalDecision.Exercises
+    -- THE BEHAVIOUR: bob kept his three Plains' mana, and CR 733.1 cancelled
+    -- the three he had paid, so it is back in his pool.
+    Spec.assertEqWith s "the helper who keeps has his three Plains' mana floating" (poolSize S.bob bobKeeps) 3
+    Spec.assertEqWith s "and his three Plains tapped" (S.tappedCount S.bob bobKeeps) 3
+    Spec.assertEqWith s "while alice, who reversed, has nothing floating" (poolSize S.alice bobKeeps) 0
+    Spec.assertEqWith s "and her Forest untapped" (S.tappedCount S.alice bobKeeps) 0
+    Spec.assertEqWith s "the helper who reverses has nothing floating" (poolSize S.bob aliceKeeps) 0
+    Spec.assertEqWith s "and every Plains untapped" (S.tappedCount S.bob aliceKeeps) 0
+    Spec.assertEqWith s "while alice, who kept, has her {G}" (poolSize S.alice aliceKeeps) 1
+    Spec.assertEqWith s "both keeping: bob's three and alice's one" (poolSize S.bob bothKeep, poolSize S.alice bothKeep) (3, 1)
+    Spec.assertEqWith s "both reversing: nothing tapped" (S.tappedCount S.bob neither + S.tappedCount S.alice neither) 0
+    Spec.assertEqWith s "CR 601.2a the Binox is back in alice's hand whatever they answered" (fmap (\g -> (GameState.stack g, Game.zoneMembers Zone.Hand S.alice g)) [bobKeeps, aliceKeeps, bothKeep, neither]) (replicate 4 ([], [spell]))
+    Spec.assertEqWith s "CR 101.4 alice then bob, each once" asked [S.alice, S.bob]
+
 -- Answer CR 702.132a's two prompts with `helper` and `amount`, and each mana
 -- window with the lands that window's player is meant to tap -- alice the one
 -- Forest, bob every Plains.
@@ -6056,3 +6085,13 @@ assisting helper amount forestId plainsIds p =
         Prompt.ChooseManaSource _ who candidates -> pick who candidates
         Prompt.ChooseExtraManaSource _ who candidates -> pick who candidates
         _ -> S.identityAnswer p
+
+-- `assisting` with bob chosen to pay as much as his tapped Plains made, and CR
+-- 733.1's question answered `alice` or `bob` by whoever is asked, the askers
+-- recorded in order.
+reversingAssist :: OptionalDecision.OptionalDecision -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+reversingAssist alice bob forestId plainsIds p = case p of
+  Prompt.ReverseManaAbilities _ player _ -> do
+    State.modify' (<> [player])
+    pure (if player == S.bob then bob else alice)
+  _ -> pure (assisting (Just S.bob) (Natural.Extra.length plainsIds) forestId plainsIds p)
