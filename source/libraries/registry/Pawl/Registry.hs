@@ -1,6 +1,7 @@
--- Answering one question: given a card's name, what card is that?
+-- Answering two questions: given a card's name, what card is that? And which
+-- cards are there?
 --
--- The registry is that function and nothing else. It is parameterized over the
+-- The registry is those two functions and nothing else. It is parameterized over the
 -- monad a LOOKUP works in, which is what lets a registry that does no work to
 -- answer -- a fixture map, a pool compiled in, a generated one, or the
 -- file-backed one below, which reads everything before the registry exists --
@@ -11,12 +12,13 @@
 -- is a returned value rather than an exception for the same reason: a pure
 -- registry cannot throw. How a registry answers is not part of the type.
 --
--- Enumerating the pool is deliberately NOT in the INTERFACE: every caller that
--- wanted it was linting the corpus pawl ships, which is a claim about the data
--- rather than a question for a registry, and that lives in the test suite. What
--- the test suite does borrow is cardPath, loadRoot and filedAs -- facts about
--- the on-disk format rather than about looking a card up. parseCard is an
--- internal helper of loadRoot and has no test-suite caller of its own.
+-- Enumerating the pool is in the interface for ONE question a game asks: which
+-- cards of the reference an Alchemy conjure picks over
+-- (Pawl.Interpreter.lookingUpCards). A lint of the corpus pawl ships is a claim
+-- about the data rather than a question for a registry, and that lives in the
+-- test suite, which borrows cardPath, loadRoot and filedAs -- facts about the
+-- on-disk format rather than about looking a card up. parseCard is an internal
+-- helper of loadRoot and has no test-suite caller of its own.
 module Pawl.Registry where
 
 import qualified Control.Exception as Exception
@@ -44,8 +46,11 @@ import qualified System.Directory as Directory
 -- front, a pool that cannot be used fails when the registry is BUILT, so the
 -- only thing left for a lookup to say is that no card has that name -- and the
 -- caller supplied the name (#649).
-newtype Registry m = MkRegistry
-  { fetchCard :: CardName.CardName -> m (Maybe Card.Card)
+data Registry m = MkRegistry
+  { fetchCard :: CardName.CardName -> m (Maybe Card.Card),
+    -- | Every card of the Oracle card reference the pool holds, once each. A
+    -- synthetic test fixture is in the pool without being such a card.
+    cards :: m [Card.Card]
   }
 
 -- A card by name ("Goblin Piker") or by slug ("goblin-piker") -- a file-backed
@@ -91,7 +96,16 @@ fileRegistry root = do
       loaded <- loadRoot root
       case index loaded of
         Left problems -> Exception.throwIO InvalidCorpus.MkInvalidCorpus {InvalidCorpus.root = root, InvalidCorpus.problems = problems}
-        Right cards -> pure (MkRegistry (\name -> pure (Map.lookup (slugFor name) cards)))
+        Right keyed -> pure MkRegistry {fetchCard = \name -> pure (Map.lookup (slugFor name) keyed), cards = pure (Maybe.mapMaybe referenceCard loaded)}
+
+-- A parsed card of the Oracle card reference, which a synthetic is not: a card
+-- no printing carries, written only to reach a rule, and filed as
+-- `synthetic-*.json` (docs/design.md section 6).
+referenceCard :: (FilePath, Either Text.Text Card.Card) -> Maybe Card.Card
+referenceCard (path, parsed) =
+  if "synthetic-" `List.isPrefixOf` List.reverse (List.takeWhile (/= '/') (List.reverse path))
+    then Nothing
+    else either (const Nothing) Just parsed
 
 -- The slug a name is looked up by. `named` accepts a name or a slug for the
 -- same reason: slugify is idempotent, so the two are one lookup.

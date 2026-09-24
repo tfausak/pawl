@@ -2614,6 +2614,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseConjuredCard decider _ _ -> Just (Decider.unwrap decider)
   Prompt.RollDie {} -> Nothing
   Prompt.LookUpCard {} -> Nothing
+  Prompt.ReferenceCards {} -> Nothing
   Prompt.ChooseDieResult decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.FlipCoin {} -> Nothing
   Prompt.CallCoin decider _ -> Just (Decider.unwrap decider)
@@ -2761,6 +2762,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseConjuredCard {} -> "ChooseConjuredCard"
   Prompt.RollDie {} -> "RollDie"
   Prompt.LookUpCard {} -> "LookUpCard"
+  Prompt.ReferenceCards {} -> "ReferenceCards"
   Prompt.ChooseDieResult {} -> "ChooseDieResult"
   Prompt.FlipCoin {} -> "FlipCoin"
   Prompt.CallCoin {} -> "CallCoin"

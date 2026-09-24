@@ -536,6 +536,8 @@ library codec
     Pawl.Codec.ForEachSpec
     Pawl.Codec.FromOutsideTheGame
     Pawl.Codec.FromOutsideTheGameSpec
+    Pawl.Codec.FromReference
+    Pawl.Codec.FromReferenceSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
     Pawl.Codec.GameSettings
@@ -1869,6 +1871,7 @@ library types
     Pawl.Types.ForbidBlock
     Pawl.Types.ForEach
     Pawl.Types.FromOutsideTheGame
+    Pawl.Types.FromReference
     Pawl.Types.Game
     Pawl.Types.GameEvent
     Pawl.Types.GameSettings

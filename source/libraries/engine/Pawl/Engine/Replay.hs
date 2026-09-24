@@ -57,6 +57,7 @@ encode p answer = case p of
   Prompt.RandomPlayer _ -> Response.SelectedPlayerAtRandom answer
   Prompt.RollDie _ -> Response.RolledDie answer
   Prompt.LookUpCard _ -> Response.LookedUpCard answer
+  Prompt.ReferenceCards {} -> Response.ReferenceCardNames answer
   Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
   Prompt.RerollDie {} -> Response.ChoseReroll answer
   Prompt.AdjustDieRoll {} -> Response.ChoseRollAdjustment answer
@@ -225,6 +226,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.LookUpCard _ -> case response of
     Response.LookedUpCard card -> Just card
+    _ -> Nothing
+  Prompt.ReferenceCards {} -> case response of
+    Response.ReferenceCardNames names -> Just names
     _ -> Nothing
   Prompt.ChooseDieResult {} -> case response of
     Response.ChoseDieResult n -> Just n
@@ -665,6 +669,9 @@ defaultAnswer p = case p of
   -- A reference holding no such card: the engine then treats the name as it
   -- did before it could ask, known only through the cards the game holds.
   Prompt.LookUpCard _ -> Nothing
+  -- A reference holding no such card, LookUpCard's answer: the conjure then
+  -- conjures nothing.
+  Prompt.ReferenceCards {} -> []
   -- CR 706.4: the prompt is only raised where one instruction's results are not
   -- all the same number, and every position in them is a legal choice.
   -- Answering 0 takes the first die rolled, ChooseDelayedTriggerEvent's posture
