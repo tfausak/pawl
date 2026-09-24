@@ -181,7 +181,7 @@ unlock perform pid oid half = do
         -- printed Room half holds such a symbol -- Scryfall `t:room`,
         -- 2026-09-01 -- so no prompt is raised today.
         (announced, _) <- Cost.announce (PaymentSubject.Unlocking oid) ManaSpending.AsProduced pid oid pure (unlockCostOf face)
-        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution (PaymentSubject.Unlocking oid) Nothing ManaSpending.AsProduced pid oid announced
+        payment <- Cost.pay perform before PaymentMoment.OutsideResolution (PaymentSubject.Unlocking oid) Nothing ManaSpending.AsProduced pid oid announced
         case payment of
           -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
           -- special action IS the whole of what failed, so `before` goes to

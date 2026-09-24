@@ -272,7 +272,7 @@ turnFaceUp perform pid procedure oid = do
         -- the payability gate above. Discarded, Pawl.Engine.Activate's reason: rule
         -- 702.150a asks about the player who CAST the object.
         (announced, _) <- Cost.announce (PaymentSubject.TurningFaceUp oid) ManaSpending.AsProduced pid oid pure cost
-        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution (PaymentSubject.TurningFaceUp oid) Nothing ManaSpending.AsProduced pid oid announced
+        payment <- Cost.pay perform before PaymentMoment.OutsideResolution (PaymentSubject.TurningFaceUp oid) Nothing ManaSpending.AsProduced pid oid announced
         case payment of
           -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
           -- special action IS the whole of what failed, so `before` goes to

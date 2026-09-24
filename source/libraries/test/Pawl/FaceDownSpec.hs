@@ -3354,11 +3354,9 @@ attemptTurnUp taps decision permanent gs =
 -- CR 733.1: a special action a player starts and cannot legally complete is
 -- reversed and its payments cancelled, but "each player may also reverse any
 -- legal mana abilities that player activated while making the illegal play" --
--- so that half is a question and not the engine's to settle. A special action
--- announces nothing ahead of its payment that writes state (CR 118.13c), so
--- Cost.pay holds the state the action began in and can honour the answer where a
--- cast or an activation cannot (Cost.pay says why). Pawl.CostSpec's "Reversal"
--- group is the same rule at CR 118.12's moment.
+-- so that half is a question and not the engine's to settle. Pawl.CostSpec's
+-- "Reversal" group is the same rule at CR 118.12's moment, and its "Reversal
+-- after an announcement" group at a cast's and an activation's.
 --
 -- Misthoof Kirin is the producer: megamorph {1}{W}, off five Plains with three
 -- spent on CR 702.37a's {3} cast. CR 702.37b makes a megamorph cost a morph
