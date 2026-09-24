@@ -1,6 +1,7 @@
 module Pawl.Types.GrantedAbility where
 
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
@@ -33,4 +34,7 @@ data GrantedAbility card
   | Triggered (TriggeredAbility.TriggeredAbility card (GrantedAbility card))
   | -- | CR 113.3d.
     Static (StaticAbility.StaticAbility (GrantedAbility card))
+  | -- | CR 613.11: rule-affecting static abilities, Chomping Kavu's "can't be
+    -- blocked by creatures with power 2 or less".
+    Rules RuleAbilities.RuleAbilities
   deriving (Eq, Ord, Show)

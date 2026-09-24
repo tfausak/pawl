@@ -9040,11 +9040,12 @@ bindEarthbentLand resolving land gs =
 -- The copiable list holds no ability rule 702 mints from a keyword
 -- (Keyword.mintedStaticAbilitiesOf), so none is granted twice.
 --
--- Not implemented: the source's rule abilities (PC.ruleAbilities), Chomping
--- Kavu's "can't be blocked by creatures with power 2 or less" among them, which
--- have no Pawl.Types.GrantedAbility arm to travel in (#4048). No printing with
--- backup prints a player static ability, a special action or a replacement
--- ability, the other kinds with no arm.
+-- The RULE abilities (CR 613.11) travel as one GainAbility carrying the whole
+-- bundle, gathered from the new host beside its own
+-- (Pawl.Engine.Projection.grantedRuleAbilities); Chomping Kavu's is the one in
+-- the pool. No printing with backup prints a player static ability, a special
+-- action or a replacement ability, the other kinds with no arm (Scryfall
+-- `keyword:backup`, 2026-09-24).
 expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
 expandGrant resolving source gs modification = case modification of
   Modification.GainAbilitiesOfSource ->
@@ -9056,6 +9057,7 @@ expandGrant resolving source gs modification = case modification of
           <> fmap (Modification.GainAbility . GrantedAbility.Activated) (PC.activatedAbilities pc)
           <> fmap (Modification.GainAbility . GrantedAbility.Triggered) (PC.triggeredAbilities pc)
           <> fmap (Modification.GainAbility . GrantedAbility.Static) (PC.staticAbilities pc)
+          <> [Modification.GainAbility (GrantedAbility.Rules (PC.ruleAbilities pc)) | PC.ruleAbilities pc /= mempty]
   _ -> [modification]
 
 -- The no-subgame executor (the ability path and every direct caller): a

@@ -3382,6 +3382,12 @@ graftSpec s registry =
 -- different amounts of damage. Turn to Frog ({1}{U} Instant, loses all
 -- abilities until end of turn) is the CR 613.1f removal whose timestamp,
 -- before or after the grant's, decides whether the Piker keeps it.
+--
+-- Chomping Kavu ({3}{G} Creature -- Kavu 3/3, "Backup 1 / This creature can't
+-- be blocked by creatures with power 2 or less", checked against
+-- api.scryfall.com 2026-09-24) grants a RULE ability (CR 613.11). bob's Cabal
+-- Evangel (2/2) is the blocker it bars and his War Mammoth (3/3) the one it
+-- does not.
 backupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 backupSpec s registry =
   let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
@@ -3414,6 +3420,10 @@ backupSpec s registry =
       entersTargeting :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
       entersTargeting victim card gs =
         S.runPure (targeting victim) gs (Event.changeZone card Zone.Battlefield >> Engine.settleForPriority >> Stack.resolveTop)
+      -- alice attacks with everything, then CR 509.1b's question: may bob's
+      -- `blocker` alone block `attacker`?
+      attacked gs = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
+      mayBlock blocker attacker gs = Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton attacker)) (attacked gs)
    in Spec.describe s "Backup" $ do
         -- THE KEYWORD HALF, at gameplay level. The Piker connects with a 5/5 and
         -- destroys it, which only deathtouch (CR 702.2b) can do at three damage.
@@ -3658,6 +3668,81 @@ backupSpec s registry =
               Spec.assertEqWith s "CR 305.7 the Arbor dealt bob its toughness of 5" (S.lifeOf S.bob after) (Just 15)
               Spec.assertEqWith s "where its power was 3" (Projection.powerOf arborId pumped) (Just 3)
               Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf arborId pumped)) "and Blood Moon really had made it a Mountain"
+            _ -> Spec.assertFailure s "fixture should give alice a Dryad Arbor"
+        -- THE RULE HALF, at gameplay level, as a pair differing only in rule
+        -- 702.165a's target. Backed up, the Piker (now 3/2) can't be blocked by
+        -- the 2/2 Evangel but can by the 3/3 Mammoth; aimed at the Kavu itself,
+        -- the Piker gains nothing and the Evangel may block it.
+        Spec.it s "CR 702.165a the backed-up creature can't be blocked by a creature with power 2 or less" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          evangel <- S.printingOf s registry "Cabal Evangel"
+          mammoth <- S.printingOf s registry "War Mammoth"
+          kavu <- S.printingOf s registry "Chomping Kavu"
+          case S.combatBoardOf [piker] [evangel, mammoth] of
+            (gs0, [pikerId], [evangelId, mammothId]) -> do
+              let (card, staged) = S.addHandCard kavu S.alice gs0
+                  backed = entersTargeting pikerId card staged
+                  -- RE-FOUND after the entry, for the Archpriest pair's CR 400.7
+                  -- reason.
+                  placed = S.runPure S.identityAnswer staged (Event.changeZone card Zone.Battlefield)
+                  kavuId = Maybe.fromMaybe card (Maybe.listToMaybe (reverse (Game.zoneMembers Zone.Battlefield S.alice placed)))
+                  selfBacked = S.runPure (targeting kavuId) placed (Engine.settleForPriority >> Stack.resolveTop)
+              Spec.assertBool s (not (mayBlock evangelId pikerId backed)) "CR 702.165a the backed-up Piker can't be blocked by the 2/2"
+              Spec.assertBool s (mayBlock mammothId pikerId backed) "but can by the 3/3"
+              Spec.assertBool s (mayBlock evangelId pikerId selfBacked) "and aimed at the Kavu itself, the 2/2 may block the Piker"
+              Spec.assertEqWith s "the self-aimed trigger put its counter on the Kavu" (plusOnes kavuId selfBacked) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Evangel and a Mammoth"
+        -- THE PROJECTION TRIPWIRE for the rule half: a Clone of the Kavu grants
+        -- the restriction it copied (CR 702.165b), where a printed read answers
+        -- "Clone" and grants nothing.
+        Spec.it s "CR 702.165b a Clone of Chomping Kavu grants the restriction it copied" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          evangel <- S.printingOf s registry "Cabal Evangel"
+          kavu <- S.printingOf s registry "Chomping Kavu"
+          clone <- S.printingOf s registry "Clone"
+          case S.combatBoardOf [piker] [kavu, evangel] of
+            (gs0, [pikerId], [kavuId, evangelId]) -> do
+              let (_, staged) = S.spellOnStack clone S.alice gs0
+                  copied = S.runPure (copying kavuId pikerId) staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+              Spec.assertBool s (not (mayBlock evangelId pikerId copied)) "CR 702.165b the Piker can't be blocked by the 2/2"
+              Spec.assertBool s (mayBlock evangelId pikerId gs0) "where before the Clone the 2/2 could block it"
+            _ -> Spec.assertFailure s "fixture should give alice a Piker"
+        -- CR 613.1f in CR 613.7 timestamp order, the static half's pair over a
+        -- rule ability: a Turn to Frog before the grant leaves the Piker barring
+        -- the Evangel, one after takes the restriction away. Either way the
+        -- Piker is a 2/2.
+        Spec.it s "CR 613.1f only a removal later than the grant takes the granted restriction away" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          evangel <- S.printingOf s registry "Cabal Evangel"
+          kavu <- S.printingOf s registry "Chomping Kavu"
+          frog <- S.printingOf s registry "Turn to Frog"
+          island <- S.printingOf s registry "Island"
+          case S.combatBoardOf [piker] [evangel] of
+            (gs0, [pikerId], [evangelId]) -> do
+              let (card, staged) = S.addHandCard kavu S.alice (S.landsFor island S.alice 2 gs0)
+                  (frogId, armed) = S.addHandCard frog S.alice staged
+                  frogged g = S.runPure (targeting pikerId) g (S.cast S.alice frogId >> Stack.resolveTop)
+                  frogFirst = entersTargeting pikerId card (frogged armed)
+                  frogLast = frogged (entersTargeting pikerId card armed)
+              Spec.assertBool s (not (mayBlock evangelId pikerId frogFirst)) "CR 613.1f the grant after Turn to Frog left the Piker unblockable by the 2/2"
+              Spec.assertBool s (mayBlock evangelId pikerId frogLast) "CR 613.1f Turn to Frog after the grant took the restriction away"
+              Spec.assertEqWith s "the Frog really resolved first, leaving a 1/1 with the counter" (Projection.powerOf pikerId frogFirst) (Just 2)
+              Spec.assertEqWith s "and last" (Projection.powerOf pikerId frogLast) (Just 2)
+            _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Evangel"
+        -- CR 305.7's last clause over a rule ability: Blood Moon strips the
+        -- Dryad Arbor's rules text but not the restriction backup granted it.
+        Spec.it s "CR 305.7 a Blood Moon'd Dryad Arbor keeps the restriction backup granted it" $ do
+          arbor <- S.printingOf s registry "Dryad Arbor"
+          evangel <- S.printingOf s registry "Cabal Evangel"
+          kavu <- S.printingOf s registry "Chomping Kavu"
+          bloodMoon <- S.printingOf s registry "Blood Moon"
+          case S.combatBoardOf [arbor] [evangel] of
+            (gs0, [arborId], [evangelId]) -> do
+              let (_, mooned) = S.addPermanent bloodMoon S.bob gs0
+                  (card, staged) = S.addHandCard kavu S.alice mooned
+                  backed = entersTargeting arborId card staged
+              Spec.assertBool s (not (mayBlock evangelId arborId backed)) "CR 305.7 the Arbor still can't be blocked by the 2/2"
+              Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf arborId backed)) "and Blood Moon really had made it a Mountain"
             _ -> Spec.assertFailure s "fixture should give alice a Dryad Arbor"
 
 -- CR 702.101a: "Extort is a triggered ability. 'Extort' means 'Whenever you cast

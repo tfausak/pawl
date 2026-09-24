@@ -12,6 +12,8 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Filter as Filter
@@ -21,6 +23,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
@@ -88,4 +91,17 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
           )
       )
       " {\"type\":\"Static\",\"value\":{\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"modifications\":[{\"type\":\"AssignCombatDamageWithToughness\"}]}} "
+  -- Chomping Kavu's "This creature can't be blocked by creatures with power 2
+  -- or less", as backup hands it over.
+  Spec.it s "Rules" $
+    Common.assertCodec
+      s
+      codec
+      ( GrantedAbility.Rules
+          mempty
+            { RuleAbilities.combatRestrictions =
+                [CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy (Affected.Matching Filter.IsSource) (Filter.PowerAtMost 2) Nothing Nothing)]
+            }
+      )
+      " {\"type\":\"Rules\",\"value\":{\"combatRestrictions\":[{\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"blockers\":{\"type\":\"PowerAtMost\",\"value\":2}}}]}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

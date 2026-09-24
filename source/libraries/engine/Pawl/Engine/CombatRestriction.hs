@@ -606,8 +606,15 @@ gathered gs =
       -- can settle with a bare bit.
       keepsRulesText source = null setEffs || Projection.liveAfterLayers setEffs source gs
       keepsAbilities source = keepsRulesText source && not (removed source)
+      -- CR 613.1f: the restrictions a stored grant gave the permanent (Chomping
+      -- Kavu's backup), whose gates Projection.grantedRuleAbilities has asked
+      -- already, so no `keepsAbilities` and no CR 612.1 word swap (CR 612.3).
+      -- The source is the host, per CR 113.7. Pawl.KeywordTriggerSpec's Backup
+      -- group proves it.
+      grantedRules = Projection.grantedRuleAbilities gs
+      grantedRows source = fmap (\restriction -> (source, [], restriction)) (RuleAbilities.combatRestrictions (grantedRules source))
       fromPermanent source =
-        designationRows source <> mintedRows source <> case RuleAbilities.combatRestrictions (Projection.ruleAbilitiesOf source gs) of
+        designationRows source <> mintedRows source <> grantedRows source <> case RuleAbilities.combatRestrictions (Projection.ruleAbilitiesOf source gs) of
           -- Every permanent in almost every game.
           [] -> []
           restrictions ->

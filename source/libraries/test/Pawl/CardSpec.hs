@@ -269,6 +269,7 @@ import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
@@ -822,6 +823,7 @@ modificationCounts modification = case modification of
     GrantedAbility.Activated ability -> activatedAbilityCounts ability
     GrantedAbility.Triggered ability -> triggeredAbilityCounts ability
     GrantedAbility.Static ability -> staticAbilityCounts ability
+    GrantedAbility.Rules rules -> ruleAbilitiesCounts rules
   -- Payload-free: rule 702.165a's grant names the source and carries no text of
   -- its own, so there is nothing here to sweep.
   Modification.GainAbilitiesOfSource -> []
@@ -1768,27 +1770,33 @@ cardCounts card =
     -- literal amount or a Filter, never a fold over a zone.
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . PlayerStaticAbility.condition) (Face.playerAbilities card)
     <> concatMap (quantityCounts . CostReduction.perEach) (Face.costReductions card)
-    <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
-    <> concatMap blockPermissionCounts (Face.blockPermissions card)
+    <> ruleAbilitiesCounts (Projection.ruleAbilitiesOfFace card)
+
+-- Every Count reachable from the thirteen CR 613.11 rule-ability families, a
+-- printed face's (cardCounts) and a granted bundle's (modificationCounts) alike.
+ruleAbilitiesCounts :: RuleAbilities.RuleAbilities -> [Count.Type.Count Quantity.Type.Quantity]
+ruleAbilitiesCounts rules =
+  concatMap combatRestrictionCounts (RuleAbilities.combatRestrictions rules)
+    <> concatMap blockPermissionCounts (RuleAbilities.blockPermissions rules)
     -- CR 508.1d's "or that it attacks if some condition is met", the same CR
     -- 604.2 clause blockPermissionCounts reads one field over (Otarian
     -- Juggernaut counts its controller's graveyard). The requirement's SUBJECT
     -- is an Affected, which holds a Filter but no Count.
-    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AttackRequirement.while) (Face.attackRequirements card)
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AttackRequirement.while) (RuleAbilities.attackRequirements rules)
     -- CR 509.1c's identically worded second reading, on the other side of the
     -- combat phase (Seton's Desire counts its controller's graveyard, the same
     -- threshold clause). Both of this requirement's axes are Affecteds, which
     -- hold a Filter but no Count.
-    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . BlockRequirement.while) (Face.blockRequirements card)
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . BlockRequirement.while) (RuleAbilities.blockRequirements rules)
     -- CR 508.1h's counted share (Sphere of Safety's "the number of enchantments
     -- you control"), the one Count a cost to attack can hold: its subject is an
     -- Affected, which holds a Filter but no Count.
-    <> concatMap (perCreatureCounts . AttackCost.perAttacker) (Face.attackCosts card)
+    <> concatMap (perCreatureCounts . AttackCost.perAttacker) (RuleAbilities.attackCosts rules)
     -- CR 509.1d's counted share, the same Count in the blocking carrier. A FENCE
     -- rather than a proved line: Sphere of Safety fills the attacking one and
     -- pins the positive assertion below, and no cost to block in `data/cards/`
     -- writes a Counted share -- Oppressive Rays' is a literal {3}.
-    <> concatMap (perCreatureCounts . BlockCost.perBlocker) (Face.blockCosts card)
+    <> concatMap (perCreatureCounts . BlockCost.perBlocker) (RuleAbilities.blockCosts rules)
 
 -- The shared shape of the D4 dataflow lint, over EVERY carrier a card can hang
 -- modes off: its spell, and its activated, triggered and delayed abilities. The
@@ -5592,6 +5600,46 @@ grantedTriggeredAbilities card =
     )
     (grantedModifications card)
 
+-- Every Filter the thirteen CR 613.11 rule-ability families carry, a printed
+-- face's (cardFilters) and a granted bundle's alike.
+ruleAbilitiesFilters :: RuleAbilities.RuleAbilities -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+ruleAbilitiesFilters rules =
+  frame
+    Unframed
+    ( concatMap (frame Unframed . blockRequirementFilters) (RuleAbilities.blockRequirements rules)
+        <> concatMap blockPermissionFilters (RuleAbilities.blockPermissions rules)
+        <> concatMap (frame Unframed . attackRequirementFilters) (RuleAbilities.attackRequirements rules)
+        <> concatMap (unframed . affectedFilters . AttackCost.subject) (RuleAbilities.attackCosts rules)
+        <> concatMap (perCreatureFilters . AttackCost.perAttacker) (RuleAbilities.attackCosts rules)
+        <> concatMap (unframed . affectedFilters . BlockCost.subject) (RuleAbilities.blockCosts rules)
+        <> concatMap (perCreatureFilters . BlockCost.perBlocker) (RuleAbilities.blockCosts rules)
+        <> concatMap (frame Unframed . combatRestrictionFilters) (RuleAbilities.combatRestrictions rules)
+        <> concatMap (unframed . affectedFilters . SacrificeRestriction.affected) (RuleAbilities.sacrificeRestrictions rules)
+        <> concatMap (unframed . affectedFilters . UntapRestriction.affected) (RuleAbilities.untapRestrictions rules)
+        <> concatMap (unframed . affectedFilters . CrewRestriction.affected) (RuleAbilities.crewRestrictions rules)
+        <> concatMap (unframed . attachRestrictionFilters) (RuleAbilities.attachRestrictions rules)
+        <> concatMap (unframed . affectedFilters . EntryRestriction.affected) (RuleAbilities.entryRestrictions rules)
+        <> concatMap (unframed . affectedFilters . CounterRestriction.affected) (RuleAbilities.counterRestrictions rules)
+        -- And the KIND the prohibition names (Melira, Sylvok Outcast's -1/-1
+        -- counters), which may be a whole Keyword carrying a Filter (CR 122.1b);
+        -- see #2728. Nothing there is Solemnity's "counters" -- any kind at all.
+        <> concatMap (concatMap counterKindFilters . Maybe.maybeToList . CounterRestriction.kind) (RuleAbilities.counterRestrictions rules)
+        -- CR 602.2's activation prohibition. Its own KIND beside the affected
+        -- set is CR 605.1a's classification, which holds no Filter at all --
+        -- unlike the counter kind one line up.
+        <> concatMap (unframed . affectedFilters . ActivationProhibition.affected) (RuleAbilities.activationProhibitions rules)
+    )
+
+-- The RULE kind of the same grant (CR 613.11), swept for the same reason.
+grantedRuleAbilities :: Face.Face Card.Type.Card -> [RuleAbilities.RuleAbilities]
+grantedRuleAbilities card =
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.Rules rules) -> Just rules
+        _ -> Nothing
+    )
+    (grantedModifications card)
+
 -- The STATIC kind of the same grant, swept for the same reason.
 grantedStaticAbilities :: Face.Face Card.Type.Card -> [StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card)]
 grantedStaticAbilities card =
@@ -5808,28 +5856,7 @@ cardFilters card =
         <> concatMap (frame Unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
         <> concatMap (slotlessCost . specialActionFilters) (Face.specialActions card)
-        <> concatMap (frame Unframed . blockRequirementFilters) (Face.blockRequirements card)
-        <> concatMap blockPermissionFilters (Face.blockPermissions card)
-        <> concatMap (frame Unframed . attackRequirementFilters) (Face.attackRequirements card)
-        <> concatMap (unframed . affectedFilters . AttackCost.subject) (Face.attackCosts card)
-        <> concatMap (perCreatureFilters . AttackCost.perAttacker) (Face.attackCosts card)
-        <> concatMap (unframed . affectedFilters . BlockCost.subject) (Face.blockCosts card)
-        <> concatMap (perCreatureFilters . BlockCost.perBlocker) (Face.blockCosts card)
-        <> concatMap (frame Unframed . combatRestrictionFilters) (Face.combatRestrictions card)
-        <> concatMap (unframed . affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
-        <> concatMap (unframed . affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
-        <> concatMap (unframed . affectedFilters . CrewRestriction.affected) (Face.crewRestrictions card)
-        <> concatMap (unframed . attachRestrictionFilters) (Face.attachRestrictions card)
-        <> concatMap (unframed . affectedFilters . EntryRestriction.affected) (Face.entryRestrictions card)
-        <> concatMap (unframed . affectedFilters . CounterRestriction.affected) (Face.counterRestrictions card)
-        -- And the KIND the prohibition names (Melira, Sylvok Outcast's -1/-1
-        -- counters), which may be a whole Keyword carrying a Filter (CR 122.1b);
-        -- see #2728. Nothing there is Solemnity's "counters" -- any kind at all.
-        <> concatMap (concatMap counterKindFilters . Maybe.maybeToList . CounterRestriction.kind) (Face.counterRestrictions card)
-        -- CR 602.2's activation prohibition. Its own KIND beside the affected
-        -- set is CR 605.1a's classification, which holds no Filter at all --
-        -- unlike the counter kind one line up.
-        <> concatMap (unframed . affectedFilters . ActivationProhibition.affected) (Face.activationProhibitions card)
+        <> ruleAbilitiesFilters (Projection.ruleAbilitiesOfFace card)
     )
     <> concatMap printedReplacementFilters (Face.replacementEffects card)
     <> concatMap staticAbilityFilters (Face.staticAbilities card)
@@ -5849,6 +5876,7 @@ cardFilters card =
     <> concatMap activatedAbilityFilters (grantedActivatedAbilities card)
     <> concatMap triggeredAbilityFilters (grantedTriggeredAbilities card)
     <> concatMap staticAbilityFilters (grantedStaticAbilities card)
+    <> concatMap ruleAbilitiesFilters (grantedRuleAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)

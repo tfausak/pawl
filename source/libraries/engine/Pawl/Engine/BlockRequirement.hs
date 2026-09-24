@@ -78,6 +78,11 @@ instances able candidates attackers gs =
       -- unforced until some permanent actually declares a requirement.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
+      -- CR 613.1f: what a stored grant gave the permanent, whose gates
+      -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
+      -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
+      grantedRules = Projection.grantedRuleAbilities gs
+      fromGrant source = mconcat (fmap (fromRequirement source []) (RuleAbilities.blockRequirements (grantedRules source)))
       fromPermanent source = case RuleAbilities.blockRequirements (Projection.ruleAbilitiesOf source gs) of
         -- Every permanent in almost every game.
         [] -> ([], [])
@@ -206,6 +211,6 @@ instances able candidates attackers gs =
               []
             )
       gathered =
-        fmap fromPermanent (Set.toList (GameState.battlefield gs))
+        fmap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs))
           <> fmap fromStored (GameState.blockRequirements gs)
    in Requirement.gather (concatMap fst gathered) (concatMap snd gathered)
