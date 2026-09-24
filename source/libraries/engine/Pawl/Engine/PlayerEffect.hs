@@ -130,10 +130,17 @@ inScope pid controller gs scope = case scope of
 --
 -- Both carriers are asked through this, and the printed one only ever holds a
 -- Scoped: a static ability has no target slot to have named a seat.
+--
+-- CR 801.10: a row reaches only players within its controller's range of
+-- influence, which is cut here rather than in inScope, whose other readers ask
+-- about a relation between two players and not about an effect's reach.
+-- Pawl.RangeOfInfluenceSpec's "CR 801.10 a player ability does not reach a
+-- player outside its controller's range" proves it.
 applies :: PlayerId -> PlayerId -> GameState -> AffectedPlayers.AffectedPlayers PlayerId -> Bool
-applies pid controller gs affected = case affected of
-  AffectedPlayers.Scoped scope -> inScope pid controller gs scope
-  AffectedPlayers.Named seat -> pid == seat
+applies pid controller gs affected =
+  Game.inRangeOf controller pid gs && case affected of
+    AffectedPlayers.Scoped scope -> inScope pid controller gs scope
+    AffectedPlayers.Named seat -> pid == seat
 
 -- Damping Engine's "a player who controls more permanents than each other
 -- player", as the at-most-one player it names. Nothing when the lead is TIED,

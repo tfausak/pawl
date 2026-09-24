@@ -581,8 +581,12 @@ chooseLegendVictims (controller, candidates) = do
 -- Read off the PROJECTION rather than the printed type line, for the reason
 -- legendGroups is: CR 707.2 makes a copy of a world permanent world too.
 --
--- Not implemented: CR 801.12's narrowing of this rule to world permanents within
--- a controller's range of influence (#3074).
+-- CR 801.12: each world permanent is compared only against the world permanents
+-- within its controller's range of influence, itself among them (CR 801.2b), so
+-- one with no rival in range survives and two out of each other's range both do.
+-- Under an unlimited range every world permanent is every one's rival, which is
+-- CR 704.5k's table-wide comparison. Pawl.RangeOfInfluenceSpec's "CR 801.12 the
+-- world rule compares only world permanents within range" proves it.
 --
 -- A put-into-graveyard, NOT a destruction, so the caller consults neither
 -- indestructible (CR 702.12b) nor a regeneration shield.
@@ -595,16 +599,19 @@ worldVictims pcs gs =
               fmap (\ts -> (ts, oid)) (Game.lookupObject oid gs >>= Object.worldSince)
           | otherwise -> Nothing
       worlds = Maybe.mapMaybe stamped (Set.toList (GameState.battlefield gs))
-   in case fmap fst worlds of
-        [] -> []
-        ts : rest ->
+      grants = Projection.controlGrants gs
+      rivalsOf oid =
+        let controller = Projection.controllerOfGiven grants Set.empty oid gs
+         in filter (\(_, other) -> other == oid || all (\you -> Projection.objectInRangeGiven grants you other gs) controller) worlds
+      buried (ts, oid) = case fmap fst (rivalsOf oid) of
+        [] -> False
+        [_] -> False
+        t : rest ->
           -- The SHORTEST amount of time is the LARGEST timestamp: the last one to
           -- become world has been world for the least time.
-          let newest = List.foldl' max ts rest
-              (survivors, older) = List.partition (\(t, _) -> t == newest) worlds
-           in case survivors of
-                [_] -> fmap snd older
-                _ -> fmap snd worlds
+          let newest = List.foldl' max t rest
+           in ts /= newest || length (filter (== newest) (t : rest)) > 1
+   in fmap snd (filter buried worlds)
 
 -- CR 704.3: repeat until no state-based action is performed. ONE pass here, with
 -- the repeat living in Engine's CR 117.5 settle loop (settleForPriority). A
