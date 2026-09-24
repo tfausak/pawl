@@ -31,7 +31,6 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
-import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -51,7 +50,6 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import Pawl.Types.Quantity (Quantity)
-import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotCount as SlotCount
@@ -211,30 +209,14 @@ legalRecipientsGiven pcs grants pools perspective unannounced bindings source sl
    in Set.filter keep (admittedGiven pcs grants pools perspective unannounced bindings source slot gs)
 
 -- CR 801.2: is this recipient within @you@'s range of influence -- a player
--- within range, or an object objectInRangeGiven admits? CR 801.4 is the reader:
--- legalRecipientsGiven asks it of the perspective, the controller of the spell
--- or ability.
+-- within range, or an object Projection.objectInRangeGiven admits? CR 801.4 is
+-- the reader: legalRecipientsGiven asks it of the perspective, the controller of
+-- the spell or ability.
 inRangeGiven :: [Projection.ControlGrant] -> PlayerId -> Recipient -> GameState -> Bool
 inRangeGiven grants you recipient gs = case (Recipient.playerOf recipient, Recipient.objectOf recipient) of
   (Just pid, _) -> Game.inRangeOf you pid gs
-  (Nothing, Just oid) -> objectInRangeGiven grants you oid gs
+  (Nothing, Just oid) -> Projection.objectInRangeGiven grants you oid gs
   (Nothing, Nothing) -> True
-
--- CR 801.2d: is this object within @you@'s range of influence -- controlled by a
--- player within range, or a battle protected by one? CR 801.4 (inRangeGiven
--- above) and CR 801.6 (Pawl.Engine.Activatable.activatableGiven) read it.
---
--- Nothing is asked under an unlimited range, so a game without CR 801's option
--- never takes the control fold. An object's controller is CR 108.4a's owner off
--- the battlefield and the stack, which controllerOfGiven already answers.
-objectInRangeGiven :: [Projection.ControlGrant] -> PlayerId -> ObjectId -> GameState -> Bool
-objectInRangeGiven grants you oid gs =
-  let reaches = maybe False (\pid -> Game.inRangeOf you pid gs)
-   in case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
-        Nothing -> True
-        Just _ ->
-          reaches (Projection.controllerOfGiven grants Set.empty oid gs)
-            || reaches (Object.protector =<< Game.lookupObject oid gs)
 
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SLOT itself admits -- its
 -- Pool's base candidate set (CR 115.4's "any target" is creatures, planeswalkers
