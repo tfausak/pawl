@@ -13,23 +13,6 @@ import qualified Pawl.Types.TapState as TapState
 -- most zones a Zone can name have no conjuring card behind them, and an
 -- exhaustive case over the seven would be answering about zones no printing
 -- reaches.
---
--- Not implemented: exile (Dazzling Flameweaver\'s "conjure a random card from
--- Dazzling Flameweaver\'s spellbook into exile", Gyox, Brutal Carnivora\'s
--- "conjure X duplicates of it into exile"), which is an axis of its own rather
--- than a fifth arm nothing else was waiting on -- Scryfall @o:conjure o:exile@,
--- 2026-09-11, five printings name this destination and every one of them also
--- wants something else the opcode cannot say. Dazzling Flameweaver\'s "you may
--- play that card until the end of your next turn" and Darigaaz, Shivan
--- Champion\'s arrival "face down with three egg counters on it" both name the
--- conjured card in a later clause, which wants the slot the conjure does not
--- bind (#3971); Gyox, Brutal Carnivora\'s "those duplicates perpetually get
--- +X\/+X. Then shuffle those duplicates into your library" names them the same
--- way and wants the same slot; Limitless Rekindling picks from outside the game
--- (#3063); Smog Smasher\'s conjuring line wants nothing else, and its "Max
--- speed -- ... put all cards exiled with this creature onto the battlefield" is
--- a speed threshold no ability condition states. So no board reaches such an arm
--- (#2653).
 data ConjureDestination
   = -- | Emporium Thopterist\'s "conjure a card named Ornithopter into your
     -- hand".
@@ -62,7 +45,7 @@ data ConjureDestination
   | -- | Lam, Storm Crane Elder\'s "conjure a card named Monastery Mentor onto
     -- the battlefield" (CR 403.1).
     --
-    -- The only arm that is an ENTRY: the other three put the card into a zone
+    -- The only arm that is an ENTRY: the other four put the card into a zone
     -- and stop, where this one wants CR 616.1's entry loop and the CR 603.6a
     -- trigger scan, so Pawl.Engine.Event.conjureOntoBattlefield is a road of its
     -- own rather than another argument to Pawl.Engine.Event.conjure.
@@ -75,9 +58,9 @@ data ConjureDestination
     -- codec elides.
     --
     -- On the ARM rather than beside 'Pawl.Types.Conjure.destination', which is
-    -- what makes a conjure into a hand, a library or a graveyard unable to state
-    -- one: CR 110.5d gives a card outside the battlefield no status at all, so a
-    -- field there would be a key three of the four destinations could write and
+    -- what makes a conjure into a hand, a library, a graveyard or exile unable to
+    -- state one: CR 110.5d gives a card outside the battlefield no status at all,
+    -- so a field there would be a key four of the five destinations could write and
     -- nothing could read. 'Pawl.Types.EntryRiders.EntryRiders', what the other
     -- three entry doors carry, is not what this arm holds: beyond the status and
     -- the combat state below, its riders are counters, two kinds of
@@ -90,4 +73,14 @@ data ConjureDestination
     -- Zev, Crew of Two\'s same sentence, whose rider then names the conjured card
     -- and so wants the binding see #3971 as well (#3973).
     Battlefield TapState.TapState
+  | -- | Smog Smasher\'s "conjure a duplicate of target nontoken creature into
+    -- exile" (CR 406.1).
+    --
+    -- Not implemented: Dazzling Flameweaver\'s "you may play that card until
+    -- the end of your next turn", Darigaaz, Shivan Champion\'s "face down with
+    -- three egg counters on it", Gyox, Brutal Carnivora\'s "those duplicates
+    -- perpetually get +X\/+X" and Limitless Rekindling\'s "you may cast that
+    -- card" each name the card this arm exiled in a later clause, which wants the
+    -- slot the conjure does not bind (#3971).
+    Exile
   deriving (Eq, Ord, Show)

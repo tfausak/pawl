@@ -2192,6 +2192,13 @@ replaySpec s registry =
       Spec.assertEqWith s "no card round trips" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
       Spec.assertEqWith s "a chosen name does not decode as a lookup" (Replay.decode p (Response.ChoseCardName (CardName.MkCardName (Text.pack "Goblin Piker")))) Nothing
       Spec.assertEqWith s "a short transcript answers no card" (Replay.defaultAnswer p) Nothing
+    -- The same for the names the reference answers a filter with.
+    Spec.it s "ReferenceCards round-trips through the transcript" $ do
+      let p = Prompt.ReferenceCards (Filter.Type.HasCardType CardType.Creature) (Just 4)
+          names = [CardName.MkCardName (Text.pack "Hill Giant"), CardName.MkCardName (Text.pack "Giant Spider")]
+      Spec.assertEqWith s "names round trip" (Replay.decode p (Replay.encode p names)) (Just names)
+      Spec.assertEqWith s "a looked-up card does not decode as names" (Replay.decode p (Response.LookedUpCard Nothing)) Nothing
+      Spec.assertEqWith s "a short transcript answers no names" (Replay.defaultAnswer p) []
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replay" $ do

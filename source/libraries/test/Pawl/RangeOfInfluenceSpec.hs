@@ -4,9 +4,14 @@
 -- the Pawl.Types.GameSettings field that carries it, Pawl.Engine.Game.inRangeOf,
 -- and its readers: Pawl.Engine.Combat's attackableOpponents (CR 801.3),
 -- Pawl.Engine.Target's legalRecipientsGiven (CR 801.4),
--- Pawl.Engine.Activate's activatableGiven (CR 801.6) and Pawl.Engine.Sba's
--- fallsOff and becomesUnattached (CR 801.8 / CR 801.9); and CR 801.2c's
--- turn-start seating, Pawl.Types.GameState's departedThisTurn.
+-- Pawl.Engine.Activate's activatableGiven (CR 801.6), Pawl.Engine.Sba's
+-- fallsOff and becomesUnattached (CR 801.8 / CR 801.9),
+-- Pawl.Engine.Projection's affectsWith and Pawl.Engine.PlayerEffect's applies
+-- (CR 801.10 for static abilities), Pawl.Engine.Projection.View's
+-- controlNames (CR 801.10 for a layer-2 grant), Pawl.Engine.CombatRestriction's
+-- attackLimit and blockLimit (CR 801.10 for a declaration's bound) and Sba's
+-- worldVictims (CR 801.12); and CR 801.2c's turn-start seating,
+-- Pawl.Types.GameState's departedThisTurn.
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
 -- carol, dave]: bob and dave sit next to alice and carol sits two seats away.
@@ -23,12 +28,16 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -163,6 +172,90 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (S.onBattlefield equipment limited) "CR 801.9 and stays on the battlefield"
     Spec.assertBool s (S.onBattlefield steal limited) "carol's Control Magic, on a creature she controls, stays"
     Spec.assertEqWith s "at an unlimited range the Piker keeps both" (S.powerToughnessOf creature unlimited) (Just (6, 2))
+
+  -- CR 801.10 for a static ability: alice's Living Plane ("All lands are 1/1
+  -- creatures that are still lands.") over a Forest each for bob, one seat
+  -- away, and carol, two seats away.
+  Spec.it s "CR 801.10 a static ability does not reach a permanent outside its controller's range" $ do
+    livingPlane <- S.printingOf s registry "Living Plane"
+    forest <- S.printingOf s registry "Forest"
+    let (_, g0) = S.addPermanent livingPlane S.alice S.fourPlayerGame
+        (bobs, g1) = S.addPermanent forest S.bob g0
+        (carols, board) = S.addPermanent forest S.carol g1
+    Spec.assertEqWith s "CR 801.10 at range 1 carol's Forest is not a creature" (S.powerToughnessOf carols (S.withRange 1 board)) Nothing
+    Spec.assertEqWith s "at an unlimited range it is a 1/1" (S.powerToughnessOf carols board) (Just (1, 1))
+    Spec.assertEqWith s "and bob's Forest, in range, is a 1/1 at range 1" (S.powerToughnessOf bobs (S.withRange 1 board)) (Just (1, 1))
+
+  -- CR 801.10 for a player ability: alice's Gnat Miser ("Each opponent's
+  -- maximum hand size is reduced by one.") over bob, one seat away, and carol,
+  -- two seats away.
+  Spec.it s "CR 801.10 a player ability does not reach a player outside its controller's range" $ do
+    miser <- S.printingOf s registry "Gnat Miser"
+    let (_, board) = S.addPermanent miser S.alice S.fourPlayerGame
+    Spec.assertEqWith s "CR 801.10 at range 1 carol keeps a maximum hand size of seven" (PlayerEffect.maximumHandSize S.carol (S.withRange 1 board)) (Just 7)
+    Spec.assertEqWith s "at an unlimited range hers is six" (PlayerEffect.maximumHandSize S.carol board) (Just 6)
+    Spec.assertEqWith s "and bob's, in range, is six at range 1" (PlayerEffect.maximumHandSize S.bob (S.withRange 1 board)) (Just 6)
+
+  -- CR 801.10 for a layer-2 grant: alice's Synthetic Goblin Dominion ("You
+  -- control all Goblins.") over a Goblin Piker each for bob, one seat away, and
+  -- carol, two seats away.
+  Spec.it s "CR 801.10 a control grant does not take a permanent outside its controller's range" $ do
+    dominion <- S.printingOf s registry "Synthetic Goblin Dominion"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent dominion S.alice S.fourPlayerGame
+        (bobs, g1) = S.addPermanent piker S.bob g0
+        (carols, board) = S.addPermanent piker S.carol g1
+    Spec.assertEqWith s "CR 801.10 at range 1 carol keeps her Goblin" (Projection.controllerOf carols (S.withRange 1 board)) (Just S.carol)
+    Spec.assertEqWith s "at an unlimited range alice takes it" (Projection.controllerOf carols board) (Just S.alice)
+    Spec.assertEqWith s "and at range 1 alice takes bob's, in range" (Projection.controllerOf bobs (S.withRange 1 board)) (Just S.alice)
+
+  -- CR 801.10 for a bound on a declaration: alice's Silent Arbiter ("No more
+  -- than one creature can attack each combat. No more than one creature can
+  -- block each combat.") over carol, two seats away. Carol attacks dave, beside
+  -- her, with two Goblin Pikers; and when bob attacks carol, carol blocks with
+  -- two.
+  Spec.it s "CR 801.10 a limit on attackers or blockers does not bind a player outside its controller's range" $ do
+    arbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent arbiter S.alice S.fourPlayerGame
+        (first, g1) = S.addPermanent piker S.carol g0
+        (second, g2) = S.addPermanent piker S.carol g1
+        (attacker, g3) = S.addPermanent piker S.bob g2
+        attackBoard =
+          g3
+            { GameState.activePlayer = S.carol,
+              GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.dave, S.bob]}
+            }
+        blockBoard =
+          g3
+            { GameState.activePlayer = S.bob,
+              GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.carol], Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.carol)}
+            }
+        both = fmap (\oid -> (oid, AttackTarget.OfPlayer S.dave)) [first, second]
+        doubleBlock = Map.fromList [(first, Set.singleton attacker), (second, Set.singleton attacker)]
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.carol both (S.withRange 1 attackBoard)) "CR 801.10 at range 1 carol attacks dave with both Pikers"
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.carol both attackBoard)) "at an unlimited range the Arbiter holds her to one"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.carol doubleBlock (S.withRange 1 blockBoard)) "CR 801.10 at range 1 carol blocks with both"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol doubleBlock blockBoard)) "at an unlimited range she may block with only one"
+
+  -- CR 801.12: alice's Living Plane, then a newer Concordant Crossroads, each
+  -- stamped by the settle that follows its entry (Engine.sampleWorldSince).
+  -- Carol's is two seats from alice; bob's is one.
+  Spec.it s "CR 801.12 the world rule compares only world permanents within range" $ do
+    livingPlane <- S.printingOf s registry "Living Plane"
+    crossroads <- S.printingOf s registry "Concordant Crossroads"
+    let addWorld printing pid gs =
+          let (oid, placed) = S.addPermanent printing pid gs
+           in (oid, S.runPure S.identityAnswer placed Engine.sampleWorldSince)
+        (plane, g0) = addWorld livingPlane S.alice S.fourPlayerGame
+        (_, carols) = addWorld crossroads S.carol g0
+        (_, bobs) = addWorld crossroads S.bob g0
+        pass gs = S.runPure S.identityAnswer gs (Engine.sampleWorldSince >> Sba.checkStateBasedActions)
+    Spec.assertBool s (S.onBattlefield plane (pass (S.withRange 1 carols))) "CR 801.12 at range 1 alice's Living Plane survives carol's newer Crossroads"
+    Spec.assertBool s (not (S.onBattlefield plane (pass carols))) "at an unlimited range it is put into the graveyard"
+    Spec.assertBool s (not (S.onBattlefield plane (pass (S.withRange 1 bobs)))) "and at range 1 bob's newer Crossroads, in range, buries it"
 
   -- CR 801.2c and its example: bob concedes during alice's turn, and carol,
   -- two seats from alice across bob's emptied seat, stays out of alice's range

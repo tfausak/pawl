@@ -1521,8 +1521,9 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- below rather than to this creature-scoped fold (#981).
 --
 -- The becomes-a-battle clause IS here, and it is sampled like the other two: a
--- combatant that IS a battle became one, since CR 508.1a and CR 509.1a both keep
--- a battle out of the declaration it joined combat through.
+-- combatant that IS a battle became one, since CR 508.1a and CR 509.1a keep a
+-- battle out of both declarations and CR 506.3f out of both
+-- put-onto-the-battlefield roads.
 --
 -- The ATTACKED planeswalker or battle is noteAttackingNothing's, below, run on
 -- the state this fold leaves behind.
@@ -2101,12 +2102,12 @@ data AttackChoice
 -- and none of canAttack's questions, per CR 508.4c.
 --
 -- The guards are the ways the rules say the creature enters WITHOUT being an
--- attacking creature -- CR 506.3a, CR 506.3b, CR 506.3c / CR 508.4a, and an empty
--- Defender.defendingPlayers -- each a silent no-op, which is what those rules
--- say. CR
--- 508.4a's remaining clauses need no check, attackTargets deriving the offer from
--- the board AT THIS MOMENT, and CR 508.4d holds by construction: the creature gets
--- no key in Combat.blockers.
+-- attacking creature -- CR 506.3a, CR 506.3b, CR 506.3c / CR 508.4a, CR 506.3f,
+-- and an empty Defender.defendingPlayers -- each a silent no-op, which is what
+-- those rules say. Pawl.CombatSpec's Synthetic Siege Muster pair proves CR
+-- 506.3f. CR 508.4a's remaining clauses need no check, attackTargets deriving
+-- the offer from the board AT THIS MOMENT, and CR 508.4d holds by construction:
+-- the creature gets no key in Combat.blockers.
 --
 -- CR 508.4's CHOICE is prompted per permanent over CR 508.1b's candidates -- CR
 -- 802.3's every defending player included, this being the same announcement --
@@ -2153,6 +2154,8 @@ putOntoBattlefieldAttacking choice oid = do
       | Set.member oid (GameState.battlefield gs),
         -- CR 506.3a
         isCreatureObject oid gs,
+        -- CR 506.3f
+        not (Projection.isBattleOf oid gs),
         -- CR 506.3b / CR 506.2: the attacking player is the active player
         controller == GameState.activePlayer gs -> do
           -- CR 508.4's chooser is the creature's controller, whom the guard above
@@ -2239,14 +2242,13 @@ putOntoBattlefieldAttacking choice oid = do
 --
 -- The guards are the ways the rules say the creature enters WITHOUT ever being a
 -- blocking creature, each a silent no-op because that is what those rules say:
--- CR 506.3a (not a creature), CR 509.4a's first clause (the named creature is no
--- longer attacking), and CR 506.3e / CR 509.4a's second clause -- which is
--- Defender.playerOfAttacker, that function answering CR 508.5's three cases and
--- so exactly rule 506.3e's "attacking the entering creature's controller, a
--- planeswalker that player controls, or a battle that player protects".
---
--- CR 506.3f (a creature that's also a battle) is not guarded, as
--- putOntoBattlefieldAttacking does not guard it either: no printing is both.
+-- CR 506.3a (not a creature), CR 506.3f (also a battle), CR 509.4a's first
+-- clause (the named creature is no longer attacking), and CR 506.3e / CR
+-- 509.4a's second clause -- which is Defender.playerOfAttacker, that function
+-- answering CR 508.5's three cases and so exactly rule 506.3e's "attacking the
+-- entering creature's controller, a planeswalker that player controls, or a
+-- battle that player protects". Pawl.CombatSpec's Synthetic Siege Muster pair
+-- proves CR 506.3f.
 --
 -- The last two guards are REGRESSION FENCES rather than proved behaviour:
 -- dropping both leaves the whole suite green. Neither pooled producer can reach
@@ -2271,6 +2273,8 @@ putOntoBattlefieldBlocking oid attacker = do
       | Set.member oid (GameState.battlefield gs),
         -- CR 506.3a
         isCreatureObject oid gs,
+        -- CR 506.3f
+        not (Projection.isBattleOf oid gs),
         -- CR 509.4a's first clause
         Map.member attacker (Combat.attackers c),
         -- CR 506.3e / CR 509.4a's second clause

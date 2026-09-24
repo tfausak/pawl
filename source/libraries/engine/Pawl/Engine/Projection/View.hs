@@ -48,6 +48,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -70,12 +71,14 @@ import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Teams as Teams
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -101,8 +104,10 @@ lastKnownView peers oid gs lk =
 -- only an OBJECT can have are Nothing or empty, and each says so at its field.
 --
 -- Its readers are Pawl.ProjectionSpec's, which ask about a printed face with no
--- game around it, and Pawl.Engine.Replacement.matchesTokenLot, which asks about
--- a token that is proposed and not yet minted (CR 614.12). A reader that holds
+-- game around it, Pawl.Engine.Replacement.matchesTokenLot, which asks about a
+-- token that is proposed and not yet minted (CR 614.12), and the readers of a
+-- card outside the game -- Pawl.Engine.Event.eligible, referenceAdmits below,
+-- Pawl.Interpreter.legalCardName. A reader that holds
 -- an OBJECT takes viewOfObject instead, in whatever zone the object sits -- see
 -- #1911, which moved the last of them.
 viewOfCard :: Face.Face Card.Type.Card -> Filter.View
@@ -295,6 +300,22 @@ viewOfCard face =
           -- a printed FACE with no controller and no board to grant it one.
           Filter.grantsStationToughness = False
         }
+
+-- CR 108.1 / 400.11: does a card of the Oracle card reference, which no game
+-- holds, match the filter a conjure picks over it by
+-- (Pawl.Types.ConjureCards.Reference)? Read off the printed card through
+-- viewOfCard, Pawl.Engine.Event.eligible's posture for a card outside the game.
+-- The amount is the bound Filter.ManaValueEqualToAmount reads.
+--
+-- The one judgement both sides make: Pawl.Interpreter.lookingUpCards narrows the
+-- reference by it, and the conjure filters the card it is handed back through
+-- it rather than trusting the answer.
+referenceAdmits :: Teams.Teams -> Maybe Integer -> Filter.Type.Filter Keyword -> Card.Type.Card -> Bool
+referenceAdmits teams amount predicate card =
+  Filter.matches
+    ((Filter.contextFor teams Nothing Nothing) {Filter.slotAmount = amount})
+    (viewOfCard (Game.resolveFaceFor Nothing card))
+    predicate
 
 -- CR 208.1's PRINTED power box, for a card off the battlefield. Nothing for a
 -- face with no power box, since CR 208.1 gives power only to creature cards.
@@ -1808,6 +1829,33 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
               [] -> Just (defaultControllerOf obj)
               setters -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
 
+-- CR 801.2d: is this object within @you@'s range of influence -- controlled by a
+-- player within range, or a battle protected by one? CR 801.4
+-- (Pawl.Engine.Target.inRangeGiven), CR 801.6
+-- (Pawl.Engine.Activatable.activatableGiven) and CR 801.10
+-- (Pawl.Engine.Projection.affectsWith) read it.
+--
+-- Nothing is asked under an unlimited range, so a game without CR 801's option
+-- never takes the control fold. An object's controller is CR 108.4a's owner off
+-- the battlefield and the stack, which controllerOfGiven already answers.
+objectInRangeGiven :: [ControlGrant] -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
+objectInRangeGiven grants you oid gs =
+  let reaches = maybe False (\pid -> Game.inRangeOf you pid gs)
+   in case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
+        Nothing -> True
+        Just _ ->
+          reaches (controllerOfGiven grants Set.empty oid gs)
+            || reaches (Object.protector =<< Game.lookupObject oid gs)
+
+-- CR 801.10: is @oid@ within the range of influence of @source@'s controller?
+-- Pawl.Engine.Projection.affectsWith's cut on a static ability's dynamic set.
+-- Asked of the limited-range option first, so a game without it takes no control
+-- fold; a source with no controller cuts nothing.
+inSourceRangeGiven :: [ControlGrant] -> ObjectId -> ObjectId -> GameState -> Bool
+inSourceRangeGiven grants source oid gs =
+  Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs)))
+    || all (\you -> objectInRangeGiven grants you oid gs) (controllerOfGiven grants Set.empty source gs)
+
 -- Which objects an affected set NAMES, for the CR 613.1b layer-2 control fold.
 -- Parameterized by the source because Affected.Attached asks about the SOURCE's
 -- state, and by the grant list and the caller's visited set because a PREDICATE
@@ -1832,7 +1880,7 @@ controlNames grants visited gs source a = case a of
   -- values, since layer 1 is the only layer before it and CR 613.8a confines
   -- dependency to one layer -- so no layer-4 type change feeds this test, which
   -- is what lets it run without projecting.
-  Affected.Matching f -> Set.filter (matchesLeanly grants visited gs source f) (GameState.battlefield gs)
+  Affected.Matching f -> Set.filter (\oid -> matchesLeanly grants visited gs source f oid && controlReaches grants visited gs source oid) (GameState.battlefield gs)
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.MatchingOffBattlefield _ -> Set.empty
   -- A rider is stored against the object it names (Event.permissionRiders), and
@@ -1876,6 +1924,19 @@ controlNames grants visited gs source a = case a of
        in Set.filter
             (\oid -> controllerOfGiven others Set.empty oid gs == Just pid && matchesLeanly grants visited gs source f oid)
             (GameState.battlefield gs)
+
+-- CR 801.10 for a layer-2 grant: is `oid` within the range of influence of
+-- `source`'s controller, judged on the controller `oid` has WITHOUT this source's
+-- own grants? A grant cannot bring an object into its own reach by taking it:
+-- CR 613.8a's dependency, and the AttachedPlayerControls arm's escape above,
+-- whose strictly shorter grant list is also what makes this terminate. Asked of
+-- the limited-range option first, so a game without it takes no control fold.
+-- Pawl.RangeOfInfluenceSpec's "CR 801.10 a control grant does not take a
+-- permanent outside its controller's range" proves it.
+controlReaches :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> ObjectId -> Bool
+controlReaches grants visited gs source oid =
+  Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs)))
+    || all (\you -> objectInRangeGiven (filter (\g -> cgSource g /= source) grants) you oid gs) (controllerOfGiven grants visited source gs)
 
 -- Does `oid` match a layer-2 affected set's Filter, read at the copiable values
 -- controlNames explains and with CR 109.5's "you" bound to the SOURCE's
