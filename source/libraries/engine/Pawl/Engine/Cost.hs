@@ -3536,13 +3536,15 @@ criteriaOf component = case component of
 -- is what it offers, so an empty one is no choice and raises nothing.
 --
 -- Only the PAYER is asked. Rule 733.1's "each player" is wider, but the window
--- here offers sources only to the player paying (Mana.manaSourcesGiven), so no
--- other player has activated anything to reverse.
+-- here offers sources only to the player paying (Mana.manaSourcesGiven).
+-- Not implemented: the question to CR 702.132a's assist helper, the one other
+-- player who can have activated anything (`offerAssist`, #4061).
 --
--- Reached from a payment that IS the whole of the action that failed -- CR
--- 118.12's resolution-time cost, and every special action -- so that no caller
--- unwinds a wider snapshot afterwards and discards what the payer kept. `pay`
--- below says which callers are left out and why.
+-- `before` is where the failed ACTION began, which is the caller's to name: a
+-- cast's is ahead of CR 601.2a's move, an activation's ahead of CR 602.2a's
+-- reveal, a combat declaration's ahead of CR 508.1a's or 509.1a's record. No
+-- caller unwinds a wider snapshot afterwards, so nothing discards what the
+-- payer kept.
 --
 -- `entry` is where the mana window OPENED, which is what tells the two sides
 -- apart: the payer who declines goes back to `before` for everything the
@@ -3551,15 +3553,16 @@ criteriaOf component = case component of
 -- composes that state, and answers Nothing where the two sides wrote one leaf
 -- differently, which falls back to the whole reversal unasked -- conservative,
 -- and reached by nothing in the suite.
--- A caller whose announcement writes no leaf this function reverses hands down
--- two states the composition cannot tell apart, and then the composed state IS
--- `closed` and nothing here moves. That is every caller today: they differ only
--- in GameState.lastChoice and, at Pawl.Engine.Companion.take, in
--- GameState.nextObjectId, both of which ride at `closed`'s value by rule.
+-- The special actions and CR 118.12's payment announce nothing that writes:
+-- their two states differ only in GameState.lastChoice and, at
+-- Pawl.Engine.Companion.take, in GameState.nextObjectId, both of which ride at
+-- `closed`'s value by rule, so the composed state IS `closed` there.
 --
--- CostSpec's "Reversal" group proves it at CR 118.12's payment, and
+-- CostSpec's "Reversal" group proves it at CR 118.12's payment,
 -- Pawl.FaceDownSpec's "Reversal at a special action" group at a special
--- action's.
+-- action's, CostSpec's "Reversal after an announcement" group at a cast, an
+-- activation and a mana ability's own cost, and CombatCostSpec's "Reversal at
+-- a combat toll" group at CR 508.1's and CR 509.1's declarations.
 --
 -- ALL OR NOTHING, where the rule's "any" admits a subset (gap #3134). That is
 -- also what keeps its "unless" clause -- mana from a reversed ability spent on
@@ -3584,10 +3587,9 @@ reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> GameState 
 reverseIllegal pid activated closed entry before = case NonEmpty.nonEmpty activated of
   Nothing -> restoreKeepingLibraryActions before
   Just sources -> case Reversal.withoutAnnouncement before entry closed of
-    -- Not implemented: rule 733.1's question where no state answers "keep
-    -- them". The whole action goes back unasked, which is the reversal every
-    -- caller did before this and so costs at most the question
-    -- (Pawl.Engine.Reversal) (#3119).
+    -- No state answers "keep them" where both sides wrote one leaf to two
+    -- values, so the whole action goes back unasked (Pawl.Engine.Reversal says
+    -- why that is conservative rather than invented).
     Nothing -> restoreKeepingLibraryActions before
     Just kept -> do
       State.put kept
@@ -3705,13 +3707,11 @@ announceSubstitutions substituting pid oid cost = case Cost.mana cost of
 -- A payment can still go Unpaid where `canPay` called the cost payable: an order,
 -- or an answer to a component's own prompt, that spends the wrong object loses it.
 --
--- All or nothing (CR 601.2h). The entry state is captured and put back on any
--- rejection, so an Unpaid result unwinds the whole payment even though paying is
--- monadic. WHAT goes back is rule 733.1's partition and not the whole state:
--- the payments go unasked, and the mana abilities activated in the CR 605.3a
--- window go back only if the payer says so (`reverseIllegal` above). That
--- partition is honoured wherever the caller could name the state its action
--- began in (`reversible` below) -- see the Unpaid arm for which callers cannot.
+-- All or nothing (CR 601.2h). An Unpaid result unwinds the whole ACTION even
+-- though paying is monadic, and the caller does nothing more. WHAT goes back is
+-- rule 733.1's partition and not the whole state: the announcement and the
+-- payments go unasked, and the mana abilities activated in the CR 605.3a window
+-- go back only if the payer says so (`reverseIllegal` above).
 --
 -- Rule 733.1's MOVE limb -- an action that moved cards to or from a library may
 -- NOT be reversed -- needs no arm here, and by two rules rather than by luck.
@@ -3727,26 +3727,13 @@ announceSubstitutions substituting pid oid cost = case Cost.mana cost of
 -- Pawl.Engine.ManaAbility.movesLibraryCard answers False of Effect.Shuffle and
 -- Effect.Reveal, so a mana ability may carry one -- are why `reverseIllegal`
 -- above restores through `keepingLibraryActions` rather than a bare State.put:
--- CostSpec's "Reversal" group proves the library stands at CR 118.12's moment.
--- The no-`reversible` arm below does the same for its OWN local `before`, and
--- each of the callers that arm serves (Pawl.Engine.Cast.castProposed,
--- Pawl.Engine.Activate.activateAbility) restores through `keepingLibraryActions`
--- against its wider snapshot once this returns Unpaid, which is what an observer
--- actually sees -- CostSpec's "Synthetic Reversal Rig" group proves it at the
--- activation. This arm's own restore is redundant with theirs on every path the
--- pool reaches today, and is kept as the same discipline for a caller that some
--- day does not add one.
+-- CostSpec's "Reversal" group proves the library stands at CR 118.12's moment,
+-- and its "Synthetic Reversal Rig" group at an activation.
 --
--- `reversible` is WHERE the failed action began, and so whether rule 733.1's
--- question can be asked here at all. A caller names one when this payment IS the
--- whole of the action -- CR 118.12's resolution-time cost, and every special
--- action, whose only step ahead of the payment is CR 118.13c's announcement and
--- that writes no state. Nothing where the caller announced something this
--- payment cannot see and unwinds a wider snapshot of its own (#3119): a cast has
--- CR 601.2a's spell on the stack and an activation CR 602.2a's ability object,
--- neither of which the state the window closed on could be handed back without.
--- `payToll` below is outside this function and elides the same question for CR
--- 508.1's declaration.
+-- `began` is WHERE the failed action began -- the caller's snapshot ahead of its
+-- own announcement, CR 601.2a's move for a cast and CR 602.2a's reveal for an
+-- activation. Everything between it and the window is what rule 733.1 reverses
+-- unasked (Pawl.Engine.Reversal).
 --
 -- `moment` is which of CR 601.2h and CR 118.12 this payment is (see
 -- Pawl.Types.PaymentMoment). Taken from the CALLER and never derived, since the
@@ -3774,8 +3761,8 @@ announceSubstitutions substituting pid oid cost = case Cost.mana cost of
 --
 -- `perform` is CR 405.6c's executor, carried down to the mana window for a mana
 -- ability that has an effect beyond its mana (Pawl.Types.ManaAbilityPerformer).
-pay :: ManaAbilityPerformer.ManaAbilityPerformer -> Maybe GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-pay perform reversible moment subject announced spending pid oid cost = fmap fst (paySubstituting perform reversible moment subject announced spending pid oid (\c -> pure (c, [])) cost)
+pay :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+pay perform began moment subject announced spending pid oid cost = fmap fst (paySubstituting perform began moment subject announced spending pid oid (\c -> pure (c, [])) cost)
 
 -- `pay` with CR 702.51a's, CR 702.66a's and CR 702.126a's substitution offered
 -- INSIDE the mana window rather than ahead of it, and the components it adds
@@ -3802,13 +3789,15 @@ pay perform reversible moment subject announced spending pid oid cost = fmap fst
 -- Nothing in `data/cards/` observes it, which is why no issue is filed: no
 -- printing there that states convoke, delve or improvise carries a cost
 -- component at all (checked 2026-09-13), and one that did would refute this.
-paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> Maybe GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
-paySubstituting perform reversible moment subject announced spending pid oid substituting cost = do
-  before <- State.get
-  let slots = announcedSlots announced before
+paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
+paySubstituting perform began moment subject announced spending pid oid substituting cost = do
+  slots <- State.gets (announcedSlots announced)
   case Cost.mana cost of
-    -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
-    Nothing -> pure (Payment.Unpaid, Map.empty)
+    -- CR 118.6: attempting to pay an unpayable cost is an illegal action, and
+    -- CR 733.1 reverses it with no window to ask about.
+    Nothing -> do
+      restoreKeepingLibraryActions began
+      pure (Payment.Unpaid, Map.empty)
     -- CR 601.2g: the window PROMPTS for which sources to activate, so it is
     -- monadic, and it hands back how to reverse itself rather than reversing
     -- itself -- one question has to cover the components below too.
@@ -3833,23 +3822,10 @@ paySubstituting perform reversible moment subject announced spending pid oid sub
         -- above binds none, and a caller that has a binding environment to
         -- write them into is the only thing between here and CR 608.2h.
         Payment.Paid _ -> pure (outcome, substituted)
+        -- CR 733.1: the action is reversed back to `began`, and the window is
+        -- the payer's to keep.
         Payment.Unpaid -> do
-          case reversible of
-            -- This payment IS the whole of the action that failed, so rule
-            -- 733.1's partition can be honoured: `began` is where the action
-            -- began, and the window is the payer's to keep.
-            Just began -> undoWindow began
-            -- Not implemented: the same partition for a cast or an activation.
-            -- Each announced something before this payment -- CR 601.2a's spell
-            -- on the stack, CR 602.2a's ability object -- and unwinds its own
-            -- older snapshot when this returns Unpaid, which would discard
-            -- whatever the payer kept. So they are reversed whole, and the
-            -- question is not raised where the answer could not stand (#3119).
-            -- The restore is still through `keepingLibraryActions` rather than a
-            -- bare State.put, the block comment above's reason -- both callers
-            -- redo this same restore against their OWN wider `before` once
-            -- Unpaid reaches them, which is what an observer actually sees.
-            Nothing -> restoreKeepingLibraryActions before
+          undoWindow began
           pure (Payment.Unpaid, Map.empty)
 
 -- CR 508.1h-508.1j and CR 509.1d-509.1f: pay a COMBAT TOLL -- the costs to attack
@@ -3865,18 +3841,16 @@ paySubstituting perform reversible moment subject announced spending pid oid sub
 -- Skipped at {0}, so a toll of components alone never opens a window: both rules
 -- say "if any of the costs require mana".
 --
--- ALL OR NOTHING (CR 508.1j, CR 509.1f: "partial payments are not allowed"). The
--- entry state is captured and restored on any refusal, so a payer who sacrifices
--- the first land and then cannot find a second ends up having sacrificed nothing.
--- `pay` above rests on the same capture for CR 601.2h; what is different here is
--- that the caller cannot stand in for it, Pawl.Engine.Combat.declareBlockers
--- having nothing of its own to rewind.
---
--- Not implemented: rule 733.1's option to keep the mana abilities activated in
--- the window, `pay` above and for its reason -- Pawl.Engine.Combat puts back an
--- older snapshot still when the toll goes unpaid. Composing the state that
--- answer needs has to descend inside an Object here, CR 508.1f's tap being one
--- the window may take too (#3867).
+-- ALL OR NOTHING (CR 508.1j, CR 509.1f: "partial payments are not allowed"). A
+-- payer who sacrifices the first land and then cannot find a second ends up
+-- having sacrificed nothing. CR 508.1's and CR 509.1's preambles send the
+-- illegal declaration to rule 733, so a False here has reversed the whole
+-- declaration back to `began`, the caller's snapshot ahead of CR 508.1a's or
+-- 509.1a's record, and the mana abilities the window activated go back only if
+-- the payer says so (`reverseIllegal` above) -- `pay`'s posture for CR 601.2h.
+-- The declaration's own writes include CR 508.1f's tap and CR 508.1g's exert on
+-- a creature the window may tap for mana too, which is why
+-- Pawl.Engine.Reversal descends inside an Object.
 --
 -- The bound slots ride out unread. A component of a combat toll binds what
 -- payComponent binds it (Sacrifice, TapPermanents, TapForTotalPower, ExileThis
@@ -3896,25 +3870,30 @@ paySubstituting perform reversible moment subject announced spending pid oid sub
 -- The pooled MANA is paid before the order is asked, which is CR 508.1i and CR
 -- 509.1e sitting ahead of the payment rule rather than a choice pawl made, and
 -- `pay` above takes the same posture for CR 601.2g.
-payToll :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game Bool
-payToll perform pid charges = do
-  before <- State.get
+payToll :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game Bool
+payToll perform began pid charges =
   -- CR 118.6: a toll one of whose parts is unpayable is unpayable whole.
   case traverse (Cost.mana . snd) charges of
-    Nothing -> pure False
+    Nothing -> do
+      restoreKeepingLibraryActions began
+      pure False
     Just _ -> do
       announced <- announceToll pid charges
       let pooled = ManaCost.MkManaCost (concatMap (foldMap ManaCost.unwrap . Cost.mana . snd) announced)
-      paidMana <-
+      (paidMana, undo) <-
         if null (ManaCost.unwrap pooled)
-          then pure True
+          then pure (True, restoreKeepingLibraryActions)
           -- No subject (ForNeither), so CR 106.6-restricted mana cannot pay a
           -- combat toll. Exact: every printed restriction names a cast, an
           -- activation or a special action, and CR 508.1j's toll is none of
           -- those.
-          else payMana perform PaymentSubject.ForNeither ManaSpending.AsProduced pid pooled
+          else do
+            (paid, _, undoWindow) <- payManaWindow perform Set.empty Nothing PaymentSubject.ForNeither ManaSpending.AsProduced pid (\mc -> pure (mc, [])) pooled
+            pure (paid, undoWindow)
       if not paidMana
-        then pure False
+        then do
+          undo began
+          pure False
         else do
           let tagged = fmap (fmap Cost.components) announced
           ordered <-
@@ -3931,20 +3910,13 @@ payToll perform pid charges = do
           case outcome of
             Payment.Paid _ -> pure True
             Payment.Unpaid -> do
-              -- `keepingLibraryActions`'s reason (Cost.pay): the mana window
-              -- `payMana` opened above may have shuffled or revealed before a
-              -- later tag refused. Redundant with, and for the same reason as,
-              -- Pawl.Engine.Combat's own restore over ITS wider `before` once a
-              -- False here reaches it -- that caller's is what an observer
-              -- actually sees (CombatEffectSpec has no shuffling toll to prove
-              -- this one directly).
-              restoreKeepingLibraryActions before
+              undo began
               pure False
 
 -- Which way each of the toll's symbols payable in more than one way will be
 -- paid, chosen by the PAYER immediately before CR 508.1j's and CR 509.1f's
 -- payment -- so after CR 508.1h's and CR 509.1d's lock-in, and before CR 508.1i's
--- and CR 509.1e's mana window, which `payMana` above opens.
+-- and CR 509.1e's mana window, which `payToll` above opens.
 --
 -- NOT one of rule 118.13's moments, and that rule states no fourth: 118.13a names
 -- a spell's or an activated ability's cost, 118.13b a cost paid during a
@@ -4371,23 +4343,17 @@ payManaExcept perform inFlight record subject spending pid cost = do
   before <- State.get
   -- No substitution: CR 702.51a, CR 702.66a and CR 702.126a all function while a
   -- SPELL is on the stack, and every road into this one is something else.
-  (paid, _, _) <- payManaWindow perform inFlight record subject spending pid (\mc -> pure (mc, [])) cost
-  -- `keepingLibraryActions`'s reason (Cost.pay): the window this call opened
-  -- may have shuffled or revealed before its own mana came up short. Every
-  -- caller of this function -- `payMana` inside `payToll` above,
-  -- `payActivation` below for a mana ability's own cost -- restores a WIDER
-  -- `before` of its own once False reaches it, which is what an observer
-  -- actually sees; this restore is the same discipline kept for a caller
-  -- that calls this directly.
-  Monad.unless paid (restoreKeepingLibraryActions before)
+  (paid, _, undo) <- payManaWindow perform inFlight record subject spending pid (\mc -> pure (mc, [])) cost
+  -- CR 733.1, this payment being the whole of what failed: the payer may keep
+  -- what the window activated.
+  Monad.unless paid (undo before)
   pure paid
 
 -- payManaExcept's window, handing back what CR 733.1 needs to reverse it: the
 -- outcome, and an undo that takes the state the payment began in -- which is the
 -- CALLER's, since a payment goes on past the window and one question has to cover
--- the whole reversal. `pay` holds it until the components have settled;
--- payManaExcept itself, whose callers unwind more than the window, discards it
--- and puts the whole state back (#3119).
+-- the whole reversal. `pay`, `payToll` and `payActivation` hold it until the
+-- components have settled.
 --
 -- `substituting` is CR 702.51b's, CR 702.66b's and CR 702.126b's offer, run once the
 -- window has CLOSED and before a symbol is spent: it takes the total cost's mana
@@ -4598,9 +4564,9 @@ genericOf symbol = case symbol of
 -- loop is the ordinary CR 605.3a one and its settlement spends no symbol. It runs
 -- HERE, ahead of the caster's, which is the order rule 702.132a states.
 --
--- Not implemented: rule 733.1's option to keep the mana abilities this window
--- activated when the cast is reversed -- its undo is discarded and the cast
--- unwinds whole, `paySubstituting`'s reason (#3119).
+-- Not implemented: rule 733.1's question to the HELPER when the cast is
+-- reversed. This window's undo is discarded, and the caster's reversal undoes
+-- what it activated with the rest of the announcement, unasked (#4061).
 offerAssist :: ManaAbilityPerformer.ManaAbilityPerformer -> Set.Set Keyword.Type.Keyword -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Maybe PlayerId)
 offerAssist perform keywords subject pid sid cost
   | not (Set.member Keyword.Type.Assist keywords) = pure Nothing
@@ -4904,8 +4870,11 @@ applyManaTriggers perform events = do
   Monad.mapM_ (ManaAbilityPerformer.triggered perform) fired
 
 -- CR 602.2b sends an activation cost through CR 601.2b-i, so a mana ability pays
--- its whole cost. All or nothing, `pay`'s posture and for CR 601.2h's reason --
--- including its rule 733.1 elision, this being an activation (#3119).
+-- its whole cost. All or nothing, `pay`'s posture and for CR 601.2h's reason,
+-- and CR 733.1's question with it: the mana abilities a NESTED window activated
+-- are the payer's to keep, and the outer window goes on with them. Nothing is
+-- written between `before` and the nested window -- the announcement ahead of
+-- this only prompts -- so no announcement is undone here.
 --
 -- MANA FIRST (CR 601.2g), then the components (CR 601.2h), which is what lets
 -- Transmogrant Altar's "{B}, {T}, Sacrifice a creature" tap the one creature for
@@ -4923,17 +4892,19 @@ applyManaTriggers perform events = do
 payActivation :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 payActivation perform inFlight pid oid cost = do
   before <- State.get
-  paid <- case Cost.mana cost of
-    Just (ManaCost.MkManaCost []) -> pure True
+  (paid, undo) <- case Cost.mana cost of
+    Just (ManaCost.MkManaCost []) -> pure (True, restoreKeepingLibraryActions)
     -- CR 118.14's permission is granted to CAST a spell and never to activate an
     -- ability, so an activation cost is paid with the mana it is. CR 106.6 is a
     -- different sentence and answers differently: this is CR 602.2b's payment,
     -- so mana restricted to activations may pay it -- Omen Hawker's {C} into
     -- Chromatic Star's {1} -- and mana restricted to casts may not. `oid` is the
     -- ability's SOURCE, which is what "abilities of artifacts" reads.
-    Just manaCost -> payManaExcept perform inFlight Nothing (PaymentSubject.Activating oid) ManaSpending.AsProduced pid manaCost
+    Just manaCost -> do
+      (windowPaid, _, undoWindow) <- payManaWindow perform inFlight Nothing (PaymentSubject.Activating oid) ManaSpending.AsProduced pid (\mc -> pure (mc, [])) manaCost
+      pure (windowPaid, undoWindow)
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
-    Nothing -> pure False
+    Nothing -> pure (False, restoreKeepingLibraryActions)
   -- CR 602.2b sends this through CR 601.2h, so the payment is made while the
   -- ability is being ACTIVATED and no resolution is behind it.
   --
@@ -4944,7 +4915,7 @@ payActivation perform inFlight pid oid cost = do
   let settled = case outcome of
         Payment.Paid _ -> paid
         Payment.Unpaid -> False
-  Monad.unless settled (State.put before)
+  Monad.unless settled (undo before)
   -- `outcome` and not a fresh Paid: the components' bound slots are what the
   -- payment bound, the mana half binding none of its own.
   pure (if settled then outcome else Payment.Unpaid)

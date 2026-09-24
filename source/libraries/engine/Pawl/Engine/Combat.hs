@@ -1974,8 +1974,9 @@ attemptAttackDeclaration perform pid rejected = do
         -- rule forbids, which is why that function leaves locking to its caller.
         let owed = AttackCost.totalCost recorded gs1
         -- CR 508.1i's mana-ability window and CR 508.1j's all-costs-or-nothing
-        -- payment are both Cost.payToll, which restores the entry state rather than
-        -- spending half of it. Skipped outright when nothing is owed.
+        -- payment are both Cost.payToll, which reverses the declaration back to
+        -- `before` rather than spending half of it. Skipped outright when nothing
+        -- is owed.
         --
         -- NO "will you pay?" prompt, and that is a rules reading rather than an
         -- elision: CR 508.1j is unconditional once the creatures are chosen, and CR
@@ -1984,18 +1985,14 @@ attemptAttackDeclaration perform pid rejected = do
         paid <-
           if null owed
             then pure True
-            else Cost.payToll perform pid owed
+            else Cost.payToll perform before pid owed
         if not paid
           then do
-            -- CR 508.1's preamble: the declaration is illegal and the game returns
-            -- to the moment before it. Reachable by an ordinary player who
-            -- declares more attackers than they can pay for.
+            -- CR 508.1's preamble: the declaration is illegal and CR 733.1
+            -- reverses it, which Cost.payToll has done -- back to `before`, less
+            -- whatever the payer kept of the mana window. Reachable by an
+            -- ordinary player who declares more attackers than they can pay for.
             --
-            -- Through Cost.keepingLibraryActions rather than a bare State.put:
-            -- CR 733.1's last sentence -- a mana ability the toll's window
-            -- tapped may have shuffled or revealed, and this restore must not
-            -- undo that too.
-            Cost.restoreKeepingLibraryActions before
             -- And then the declaration is made again, normally a smaller attack
             -- the player can afford. CombatEffectSpec's "CR 508.1 the rewound
             -- declaration is made again: two Pikers under a Ghostly Prison
@@ -2469,9 +2466,9 @@ attemptBlockDeclaration perform pid attacking rejected = do
         -- Unioned, never overwritten, for Combat.attacked's reason.
         State.modify' (recordDeclaredBlockers (Map.keysSet (Map.filter (not . Set.null) legal)))
         -- CR 509.1e's mana-ability window and CR 509.1f's all-costs-or-nothing
-        -- payment are both Cost.payToll, which restores the entry state rather
-        -- than spending half of it. Skipped outright when nothing is owed, which
-        -- is every board with no cost to block on it.
+        -- payment are both Cost.payToll, which reverses the declaration back to
+        -- `before` rather than spending half of it. Skipped outright when
+        -- nothing is owed, which is every board with no cost to block on it.
         --
         -- NO "will you pay?" prompt, declareAttackers' reading of the same pair of
         -- sentences: CR 509.1f is unconditional once the creatures are chosen, and
@@ -2487,23 +2484,17 @@ attemptBlockDeclaration perform pid attacking rejected = do
         paid <-
           if null owed
             then pure True
-            else Cost.payToll perform pid owed
+            else Cost.payToll perform before pid owed
         -- CR 509.1's preamble: a declaration the defending player cannot pay for
-        -- is illegal and the game returns to the moment before it. That is
-        -- `before` and no more: Cost.payToll restores what a half-paid toll
-        -- spent, and the blocks themselves are recorded below, so the only thing
-        -- this undoes is the declaredBlockers write above -- which has to go,
-        -- since the retry and the CR 509.1c degradation both ask the same toll
-        -- again and would otherwise see stale ids. Then the rewind is the
-        -- declaration being made again. CombatEffectSpec's "CR 509.1 the rewound
-        -- declaration is made again: the taxed blocker is dropped and the free
-        -- one blocks" is the proof; the case beside it is what a repeated answer
-        -- does instead.
-        --
-        -- Through Cost.keepingLibraryActions rather than a bare State.put: CR
-        -- 733.1's last sentence -- a mana ability the toll's window tapped may
-        -- have shuffled or revealed, and this restore must not undo that too.
-        Monad.unless paid (Cost.restoreKeepingLibraryActions before)
+        -- is illegal and CR 733.1 reverses it, which Cost.payToll has done back
+        -- to `before`. The blocks themselves are recorded below, so the only
+        -- thing of this function's that undoes is the declaredBlockers write
+        -- above -- which has to go, since the retry and the CR 509.1c
+        -- degradation both ask the same toll again and would otherwise see stale
+        -- ids. Then the rewind is the declaration being made again.
+        -- CombatEffectSpec's "CR 509.1 the rewound declaration is made again:
+        -- the taxed blocker is dropped and the free one blocks" is the proof; the
+        -- case beside it is what a repeated answer does instead.
         gs2 <- State.get
         if not paid && again
           then attemptBlockDeclaration perform pid attacking (Set.insert chosen rejected)

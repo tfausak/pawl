@@ -1312,7 +1312,7 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
           -- (Cost.pay). Taken after the announcement above, which writes no
           -- state of its own.
           began <- State.get
-          outcome <- Cost.pay performManaAbility (Just began) PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
+          outcome <- Cost.pay performManaAbility began PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer source announced
           -- Not implemented: the slots this payment bound are dropped, so a
           -- CR 118.12 cost that sacrifices a permanent cannot be read by a
           -- later clause of the same resolution (#1872).
