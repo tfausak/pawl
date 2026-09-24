@@ -3544,8 +3544,9 @@ criteriaOf component = case component of
 -- nothing. Most actions open one window; a cast with CR 702.132a's assist opens
 -- the chosen player's ahead of the caster's (`offerAssist`), so two players can
 -- each be asked. They answer in APNAP order (CR 101.4), each against the state
--- the cancellation leaves with every window still standing, and the answers
--- then take effect together.
+-- the cancellation and the earlier answers leave, with every window not yet
+-- answered still standing -- so a later player sees what an earlier one chose
+-- (CR 101.4b).
 --
 -- Where each window OPENED is what tells the sides apart: everything between
 -- one window's close (or `before`) and the next one's opening is the
@@ -3580,8 +3581,8 @@ criteriaOf component = case component of
 -- that cancellation leaves -- the announcement undone and nothing of the cost
 -- paid -- rather than against the half-paid state the refusal left, which is
 -- what Pawl.Engine.Game.ask hands the answerer. It also keeps CR 104.4b's
--- stamp: `Game.choose` writes GameState.lastChoice, and the answers put back
--- nothing that could discard it.
+-- stamp: `Game.choose` writes GameState.lastChoice, and each state an answer
+-- leaves is put with the live stamp rather than the one it was composed with.
 --
 -- Every restore goes through `keepingLibraryActions` rather than a bare
 -- State.put, CR 733.1's last sentence's reason: a shuffle or a reveal one of the
@@ -3606,21 +3607,31 @@ reverseIllegal windows before =
         -- says why that is conservative rather than invented).
         (_, Nothing) -> [] <$ restoreKeepingLibraryActions before
         (askers, Just table) -> do
-          let standing = fmap asks windows
-          Monad.forM_ (lookup standing table) State.put
+          -- The flags for the answers given so far, a window not yet answered
+          -- still standing; and the state they leave, put with the live CR
+          -- 104.4b stamp so that no answer's is discarded.
+          let flags answers = [Maybe.fromMaybe (asks window) (lookup i answers) | (i, window) <- zip [0 :: Int ..] windows]
+              settle answers = Monad.forM_ (lookup (flags answers) table) (\composedState -> State.modify' (\live -> composedState {GameState.lastChoice = GameState.lastChoice live}))
+          settle []
           cancelled <- State.get
           let rank (_, window) = List.elemIndex (ManaWindow.payer window) (Game.apnapOrder cancelled)
           answers <-
-            Monad.forM (List.sortOn rank askers) $ \(i, window) -> case NonEmpty.nonEmpty (ManaWindow.activated window) of
-              Nothing -> pure (i, False)
-              Just sources -> do
-                answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor (ManaWindow.payer window) cancelled) (ManaWindow.payer window) sources)
-                pure $ case answer of
-                  OptionalDecision.Exercises -> (i, False)
-                  OptionalDecision.Declines -> (i, True)
-          let keeps = [Maybe.fromMaybe False (lookup i answers) | (i, _) <- zip [0 :: Int ..] windows]
-          Monad.forM_ (lookup keeps table) State.put
-          pure (concat [ManaWindow.activated window | (window, True) <- zip windows keeps])
+            Monad.foldM
+              ( \given (i, window) -> case NonEmpty.nonEmpty (ManaWindow.activated window) of
+                  Nothing -> pure given
+                  Just sources -> do
+                    -- CR 101.4b: the board already shows the earlier answers.
+                    settle given
+                    current <- State.get
+                    answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor (ManaWindow.payer window) current) (ManaWindow.payer window) sources)
+                    pure $ case answer of
+                      OptionalDecision.Exercises -> given <> [(i, False)]
+                      OptionalDecision.Declines -> given <> [(i, True)]
+              )
+              []
+              (List.sortOn rank askers)
+          settle answers
+          pure (concat [ManaWindow.activated window | (window, True) <- zip windows (flags answers)])
 
 -- One combination of CR 733.1's answers composed into the state it leaves:
 -- `windows` oldest first, each flagged with whether its payer keeps it.
