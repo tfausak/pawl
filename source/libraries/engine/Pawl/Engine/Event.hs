@@ -4837,7 +4837,7 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- 712.14b is not a replacement effect -- there is no event for CR 616.1 to
 -- choose among, and running the entry loop first would fire CR 614.1c's
 -- as-enters abilities for a card that never enters.
-changeZoneEntering :: ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
+changeZoneEntering :: ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
 changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
 
 -- changeZoneEntering for ONE MEMBER of a CR 608.2f batch: `asOf` and `batch` are
@@ -4845,7 +4845,7 @@ changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
 -- only caller that supplies either. A separate door rather than two more
 -- parameters on changeZoneEntering, changeZoneInBatch's shape one door over: the
 -- lone moves have no batch to name.
-changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
+changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
 changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
   gs <- State.get
   let mCard = Game.cardOf oid gs
@@ -4895,9 +4895,16 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       -- procedure (Pawl.Engine.FaceDown.canTurnFaceUp) -- and Yedora, Grave
       -- Gardener writes CR 708.3's plain putting, which opens nothing.
       facing = if onto then maybe Facing.FaceUp Facing.FaceDown (EntryRiders.faceDown riders) else Facing.FaceUp
+      -- CR 707.14: the card noted is the one being moved, read BEFORE the move
+      -- -- a card in a graveyard, whose copiable values are its printed ones.
+      noted = if EntryRiders.noted riders then Game.lookupObject oid gs >>= Game.printingIdOfSource . Object.source else Nothing
   if refused
     then pure Seq.empty
-    else changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under2 shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried False
+    else do
+      entered <- changeZoneAttaching asOf batch oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under2 shown facing (EntryRiders.exiledFaceDown riders) CarryOver.NotCarried False
+      Monad.forM_ noted $ \printingId ->
+        State.modify' $ \g -> g {GameState.notedCards = foldr (`Map.insert` printingId) (GameState.notedCards g) entered}
+      pure entered
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being

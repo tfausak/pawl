@@ -243,6 +243,7 @@ emptyGame order =
           GameState.lookedUp = Set.empty,
           GameState.outsideCopies = Set.empty,
           GameState.namedCopyChoices = Map.empty,
+          GameState.notedCards = Map.empty,
           GameState.nextPrintingId = PrintingId.MkPrintingId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,

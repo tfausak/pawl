@@ -13,9 +13,9 @@ import qualified Pawl.Types.FaceDownReason as FaceDownReason
 -- characteristics are "those listed by the ability or rules that allowed the
 -- spell or permanent to be face down", so the list is the allower's and not the
 -- other way round.
-data FaceDownState = MkFaceDownState
+data FaceDownState ability = MkFaceDownState
   { reason :: FaceDownReason.FaceDownReason,
-    listed :: FaceDownCharacteristics.FaceDownCharacteristics
+    listed :: FaceDownCharacteristics.FaceDownCharacteristics ability
   }
   deriving (Eq, Ord, Show)
 
@@ -24,5 +24,5 @@ data FaceDownState = MkFaceDownState
 -- Effect.TurnFaceDown's Backslide all take this; the ones that do not are
 -- disguise and cloak ('FaceDownCharacteristics.disguisedValue') and an entry
 -- that lists its own (Pawl.Types.EntryRiders' faceDown).
-defaultFor :: FaceDownReason.FaceDownReason -> FaceDownState
+defaultFor :: FaceDownReason.FaceDownReason -> FaceDownState ability
 defaultFor r = MkFaceDownState {reason = r, listed = FaceDownCharacteristics.defaultValue}

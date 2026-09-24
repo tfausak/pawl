@@ -28,14 +28,16 @@ import qualified Pawl.Types.Ward as Ward
 -- ONLY the fields a printing lists. The pool lists a type line and a power and
 -- toughness (Cyber Conversion's and Missy's "a 2\/2 Cyberman artifact creature",
 -- Magar of the Magic Strings' "a 3\/3 creature with ...", Yedora, Grave
--- Gardener's "a Forest land") and, from a keyword rather than a card,
--- disguise's and cloak's ward {2}. Everything CR 708.2a leaves off the list --
--- name, mana cost, colour, supertypes, text -- is empty for every listing there
--- is, so it is Card.faceDownFace's constant rather than a field here.
+-- Gardener's "a Forest land"), Magar's two quoted abilities and, from a keyword
+-- rather than a card, disguise's and cloak's ward {2}. Everything else CR 708.2a
+-- leaves off the list -- name, mana cost, colour, supertypes -- is empty for
+-- every listing there is, so it is Card.faceDownFace's constant rather than a
+-- field here.
 --
--- Not implemented: the ABILITIES Magar lists, which are whole abilities rather
--- than keywords (#1667). That is one more field on this record when a card asks.
-data FaceDownCharacteristics = MkFaceDownCharacteristics
+-- Parametric in the quoted-ability type for Pawl.Types.GrantedAbility's reason:
+-- the ability types import Pawl.Types.Effect, which reaches this module through
+-- EntryRiders, so Pawl.Types.Facing instantiates it where the cycle is closed.
+data FaceDownCharacteristics ability = MkFaceDownCharacteristics
   { typeLine :: TypeLine.TypeLine,
     -- | Absent for a listing that names no creature -- Yedora's "Forest land"
     -- has no power to list, and CR 208.3 gives a noncreature permanent none.
@@ -45,7 +47,10 @@ data FaceDownCharacteristics = MkFaceDownCharacteristics
     -- Pawl.Types.Face.keywords counts: a listing says WHICH keywords the object
     -- has, and no rule lists one twice. Pawl.Engine.Card.faceDownFace is where
     -- the two meet, at one instance each.
-    keywords :: Set.Set Keyword.Keyword
+    keywords :: Set.Set Keyword.Keyword,
+    -- | CR 708.2: whole quoted abilities the listing names, Magar of the Magic
+    -- Strings' two.
+    abilities :: [ability]
   }
   deriving (Eq, Ord, Show)
 
@@ -55,7 +60,7 @@ data FaceDownCharacteristics = MkFaceDownCharacteristics
 -- Effect.TurnFaceDown's Backslide all list nothing and get this. An entry rider
 -- that lists its own -- Yedora, Grave Gardener's "It's a Forest land" -- carries
 -- a value of its own instead.
-defaultValue :: FaceDownCharacteristics
+defaultValue :: FaceDownCharacteristics ability
 defaultValue =
   MkFaceDownCharacteristics
     { typeLine =
@@ -66,7 +71,8 @@ defaultValue =
           },
       power = Just (Power.MkPower (Quantity.Literal 2)),
       toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
-      keywords = Set.empty
+      keywords = Set.empty,
+      abilities = []
     }
 
 -- | CR 702.168b and CR 701.58a, which list the same thing in the same words: "a
@@ -84,7 +90,7 @@ defaultValue =
 -- which is what Pawl.Types.Keyword carries and what
 -- Pawl.Engine.Keyword.abilitiesFor needs to mint CR 702.21a's trigger with a
 -- cost on it.
-disguisedValue :: FaceDownCharacteristics
+disguisedValue :: FaceDownCharacteristics ability
 disguisedValue =
   defaultValue
     { keywords =

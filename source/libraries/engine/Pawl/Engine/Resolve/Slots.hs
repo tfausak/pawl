@@ -254,7 +254,7 @@ quantitySlots quantity =
 -- a card may write as anything a Quantity spells. A position the three walkers
 -- below would otherwise pass over -- every arm that reads a rider matches it as
 -- `_` -- so the reads are spelled out here and each walker goes through this.
-riderQuantities :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [Quantity.Type.Quantity]
+riderQuantities :: EntryRiders.EntryRiders Quantity.Type.Quantity ability -> [Quantity.Type.Quantity]
 riderQuantities = Map.elems . EntryRiders.counters
 
 -- The Quantities an Effect.Create's TOKEN CARD carries that the CREATING effect
@@ -293,7 +293,7 @@ tokenBoxQuantities card =
 -- Foliage), a CreateCopy its copies (Mirror Match), and a MoveToZone the card it
 -- moved, from moveOne (Aetherplasm). What stays inert is the rider on a
 -- destination other than the battlefield, which Pawl.CardSpec lints.
-riderSlots :: EntryRiders.EntryRiders count -> Map.Map SlotName SlotArity
+riderSlots :: EntryRiders.EntryRiders count ability -> Map.Map SlotName SlotArity
 riderSlots riders =
   let attacked = case EntryRiders.attacking riders of
         Just (EntryAttack.SameAs slot) -> oneSlot slot
@@ -747,6 +747,7 @@ effectObjectRefs effect = case effect of
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
+  Effect.OfferNotedCopy {} -> []
   Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _) -> [ref]
   Effect.GrantLookAtExiled grant -> [GrantLookAtExiled.cards grant]
   Effect.MakePlotted ref -> [ref]
@@ -923,6 +924,7 @@ effectPlayerRefs effect = case effect of
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _) -> [caster]
   Effect.OfferNamedCopy {} -> []
+  Effect.OfferNotedCopy {} -> []
   -- CR 601.3's "that player", the seat the permission is written for.
   Effect.GrantPlayFromExile x -> durationPlayerRefs (GrantPlayFromExile.duration x) <> [GrantPlayFromExile.player x]
   Effect.GrantLookAtExiled {} -> []
@@ -1270,6 +1272,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- it names a slot at all.
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _) -> objectRefSlots ref
   Effect.OfferNamedCopy {} -> Map.empty
+  Effect.OfferNotedCopy {} -> Map.empty
   Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)
   -- Everything the BODY reads. The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.
@@ -1847,6 +1850,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
   Effect.OfferNamedCopy {} -> True
+  Effect.OfferNotedCopy {} -> True
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
   -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
   -- nested in the DEPTH is one slotsOf cannot see.
@@ -2052,6 +2056,7 @@ readsX =
         Effect.Shuffle {} -> False
         Effect.OfferCast {} -> False
         Effect.OfferNamedCopy {} -> False
+        Effect.OfferNotedCopy {} -> False
         Effect.GrantPlayFromExile {} -> False
         -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
         Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> readsX (Foldable.toList body)
@@ -2271,6 +2276,7 @@ boundSlots effect = case effect of
   Effect.Shuffle {} -> Set.empty
   Effect.OfferCast {} -> Set.empty
   Effect.OfferNamedCopy {} -> Set.empty
+  Effect.OfferNotedCopy {} -> Set.empty
   Effect.GrantPlayFromExile {} -> Set.empty
   -- The loop's member slot, plus every name the BODY authors -- which the loop
   -- really does leave bound once it is over, to the union across its members

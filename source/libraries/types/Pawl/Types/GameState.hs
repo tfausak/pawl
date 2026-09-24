@@ -265,6 +265,10 @@ data GameState = MkGameState
     -- | CR 707.13: the card names each object's ability has chosen to copy by
     -- name. Keyed by id, so CR 400.7's new object remembers none.
     namedCopyChoices :: Map.Map ObjectId.ObjectId (Set.Set CardName.CardName),
+    -- | CR 707.14: the card whose name an effect noted as each object entered
+    -- (EntryRiders.noted). Keyed by id, so neither CR 400.7's new object nor a
+    -- copy of the object knows it.
+    notedCards :: Map.Map ObjectId.ObjectId PrintingId.PrintingId,
     nextPrintingId :: PrintingId.PrintingId,
     -- | CR 613.7: the monotonic source of timestamps for objects and stored
     -- continuous effects. See Timestamp.

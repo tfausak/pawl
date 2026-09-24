@@ -11,13 +11,14 @@ import qualified Pawl.Types.SlotName as SlotName
 --
 -- Parametric in @card@ for 'Pawl.Types.Effect.Effect'\'s reason: the token's
 -- card is card DATA nested inside card data, and the parameter is what keeps
--- 'Pawl.Types.Effect' from naming a concrete card type.
-data Create card = MkCreate
+-- 'Pawl.Types.Effect' from naming a concrete card type; @ability@ is the
+-- riders' (EntryRiders).
+data Create card ability = MkCreate
   { quantity :: Quantity.Quantity,
     card :: card,
     -- | CR 110.5b's default is no riders at all, which is most tokens, so the
     -- key is elided rather than written.
-    riders :: EntryRiders.EntryRiders Quantity.Quantity,
+    riders :: EntryRiders.EntryRiders Quantity.Quantity ability,
     -- | The slot the created tokens are bound to, when a later effect in the
     -- same list reads them. Absent when nothing does.
     slot :: Maybe SlotName.SlotName,

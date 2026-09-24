@@ -2,6 +2,7 @@
 
 module Pawl.Codec.FaceDownCharacteristics where
 
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Power as Power
 import qualified Pawl.Codec.Toughness as Toughness
@@ -22,16 +23,18 @@ import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 -- no printing in the pool lists a keyword for the object it turns face down. A
 -- lossy codec would be the alternative, which is worse: the field would decode
 -- back empty on a card that did name one.
-codec :: Codec.Codec FaceDownCharacteristics.FaceDownCharacteristics
-codec = Fields.object $ do
+codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (FaceDownCharacteristics.FaceDownCharacteristics ability)
+codec abilityCodec = Fields.object $ do
   typeLine <- Fields.defaulted "typeLine" (FaceDownCharacteristics.typeLine FaceDownCharacteristics.defaultValue) TypeLine.codec FaceDownCharacteristics.typeLine
   power <- Fields.defaulted "power" (FaceDownCharacteristics.power FaceDownCharacteristics.defaultValue) (Common.maybe Power.codec) FaceDownCharacteristics.power
   toughness <- Fields.defaulted "toughness" (FaceDownCharacteristics.toughness FaceDownCharacteristics.defaultValue) (Common.maybe Toughness.codec) FaceDownCharacteristics.toughness
   keywords <- Fields.defaulted "keywords" (FaceDownCharacteristics.keywords FaceDownCharacteristics.defaultValue) (Common.set Keyword.codec) FaceDownCharacteristics.keywords
+  abilities <- Fields.defaulted "abilities" [] (Common.list abilityCodec) FaceDownCharacteristics.abilities
   pure
     FaceDownCharacteristics.MkFaceDownCharacteristics
       { FaceDownCharacteristics.typeLine = typeLine,
         FaceDownCharacteristics.power = power,
         FaceDownCharacteristics.toughness = toughness,
-        FaceDownCharacteristics.keywords = keywords
+        FaceDownCharacteristics.keywords = keywords,
+        FaceDownCharacteristics.abilities = abilities
       }

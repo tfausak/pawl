@@ -362,6 +362,7 @@ ownQuantities effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
+  Effect.OfferNotedCopy {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile grant -> durationQuantities (GrantPlayFromExile.duration grant)
   Effect.ForEach {} -> []
@@ -1399,6 +1400,7 @@ effectObjectRefs effect =
         Effect.Shuffle {} -> []
         -- Nor here: the opcode names cards by name.
         Effect.OfferNamedCopy {} -> []
+        Effect.OfferNotedCopy {} -> []
         Effect.OfferCast offer -> read_ [OfferCast.ref offer]
         Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
         Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> read_ [ref]

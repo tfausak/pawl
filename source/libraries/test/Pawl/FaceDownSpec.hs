@@ -154,6 +154,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -170,6 +171,7 @@ import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana.Type
@@ -2164,9 +2166,9 @@ manifestedWith s registry land top extra = do
 -- Effect.MoveToZone takes, with CR 708.3's rider set or not and nothing else
 -- differing -- then settled and run to a stable board so any enters trigger has
 -- resolved. Nothing if the move did not land.
-putOntoBattlefield :: Maybe FaceDownState.FaceDownState -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
+putOntoBattlefield :: Maybe (FaceDownState.FaceDownState (GrantedAbility.GrantedAbility Card.Card)) -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
 putOntoBattlefield faceDown oid gs =
-  let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = faceDown}
+  let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.noted = False, EntryRiders.faceDown = faceDown}
       (entered, moved) = Engine.runGamePure S.identityAnswer gs (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just S.alice))
    in -- At most ONE arrival: the funnel answers with several only for a melded
       -- permanent leaving the battlefield (CR 712.21), and this move enters one.
@@ -2384,7 +2386,7 @@ enteringFaceDownSpec s registry = Spec.describe s "Entering face down" $ do
 
 -- Yedora's "It's a Forest land", as a FaceDownState: CR 708.2a's list under CR
 -- 708.3's reason. No power or toughness, which CR 208.3 is the rule for.
-forestLand :: FaceDownState.FaceDownState
+forestLand :: FaceDownState.FaceDownState ability
 forestLand =
   FaceDownState.MkFaceDownState
     { FaceDownState.reason = FaceDownReason.EnteredFaceDown,
@@ -2525,7 +2527,7 @@ faceUpEffectSpec s registry = Spec.describe s "TurnFaceUp (CR 701.40g)" $ do
 enterFaceDown :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
 enterFaceDown printing pid gs =
   let (oid, g1) = S.addLibraryCard printing pid gs
-      riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Just (FaceDownState.defaultFor FaceDownReason.Manifested)}
+      riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.noted = False, EntryRiders.faceDown = Just (FaceDownState.defaultFor FaceDownReason.Manifested)}
       (entered, moved) = Engine.runGamePure S.identityAnswer g1 (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just pid))
    in (S.settleSba moved, Maybe.listToMaybe (Foldable.toList entered))
 

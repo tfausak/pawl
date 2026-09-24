@@ -3,6 +3,7 @@
 module Pawl.Codec.EntryRiders where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryAttack as EntryAttack
 import qualified Pawl.Codec.FaceDownState as FaceDownState
@@ -38,8 +39,8 @@ counter = Fields.object $ do
 
 -- | Every field is defaulted, so riders equal to 'defaultValue' write the empty
 -- object -- and their own key is then elided by whichever effect carries them.
-codec :: Codec.Codec (EntryRiders.EntryRiders Quantity.Type.Quantity)
-codec = Fields.object $ do
+codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (EntryRiders.EntryRiders Quantity.Type.Quantity ability)
+codec abilityCodec = Fields.object $ do
   tapped <- Fields.defaulted "tapped" defaultTapped TapState.codec EntryRiders.tapped
   attacking <- Fields.defaulted "attacking" Nothing (Common.maybe EntryAttack.codec) EntryRiders.attacking
   blocking <- Fields.defaulted "blocking" Nothing (Common.maybe SlotName.codec) EntryRiders.blocking
@@ -48,7 +49,8 @@ codec = Fields.object $ do
   underOwner <- Fields.defaulted "underOwner" False Common.boolean EntryRiders.underOwner
   exiledFaceDown <- Fields.defaulted "exiledFaceDown" False Common.boolean EntryRiders.exiledFaceDown
   attachedTo <- Fields.defaulted "attachedTo" Nothing (Common.maybe SlotName.codec) EntryRiders.attachedTo
-  faceDown <- Fields.defaulted "faceDown" Nothing (Common.maybe FaceDownState.codec) EntryRiders.faceDown
+  faceDown <- Fields.defaulted "faceDown" Nothing (Common.maybe (FaceDownState.codec abilityCodec)) EntryRiders.faceDown
+  noted <- Fields.defaulted "noted" False Common.boolean EntryRiders.noted
   pure
     EntryRiders.MkEntryRiders
       { EntryRiders.tapped = tapped,
@@ -59,7 +61,8 @@ codec = Fields.object $ do
         EntryRiders.underOwner = underOwner,
         EntryRiders.exiledFaceDown = exiledFaceDown,
         EntryRiders.attachedTo = attachedTo,
-        EntryRiders.faceDown = faceDown
+        EntryRiders.faceDown = faceDown,
+        EntryRiders.noted = noted
       }
 
 -- | The value every carrier elides: a card file carries riders only when the
@@ -70,7 +73,7 @@ codec = Fields.object $ do
 -- double-faced card enters showing by default, CR 122.6 for the counters an
 -- object enters with, CR 110.2a for who it enters under, CR 406.3 for an exiled
 -- card being kept face up, CR 110.5b for a permanent entering face up).
-defaultValue :: EntryRiders.EntryRiders count
+defaultValue :: EntryRiders.EntryRiders count ability
 defaultValue =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = defaultTapped,
@@ -81,5 +84,6 @@ defaultValue =
       EntryRiders.underOwner = False,
       EntryRiders.exiledFaceDown = False,
       EntryRiders.attachedTo = Nothing,
-      EntryRiders.faceDown = Nothing
+      EntryRiders.faceDown = Nothing,
+      EntryRiders.noted = False
     }

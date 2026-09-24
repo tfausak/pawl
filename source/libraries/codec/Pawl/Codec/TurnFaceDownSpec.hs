@@ -19,14 +19,14 @@ spec s = Spec.describe s "Pawl.Codec.TurnFaceDown" $ do
   Spec.it s "MkTurnFaceDown, no listed characteristics: the key is omitted" $
     Common.assertCodec
       s
-      TurnFaceDown.codec
+      (TurnFaceDown.codec Common.text)
       (TurnFaceDown.MkTurnFaceDown (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) FaceDownCharacteristics.defaultValue)
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- Cyber Conversion: CR 708.2's listed set, written.
   Spec.it s "MkTurnFaceDown, a listed set: the key is written" $
     Common.assertCodec
       s
-      TurnFaceDown.codec
+      (TurnFaceDown.codec Common.text)
       ( TurnFaceDown.MkTurnFaceDown
           (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
           FaceDownCharacteristics.defaultValue
@@ -39,4 +39,4 @@ spec s = Spec.describe s "Pawl.Codec.TurnFaceDown" $ do
             }
       )
       " {\"characteristics\":{\"typeLine\":{\"subtypes\":[{\"type\":\"Cyberman\"}],\"types\":[{\"type\":\"Artifact\"},{\"type\":\"Creature\"}]}},\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s TurnFaceDown.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (TurnFaceDown.codec Common.text)

@@ -21,7 +21,7 @@ target = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
 
 -- Every optional field at its default, so only the two required keys are
 -- written. Unsummon's shape.
-bare :: MoveToZone.MoveToZone
+bare :: MoveToZone.MoveToZone Text.Text
 bare =
   MoveToZone.MkMoveToZone
     { MoveToZone.ref = target,
@@ -33,7 +33,7 @@ bare =
       MoveToZone.duration = Nothing
     }
 
-tapped :: EntryRiders.EntryRiders Quantity.Quantity
+tapped :: EntryRiders.EntryRiders Quantity.Quantity Text.Text
 tapped = EntryRiders.defaultValue {EntryRiders.tapped = TapState.Tapped}
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -41,7 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
   Spec.it s "every optional key elided" $
     Common.assertCodec
       s
-      MoveToZone.codec
+      (MoveToZone.codec Common.text)
       bare
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Hand\"}} "
   -- The case @moveTail@ existed for, and the one it could only just handle: an
@@ -52,7 +52,7 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
   Spec.it s "riders and an origin zone together, which moveTail had to order" $
     Common.assertCodec
       s
-      MoveToZone.codec
+      (MoveToZone.codec Common.text)
       bare
         { MoveToZone.zone = Zone.Battlefield,
           MoveToZone.riders = tapped,
@@ -66,7 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
   Spec.it s "all five optional keys at once" $
     Common.assertCodec
       s
-      MoveToZone.codec
+      (MoveToZone.codec Common.text)
       bare
         { MoveToZone.zone = Zone.Library,
           MoveToZone.riders = tapped,
@@ -76,4 +76,4 @@ spec s = Spec.describe s "Pawl.Codec.MoveToZone" $ do
           MoveToZone.duration = Just MoveDuration.UntilSourceLeavesTheBattlefield
         }
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"zone\":{\"type\":\"Library\"},\"riders\":{\"tapped\":{\"type\":\"Tapped\"}},\"slot\":\"moved\",\"origin\":{\"type\":\"Exile\"},\"placement\":{\"type\":\"Stated\",\"value\":{\"type\":\"Top\"}},\"duration\":{\"type\":\"UntilSourceLeavesTheBattlefield\"}} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s MoveToZone.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (MoveToZone.codec Common.text)

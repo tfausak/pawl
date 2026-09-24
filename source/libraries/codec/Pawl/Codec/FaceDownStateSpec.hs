@@ -14,7 +14,7 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownState" $ do
   Spec.it s "a morphed object lists nothing" $
     Common.assertCodec
       s
-      FaceDownState.codec
+      (FaceDownState.codec Common.text)
       FaceDownState.MkFaceDownState
         { FaceDownState.reason = FaceDownReason.Morphed,
           FaceDownState.listed = FaceDownCharacteristics.defaultValue
@@ -25,11 +25,11 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownState" $ do
   Spec.it s "a disguised object carries the listing its allower made" $
     Common.assertCodec
       s
-      FaceDownState.codec
+      (FaceDownState.codec Common.text)
       FaceDownState.MkFaceDownState
         { FaceDownState.reason = FaceDownReason.Disguised,
           FaceDownState.listed = FaceDownCharacteristics.disguisedValue
         }
       " {\"reason\":{\"type\":\"Disguised\"},\"listed\":{\"keywords\":[{\"type\":\"Ward\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}}]}} "
   Spec.it s "has a schema" $
-    Common.assertHasSchema s FaceDownState.codec
+    Common.assertHasSchema s (FaceDownState.codec Common.text)

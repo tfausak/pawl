@@ -16,7 +16,7 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownCharacteristics" $ do
   Spec.it s "the CR 708.2a defaults write no keys" $
     Common.assertCodec
       s
-      FaceDownCharacteristics.codec
+      (FaceDownCharacteristics.codec Common.text)
       FaceDownCharacteristics.defaultValue
       " {} "
   -- Cyber Conversion's "it's a 2/2 Cyberman artifact creature": the type line is
@@ -24,7 +24,7 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownCharacteristics" $ do
   Spec.it s "a listed type line writes that key alone" $
     Common.assertCodec
       s
-      FaceDownCharacteristics.codec
+      (FaceDownCharacteristics.codec Common.text)
       FaceDownCharacteristics.defaultValue
         { FaceDownCharacteristics.typeLine =
             TypeLine.MkTypeLine
@@ -41,7 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.FaceDownCharacteristics" $ do
   Spec.it s "a listed keyword writes that key alone" $
     Common.assertCodec
       s
-      FaceDownCharacteristics.codec
+      (FaceDownCharacteristics.codec Common.text)
       FaceDownCharacteristics.disguisedValue
       " {\"keywords\":[{\"type\":\"Ward\",\"value\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}}]} "
-  Spec.it s "has a schema" $ Common.assertHasSchema s FaceDownCharacteristics.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (FaceDownCharacteristics.codec Common.text)

@@ -25,7 +25,7 @@ data CreateCopy ability = MkCreateCopy
     -- Create. `counters`, `tapped`, `attacking` and `blocking` are read here;
     -- Pawl.EffectLintSpec lints that no CreateCopy in the pool sets any of the
     -- others.
-    riders :: EntryRiders.EntryRiders Quantity.Quantity,
+    riders :: EntryRiders.EntryRiders Quantity.Quantity ability,
     -- | CR 603.7c: the slot the minted token is bound under, Create.slot's
     -- shape -- Flamerush Rider's "Exile the token at end of combat".
     slot :: Maybe SlotName.SlotName,
