@@ -181,7 +181,7 @@
                         "value": 1
                       },
                       "riders": {
-                        "blocking": "target"
+                        "blocking": "soldierBlocked"
                       }
                     }
                   }
@@ -189,7 +189,7 @@
               }
             ],
             "targetSlots": {
-              "target": {
+              "soldierBlocked": {
                 "filter": {
                   "type": "IsAttackingPlayer",
                   "value": {
@@ -250,7 +250,7 @@
                         "value": 1
                       },
                       "riders": {
-                        "blocking": "target"
+                        "blocking": "battleBlocked"
                       }
                     }
                   }
@@ -258,7 +258,7 @@
               }
             ],
             "targetSlots": {
-              "target": {
+              "battleBlocked": {
                 "filter": {
                   "type": "IsAttackingPlayer",
                   "value": {
