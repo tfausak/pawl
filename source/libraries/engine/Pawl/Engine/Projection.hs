@@ -1560,9 +1560,10 @@ textChangesAffecting oid gs =
           | otherwise -> own
 
 -- Layer 3 alone over `oid`, from the stored effects alone: textChangesAffecting's
--- fold. Projection-free for the gather's sake -- no static ability writes at
--- layer 3 but CR 612.7's names (Modification.AddNamesMatching), which reads no
--- text and changes none, so leaving those out moves nothing the result reads.
+-- fold. Stored effects only, the posture of the pair list it replaced, which is
+-- what lets the gather ask it: a static ability's layer-3 effect is not walked.
+-- A grep of data/cards/ for ChangeSubtypeWord and ExchangeTextBoxes (2026-09-24)
+-- finds only resolution effects.
 textLayerOf :: ObjectId -> GameState -> ProjectedCharacteristics
 textLayerOf oid gs =
   let candidate eff =
