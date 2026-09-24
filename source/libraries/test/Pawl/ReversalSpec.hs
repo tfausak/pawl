@@ -98,3 +98,36 @@ withoutAnnouncementSpec s registry = Spec.describe s "withoutAnnouncement" $ do
             Spec.assertEqWith s "and the land it came from is still tapped" (fmap Object.tapped (Map.lookup land (GameState.objects kept))) (Just TapState.Tapped)
             Spec.assertEqWith s "the spell is off the stack" (GameState.stack kept) []
             Spec.assertEqWith s "and back in the hand it was announced from" (Map.lookup S.alice (GameState.hand kept)) (Map.lookup S.alice (GameState.hand began))
+
+  -- CR 508.1g exerts an attacker and the toll's window taps that same creature
+  -- for Springleaf Drum's cost: one permanent, two fields, one written by each
+  -- side. A whole-Object leaf has no answer here.
+  Spec.it s "CR 733.1 a permanent both sides wrote keeps the window's field and loses the announcement's" $ do
+    (began, _) <- transition s registry
+    case Set.lookupMin (GameState.battlefield began) of
+      Nothing -> Spec.assertFailure s "the board seated no permanent"
+      Just land -> do
+        let entry = began {GameState.objects = Map.adjust (\o -> o {Object.exertedBy = Set.singleton S.alice}) land (GameState.objects began)}
+            closed = entry {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) land (GameState.objects entry)}
+            keptField :: (Object.Object -> a) -> Maybe (Maybe a)
+            keptField field = fmap (fmap field . Map.lookup land . GameState.objects) (Reversal.withoutAnnouncement began entry closed)
+        Spec.assertEqWith s "the window's tap stands" (keptField Object.tapped) (Just (Just TapState.Tapped))
+        Spec.assertEqWith s "and the announcement's exert goes" (keptField Object.exertedBy) (Just (Just Set.empty))
+
+  -- CR 733.1's last sentence on a library both sides touched: the announcement
+  -- cast its second card (the stack exception), and the window shuffled. The
+  -- window's order stands and the cast card goes back where it was.
+  Spec.it s "CR 733.1 a shuffle stands where the announcement also moved a library card" $ do
+    let before = [1, 2, 3, 4] :: [Int]
+        entry = [1, 3, 4] :: [Int]
+        closed = [4, 3, 1] :: [Int]
+    Spec.assertEqWith s "the window's order, with the cast card back at its index" (Reversal.libraryOrder before entry closed) [4, 2, 3, 1]
+    Spec.assertEqWith s "and a card the window milled stays milled" (Reversal.libraryOrder before before closed) closed
+
+  -- The WHOLE reversal's library (Pawl.Engine.Cost.keepingLibraryActions): the
+  -- cast card goes back at its index and the window's shuffle stands.
+  Spec.it s "CR 733.1 reversing the whole action still keeps the window's shuffle" $ do
+    let snapshot = [1, 2, 3, 4] :: [Int]
+        since = [4, 3, 1] :: [Int]
+    Spec.assertEqWith s "the window's order, with the cast card back at its index" (Reversal.restoredOrder snapshot since) [4, 2, 3, 1]
+    Spec.assertEqWith s "and an unchanged membership is the window's order outright" (Reversal.restoredOrder snapshot [3, 1, 4, 2]) [3, 1, 4, 2]

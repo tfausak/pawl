@@ -156,7 +156,7 @@ foretell perform pid oid = do
       -- reasons. CR 116.2h fixes this cost at {2}, so no symbol here is ever
       -- payable in multiple ways and no prompt is ever raised.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure actionCost
-      payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         -- CR 733.1's reversal, made inside the payment because this special
         -- action IS the whole of what failed: `before` is where it began, so

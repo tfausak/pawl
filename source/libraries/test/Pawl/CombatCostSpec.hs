@@ -43,6 +43,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -785,9 +786,9 @@ blockCostSpec s registry = Spec.describe s "BlockCosts" $ do
   Spec.it s "CR 509.1f partial payments are not allowed: two taxed blockers and one land sacrifice nothing" $ do
     -- CR 509.1d totals over the chosen creatures, so two taxed blockers owe two
     -- lands and one land cannot pay. The land sacrificed while the toll was being
-    -- paid comes back: Cost.payToll restores what a half-paid toll spent, and CR
-    -- 509.1's preamble restore beside it puts back the one thing declareBlockers
-    -- writes ahead of the payment (Combat.declaredBlockers).
+    -- paid comes back: Cost.payToll reverses the whole declaration, including
+    -- the one thing declareBlockers writes ahead of the payment
+    -- (Combat.declaredBlockers).
     tithe <- S.printingOf s registry "Synthetic Blocking Tithe"
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -2848,6 +2849,134 @@ isActivation a = case a of
   A.Activate _ _ -> True
   _ -> False
 
+-- How many mana units `pid` has floating.
+floating :: PlayerId.PlayerId -> GameState.GameState -> Int
+floating pid gs = case Game.poolOf pid gs of
+  Mana.Type.MkMana units -> length units
+
+-- What a toll answerer counts: CR 508.1a's asks, and CR 733.1's.
+data TollAsks = MkTollAsks
+  { tollDeclarations :: Int,
+    tollReversals :: Int,
+    tollTapped :: Bool
+  }
+
+noTollAsks :: TollAsks
+noTollAsks = MkTollAsks {tollDeclarations = 0, tollReversals = 0, tollTapped = False}
+
+-- CR 605.3a's window answered with ONE of `lands` and then closed, every
+-- window. CR 733.1's question answered with `decision`. CR 508.1a's
+-- declaration is every candidate the first time and the first alone after,
+-- retryAttackAnswer's posture.
+oneLandPerWindow :: OptionalDecision.OptionalDecision -> [ObjectId.ObjectId] -> Prompt.Prompt r -> State.State TollAsks r
+oneLandPerWindow decision lands p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> do
+    asks <- State.get
+    if tollTapped asks
+      then do
+        State.put asks {tollTapped = False}
+        pure Nothing
+      else do
+        State.put asks {tollTapped = True}
+        pure (List.find (`elem` NonEmpty.toList candidates) lands)
+  Prompt.ReverseManaAbilities {} -> do
+    State.modify' (\asks -> asks {tollReversals = tollReversals asks + 1})
+    pure decision
+  Prompt.DeclareAttackers _ _ candidates -> do
+    asks <- State.get
+    State.put asks {tollDeclarations = tollDeclarations asks + 1}
+    pure (if tollDeclarations asks == 0 then candidates else take 1 candidates)
+  Prompt.DeclareBlockers _ _ mine attackers -> do
+    asks <- State.get
+    State.put asks {tollDeclarations = tollDeclarations asks + 1}
+    pure $ case attackers of
+      a : _ | tollDeclarations asks == 0 -> Map.fromList (fmap (\b -> (b, Set.singleton a)) mine)
+      _ -> Map.empty
+  _ -> pure (S.identityAnswer p)
+
+-- CR 508.1's and CR 509.1's preambles send an unpayable declaration to rule
+-- 733, so the toll's payer may keep the mana abilities its window activated
+-- (CR 733.1) while the declaration itself goes back. Every case is a PAIR on
+-- one board differing only in the answer to Prompt.ReverseManaAbilities.
+tollReversalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tollReversalSpec s registry = Spec.describe s "Reversal at a combat toll" $ do
+  -- Two Pikers under a Ghostly Prison owe {4}, and one Forest is tapped before
+  -- the window closes. Each window taps ONE Forest, so the second, smaller
+  -- declaration's {2} is payable only with the first window's {G} still
+  -- floating.
+  Spec.it s "CR 733.2 the kept mana pays the smaller declaration" $ do
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, forests) = imprisoning prison forest S.bob [piker, piker] 3
+        run decision = State.runState (Engine.runGame (oneLandPerWindow decision forests) gs (Combat.declareAttackers S.manaPerformer S.alice)) noTollAsks
+        ((_, kept), keptAsks) = run OptionalDecision.Declines
+        ((_, reversed), reversedAsks) = run OptionalDecision.Exercises
+    Spec.assertEqWith s "CR 508.1j the second declaration was paid: one Piker attacks" (length (S.attackerDeclarationsOf kept)) 1
+    Spec.assertEqWith s "off the first window's Forest and the second's" (length (filter (\oid -> tapStateOf oid kept == Just TapState.Tapped) forests)) 2
+    Spec.assertEqWith s "with nothing left floating" (floating S.alice kept) 0
+    Spec.assertBool s (all (\oid -> List.elem oid mine) (S.attackerDeclarationsOf kept)) "and the attacker is one of alice's"
+    Spec.assertEqWith s "the payer who reverses cannot pay {2} off one Forest: nothing attacks" (S.attackerDeclarationsOf reversed) []
+    Spec.assertBool s (allUntapped forests reversed) "and every Forest is untapped"
+    Spec.assertEqWith s "alice was asked once, keeping" (tollReversals keptAsks) 1
+    Spec.assertBool s (tollReversals reversedAsks >= 1) "and asked at least once, reversing"
+
+  -- Glory-Bound Initiate under Always Watching has vigilance, so CR 508.1f does
+  -- not tap it and CR 508.1g exerts it untapped. The toll's window then taps it
+  -- for Springleaf Drum's cost: the declaration and the window wrote two
+  -- different fields of one permanent.
+  Spec.it s "CR 733.1 the exert goes back with the declaration and the Drum's tap stands" $ do
+    initiate <- S.printingOf s registry "Glory-Bound Initiate"
+    watching <- S.printingOf s registry "Always Watching"
+    drum <- S.printingOf s registry "Springleaf Drum"
+    prison <- S.printingOf s registry "Ghostly Prison"
+    let (gs0, mine, _) = S.combatBoardOf [initiate] []
+        (drumId, gs1) = S.addPermanent drum S.alice (snd (S.addPermanent watching S.alice gs0))
+        gs = snd (S.addPermanent prison S.bob gs1)
+        answer :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State TollAsks r
+        answer decision initiateId p = case p of
+          Prompt.ChooseExert {} -> pure OptionalDecision.Exercises
+          Prompt.ChooseTaps _ _ _ candidates _ -> pure (Set.fromList (filter (== initiateId) candidates))
+          _ -> oneLandPerWindow decision [drumId] p
+    case mine of
+      [initiateId] -> do
+        let run decision = State.runState (Engine.runGame (answer decision initiateId) gs (Combat.declareAttackers S.manaPerformer S.alice)) noTollAsks
+            ((_, kept), keptAsks) = run OptionalDecision.Declines
+            ((_, reversed), _) = run OptionalDecision.Exercises
+        Spec.assertEqWith s "CR 701.26a the Drum's cost tapped the Initiate, and that stands" (tapStateOf initiateId kept) (Just TapState.Tapped)
+        Spec.assertEqWith s "CR 701.43a while the declaration's exert is undone" (fmap Object.exertedBy (Game.lookupObject initiateId kept)) (Just Set.empty)
+        Spec.assertEqWith s "CR 106.4 the Drum's mana is floating" (floating S.alice kept) 1
+        Spec.assertBool s (tapStateOf drumId kept == Just TapState.Tapped) "and the Drum is tapped"
+        Spec.assertEqWith s "the payer who reverses: the Initiate untapped" (tapStateOf initiateId reversed) (Just TapState.Untapped)
+        Spec.assertEqWith s "and not exerted" (fmap Object.exertedBy (Game.lookupObject initiateId reversed)) (Just Set.empty)
+        Spec.assertEqWith s "and nothing floating" (floating S.alice reversed) 0
+        Spec.assertEqWith s "alice was asked" (tollReversals keptAsks) 1
+      _ -> Spec.assertFailure s "the fixture should have put one attacker on the board"
+
+  -- An Oppressive Rays blocker owes {3}, and bob's two Forests pay {2}.
+  Spec.it s "CR 733.1 a blocker's toll: the Forests stay tapped and their mana floats" $ do
+    rays <- S.printingOf s registry "Oppressive Rays"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [piker]
+    case (mine, theirs) of
+      ([attacker], [blocker]) -> do
+        let (forests, board) = addForestsFor S.bob forest 2 (raying rays blocker gs)
+            everyForest :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> State.State TollAsks r
+            everyForest decision p = case p of
+              Prompt.ChooseManaSource _ _ candidates -> pure (List.find (`elem` NonEmpty.toList candidates) forests)
+              _ -> oneLandPerWindow decision forests p
+            run decision = State.runState (Engine.runGame (everyForest decision) board (Combat.declareBlockers S.manaPerformer)) noTollAsks
+            ((_, kept), keptAsks) = run OptionalDecision.Declines
+            ((_, reversed), _) = run OptionalDecision.Exercises
+        Spec.assertEqWith s "CR 106.4 bob's {G}{G} is floating" (floating S.bob kept) 2
+        Spec.assertBool s (allTapped forests kept) "and both Forests stay tapped"
+        Spec.assertEqWith s "CR 509.1 nothing blocks" (blockersOf attacker kept) Set.empty
+        Spec.assertEqWith s "the payer who reverses gets nothing floating" (floating S.bob reversed) 0
+        Spec.assertBool s (allUntapped forests reversed) "and both Forests untapped"
+        Spec.assertEqWith s "bob was asked" (tollReversals keptAsks) 1
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   landSubtypeStripSpec s registry
@@ -2864,5 +2993,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   randomPlayerSpec s registry
   declarationRetrySpec s registry
   blockCostSpec s registry
+  tollReversalSpec s registry
   exertSpec s registry
   enlistSpec s registry
