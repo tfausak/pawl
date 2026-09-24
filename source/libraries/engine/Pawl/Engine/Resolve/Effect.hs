@@ -195,6 +195,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.FromReference as FromReference
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -6043,7 +6044,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-        -- Three of the four arrivals are no zone change -- the card was in no
+        -- Four of the five arrivals are no zone change -- the card was in no
         -- zone to leave -- so nothing triggers and nothing is revealed. The rule
         -- behind that: CR 603.6 makes a "put into a graveyard from anywhere"
         -- ability a zone-change trigger, CR 603.6c's last sentence naming that
@@ -6108,26 +6109,54 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- and resolved is the Piker" proves it.
         duplicatesOf ref = Maybe.mapMaybe (\oid -> fmap (\card -> (card, Just (Event.copiedSnapshotWithLastKnown oid gs))) (Game.cardOfWithLastKnown oid gs)) (objectRefObjects legal resolving controller source gs ref)
         answered written answer = Maybe.fromMaybe (NonEmpty.head written) (List.find (\candidate -> conjuredName candidate == answer) (NonEmpty.toList written))
-        pickWritten written = case written of
-          one NonEmpty.:| [] -> pure (one, Nothing)
+        -- The question `selection` names, put over a list of NAMES of two or
+        -- more; a one-name list is taken outright.
+        pickName names = case names of
+          one NonEmpty.:| [] -> pure one
           _ -> case selection of
-            ConjureSelection.AtRandom -> fmap (\answer -> (answered written answer, Nothing)) (Game.ask (Prompt.RandomCard (fmap conjuredName written)))
+            ConjureSelection.AtRandom -> Game.ask (Prompt.RandomCard names)
             ConjureSelection.ByChoice -> do
               g <- State.get
-              fmap (\answer -> (answered written answer, Nothing)) (Game.choose (Prompt.ChooseConjuredCard (Decide.deciderFor controller g) controller (fmap conjuredName written)))
-        -- One pick per card conjured on the written road, and one entry per
-        -- named object on the duplicate road. `pure` rather than a prompt for a
-        -- duplicate: the object was named before the conjure ran.
-        picks n = case cards of
-          ConjureCards.Written written -> replicate (Integer.toIntSaturating n) (pickWritten written)
-          ConjureCards.Duplicate ref -> fmap pure (duplicatesOf ref)
-        intoZone zone n = Monad.mapM_ (\p -> p >>= \(card, copied) -> Monad.void (Event.conjure controller card copied zone LibraryPosition.defaultValue)) (picks n)
+              Game.choose (Prompt.ChooseConjuredCard (Decide.deciderFor controller g) controller names)
+        pickWritten written = fmap (\answer -> (answered written answer, Nothing)) (pickName (fmap conjuredName written))
+        -- A REFERENCE pick (CR 108.1) asks the interpreter which of the
+        -- reference's cards the filter admits -- ONCE, off the pre-effect board
+        -- like the count -- then puts the written road's question over their
+        -- names and looks the picked name up. Filtered, not trusted: an answer
+        -- outside the names takes the head, and a card the lookup hands back
+        -- that the filter does not admit is not conjured. A reference admitting
+        -- nothing conjures nothing.
+        referenceAmount from = FromReference.amount from >>= evaluateForRecipient viewOf context gs resolving source controller
+        pickReference predicate amount names = do
+          answer <- pickName names
+          found <- Game.lookUpCard (if answer `elem` names then answer else NonEmpty.head names)
+          g <- State.get
+          pure $ do
+            card <- found >>= (`Game.cardOfPrinting` g)
+            Monad.guard (Projection.referenceAdmits (Game.teams g) amount predicate card)
+            Just (card, Nothing)
+        referencePickers from count = do
+          let amount = referenceAmount from
+              predicate = FromReference.filter from
+          names <- Game.ask (Prompt.ReferenceCards predicate amount)
+          pure $ case NonEmpty.nonEmpty (ListUtils.nubOrd names) of
+            Nothing -> []
+            Just offered -> replicate count (pickReference predicate amount offered)
+        -- One pick per card conjured on the written and reference roads, and one
+        -- entry per named object on the duplicate road. `pure` rather than a
+        -- prompt for a duplicate: the object was named before the conjure ran.
+        pickers n = case cards of
+          ConjureCards.Written written -> pure (replicate (Integer.toIntSaturating n) (fmap Just (pickWritten written)))
+          ConjureCards.Duplicate ref -> pure (fmap (pure . Just) (duplicatesOf ref))
+          ConjureCards.Reference from -> referencePickers from (Integer.toIntSaturating n)
+        intoZone zone n = pickers n >>= Monad.mapM_ (\p -> p >>= Monad.mapM_ (\(card, copied) -> Monad.void (Event.conjure controller card copied zone LibraryPosition.defaultValue)))
     case evaluateForRecipient viewOf context gs resolving source controller quantity of
       Just n
         | n > 0 -> case destination of
             ConjureDestination.Hand -> intoZone Zone.Hand n
             ConjureDestination.Library -> intoZone Zone.Library n
             ConjureDestination.Graveyard -> intoZone Zone.Graveyard n
+            ConjureDestination.Exile -> intoZone Zone.Exile n
             -- CR 110.2a: the resolving controller is who the permanent enters
             -- under, which conjureOntoBattlefield stamps.
             -- One pick for the whole BATCH rather than one per card, which is
@@ -6147,6 +6176,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             ConjureDestination.Battlefield tapped -> case cards of
               ConjureCards.Written written -> pickWritten written >>= \(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped)
               ConjureCards.Duplicate ref -> Monad.forM_ (duplicatesOf ref) (\(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped))
+              ConjureCards.Reference from -> referencePickers from 1 >>= Monad.mapM_ (>>= Monad.mapM_ (\(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped)))
       _ -> pure ()
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry mSlot exceptions) -> do
     gs <- State.get

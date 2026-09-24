@@ -6,7 +6,10 @@ import qualified Pawl.Codec.ConjureCards as ConjureCards
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ConjureCards as ConjureCards
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -29,4 +32,10 @@ spec s = Spec.describe s "Pawl.Codec.ConjureCards" $ do
       codec
       (ConjureCards.Duplicate (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"Duplicate\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  Spec.it s "Reference" $
+    Common.assertCodec
+      s
+      codec
+      (ConjureCards.Reference (FromReference.MkFromReference (Filter.HasCardType CardType.Creature) Nothing))
+      " {\"type\":\"Reference\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

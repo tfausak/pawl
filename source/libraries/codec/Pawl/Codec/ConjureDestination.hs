@@ -20,6 +20,7 @@ codec =
     [ Arm.nullary "Hand" ConjureDestination.Hand,
       Arm.nullary "Library" ConjureDestination.Library,
       Arm.nullary "Graveyard" ConjureDestination.Graveyard,
+      Arm.nullary "Exile" ConjureDestination.Exile,
       Arm.optionalPayload
         "Battlefield"
         TapState.codec
@@ -39,3 +40,4 @@ tagOf x = case x of
   ConjureDestination.Library -> "Library"
   ConjureDestination.Graveyard -> "Graveyard"
   ConjureDestination.Battlefield _ -> "Battlefield"
+  ConjureDestination.Exile -> "Exile"
