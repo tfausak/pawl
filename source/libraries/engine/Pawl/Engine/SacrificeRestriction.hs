@@ -58,6 +58,11 @@ cantBeSacrificed candidates gs =
           candidate
           affected
           gs
+      -- CR 613.1f: what a stored grant gave the permanent, whose gates
+      -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
+      -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
+      grantedRules = Projection.grantedRuleAbilities gs
+      fromGrant source = concatMap (fromRestriction source []) (RuleAbilities.sacrificeRestrictions (grantedRules source))
       fromPermanent source = case RuleAbilities.sacrificeRestrictions (Projection.ruleAbilitiesOf source gs) of
         -- Every permanent in almost every game.
         [] -> []
@@ -82,7 +87,7 @@ cantBeSacrificed candidates gs =
       fromRestriction source changes restriction =
         let affected = SacrificeRestriction.affected restriction
          in filter (named source (if null changes then affected else Projection.rewriteAffected changes affected)) candidates
-   in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
+   in Set.fromList (concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs)))
 
 -- The same question about ONE permanent, for the callers that hold a victim
 -- rather than a candidate list: the CR 701.21 funnel itself, and the two cost

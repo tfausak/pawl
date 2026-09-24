@@ -59,6 +59,11 @@ gathered gs =
       -- prohibition.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
+      -- CR 613.1f: what a stored grant gave the permanent, whose gates
+      -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
+      -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
+      grantedRules = Projection.grantedRuleAbilities gs
+      fromGrant source = fmap (\prohibition -> (source, [], prohibition)) (RuleAbilities.activationProhibitions (grantedRules source))
       fromPermanent source = case RuleAbilities.activationProhibitions (Projection.ruleAbilitiesOf source gs) of
         -- Every permanent in almost every game.
         [] -> []
@@ -80,7 +85,7 @@ gathered gs =
               -- prohibition.
               fmap (\prohibition -> (source, Projection.textChangesAffecting source gs, prohibition)) prohibitions
             else []
-   in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+   in concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs))
 
 -- CR 602.2 with CR 101.2: which of `candidates` an effect in force right now
 -- says can't have an activated ability of this CR 605.1a kind activated. Arrest,

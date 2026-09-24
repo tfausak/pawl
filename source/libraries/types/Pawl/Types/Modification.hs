@@ -136,7 +136,8 @@ data Modification ability
     --
     -- EXPANDED AS THE ABILITY RESOLVES, by Pawl.Engine.Resolve.Effect's
     -- ModifyTarget arm, into one ordinary GainKeyword or GainAbility per ability
-    -- the source's COPIABLE characteristics (CR 707.2) carried as the ability
+    -- (the CR 613.11 rule abilities as one bundle) the source's COPIABLE
+    -- characteristics (CR 707.2) carried as the ability
     -- was put on the stack (CR 702.165d), which is when Pawl.Engine.Engine's
     -- placeBorne stamps them. So this arm never
     -- reaches Pawl.Engine.Projection, and the grant outlives the source: a
@@ -148,9 +149,6 @@ data Modification ability
     -- backup grants what it copied, and an ability a layer-6 effect afterwards
     -- gave the creature with backup is not granted. Pawl.KeywordTriggerSpec's Backup group
     -- proves the first half.
-    --
-    -- Not implemented: the source's rule abilities, a combat restriction among
-    -- them (#4048).
     GainAbilitiesOfSource
   | LoseAllAbilities -- layer 6 (Humility)
   | -- | layer 6, CR 613.1f: this object loses the abilities carrying this name
