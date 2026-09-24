@@ -30,6 +30,7 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
@@ -259,6 +260,9 @@ data GameState = MkGameState
     -- | CR 108.1: the printings the Oracle card reference answered a chosen
     -- name with (Prompt.LookUpCard), part of the names CR 612.7 enumerates.
     lookedUp :: Set.Set PrintingId.PrintingId,
+    -- | CR 612.7 / 108.1: the face names the Oracle card reference answered each
+    -- name grant's filter with (Prompt.ReferenceNames), asked once per filter.
+    referenceNames :: Map.Map (Filter.Filter Keyword.Keyword) (Set.Set CardName.CardName),
     -- | CR 400.11 / 707.13: objects in `objects` that are outside the game, in no
     -- zone's membership. Pawl.Engine.Game.zoneOf answers Nothing for them.
     outsideCopies :: Set.Set ObjectId.ObjectId,

@@ -241,6 +241,7 @@ emptyGame order =
           GameState.printings = Map.empty,
           GameState.printingIds = Map.empty,
           GameState.lookedUp = Set.empty,
+          GameState.referenceNames = Map.empty,
           GameState.outsideCopies = Set.empty,
           GameState.namedCopyChoices = Map.empty,
           GameState.notedCards = Map.empty,
@@ -1447,6 +1448,7 @@ funnelBack finalSub parent =
           GameState.printings = Map.union (GameState.printings finalSub) (GameState.printings parent),
           GameState.printingIds = Map.union (GameState.printingIds finalSub) (GameState.printingIds parent),
           GameState.lookedUp = Set.union (GameState.lookedUp finalSub) (GameState.lookedUp parent),
+          GameState.referenceNames = Map.union (GameState.referenceNames finalSub) (GameState.referenceNames parent),
           GameState.nextPrintingId = max (GameState.nextPrintingId parent) (GameState.nextPrintingId finalSub),
           GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub),
           -- CR 104.4b: the subgame's events are not a stretch during which the

@@ -188,6 +188,33 @@ combined = foldSplit . combinedFaces
 combinedNames :: Card.Card -> Set.Set CardName.CardName
 combinedNames = Set.fromList . fmap Face.name . NonEmpty.toList . combinedFaces
 
+-- CR 612.7 / 108.1: each name a card of the Oracle card reference has, paired
+-- with the characteristics a "nonlegendary creature card" test judges it by. A
+-- card is judged as it is off the stack (CR 709.4, 712.8a), so a split card's
+-- two names share its combined view and a type line from either half (CR
+-- 709.4a/c). Spy Kit's ruling adds each back face of a double-faced card,
+-- judged alone.
+referenceViews :: Card.Card -> [(CardName.CardName, Face.Face Card.Card)]
+referenceViews card =
+  let whole = combined card
+      shown = fmap (\name -> (name, whole)) (Set.toList (combinedNames card))
+      backs = fmap (\face -> (Face.name face, face)) (NonEmpty.tail (Card.faces card))
+   in shown <> case Card.layout card of
+        Layout.Transforming -> backs
+        Layout.ModalDoubleFaced -> backs
+        Layout.Normal -> []
+        Layout.Split -> []
+        Layout.Room -> []
+        -- CR 710.2 / 715.4 / 720.4 / 722.4: the inset or flipped half is no
+        -- characteristic of the card where the reference holds it.
+        Layout.Flip -> []
+        Layout.Adventure -> []
+        Layout.Omen -> []
+        Layout.Preparation -> []
+        -- The combined back face is the melded card's own printing, not a face of
+        -- either meld card (CR 712.4a).
+        Layout.Meld -> []
+
 -- Which halves `combined` folds -- the layout's own answer to "what does a card
 -- show where nothing has singled out one half for itself".
 combinedFaces :: Card.Card -> NonEmpty.NonEmpty (Face.Face Card.Card)

@@ -435,16 +435,20 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
           Nothing -> pc
           Just other -> exchangeTextBoxFrom (textBoxOf other) pc
         -- CR 612.7: every name in the Oracle card reference whose card face
-        -- matches, in addition to the object's own. Each face is judged off its
-        -- printed characteristics, so a token's name and a noncreature card
-        -- that has become a creature stay out.
+        -- matches, in addition to the object's own. Each name is judged off the
+        -- printed characteristics Card.referenceViews pairs it with, so a
+        -- token's name and a noncreature card that has become a creature stay
+        -- out.
         --
-        -- Not implemented: a name the game has never seen -- a card-data HasName
-        -- literal or a CR 206.3 list naming a card in no zone and never looked
-        -- up -- is not enumerated; Game.referenceFaces is the reference (#4057).
+        -- The reference is the faces the game holds (Game.referenceFaces) and
+        -- the names the interpreter answered the filter with
+        -- (GameState.referenceNames, which Pawl.Engine.Engine's
+        -- learnReferenceNames asks for). The first is all a game whose
+        -- interpreter holds no reference knows; the second is every other face.
         Modification.AddNamesMatching f ->
           let matching = Map.keysSet (Map.filter (\face -> Filter.matches context (viewOfCard face) f) (Game.referenceFaces gs))
-           in pc {PC.names = Set.union matching (PC.names pc)}
+              referenced = Map.findWithDefault Set.empty f (GameState.referenceNames gs)
+           in pc {PC.names = Set.unions [matching, referenced, PC.names pc]}
         -- CR 613.1b layer 2: controllerOf reads GameState.continuousEffects
         -- directly. Identity here to keep gather/project's walk total.
         Modification.SetController _ -> pc
@@ -1220,6 +1224,53 @@ quantitiesOf m = case m of
   Modification.AddNamesMatching _ -> []
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
+
+-- CR 612.7 / 108.1: the filter over the Oracle card reference this modification
+-- grants the names of, which the projection cannot ask the interpreter about
+-- itself. Total, like removesAbilities: a new modification that reads the
+-- reference must break this build rather than silently answer Nothing.
+referenceQuery :: Modification.Modification ability -> Maybe (Filter.Type.Filter Keyword)
+referenceQuery m = case m of
+  Modification.AddNamesMatching f -> Just f
+  Modification.SetBasePowerToughness _ -> Nothing
+  Modification.ModifyPowerToughness _ -> Nothing
+  Modification.GainKeyword _ -> Nothing
+  Modification.GainFlashbackAtManaCost -> Nothing
+  Modification.GainEnchant _ -> Nothing
+  Modification.GainAbility _ -> Nothing
+  Modification.GainAbilitiesOfSource -> Nothing
+  Modification.LoseAllAbilities -> Nothing
+  Modification.LoseNamedAbility _ -> Nothing
+  Modification.LoseKeyword _ -> Nothing
+  Modification.LoseKeywordFamily _ -> Nothing
+  Modification.SetLandSubtype _ -> Nothing
+  Modification.SetLandSubtypeToChosen -> Nothing
+  Modification.AddLandSubtype _ -> Nothing
+  Modification.SetCreatureSubtype _ -> Nothing
+  Modification.AddCreatureSubtype _ -> Nothing
+  Modification.AddEveryCreatureSubtype -> Nothing
+  Modification.LoseEveryCreatureSubtype -> Nothing
+  Modification.AddSubtype _ -> Nothing
+  Modification.AddCardType _ -> Nothing
+  Modification.SetCardType _ -> Nothing
+  Modification.LoseCardType _ -> Nothing
+  Modification.AddSupertype _ -> Nothing
+  Modification.RemoveSupertype _ -> Nothing
+  Modification.ChangeSubtypeWord {} -> Nothing
+  Modification.SetController _ -> Nothing
+  Modification.SetControllerToSource -> Nothing
+  Modification.SetColor _ -> Nothing
+  Modification.AddColor _ -> Nothing
+  Modification.AddChosenColor -> Nothing
+  Modification.SwitchPowerToughness -> Nothing
+  Modification.ExchangeTextBoxes -> Nothing
+  Modification.AssignCombatDamageWithToughness -> Nothing
+  Modification.GrantsStationToughness -> Nothing
+
+-- Every filter a live continuous effect asks the reference about
+-- (referenceQuery), each once.
+referenceQueries :: GameState -> Set (Filter.Type.Filter Keyword)
+referenceQueries gs = Set.fromList (Maybe.mapMaybe (referenceQuery . gModification) (gather gs))
 
 -- CR 305.7: does this modification SET a land's subtype, and so strip the land's
 -- rules text? Total, like removesAbilities: a new subtype-setting Modification
