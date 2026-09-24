@@ -220,7 +220,7 @@ import qualified Pawl.Types.TapState as TapState
 -- could not say at all. The keyword action mints it in the engine instead
 -- (Pawl.Engine.Cloak), rule 701.58a fixing the listing so that no printing has
 -- anything to say about it.
-data EntryRiders count = MkEntryRiders
+data EntryRiders count ability = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Maybe EntryAttack.EntryAttack,
     blocking :: Maybe SlotName.SlotName,
@@ -229,6 +229,9 @@ data EntryRiders count = MkEntryRiders
     underOwner :: Bool,
     exiledFaceDown :: Bool,
     attachedTo :: Maybe SlotName.SlotName,
-    faceDown :: Maybe FaceDownState.FaceDownState
+    faceDown :: Maybe (FaceDownState.FaceDownState ability),
+    -- | CR 707.14: note the card being moved, for a later "copy of the card
+    -- with the noted name" (GameState.notedCards).
+    noted :: Bool
   }
   deriving (Eq, Ord, Show)

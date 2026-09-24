@@ -2,6 +2,7 @@
 
 module Pawl.Codec.MoveToZone where
 
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Codec.MoveDuration as MoveDuration
@@ -24,11 +25,11 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 -- accepted either tagged object and silently returned the defaults. Named keys
 -- need none of it: absence is absence, and two objects that are both objects no
 -- longer have to be told apart.
-codec :: Codec.Codec MoveToZone.MoveToZone
-codec = Fields.object $ do
+codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec.Codec (MoveToZone.MoveToZone ability)
+codec abilityCodec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec MoveToZone.ref
   zone <- Fields.required "zone" Zone.codec MoveToZone.zone
-  riders <- Fields.defaulted "riders" EntryRiders.defaultValue EntryRiders.codec MoveToZone.riders
+  riders <- Fields.defaulted "riders" EntryRiders.defaultValue (EntryRiders.codec abilityCodec) MoveToZone.riders
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) MoveToZone.slot
   origin <- Fields.defaulted "origin" Nothing (Common.maybe Zone.codec) MoveToZone.origin
   placement <- Fields.defaulted "placement" LibraryPlacement.defaultValue LibraryPlacement.codec MoveToZone.placement

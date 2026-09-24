@@ -2398,6 +2398,9 @@ applyCopyException this own snapshot exception = case exception of
       snapshot {PC.triggeredAbilities = PC.triggeredAbilities snapshot <> [triggered]}
     GrantedAbility.Static static ->
       snapshot {PC.staticAbilities = PC.staticAbilities snapshot <> [static]}
+    -- Not implemented: a copy exception granting a quoted replacement
+    -- ability (#1942).
+    GrantedAbility.Replacement _ -> snapshot
   -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
   -- copied type line rather than the replacement CR 205.1a's own sentence would
   -- make. Phyrexian Metamorph copying a Goblin Piker is an artifact creature.

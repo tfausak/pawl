@@ -76,11 +76,14 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- casting permissions and no additional or alternative costs. Every field below
 -- is that reading, written out rather than inherited, so a field added to
 -- Pawl.Types.Face has to be decided here rather than defaulting to the card's.
--- The four the argument reaches are the ones a listing names -- see
--- Pawl.Types.FaceDownCharacteristics for which listings pawl cannot yet carry.
+-- The fields the argument reaches are the ones a listing names
+-- (Pawl.Types.FaceDownCharacteristics).
 --
--- The KEYWORDS are the exception to "no abilities of any kind", and CR 702.168b
--- is why: disguise's listing is "a 2/2 face-down creature card WITH WARD {2}",
+-- The listed ABILITIES are the exception to "no abilities of any kind", each
+-- joining the Face list that holds its kind: Magar of the Magic Strings' 3/3 has
+-- a triggered ability and a static one whose effect is a replacement effect (CR
+-- 113.3d, 614.1a), which Face keeps in replacementEffects. So are the KEYWORDS, and CR
+-- 702.168b is why: disguise's listing is "a 2/2 face-down creature card WITH WARD {2}",
 -- so rule 708.2's "no characteristics other than those listed" leaves that one
 -- ability standing. It arrives here as an ordinary Face.keywords entry at one
 -- instance each, so CR 702.21a's trigger is minted from the projection by the
@@ -99,7 +102,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- what makes CR 708.4's "effects that care about the characteristics of a spell
 -- will see only the face-down spell's characteristics" true for a prohibition
 -- that names a card (Pawl.Engine.PlayerEffect.prohibitsCasting).
-faceDownFace :: FaceDownCharacteristics.FaceDownCharacteristics -> Face.Face Card.Card
+faceDownFace :: FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Card) -> Face.Face Card.Card
 faceDownFace listed =
   Face.MkFace
     { Face.name = CardName.MkCardName Text.empty,
@@ -114,11 +117,11 @@ faceDownFace listed =
       Face.keywords = Map.fromSet (const 1) (FaceDownCharacteristics.keywords listed),
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
-      Face.staticAbilities = [],
+      Face.staticAbilities = [a | GrantedAbility.Static a <- listedAbilities],
       Face.spell = Face.defaultSpell,
-      Face.activatedAbilities = [],
-      Face.replacementEffects = [],
-      Face.triggeredAbilities = [],
+      Face.activatedAbilities = [a | GrantedAbility.Activated a <- listedAbilities],
+      Face.replacementEffects = [a | GrantedAbility.Replacement a <- listedAbilities],
+      Face.triggeredAbilities = [a | GrantedAbility.Triggered a <- listedAbilities],
       Face.delayedAbilities = Map.empty,
       Face.rooms = Seq.empty,
       Face.dungeonEntryQuality = Nothing,
@@ -150,6 +153,8 @@ faceDownFace listed =
       Face.openingHandActions = [],
       Face.specialActions = []
     }
+  where
+    listedAbilities = FaceDownCharacteristics.abilities listed
 
 -- The face a card shows where nothing has singled out one half for itself. WHICH
 -- face that is, is exactly what the layout decides, and the three rules disagree:

@@ -2,6 +2,8 @@ module Pawl.Codec.GrantedAbility where
 
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Codec.Effect as Effect
+import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -23,7 +25,8 @@ codec cardCodec =
     tagOf
     [ Arm.payload "Activated" (ActivatedAbility.codec cardCodec (codec cardCodec)) GrantedAbility.Activated (\x -> case x of GrantedAbility.Activated y -> Just y; _ -> Nothing),
       Arm.payload "Triggered" (TriggeredAbility.codec cardCodec (codec cardCodec)) GrantedAbility.Triggered (\x -> case x of GrantedAbility.Triggered y -> Just y; _ -> Nothing),
-      Arm.payload "Static" (StaticAbility.codec (codec cardCodec)) GrantedAbility.Static (\x -> case x of GrantedAbility.Static y -> Just y; _ -> Nothing)
+      Arm.payload "Static" (StaticAbility.codec (codec cardCodec)) GrantedAbility.Static (\x -> case x of GrantedAbility.Static y -> Just y; _ -> Nothing),
+      Arm.payload "Replacement" (PrintedReplacement.codec cardCodec (codec cardCodec) (Effect.codec cardCodec (codec cardCodec))) GrantedAbility.Replacement (\x -> case x of GrantedAbility.Replacement y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: GrantedAbility.GrantedAbility card -> String
@@ -31,3 +34,4 @@ tagOf x = case x of
   GrantedAbility.Activated {} -> "Activated"
   GrantedAbility.Triggered {} -> "Triggered"
   GrantedAbility.Static {} -> "Static"
+  GrantedAbility.Replacement {} -> "Replacement"

@@ -237,6 +237,9 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
           GrantedAbility.Triggered t ->
             pc {PC.triggeredAbilities = PC.triggeredAbilities pc <> [t]}
           GrantedAbility.Static _ -> pc
+          -- Not implemented: a replacement ability granted by a continuous
+          -- effect (#1942).
+          GrantedAbility.Replacement _ -> pc
         -- CR 702.165a's grant never reaches a STORED effect: Resolve.Effect's
         -- expandGrant turns it into the ordinary GainKeyword and GainAbility arms
         -- above as the ability resolves, so nothing with this modification is ever
@@ -4750,6 +4753,7 @@ grantedStaticWrites p g = case g of
   GrantedAbility.Static sa -> any p (StaticAbility.modifications sa)
   GrantedAbility.Activated _ -> False
   GrantedAbility.Triggered _ -> False
+  GrantedAbility.Replacement _ -> False
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands

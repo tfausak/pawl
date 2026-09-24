@@ -86,6 +86,9 @@
 --
 -- And CR 707.13's copy of a card defined by NAME, created outside the game and
 -- then cast: Garth One-Eye (garthSpec).
+--
+-- And CR 707.14's copy of a card noted as it went face down: Magar of the
+-- Magic Strings (magarSpec).
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -108,8 +111,10 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -146,8 +151,10 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
@@ -4290,3 +4297,161 @@ lotusesOnStack gs = length (filter (\oid -> PC.names (Projection.project oid gs)
 
 lotusesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
 lotusesOnBattlefield gs = filter (\oid -> PC.names (Projection.project oid gs) == Set.singleton lotusName) (Set.toList (GameState.battlefield gs))
+
+-- CR 707.14 on Magar of the Magic Strings {1}{B}{R}, "{1}{B}{R}: Note the name
+-- of target instant or sorcery card in your graveyard and put it onto the
+-- battlefield face down. It's a 3/3 creature with 'Whenever this creature deals
+-- combat damage to a player, you may create a copy of the card with the noted
+-- name. You may cast the copy without paying its mana cost' and 'If this
+-- creature would leave the battlefield, exile it instead of putting it anywhere
+-- else.'" (Oracle text and rulings checked on Scryfall, 2026-09-24).
+--
+-- alice's graveyard holds Divination and a Lightning Bolt, so the target is a
+-- real choice; her library holds three Islands, so Divination's two draws are
+-- what the hand counts.
+magarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+magarSpec s registry = Spec.describe s "MagarOfTheMagicStrings" $ do
+  Spec.it s "CR 707.14 the face-down Divination connects and alice casts a copy of Divination for free" $ do
+    (downId, board) <- magarBoard s registry
+    let after = S.runCombat (magarAnswer Nothing) board
+    Spec.assertEqWith s "CR 707.14 the copy resolved: alice drew two" (length (Game.zoneMembers Zone.Hand S.alice after)) 2
+    Spec.assertEqWith s "CR 601.2i alice cast one spell, the copy" (PlayerEffect.castsThisTurn S.alice after) (PlayerEffect.castsThisTurn S.alice board + 1)
+    Spec.assertEqWith s "CR 510.1b the 3/3 and Magar dealt 6 to bob" (S.lifeOf S.bob after) (Just 14)
+    Spec.assertEqWith s "the card itself stayed face down on the battlefield" (fmap Object.facing (Game.lookupObject downId after)) (fmap Object.facing (Game.lookupObject downId board))
+    Spec.assertEqWith s "and nothing is left outside the game" (GameState.outsideCopies after) Set.empty
+
+  Spec.it s "CR 708.2 the face-down permanent is a nameless 3/3 creature with the two listed abilities" $ do
+    (downId, board) <- magarBoard s registry
+    let pc = Projection.project downId board
+    Spec.assertEqWith s "no name, a creature" (PC.names pc, PC.cardTypes pc) (Set.empty, Set.singleton CardType.Creature)
+    Spec.assertEqWith s "3/3" (Projection.powerOf downId board, Projection.toughnessOf downId board) (Just 3, Just 3)
+    Spec.assertEqWith s "one triggered and one replacement ability" (length (PC.triggeredAbilities pc), length (PC.replacementEffects pc)) (1, 1)
+
+  -- The rulings' Clone case: the copy has both abilities (CR 708.2 makes them
+  -- copiable values) and no noted name. Only the Clone attacks, so a trigger
+  -- that copied the card under its source would cast a Clone.
+  Spec.it s "CR 707.14 a Clone of the face-down 3/3 connects and creates no copy" $ do
+    (downId, board) <- magarBoard s registry
+    clone <- S.printingOf s registry "Clone"
+    let resolved = cloneOnto clone downId board
+        entered = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield board))
+    case entered of
+      [cloneId] -> do
+        let ready = settleObject cloneId resolved
+            pc = Projection.project cloneId ready
+            after = S.runCombat (magarAnswer (Just [cloneId])) ready
+        Spec.assertEqWith s "CR 708.2 the Clone is a nameless 3/3 with the trigger and the replacement" (PC.names pc, Projection.powerOf cloneId ready, length (PC.triggeredAbilities pc), length (PC.replacementEffects pc)) (Set.empty, Just 3, 1, 1)
+        Spec.assertEqWith s "CR 707.14 the Clone's trigger created nothing: alice cast no spell in combat" (PlayerEffect.castsThisTurn S.alice after) (PlayerEffect.castsThisTurn S.alice ready)
+        Spec.assertEqWith s "and her hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+        Spec.assertEqWith s "CR 510.1b the Clone alone dealt bob 3" (S.lifeOf S.bob after) (Just 17)
+      other -> Spec.assertFailure s ("expected one Clone to enter, got " <> show (length other))
+
+  -- The listed "exile it instead", on the permanent and on a Clone of it.
+  Spec.it s "CR 614.1a the face-down permanent and a Clone of it are exiled instead of dying" $ do
+    (downId, board) <- magarBoard s registry
+    clone <- S.printingOf s registry "Clone"
+    let resolved = cloneOnto clone downId board
+        entered = Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield board))
+        killed = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable (downId : entered))
+        names zone = List.sort (fmap (\oid -> S.soleFaceName oid killed) (Game.zoneMembers zone S.alice killed))
+    Spec.assertEqWith s "both are in exile, Divination and Clone" (names Zone.Exile) (List.sort [CardName.MkCardName (Text.pack "Clone"), CardName.MkCardName (Text.pack "Divination")])
+    Spec.assertEqWith s "and alice's graveyard holds only the Lightning Bolt" (names Zone.Graveyard) [CardName.MkCardName (Text.pack "Lightning Bolt")]
+
+  -- The ruling's "turn a face-down instant or sorcery card face up" case, the
+  -- shape CR 701.40g gives a manifested one. Break Open's effect, driven through
+  -- its funnel.
+  Spec.it s "CR 708.2 the rulings: an effect turning the face-down Divination face up leaves it face down" $ do
+    (downId, board) <- magarBoard s registry
+    let after = S.runPure S.identityAnswer board (FaceDown.turnFaceUpByEffect downId)
+    Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject downId board)) "before: it is face down"
+    Spec.assertEqWith s "the ruling: it is still face down" (fmap (Facing.isFaceDown . Object.facing) (Game.lookupObject downId after)) (Just True)
+
+  -- The ruling's blink case: exiled, the card is an instant card, and CR 400.4a
+  -- keeps it there when Flicker of Fate tries to return it.
+  Spec.it s "CR 400.4a Flicker of Fate exiles the face-down Divination and it stays in exile" $ do
+    (downId, board) <- magarBoard s registry
+    flicker <- S.printingOf s registry "Flicker of Fate"
+    let (flickerId, inHand) = S.addHandCard flicker S.alice board
+        funded = inHand {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana [floating Color.White, floating Color.White]), GameState.priority = Just S.alice}
+        after = S.runPure (targetingCard downId) funded (S.cast S.alice flickerId >> Stack.resolveTop)
+        names zone = fmap (\oid -> S.soleFaceName oid after) (Game.zoneMembers zone S.alice after)
+    Spec.assertEqWith s "CR 400.4a Divination is in exile" (names Zone.Exile) [CardName.MkCardName (Text.pack "Divination")]
+    Spec.assertEqWith s "and alice controls only Magar" (length (filter (\oid -> Projection.controllerOf oid after == Just S.alice) (Set.toList (GameState.battlefield after)))) 1
+
+  -- CR 712.14b asks about a card entering FACE UP: CR 708.3 has turned this
+  -- one over first, and CR 712.15 gives a face-down double-faced card the listed
+  -- characteristics.
+  Spec.it s "CR 712.15 Magar puts a modal double-faced card with a sorcery front onto the battlefield face down" $ do
+    (downId, board) <- magarBoardAt s registry "Sea Gate Restoration"
+    Spec.assertEqWith s "a face-down 3/3 entered" (fmap (Facing.isFaceDown . Object.facing) (Game.lookupObject downId board), Projection.powerOf downId board) (Just True, Just 3)
+
+-- alice's settled Magar in combat's declare attackers step, bob defending, and
+-- Magar's ability activated at Divination and resolved. Answers the face-down
+-- permanent's id, settled -- CR 302.6 would otherwise keep it home, and settling
+-- it is the one fixture step that is not the cards' own doing.
+magarBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId, GameState.GameState)
+magarBoard s registry = magarBoardAt s registry "Divination"
+
+-- magarBoard with this card in Divination's place.
+magarBoardAt :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (ObjectId, GameState.GameState)
+magarBoardAt s registry targetName = do
+  magar <- S.printingOf s registry "Magar of the Magic Strings"
+  divination <- S.printingOf s registry targetName
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  island <- S.printingOf s registry "Island"
+  let (gs0, mine, _) = S.combatBoardOf [magar] []
+      (divinationId, gs1) = S.addGraveyardCard divination S.alice gs0
+      (_, gs2) = S.addGraveyardCard bolt S.alice gs1
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) gs2 [1 :: Int .. 3]
+      funded = stocked {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana [floating Color.Black, floating Color.Red, floating Color.Red]), GameState.priority = Just S.alice}
+  case mine of
+    [magarId] -> case Activatable.abilitiesFor magarId funded of
+      [ability] -> do
+        let resolved = S.runPure (targetingCard divinationId) funded (Activate.activateAbility S.alice magarId ability >> Stack.resolveTop)
+        case Set.toList (Set.difference (GameState.battlefield resolved) (GameState.battlefield funded)) of
+          [downId] -> pure (downId, settleObject downId resolved)
+          _ -> pure (magarId, resolved)
+      _ -> pure (magarId, funded)
+    _ -> pure (ObjectId.MkObjectId 0, funded)
+
+-- alice casts Clone and copies `original` as it enters (CR 707.5).
+cloneOnto :: Printing.Printing -> ObjectId -> GameState.GameState -> GameState.GameState
+cloneOnto clone original board =
+  let (_, staged) = S.spellOnStack clone S.alice board
+   in snd (Engine.runGamePure (copyingOnto original) staged (Stack.resolveTop >> Engine.settleForPriority))
+
+copyingOnto :: ObjectId -> Prompt.Prompt r -> r
+copyingOnto original p = case p of
+  Prompt.ChooseCopyTarget {} -> Just original
+  _ -> S.identityAnswer p
+
+-- Aims every target slot at this card when it is offered.
+targetingCard :: ObjectId -> Prompt.Prompt r -> r
+targetingCard card p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just card) . Recipient.objectOf) sets
+  _ -> S.identityAnswer p
+
+-- One ordinary unit of floating mana of this colour.
+floating :: Color.Color -> ManaUnit.ManaUnit
+floating color =
+  ManaUnit.MkManaUnit
+    { ManaUnit.manaType = ManaType.Colored color,
+      ManaUnit.tags = Set.empty,
+      ManaUnit.retention = ManaRetention.Ordinary,
+      ManaUnit.restriction = Nothing,
+      ManaUnit.rider = Nothing,
+      ManaUnit.sourceChosenSubtype = Nothing
+    }
+
+-- CR 302.6: as if the object had been under alice's control since her turn began.
+settleObject :: ObjectId -> GameState.GameState -> GameState.GameState
+settleObject oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects gs)}
+
+-- Attacks bob -- with everything, or with only the listed attackers -- and takes
+-- every "may" and every offered cast.
+magarAnswer :: Maybe [ObjectId] -> Prompt.Prompt r -> r
+magarAnswer only p = case p of
+  Prompt.DeclareAttackers _ _ ids -> maybe ids (filter (`elem` ids)) only
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  _ -> S.attackTo S.bob p

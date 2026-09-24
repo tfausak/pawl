@@ -15,17 +15,18 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
 
--- | The @card@ parameter is instantiated at 'Text.Text': this codec reaches it
--- only through the supplied codec, so any type proves the shape.
-codec :: Codec.Codec (Create.Create Text.Text)
-codec = Create.codec Common.text
+-- | The @card@ and @ability@ parameters are instantiated at 'Text.Text': this
+-- codec reaches them only through the supplied codecs, so any type proves the
+-- shape.
+codec :: Codec.Codec (Create.Create Text.Text Text.Text)
+codec = Create.codec Common.text Common.text
 
 -- CR 111.2's default creator under CR 109.5, which every case but the last
 -- elides.
 you :: PlayerRef.PlayerRef
 you = PlayerRef.Relative PlayerRelation.You
 
-plain :: EntryRiders.EntryRiders Quantity.Quantity
+plain :: EntryRiders.EntryRiders Quantity.Quantity Text.Text
 plain =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = TapState.Untapped,
@@ -36,7 +37,8 @@ plain =
       EntryRiders.underOwner = False,
       EntryRiders.exiledFaceDown = False,
       EntryRiders.attachedTo = Nothing,
-      EntryRiders.faceDown = Nothing
+      EntryRiders.faceDown = Nothing,
+      EntryRiders.noted = False
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

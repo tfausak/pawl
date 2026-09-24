@@ -434,6 +434,7 @@ manaProduced effect = case effect of
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.OfferNamedCopy {} -> Nothing
+  Effect.OfferNotedCopy {} -> Nothing
   Effect.GrantPlayFromExile {} -> Nothing
   -- Descended into, unlike CR 615.5's rider above: rule 608.2f's body runs as
   -- part of THIS effect, so an AddMana in it would be mana this ability adds.
@@ -680,6 +681,7 @@ movesLibraryCard effect = case effect of
   Effect.OfferCast {} -> False
   -- Its copy is minted outside the game, never in a library.
   Effect.OfferNamedCopy {} -> False
+  Effect.OfferNotedCopy {} -> False
   -- Writes a permission onto objects an earlier effect already placed, and moves
   -- nothing itself.
   Effect.GrantPlayFromExile {} -> False

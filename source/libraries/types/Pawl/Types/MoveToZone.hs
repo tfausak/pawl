@@ -45,10 +45,10 @@ import qualified Pawl.Types.Zone as Zone
 -- that has already happened when the spell resolves (CR 608.1 puts the source on
 -- the stack), and every such move is declined. Nothing lints that, as nothing
 -- lints the placement one paragraph up.
-data MoveToZone = MkMoveToZone
+data MoveToZone ability = MkMoveToZone
   { ref :: ObjectRef.ObjectRef,
     zone :: Zone.Zone,
-    riders :: EntryRiders.EntryRiders Quantity.Quantity,
+    riders :: EntryRiders.EntryRiders Quantity.Quantity ability,
     slot :: Maybe SlotName.SlotName,
     origin :: Maybe Zone.Zone,
     placement :: LibraryPlacement.LibraryPlacement,
