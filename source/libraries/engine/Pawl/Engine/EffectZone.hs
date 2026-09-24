@@ -289,6 +289,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Shuffle {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.OfferNamedCopy {} -> Nothing
+  Effect.OfferNotedCopy {} -> Nothing
   -- CR 113.6m names a zone an ability FUNCTIONS in by moving its own object out
   -- of it. This opcode moves nothing -- it writes a permission onto objects an
   -- earlier effect already placed -- so it names no zone.

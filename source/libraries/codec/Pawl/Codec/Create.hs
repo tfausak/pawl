@@ -26,11 +26,11 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 -- The card codec is a PARAMETER, the posture Pawl.Codec.Filter takes with its
 -- keyword: this arm is where card data nests inside card data, and
 -- Pawl.Codec.Card is what ties the knot.
-codec :: (Typeable.Typeable card) => Codec.Codec card -> Codec.Codec (Create.Create card)
-codec cardCodec = Fields.object $ do
+codec :: (Typeable.Typeable card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (Create.Create card ability)
+codec cardCodec abilityCodec = Fields.object $ do
   quantity <- Fields.required "quantity" Quantity.codec Create.quantity
   card <- Fields.required "card" cardCodec Create.card
-  riders <- Fields.defaulted "riders" EntryRiders.defaultValue EntryRiders.codec Create.riders
+  riders <- Fields.defaulted "riders" EntryRiders.defaultValue (EntryRiders.codec abilityCodec) Create.riders
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Create.slot
   -- CR 111.2 under CR 109.5: elided is "you", which is all but one printing.
   creator <- Fields.defaulted "creator" (PlayerRef.Relative PlayerRelation.You) PlayerRef.codec Create.creator

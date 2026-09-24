@@ -11,6 +11,7 @@ import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
@@ -192,7 +193,7 @@ data Effect card ability
     -- changeZone funnel; the destination, the entry riders, the binding for CR
     -- 400.7j's new incarnations, CR 113.6m's stated origin zone and CR 401.2's
     -- library placement are all payload fields.
-    MoveToZone MoveToZone.MoveToZone
+    MoveToZone (MoveToZone.MoveToZone ability)
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one
     -- at a time (CR 121.2), an empty library being a loss (CR 104.3c). The slot
     -- remembers which cards, for a later clause of the same resolution (#1899).
@@ -309,7 +310,7 @@ data Effect card ability
     -- characteristics (CR 111.3), the `card` being the token's text embedded
     -- literally. Create.slot binds EVERY token minted (Resolve.bindMinted), so
     -- CR 603.7c's "it" reaches the ones CR 614.16 added too.
-    Create (Create.Create card)
+    Create (Create.Create card ability)
   | -- | Alchemy's conjure keyword action: create a card that was in nobody's
     -- deck and put it into a zone (Emporium Thopterist). Digital-only, so there
     -- is no rule to cite; unlike CR 111.1's token, the result is a card.
@@ -442,7 +443,7 @@ data Effect card ability
   | -- | CR 708.2: turn the named permanents face down with the copiable values
     -- the effect lists for them, CR 708.2a's 2/2 supplying them where it lists
     -- none.
-    TurnFaceDown TurnFaceDown.TurnFaceDown
+    TurnFaceDown (TurnFaceDown.TurnFaceDown ability)
   | -- | CR 708: turn the slot's target permanent face up, which CR 708.8 makes
     -- argumentless -- not CR 116.2b's special action, so no cost is paid.
     TurnFaceUp SlotName.SlotName
@@ -725,6 +726,10 @@ data Effect card ability
     -- create a copy of that card outside the game, and offer its controller the
     -- cast (Garth One-Eye).
     OfferNamedCopy (NonEmpty.NonEmpty CardName.CardName)
+  | -- | CR 707.14: create a copy of the card noted for the source
+    -- (GameState.notedCards) outside the game, from its last graveyard values,
+    -- and offer its controller the cast (Magar of the Magic Strings).
+    OfferNotedCopy CastOffer.CastOffer
   | -- | CR 601.3: grant the permission to play the objects the ObjectRef names,
     -- for a duration (Victor Mancha, Runaway) -- a standing permission where
     -- OfferCast is one cast now. The `spending` rider is CR 118.14's.

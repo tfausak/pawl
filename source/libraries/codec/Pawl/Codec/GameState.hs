@@ -166,6 +166,7 @@ codec resolve = Fields.object $ do
   referenceNames <- Fields.defaulted "referenceNames" Map.empty (Common.keyedList (Common.keyValue (Filter.codec Keyword.codec) (Common.set CardName.codec))) GameState.referenceNames
   outsideCopies <- Fields.defaulted "outsideCopies" Set.empty (Common.set ObjectId.codec) GameState.outsideCopies
   namedCopyChoices <- Fields.defaulted "namedCopyChoices" Map.empty (Common.naturalMap ObjectId.codec (Common.set CardName.codec)) GameState.namedCopyChoices
+  notedCards <- Fields.defaulted "notedCards" Map.empty (Common.naturalMap ObjectId.codec PrintingId.codec) GameState.notedCards
   nextPrintingId <- Fields.required "nextPrintingId" PrintingId.codec GameState.nextPrintingId
   nextTimestamp <- Fields.required "nextTimestamp" Timestamp.codec GameState.nextTimestamp
   lastChoice <- Fields.required "lastChoice" Timestamp.codec GameState.lastChoice
@@ -256,6 +257,7 @@ codec resolve = Fields.object $ do
         GameState.referenceNames = referenceNames,
         GameState.outsideCopies = outsideCopies,
         GameState.namedCopyChoices = namedCopyChoices,
+        GameState.notedCards = notedCards,
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,

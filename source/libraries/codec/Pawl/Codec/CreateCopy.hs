@@ -30,7 +30,7 @@ codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec
 codec abilityCodec = Fields.object $ do
   quantity <- Fields.defaulted "quantity" CreateCopy.defaultQuantity Quantity.codec CreateCopy.quantity
   ref <- Fields.required "ref" ObjectRef.codec CreateCopy.ref
-  riders <- Fields.defaulted "riders" EntryRiders.defaultValue EntryRiders.codec CreateCopy.riders
+  riders <- Fields.defaulted "riders" EntryRiders.defaultValue (EntryRiders.codec abilityCodec) CreateCopy.riders
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) CreateCopy.slot
   exceptions <- Fields.defaulted "exceptions" [] (Common.list (CopyException.codec abilityCodec)) CreateCopy.exceptions
   pure

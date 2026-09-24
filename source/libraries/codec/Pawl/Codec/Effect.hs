@@ -23,6 +23,7 @@ import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.Blight as Blight
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Codec.CardName as CardName
+import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
@@ -105,7 +106,7 @@ import qualified Pawl.Types.Effect as Effect
 
 codec :: (Typeable.Typeable card, Eq card, Typeable.Typeable ability, Eq ability) => Codec.Codec card -> Codec.Codec ability -> Codec.Codec (Effect.Effect card ability)
 codec cardCodec abilityCodec =
-  let createCodec = Create.codec cardCodec
+  let createCodec = Create.codec cardCodec abilityCodec
       conjureCodec = Conjure.codec cardCodec
       meldCodec = Meld.codec cardCodec
       replaceCodec = Replace.codec cardCodec abilityCodec (codec cardCodec abilityCodec)
@@ -147,13 +148,13 @@ codec cardCodec abilityCodec =
           Arm.payload "Destroy" Destroy.codec Effect.Destroy (\x -> case x of Effect.Destroy y -> Just y; _ -> Nothing),
           Arm.payload "Fight" Fight.codec Effect.Fight (\x -> case x of Effect.Fight y -> Just y; _ -> Nothing),
           Arm.payload "Sacrifice" SacrificeEffect.codec Effect.Sacrifice (\x -> case x of Effect.Sacrifice y -> Just y; _ -> Nothing),
-          Arm.payload "TurnFaceDown" TurnFaceDown.codec Effect.TurnFaceDown (\x -> case x of Effect.TurnFaceDown y -> Just y; _ -> Nothing),
+          Arm.payload "TurnFaceDown" (TurnFaceDown.codec abilityCodec) Effect.TurnFaceDown (\x -> case x of Effect.TurnFaceDown y -> Just y; _ -> Nothing),
           Arm.payload "TurnFaceUp" SlotName.codec Effect.TurnFaceUp (\x -> case x of Effect.TurnFaceUp y -> Just y; _ -> Nothing),
           Arm.payload "RemoveFromCombat" ObjectRef.codec Effect.RemoveFromCombat (\x -> case x of Effect.RemoveFromCombat y -> Just y; _ -> Nothing),
           Arm.payload "BecomesBlocked" SlotName.codec Effect.BecomesBlocked (\x -> case x of Effect.BecomesBlocked y -> Just y; _ -> Nothing),
           Arm.payload "SwitchBlockers" SlotName.codec Effect.SwitchBlockers (\x -> case x of Effect.SwitchBlockers y -> Just y; _ -> Nothing),
           Arm.payload "Counter" Counter.codec Effect.Counter (\x -> case x of Effect.Counter y -> Just y; _ -> Nothing),
-          Arm.payload "MoveToZone" MoveToZone.codec Effect.MoveToZone (\x -> case x of Effect.MoveToZone y -> Just y; _ -> Nothing),
+          Arm.payload "MoveToZone" (MoveToZone.codec abilityCodec) Effect.MoveToZone (\x -> case x of Effect.MoveToZone y -> Just y; _ -> Nothing),
           Arm.payload "Draw" Draw.codec Effect.Draw (\x -> case x of Effect.Draw y -> Just y; _ -> Nothing),
           Arm.payload "Reveal" Reveal.codec Effect.Reveal (\x -> case x of Effect.Reveal y -> Just y; _ -> Nothing),
           Arm.payload "LookAt" LookAt.codec Effect.LookAt (\x -> case x of Effect.LookAt y -> Just y; _ -> Nothing),
@@ -247,6 +248,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Shuffle" PlayerRef.codec Effect.Shuffle (\x -> case x of Effect.Shuffle y -> Just y; _ -> Nothing),
           Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
           Arm.payload "OfferNamedCopy" (Common.nonEmpty CardName.codec) Effect.OfferNamedCopy (\x -> case x of Effect.OfferNamedCopy y -> Just y; _ -> Nothing),
+          Arm.payload "OfferNotedCopy" CastOffer.codec Effect.OfferNotedCopy (\x -> case x of Effect.OfferNotedCopy y -> Just y; _ -> Nothing),
           Arm.payload "GrantPlayFromExile" GrantPlayFromExile.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
           Arm.payload "GrantLookAtExiled" GrantLookAtExiled.codec Effect.GrantLookAtExiled (\x -> case x of Effect.GrantLookAtExiled y -> Just y; _ -> Nothing),
           Arm.payload "MakePlotted" ObjectRef.codec Effect.MakePlotted (\x -> case x of Effect.MakePlotted y -> Just y; _ -> Nothing),
@@ -391,6 +393,7 @@ tagOf x = case x of
   Effect.Shuffle {} -> "Shuffle"
   Effect.OfferCast {} -> "OfferCast"
   Effect.OfferNamedCopy {} -> "OfferNamedCopy"
+  Effect.OfferNotedCopy {} -> "OfferNotedCopy"
   Effect.GrantPlayFromExile {} -> "GrantPlayFromExile"
   Effect.GrantLookAtExiled {} -> "GrantLookAtExiled"
   Effect.MakePlotted {} -> "MakePlotted"

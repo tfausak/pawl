@@ -299,6 +299,10 @@ turnFaceUp perform pid procedure oid = do
 -- no concealment for it to lift (#1412). What is left of the rule is the second
 -- half of its first sentence, and its second sentence.
 --
+-- EnteredFaceDown joins them on Magar of the Magic Strings' ruling (2022-10-07),
+-- which gives its face-down instant or sorcery card the same treatment; Yedora,
+-- Grave Gardener's other producer returns only a nonland permanent card.
+--
 -- CR 730.2g is the same replacement for a face-down MERGED permanent, asked of
 -- every card component (Game.componentsOf) with no reason at all, and read off
 -- each card's own characteristics (Card.combined) rather than the permanent's.
@@ -309,7 +313,7 @@ revealsInsteadOfTurningUp oid gs =
       object = Game.lookupObject oid gs
       reason = fmap (Facing.reasonOf . Object.facing) object
       manifested =
-        (reason == Just (Just FaceDownReason.Manifested) || reason == Just (Just FaceDownReason.Cloaked))
+        (reason == Just (Just FaceDownReason.Manifested) || reason == Just (Just FaceDownReason.Cloaked) || reason == Just (Just FaceDownReason.EnteredFaceDown))
           && maybe False isInstantOrSorcery (Game.faceUpFaceOf oid gs)
       components = foldMap (Seq.filter Game.componentIsCard . Game.componentsOf . Object.source) object
       merged =

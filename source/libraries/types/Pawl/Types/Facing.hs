@@ -1,7 +1,9 @@
 module Pawl.Types.Facing where
 
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 
 -- | CR 110.5: one of the four status categories a permanent always has a value
 -- for -- face up or face down. TapState's sibling, and deliberately a second
@@ -24,7 +26,7 @@ data Facing
   = FaceUp
   | -- | CR 708.2: what the game knows about a face-down object, which
     -- Pawl.Types.FaceDownState carries and documents.
-    FaceDown FaceDownState.FaceDownState
+    FaceDown (FaceDownState.FaceDownState (GrantedAbility.GrantedAbility Card.Card))
   deriving (Eq, Ord, Show)
 
 -- | CR 708.2a's face-down status -- what every producer that lists no

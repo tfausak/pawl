@@ -1007,7 +1007,7 @@ onePlayerNamed legal slot resolving gs = case Maybe.mapMaybe Recipient.playerOf 
 -- Combat.Under is CR 702.116a's narrowing: the slot names a PLAYER rather than an
 -- object, and a slot naming none narrows to nobody, so nothing enters attacking
 -- -- the myriad iteration whose opponent has left the game (CR 800.4a).
-entryAttack :: Map.Map SlotName (Set Recipient) -> ObjectId -> EntryRiders.EntryRiders count -> GameState -> Maybe Combat.AttackChoice
+entryAttack :: Map.Map SlotName (Set Recipient) -> ObjectId -> EntryRiders.EntryRiders count ability -> GameState -> Maybe Combat.AttackChoice
 entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
   Nothing -> Nothing
   Just EntryAttack.Chosen -> Just Combat.Any
@@ -1118,30 +1118,32 @@ castableCopy caster original = do
         State.put (Game.insertIntoZone (Object.zone obj) LibraryPosition.Top caster copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
         pure (Just copyId)
 
--- CR 707.13: offer the cast of a copy of this printing created outside the game
--- (Event.mintOutside), bracketing `offerCast` with the mint and the discard. An
--- uncast copy is deleted as the offer returns: CR 109.1 and CR 400.11c leave
--- nothing able to observe it afterwards, and it bounds Object.zone's placeholder
--- to one resolution, in which no player gets priority and no SBA is checked.
-offerOutsideCopy :: Filter.Context -> PlayerId -> PrintingId.PrintingId -> Game ()
-offerOutsideCopy context caster printingId = do
+-- CR 707.13 / 707.14: offer the cast of a copy of this printing created outside
+-- the game (Event.mintOutside), bracketing `offerCast` with the mint and the
+-- discard. An uncast copy is deleted as the offer returns: CR 109.1 and CR
+-- 400.11c leave nothing able to observe it afterwards, and it bounds
+-- Object.zone's placeholder to one resolution, in which no player gets priority
+-- and no SBA is checked.
+offerOutsideCopy :: Filter.Context -> PlayerId -> PrintingId.PrintingId -> CastOffer.CastOffer -> Game ()
+offerOutsideCopy context caster printingId offer = do
   copyId <- State.state (Event.mintOutside caster printingId)
-  offerCast context [copyId] caster CastObligation.Optional CastRepetition.Once False ordinary
+  offerCast context [copyId] caster CastObligation.Optional CastRepetition.Once False offer
   State.modify' $ \g ->
     if Set.member copyId (GameState.outsideCopies g)
       then g {GameState.objects = Map.delete copyId (GameState.objects g), GameState.outsideCopies = Set.delete copyId (GameState.outsideCopies g)}
       else g
-  where
-    -- "You still pay its costs": an ordinary cast of the copy.
-    ordinary =
-      CastOffer.MkCastOffer
-        { CastOffer.transformed = False,
-          CastOffer.withoutPayingManaCost = False,
-          CastOffer.payingInstead = Nothing,
-          CastOffer.spending = ManaSpending.AsProduced,
-          CastOffer.restriction = Nothing,
-          CastOffer.offeredBy = Nothing
-        }
+
+-- Garth One-Eye's "you still pay its costs": an ordinary cast of the copy.
+ordinaryOffer :: CastOffer.CastOffer
+ordinaryOffer =
+  CastOffer.MkCastOffer
+    { CastOffer.transformed = False,
+      CastOffer.withoutPayingManaCost = False,
+      CastOffer.payingInstead = Nothing,
+      CastOffer.spending = ManaSpending.AsProduced,
+      CastOffer.restriction = Nothing,
+      CastOffer.offeredBy = Nothing
+    }
 
 -- One round of the offer above: CR 601.3's choice among the cards `named` still
 -- holds, and the cast if it is taken. Answers the id of the card that was cast,
@@ -1742,8 +1744,8 @@ freezeRiders ::
   GameState ->
   ObjectId ->
   ObjectId ->
-  EntryRiders.EntryRiders Quantity.Type.Quantity ->
-  EntryRiders.EntryRiders Natural
+  EntryRiders.EntryRiders Quantity.Type.Quantity ability ->
+  EntryRiders.EntryRiders Natural ability
 freezeRiders viewOf context gs resolving source riders =
   let frozen quantity = case Quantity.evaluateFor viewOf context gs resolving source quantity of
         Just n | n > 0 -> Just (Integer.toNaturalSaturating n)
@@ -2781,6 +2783,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Shuffle {} -> False
   Effect.OfferCast {} -> False
   Effect.OfferNamedCopy {} -> False
+  Effect.OfferNotedCopy {} -> False
   Effect.GrantPlayFromExile {} -> False
   Effect.GrantLookAtExiled {} -> False
   Effect.MakePlotted {} -> False
@@ -4879,7 +4882,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       found <- Game.lookUpCard name
       Monad.forM_ found $ \printingId -> do
         g <- State.get
-        offerOutsideCopy (effectContext g controller source legal (slotBindings resolving g)) controller printingId
+        offerOutsideCopy (effectContext g controller source legal (slotBindings resolving g)) controller printingId ordinaryOffer
+  -- CR 707.14 (Magar of the Magic Strings): the copy is made from the card noted
+  -- for the SOURCE as it entered (EntryRiders.noted), so a copy of that permanent,
+  -- which has this ability but no note (CR 707.2), creates nothing, and the
+  -- note outlives the permanent's leaving (CR 113.7a). The card's last values in
+  -- the graveyard are its printed ones -- a copy effect ends with the zone change
+  -- that put it there (CR 400.7) -- so the printing is the copy's whole source.
+  --
+  -- Created outside the game, as CR 707.13's is: CR 707.14 names no zone.
+  Effect.OfferNotedCopy offer -> do
+    gs <- State.get
+    Monad.forM_ (Map.lookup source (GameState.notedCards gs)) $ \printingId ->
+      offerOutsideCopy (effectContext gs controller source legal (slotBindings resolving gs)) controller printingId offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
   -- for the player the PlayerRef names and the stated duration.
   --
@@ -9043,8 +9058,8 @@ bindEarthbentLand resolving land gs =
 -- Not implemented: the source's rule abilities (PC.ruleAbilities), Chomping
 -- Kavu's "can't be blocked by creatures with power 2 or less" among them, which
 -- have no Pawl.Types.GrantedAbility arm to travel in (#4048). No printing with
--- backup prints a player static ability, a special action or a replacement
--- ability, the other kinds with no arm.
+-- backup prints a player static ability or a special action, which have no arm,
+-- or a replacement effect, whose arm travels in no grant (#1942).
 expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
 expandGrant resolving source gs modification = case modification of
   Modification.GainAbilitiesOfSource ->
