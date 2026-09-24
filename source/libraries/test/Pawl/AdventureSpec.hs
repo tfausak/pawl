@@ -49,6 +49,7 @@ import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -402,7 +403,7 @@ spec s registry = Spec.describe s "Adventure" $ do
               CastOffer.offeredBy = Nothing
             }
         context bound = (Filter.contextFor (Game.teams gs) (Just S.alice) Nothing) {Filter.sourceManaValue = Just bound}
-        under bound = S.runPure preferringTheCreature gs (Resolve.offerCast (context bound) [exiledId] S.alice CastObligation.Optional CastRepetition.Once False offer)
+        under bound = S.runPure preferringTheCreature gs (Resolve.offerCast (context bound) [exiledId] S.alice CastObligation.Optional PermissionVerb.Cast Nothing CastRepetition.Once False offer)
         resolved bound = S.runPure preferringTheCreature (under bound) Stack.resolveTop
         knights g = filter (\o -> Set.member Subtype.Knight (Projection.subtypesOf o g)) (Set.toList (GameState.battlefield g))
         artifacts g = filter (\o -> Set.member CardType.Artifact (Projection.cardTypesOf o g)) (Set.toList (GameState.battlefield g))

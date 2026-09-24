@@ -2,7 +2,6 @@ module Pawl.Engine.Action where
 
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
-import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -26,7 +25,6 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
-import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -146,18 +144,7 @@ legalActions pid gs =
       -- ruling reads the split the same way: a land granted flash "can't be
       -- played during another player's turn", and the land plays remaining still
       -- gate it.
-      canPlayLand =
-        Turn.isActive gs pid
-          -- CR 305.2a: compare the number of lands this player CAN play this
-          -- turn with the number they HAVE already played; the play is legal
-          -- only if the first is greater. A comparison of two counts and never
-          -- a yes/no, because CR 305.2 lets a continuous effect raise the first
-          -- one (Exploration, Azusa Lost but Seeking). Strictly greater is CR
-          -- 305.2b read from the other side: it forbids the play once the
-          -- allowance is EQUAL TO OR LESS THAN the tally, and less than is
-          -- reachable -- Exploration destroyed after the second land leaves an
-          -- allowance of one against a tally of two.
-          && Map.findWithDefault 0 pid (GameState.landsPlayed gs) < PlayerEffect.landPlaysAllowed pid gs
+      canPlayLand = Cast.landDropOpen pid gs
       -- CR 305.1 / 116.2a: the rest of the window is a main phase with the stack
       -- empty, which together with the active-player conjunct above is CR 307.5's
       -- "as a sorcery" window conjunct for conjunct -- so it is asked through the

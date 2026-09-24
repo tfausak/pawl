@@ -850,6 +850,69 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "a land's mana pays for the forced cast" (handNames fromLand) [card "Mountain"]
     Spec.assertEqWith s "CR 723.7: a creature's does not, so the cast is not made" (handNames fromCreature) (List.sort [card "Llanowar Elves", card "Mountain"])
 
+  -- CR 601.1a / 305.2a: Word of Command's "plays that card" reaches a land. A
+  -- PAIR of boards differing only in whose turn it is: CR 305.3 lets bob play a
+  -- land on his own turn and on no other, so the negative is the same instruction
+  -- refused by the rule rather than by an offer that never included lands.
+  Spec.it s "CR 305.2a gameplay: Word of Command makes bob play a land on his turn" $ do
+    wordOfCommand <- S.printingOf s registry "Word of Command"
+    swamp <- S.printingOf s registry "Swamp"
+    forest <- S.printingOf s registry "Forest"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let stock active =
+          let g0 = Setup.emptyGame S.bothPlayers
+              (_swampOne, g1) = S.addPermanent swamp S.alice g0
+              (_swampTwo, g2) = S.addPermanent swamp S.alice g1
+              (_wocId, g3) = S.addHandCard wordOfCommand S.alice g2
+              (forestId, g4) = S.addHandCard forest S.bob g3
+              (_decoy, g5) = S.addHandCard elves S.bob g4
+           in ( forestId,
+                g5
+                  { GameState.activePlayer = active,
+                    GameState.phase = Phase.PrecombatMain,
+                    GameState.priority = Just S.alice
+                  }
+              )
+        run (pinned, board) = snd (fst (State.runState (Engine.runGame (wordAnswer pinned) board Engine.priorityLoop) []))
+        onBobsTurn = run (stock S.bob)
+        onAlicesTurn = run (stock S.alice)
+        card n = CardName.MkCardName (Text.pack n)
+    Spec.assertEqWith s "CR 305.2a: alice made bob play his Forest" (S.countOnBattlefieldByName (card "Forest") S.bob onBobsTurn) 1
+    Spec.assertEqWith s "CR 305.3: not on alice's turn" (S.countOnBattlefieldByName (card "Forest") S.bob onAlicesTurn) 0
+    Spec.assertEqWith s "CR 305.2a: the play counts as bob's land for the turn" (Map.lookup S.bob (GameState.landsPlayed onBobsTurn)) (Just 1)
+
+  -- CR 723.2: "if the chosen card is cast as a spell, you control the player
+  -- while that spell is resolving". Duress's choice is made by its controller as
+  -- it resolves, well after Word of Command has finished, so the question put to
+  -- bob there carries alice only if control re-entered for that resolution.
+  Spec.it s "CR 723.2 gameplay: alice controls bob again while the forced spell resolves" $ do
+    wordOfCommand <- S.printingOf s registry "Word of Command"
+    swamp <- S.printingOf s registry "Swamp"
+    duress <- S.printingOf s registry "Duress"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    divination <- S.printingOf s registry "Divination"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (_swampOne, g1) = S.addPermanent swamp S.alice g0
+        (_swampTwo, g2) = S.addPermanent swamp S.alice g1
+        (_bobsSwamp, g3) = S.addPermanent swamp S.bob g2
+        (_wocId, g4) = S.addHandCard wordOfCommand S.alice g3
+        -- Two cards Duress may take, so its choice is a real question.
+        (_bolt, g5) = S.addHandCard lightningBolt S.alice g4
+        (_divination, g6) = S.addHandCard divination S.alice g5
+        (duressId, g7) = S.addHandCard duress S.bob g6
+        (_decoy, g8) = S.addHandCard elves S.bob g7
+        gStart =
+          g8
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        ((_, after), asks) = State.runState (Engine.runGame (retakeAnswer duressId) gStart Engine.priorityLoop) []
+    Spec.assertEqWith s "CR 723.2: alice makes Duress's choice for bob" (askedOf "ChooseCardFromAmong" S.bob asks) [Just (Decider.MkDecider S.alice)]
+    Spec.assertEqWith s "Duress took one of alice's two cards" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "and the control lapses with Duress's resolution" (GameState.control after) Map.empty
+
   Spec.it s "CR 727.1/727.2/727.4 gameplay: bob activates a restart and the game rebuilds from its own cards" $ do
     -- bob controls Karn Liberated and owns 8 cards total; alice owns 8. Both
     -- start with reduced life on a populated board. bob activates Karn's
@@ -2493,6 +2556,15 @@ wordAnswer pinned p = case p of
     pure (S.identityAnswer p)
   Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring (== Recipient.ToPlayer S.bob) sets)
   _ -> pure (S.identityAnswer p)
+
+-- wordAnswer, recording CR 608.2d's resolution-time choice as well, answered by
+-- position so the answer cannot depend on who was asked.
+retakeAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [(String, PlayerId.PlayerId, Maybe Decider.Decider)] r
+retakeAnswer pinned p = case p of
+  Prompt.ChooseCardFromAmong decider player _ offered -> do
+    State.modify' (<> [("ChooseCardFromAmong", player, Just decider)])
+    pure (NonEmpty.head offered)
+  _ -> wordAnswer pinned p
 
 -- The deciders recorded for one prompt kind put to one seat, in order.
 askedOf :: String -> PlayerId.PlayerId -> [(String, PlayerId.PlayerId, Maybe Decider.Decider)] -> [Maybe Decider.Decider]

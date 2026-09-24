@@ -748,7 +748,7 @@ effectObjectRefs effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> [ref]
   Effect.Shuffle {} -> []
-  Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _) -> [ref]
+  Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
   Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _) -> [ref]
@@ -925,7 +925,7 @@ effectPlayerRefs effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Shuffle ref -> [ref]
-  Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _) -> [caster]
+  Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _ _ _) -> [caster]
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
   -- CR 601.3's "that player", the seat the permission is written for.
@@ -1274,7 +1274,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- The REFERENCE alone: the caster is a PlayerRef and is reported at the head.
   -- This one is a read, bound by an earlier effect of the list (CR 400.7) where
   -- it names a slot at all.
-  Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _) -> objectRefSlots ref
+  Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _) -> objectRefSlots ref
   Effect.OfferNamedCopy {} -> Map.empty
   Effect.OfferNotedCopy {} -> Map.empty
   Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)

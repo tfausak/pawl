@@ -80,6 +80,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -326,7 +327,9 @@ siegeDefeat =
               OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing},
               -- rule 310.12b's "cast it": one card, the one the slot names.
               OfferCast.repetition = CastRepetition.Once,
-              OfferCast.copied = False
+              OfferCast.copied = False,
+              OfferCast.verb = PermissionVerb.Cast,
+              OfferCast.controlWhileResolving = False
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
