@@ -61,6 +61,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
@@ -5250,6 +5251,64 @@ creatureBattleDeclarationSpec s registry = Spec.describe s "CreatureBattleDeclar
     Spec.assertEqWith s "CR 509.1a the offer holds the Piker that is not a battle, and only it" (Set.fromList (Combat.legalBlockers S.bob granted)) (Set.fromList plain)
     Spec.assertEqWith s "CR 510.1c and one Piker really blocked, so the Warden took two and lived" (fmap (\oid -> (S.onBattlefield oid fought, S.damageOf oid fought)) wardens) [(True, Just 2)]
     Spec.assertEqWith s "and the spell really left the other one a creature that is a battle" (length pikers, fmap (\oid -> Projection.isCreatureOf oid granted) battles) (2, [True])
+  -- CR 506.3f, the put-onto-the-battlefield roads, which no printing reaches
+  -- for the reason above: data/cards/synthetic-siege-muster.json is the
+  -- producer. Its first two modes
+  -- make the same tapped and attacking Soldier and differ only in its battle
+  -- type. alice declares nothing, so CR 508.8's second clause alone keeps the
+  -- declare blockers step: the plain Soldier keeps it and the creature-battle
+  -- must not. The skip is the only observable, since CR 506.4 would pull an
+  -- attacking creature-battle back out before it dealt any damage.
+  Spec.it s "CR 506.3f a creature-battle put onto the battlefield attacking never attacks, so CR 508.8 skips blocks and damage" $ do
+    let muster mode = do
+          let mine =
+                (S.battlefield S.alice [S.settled "first" "Plains", S.settled "second" "Plains"])
+                  { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Siege Muster"))
+                  }
+              setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.declareAttackers
+              choices =
+                S.noChoices
+                  { S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex mode)),
+                    S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
+                  }
+              script = S.turn 1 [S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "spell") choices)]
+          S.play s registry setup script Engine.runStep
+    plain <- muster 0
+    battle <- muster 1
+    let soldiers = S.namedObjects (CardName.MkCardName (Text.pack "Soldier Token"))
+    Spec.assertEqWith s "CR 508.8 the creature-battle attacked nothing, so the step after declare attackers is end of combat" (GameState.phase battle) S.endOfCombat
+    Spec.assertEqWith s "CR 508.8 while the plain Soldier keeps the declare blockers step" (GameState.phase plain) S.declareBlockers
+    Spec.assertEqWith s "and each mode really made one tapped Soldier, the second a creature that is a battle" (fmap (\gs -> fmap (\oid -> (fmap Object.tapped (Game.lookupObject oid gs), Projection.isCreatureOf oid gs, Projection.isBattleOf oid gs)) (soldiers gs)) [plain, battle]) [[(Just TapState.Tapped, True, False)], [(Just TapState.Tapped, True, True)]]
+  -- The blocking twin: the Muster's other two modes, the same pair on alice's
+  -- side of bob's attack. A creature-battle that blocked and was then pulled out
+  -- by CR 506.4 would leave the Piker blocked and assigning nothing (CR
+  -- 510.1c), so alice's life is the discriminator.
+  Spec.it s "CR 506.3f a creature-battle put onto the battlefield blocking never blocks, so the attacker is unblocked" $ do
+    let muster mode = do
+          let mine =
+                (S.battlefield S.alice [S.settled "first" "Plains", S.settled "second" "Plains"])
+                  { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Siege Muster"))
+                  }
+              setup = S.board (S.battlefield S.bob [S.settled "piker" "Goblin Piker"] NonEmpty.:| [mine]) S.bob S.beginningOfCombat
+              choices =
+                S.noChoices
+                  { S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex mode)),
+                    S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "piker")],
+                    S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
+                  }
+              script =
+                S.turn
+                  1
+                  [ S.on S.declareAttackers S.bob (S.attack [S.aliasRef "piker"]),
+                    S.on S.declareBlockers S.alice (S.castAction (S.aliasRef "spell") choices)
+                  ]
+          S.play s registry setup script S.combatGame
+    plain <- muster 2
+    battle <- muster 3
+    let soldiers = S.namedObjects (CardName.MkCardName (Text.pack "Soldier Token"))
+    Spec.assertEqWith s "CR 510.1b the creature-battle never blocked, so the unblocked Piker's two reached alice" (S.lifeOf S.alice battle) (Just 18)
+    Spec.assertEqWith s "CR 510.1c while the plain Soldier blocked it and alice took nothing" (S.lifeOf S.alice plain) (Just 20)
+    Spec.assertEqWith s "and the second mode really made a creature that is a battle, left alive" (fmap (\oid -> (Projection.isCreatureOf oid battle, Projection.isBattleOf oid battle)) (soldiers battle)) [(True, True)]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
