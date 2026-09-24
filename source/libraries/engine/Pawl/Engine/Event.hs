@@ -213,6 +213,7 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import Pawl.Types.TurnWindow (TurnWindow)
 import qualified Pawl.Types.TurnWindow as TurnWindow
+import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import Pawl.Types.Zone (Zone)
@@ -4855,9 +4856,18 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       -- rider is read alongside it below: no back face to turn to, or no
       -- instruction to turn at all.
       mBack = if EntryRiders.transformed riders then mCard >>= Card.backFace else Nothing
+      -- CR 708.3 turns a face-down entry over BEFORE it enters, so neither the
+      -- front face (CR 712.14b, 712.15) nor the card type (CR 400.4a) is asked
+      -- of it: a manifested or Magar'd instant is a face-down 3/3 as it enters.
+      faceUpEntry = Maybe.isNothing (EntryRiders.faceDown riders)
+      -- CR 400.4a / 304.4 / 307.4: an instant or sorcery card entering face up
+      -- stays where it was -- Flicker of Fate returning the card under Magar's
+      -- 3/3 (rulings, 2022-10-07).
+      instantOrSorcery face = any (`Set.member` TypeLine.types (Face.typeLine face)) [CardType.Instant, CardType.Sorcery]
       refused =
         onto
-          && ( maybe False Card.staysWhenPutOntoBattlefield mCard -- CR 712.14b
+          && ( (faceUpEntry && maybe False Card.staysWhenPutOntoBattlefield mCard) -- CR 712.14b
+                 || (faceUpEntry && maybe False (instantOrSorcery . Card.combined) mCard && Maybe.isNothing mBack) -- CR 400.4a
                  || (EntryRiders.transformed riders && Maybe.isNothing mBack) -- CR 712.14a
              )
       -- CR 712.14: "A double-faced card put onto the battlefield from a zone

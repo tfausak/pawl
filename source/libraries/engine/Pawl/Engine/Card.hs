@@ -80,8 +80,9 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- (Pawl.Types.FaceDownCharacteristics).
 --
 -- The listed ABILITIES are the exception to "no abilities of any kind", each
--- joining the Face list CR 113.3's kind names: Magar of the Magic Strings' 3/3
--- has one triggered and one replacement ability. So are the KEYWORDS, and CR
+-- joining the Face list that holds its kind: Magar of the Magic Strings' 3/3 has
+-- a triggered ability and a static one whose effect is a replacement effect (CR
+-- 113.3d, 614.1a), which Face keeps in replacementEffects. So are the KEYWORDS, and CR
 -- 702.168b is why: disguise's listing is "a 2/2 face-down creature card WITH WARD {2}",
 -- so rule 708.2's "no characteristics other than those listed" leaves that one
 -- ability standing. It arrives here as an ordinary Face.keywords entry at one

@@ -36,6 +36,6 @@ data GrantedAbility card
   | Triggered (TriggeredAbility.TriggeredAbility card (GrantedAbility card))
   | -- | CR 113.3d.
     Static (StaticAbility.StaticAbility (GrantedAbility card))
-  | -- | CR 614.1a: a replacement ability.
+  | -- | CR 113.3d / 614.1a: a static ability whose effect is a replacement effect.
     Replacement (PrintedReplacement.PrintedReplacement card (GrantedAbility card) (Effect.Effect card (GrantedAbility card)))
   deriving (Eq, Ord, Show)

@@ -9058,8 +9058,8 @@ bindEarthbentLand resolving land gs =
 -- Not implemented: the source's rule abilities (PC.ruleAbilities), Chomping
 -- Kavu's "can't be blocked by creatures with power 2 or less" among them, which
 -- have no Pawl.Types.GrantedAbility arm to travel in (#4048). No printing with
--- backup prints a player static ability, a special action or a replacement
--- ability, the other kinds with no arm.
+-- backup prints a player static ability or a special action, which have no arm,
+-- or a replacement effect, whose arm travels in no grant (#1942).
 expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
 expandGrant resolving source gs modification = case modification of
   Modification.GainAbilitiesOfSource ->

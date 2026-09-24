@@ -2049,7 +2049,8 @@ effectReplacements effect = case effect of
   Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
-  Effect.MoveToZone {} -> []
+  -- CR 708.2's listed replacement effects, TurnFaceDown's below.
+  Effect.MoveToZone move -> foldMap (listedReplacements . FaceDownState.listed) (EntryRiders.faceDown (MoveToZone.riders move))
   Effect.Draw {} -> []
   Effect.Mill {} -> []
   Effect.Reveal {} -> []
@@ -5658,8 +5659,9 @@ grantedModifications card =
                   Effect.ModifyTarget modify -> [ModifyTarget.modification modify]
                   -- CR 708.2's listed abilities are this card's text too.
                   Effect.MoveToZone move -> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (MoveToZone.riders move))
+                  Effect.Create create -> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (Create.riders create))
                   Effect.TurnFaceDown turn -> listedGrants (TurnFaceDown.characteristics turn)
-                  Effect.CreateCopy create -> copyQuotedAbilities (CreateCopy.exceptions create)
+                  Effect.CreateCopy create -> copyQuotedAbilities (CreateCopy.exceptions create) <> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (CreateCopy.riders create))
                   Effect.BecomeCopy become -> copyQuotedAbilities (BecomeCopy.exceptions become)
                   Effect.CopyStackObject copy -> copyQuotedAbilities (CopyStackObject.exceptions copy)
                   Effect.Replace replace -> copyQuotedAbilities (replacementCopyExceptions (Replace.effect replace))

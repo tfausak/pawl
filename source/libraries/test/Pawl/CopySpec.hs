@@ -111,6 +111,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -4356,30 +4357,53 @@ magarSpec s registry = Spec.describe s "MagarOfTheMagicStrings" $ do
     Spec.assertEqWith s "both are in exile, Divination and Clone" (names Zone.Exile) (List.sort [CardName.MkCardName (Text.pack "Clone"), CardName.MkCardName (Text.pack "Divination")])
     Spec.assertEqWith s "and alice's graveyard holds only the Lightning Bolt" (names Zone.Graveyard) [CardName.MkCardName (Text.pack "Lightning Bolt")]
 
+  -- The ruling's "turn a face-down instant or sorcery card face up" case, the
+  -- shape CR 701.40g gives a manifested one. Break Open's effect, driven through
+  -- its funnel.
+  Spec.it s "CR 708.2 the rulings: an effect turning the face-down Divination face up leaves it face down" $ do
+    (downId, board) <- magarBoard s registry
+    let after = S.runPure S.identityAnswer board (FaceDown.turnFaceUpByEffect downId)
+    Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject downId board)) "before: it is face down"
+    Spec.assertEqWith s "the ruling: it is still face down" (fmap (Facing.isFaceDown . Object.facing) (Game.lookupObject downId after)) (Just True)
+
+  -- The ruling's blink case: exiled, the card is an instant card, and CR 400.4a
+  -- keeps it there when Flicker of Fate tries to return it.
+  Spec.it s "CR 400.4a Flicker of Fate exiles the face-down Divination and it stays in exile" $ do
+    (downId, board) <- magarBoard s registry
+    flicker <- S.printingOf s registry "Flicker of Fate"
+    let (flickerId, inHand) = S.addHandCard flicker S.alice board
+        funded = inHand {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana [floating Color.White, floating Color.White]), GameState.priority = Just S.alice}
+        after = S.runPure (targetingCard downId) funded (S.cast S.alice flickerId >> Stack.resolveTop)
+        names zone = fmap (\oid -> S.soleFaceName oid after) (Game.zoneMembers zone S.alice after)
+    Spec.assertEqWith s "CR 400.4a Divination is in exile" (names Zone.Exile) [CardName.MkCardName (Text.pack "Divination")]
+    Spec.assertEqWith s "and alice controls only Magar" (length (filter (\oid -> Projection.controllerOf oid after == Just S.alice) (Set.toList (GameState.battlefield after)))) 1
+
+  -- CR 712.14b asks about a card entering FACE UP: CR 708.3 has turned this
+  -- one over first, and CR 712.15 gives a face-down double-faced card the listed
+  -- characteristics.
+  Spec.it s "CR 712.15 Magar puts a modal double-faced card with a sorcery front onto the battlefield face down" $ do
+    (downId, board) <- magarBoardAt s registry "Sea Gate Restoration"
+    Spec.assertEqWith s "a face-down 3/3 entered" (fmap (Facing.isFaceDown . Object.facing) (Game.lookupObject downId board), Projection.powerOf downId board) (Just True, Just 3)
+
 -- alice's settled Magar in combat's declare attackers step, bob defending, and
 -- Magar's ability activated at Divination and resolved. Answers the face-down
 -- permanent's id, settled -- CR 302.6 would otherwise keep it home, and settling
 -- it is the one fixture step that is not the cards' own doing.
 magarBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId, GameState.GameState)
-magarBoard s registry = do
+magarBoard s registry = magarBoardAt s registry "Divination"
+
+-- magarBoard with this card in Divination's place.
+magarBoardAt :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (ObjectId, GameState.GameState)
+magarBoardAt s registry targetName = do
   magar <- S.printingOf s registry "Magar of the Magic Strings"
-  divination <- S.printingOf s registry "Divination"
+  divination <- S.printingOf s registry targetName
   bolt <- S.printingOf s registry "Lightning Bolt"
   island <- S.printingOf s registry "Island"
   let (gs0, mine, _) = S.combatBoardOf [magar] []
       (divinationId, gs1) = S.addGraveyardCard divination S.alice gs0
       (_, gs2) = S.addGraveyardCard bolt S.alice gs1
       stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) gs2 [1 :: Int .. 3]
-      unit color =
-        ManaUnit.MkManaUnit
-          { ManaUnit.manaType = ManaType.Colored color,
-            ManaUnit.tags = Set.empty,
-            ManaUnit.retention = ManaRetention.Ordinary,
-            ManaUnit.restriction = Nothing,
-            ManaUnit.rider = Nothing,
-            ManaUnit.sourceChosenSubtype = Nothing
-          }
-      funded = stocked {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana [unit Color.Black, unit Color.Red, unit Color.Red]), GameState.priority = Just S.alice}
+      funded = stocked {GameState.manaPool = Map.singleton S.alice (Mana.Type.MkMana [floating Color.Black, floating Color.Red, floating Color.Red]), GameState.priority = Just S.alice}
   case mine of
     [magarId] -> case Activatable.abilitiesFor magarId funded of
       [ability] -> do
@@ -4406,6 +4430,18 @@ targetingCard :: ObjectId -> Prompt.Prompt r -> r
 targetingCard card p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just card) . Recipient.objectOf) sets
   _ -> S.identityAnswer p
+
+-- One ordinary unit of floating mana of this colour.
+floating :: Color.Color -> ManaUnit.ManaUnit
+floating color =
+  ManaUnit.MkManaUnit
+    { ManaUnit.manaType = ManaType.Colored color,
+      ManaUnit.tags = Set.empty,
+      ManaUnit.retention = ManaRetention.Ordinary,
+      ManaUnit.restriction = Nothing,
+      ManaUnit.rider = Nothing,
+      ManaUnit.sourceChosenSubtype = Nothing
+    }
 
 -- CR 302.6: as if the object had been under alice's control since her turn began.
 settleObject :: ObjectId -> GameState.GameState -> GameState.GameState
