@@ -1008,7 +1008,7 @@ soldeviDiggerSpec s registry =
                 ([], [named "Benalish Hero", named "Bird Maiden"])
         -- CR 404.3's arrangement is what this reference READS: the owner puts
         -- simultaneous arrivals in an order of their own, and pawl records one on
-        -- the surveil path (Pawl.Engine.Resolve.Effect.surveilOne). alice
+        -- the surveil path (Pawl.Engine.Resolve.Effect.applySurveil). alice
         -- surveils two cards into an empty graveyard, and the ability then takes
         -- the one the ANSWER named last -- the card that went in last is on top
         -- (CR 404.1). The pair differs in exactly one thing, the order the answer

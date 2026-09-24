@@ -5358,27 +5358,42 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- An illegal slot (CR 608.2b) or a reference naming nobody scries nothing.
         named = playerRefPlayers legal controller gs ref
         -- CR 701.22c: players scrying at once decide in APNAP order -- apnapOrder
-        -- supplies the ORDER, `named` the MEMBERSHIP. Each scryer's cards move
-        -- before the next is asked, rather than all together (#1340).
+        -- supplies the ORDER, `named` the MEMBERSHIP.
         scryers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    Monad.forM_ scryers $ \pid ->
-      case evaluateForRecipient viewOf context gs resolving source pid quantity of
-        -- CR 701.22b: scry 0 is not a scry, so zero raises no prompt.
-        Just n | n > 0 -> scryOne n pid
-        _ -> pure ()
+    -- CR 701.22c's two phases: every scryer decides, and only then do the cards
+    -- move, so no decider is asked over a board an earlier one already changed.
+    -- Pawl.LibraryOrderSpec's "CR 701.22c Eager Construct" case proves it.
+    decided <-
+      fmap Maybe.catMaybes . Monad.forM scryers $ \pid ->
+        case evaluateForRecipient viewOf context gs resolving source pid quantity of
+          -- CR 701.22b: scry 0 is not a scry, so zero raises no prompt.
+          Just n | n > 0 -> fmap Just (decideScry n pid)
+          _ -> pure Nothing
+    Monad.mapM_ (\(pid, order) -> Monad.forM_ order (State.modify' . reorderLibrary pid)) decided
+    -- CR 701.22d: recorded once the process is complete, and for a scry whose
+    -- move was impossible too.
+    Monad.mapM_ (\(pid, _) -> State.modify' (Event.recordEvent (GameEvent.Scried pid))) decided
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-        -- Scry's arm in every respect, APNAP included (CR 101.4, rule 701.25
-        -- stating no order of its own).
+        -- Scry's arm in every respect, APNAP and both phases included (CR
+        -- 101.4, rule 701.25 stating no order of its own).
         named = playerRefPlayers legal controller gs ref
         surveillers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    Monad.forM_ surveillers $ \pid ->
-      case evaluateForRecipient viewOf context gs resolving source pid quantity of
-        -- CR 701.25c: surveil 0 is not a surveil at all.
-        Just n | n > 0 -> surveilOne n pid
-        _ -> pure ()
+    -- The split is a regression fence rather than a proven behaviour: no card
+    -- in data/cards/ names two surveillers, and MTGJSON's 2026-08-23 dump has no
+    -- printing whose text puts "each player", "each opponent" or "target
+    -- players" before "surveil".
+    decided <-
+      fmap Maybe.catMaybes . Monad.forM surveillers $ \pid ->
+        case evaluateForRecipient viewOf context gs resolving source pid quantity of
+          -- CR 701.25c: surveil 0 is not a surveil at all.
+          Just n | n > 0 -> fmap Just (decideSurveil n pid)
+          _ -> pure Nothing
+    Monad.mapM_ applySurveil decided
+    -- CR 701.25d, scry's placement and for its rule.
+    Monad.mapM_ (\(pid, _) -> State.modify' (Event.recordEvent (GameEvent.Surveiled pid))) decided
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -5387,6 +5402,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- library is looked at is fatesealOne's separate choice.
         named = playerRefPlayers legal controller gs ref
         fatesealers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+    -- One fatesealer at a time, unlike Scry's two phases: MTGJSON's 2026-08-23
+    -- dump has no printing whose text puts "each player", "each opponent" or
+    -- "target players" before "fateseal", so no card makes two players
+    -- fateseal at once.
     Monad.forM_ fatesealers $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         -- Zero reaches no library, so there is nothing to look at and nobody to
@@ -9531,7 +9550,7 @@ reorderLibrary pid order gs =
 -- an order they state, at the positions those cards already occupy.
 --
 -- The library is REWRITTEN rather than funnelled through Event.changeZone, for
--- scryOne's reason one rule over: nothing crosses a zone boundary, so CR 400.7
+-- decideScry's reason one rule over: nothing crosses a zone boundary, so CR 400.7
 -- mints no new incarnation and the ids the prompt named are the ids that move.
 --
 -- ASKED AT TWO OR MORE, which is rule 401.4's own count: one card has one
@@ -9564,14 +9583,17 @@ refill whole moving ordered =
         _ -> (remaining, oid)
    in snd (List.mapAccumL step ordered whole)
 
--- CR 701.22a: one player's scry. A short library is looked at as far as it goes;
--- rule 701.22 states no penalty for scrying more than there is.
+-- CR 701.22a: one player's scry DECISION, answered with the library order it
+-- makes -- Nothing where there was nothing to decide. A short library is looked
+-- at as far as it goes; rule 701.22 states no penalty for scrying more than
+-- there is. The move and the CR 701.22d event are the Scry arm's, after every
+-- scryer has decided (CR 701.22c).
 --
 -- The library is REWRITTEN rather than funnelled through Event.changeZone:
 -- nothing crosses a zone boundary, so CR 400.7 mints no new incarnation and the
 -- ids the prompt named still move. Looking mints nothing either (CR 701.20b).
-scryOne :: Integer -> PlayerId -> Game ()
-scryOne n pid = do
+decideScry :: Integer -> PlayerId -> Game (PlayerId, Maybe [ObjectId])
+decideScry n pid = do
   gs <- State.get
   let whole = Game.zoneMembers Zone.Library pid gs
       looked = List.genericTake n whole
@@ -9583,14 +9605,12 @@ scryOne n pid = do
         [] -> False
         [_] -> not (null beneath)
         _ -> True
-  Monad.when decided $ do
-    answer <- Game.choose (Prompt.ChooseScry (Decide.deciderFor pid gs) pid looked)
-    let (toBottom, onTop) = splitLooked looked answer
-    State.modify' (reorderLibrary pid (onTop <> beneath <> toBottom))
-  -- CR 701.22d: recorded AFTER rule 701.22a's process and OUTSIDE the guard
-  -- above, that rule firing "even if some or all of those actions were
-  -- impossible".
-  State.modify' (Event.recordEvent (GameEvent.Scried pid))
+  if decided
+    then do
+      answer <- Game.choose (Prompt.ChooseScry (Decide.deciderFor pid gs) pid looked)
+      let (toBottom, onTop) = splitLooked looked answer
+      pure (pid, Just (onTop <> beneath <> toBottom))
+    else pure (pid, Nothing)
 
 -- Repair a look-and-split answer into the two groups the effect then moves: the
 -- cards going AWAY from the top, and the cards staying on top in reading order.
@@ -9607,33 +9627,38 @@ splitLooked looked (away, kept) =
       unnamed = filter (\c -> List.notElem c leaving && List.notElem c onTop) looked
    in (leaving, onTop <> unnamed)
 
--- CR 701.25a: one player's surveil -- scryOne's shape over a different
--- destination.
+-- CR 701.25a: one player's surveil DECISION -- decideScry's shape over a
+-- different destination, answered with the library order that stays and the
+-- cards bound for the graveyard. Nothing for an empty library, which is still a
+-- surveil (CR 701.25d) with nothing to ask.
 --
--- Half of it IS a zone change: the graveyard cards go through Event.changeZone in
--- the order the answer named them, so the first named ends up deepest (CR 404.1),
--- an order that is the player's rather than the engine's (CR 404.3).
---
--- The ELISION is scryOne's minus its one-card case: the graveyard and the top of
--- the library are still two different places.
-surveilOne :: Integer -> PlayerId -> Game ()
-surveilOne n pid = do
+-- The ELISION is decideScry's minus its one-card case: the graveyard and the top
+-- of the library are still two different places.
+decideSurveil :: Integer -> PlayerId -> Game (PlayerId, Maybe ([ObjectId], [ObjectId]))
+decideSurveil n pid = do
   gs <- State.get
   let whole = Game.zoneMembers Zone.Library pid gs
       looked = List.genericTake n whole
       beneath = List.genericDrop n whole
-  Monad.unless (null looked) $ do
-    answer <- Game.choose (Prompt.ChooseSurveil (Decide.deciderFor pid gs) pid looked)
-    let (toGraveyard, onTop) = splitLooked looked answer
-    -- Order-independent: Game.removeFromZones takes each mover out of the library
-    -- by identity rather than by position.
-    State.modify' (reorderLibrary pid (onTop <> beneath))
-    Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard
-  -- CR 701.25d, scryOne's placement and for its rule: outside the guard, so a
-  -- surveil of an empty library is still a surveil.
-  State.modify' (Event.recordEvent (GameEvent.Surveiled pid))
+  if null looked
+    then pure (pid, Nothing)
+    else do
+      answer <- Game.choose (Prompt.ChooseSurveil (Decide.deciderFor pid gs) pid looked)
+      let (toGraveyard, onTop) = splitLooked looked answer
+      pure (pid, Just (onTop <> beneath, toGraveyard))
 
--- CR 701.29a: one player's fateseal -- scryOne's question over an opponent's
+-- One decided surveil's move. Half of it IS a zone change: the graveyard cards
+-- go through Event.changeZone in the order the answer named them, so the first
+-- named ends up deepest (CR 404.1), an order that is the player's rather than
+-- the engine's (CR 404.3).
+applySurveil :: (PlayerId, Maybe ([ObjectId], [ObjectId])) -> Game ()
+applySurveil (pid, decision) = Monad.forM_ decision $ \(kept, toGraveyard) -> do
+  -- Order-independent: Game.removeFromZones takes each mover out of the library
+  -- by identity rather than by position.
+  State.modify' (reorderLibrary pid kept)
+  Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard
+
+-- CR 701.29a: one player's fateseal -- decideScry's question over an opponent's
 -- library.
 --
 -- TWO choices, both the fatesealer's and in this order: which opponent, then how
@@ -9737,7 +9762,7 @@ clash source controller = do
             asked <- State.get
             -- The engine never makes the player's choice, but does not ask a
             -- question with one answer either: a revealed card that is the whole
-            -- library is already at both ends, scryOne's elision one card over.
+            -- library is already at both ends, decideScry's elision one card over.
             --
             -- Not implemented: the later decider is not told what the earlier one
             -- chose, which CR 101.4b entitles them to; this prompt carries rule
