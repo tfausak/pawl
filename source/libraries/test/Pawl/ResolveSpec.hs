@@ -1099,7 +1099,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library still holds all three Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
     Spec.assertEqWith s "the control: the mandatory first clause still happened, so bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
-  -- CR 608.2d's own worked example, one opcode over: Excavating Anurid -- "When
+  -- CR 608.2d, one opcode over: Excavating Anurid -- "When
   -- this creature enters, you may sacrifice a land. If you do, draw a card." --
   -- entering under a controller who controls no land. Two boards differing in
   -- exactly that, and an answerer that takes every "may" it is offered, so the
@@ -1152,6 +1152,53 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "CR 701.17a both cards were milled" (namesIn Zone.Graveyard S.alice after) [nameOf "Goblin Piker", nameOf "Goblin Piker"]
     Spec.assertEqWith s "and the third is still in her library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
     Spec.assertEqWith s "CR 603.5's \"may\" was asked once" (optionalsAnswered asked) [OptionalDecision.Exercises]
+  -- CR 608.2d with a COUNT: Thrilling Discovery -- "You gain 2 life. Then you
+  -- may discard two cards. If you do, draw three cards." -- cast by alice holding
+  -- ONE other card. Discarding two is an option she cannot carry out, so it is
+  -- not an option at all (The Mimeoplasm's 2011-09-22 ruling, "You can't choose
+  -- to exile just one creature card"), where CR 609.3's "as much as possible"
+  -- would have traded her one card for three.
+  --
+  -- The hand comes first because it is the rider the rule is about.
+  Spec.it s "CR 608.2d Thrilling Discovery's discard of two is not offered over a one-card hand" $ do
+    (gs, spellId, _) <- discoveryBoard s registry 1
+    let ((_, after), asked) = Replay.record (discoveryAnswer []) gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2d nothing was discarded and so nothing was drawn: alice holds her one card" (namesIn Zone.Hand S.alice after) [Just (CardName.MkCardName (Text.pack "Bird Maiden"))]
+    Spec.assertEqWith s "and her library still holds all four Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 4
+    Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
+    Spec.assertEqWith s "the control: the mandatory first clause still happened" (S.lifeOf S.alice after) (Just 22)
+  -- The control, the same board with three cards in hand: two can go, so the
+  -- option is a real one, the pinned pair is discarded and the rider draws.
+  Spec.it s "CR 608.2d Thrilling Discovery's discard of two is offered over a three-card hand" $ do
+    (gs, spellId, held) <- discoveryBoard s registry 3
+    let pinned = take 2 held
+        ((_, after), asked) = Replay.record (discoveryAnswer pinned) gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2c the rider ran: alice holds the card she kept and three Pikers" (length (Game.zoneMembers Zone.Hand S.alice after)) 4
+    Spec.assertEqWith s "and her library is three cards shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+    Spec.assertEqWith s "CR 701.9a the pinned pair and the spell are in her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
+    Spec.assertEqWith s "CR 603.5's \"may\" was asked once" (optionalsAnswered asked) [OptionalDecision.Exercises]
+  -- The same judgement for a sacrifice, in CR 608.2d's other offer, the
+  -- either-or: Giant Opportunity -- "You may sacrifice two Foods. If you do,
+  -- create a 7/7 green Giant creature token. Otherwise, create three Food
+  -- tokens." -- cast by alice controlling ONE Food. Sacrificing two is not a
+  -- branch she can take, so the other is forced with no prompt; offering it would
+  -- have traded one Golden Egg for a 7/7.
+  Spec.it s "CR 608.2d Giant Opportunity's sacrifice of two Foods is not offered with one Food" $ do
+    (gs, spellId, _) <- opportunityBoard s registry 1
+    let ((_, after), asked) = Replay.record (opportunityAnswer []) gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2d no Giant was made" (S.countOnBattlefieldByName giantToken S.alice after) 0
+    Spec.assertEqWith s "the Otherwise branch ran: three Food tokens" (S.countOnBattlefieldByName foodToken S.alice after) 3
+    Spec.assertEqWith s "and the Golden Egg still stands" (S.countOnBattlefieldByName goldenEgg S.alice after) 1
+    Spec.assertEqWith s "CR 608.2d the forced branch raised no announcement" (clausesAnswered asked) []
+  -- The control, three Foods: both branches are real, the sacrifice is
+  -- announced, the pinned pair goes and the Giant arrives in place of the Foods.
+  Spec.it s "CR 608.2d Giant Opportunity's sacrifice of two Foods is offered with three Foods" $ do
+    (gs, spellId, eggs) <- opportunityBoard s registry 3
+    let ((_, after), asked) = Replay.record (opportunityAnswer (take 2 eggs)) gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2c the rider ran: one Giant" (S.countOnBattlefieldByName giantToken S.alice after) 1
+    Spec.assertEqWith s "and the Otherwise branch did not: no Food token" (S.countOnBattlefieldByName foodToken S.alice after) 0
+    Spec.assertEqWith s "CR 701.21a two of the three Golden Eggs went" (S.countOnBattlefieldByName goldenEgg S.alice after) 1
+    Spec.assertEqWith s "CR 608.2d the branch was announced once" (clausesAnswered asked) [ClauseIndex.MkClauseIndex 0]
   -- CR 608.2f / 603.12: does Effect.ForEach's own body run through the SAME
   -- happened-fold a clause's instructions do, or does every body instruction
   -- run unconditionally regardless of whether the one before it did anything?
@@ -3448,6 +3495,65 @@ spiderAnswer :: Prompt.Prompt r -> r
 spiderAnswer p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
+
+-- The board the two Thrilling Discovery cases share, differing in exactly one
+-- thing: how many cards besides the spell alice holds. A Mountain and a Plains
+-- pay the {R}{W}, and four Goblin Pikers in her library make the draw visible
+-- and keep CR 104.3c from deciding the game first. Three cards for a discard of
+-- two, so Prompt.ChooseDiscard is a real choice rather than eliding itself.
+discoveryBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId])
+discoveryBoard s registry held = do
+  mountain <- S.printingOf s registry "Mountain"
+  plains <- S.printingOf s registry "Plains"
+  discovery <- S.printingOf s registry "Thrilling Discovery"
+  piker <- S.printingOf s registry "Goblin Piker"
+  others <- traverse (S.printingOf s registry) (take held ["Bird Maiden", "Chaos Charm", "Lightning Bolt"])
+  let (base, spellId) = S.handOne discovery (S.landsFor plains S.alice 1 (S.landsInPlay mountain 1))
+      (ids, withHand) = List.foldl' (\(acc, gs) printing -> let (oid, gs') = S.addHandCard printing S.alice gs in (acc <> [oid], gs')) ([], base) others
+      stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) withHand [1 :: Int .. 4]
+  pure (stocked, spellId, ids)
+
+-- CR 603.5's "may" always taken, so an offer the engine should have withheld
+-- shows up as a discard and a draw, and CR 701.9b's pick pinned by id.
+discoveryAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+discoveryAnswer pinned p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n (filter (`elem` pinned) ids <> filter (`notElem` pinned) ids)
+  _ -> S.identityAnswer p
+
+-- The board the two Giant Opportunity cases share, differing in exactly one
+-- thing: how many Golden Eggs (Food artifacts) alice controls. Three Forests pay
+-- the {2}{G}.
+opportunityBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId])
+opportunityBoard s registry eggs = do
+  forest <- S.printingOf s registry "Forest"
+  opportunity <- S.printingOf s registry "Giant Opportunity"
+  egg <- S.printingOf s registry "Golden Egg"
+  let (base, spellId) = S.handOne opportunity (S.landsInPlay forest 3)
+      (ids, placed) = List.foldl' (\(acc, gs) _ -> let (oid, gs') = S.addPermanent egg S.alice gs in (acc <> [oid], gs')) ([], base) [1 .. eggs]
+  pure (placed, spellId, ids)
+
+-- CR 608.2d's announcement always takes the sacrifice when it is offered, so a
+-- branch the engine should have withheld shows up as a Giant, and CR 701.21a's
+-- pick is pinned by id.
+opportunityAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+opportunityAnswer pinned p = case p of
+  Prompt.ChooseClause _ _ _ _ live -> if elem (ClauseIndex.MkClauseIndex 0) live then ClauseIndex.MkClauseIndex 0 else NonEmpty.head live
+  Prompt.ChooseSacrifices _ _ _ offered n -> Set.fromList (List.genericTake n (filter (`elem` pinned) offered <> filter (`notElem` pinned) offered))
+  _ -> S.identityAnswer p
+
+-- The CR 608.2d announcements a transcript holds.
+clausesAnswered :: [Response.Response] -> [ClauseIndex.ClauseIndex]
+clausesAnswered = Maybe.mapMaybe (\r -> case r of Response.ChoseClause c -> Just c; _ -> Nothing)
+
+giantToken :: CardName.CardName
+giantToken = CardName.MkCardName (Text.pack "Giant Token")
+
+foodToken :: CardName.CardName
+foodToken = CardName.MkCardName (Text.pack "Food Token")
+
+goldenEgg :: CardName.CardName
+goldenEgg = CardName.MkCardName (Text.pack "Golden Egg")
 
 -- The entry trigger placed and resolved, KEEPING the transcript: the prompts a
 -- case asserts about are the ones actually raised.
