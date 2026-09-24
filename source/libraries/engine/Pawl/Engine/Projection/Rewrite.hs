@@ -15,19 +15,28 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationProhibition as ActivationProhibition
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
+import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
+import qualified Pawl.Types.BlockPermission as BlockPermission
+import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
+import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
@@ -42,6 +51,7 @@ import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
@@ -56,8 +66,10 @@ import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
+import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
@@ -80,6 +92,7 @@ import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
+import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
@@ -99,6 +112,7 @@ import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.LifeLoss as LifeLoss
+import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
@@ -128,6 +142,7 @@ import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
@@ -150,8 +165,10 @@ import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
+import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -177,6 +194,7 @@ import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapRestriction as UntapRestriction
 import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
@@ -1028,6 +1046,63 @@ rewriteStaticAbility pairs sa =
       StaticAbility.condition = fmap (rewriteCondition pairs) (StaticAbility.condition sa),
       StaticAbility.modifications = fmap (rewriteModification pairs) (StaticAbility.modifications sa)
     }
+
+-- A player static ability under CR 612.1: its clause and its effect, the two
+-- halves Pawl.Engine.PlayerEffect.printedRows rewrites.
+rewritePlayerStaticAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> PlayerStaticAbility.PlayerStaticAbility -> PlayerStaticAbility.PlayerStaticAbility
+rewritePlayerStaticAbility pairs ability =
+  ability
+    { PlayerStaticAbility.condition = fmap (rewriteCondition pairs) (PlayerStaticAbility.condition ability),
+      PlayerStaticAbility.effect = rewritePlayerEffect pairs (PlayerStaticAbility.effect ability)
+    }
+
+-- CR 613.11's thirteen families under CR 612.1, each at the positions its
+-- gatherer module rewrites (Pawl.Engine.CombatRestriction and its siblings), so
+-- the layer fold and the gatherers agree on where a word is. CR 508.1h's and CR
+-- 509.1d's costs stay as printed, as their gatherers leave them.
+rewriteRuleAbilities :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> RuleAbilities.RuleAbilities -> RuleAbilities.RuleAbilities
+rewriteRuleAbilities pairs abilities =
+  let affected = rewriteAffected pairs
+      condition :: Maybe Condition.Type.Condition -> Maybe Condition.Type.Condition
+      condition = fmap (rewriteCondition pairs)
+   in RuleAbilities.MkRuleAbilities
+        { RuleAbilities.activationProhibitions = fmap (\x -> x {ActivationProhibition.affected = affected (ActivationProhibition.affected x)}) (RuleAbilities.activationProhibitions abilities),
+          RuleAbilities.attachRestrictions = fmap (\x -> x {AttachRestriction.affected = affected (AttachRestriction.affected x), AttachRestriction.attachers = Filter.rewrite pairs (AttachRestriction.attachers x)}) (RuleAbilities.attachRestrictions abilities),
+          RuleAbilities.attackCosts = RuleAbilities.attackCosts abilities,
+          RuleAbilities.attackRequirements = fmap (\x -> x {AttackRequirement.subject = affected (AttackRequirement.subject x), AttackRequirement.while = condition (AttackRequirement.while x)}) (RuleAbilities.attackRequirements abilities),
+          RuleAbilities.blockCosts = RuleAbilities.blockCosts abilities,
+          RuleAbilities.blockPermissions = fmap (\x -> x {BlockPermission.affected = affected (BlockPermission.affected x), BlockPermission.additional = fmap (rewriteQuantity pairs) (BlockPermission.additional x), BlockPermission.while = condition (BlockPermission.while x)}) (RuleAbilities.blockPermissions abilities),
+          RuleAbilities.blockRequirements = fmap (\x -> x {BlockRequirement.subject = fmap affected (BlockRequirement.subject x), BlockRequirement.attacker = fmap affected (BlockRequirement.attacker x), BlockRequirement.while = condition (BlockRequirement.while x)}) (RuleAbilities.blockRequirements abilities),
+          RuleAbilities.combatRestrictions = fmap (rewriteCombatRestriction pairs) (RuleAbilities.combatRestrictions abilities),
+          RuleAbilities.counterRestrictions = fmap (\x -> x {CounterRestriction.affected = affected (CounterRestriction.affected x)}) (RuleAbilities.counterRestrictions abilities),
+          RuleAbilities.crewRestrictions = fmap (\x -> x {CrewRestriction.affected = affected (CrewRestriction.affected x)}) (RuleAbilities.crewRestrictions abilities),
+          RuleAbilities.entryRestrictions = fmap (\x -> x {EntryRestriction.affected = affected (EntryRestriction.affected x)}) (RuleAbilities.entryRestrictions abilities),
+          RuleAbilities.sacrificeRestrictions = fmap (\x -> x {SacrificeRestriction.affected = affected (SacrificeRestriction.affected x)}) (RuleAbilities.sacrificeRestrictions abilities),
+          RuleAbilities.untapRestrictions = fmap (\x -> x {UntapRestriction.affected = affected (UntapRestriction.affected x)}) (RuleAbilities.untapRestrictions abilities)
+        }
+
+-- One CR 508.1c / 509.1b restriction under CR 612.1: its subject, its gate and
+-- the blockers it describes, as Pawl.Engine.CombatRestriction rewrites them.
+-- Exhaustive, so a new arm has to say where its words are.
+rewriteCombatRestriction :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CombatRestriction.CombatRestriction -> CombatRestriction.CombatRestriction
+rewriteCombatRestriction pairs restriction =
+  let unlessOf :: Maybe Condition.Type.Condition -> Maybe Condition.Type.Condition
+      unlessOf = fmap (rewriteCondition pairs)
+      affectedUnless x = x {AffectedUnless.affected = rewriteAffected pairs (AffectedUnless.affected x), AffectedUnless.unless = unlessOf (AffectedUnless.unless x)}
+   in case restriction of
+        CombatRestriction.CantAttack x -> CombatRestriction.CantAttack (affectedUnless x)
+        CombatRestriction.CantBlock x -> CombatRestriction.CantBlock (affectedUnless x)
+        CombatRestriction.CantAttackAlone x -> CombatRestriction.CantAttackAlone (affectedUnless x)
+        CombatRestriction.CantBeBlockedBy x ->
+          CombatRestriction.CantBeBlockedBy
+            x
+              { CantBeBlockedBy.affected = rewriteAffected pairs (CantBeBlockedBy.affected x),
+                CantBeBlockedBy.blockers = Filter.rewrite pairs (CantBeBlockedBy.blockers x),
+                CantBeBlockedBy.unless = unlessOf (CantBeBlockedBy.unless x)
+              }
+        CombatRestriction.CantAttackPlayer x -> CombatRestriction.CantAttackPlayer x {CantAttackPlayer.affected = rewriteAffected pairs (CantAttackPlayer.affected x), CantAttackPlayer.unless = unlessOf (CantAttackPlayer.unless x)}
+        CombatRestriction.CantAttackMoreThan x -> CombatRestriction.CantAttackMoreThan x {AttackLimitUnless.unless = unlessOf (AttackLimitUnless.unless x)}
+        CombatRestriction.CantBlockMoreThan x -> CombatRestriction.CantBlockMoreThan x {LimitUnless.unless = unlessOf (LimitUnless.unless x)}
 
 -- CR 612.2a's name half, gated on both words being creature types -- CR 612.2
 -- prohibits every other family. EVERY occurrence, since CR 111.4's derived name

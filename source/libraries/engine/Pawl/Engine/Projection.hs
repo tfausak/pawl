@@ -21,7 +21,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
-import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePrintedReplacement, rewriteTriggeredAbility)
+import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
 import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
@@ -402,6 +402,16 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         -- counter kinds, where the values are Quantities and the combiner is
         -- Quantity.Plus rather than (+).
         --
+        -- The static, player and rule-ability lists, gathered off the copiable
+        -- values rather than read off the fold (exchangeTextBoxFrom), are
+        -- rewritten too, and nothing reads them here but CR 613.8a's
+        -- changesText: a word printed only in one of them is still a word this
+        -- effect changes. The gather rewrites its own copy with
+        -- textChangesAffecting. Pawl.ProjectionSpec's "CR 613.8b Kird Ape's
+        -- Hack and the exchange loop back to timestamp order" and its Armored
+        -- Galleon sibling prove the first and the last; the player list is a
+        -- regression fence, no card in data/cards/ pairing a player ability's
+        -- word with a second text box that prints it.
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           let pairs = [(from, to)]
               keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc)
@@ -412,6 +422,9 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
                     PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc),
                     PC.replacementEffects = fmap (rewritePrintedReplacement pairs) (PC.replacementEffects pc),
                     PC.characteristicPT = fmap (rewriteCharacteristicPT pairs) (PC.characteristicPT pc),
+                    PC.staticAbilities = fmap (rewriteStaticAbility pairs) (PC.staticAbilities pc),
+                    PC.playerAbilities = fmap (rewritePlayerStaticAbility pairs) (PC.playerAbilities pc),
+                    PC.ruleAbilities = rewriteRuleAbilities pairs (PC.ruleAbilities pc),
                     PC.subtypeWordChanges = PC.subtypeWordChanges pc <> [ChangeSubtypeWord.MkChangeSubtypeWord from to],
                     PC.textChangedKeywords = keywords
                   }
@@ -601,6 +614,11 @@ exchangePartner oid a = case a of
 -- from the ones layer 6 grants afterwards, and after this arm the ones layer 3
 -- left behind are exactly these.
 --
+-- PC.subtypeWordChanges moves for the same reason: the word changes CR 613.7
+-- applied to `from`'s text before this effect are part of the text that moves
+-- (CR 612.5), and the ones this object's own text took go with that text.
+-- textChangesAffecting reads the list back for the gather.
+--
 -- The four ability lists no layer writes move here too, though nothing reads
 -- them off the projection: each is gathered from the copiable characteristics
 -- of Pawl.Engine.Projection.View.textBoxHolderOf, which answers the same
@@ -609,6 +627,7 @@ exchangeTextBoxFrom :: ProjectedCharacteristics -> ProjectedCharacteristics -> P
 exchangeTextBoxFrom from pc =
   pc
     { PC.keywords = PC.keywords from,
+      PC.subtypeWordChanges = PC.subtypeWordChanges from,
       PC.activatedAbilities = PC.activatedAbilities from,
       PC.triggeredAbilities = PC.triggeredAbilities from,
       PC.replacementEffects = PC.replacementEffects from,
@@ -1497,19 +1516,74 @@ appliedSetEffects setEffs gs =
            in go (filter (\o -> fst o /= fst next) remaining) (if stripped then applied else snd next : applied)
    in go indexed []
 
--- Every subtype-word pair a ChangeSubtypeWord continuous effect imposes on `oid`
--- (CR 612). CR 612.2's family gate is applied where a pair meets a word, not here.
--- Stored resolution effects only, read against BASE characteristics, so nothing
--- recurses.
+-- CR 612.1: the subtype-word swaps the rules text `oid` carries has taken, as one
+-- lookup table -- every word paired with the word it ends up as. CR 612.2's
+-- family gate is applied where a pair meets a word, not here.
+--
+-- CR 612.5 / 613.7 / 613.8: under an exchange that text box is not the one
+-- `oid` was printed with, and the swaps it has taken are the ones layer 3
+-- applied to it wherever it was when each applied. So the answer is read off
+-- layer 3 itself (textLayerOf), where exchangeTextBoxFrom carries
+-- PC.subtypeWordChanges with the text and CR 613.8's dependency order is the
+-- fold's own. Pawl.ProjectionSpec's "CR 612.5 a Hack made before the exchange
+-- moves with Kird Ape's text" proves the carry.
+--
+-- Composed rather than listed because the swaps apply one after another (CR
+-- 613.7) and every reader looks a word up once: Forest -> Island then Island ->
+-- Swamp is Forest -> Swamp. Pawl.ProjectionSpec's "CR 613.7 two Hacks on Kird
+-- Ape compose" proves it.
+--
+-- Stored resolution effects only, so the gather may ask it: a board where no
+-- exchange touches `oid` and at most one swap does needs no fold at all.
 textChangesAffecting :: ObjectId -> GameState -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
 textChangesAffecting oid gs =
-  let pairOf eff = case ContinuousEffect.modification eff of
+  let stored = GameState.continuousEffects gs
+      pairOf eff = case ContinuousEffect.modification eff of
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           if affectsGiven (baseView gs) (ContinuousEffect.source eff) oid (ContinuousEffect.affected eff) (baseCharacteristics oid gs) gs
             then Just (from, to)
             else Nothing
         _ -> Nothing
-   in Maybe.mapMaybe pairOf (GameState.continuousEffects gs)
+      exchanges eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
+        (Modification.ExchangeTextBoxes, Affected.TheseObjects pair) -> Set.member oid pair
+        _ -> False
+      own = Maybe.mapMaybe pairOf stored
+      carried = fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges (textLayerOf oid gs))
+   in case own of
+        _ : _ : _ -> composeWordChanges carried
+        _
+          | any exchanges stored -> composeWordChanges carried
+          | otherwise -> own
+
+-- Layer 3 alone over `oid`, from the stored effects alone: textChangesAffecting's
+-- fold. Projection-free for the gather's sake -- no static ability writes at
+-- layer 3 but CR 612.7's names (Modification.AddNamesMatching), which reads no
+-- text and changes none, so leaving those out moves nothing the result reads.
+textLayerOf :: ObjectId -> GameState -> ProjectedCharacteristics
+textLayerOf oid gs =
+  let candidate eff =
+        let m = ContinuousEffect.modification eff
+         in if layer m == Layer.Text
+              then
+                Just
+                  MkGathered
+                    { gEffect = Nothing,
+                      gSource = ContinuousEffect.source eff,
+                      gAffected = ContinuousEffect.affected eff,
+                      gLayer = Layer.Text,
+                      gLowest = Layer.Text,
+                      gTimestamp = ContinuousEffect.timestamp eff,
+                      gModification = m
+                    }
+              else Nothing
+   in fst (projectDecidingFrom copiableCharacteristics (<= Layer.Text) (Maybe.mapMaybe candidate (GameState.continuousEffects gs)) oid gs)
+
+-- Swaps applied in order, as one table: each word any swap names, paired with
+-- the word the whole sequence leaves it as, and dropped where that is itself.
+composeWordChanges :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
+composeWordChanges pairs =
+  let image s = List.foldl' (\x (from, to) -> if x == from then to else x) s pairs
+   in Map.toList (Map.filterWithKey (/=) (Map.fromSet image (Set.fromList (fmap fst pairs))))
 
 -- Every continuous effect in the game: stored resolution effects, plus every
 -- battlefield permanent's static abilities (CR 613.7a, with the permanent's own
@@ -1953,7 +2027,8 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
       if null setEffs || liveGiven setEffs permId gs
         then
           -- CR 612: rewrite each static ability's subtype words by the text
-          -- changes affecting THIS source, before its effect is folded on.
+          -- changes the text box THIS source carries has taken, before its
+          -- effect is folded on.
           let changes = textChangesAffecting permId gs
               -- CR 613.1f's layer-6 removal and CR 305.7's layer-4 strip, asked
               -- of ONE ability at CR 613.6's decision point rather than of the
@@ -3852,7 +3927,13 @@ projectDecidingFrom seedOf admits cands =
                           -- PC.textChangedKeywords are CR 612.3's bookkeeping,
                           -- which a text change writes even when it rewrites
                           -- nothing, so including them would make every text
-                          -- change look like a change to every other.
+                          -- change look like a change to every other. The static,
+                          -- player and rule-ability lists are text too, and
+                          -- Pawl.ProjectionSpec's "CR 613.8b a Hack on the Piker
+                          -- waits for Kird Ape's text" and its Armored Galleon
+                          -- sibling, and Pawl.PlayerEffectSpec's Edgewalker one,
+                          -- are boards where only such a list moves. The special
+                          -- actions are left out: no text change rewrites one.
                           --
                           -- Screened on the aspects `b` WRITES before any board
                           -- is touched, so the P/T pairs -- which pass the
@@ -3868,7 +3949,10 @@ projectDecidingFrom seedOf admits cands =
                                     PC.triggeredAbilities p,
                                     PC.replacementEffects p,
                                     PC.characteristicPT p,
-                                    PC.enchant p
+                                    PC.enchant p,
+                                    PC.staticAbilities p,
+                                    PC.playerAbilities p,
+                                    PC.ruleAbilities p
                                   )
                              in not (Set.disjoint (uWrites b) (Set.fromList [Keywords, Subtypes]))
                                   && any

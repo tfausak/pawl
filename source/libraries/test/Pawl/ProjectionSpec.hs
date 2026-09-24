@@ -54,6 +54,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
@@ -4352,6 +4353,33 @@ hackedExchangeBoard hackTarget island wraith piker hack exchange =
       after = S.runPure (exchangeAnswer wraithId pikerId) staged Stack.resolveTop
    in (wraithId, pikerId, hacked, after)
 
+-- hackedExchangeBoard with the worded creature and the Hack's swap named: alice's
+-- `worded` creature and her Goblin Piker on `base`, a Magical Hack making `swap`
+-- resolved on the one `hackTarget` picks out of (worded, Piker), then Exchange of
+-- Words entering with its trigger pending. Returns the worded creature, the
+-- Piker, the hacked board before the exchange and the board after.
+wordExchangeBoard ::
+  ((ObjectId.ObjectId, ObjectId.ObjectId) -> ObjectId.ObjectId) ->
+  (Subtype.Type.Subtype, Subtype.Type.Subtype) ->
+  GameState.GameState ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+wordExchangeBoard hackTarget swap base worded piker hack exchange =
+  let (wordedId, b0) = S.addPermanent worded S.alice base
+      (pikerId, b1) = S.addPermanent piker S.alice b0
+      (b2, hackId) = S.handOne hack b1
+      hackedId = hackTarget (wordedId, pikerId)
+      -- Inlined rather than bound, for exchangeOfWordsBoard's reason.
+      cast = S.runPure (hackSwapping hackedId swap) b2 (S.cast S.alice hackId)
+      hacked = S.runPure (hackSwapping hackedId swap) cast Stack.resolveTop
+      (_, entered) = S.entersWithTrigger exchange S.alice hacked
+      staged = S.runPure (exchangeAnswer wordedId pikerId) entered Engine.settleForPriority
+      after = S.runPure (exchangeAnswer wordedId pikerId) staged Stack.resolveTop
+   in (wordedId, pikerId, hacked, after)
+
 -- alice's Bog Wraith with TWO Magical Hacks resolving on it in a stated order:
 -- the earlier Island -> Forest, which finds nothing in the printed swampwalk,
 -- then the later Swamp -> Island. Returns the Wraith, the board after the
@@ -4736,6 +4764,46 @@ exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
     Spec.assertEqWith s "the Hack resolved onto the Wraith" (Projection.textChangesAffecting wraithId hacked) [(Subtype.Type.Swamp, Subtype.Type.Island)]
     Spec.assertBool s (Projection.hasKeyword islandwalk wraithId hacked) "and the Wraith walked Islands before the exchange"
 
+  -- The same board with the word in a STATIC ability, which the gather reads
+  -- off the copiable text rather than off the layer fold. Kird Ape ({R}
+  -- Creature -- Ape 1/1, "This creature gets +1/+2 as long as you control a
+  -- Forest.", checked against Scryfall 2026-09-24) is hacked Forest -> Island,
+  -- then exchanged with the Piker, with alice controlling an Island and no
+  -- Forest. The Piker's pump must ask for the Island.
+  Spec.it s "CR 612.5 a Hack made before the exchange moves with Kird Ape's text" $ do
+    island <- S.printingOf s registry "Island"
+    ape <- S.printingOf s registry "Kird Ape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hack <- S.printingOf s registry "Magical Hack"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (apeId, pikerId, hacked, after) = wordExchangeBoard fst (Subtype.Type.Forest, Subtype.Type.Island) (S.landsInPlay island 1) ape piker hack exchange
+    Spec.assertEqWith s "CR 612.5 the Piker asks for the HACKED Island, which alice controls" (S.powerToughnessOf pikerId after) (Just (3, 3))
+    Spec.assertEqWith s "while Kird Ape, holding the Piker's empty text, is its printed 1/1" (S.powerToughnessOf apeId after) (Just (1, 1))
+    -- The anti-vacuity check, after the behaviour: the hacked Ape really was
+    -- pumped by alice's Island on the board the exchange was added to.
+    Spec.assertEqWith s "before the exchange the hacked Ape is a 2/3" (S.powerToughnessOf apeId hacked) (Just (2, 3))
+
+  -- The same carry for a CR 613.11 rule ability. Glacial Crasher ({4}{U}{U}
+  -- Creature -- Elemental 5/5, "Trample / This creature can't attack unless
+  -- there is a Mountain on the battlefield.", same check) is hacked Mountain ->
+  -- Island, then exchanged with the Piker, with alice's Island the only land.
+  -- The Forest board is the pair that shows the restriction really moved.
+  Spec.it s "CR 612.5 a Hack made before the exchange moves with Glacial Crasher's restriction" $ do
+    island <- S.printingOf s registry "Island"
+    crasher <- S.printingOf s registry "Glacial Crasher"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hack <- S.printingOf s registry "Magical Hack"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let base = S.landsInPlay island 1
+        (crasherId, pikerId, hacked, toIsland) = wordExchangeBoard fst (Subtype.Type.Mountain, Subtype.Type.Island) base crasher piker hack exchange
+        (forestCrasherId, forestPikerId, _, toForest) = wordExchangeBoard fst (Subtype.Type.Mountain, Subtype.Type.Forest) base crasher piker hack exchange
+    Spec.assertBool s (Combat.canAttack S.alice pikerId toIsland) "CR 612.5 the Piker's restriction asks for the HACKED Island, and alice's frees it"
+    Spec.assertBool s (not (Combat.canAttack S.alice forestPikerId toForest)) "while the restriction hacked to Forest keeps it home"
+    -- The anti-vacuity checks, after the behaviour: the Hack really freed the
+    -- Crasher before the exchange, and the Crasher gave its restriction away.
+    Spec.assertBool s (Combat.canAttack S.alice crasherId hacked) "before the exchange the hacked Crasher may attack"
+    Spec.assertBool s (Combat.canAttack S.alice forestCrasherId toForest) "and after it the Crasher holds no restriction"
+
 -- CR 613.8 inside layer 3: a text-changing effect whose word only appears once
 -- ANOTHER layer-3 effect has applied depends on that effect and waits for it,
 -- which overrides CR 613.7's timestamp order. Both boards are one-way -- the
@@ -4798,6 +4866,122 @@ textChangeDependencySpec s registry = Spec.describe s "TextChangeDependency" $ d
     -- the Piker, and the Piker really had nothing for it to change.
     Spec.assertEqWith s "the Hack resolved onto the Piker" (Projection.textChangesAffecting pikerId hacked) [(Subtype.Type.Swamp, Subtype.Type.Island)]
     Spec.assertBool s (not (Projection.hasKeyword swampwalk pikerId hacked)) "which had no word for it to change before the exchange"
+
+  -- The same one-way dependency with the word in a STATIC ability: Kird Ape
+  -- ({R} Creature -- Ape 1/1, "This creature gets +1/+2 as long as you control
+  -- a Forest.", checked against Scryfall 2026-09-24) and no keyword at all, so
+  -- only the static ability tells CR 613.8a that the exchange changes what the
+  -- Hack does. Forest -> Island on the Piker, then the exchange, with alice
+  -- controlling an Island and no Forest: the Piker's pump asks for the Island.
+  Spec.it s "CR 613.8b a Hack on the Piker waits for Kird Ape's text" $ do
+    island <- S.printingOf s registry "Island"
+    ape <- S.printingOf s registry "Kird Ape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hack <- S.printingOf s registry "Magical Hack"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (apeId, pikerId, hacked, after) = wordExchangeBoard snd (Subtype.Type.Forest, Subtype.Type.Island) (S.landsInPlay island 1) ape piker hack exchange
+    Spec.assertEqWith s "CR 613.8b the exchange applies first, so the Piker's pump asks for alice's Island" (S.powerToughnessOf pikerId after) (Just (3, 3))
+    Spec.assertEqWith s "while Kird Ape, holding the Piker's empty text, is its printed 1/1" (S.powerToughnessOf apeId after) (Just (1, 1))
+    -- The anti-vacuity checks, after the behaviour: the Hack really resolved on
+    -- the Piker, and Kird Ape's printed pump found no Forest.
+    Spec.assertEqWith s "the Hack resolved onto the Piker" (Projection.textChangesAffecting pikerId hacked) [(Subtype.Type.Forest, Subtype.Type.Island)]
+    Spec.assertEqWith s "and before the exchange Kird Ape is unpumped" (S.powerToughnessOf apeId hacked) (Just (1, 1))
+
+  -- A dependency LOOP, where both text boxes print the word. Kird Ape (same
+  -- check) is hacked Forest -> Island, then exchanged with Stalker Hag
+  -- ({B/G}{B/G}{B/G} Creature -- Hag 3/2, "Swampwalk, forestwalk", same
+  -- check). The exchange depends on the Hack, which changed the pump that
+  -- moves; the Hack depends on the exchange, which puts the Hag's forestwalk
+  -- where the Hack applies. CR 613.8b hands the loop to timestamp order, so
+  -- the Hack runs first and Kird Ape keeps the forestwalk it receives.
+  Spec.it s "CR 613.8b Kird Ape's Hack and the exchange loop back to timestamp order" $ do
+    island <- S.printingOf s registry "Island"
+    ape <- S.printingOf s registry "Kird Ape"
+    hag <- S.printingOf s registry "Stalker Hag"
+    hack <- S.printingOf s registry "Magical Hack"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (apeId, hagId, hacked, after) = wordExchangeBoard fst (Subtype.Type.Forest, Subtype.Type.Island) (S.landsInPlay island 1) ape hag hack exchange
+        forestwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Forest)
+        islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)
+    Spec.assertBool s (Projection.hasKeyword forestwalk apeId after) "CR 613.8b the Hack ran first, so Kird Ape keeps the Hag's forestwalk"
+    Spec.assertBool s (not (Projection.hasKeyword islandwalk apeId after)) "and not the islandwalk the Hack would leave if it ran second"
+    Spec.assertEqWith s "CR 612.5 while the Hag's pump asks for alice's Island" (S.powerToughnessOf hagId after) (Just (4, 4))
+    -- The anti-vacuity check, after the behaviour: the Hack really pumped the
+    -- Ape off alice's Island before the exchange.
+    Spec.assertEqWith s "before the exchange the hacked Ape is a 2/3" (S.powerToughnessOf apeId hacked) (Just (2, 3))
+
+  -- The same loop with the word in a CR 613.11 rule ability. Armored Galleon
+  -- ({4}{U} Creature -- Human Pirate 5/4, "This creature can't attack unless
+  -- defending player controls an Island.", same check) is hacked Island ->
+  -- Swamp, then exchanged with Merfolk Spy ({U} Creature -- Merfolk Rogue 1/1,
+  -- "Islandwalk / Whenever this creature deals combat damage to a player, that
+  -- player reveals a card at random from their hand.", same check).
+  Spec.it s "CR 613.8b Armored Galleon's Hack and the exchange loop back to timestamp order" $ do
+    island <- S.printingOf s registry "Island"
+    galleon <- S.printingOf s registry "Armored Galleon"
+    spy <- S.printingOf s registry "Merfolk Spy"
+    hack <- S.printingOf s registry "Magical Hack"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (galleonId, _, hacked, after) = wordExchangeBoard fst (Subtype.Type.Island, Subtype.Type.Swamp) (S.landsInPlay island 1) galleon spy hack exchange
+        islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)
+        swampwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)
+    Spec.assertBool s (Projection.hasKeyword islandwalk galleonId after) "CR 613.8b the Hack ran first, so the Galleon keeps the Spy's islandwalk"
+    Spec.assertBool s (not (Projection.hasKeyword swampwalk galleonId after)) "and not the swampwalk the Hack would leave if it ran second"
+    -- The anti-vacuity check, after the behaviour: the Hack really resolved
+    -- on the Galleon.
+    Spec.assertEqWith s "the Hack resolved onto the Galleon" (Projection.textChangesAffecting galleonId hacked) [(Subtype.Type.Island, Subtype.Type.Swamp)]
+
+  -- The one-way dependency again, with the word only in the Galleon's rule
+  -- ability: Island -> Swamp on the Piker, then the exchange, so the Piker's
+  -- restriction asks for a Swamp. The Island board is the pair.
+  Spec.it s "CR 613.8b a Hack on the Piker waits for Armored Galleon's restriction" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    galleon <- S.printingOf s registry "Armored Galleon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hack <- S.printingOf s registry "Magical Hack"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let base = S.landsInPlay island 1
+        swap = (Subtype.Type.Island, Subtype.Type.Swamp)
+        -- CR 506.2's defending player, stated as S.combatBoardOf states it: the
+        -- gate names one, and a direct call runs no turn-based action to fill
+        -- it in.
+        defended g = g {GameState.combat = (GameState.combat g) {Combat.Type.defenders = [S.bob]}}
+        (galleonId, pikerId, _, bobSwamp) = wordExchangeBoard snd swap (defended (S.landsFor swamp S.bob 1 base)) galleon piker hack exchange
+        (_, islandPikerId, _, bobIsland) = wordExchangeBoard snd swap (defended (S.landsFor island S.bob 1 base)) galleon piker hack exchange
+    Spec.assertBool s (Combat.canAttack S.alice pikerId bobSwamp) "CR 613.8b the Piker's restriction asks for a Swamp, which bob controls"
+    Spec.assertBool s (not (Combat.canAttack S.alice islandPikerId bobIsland)) "and bob's Island no longer frees it"
+    -- The anti-vacuity check, after the behaviour: the Galleon gave its
+    -- restriction away.
+    Spec.assertBool s (Combat.canAttack S.alice galleonId bobSwamp) "while the Galleon, with the Piker's empty text, may attack"
+
+  -- Two Magical Hacks on Kird Ape, Forest -> Island and then Island -> Swamp,
+  -- over two Islands and no Swamp. The later one depends on the earlier (it
+  -- finds its Island only after the earlier has run), so both orders agree
+  -- and the pump asks for a Swamp. The gather looks each word up once, so the
+  -- two swaps have to reach it composed.
+  Spec.it s "CR 613.7 two Hacks on Kird Ape compose" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    ape <- S.printingOf s registry "Kird Ape"
+    hack <- S.printingOf s registry "Magical Hack"
+    let (apeId, b0) = S.addPermanent ape S.alice (S.landsInPlay island 2)
+        (b1, firstId) = S.handOne hack b0
+        (b2, secondId) = S.handOne hack b1
+        toIsland = (Subtype.Type.Forest, Subtype.Type.Island)
+        toSwamp = (Subtype.Type.Island, Subtype.Type.Swamp)
+        -- Inlined rather than bound, for exchangeOfWordsBoard's reason; each
+        -- swap given verbatim to its own run, for twiceHackedBoard's.
+        castFirst = S.runPure (hackSwapping apeId toIsland) b2 (S.cast S.alice firstId)
+        first = S.runPure (hackSwapping apeId toIsland) castFirst Stack.resolveTop
+        castSecond = S.runPure (hackSwapping apeId toSwamp) first (S.cast S.alice secondId)
+        both = S.runPure (hackSwapping apeId toSwamp) castSecond Stack.resolveTop
+        (_, withSwamp) = S.addPermanent swamp S.alice both
+    Spec.assertEqWith s "CR 613.7 the Ape asks for a Swamp, and alice's Islands do not pump it" (S.powerToughnessOf apeId both) (Just (1, 1))
+    Spec.assertEqWith s "while a Swamp does" (S.powerToughnessOf apeId withSwamp) (Just (2, 3))
+    -- The anti-vacuity check, after the behaviour: the first Hack alone really
+    -- turned the pump onto alice's Islands.
+    Spec.assertEqWith s "after the first Hack alone the Ape is a 2/3" (S.powerToughnessOf apeId first) (Just (2, 3))
 
 -- The as-enters copy choice, pinned to one named permanent so a mutation cannot
 -- be repaired by an answerer that finds another legal source. Pawl.CopySpec's
