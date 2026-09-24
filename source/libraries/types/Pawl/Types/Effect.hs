@@ -1,5 +1,6 @@
 module Pawl.Types.Effect where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Amass as Amass
@@ -9,6 +10,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
@@ -719,6 +721,10 @@ data Effect card ability
     -- CR 601.3's permission comes from the offer itself, and an offer is never a
     -- cast.
     OfferCast OfferCast.OfferCast
+  | -- | CR 707.13: choose one of these card names not yet chosen for the source,
+    -- create a copy of that card outside the game, and offer its controller the
+    -- cast (Garth One-Eye).
+    OfferNamedCopy (NonEmpty.NonEmpty CardName.CardName)
   | -- | CR 601.3: grant the permission to play the objects the ObjectRef names,
     -- for a duration (Victor Mancha, Runaway) -- a standing permission where
     -- OfferCast is one cast now. The `spending` rider is CR 118.14's.

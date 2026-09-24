@@ -19,6 +19,7 @@ import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -258,6 +259,12 @@ data GameState = MkGameState
     -- | CR 108.1: the printings the Oracle card reference answered a chosen
     -- name with (Prompt.LookUpCard), part of the names CR 612.7 enumerates.
     lookedUp :: Set.Set PrintingId.PrintingId,
+    -- | CR 400.11 / 707.13: objects in `objects` that are outside the game, in no
+    -- zone's membership. Pawl.Engine.Game.zoneOf answers Nothing for them.
+    outsideCopies :: Set.Set ObjectId.ObjectId,
+    -- | CR 707.13: the card names each object's ability has chosen to copy by
+    -- name. Keyed by id, so CR 400.7's new object remembers none.
+    namedCopyChoices :: Map.Map ObjectId.ObjectId (Set.Set CardName.CardName),
     nextPrintingId :: PrintingId.PrintingId,
     -- | CR 613.7: the monotonic source of timestamps for objects and stored
     -- continuous effects. See Timestamp.

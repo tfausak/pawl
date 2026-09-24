@@ -875,6 +875,8 @@ rewriteEffect pairs effect = case effect of
                 CastOffer.restriction = fmap (Filter.rewrite pairs) (CastOffer.restriction (OfferCast.offer oc))
               }
         }
+  -- CR 612.2: card names are not among the words a text change rewrites.
+  Effect.OfferNamedCopy {} -> effect
   Effect.GrantPlayFromExile grant ->
     Effect.GrantPlayFromExile
       grant

@@ -449,8 +449,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.owner = fmap Object.owner (Game.lookupObject oid gs),
       -- CR 400.1 off the OBJECT beside its owner, and for `owner`'s reason: CR
       -- 109.3 counts no zone among the characteristics, so no projection carries
-      -- one. Nothing for an id naming nothing (CR 608.2h).
-      Filter.zone = fmap Object.zone (Game.lookupObject oid gs),
+      -- one. Nothing for an id naming nothing (CR 608.2h), and for an object
+      -- outside the game (CR 400.11, Game.zoneOf).
+      Filter.zone = Game.zoneOf oid gs,
       -- CR 601.2a off the OBJECT beside its zone, and for that field's reason
       -- squared: no projection carries a zone, and CR 400.7 leaves the spell no
       -- memory of the one it came from either, so Pawl.Engine.Cast's two stamps

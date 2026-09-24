@@ -800,66 +800,7 @@ mintCard :: PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> Libra
 mintCard pid under printingId dest position tapped gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj =
-        Object.MkObject
-          { Object.owner = pid,
-            Object.enteredUnder = under,
-            Object.source = Source.OfCard printingId,
-            Object.zone = dest,
-            Object.tapped = tapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Sick,
-            Object.controlClock = Map.empty,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColor = Nothing,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
-          }
+      obj = cardObject pid under printingId dest tapped ts
    in ( oid,
         Game.insertIntoZone
           dest
@@ -868,6 +809,87 @@ mintCard pid under printingId dest position tapped gs =
           oid
           gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
       )
+
+-- CR 707.13 / 400.11: a copy of this printing created outside the game, owned
+-- by the player told to create it (CR 112.2a). In `objects` and
+-- GameState.outsideCopies, in no zone's membership; Object.zone holds
+-- Zone.Graveyard as a placeholder that every reader on the offer and cast road
+-- bypasses through Game.zoneOf.
+mintOutside :: PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
+mintOutside pid printingId gs =
+  let (oid, gs1) = Game.freshObjectId gs
+      (ts, gs2) = Game.freshTimestamp gs1
+      obj = (cardObject pid Nothing printingId Zone.Graveyard TapState.Untapped ts) {Object.source = Source.OfCardCopy printingId}
+   in ( oid,
+        gs2
+          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
+            GameState.outsideCopies = Set.insert oid (GameState.outsideCopies gs2)
+          }
+      )
+
+-- The card object `mintCard` and `mintOutside` place, with every per-incarnation
+-- field at its no-memory value.
+cardObject :: PlayerId -> Maybe PlayerId -> PrintingId.PrintingId -> Zone -> TapState.TapState -> Timestamp.Timestamp -> Object.Object
+cardObject pid under printingId dest tapped ts =
+  Object.MkObject
+    { Object.owner = pid,
+      Object.enteredUnder = under,
+      Object.source = Source.OfCard printingId,
+      Object.zone = dest,
+      Object.tapped = tapped,
+      Object.facing = Facing.FaceUp,
+      Object.flipped = False,
+      Object.exiledFaceDown = False,
+      Object.exileLookers = Set.empty,
+      Object.damage = 0,
+      Object.sickness = Sickness.Sick,
+      Object.controlClock = Map.empty,
+      Object.bindings = Map.empty,
+      Object.counters = Map.empty,
+      Object.counterTimestamps = Map.empty,
+      Object.attachedTo = Nothing,
+      Object.chosenColor = Nothing,
+      Object.chosenSubtype = Nothing,
+      Object.chosenNames = Set.empty,
+      Object.chosenPlayer = Nothing,
+      Object.timestamp = ts,
+      Object.face = Nothing,
+      Object.turnedOverAt = Nothing,
+      Object.worldSince = Nothing,
+      Object.playableFromExile = Nothing,
+      Object.plotted = Nothing,
+      Object.foretold = Nothing,
+      Object.foretellCostReduction = Nothing,
+      Object.warped = Nothing,
+      Object.preparedCopyOf = Nothing,
+      Object.ringBearerFor = Nothing,
+      Object.duplicate = Nothing,
+      Object.paired = Nothing,
+      Object.protector = Nothing,
+      Object.ventureRoom = Nothing,
+      Object.classLevel = Nothing,
+      Object.unlockedHalves = Set.empty,
+      Object.designations = Set.empty,
+      Object.designationValues = Map.empty,
+      Object.paidCosts = Map.empty,
+      Object.tributePaid = False,
+      Object.bestowed = False,
+      Object.mutating = False,
+      Object.prototyped = False,
+      Object.boughtBack = False,
+      Object.spliced = Seq.empty,
+      Object.phyrexianLifePaid = 0,
+      Object.manaSpent = Mana.MkMana [],
+      Object.announcedX = Nothing,
+      Object.castFrom = Nothing,
+      Object.castUsing = Nothing,
+      Object.castGrant = Nothing,
+      Object.detainedUntil = Set.empty,
+      Object.goadedBy = Set.empty,
+      Object.doesNotUntapNext = False,
+      Object.exertedBy = Set.empty,
+      Object.activatedOnce = Set.empty
+    }
 
 -- Alchemy's conjure keyword action: create the given card out of nothing and put
 -- it into the conjuring player's zone.
@@ -1280,10 +1302,11 @@ arrivalOf destination = case destination of
 
 -- CR 400.11b: take one copy of this printing out of the player's pool and mint
 -- the card where the destination says. Split out from `bringInto` above because
--- it is the half every other road into the game will want -- CR 727.2's restart (#135) and CR
--- 707.13's copy created outside the game (#888) -- and none of those reveals
--- anything. The SPEND is the whole of what it adds over `mintCard`, which
--- Alchemy's conjure reaches with nothing to spend.
+-- it is the half every other road into the game will want -- CR 727.2's restart
+-- (#135) -- and that reveals nothing. CR 707.13's copy takes `mintOutside`
+-- instead, since it is minted from nothing rather than spent from a pool. The
+-- SPEND is the whole of what it adds over `mintCard`, which Alchemy's conjure
+-- reaches with nothing to spend.
 bringIn :: OutsideDestination.OutsideDestination -> PlayerId -> PrintingId.PrintingId -> GameState.GameState -> (ObjectId, GameState.GameState)
 bringIn destination pid printingId gs =
   let (zone, position) = arrivalOf destination
@@ -4956,8 +4979,48 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing Set.emp
 -- A CR 616.1 redirect that lands the move in any zone but the stack or the
 -- battlefield drops the stamp, exactly as it drops the face, because CR 109.4
 -- gives an object there no controller to record.
+--
+-- A CR 707.13 copy outside the game (GameState.outsideCopies) takes
+-- `castFromOutside` instead: it is in no zone, so nothing leaves one.
 changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Seq.Seq ObjectId)
-changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False CarryOver.NotCarried False
+changeZoneCasting caster oid requestedDest shown facing = do
+  gs <- State.get
+  if Set.member oid (GameState.outsideCopies gs)
+    then castFromOutside caster oid requestedDest shown facing
+    else changeZoneAttaching Nothing Set.empty oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False CarryOver.NotCarried False
+
+-- CR 601.2a from outside the game (CR 400.11): "moves that copy of a card from
+-- where it is to the stack". The CR 614 loop runs, since a replacement keyed on
+-- the destination (Synthetic Stack Interdiction) still applies; none in the pool
+-- reads the origin, which is the placeholder Object.zone here. Then the new
+-- incarnation is minted where the loop settled, with no ZoneChanged: nothing
+-- left a zone, and Event.bringIn's road into the game records none either.
+castFromOutside :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Seq.Seq ObjectId)
+castFromOutside caster oid requestedDest shown facing = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure Seq.empty
+    Just obj -> do
+      (resolved, _, _, _) <- resolveZoneChange Nothing (ZoneChange.MkZoneChange oid oid (Object.zone obj) requestedDest)
+      case resolved of
+        Nothing -> pure Seq.empty
+        Just settled -> do
+          let dest = ZoneChange.to settled
+              arrived = dest == requestedDest
+              mkObj ts =
+                (Object.newIncarnation obj)
+                  { Object.zone = dest,
+                    Object.timestamp = ts,
+                    Object.enteredUnder = if dest == Zone.Stack || dest == Zone.Battlefield then Just caster else Nothing,
+                    Object.face = if arrived then shown else Nothing,
+                    Object.facing = if arrived then facing else Facing.FaceUp
+                  }
+          State.modify' $ \g ->
+            g
+              { GameState.objects = Map.delete oid (GameState.objects g),
+                GameState.outsideCopies = Set.delete oid (GameState.outsideCopies g)
+              }
+          fmap Seq.singleton (placeObject (Object.owner obj) mkObj dest LibraryPosition.defaultValue)
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -5383,12 +5446,20 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- Source already names, so dropping the stamp leaves the suite
               -- green. A copy carrying a CR 707.9b exception is what would tell
               -- them apart, and no producer in data/cards/ applies one to a spell.
+              --
+              -- A cast copy of a CARD resolves the same way (CR 608.3f's "copy of
+              -- a permanent spell"; Garth One-Eye's rulings, 2021-06-18), so its
+              -- arm is gated on leaving the stack. Pawl.CopySpec's "Garth
+              -- One-Eye's cast copy of Black Lotus ... resolves as a token"
+              -- proves it.
+              becomesToken printingId =
+                (Object.newIncarnation obj)
+                  { Object.source = Source.OfToken printingId,
+                    Object.bindings = foldMap (\pc -> Binding.setCopy pc Map.empty) (Game.copyStampOf obj)
+                  }
               arriving = case (Object.source obj, dest) of
-                (Source.OfSpellCopy printingId, Zone.Battlefield) ->
-                  (Object.newIncarnation obj)
-                    { Object.source = Source.OfToken printingId,
-                      Object.bindings = foldMap (\pc -> Binding.setCopy pc Map.empty) (Game.copyStampOf obj)
-                    }
+                (Source.OfSpellCopy printingId, Zone.Battlefield) -> becomesToken printingId
+                (Source.OfCardCopy printingId, Zone.Battlefield) | fromZone == Zone.Stack -> becomesToken printingId
                 _ -> Object.newIncarnation obj
               mkObj entrySeed ts =
                 arriving

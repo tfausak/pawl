@@ -148,7 +148,8 @@ data View = MkView
     -- Nothing where there is no OBJECT to read it off -- a player view, an event
     -- snapshot, or a printed card being matched by a search, which CR 109.1 makes
     -- an object of nothing -- so IsInZone is vacuously False there, the posture
-    -- `controller` and `identity` already take.
+    -- `controller` and `identity` already take. Nothing too for an object
+    -- outside the game (CR 400.11), which is in no zone.
     zone :: Maybe Zone.Zone,
     -- CR 601.2a: which zone the candidate was moved to the stack FROM when it was
     -- cast -- what WasCastFrom reads, off Pawl.Types.Object.castFrom.

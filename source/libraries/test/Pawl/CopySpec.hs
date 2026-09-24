@@ -83,6 +83,9 @@
 -- `copied`): Mizzix's Mastery, whose exiled instant stays in exile while the copy
 -- goes on the stack, and whose declined copy is swept by CR 704.5e
 -- (castCopySpec).
+--
+-- And CR 707.13's copy of a card defined by NAME, created outside the game and
+-- then cast: Garth One-Eye (garthSpec).
 module Pawl.CopySpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -4164,3 +4167,126 @@ burningDown victim decision p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer victim) sets
   Prompt.OfferedCast {} -> decision
   _ -> S.identityAnswer p
+
+-- CR 707.13 on Garth One-Eye {W}{U}{B}{R}{G}, "{T}: Choose a card name that
+-- hasn't been chosen from among Disenchant, Braingeyser, Terror, Shivan Dragon,
+-- Regrowth, and Black Lotus. Create a copy of the card with the chosen name. You
+-- may cast the copy. (You still pay its costs.)" (Oracle text and rulings checked
+-- on Scryfall, 2026-09-23).
+--
+-- Black Lotus costs {0}, so every board has NO MANA: a copy the engine mistook
+-- for a graveyard card would be taxed {2} by bob's Aven Interrupter and not be
+-- castable at all, and Grafdigger's Cage would forbid it outright.
+garthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+garthSpec s registry = Spec.describe s "GarthOneEye" $ do
+  Spec.it s "CR 707.13 Garth One-Eye's cast copy of Black Lotus has Black Lotus's characteristics and resolves as a token" $ do
+    garth <- S.printingOf s registry "Garth One-Eye"
+    lotus <- S.printingOf s registry "Black Lotus"
+    let reference = [lotus]
+        (garthId, board) = garthBoard garth (Setup.emptyGame S.bothPlayers)
+        cast = activateGarth (naming reference lotusName OptionalDecision.Exercises) garthId board
+        spell = List.find (\oid -> Maybe.isJust (Game.lookupObject oid cast)) (GameState.stack cast)
+        resolved = S.settleSba (S.runPure (naming reference lotusName OptionalDecision.Exercises) cast Stack.resolveTop)
+        lotuses = filter (\oid -> PC.names (Projection.project oid resolved) == Set.singleton lotusName) (Set.toList (GameState.battlefield resolved))
+    Spec.assertEqWith
+      s
+      "the spell on the stack is Black Lotus: its name, its types and its {0}"
+      (fmap (\sid -> let pc = Projection.project sid cast in (PC.names pc, PC.cardTypes pc, PC.manaCost pc)) spell)
+      (Just (Set.singleton lotusName, Set.singleton CardType.Artifact, Just (ManaCost.MkManaCost [])))
+    Spec.assertEqWith s "CR 601.2a it was cast from no zone" (fmap (\sid -> Game.lookupObject sid cast >>= Object.castFrom) spell) (Just Nothing)
+    Spec.assertEqWith s "CR 608.3f the resolved Lotus is a token" (fmap (`Game.isToken` resolved) lotuses) [True]
+    Spec.assertEqWith s "and nothing is left outside the game" (GameState.outsideCopies resolved) Set.empty
+
+  Spec.it s "CR 707.13 a second activation of the same Garth does not offer Black Lotus again" $ do
+    garth <- S.printingOf s registry "Garth One-Eye"
+    lotus <- S.printingOf s registry "Black Lotus"
+    let reference = [lotus]
+        answer :: Prompt.Prompt r -> r
+        answer = naming reference lotusName OptionalDecision.Exercises
+        (garthId, board) = garthBoard garth (Setup.emptyGame S.bothPlayers)
+        first = S.runPure answer (activateGarth answer garthId board) Stack.resolveTop
+        untapped = first {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) garthId (GameState.objects first)}
+        second = activateGarth answer garthId untapped
+    Spec.assertEqWith s "the first activation cast the Lotus copy" (lotusesOnStack first + length (lotusesOnBattlefield first)) 1
+    Spec.assertEqWith s "the second, named Black Lotus again, cast nothing" (lotusesOnStack second) 0
+    Spec.assertEqWith s "Black Lotus is remembered for this Garth" (Map.lookup garthId (GameState.namedCopyChoices second)) (Just (Set.singleton lotusName))
+
+  -- The pair differs only in the permanent bob controls. CR 400.11: the copy is
+  -- in no zone, so neither "from graveyards" rule reaches it, where "anywhere
+  -- other than their hands" does.
+  Spec.it s "CR 400.11 the copy is cast under Grafdigger's Cage and Aven Interrupter, and not under Drannith Magistrate" $ do
+    garth <- S.printingOf s registry "Garth One-Eye"
+    lotus <- S.printingOf s registry "Black Lotus"
+    aven <- S.printingOf s registry "Aven Interrupter"
+    cage <- S.printingOf s registry "Grafdigger's Cage"
+    magistrate <- S.printingOf s registry "Drannith Magistrate"
+    let answer :: Prompt.Prompt r -> r
+        answer = naming [lotus] lotusName OptionalDecision.Exercises
+        under watcher =
+          let (_, withWatcher) = S.addPermanent watcher S.bob (Setup.emptyGame S.bothPlayers)
+              (garthId, board) = garthBoard garth withWatcher
+           in lotusesOnStack (activateGarth answer garthId board)
+    Spec.assertEqWith s "CR 601.3 Grafdigger's Cage does not stop it" (under cage) 1
+    Spec.assertEqWith s "CR 601.2f bob's Aven Interrupter taxes nothing, so the {0} copy is cast with no mana" (under aven) 1
+    Spec.assertEqWith s "CR 601.3 bob's Drannith Magistrate does" (under magistrate) 0
+
+  Spec.it s "CR 707.13 a declined copy leaves nothing behind, and a name the reference does not know makes no copy" $ do
+    garth <- S.printingOf s registry "Garth One-Eye"
+    lotus <- S.printingOf s registry "Black Lotus"
+    let (garthId, board) = garthBoard garth (Setup.emptyGame S.bothPlayers)
+        declined = activateGarth (naming [lotus] lotusName OptionalDecision.Declines) garthId board
+        unknown = activateGarth (naming [] lotusName OptionalDecision.Exercises) garthId board
+        copies gs = filter (\o -> case Object.source o of Source.OfCardCopy _ -> True; _ -> False) (Map.elems (GameState.objects gs))
+    Spec.assertEqWith s "declined: no copy of a card exists anywhere" (length (copies declined), GameState.outsideCopies declined) (0, Set.empty)
+    Spec.assertEqWith s "declined: the name is still spent" (Map.lookup garthId (GameState.namedCopyChoices declined)) (Just (Set.singleton lotusName))
+    Spec.assertEqWith s "unknown: nothing was cast" (length (GameState.stack unknown), length (copies unknown)) (0, 0)
+
+  -- CR 400.11: nothing left a zone, so Kishla Skimmer's "whenever a card leaves
+  -- your graveyard during your turn" has no event to see. Its trigger would be
+  -- the second object on the stack once priority is settled.
+  Spec.it s "CR 400.11 casting the copy moves nothing out of a graveyard, so Kishla Skimmer does not trigger" $ do
+    garth <- S.printingOf s registry "Garth One-Eye"
+    lotus <- S.printingOf s registry "Black Lotus"
+    skimmer <- S.printingOf s registry "Kishla Skimmer"
+    let answer :: Prompt.Prompt r -> r
+        answer = naming [lotus] lotusName OptionalDecision.Exercises
+        (_, withSkimmer) = S.addPermanent skimmer S.alice (Setup.emptyGame S.bothPlayers)
+        (garthId, board) = garthBoard garth withSkimmer
+        settled = S.runPure answer (activateGarth answer garthId board) Engine.settleForPriority
+    Spec.assertEqWith s "the stack holds the Lotus copy and nothing else" (fmap (\oid -> PC.names (Projection.project oid settled)) (GameState.stack settled)) [Set.singleton lotusName]
+
+lotusName :: CardName.CardName
+lotusName = CardName.MkCardName (Text.pack "Black Lotus")
+
+-- alice's settled Garth in her main phase, with priority.
+garthBoard :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+garthBoard garth gs =
+  let (garthId, withGarth) = S.addPermanent garth S.alice gs
+   in ( garthId,
+        withGarth
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Activates Garth's one ability and resolves it.
+activateGarth :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+activateGarth answer garthId board = case Activatable.abilitiesFor garthId board of
+  [ability] -> S.runPure answer board (Activate.activateAbility S.alice garthId ability >> Stack.resolveTop)
+  _ -> board
+
+-- Names `name` when a card name is asked for, answers CR 108.1's lookup from
+-- `reference` alone, and takes or declines the offered cast.
+naming :: [Printing.Printing] -> CardName.CardName -> OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+naming reference name decision p = case p of
+  Prompt.ChooseCardName {} -> name
+  Prompt.LookUpCard wanted -> fmap Printing.card (List.find ((== wanted) . S.printingName) reference)
+  Prompt.OfferedCast {} -> decision
+  _ -> S.identityAnswer p
+
+lotusesOnStack :: GameState.GameState -> Int
+lotusesOnStack gs = length (filter (\oid -> PC.names (Projection.project oid gs) == Set.singleton lotusName) (GameState.stack gs))
+
+lotusesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
+lotusesOnBattlefield gs = filter (\oid -> PC.names (Projection.project oid gs) == Set.singleton lotusName) (Set.toList (GameState.battlefield gs))

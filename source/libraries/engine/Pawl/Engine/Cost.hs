@@ -619,7 +619,7 @@ candidateCostsGiven permitted pid name oid gs =
               -- face had a mana cost would be the card that told the two apart.
               orConverted zoneCandidates =
                 if isConvertedFace
-                  then converted <> (if Object.zone obj == Zone.Graveyard then disturbed else [])
+                  then converted <> (if Game.zoneOf oid gs == Just Zone.Graveyard then disturbed else [])
                   else zoneCandidates
               -- CR 118.9a / 601.2b: the keyword alternatives ride BESIDE the printed
               -- cost, wherever the permission that lets the card be cast admits
@@ -633,8 +633,11 @@ candidateCostsGiven permitted pid name oid gs =
               ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> emerged <> surged <> spectacled <> prowled <> freerun
            in -- CR 118.8 / 601.2b: every candidate below owes this face's choice
               -- costs, whichever of them the caster announces, so the expansion
-              -- wraps the whole list rather than any one arm of it.
-              concatMap (choiceVariants face) . orConverted $ case Object.zone obj of
+              -- wraps the whole list rather than any one arm of it. The zone is
+              -- Game.zoneOf's, so a CR 707.13 copy outside the game (CR 400.11)
+              -- takes the `_` arm. A regression fence: none of Garth One-Eye's
+              -- six cards prints a cost the graveyard arm offers.
+              concatMap (choiceVariants face) . orConverted $ case Game.zoneOf oid gs of
                 -- Three shapes, differing in what they do to the printed cost, plus
                 -- an effect's permission. Flashback (CR 702.34a) REPLACES the mana
                 -- cost, so it is wrapped by `withAdditional`, and escape (CR
@@ -649,7 +652,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- not re-asked here; rule 702.138a and rule 702.81a state no such
                 -- clause to gate, and rule 702.187b's own clause is asked here
                 -- rather than there, at the mayhem offer below.
-                Zone.Graveyard ->
+                Just Zone.Graveyard ->
                   let -- CR 613.1: the keywords the card HAS in the graveyard, not
                       -- the ones it prints, an ability granted there (CR 113.6f)
                       -- stating rule 702.34a's cost as much as a printed one. Read
@@ -773,7 +776,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- 715.3d's permission states no cost and falls through to the `_`
                 -- arm; Effect.GrantPlayFromExile's states one only when it carries
                 -- CR 118.9's waiver, which is the arm two below.
-                Zone.Exile
+                Just Zone.Exile
                   | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
                 -- CR 702.143a: a FORETOLD card is cast for its foretell cost, CR
                 -- 118.9's alternative cost, wrapped by withAdditional as flashback's
@@ -793,7 +796,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- the two faces print different mana costs (Birgi, God of
                 -- Storytelling // Harnfel, Horn of Bounty). `face` is the face this
                 -- call was asked about.
-                Zone.Exile
+                Just Zone.Exile
                   | Maybe.isJust (Object.foretold obj) ->
                       fmap
                         (untagged . withAdditional)
@@ -809,7 +812,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- Pawl.Types.ExilePlayPermission baked in: a second player casting
                 -- the same card under some other permission is priced by the `_`
                 -- arm below.
-                Zone.Exile
+                Just Zone.Exile
                   | Just permission <- Object.playableFromExile obj,
                     ExilePlayPermission.player permission == pid,
                     Just mana <- ExilePlayPermission.alternativeManaCost permission ->
@@ -824,7 +827,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- CR 107.3b's "the only legal choice for X is 0" falls out rather
                 -- than being enforced: withoutPayingManaCost carries an empty
                 -- ManaCost, which has no variable to prompt for.
-                Zone.Hand ->
+                Just Zone.Hand ->
                   ordinary
                     <> warped
                     <> (if PlayerEffect.mayCastFromHandWithoutPayingManaCost pid oid gs then [untagged (withoutPayingManaCost face)] else [])

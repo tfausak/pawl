@@ -20,6 +20,7 @@ import qualified Pawl.Codec.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Codec.BattlefieldCandidate as BattlefieldCandidate
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CastFromZone as CastFromZone
 import qualified Pawl.Codec.Combat as Combat
 import qualified Pawl.Codec.ContinuousEffect as ContinuousEffect
@@ -161,6 +162,8 @@ codec resolve = Fields.object $ do
   nextObjectId <- Fields.required "nextObjectId" ObjectId.codec GameState.nextObjectId
   printings <- Fields.defaulted "printings" Map.empty (Common.naturalMap PrintingId.codec (Printing.reference resolve)) GameState.printings
   lookedUp <- Fields.defaulted "lookedUp" Set.empty (Common.set PrintingId.codec) GameState.lookedUp
+  outsideCopies <- Fields.defaulted "outsideCopies" Set.empty (Common.set ObjectId.codec) GameState.outsideCopies
+  namedCopyChoices <- Fields.defaulted "namedCopyChoices" Map.empty (Common.naturalMap ObjectId.codec (Common.set CardName.codec)) GameState.namedCopyChoices
   nextPrintingId <- Fields.required "nextPrintingId" PrintingId.codec GameState.nextPrintingId
   nextTimestamp <- Fields.required "nextTimestamp" Timestamp.codec GameState.nextTimestamp
   lastChoice <- Fields.required "lastChoice" Timestamp.codec GameState.lastChoice
@@ -248,6 +251,8 @@ codec resolve = Fields.object $ do
         GameState.nextObjectId = nextObjectId,
         GameState.printings = printings,
         GameState.lookedUp = lookedUp,
+        GameState.outsideCopies = outsideCopies,
+        GameState.namedCopyChoices = namedCopyChoices,
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,

@@ -1289,6 +1289,7 @@ ownCounts effect = case effect of
   Effect.TakeExtraTurn takeExtraTurn -> quantityCounts (TakeExtraTurn.count takeExtraTurn)
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
+  Effect.OfferNamedCopy {} -> []
   Effect.OfferCast {} -> []
   -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
   -- "for as long as you control this creature" is a Count, and dropping it here
@@ -1657,6 +1658,7 @@ effectNestedEffects effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
+  Effect.OfferNamedCopy {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -2143,6 +2145,7 @@ effectReplacements effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
+  Effect.OfferNamedCopy {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -2601,6 +2604,7 @@ effectMintedFaces effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
+  Effect.OfferNamedCopy {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -5489,6 +5493,8 @@ effectFilters effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
+  -- Nor do card names.
+  Effect.OfferNamedCopy {} -> []
   -- All THREE positions the opcode can hold a Filter in: the reference, CR 118.9's
   -- stated alternative cost, and CR 702.85a's `restriction`. The cost half is SlotlessCostFramed, and NOT because
   -- the announcement has no slots: CR 608.2g sends the offered cast through rule

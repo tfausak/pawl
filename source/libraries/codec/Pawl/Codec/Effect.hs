@@ -22,6 +22,7 @@ import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
 import qualified Pawl.Codec.Blight as Blight
 import qualified Pawl.Codec.CantBeRegenerated as CantBeRegenerated
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.ChooseCardName as ChooseCardName
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
@@ -245,6 +246,7 @@ codec cardCodec abilityCodec =
           Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
           Arm.payload "Shuffle" PlayerRef.codec Effect.Shuffle (\x -> case x of Effect.Shuffle y -> Just y; _ -> Nothing),
           Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
+          Arm.payload "OfferNamedCopy" (Common.nonEmpty CardName.codec) Effect.OfferNamedCopy (\x -> case x of Effect.OfferNamedCopy y -> Just y; _ -> Nothing),
           Arm.payload "GrantPlayFromExile" GrantPlayFromExile.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
           Arm.payload "GrantLookAtExiled" GrantLookAtExiled.codec Effect.GrantLookAtExiled (\x -> case x of Effect.GrantLookAtExiled y -> Just y; _ -> Nothing),
           Arm.payload "MakePlotted" ObjectRef.codec Effect.MakePlotted (\x -> case x of Effect.MakePlotted y -> Just y; _ -> Nothing),
@@ -388,6 +390,7 @@ tagOf x = case x of
   Effect.ShuffleIntoLibrary {} -> "ShuffleIntoLibrary"
   Effect.Shuffle {} -> "Shuffle"
   Effect.OfferCast {} -> "OfferCast"
+  Effect.OfferNamedCopy {} -> "OfferNamedCopy"
   Effect.GrantPlayFromExile {} -> "GrantPlayFromExile"
   Effect.GrantLookAtExiled {} -> "GrantLookAtExiled"
   Effect.MakePlotted {} -> "MakePlotted"
