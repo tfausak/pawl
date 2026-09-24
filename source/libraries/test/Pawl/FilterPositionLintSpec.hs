@@ -50,6 +50,9 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureCards as ConjureCards
+import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -79,6 +82,7 @@ import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.HandAction as HandAction
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
@@ -133,6 +137,7 @@ import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
@@ -411,9 +416,11 @@ cantCrewVehiclesTag = Text.pack "CantCrewVehicles"
 --
 -- "pool" is the key that identifies a target slot -- Pawl.Codec.TargetSlot is the
 -- only codec in the tree that writes one -- and "amount" beside it is the slot
--- naming its bound. Only that slot's own "filter" subtree is counted, which is
--- sound because a Filter holds no TargetSlot: nothing nests below it to be
--- double-counted.
+-- naming its bound. The other position that fills the bound is a conjure's
+-- reference pick (Pawl.Types.FromReference), the "Reference" arm of
+-- Pawl.Codec.ConjureCards, whose value carries the same two keys. Only that
+-- position's own "filter" subtree is counted, which is sound because a Filter
+-- holds neither: nothing nests below it to be double-counted.
 --
 -- Parameterized by the TAG for jsonAtoms' reason: the order bound and the
 -- equality bound want the same position and so the same count.
@@ -423,15 +430,27 @@ amountedSlotAtoms tag value = case value of
   Value.Object o ->
     let pairs = Object.unwrap o
         keyed k = fmap Pair.value (filter (\pair -> String.unwrap (Pair.name pair) == Text.pack k) pairs)
+        isReference = any (\v -> case v of Value.String t -> String.unwrap t == Text.pack "Reference"; _ -> False) (keyed "type")
+        referenceAtoms = sum (fmap (amountedReferenceAtoms tag) (if isReference then keyed "value" else []))
         here =
           if null (keyed "pool") || null (keyed "amount")
-            then 0
+            then referenceAtoms
             else sum (fmap (jsonAtoms tag) (keyed "filter"))
      in here + sum (fmap (amountedSlotAtoms tag . Pair.value) pairs)
   Value.String _ -> 0
   Value.Null _ -> 0
   Value.Boolean _ -> 0
   Value.Number _ -> 0
+
+-- A conjure reference pick's value: its "filter" subtree's atoms where an
+-- "amount" sits beside it, and none where it does not.
+amountedReferenceAtoms :: Text.Text -> Value.Value -> Int
+amountedReferenceAtoms tag value = case value of
+  Value.Object o ->
+    let pairs = Object.unwrap o
+        keyed k = fmap Pair.value (filter (\pair -> String.unwrap (Pair.name pair) == Text.pack k) pairs)
+     in if null (keyed "amount") then 0 else sum (fmap (jsonAtoms tag) (keyed "filter"))
+  _ -> 0
 
 -- How many CR 202.3 computed-bound atoms this card carries in a target slot that
 -- names an amount, and how many anywhere else. The second number is the offence;
@@ -1528,19 +1547,21 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace manaValueEqualToAmountOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: Chthonian Nightmare is the pool's one author of the atom, and
-    -- the card that is ACCEPTED here rather than skipped.
+    -- NOT vacuous: Chthonian Nightmare and Fear of Change are the pool's authors
+    -- of the atom, one per position that fills the bound, and both are ACCEPTED
+    -- here rather than skipped.
     nightmare <- S.printingOf s registry "Chthonian Nightmare"
+    fear <- S.printingOf s registry "Fear of Change"
     Spec.assertEqWith
       s
-      "the Nightmare's slot names its bound"
-      (manaValueEqualToAmountCounts (S.combinedFace nightmare))
-      (1, 0)
+      "the Nightmare's slot names its bound, and so does Fear of Change's reference pick"
+      (manaValueEqualToAmountCounts (S.combinedFace nightmare), manaValueEqualToAmountCounts (S.combinedFace fear))
+      ((1, 0), (1, 0))
     Spec.assertEqWith
       s
-      "and it is the pool's only one"
+      "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . manaValueEqualToAmountCounts . S.combinedFace) ps))
-      1
+      2
     -- The rejected side, the at-most lint's pair one operator over: the same atom
     -- buried under all three combinators, in a target slot that names no amount.
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1558,6 +1579,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     -- And the pair that differs in exactly one thing, as above.
     let amounted = slotWith (TargetSlot.withAmount (Quantity.Type.LifeGainedThisTurn (PlayerRef.Relative PlayerRelation.You)) (TargetSlot.required Pool.Creatures (Just buried)))
     Spec.assertEqWith s "the same atom in a slot that names one is not" (manaValueEqualToAmountCounts amounted) (1, 0)
+    -- The same pair at the other position: a conjure's reference pick, which
+    -- fills the bound only where it names one.
+    let conjuring amount =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (ConjureCards.Reference (FromReference.MkFromReference buried amount)) Conjure.defaultSelection (ConjureDestination.Battlefield TapState.Untapped)))))) Map.empty))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom in a reference pick naming no amount is an offence" (manaValueEqualToAmountCounts (conjuring Nothing)) (0, 1)
+    Spec.assertEqWith s "and one naming an amount is not" (manaValueEqualToAmountCounts (conjuring (Just (Quantity.Type.Literal 4)))) (1, 0)
   -- CR 303.4b's Filter.IsHostOfSource is CR 709.4a's atom one axis over again:
   -- answerable only where Filter.Context.sourceAttachedTo is filled, which is the
   -- positions `hostFramed` admits. See hostOfSourceOffends for the two offences.

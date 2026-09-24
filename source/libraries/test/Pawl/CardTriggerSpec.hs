@@ -2195,10 +2195,10 @@ matoyaTriggerSpec s registry =
         -- CR 701.22d's "even if some or all of those actions were impossible",
         -- and the case that discriminates WHERE the event is recorded: a library
         -- of exactly one card gives scry 2 nothing to decide -- top and bottom
-        -- are one position -- so Resolve.scryOne asks no question and reorders
+        -- are one position -- so Resolve.decideScry asks no question and reorders
         -- nothing. The scry happened all the same, and Matoya draws that card.
         --
-        -- Recording the event inside scryOne's `decided` guard passes every
+        -- Recording the event only for a scryer decideScry asked passes every
         -- assertion in the case above and fails this one.
         Spec.it s "CR 701.22d a scry with nothing to decide still draws Matoya's card" $ do
           (ballId, board) <- scryBoardFor True 1

@@ -91,6 +91,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -900,11 +901,14 @@ swapWordIn family pairs word =
 -- CR 612.1 through an Alchemy conjure's card half. A written candidate is card
 -- data and takes the same walk as any other nested card; a duplicate names an
 -- object already in the game and takes the ObjectRef walk below, since the card
--- it duplicates is read off the board rather than out of the opcode.
+-- it duplicates is read off the board rather than out of the opcode; a
+-- reference pick's filter and bound are the opcode's own words, and take the
+-- walks every filter and quantity does.
 rewriteConjureCards :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ConjureCards.ConjureCards Card.Type.Card -> ConjureCards.ConjureCards Card.Type.Card
 rewriteConjureCards pairs cards = case cards of
   ConjureCards.Written written -> ConjureCards.Written (fmap (rewriteCard pairs) written)
   ConjureCards.Duplicate ref -> ConjureCards.Duplicate (rewriteObjectRef pairs ref)
+  ConjureCards.Reference (FromReference.MkFromReference predicate amount) -> ConjureCards.Reference (FromReference.MkFromReference (Filter.rewrite pairs predicate) (fmap (rewriteQuantity pairs) amount))
 
 -- CR 612.1 through an ObjectRef. An InSlot names an object chosen at cast time,
 -- and the player-naming arms hold no subtype word; only the Filters and the

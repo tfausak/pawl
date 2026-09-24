@@ -98,6 +98,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -279,7 +280,11 @@ ownQuantities effect = case effect of
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.DecreaseSpeed d -> [SpeedDecrease.quantity d]
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
-  Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> [quantity]
+  Effect.Conjure (Conjure.MkConjure quantity cards _ _) ->
+    quantity : case cards of
+      ConjureCards.Written {} -> []
+      ConjureCards.Duplicate {} -> []
+      ConjureCards.Reference from -> Maybe.maybeToList (FromReference.amount from)
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _) -> foldMap durationQuantities duration
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> [quantity]
@@ -1306,6 +1311,8 @@ effectObjectRefs effect =
         Effect.Conjure (Conjure.MkConjure _ cards _ _) -> case cards of
           ConjureCards.Written {} -> []
           ConjureCards.Duplicate ref -> read_ [ref]
+          -- A reference pick names no object at all.
+          ConjureCards.Reference {} -> []
         Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> read_ [ref]
         Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _ _) -> read_ [original, subject]
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _ _ _) -> read_ (ref : copyTargetsRefs targets)

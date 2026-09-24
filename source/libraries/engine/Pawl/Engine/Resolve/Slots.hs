@@ -103,6 +103,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.FromReference as FromReference
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
@@ -629,12 +630,14 @@ effectObjectRefs effect = case effect of
   Effect.IncreaseSpeed {} -> []
   Effect.DecreaseSpeed {} -> []
   Effect.Create {} -> []
-  -- A written conjure names no object -- its candidates are card data -- where a
-  -- duplicate names the object it is a duplicate OF, which is the arm that makes
-  -- a conjure able to target (Sinister Reflections).
+  -- A written conjure names no object -- its candidates are card data -- and nor
+  -- does a reference pick, whose candidates are in no game; a duplicate names
+  -- the object it is a duplicate OF, which is the arm that makes a conjure able
+  -- to target (Sinister Reflections).
   Effect.Conjure (Conjure.MkConjure _ cards _ _) -> case cards of
     ConjureCards.Written {} -> []
     ConjureCards.Duplicate ref -> [ref]
+    ConjureCards.Reference {} -> []
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> [ref]
   -- Both sides: CR 707.2's copiable values come off one and go onto the other.
   -- The exceptions beside them read no slot: CR 707.9a's "this ability" is the
@@ -1091,9 +1094,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- riders' counts are: CR 111.3 has the CREATING effect define it, in this
   -- resolution's slots (tokenBoxQuantities).
   Effect.Create (Create.MkCreate quantity card riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders <> tokenBoxQuantities card)), riderSlots riders]
-  -- The COUNT only: the conjure's candidates are literal card data, its
-  -- destination is a constructor, and the conjurer is the resolving controller.
-  Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> quantitySlots quantity
+  -- The COUNT and a reference pick's bound: the conjure's other candidates are
+  -- literal card data, its destination is a constructor, and the conjurer is
+  -- the resolving controller.
+  Effect.Conjure conjure -> joinSlots (fmap quantitySlots (conjureQuantities conjure))
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- The DURATION reads slots, ModifyTarget's arm above; the two refs are
   -- effectObjectRefs' half.
@@ -1734,7 +1738,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- the opcode. The COUNT is the effect speaking, read in the resolution's own
   -- slots -- CreateCopy's arm below reads its own ref the same way, which is to
   -- say not at all.
-  Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Conjure conjure -> all Quantity.slotsAreExhaustive (conjureQuantities conjure)
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
   Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _) -> all durationSlotsAreExhaustive duration
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
@@ -1969,7 +1973,7 @@ readsX =
         -- The token's printed P/T box reaches CR 601.2b's X too: it is the
         -- creating effect's number (tokenBoxQuantities).
         Effect.Create (Create.MkCreate quantity card riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders <> tokenBoxQuantities card)
-        Effect.Conjure (Conjure.MkConjure quantity _ _ _) -> Quantity.readsX quantity
+        Effect.Conjure conjure -> any Quantity.readsX (conjureQuantities conjure)
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> Quantity.readsX quantity
         Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> any Quantity.readsX (quantity : riderQuantities riders)
         Effect.BecomeCopy {} -> False
@@ -3095,3 +3099,12 @@ triggeredAbilitySlots ability =
     ( maybe Map.empty conditionSlots (TriggeredAbility.intervening ability)
         : fmap modeSlots (Foldable.toList (Modal.modes (TriggeredAbility.modal ability)))
     )
+
+-- The quantities a conjure reads: its count, and a reference pick's bound
+-- (Pawl.Types.FromReference's amount).
+conjureQuantities :: Conjure.Conjure card -> [Quantity.Type.Quantity]
+conjureQuantities conjure =
+  Conjure.quantity conjure : case Conjure.cards conjure of
+    ConjureCards.Written {} -> []
+    ConjureCards.Duplicate {} -> []
+    ConjureCards.Reference from -> Maybe.maybeToList (FromReference.amount from)

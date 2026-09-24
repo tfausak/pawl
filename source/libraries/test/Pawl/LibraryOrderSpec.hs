@@ -38,6 +38,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activator as Activator
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -799,6 +800,18 @@ runScry answer ballId gs = case Activatable.abilitiesFor ballId gs of
     Stack.resolveTop
   _ -> gs
 
+-- Eager Construct's answerer: every seat takes the may and bottoms what it
+-- looked at, and each ChooseScry logs its seat with every library as the ASKING
+-- game held it.
+constructAnswer :: Asked.Asked r -> State.State [(PlayerId.PlayerId, [[ObjectId.ObjectId]])] r
+constructAnswer a = case Asked.prompt a of
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  Prompt.ChooseScry _ pid looked -> do
+    let seen = fmap (\seat -> Game.zoneMembers Zone.Library seat (Asked.game a)) [S.alice, S.bob, S.carol]
+    State.modify' (<> [(pid, seen)])
+    pure (looked, [])
+  p -> pure (S.identityAnswer p)
+
 scryLibrary :: GameState.GameState -> [ObjectId.ObjectId]
 scryLibrary = Game.zoneMembers Zone.Library S.alice
 
@@ -855,6 +868,42 @@ scrySpec s registry = Spec.describe s "Scry" $ do
         Spec.assertEqWith s "the whole library was looked at" (scryLibrary board) [piker, maiden]
         Spec.assertEqWith s "and the answer swapped it" (scryLibrary after) [maiden, piker]
       _ -> Spec.assertFailure s "expected two library cards"
+  -- Eager Construct -- "{2} Artifact Creature -- Construct 2/2. When this
+  -- creature enters, each player may scry 1." -- at three seats, every seat
+  -- taking the may and bottoming its top card. The answerer runs through the
+  -- Asked seam (Engine.runGameAsked), which the Board harness does not expose,
+  -- because what the case reads is the BOARD each scryer decided over: CR
+  -- 701.22c has every player decide before any card moves, so bob and carol
+  -- must be asked over libraries alice's answer has not yet changed. Moving
+  -- each scryer's card before asking the next leaves every final library the
+  -- same and fails the first assertion.
+  Spec.it s "CR 701.22c Eager Construct: every scryer decides before any card moves" $ do
+    construct <- S.printingOf s registry "Eager Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    maiden <- S.printingOf s registry "Bird Maiden"
+    island <- S.printingOf s registry "Island"
+    let -- addLibraryCard puts its card ON TOP, so each list is stocked bottom first.
+        stock pid g printings = List.foldl' (\h p -> snd (S.addLibraryCard p pid h)) g (reverse printings)
+        stocked =
+          stock S.carol (stock S.bob (stock S.alice S.threePlayerGame [piker, maiden, island]) [maiden, island, piker]) [island, piker, maiden]
+        (_, entered) = S.entersWithTrigger construct S.alice stocked
+        onStack = S.runPure S.identityAnswer entered Engine.settleForPriority
+        seats = [S.alice, S.bob, S.carol]
+        libraries gs = fmap (\pid -> Game.zoneMembers Zone.Library pid gs) seats
+        ((_, after), asked) = State.runState (Engine.runGameAsked constructAnswer onStack Stack.resolveTop) []
+        rotated = fmap (\lib -> drop 1 lib <> take 1 lib) (libraries onStack)
+    Spec.assertEqWith
+      s
+      "CR 701.22c: each seat, in APNAP order, decided over every library as it started"
+      asked
+      (fmap (\pid -> (pid, libraries onStack)) seats)
+    Spec.assertEqWith s "then every top card went to the bottom" (libraries after) rotated
+    Spec.assertEqWith
+      s
+      "CR 701.22d: each seat scried"
+      (filter (`elem` fmap GameEvent.Scried seats) (S.eventsOf after))
+      (fmap GameEvent.Scried seats)
+    Spec.assertEqWith s "CR 603.6a: the enters trigger, and nothing else, was on the stack" (length (GameState.stack onStack)) 1
 
 -- The elision half. Each case counts the scry prompts one activation raises,
 -- and the two-card board is the one-card board's PAIR: same seats, same mana,
@@ -1063,7 +1112,7 @@ surveilPromptSpec s registry = Spec.describe s "SurveilPrompt" $ do
     (_, sourceId, board) <- surveilOpcodeBoard s registry 0
     Spec.assertEqWith s "not asked" (asks surveilTwo sourceId board) 0
   -- The case that separates surveil from scry, and the reason this pair exists:
-  -- with ONE card that is the whole library, Pawl.Engine.Resolve.Effect.scryOne asks
+  -- with ONE card that is the whole library, Pawl.Engine.Resolve.Effect.decideScry asks
   -- nothing because top and bottom are the same position -- but a graveyard is
   -- somewhere else, so the player IS asked, and the answer is honoured.
   Spec.it s "CR 701.25a one card that is the whole library is still a real choice" $ do
@@ -1230,7 +1279,7 @@ fatesealSpec s registry = Spec.describe s "Fateseal" $ do
   -- The elision pair for the SPLIT question, two boards differing in one card:
   -- a lone card that is the whole library has its top and its bottom at the same
   -- position, so both answers give the same library and there is nothing to ask
-  -- -- scryOne's case, and NOT surveil's, where the two destinations differ.
+  -- -- decideScry's case, and NOT surveil's, where the two destinations differ.
   -- Driven through the opcode, Spin into Myth's count being fixed at two.
   Spec.it s "CR 701.29a a one-card library raises no fateseal prompt, and a card beneath it does" $ do
     island <- S.printingOf s registry "Island"
