@@ -4,6 +4,7 @@ import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
 -- | CR 608.2g: offer a player the cast of the objects a reference names, under
@@ -28,11 +29,8 @@ data OfferCast = MkOfferCast
     caster :: PlayerRef.PlayerRef,
     -- | Whether the cast is CR 608.2g's "instructs" or its "allows" -- the rule
     -- carries both postures in one sentence. Wild Evocation's "the player casts
-    -- it ... if able" is the mandatory one; every other producer prints a "may".
-    --
-    -- Not implemented: a printed "plays that card" reaches CR 116.2a's land
-    -- drop as well as CR 601's cast, and this opcode offers only the cast, so
-    -- Word of Command cannot make a player play a land (#3347).
+    -- it ... if able" is the mandatory one, as is Word of Command's "the player
+    -- plays that card if able".
     --
     -- Mandatory does NOT mean the cast always happens: rule 601.3's prohibitions
     -- and an unpayable cost still stop it, which is what "if able" says out
@@ -40,6 +38,10 @@ data OfferCast = MkOfferCast
     -- where the mandatory additional cost names cards of a stated quality in a
     -- hidden zone, which Pawl.Engine.Cost.statesHiddenQuality classifies.
     optionality :: CastObligation.CastObligation,
+    -- | CR 601.1a: whether the offer is to cast the card, or to PLAY it -- cast
+    -- it, or play it as a land under CR 305.2a (Word of Command, Windbrisk
+    -- Heights).
+    verb :: PermissionVerb.PermissionVerb,
     -- | Elided when the offer carries neither rider, which is an ordinary cast
     -- of the card.
     offer :: CastOffer.CastOffer,
@@ -63,6 +65,9 @@ data OfferCast = MkOfferCast
     -- above then asks per copy: "an effect that creates multiple copies and says
     -- a player 'may cast' those objects allows that player to choose
     -- individually, for each of those objects, whether or not to cast it".
-    copied :: Bool
+    copied :: Bool,
+    -- | CR 723.2: the resolving controller controls the caster while the spell
+    -- this offer casts resolves (Word of Command).
+    controlWhileResolving :: Bool
   }
   deriving (Eq, Ord, Show)
