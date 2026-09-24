@@ -33,12 +33,14 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Interpreter as Interpreter
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -1190,6 +1192,31 @@ legendRuleSpec s registry =
       Spec.assertEqWith s "and the legend rule offered exactly the host and the Piker" offered [pair]
       Spec.assertEqWith s "with the Kit unattached both stay" unequipped 2
       Spec.assertEqWith s "beside a legendary creature card both stay" legendary 2
+
+    -- CR 612.7 / 704.5j: two legendary Spy Kit hosts, Jedit Ojanen and Rograkh,
+    -- share every nonlegendary creature card's name, though the game holds no
+    -- such card -- two Spy Kits and two legendary creatures are all there is. Two
+    -- boards differing in one thing: the reference answered by the suite's
+    -- registry (Pawl.Interpreter.lookingUpCards), and never consulted.
+    Spec.it s "CR 612.7/704.5j two legendary Spy Kit hosts share the names of cards the game has never seen, and the legend rule buries one" $ do
+      jedit <- S.printingOf s registry "Jedit Ojanen"
+      rograkh <- S.printingOf s registry "Rograkh, Son of Rohgahh"
+      kit <- S.printingOf s registry "Spy Kit"
+      let (a, g0) = S.addPermanent jedit S.alice (Setup.emptyGame S.bothPlayers)
+          (b, g1) = S.addPermanent rograkh S.alice g0
+          (ka, g2) = S.addPermanent kit S.alice g1
+          (kb, g3) = S.addPermanent kit S.alice g2
+          board = S.attachTo kb (Recipient.ToObject b) (S.attachTo ka (Recipient.ToObject a) g3)
+          unasked = S.runPure (keepsLegend a) board Engine.settleForPriority
+      (_, asked) <- Engine.runGameAsked (Interpreter.lookingUpCards registry (pure . keepsLegend a . Asked.prompt)) board Engine.settleForPriority
+      Spec.assertBool s (inPlay a asked && not (inPlay b asked)) "the legend rule kept the Jedit alice chose and buried Rograkh"
+      Spec.assertBool s (inPlay a unasked && inPlay b unasked) "with the reference never consulted both stay"
+      -- Spy Kit's ruling: a back face counts. Befriending the Moths is a Saga
+      -- whose back face, Imperial Moth, is a nonlegendary creature.
+      let names = PC.names (Projection.project a asked)
+          named = CardName.MkCardName . Text.pack
+      Spec.assertBool s (Set.member (named "Imperial Moth") names) "the survivor has a back face's name"
+      Spec.assertBool s (not (Set.member (named "Befriending the Moths") names)) "and not its noncreature front face's"
 
     -- The other half of Leyline of Singularity's affected set: "All NONLAND
     -- permanents". Two Forests share a name and would be a legend rule pair if

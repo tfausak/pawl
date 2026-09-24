@@ -1131,8 +1131,8 @@ meldComponentsOf source = case source of
 -- CR 108.1's Oracle card reference, as far as this game knows it: every face of
 -- every card an object is or is represented by (CR 108.2, 712.21, 730.2), every
 -- card a player holds outside the game (CR 400.11a), and every card
--- Prompt.LookUpCard answered with (GameState.lookedUp). Keyed by face name, so a
--- double-faced card's back face is a name of its own (CR 201.4d).
+-- Prompt.LookUpCard answered with (GameState.lookedUp). Keyed by name, each
+-- paired with the view it is judged by (Card.referenceViews).
 --
 -- A token, an emblem and a copy are no card (CR 108.2), so their printings are
 -- left out. A melded permanent brings its combined back face too: it is an
@@ -1162,8 +1162,7 @@ referenceFaces gs =
             foldMap (Map.keysSet . Player.outsideTheGame) (GameState.players gs),
             GameState.lookedUp gs
           ]
-      faces = foldMap (\pid -> foldMap (NonEmpty.toList . Card.Type.faces) (cardOfPrinting pid gs)) (Set.toList pids)
-   in Map.fromList (fmap (\f -> (Face.name f, f)) faces)
+   in Map.fromList (foldMap (\pid -> foldMap Card.referenceViews (cardOfPrinting pid gs)) (Set.toList pids))
 
 -- CR 202.3c's "the front faces of each card that represents it", one card at a
 -- time. Empty rather than an error for a printing the game does not know, the
