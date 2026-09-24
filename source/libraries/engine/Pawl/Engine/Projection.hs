@@ -2050,9 +2050,9 @@ abilityRemovalAfter gs =
         else \_ _ -> False
 
 -- CR 613.11 / 613.1f: the rule abilities stored layer-6 grants give `oid`
--- (Chomping Kavu's backup), which every gatherer beside
--- Pawl.Engine.CombatRestriction reads next to the object's own
--- (ruleAbilitiesOf). Hoisted over the whole game like abilityRemoval, and no
+-- (Chomping Kavu's backup), which each of the thirteen gatherers
+-- (Pawl.Engine.CombatRestriction and its siblings) reads next to the object's
+-- own (ruleAbilitiesOf). Hoisted over the whole game like abilityRemoval, and no
 -- work on a board that stores no such grant.
 --
 -- CR 613.1f's removal is asked in CR 613.7 timestamp order: only a removal
@@ -2061,7 +2061,9 @@ abilityRemovalAfter gs =
 -- granted to the land by other effects", CR 612.3 keeps a text change affecting
 -- the host out of a granted ability, and it is read off `oid` itself rather
 -- than textBoxHolderOf, for grantedStaticAbilitiesOf's reason.
--- Pawl.KeywordTriggerSpec's Backup group proves the first two.
+-- Pawl.KeywordTriggerSpec's Backup group proves the removal order and the CR
+-- 305.7 exemption, through the combat restriction; the other twelve families
+-- are regression fences, no printing with backup granting one.
 grantedRuleAbilities :: GameState -> ObjectId -> RuleAbilities.RuleAbilities
 grantedRuleAbilities gs =
   let grant eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
