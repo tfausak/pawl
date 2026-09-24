@@ -2510,10 +2510,10 @@ conjuredName card = Face.name (NonEmpty.head (Card.Type.faces card))
 -- lives beside applyOneEffect, this module being the one legitimate home of
 -- `case effect of`, and Pawl.Engine.Resolve reads only the answer.
 --
--- ALL its effects and not any, clauseIsInert's shape: an option whose
--- instructions partly happen is carried out as much as possible (CR 609.3) and
--- is still an option, so a clause is impossible only when nothing in it can
--- happen.
+-- ALL its effects and not any, clauseIsInert's shape: an option some of whose
+-- instructions can happen is carried out as much as possible (CR 609.3) and is
+-- still an option, so a clause is impossible only when every instruction in it
+-- is -- effectIsImpossible says what that means for one instruction.
 --
 -- An instruction acting only on what an EARLIER instruction of the same clause
 -- binds is left out of that test, its fate being its definer's: Carth the
@@ -2545,9 +2545,11 @@ clauseIsImpossible resolving source controller legal gs clause =
 -- also what keeps a slot a sibling effect of the same clause will define (Carth
 -- the Lion's Reveal then MoveToZone) from reading as impossible while it is
 -- still unbound. Drawing is never impossible either (CR 121.3), nor is
--- searching (CR 701.23b's fail to find). Effect.Mill is the one arm that asks
--- more than "nothing at all happens", because rule 701.17b states the whole
--- comparison itself.
+-- searching (CR 701.23b's fail to find). Three arms ask more than "nothing at
+-- all happens": Effect.Mill, because rule 701.17b states the whole comparison
+-- itself, and a counted discard or sacrifice, where an instruction to give up N
+-- things is not an option for a player holding fewer (The Mimeoplasm's
+-- 2011-09-22 ruling, "You can't choose to exile just one creature card").
 --
 -- Exhaustive with no wildcard, ownSlotsAreExhaustive's shape and for its reason:
 -- a new opcode must answer here. Each arm below mirrors the read its
@@ -2610,11 +2612,15 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     -- CR 701.9a: the victims are the slot's player recipients, read through
     -- legalMany and Recipient.playerOf as the executing arm reads them, and the
     -- amount is read per victim because a card may count something about them.
+    -- Short of the count is impossible, not merely an empty hand: Thrilling
+    -- Discovery's "you may discard two cards" over a one-card hand is
+    -- Pawl.ResolveSpec's "CR 608.2d Thrilling Discovery's discard of two is not
+    -- offered over a one-card hand".
     let victims = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
-        emptyHanded victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
-          Just n | n > 0 -> null (Game.zoneMembers Zone.Hand victim gs)
+        shortHanded victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
+          Just n | n > 0 -> n > List.genericLength (Game.zoneMembers Zone.Hand victim gs)
           _ -> False
-     in not (null victims) && all emptyHanded victims
+     in not (null victims) && all shortHanded victims
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals {} -> False
@@ -2753,16 +2759,18 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- as it can rather than CR 608.2d refusing the instruction.
   Effect.Cloak {} -> False
   Effect.Venture {} -> False
-  -- CR 608.2d's own worked example: a player who controls nothing the edict
-  -- matches cannot sacrifice one. Through Replacement.sacrificeCandidates, so CR
-  -- 101.2's "can't be sacrificed" narrows the pool here exactly as it does in the
-  -- executing arm, and the amount is read per victim there too.
+  -- CR 608.2d / 701.21a: a player controlling fewer permanents the edict matches
+  -- than it counts cannot sacrifice that many. Through
+  -- Replacement.sacrificeCandidates, so CR 101.2's "can't be sacrificed" narrows
+  -- the pool here exactly as it does in the executing arm, and the amount is read
+  -- per victim there too. Pawl.ResolveSpec's "CR 608.2d Giant Opportunity's
+  -- sacrifice of two Foods is not offered with one Food" proves the count.
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) ->
     let victims = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
-        nothingToGive victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
-          Just n | n > 0 -> null (Replacement.sacrificeCandidates (Filter.slotObjects context) victim Nothing filter_ gs)
+        tooFewToGive victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
+          Just n | n > 0 -> n > List.genericLength (Replacement.sacrificeCandidates (Filter.slotObjects context) victim Nothing filter_ gs)
           _ -> False
-     in not (null victims) && all nothingToGive victims
+     in not (null victims) && all tooFewToGive victims
   -- CR 701.38b lists the choices, and an object vote's empty list is the
   -- naming-nobody case: nobody votes and nothing is bound, which CR 609.3
   -- carries out vacuously. A word vote's list is printed, so it cannot be empty.
