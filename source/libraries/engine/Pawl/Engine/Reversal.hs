@@ -11,7 +11,7 @@
 -- announcement's spell already gone from it, and CR 733.1 keeps the ability as
 -- it HAPPENED.
 --
--- Pawl.Engine.Cost.reverseIllegal is the caller.
+-- Pawl.Engine.Cost.composeReversal is the caller.
 module Pawl.Engine.Reversal where
 
 import qualified Data.Foldable as Foldable
