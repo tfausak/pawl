@@ -496,21 +496,19 @@ newGame perform matchup = do
 -- rather than moved, so no other zone can come to hold one.
 --
 -- Object.newIncarnation is CR 400.7's forgetting, the same one `toLibraryCard`
--- performs below; only Object.source differs between the two cards, since each
--- represents itself again and not the permanent they were. Object.duplicate is
--- the merged object's and not a component's, so no component keeps it. Not
--- implemented: a conjured duplicate's values as a merge component (#4037).
--- A merged permanent's
--- TOKEN component (CR 730.2d) is minted as the token it is, and its copy
--- component (CR 730.2, CR 707.10) as the copy it is, which the funnel below then
--- drops for CR 727.2's own reason: neither is a card. CR 712.21a's
--- arrangement is not asked: both callers shuffle what they build (CR 103.5, CR
--- 729.5), so the order the two cards are placed in is not observable.
+-- performs below; only Object.source and a conjured duplicate's values differ
+-- between the two cards (Game.representComponent), since each represents itself
+-- again and not the permanent they were. A merged permanent's TOKEN component
+-- (CR 730.2d) is minted as the token it is, and its copy component (CR 730.2,
+-- CR 707.10) as the copy it is, which the funnel below then drops for CR
+-- 727.2's own reason: neither is a card. CR 712.21a's arrangement is not asked:
+-- both callers shuffle what they build (CR 103.5, CR 729.5), so the order the
+-- two cards are placed in is not observable.
 splitComponents :: ObjectId -> Map.Map ObjectId Object.Object -> (Map.Map ObjectId Object.Object, ObjectId)
 splitComponents next objects =
   let bump (ObjectId.MkObjectId n) = ObjectId.MkObjectId (n + 1)
       mint obj (acc, oid) component =
-        (Map.insert oid ((Object.newIncarnation obj) {Object.source = Game.sourceOfComponent component, Object.duplicate = Nothing}) acc, bump oid)
+        (Map.insert oid (Game.representComponent component (Object.newIncarnation obj)) acc, bump oid)
       step (acc, oid) (key, obj) =
         let components = Game.componentsOf (Object.source obj)
          in if Seq.null components
