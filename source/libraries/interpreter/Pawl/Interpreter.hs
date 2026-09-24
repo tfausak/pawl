@@ -129,14 +129,13 @@ policingCardNames registry answer asked = case Asked.prompt asked of
 -- Prompt.LookUpCard then fetches it back by. The pick among the names is not
 -- made here: the engine asks it of the answerer beneath, as randomness.
 -- Prompt.ReferenceNames asks about FACES instead, every face of every card, each
--- judged off its own printed characteristics: CR 612.7's "nonlegendary creature
--- cards" reaches a back face (CR 201.4d), which a card judged by its front face
--- would miss.
+-- judged off its own printed characteristics: a back face's name is a name of
+-- its own (CR 201.4d), and Spy Kit's ruling counts it among CR 612.7's.
 --
 -- Pawl.CastProhibitionSpec's Spy Kit case, where Runed Halo names a card in
 -- no zone, is what proves the lookup; Pawl.ConjureSpec's Fear of Change case
--- proves the enumeration; Pawl.CastProhibitionSpec's "CR 612.7 / 206.3a" case
--- proves the face names.
+-- proves the enumeration; Pawl.DamageSpec's two legendary Spy Kit hosts prove
+-- the face names, a back face's among them.
 lookingUpCards ::
   (Functor m) =>
   Registry.Registry m ->
