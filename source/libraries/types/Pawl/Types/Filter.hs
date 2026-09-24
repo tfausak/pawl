@@ -124,8 +124,9 @@ data Filter keyword
     ManaValueAtMostAmount
   | -- | The atom above at EQUALITY rather than order (CR 202.3): the object's mana
     -- value IS the amount the enclosing target slot names -- Chthonian Nightmare's
-    -- "target creature card with mana value X". Vacuously False where either
-    -- number is absent.
+    -- "target creature card with mana value X" -- or the enclosing conjure's
+    -- reference pick (Pawl.Types.FromReference's @amount@). Vacuously False where
+    -- either number is absent.
     ManaValueEqualToAmount
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the

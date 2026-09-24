@@ -11,13 +11,16 @@
 -- depends on both halves, and neither half depends on it.
 module Pawl.Interpreter where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Types.Asked as Asked
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -117,17 +120,28 @@ policingCardNames registry answer asked = case Asked.prompt asked of
      in again
   _ -> answer asked
 
--- CR 108.1: Prompt.LookUpCard answered from the registry, the reference an
--- interpreter holds; every other prompt goes to the answerer beneath. Installed
--- beside policingCardNames, whose registry it shares.
+-- CR 108.1: Prompt.LookUpCard and Prompt.ReferenceCards answered from the
+-- registry, the reference an interpreter holds; every other prompt goes to the
+-- answerer beneath. Installed beside policingCardNames, whose registry it
+-- shares.
+--
+-- A reference card is named by its FIRST face, which is the name
+-- Prompt.LookUpCard then fetches it back by. The pick among the names is not
+-- made here: the engine asks it of the answerer beneath, as randomness.
 --
 -- Pawl.CastProhibitionSpec's Spy Kit case, where Runed Halo names a card in
--- no zone, is what proves it.
+-- no zone, is what proves the lookup; Pawl.ConjureSpec's Fear of Change case
+-- proves the enumeration.
 lookingUpCards ::
+  (Functor m) =>
   Registry.Registry m ->
   (forall r. Asked.Asked r -> m r) ->
   Asked.Asked a ->
   m a
 lookingUpCards registry answer asked = case Asked.prompt asked of
   Prompt.LookUpCard name -> Registry.fetchCard registry name
+  Prompt.ReferenceCards predicate amount ->
+    fmap
+      (fmap (Face.name . NonEmpty.head . Card.Type.faces) . filter (Projection.referenceAdmits (Game.teams (Asked.game asked)) amount predicate))
+      (Registry.cards registry)
   _ -> answer asked

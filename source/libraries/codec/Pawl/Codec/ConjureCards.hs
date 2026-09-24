@@ -1,6 +1,7 @@
 module Pawl.Codec.ConjureCards where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.FromReference as FromReference
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -20,10 +21,12 @@ codec cardCodec =
   Arm.tagged
     tagOf
     [ Arm.payload "Written" (Common.nonEmpty cardCodec) ConjureCards.Written (\x -> case x of ConjureCards.Written y -> Just y; _ -> Nothing),
-      Arm.payload "Duplicate" ObjectRef.codec ConjureCards.Duplicate (\x -> case x of ConjureCards.Duplicate y -> Just y; _ -> Nothing)
+      Arm.payload "Duplicate" ObjectRef.codec ConjureCards.Duplicate (\x -> case x of ConjureCards.Duplicate y -> Just y; _ -> Nothing),
+      Arm.payload "Reference" FromReference.codec ConjureCards.Reference (\x -> case x of ConjureCards.Reference y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: ConjureCards.ConjureCards card -> String
 tagOf x = case x of
   ConjureCards.Written {} -> "Written"
   ConjureCards.Duplicate {} -> "Duplicate"
+  ConjureCards.Reference {} -> "Reference"

@@ -1007,9 +1007,11 @@ data Context = MkContext
     -- (Pawl.Types.TargetSlot's `amount`); this is that Quantity already
     -- evaluated, because this module holds no game state and cannot evaluate one.
     --
-    -- Pawl.Engine.Target.slotContext is the ONE site that fills it, which is what
-    -- makes the atom a target-slot atom: it is Nothing at every other position,
-    -- and Pawl.CardSpec's position lint is what keeps a card out of them.
+    -- Pawl.Engine.Target.slotContext fills it for a target slot, and
+    -- Pawl.Engine.Projection.View.referenceAdmits for a conjure's reference pick
+    -- (Pawl.Types.FromReference's `amount`). It is Nothing at every other
+    -- position, and Pawl.FilterPositionLintSpec's lint is what keeps a card out of
+    -- them.
     --
     -- LAZY like sourcePower, and load-bearingly so: filling it costs a whole
     -- Quantity evaluation, and no filter that omits the atom ever forces it.

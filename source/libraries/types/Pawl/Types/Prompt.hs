@@ -82,7 +82,8 @@ data Prompt r where
   -- makes who it is asked of unobservable; the caller filters the answer back.
   RandomObject :: NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | Which card randomness named out of a printed spellbook
-  -- (Pawl.Types.Conjure's card list). RandomObject's shape and its reasons for
+  -- (Pawl.Types.Conjure's card list) or the reference cards a conjure's filter
+  -- admits (Prompt.ReferenceCards). RandomObject's shape and its reasons for
   -- carrying neither Decider nor PlayerId, over NAMES rather than object ids
   -- because a conjure's candidates are card data and no object exists yet; the
   -- caller filters the answer back to a candidate.
@@ -115,6 +116,13 @@ data Prompt r where
   -- interpreter after every Prompt.ChooseCardName answer, since the engine holds
   -- no reference. RollDie's reasons for carrying neither Decider nor PlayerId.
   LookUpCard :: CardName.CardName -> Prompt (Maybe Card.Card)
+  -- | CR 108.1: the names of the cards in the Oracle card reference the filter
+  -- admits, the Integer being the bound Filter.ManaValueEqualToAmount reads.
+  -- Asked of the interpreter by a conjure that picks from the reference
+  -- (Pawl.Types.ConjureCards.Reference), since the engine holds no reference;
+  -- the pick is then RandomCard's. LookUpCard's reasons for carrying neither
+  -- Decider nor PlayerId.
+  ReferenceCards :: Filter.Filter Keyword.Keyword -> Maybe Integer -> Prompt [CardName.CardName]
   -- | CR 706.4: which result of one roll instruction the roller uses (Valiant
   -- Endeavor's "roll two d6 and choose one result"); the answer indexes the
   -- results, which are in roll order and may compare equal. A choice and not a

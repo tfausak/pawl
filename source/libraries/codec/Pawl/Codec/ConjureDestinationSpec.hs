@@ -31,6 +31,12 @@ spec s = Spec.describe s "Pawl.Codec.ConjureDestination" $ do
       ConjureDestination.codec
       ConjureDestination.Graveyard
       " {\"type\":\"Graveyard\"} "
+  Spec.it s "Exile" $
+    Common.assertCodec
+      s
+      ConjureDestination.codec
+      ConjureDestination.Exile
+      " {\"type\":\"Exile\"} "
   -- CR 110.5b's untapped is the elided default, so the arm that states nothing
   -- writes the bare tag: "conjure a card named Monastery Mentor onto the
   -- battlefield" prints no status.

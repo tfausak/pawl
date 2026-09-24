@@ -1305,6 +1305,8 @@ effectObjectRefs effect =
         Effect.Conjure (Conjure.MkConjure _ cards _ _) -> case cards of
           ConjureCards.Written {} -> []
           ConjureCards.Duplicate ref -> read_ [ref]
+          -- A reference pick names no object at all.
+          ConjureCards.Reference {} -> []
         Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> read_ [ref]
         Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _ _) -> read_ [original, subject]
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _ _ _) -> read_ (ref : copyTargetsRefs targets)
