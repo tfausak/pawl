@@ -48,6 +48,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -70,6 +71,7 @@ import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prototype as Prototype
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.Sickness as Sickness
@@ -1826,6 +1828,33 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
          in case stored <> derived of
               [] -> Just (defaultControllerOf obj)
               setters -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
+
+-- CR 801.2d: is this object within @you@'s range of influence -- controlled by a
+-- player within range, or a battle protected by one? CR 801.4
+-- (Pawl.Engine.Target.inRangeGiven), CR 801.6
+-- (Pawl.Engine.Activatable.activatableGiven) and CR 801.10
+-- (Pawl.Engine.Projection.affectsWith) read it.
+--
+-- Nothing is asked under an unlimited range, so a game without CR 801's option
+-- never takes the control fold. An object's controller is CR 108.4a's owner off
+-- the battlefield and the stack, which controllerOfGiven already answers.
+objectInRangeGiven :: [ControlGrant] -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
+objectInRangeGiven grants you oid gs =
+  let reaches = maybe False (\pid -> Game.inRangeOf you pid gs)
+   in case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
+        Nothing -> True
+        Just _ ->
+          reaches (controllerOfGiven grants Set.empty oid gs)
+            || reaches (Object.protector =<< Game.lookupObject oid gs)
+
+-- CR 801.10: is @oid@ within the range of influence of @source@'s controller?
+-- Pawl.Engine.Projection.affectsWith's cut on a static ability's dynamic set.
+-- Asked of the limited-range option first, so a game without it takes no control
+-- fold; a source with no controller cuts nothing.
+inSourceRangeGiven :: [ControlGrant] -> ObjectId -> ObjectId -> GameState -> Bool
+inSourceRangeGiven grants source oid gs =
+  Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs)))
+    || all (\you -> objectInRangeGiven grants you oid gs) (controllerOfGiven grants Set.empty source gs)
 
 -- Which objects an affected set NAMES, for the CR 613.1b layer-2 control fold.
 -- Parameterized by the source because Affected.Attached asks about the SOURCE's
