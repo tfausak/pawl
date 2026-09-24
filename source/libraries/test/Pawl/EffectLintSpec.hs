@@ -2601,6 +2601,21 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- 708.2a), so the guard holds under either shape of the rider.
     Spec.assertBool s (any (anyFace (any entersFaceDown . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
     Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 707.14's note rides the same record and is read on the MoveToZone road
+  -- alone: the noted card is the one being moved, which a token is not.
+  Spec.it s "only a move onto the battlefield notes a card" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _ _) -> EntryRiders.noted riders && zone /= Zone.Battlefield
+          Effect.Create (Create.MkCreate _ _ riders _ _) -> EntryRiders.noted riders
+          _ -> False
+        notes effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> EntryRiders.noted riders
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep. Magar of the Magic Strings notes one.
+    Spec.assertBool s (any (anyFace (any notes . cardResolutionEffects) . Printing.card) ps) "the pool has a card noting the card it moves"
+    Spec.assertEqWith s "only a move onto the battlefield notes a card (CR 707.14)" (fmap (S.nameOf . Printing.card) offenders) []
   -- Effect.CreateCopy carries the SAME EntryRiders record Create and MoveToZone
   -- do, but Pawl.Engine.Resolve's arm reads only CR 122.6's `counters`, CR
   -- 110.5b's `tapped`, CR 508.4's `attacking` and CR 509.4's `blocking` --
