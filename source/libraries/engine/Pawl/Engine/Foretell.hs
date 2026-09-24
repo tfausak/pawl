@@ -179,7 +179,7 @@ foretell perform pid oid = do
 --
 -- The funnel's instantiation, a settled count rather than a Quantity: nothing
 -- here is resolving, so there is no CR 608.2h moment to evaluate one at.
-riders :: EntryRiders.EntryRiders Natural
+riders :: EntryRiders.EntryRiders Natural ability
 riders =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = TapState.Untapped,
@@ -190,7 +190,8 @@ riders =
       EntryRiders.underOwner = False,
       EntryRiders.exiledFaceDown = True,
       EntryRiders.attachedTo = Nothing,
-      EntryRiders.faceDown = Nothing
+      EntryRiders.faceDown = Nothing,
+      EntryRiders.noted = False
     }
 
 -- "It becomes a foretold card" -- the stamp and CR 702.143d's granted cost

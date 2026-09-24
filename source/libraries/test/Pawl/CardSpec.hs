@@ -162,6 +162,7 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
+import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
@@ -569,7 +570,7 @@ refCounts = concatMap quantityCounts . Resolve.objectRefQuantities
 -- compile. This list is where that shows up.
 objectRefPositions :: [(String, Effect.Effect () (), [ObjectRef.ObjectRef])]
 objectRefPositions =
-  let plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing}
+  let plainRiders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Nothing, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False}
    in [ ("deal-damage", Effect.DealDamage (DealDamage.MkDealDamage (Seq.fromList [DamagePart.MkDamagePart (plantedRef "dd1") (Quantity.Type.Literal 1), DamagePart.MkDamagePart (plantedRef "dd2") (Quantity.Type.Literal 1)]) Nothing Nothing), [plantedRef "dd1", plantedRef "dd2"]),
         ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt")), [plantedRef "mt"]),
         ("restart-game", Effect.RestartGame (Just (plantedRef "rg")), [plantedRef "rg"]),
@@ -824,6 +825,7 @@ modificationCounts modification = case modification of
     GrantedAbility.Triggered ability -> triggeredAbilityCounts ability
     GrantedAbility.Static ability -> staticAbilityCounts ability
     GrantedAbility.Rules rules -> ruleAbilitiesCounts rules
+    GrantedAbility.Replacement ability -> concatMap conditionCounts (Maybe.maybeToList (PrintedReplacement.condition ability))
   -- Payload-free: rule 702.165a's grant names the source and carries no text of
   -- its own, so there is nothing here to sweep.
   Modification.GainAbilitiesOfSource -> []
@@ -1293,6 +1295,7 @@ ownCounts effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
+  Effect.OfferNotedCopy {} -> []
   Effect.OfferCast {} -> []
   -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
   -- "for as long as you control this creature" is a Count, and dropping it here
@@ -1662,6 +1665,7 @@ effectNestedEffects effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
+  Effect.OfferNotedCopy {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -2053,7 +2057,8 @@ effectReplacements effect = case effect of
   Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
-  Effect.MoveToZone {} -> []
+  -- CR 708.2's listed replacement effects, TurnFaceDown's below.
+  Effect.MoveToZone move -> foldMap (listedReplacements . FaceDownState.listed) (EntryRiders.faceDown (MoveToZone.riders move))
   Effect.Draw {} -> []
   Effect.Mill {} -> []
   Effect.Reveal {} -> []
@@ -2083,8 +2088,8 @@ effectReplacements effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectReplacements body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
-  -- CR 708.2's listed characteristics hold no replacement effect (gap #1667).
-  Effect.TurnFaceDown _ -> []
+  -- CR 708.2's listed replacement abilities.
+  Effect.TurnFaceDown turn -> listedReplacements (TurnFaceDown.characteristics turn)
   Effect.TurnFaceUp _ -> []
   Effect.Fight _ -> []
   Effect.RemoveFromCombat _ -> []
@@ -2155,6 +2160,7 @@ effectReplacements effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
+  Effect.OfferNotedCopy {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -2614,6 +2620,7 @@ effectMintedFaces effect = case effect of
   Effect.ShuffleIntoLibrary {} -> []
   Effect.Shuffle {} -> []
   Effect.OfferNamedCopy {} -> []
+  Effect.OfferNotedCopy {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -2786,7 +2793,7 @@ tokenNameOffends token
 -- 122.6, each a Quantity, which may carry a Count whose Filter is card text).
 -- One function so the three effect arms that carry a rider cannot sweep
 -- different halves of it.
-riderFilters :: EntryRiders.EntryRiders Quantity.Type.Quantity -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+riderFilters :: EntryRiders.EntryRiders Quantity.Type.Quantity ability -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 riderFilters riders =
   concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))
     <> concatMap quantityFilters (Map.elems (EntryRiders.counters riders))
@@ -5522,6 +5529,7 @@ effectFilters effect = case effect of
   Effect.Shuffle {} -> []
   -- Nor do card names.
   Effect.OfferNamedCopy {} -> []
+  Effect.OfferNotedCopy {} -> []
   -- All THREE positions the opcode can hold a Filter in: the reference, CR 118.9's
   -- stated alternative cost, and CR 702.85a's `restriction`. The cost half is SlotlessCostFramed, and NOT because
   -- the announcement has no slots: CR 608.2g sends the offered cast through rule
@@ -5640,6 +5648,24 @@ grantedRuleAbilities card =
     )
     (grantedModifications card)
 
+-- The REPLACEMENT kind of the same grant, swept for the same reason.
+grantedReplacements :: Face.Face Card.Type.Card -> [PrintedReplacement.PrintedReplacement Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+grantedReplacements card =
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.Replacement ability) -> Just ability
+        _ -> Nothing
+    )
+    (grantedModifications card)
+
+-- CR 708.2: a face-down listing's quoted abilities, as the grant they amount to.
+listedGrants :: FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Type.Card) -> [Projection.Modification]
+listedGrants = fmap Modification.GainAbility . FaceDownCharacteristics.abilities
+
+-- CR 708.2: the replacement effects a face-down listing's abilities carry.
+listedReplacements :: FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Type.Card) -> [ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+listedReplacements listed = [PrintedReplacement.effect r | GrantedAbility.Replacement r <- FaceDownCharacteristics.abilities listed]
+
 -- The STATIC kind of the same grant, swept for the same reason.
 grantedStaticAbilities :: Face.Face Card.Type.Card -> [StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card)]
 grantedStaticAbilities card =
@@ -5679,7 +5705,11 @@ grantedModifications card =
           ( concatMap
               ( \effect -> case effect of
                   Effect.ModifyTarget modify -> [ModifyTarget.modification modify]
-                  Effect.CreateCopy create -> copyQuotedAbilities (CreateCopy.exceptions create)
+                  -- CR 708.2's listed abilities are this card's text too.
+                  Effect.MoveToZone move -> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (MoveToZone.riders move))
+                  Effect.Create create -> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (Create.riders create))
+                  Effect.TurnFaceDown turn -> listedGrants (TurnFaceDown.characteristics turn)
+                  Effect.CreateCopy create -> copyQuotedAbilities (CreateCopy.exceptions create) <> foldMap (listedGrants . FaceDownState.listed) (EntryRiders.faceDown (CreateCopy.riders create))
                   Effect.BecomeCopy become -> copyQuotedAbilities (BecomeCopy.exceptions become)
                   Effect.CopyStackObject copy -> copyQuotedAbilities (CopyStackObject.exceptions copy)
                   Effect.Replace replace -> copyQuotedAbilities (replacementCopyExceptions (Replace.effect replace))
@@ -5877,6 +5907,7 @@ cardFilters card =
     <> concatMap triggeredAbilityFilters (grantedTriggeredAbilities card)
     <> concatMap staticAbilityFilters (grantedStaticAbilities card)
     <> concatMap ruleAbilitiesFilters (grantedRuleAbilities card)
+    <> concatMap printedReplacementFilters (grantedReplacements card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)

@@ -83,6 +83,8 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
+import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
@@ -547,7 +549,7 @@ rewriteEffect pairs effect = case effect of
   -- data/cards name a keyword family (Backslide, Weaver of Lies) and the source,
   -- neither of which rule 612 changes, so both readings leave the same board and
   -- mutating this line reddens nothing.
-  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) -> Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (rewriteObjectRef pairs ref) listed)
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) -> Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (rewriteObjectRef pairs ref) (rewriteListing pairs listed))
   Effect.TurnFaceUp _ -> effect
   Effect.RemoveFromCombat ref -> Effect.RemoveFromCombat (rewriteObjectRef pairs ref)
   Effect.BecomesBlocked _ -> effect
@@ -878,6 +880,7 @@ rewriteEffect pairs effect = case effect of
         }
   -- CR 612.2: card names are not among the words a text change rewrites.
   Effect.OfferNamedCopy {} -> effect
+  Effect.OfferNotedCopy {} -> effect
   Effect.GrantPlayFromExile grant ->
     Effect.GrantPlayFromExile
       grant
@@ -1118,6 +1121,7 @@ rewriteGrantedAbility pairs granted = case granted of
   -- one in a grant this walk reaches. Backup's is expanded at resolution
   -- (Pawl.Engine.Resolve.Effect.expandGrant) and stored, where no rewrite runs.
   GrantedAbility.Rules rules -> GrantedAbility.Rules rules
+  GrantedAbility.Replacement r -> GrantedAbility.Replacement (rewritePrintedReplacement pairs r)
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
 -- just the payload: the CR 603.8 condition is where the word usually is, and CR
@@ -1890,14 +1894,20 @@ rewritePlayerQuantity pairs x = x {PlayerQuantity.quantity = rewriteQuantity pai
 -- last sentence makes counters with the same name interchangeable, so a swap
 -- that collides two keys merges the rows rather than keeping an arbitrary
 -- survivor.
-rewriteEntryRiders :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRiders.EntryRiders Quantity.Type.Quantity -> EntryRiders.EntryRiders Quantity.Type.Quantity
+rewriteEntryRiders :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> EntryRiders.EntryRiders Quantity.Type.Quantity (GrantedAbility.GrantedAbility Card.Type.Card) -> EntryRiders.EntryRiders Quantity.Type.Quantity (GrantedAbility.GrantedAbility Card.Type.Card)
 rewriteEntryRiders pairs riders =
   riders
     { EntryRiders.counters =
         Map.mapKeysWith (\greater lesser -> Quantity.Type.Plus (Plus.MkPlus lesser greater)) (Filter.rewriteCounterKind pairs)
           . fmap (rewriteQuantity pairs)
-          $ EntryRiders.counters riders
+          $ EntryRiders.counters riders,
+      EntryRiders.faceDown = fmap (\state -> state {FaceDownState.listed = rewriteListing pairs (FaceDownState.listed state)}) (EntryRiders.faceDown riders)
     }
+
+-- CR 612.1 over a CR 708.2 listing's quoted abilities, which are printed on the
+-- card whose effect lists them.
+rewriteListing :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Type.Card) -> FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Type.Card)
+rewriteListing pairs listed = listed {FaceDownCharacteristics.abilities = fmap (rewriteGrantedAbility pairs) (FaceDownCharacteristics.abilities listed)}
 
 -- Greatest and Total are the Aggregations carrying a Quantity.
 rewriteAggregation :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Aggregation.Aggregation Quantity.Type.Quantity -> Aggregation.Aggregation Quantity.Type.Quantity

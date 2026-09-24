@@ -78,7 +78,8 @@ exile ref =
               EntryRiders.underOwner = False,
               EntryRiders.exiledFaceDown = False,
               EntryRiders.attachedTo = Nothing,
-              EntryRiders.faceDown = Nothing
+              EntryRiders.faceDown = Nothing,
+              EntryRiders.noted = False
             },
         MoveToZone.slot = Just Binding.airbentObjects,
         MoveToZone.origin = Nothing,

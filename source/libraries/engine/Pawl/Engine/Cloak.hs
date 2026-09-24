@@ -43,7 +43,7 @@ import qualified Pawl.Types.Zone as Zone
 -- A settled count rather than a Quantity, Pawl.Engine.Foretell.riders' reason:
 -- the rule states no counters, so there is no CR 608.2h moment to evaluate one
 -- at.
-riders :: EntryRiders.EntryRiders Natural
+riders :: EntryRiders.EntryRiders Natural ability
 riders =
   EntryRiders.MkEntryRiders
     { EntryRiders.tapped = TapState.Untapped,
@@ -54,6 +54,7 @@ riders =
       EntryRiders.underOwner = False,
       EntryRiders.exiledFaceDown = False,
       EntryRiders.attachedTo = Nothing,
+      EntryRiders.noted = False,
       EntryRiders.faceDown =
         Just
           FaceDownState.MkFaceDownState

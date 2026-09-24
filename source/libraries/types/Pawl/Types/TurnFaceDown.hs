@@ -18,8 +18,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- second, and the singular "target creature" of Backslide is InSlot with a slot CR
 -- 601.2c filled once. Both forms have a card in data\/cards, the sweep form being
 -- Ixidron itself; Pawl.FaceDownSpec's "CR 613.7f" pair is where it is driven.
-data TurnFaceDown = MkTurnFaceDown
+data TurnFaceDown ability = MkTurnFaceDown
   { ref :: ObjectRef.ObjectRef,
-    characteristics :: FaceDownCharacteristics.FaceDownCharacteristics
+    characteristics :: FaceDownCharacteristics.FaceDownCharacteristics ability
   }
   deriving (Eq, Ord, Show)
