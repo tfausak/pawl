@@ -3081,17 +3081,14 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                       let assisting c = do
                             assisted <- maybe (pure c) (\h -> Cost.payAssist h (PaymentSubject.Casting sid) sid c) helper
                             Cost.announceSubstitutions Cost.manaSubstitutions pid sid assisted
-                      (payment, substitutedBindings) <- Cost.paySubstituting perform Nothing PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid assisting paidCost
+                      (payment, substitutedBindings) <- Cost.paySubstituting perform before PaymentMoment.OutsideResolution (PaymentSubject.Casting sid) (Just sid) spending pid sid assisting paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
-                        -- and CR 601.2 returns the game to before it was proposed
-                        -- -- which is what takes the spell back off the stack.
-                        -- Not the bare `reject` every other rejection here uses:
-                        -- CR 733.1's last sentence, Cost.keepingLibraryActions'
-                        -- reason -- a mana ability tapped in the window this
-                        -- payment opened may have shuffled or revealed, and
-                        -- this restore must not undo that too.
-                        Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
+                        -- and CR 733.1 reverses it -- which is what takes the
+                        -- spell back off the stack. The payment did that back to
+                        -- `before`, keeping what the payer chose to keep of the
+                        -- mana window, so there is nothing left to undo here.
+                        Payment.Unpaid -> pure ()
                         -- WHICH of the candidate costs was paid is `castFor`
                         -- above, stamped on the spell as Object.castUsing. CR
                         -- 702.34a asks as the cast completes, and

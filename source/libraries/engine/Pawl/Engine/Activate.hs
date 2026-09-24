@@ -424,8 +424,8 @@ activateAbility pid srcId ability = do
               -- this ability -- but Unpaid is reachable all the same, because the
               -- mana window then asks the player to make those choices and a
               -- mis-tapped colour is a choice the engine must honour (Cost.payMana).
-              -- Reject-not-repair restores the whole activation, including the
-              -- ability object this function put on the stack.
+              -- An unpaid cost reverses the whole activation (CR 733.1),
+              -- including the ability object this function put on the stack.
               -- CR 701.67a's offer is handed to the PAYMENT rather than made
               -- here, Cast.castSpellWith's posture and for its reason: CR
               -- 601.2g's mana window opens first, and the payer says how much of
@@ -433,7 +433,7 @@ activateAbility pid srcId ability = do
               -- (Cost.paySubstituting). The bindings the substitution makes are
               -- dropped -- no printing reads back which permanents a waterbend
               -- cost tapped, where CR 702.51c's convoke does.
-              (payment, _) <- Cost.paySubstituting Resolve.performManaAbility Nothing PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.activationManaSubstitutions pid srcId) paidCost
+              (payment, _) <- Cost.paySubstituting Resolve.performManaAbility before PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.activationManaSubstitutions pid srcId) paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage
@@ -489,8 +489,7 @@ activateAbility pid srcId ability = do
                   -- After the payment for Cast.castSpell's reason: everything
                   -- above can still restore `before` and unwind the activation.
                   Event.becameTarget announced abilId StackObjectKind.ActivatedAbility pid chosen
-                -- CR 733.1's last sentence, Cost.keepingLibraryActions' reason:
-                -- a mana ability tapped in the window this payment opened may
-                -- have shuffled or revealed, and this reject-not-repair
-                -- restore must not undo that too.
-                Payment.Unpaid -> Cost.restoreKeepingLibraryActions before
+                -- CR 733.1: the payment reversed the activation back to
+                -- `before` itself, keeping what the payer chose to keep of the
+                -- mana window.
+                Payment.Unpaid -> pure ()

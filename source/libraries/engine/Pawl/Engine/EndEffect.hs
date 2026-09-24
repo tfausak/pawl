@@ -100,7 +100,7 @@ endEffect pid oid = do
       -- prompt is raised today. A printing that did would be the one to
       -- refute that.
       (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (PaidExpiry.cost offer)
-      payment <- Cost.pay Resolve.performManaAbility (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+      payment <- Cost.pay Resolve.performManaAbility before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
       case payment of
         -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
         -- special action IS the whole of what failed, so `before` goes to

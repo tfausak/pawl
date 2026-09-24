@@ -21,6 +21,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Object (Object)
+import qualified Pawl.Types.Object as Object
 
 -- CR 733.1: `closed` with the announcement undone -- "the entire action is
 -- reversed and any payments already made are canceled", while the mana
@@ -32,21 +34,21 @@ import qualified Pawl.Types.GameState as GameState
 -- rather than a claim of impossibility: Pawl.Engine.Cost then reverses the whole
 -- action unasked, which is what every caller did before this function existed,
 -- so the worst it can cost is the question. Nothing in the suite reaches it --
--- CostSpec's "Reversal" groups and Pawl.FaceDownSpec's would lose their prompt
--- if it did.
+-- the Reversal groups in CostSpec, CombatCostSpec and Pawl.FaceDownSpec would
+-- lose their prompt if it did.
 --
 -- A TOTAL record construction, one bind per field, never a record update: a new
 -- GameState field is then a `-Wmissing-fields` error here rather than a leaf
 -- that silently keeps the announcement's value.
 --
--- The `objects` and `combat` fields are whole-value leaves, so a permanent or a
--- declaration both sides wrote answers Nothing. That is the combat toll's case
--- and not this one -- CR 508.1f taps a creature the window may tap again -- and
--- the per-field descent those two need is #3867.
+-- `objects` descends into each Object's fields (`objectWith`). `combat` is a
+-- whole-value leaf: a declaration writes it (Combat.declaredAttackers,
+-- Combat.declaredBlockers), and a window that wrote it too answers Nothing, the
+-- conservative fallback above.
 withoutAnnouncement :: GameState -> GameState -> GameState -> Maybe GameState
 withoutAnnouncement before entry closed = do
   settings <- one GameState.settings
-  objects <- mapOf GameState.objects
+  objects <- mapWith objectWith (GameState.objects before) (GameState.objects entry) (GameState.objects closed)
   library <- libraries GameState.library
   hand <- zoneOf GameState.hand
   graveyard <- zoneOf GameState.graveyard
@@ -254,26 +256,14 @@ withoutAnnouncement before entry closed = do
     seqOf field = Just (Seq.fromList (elements (Foldable.toList (field before)) (Foldable.toList (field entry)) (Foldable.toList (field closed))))
     zoneOf :: (Ord k, Eq a) => (GameState -> Map.Map k (Seq.Seq a)) -> Maybe (Map.Map k (Seq.Seq a))
     zoneOf field = mapWith (\b e c -> Just (Seq.fromList (elements (Foldable.toList b) (Foldable.toList e) (Foldable.toList c)))) (field before) (field entry) (field closed)
-    -- CR 733.1's last sentence: a shuffle is never reversed. Where neither side
-    -- moved a library card the membership is unchanged and the window's ORDER
-    -- stands -- which is every board this is reached on today, the
-    -- announcement's whole diff being empty for every caller that gets here
-    -- (Pawl.Engine.Cost.reverseIllegal).
-    --
-    -- Not implemented: where a card DID move, the element rule below runs and a
-    -- shuffle performed beside that move goes back with it -- as does the move
-    -- itself, which rule 733.1's last sentence forbids reversing as well. Both
-    -- sides can make one. The announcement can cast from a library (Panglacial
-    -- Wurm), and the window can too: CR 605.1a disqualifies an activated ability
-    -- whose cost or effect MOVES a library card, which a shuffle does not
-    -- (synthetic-shuffling-tomb), and CR 605.1b states no library clause at all,
-    -- so a triggered mana ability resolved inline may even mill (#3119).
-    libraries :: (Ord k, Ord a) => (GameState -> Map.Map k (Seq.Seq a)) -> Maybe (Map.Map k (Seq.Seq a))
-    libraries field = mapWith ordering (field before) (field entry) (field closed)
-      where
-        ordering b e c
-          | Set.fromList (Foldable.toList b) == Set.fromList (Foldable.toList c) = Just c
-          | otherwise = Just (Seq.fromList (elements (Foldable.toList b) (Foldable.toList e) (Foldable.toList c)))
+    -- CR 733.1's last sentence: a shuffle is never reversed, nor a move to a
+    -- library or out of one to anywhere but the stack. So the window's ORDER
+    -- stands, and so does whatever the window moved; what goes back is only the
+    -- announcement's own move, which is a cast from a library (Panglacial Wurm)
+    -- and so the stack exception. A card the announcement took returns at the
+    -- index it held, and a card it added goes.
+    libraries :: (Ord k, Eq a) => (GameState -> Map.Map k (Seq.Seq a)) -> Maybe (Map.Map k (Seq.Seq a))
+    libraries field = mapWith (\b e c -> Just (Seq.fromList (libraryOrder (Foldable.toList b) (Foldable.toList e) (Foldable.toList c)))) (field before) (field entry) (field closed)
     -- CR 733.1: "no abilities trigger and no effects apply as a result of an
     -- undone action", so the announcement's own segment of the log goes and the
     -- window's stands. The log only grows, so that segment is the one between
@@ -288,6 +278,137 @@ withoutAnnouncement before entry closed = do
     eventsOf :: (GameState -> Seq.Seq a) -> Maybe (Seq.Seq a)
     eventsOf field = Just (Seq.take (Seq.length (field before)) (field closed) <> Seq.drop (Seq.length (field entry)) (field closed))
 
+-- `leaf` reached through an Object's fields, so a permanent both sides wrote
+-- keeps each side's own field: CR 508.1f taps or CR 508.1g exerts an attacker,
+-- and the toll's window may tap that same creature for mana (Springleaf Drum's
+-- "Tap an untapped creature you control"). CombatCostSpec's "Reversal at a
+-- combat toll" group is the proof. Each field is a whole-value leaf.
+--
+-- A TOTAL record construction for `withoutAnnouncement`'s reason: a new Object
+-- field is a `-Wmissing-fields` error here.
+objectWith :: Object -> Object -> Object -> Maybe Object
+objectWith before entry closed = do
+  owner <- field Object.owner
+  enteredUnder <- field Object.enteredUnder
+  source <- field Object.source
+  zone <- field Object.zone
+  tapped <- field Object.tapped
+  facing <- field Object.facing
+  flipped <- field Object.flipped
+  exiledFaceDown <- field Object.exiledFaceDown
+  exileLookers <- field Object.exileLookers
+  damage <- field Object.damage
+  sickness <- field Object.sickness
+  controlClock <- field Object.controlClock
+  bindings <- field Object.bindings
+  counters <- field Object.counters
+  counterTimestamps <- field Object.counterTimestamps
+  attachedTo <- field Object.attachedTo
+  chosenColor <- field Object.chosenColor
+  chosenSubtype <- field Object.chosenSubtype
+  chosenNames <- field Object.chosenNames
+  chosenPlayer <- field Object.chosenPlayer
+  timestamp <- field Object.timestamp
+  face <- field Object.face
+  turnedOverAt <- field Object.turnedOverAt
+  worldSince <- field Object.worldSince
+  playableFromExile <- field Object.playableFromExile
+  plotted <- field Object.plotted
+  foretold <- field Object.foretold
+  foretellCostReduction <- field Object.foretellCostReduction
+  warped <- field Object.warped
+  preparedCopyOf <- field Object.preparedCopyOf
+  ringBearerFor <- field Object.ringBearerFor
+  protector <- field Object.protector
+  ventureRoom <- field Object.ventureRoom
+  classLevel <- field Object.classLevel
+  unlockedHalves <- field Object.unlockedHalves
+  designations <- field Object.designations
+  designationValues <- field Object.designationValues
+  paidCosts <- field Object.paidCosts
+  tributePaid <- field Object.tributePaid
+  bestowed <- field Object.bestowed
+  mutating <- field Object.mutating
+  prototyped <- field Object.prototyped
+  boughtBack <- field Object.boughtBack
+  spliced <- field Object.spliced
+  phyrexianLifePaid <- field Object.phyrexianLifePaid
+  manaSpent <- field Object.manaSpent
+  announcedX <- field Object.announcedX
+  castFrom <- field Object.castFrom
+  castUsing <- field Object.castUsing
+  castGrant <- field Object.castGrant
+  detainedUntil <- field Object.detainedUntil
+  goadedBy <- field Object.goadedBy
+  doesNotUntapNext <- field Object.doesNotUntapNext
+  exertedBy <- field Object.exertedBy
+  activatedOnce <- field Object.activatedOnce
+  paired <- field Object.paired
+  duplicate <- field Object.duplicate
+  pure
+    Object.MkObject
+      { Object.owner = owner,
+        Object.enteredUnder = enteredUnder,
+        Object.source = source,
+        Object.zone = zone,
+        Object.tapped = tapped,
+        Object.facing = facing,
+        Object.flipped = flipped,
+        Object.exiledFaceDown = exiledFaceDown,
+        Object.exileLookers = exileLookers,
+        Object.damage = damage,
+        Object.sickness = sickness,
+        Object.controlClock = controlClock,
+        Object.bindings = bindings,
+        Object.counters = counters,
+        Object.counterTimestamps = counterTimestamps,
+        Object.attachedTo = attachedTo,
+        Object.chosenColor = chosenColor,
+        Object.chosenSubtype = chosenSubtype,
+        Object.chosenNames = chosenNames,
+        Object.chosenPlayer = chosenPlayer,
+        Object.timestamp = timestamp,
+        Object.face = face,
+        Object.turnedOverAt = turnedOverAt,
+        Object.worldSince = worldSince,
+        Object.playableFromExile = playableFromExile,
+        Object.plotted = plotted,
+        Object.foretold = foretold,
+        Object.foretellCostReduction = foretellCostReduction,
+        Object.warped = warped,
+        Object.preparedCopyOf = preparedCopyOf,
+        Object.ringBearerFor = ringBearerFor,
+        Object.protector = protector,
+        Object.ventureRoom = ventureRoom,
+        Object.classLevel = classLevel,
+        Object.unlockedHalves = unlockedHalves,
+        Object.designations = designations,
+        Object.designationValues = designationValues,
+        Object.paidCosts = paidCosts,
+        Object.tributePaid = tributePaid,
+        Object.bestowed = bestowed,
+        Object.mutating = mutating,
+        Object.prototyped = prototyped,
+        Object.boughtBack = boughtBack,
+        Object.spliced = spliced,
+        Object.phyrexianLifePaid = phyrexianLifePaid,
+        Object.manaSpent = manaSpent,
+        Object.announcedX = announcedX,
+        Object.castFrom = castFrom,
+        Object.castUsing = castUsing,
+        Object.castGrant = castGrant,
+        Object.detainedUntil = detainedUntil,
+        Object.goadedBy = goadedBy,
+        Object.doesNotUntapNext = doesNotUntapNext,
+        Object.exertedBy = exertedBy,
+        Object.activatedOnce = activatedOnce,
+        Object.paired = paired,
+        Object.duplicate = duplicate
+      }
+  where
+    field :: (Eq a) => (Object -> a) -> Maybe a
+    field get = leaf (get before) (get entry) (get closed)
+
 -- The rule every leaf takes. `before` is where the action began, `entry` where
 -- the mana window opened, `closed` where it shut.
 --
@@ -300,6 +421,27 @@ leaf before entry closed
   | entry == closed = Just before
   | before == closed = Just before
   | otherwise = Nothing
+
+-- A library as `withoutAnnouncement` leaves it: `closed`'s order with the
+-- announcement's move undone. Kept apart from `elements`, whose order is
+-- `before`'s: that would put back a shuffle the window performed.
+libraryOrder :: (Eq a) => [a] -> [a] -> [a] -> [a]
+libraryOrder before entry closed =
+  let stayed = filter (\x -> elem x before || notElem x entry) closed
+      taken = [(i, x) | (i, x) <- zip [0 :: Int ..] before, notElem x entry, notElem x closed]
+   in putBackAt stayed taken
+
+-- A library the WHOLE action is reversed over, CR 733.1's last sentence still
+-- standing: `since`'s order, less what it gained, with what it lost back at the
+-- index `snapshot` gave it. Pawl.Engine.Cost.keepingLibraryActions is the
+-- caller. Where the membership is unchanged this is `since` itself.
+restoredOrder :: (Eq a) => [a] -> [a] -> [a]
+restoredOrder snapshot since =
+  putBackAt (filter (`elem` snapshot) since) [(i, x) | (i, x) <- zip [0 :: Int ..] snapshot, notElem x since]
+
+-- Each card at its index, in ascending order of index.
+putBackAt :: [a] -> [(Int, a)] -> [a]
+putBackAt = Foldable.foldl' (\held (i, x) -> let (above, below) = splitAt i held in above <> (x : below))
 
 -- `leaf` reached through a map's keys, with a missing key read as a value of its
 -- own so that an inserted key and a deleted one take the same rule as a changed

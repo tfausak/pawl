@@ -75,6 +75,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaRetention as ManaRetention
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -255,7 +256,7 @@ doorSpec s registry =
     Spec.it s "CR 118.6 paying an unpayable cost changes nothing" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 3
-          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay S.manaPerformer Nothing PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
+          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay S.manaPerformer gs PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
       Spec.assertEqWith s "Unpaid" outcome Payment.Unpaid
       Spec.assertEqWith s "no land tapped" (S.tappedCount S.alice after) 0
     -- CR 701.21a: enough controlled permanents matching the criterion.
@@ -1787,7 +1788,7 @@ jaradSpec s registry =
         (namesIn Zone.Graveyard forestFirst)
         (names ["Bayou", "Jarad, Golgari Lich Lord", "Swamp"])
       -- The other order is a legal answer that loses the payment, which is the
-      -- player's own doing: Cost.pay restores the entry state, so the Bayou it
+      -- player's own doing: CR 733.1 reverses the payment, so the Bayou it
       -- spent on the Swamp half is back and nothing was paid.
       Spec.assertEqWith
         s
@@ -2835,6 +2836,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   reversalSpec s registry
   shufflingReversalSpec s registry
   reversalRigSpec s registry
+  announcedReversalSpec s registry
   siegeWurmSpec s registry
   veneratedLoxodonSpec s registry
   convokeWindowSpec s registry
@@ -3427,7 +3429,7 @@ catharticReunionSpec s registry =
     Spec.it s "CR 601.2h an undersized answer leaves the whole cast unpaid, not partly paid" $ do
       -- The COST path's reject-not-repair, and deliberately the opposite of what
       -- the Discard EFFECT does after #245: a cost may go unpaid, so Pawl.Engine.Cost.pay
-      -- restores the entry state and nothing at all happened. Three other cards
+      -- reverses the cast (CR 733.1) and nothing at all happened. Three other cards
       -- makes the prompt real (hand > count), unlike the forced case above.
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
@@ -3564,10 +3566,10 @@ tappingNothing p = case p of
   _ -> S.identityAnswer p
 
 -- How many mana this source put in alice's pool. The observable that says the
--- cost was PAID: Cost.pay restores the entry state for an unpaid one at CR
--- 601.2h's moment, so a refused payment adds nothing and taps nothing. (CR
--- 118.12's moment is where rule 733.1 lets the payer keep what the window made
--- -- reversalSpec below.)
+-- cost was PAID: an unpaid one is reversed at CR 601.2h's moment, and
+-- S.identityAnswer reverses the mana abilities with it (CR 733.1), so a refused
+-- payment adds nothing and taps nothing. announcedReversalSpec below is the
+-- payer who keeps them.
 pooledFrom :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Int
 pooledFrom answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana S.manaPerformer oid)) of
   Mana.Type.MkMana units -> length units
@@ -4959,8 +4961,8 @@ attemptLeak taps decision tombId cast =
 -- CR 733.1: an action a player starts and cannot legally complete is reversed
 -- and its payments cancelled, but "each player may also reverse any legal mana
 -- abilities that player activated while making the illegal play" -- so that half
--- is a question, not the engine's to settle. CR 118.12's payment is the moment
--- pawl can honour the answer (Cost.pay says which cannot and why), and Ancient
+-- is a question, not the engine's to settle. This is CR 118.12's payment
+-- (announcedReversalSpec below has a cast's and an activation's), and Ancient
 -- Tomb is the sharpest producer for it: keeping the activation keeps two
 -- colorless floating (CR 106.4), the land tapped (CR 107.5) and CR 405.6c's 2
 -- damage charged, so all three ride on one answer.
@@ -5128,6 +5130,140 @@ reversalRigSpec s registry = Spec.describe s "Synthetic Reversal Rig" $ do
     Spec.assertBool s (libraryOrder S.alice after /= original) "which is not the pre-shuffle order the reversed activation still would be"
     Spec.assertEqWith s "nothing of alice's was discarded" (S.handSize S.alice after) 2
     Spec.assertEqWith s "and the unpayable activation never reached the stack" (length (GameState.stack after)) 0
+
+-- alice holds a Goblin Piker ({1}{R}) with one Forest and one Mountain to cast
+-- it. Returns the Piker, the Forest and the Mountain.
+announcedCastBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+announcedCastBoard forest mountain piker =
+  let (forestId, g1) = S.addPermanent forest S.alice (Setup.emptyGame S.bothPlayers)
+      (mountainId, g2) = S.addPermanent mountain S.alice g1
+      (g3, pikerId) = S.handOne piker g2
+   in ( pikerId,
+        forestId,
+        mountainId,
+        g3
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- CR 605.3a's window answered with `wanted` in order: each is tapped when the
+-- engine offers it, and the window closes once none of them is left on offer.
+-- CR 733.1's question is answered with `decision` and counted. Everything else
+-- goes to `rest`.
+keepingOrNot :: OptionalDecision.OptionalDecision -> [ObjectId.ObjectId] -> (forall a. Prompt.Prompt a -> a) -> Prompt.Prompt r -> State.State Int r
+keepingOrNot decision wanted rest p = case p of
+  Prompt.ChooseManaSource _ _ candidates -> pure (List.find (`elem` NonEmpty.toList candidates) wanted)
+  Prompt.ReverseManaAbilities _ player _ | player == S.alice -> do
+    State.modify' (+ 1)
+    pure decision
+  _ -> pure (rest p)
+
+-- Mystic Gate's "{W/U}, {T}" route, with its {W/U} announced blue. The yield is
+-- picked out of the offered options, never built.
+gateRoute :: Prompt.Prompt r -> r
+gateRoute p = case p of
+  Prompt.ChooseManaYield _ _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (maybe False (not . null . ManaCost.unwrap) . Cost.Type.mana . ManaOption.cost) (NonEmpty.toList candidates))
+  Prompt.AnnounceHybridHalf _ _ _ _ offers -> Maybe.fromMaybe (NonEmpty.head offers) (List.find (== ManaType.Colored Color.Blue) (NonEmpty.toList offers))
+  _ -> S.identityAnswer p
+
+-- CR 733.1 where the payment is NOT the whole of the action: a cast has put its
+-- spell on the stack (CR 601.2a) and an activation its ability (CR 602.2a)
+-- before the window opens, and a mana ability's own cost opens a window nested
+-- inside another activation. The announcement goes back unasked; the mana
+-- abilities are still the payer's to keep.
+--
+-- Every case is a PAIR on one board differing only in the answer to
+-- Prompt.ReverseManaAbilities.
+announcedReversalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+announcedReversalSpec s registry = Spec.describe s "Reversal after an announcement" $ do
+  -- alice taps only the Forest for her Piker's {1}{R} and closes the window.
+  -- CR 601.2h refuses the payment and CR 733.1 takes the spell back to her hand.
+  Spec.it s "CR 733.1 a caster who keeps the mana ability has the spell back in hand and the mana floating" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, forestId, mountainId, gs) = announcedCastBoard forest mountain piker
+        ((_, kept), asked) = State.runState (Engine.runGame (keepingOrNot OptionalDecision.Declines [forestId] S.identityAnswer) gs (S.cast S.alice pikerId)) 0
+        ((_, reversed), _) = State.runState (Engine.runGame (keepingOrNot OptionalDecision.Exercises [forestId] S.identityAnswer) gs (S.cast S.alice pikerId)) 0
+        -- CR 733.2: alice recasts, tapping the Mountain, and the {G} still
+        -- floating pays the {1}.
+        ((_, recast), _) = State.runState (Engine.runGame (keepingOrNot OptionalDecision.Declines [mountainId] S.identityAnswer) kept (S.cast S.alice pikerId)) 0
+    Spec.assertEqWith s "CR 106.4 the Forest's {G} is still in alice's pool" (poolSize S.alice kept) 1
+    Spec.assertBool s (isTapped forestId kept) "CR 107.5 and the Forest stays tapped"
+    Spec.assertEqWith s "CR 601.2a's move is reversed: the stack is empty" (GameState.stack kept) []
+    Spec.assertEqWith s "and the Piker is back in alice's hand" (Game.zoneMembers Zone.Hand S.alice kept) [pikerId]
+    Spec.assertEqWith s "the payer who reverses gets nothing floating" (poolSize S.alice reversed) 0
+    Spec.assertBool s (not (isTapped forestId reversed)) "and the Forest untapped"
+    Spec.assertEqWith s "and the Piker in hand all the same" (Game.zoneMembers Zone.Hand S.alice reversed) [pikerId]
+    Spec.assertEqWith s "CR 733.2 the recast spends the floating {G}: the Piker is on the stack" (length (GameState.stack recast)) 1
+    Spec.assertEqWith s "and nothing is left floating" (poolSize S.alice recast) 0
+    Spec.assertEqWith s "alice was asked once" asked 1
+
+  -- Hanweir Battlements' "{R}, {T}", paid by tapping the Battlements itself
+  -- and then the Mountain, so CR 107.5 refuses the {T}.
+  Spec.it s "CR 733.1 an activator who keeps the mana abilities keeps both lands tapped and both mana floating" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case hasteAbility battlements of
+      Nothing -> Spec.assertFailure s "Hanweir Battlements should print two activated abilities"
+      Just haste -> do
+        let (battlementsId, mountainId, pikerId, gs) = hanweirBattlementsBoard battlements mountain piker
+            run decision = State.runState (Engine.runGame (keepingOrNot decision [battlementsId, mountainId] (targeting pikerId)) gs (Activate.activateAbility S.alice battlementsId haste)) 0
+            ((_, kept), asked) = run OptionalDecision.Declines
+            ((_, reversed), _) = run OptionalDecision.Exercises
+        Spec.assertEqWith s "CR 106.4 the {R} and the {C} are still in alice's pool" (poolSize S.alice kept) 2
+        Spec.assertBool s (isTapped battlementsId kept && isTapped mountainId kept) "CR 107.5 and both lands stay tapped"
+        Spec.assertEqWith s "CR 602.2a's ability object is gone from the stack" (GameState.stack kept) []
+        Spec.assertEqWith s "and CR 602.5b's record was never written" (GameState.activatedThisTurn kept) (GameState.activatedThisTurn gs)
+        Spec.assertEqWith s "the payer who reverses gets nothing floating" (poolSize S.alice reversed) 0
+        Spec.assertBool s (not (isTapped battlementsId reversed || isTapped mountainId reversed)) "and both lands untapped"
+        Spec.assertEqWith s "alice was asked once" asked 1
+
+  -- Mystic Gate's "{W/U}, {T}" activated from nothing: its own window taps the
+  -- Gate for its "{T}: Add {C}" and then the Island for {U}, so the {W/U} is
+  -- paid and the Gate's {T} is not (CR 107.5).
+  Spec.it s "CR 733.1 a nested window's mana abilities are the payer's to keep" $ do
+    gate <- S.printingOf s registry "Mystic Gate"
+    island <- S.printingOf s registry "Island"
+    let (gateId, g1) = S.addPermanent gate S.alice (Setup.emptyGame S.bothPlayers)
+        (islandId, gs) = S.addPermanent island S.alice g1
+        run decision = State.runState (Engine.runGame (keepingOrNot decision [gateId, islandId] gateRoute) gs (Cost.tapForMana S.manaPerformer gateId)) 0
+        ((paid, kept), asked) = run OptionalDecision.Declines
+        ((_, reversed), _) = run OptionalDecision.Exercises
+    Spec.assertEqWith s "CR 106.4 the Island's {U} and the Gate's {C} are floating" (poolSize S.alice kept) 2
+    Spec.assertBool s (isTapped islandId kept && isTapped gateId kept) "CR 107.5 and both stay tapped"
+    Spec.assertEqWith s "the payer who reverses gets nothing floating" (poolSize S.alice reversed) 0
+    Spec.assertBool s (not (isTapped islandId reversed || isTapped gateId reversed)) "and both untapped"
+    Spec.assertBool s (not paid) "CR 601.2h the {W/U} activation itself was refused"
+    Spec.assertEqWith s "alice was asked once" asked 1
+
+  -- The same Gate activated INSIDE a cast's window: its nested window refuses,
+  -- alice keeps the Gate's {C} and the Island's {U}, and the outer window closes
+  -- with nothing else activated -- the Mountain, there so the cast is offered
+  -- at all, is left untapped. {U}{C} cannot pay the Piker's {1}{R}, so the
+  -- cast is reversed -- and the two kept activations are still the payer's to
+  -- keep, since they were activated while making the illegal play.
+  Spec.it s "CR 733.1 what a nested window kept is offered again when the outer payment fails" $ do
+    gate <- S.printingOf s registry "Mystic Gate"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gateId, g1) = S.addPermanent gate S.alice (Setup.emptyGame S.bothPlayers)
+        (islandId, g2) = S.addPermanent island S.alice g1
+        (g3, pikerId) = S.handOne piker (snd (S.addPermanent mountain S.alice g2))
+        gs = g3 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        run decision = State.runState (Engine.runGame (keepingOrNot decision [gateId, islandId] gateRoute) gs (S.cast S.alice pikerId)) 0
+        ((_, kept), asked) = run OptionalDecision.Declines
+        ((_, reversed), _) = run OptionalDecision.Exercises
+    Spec.assertEqWith s "CR 106.4 the {C} and the {U} are still floating" (poolSize S.alice kept) 2
+    Spec.assertBool s (isTapped gateId kept && isTapped islandId kept) "CR 107.5 and both lands stay tapped"
+    Spec.assertEqWith s "CR 601.2a the Piker is back in hand" (Game.zoneMembers Zone.Hand S.alice kept) [pikerId]
+    Spec.assertEqWith s "the payer who reverses gets nothing floating" (poolSize S.alice reversed) 0
+    Spec.assertBool s (not (isTapped gateId reversed || isTapped islandId reversed)) "and both lands untapped"
+    Spec.assertEqWith s "alice was asked twice: once by the nested window, once by the cast" asked 2
 
 -- `n` copies of one printing onto alice's battlefield, ids in creation order.
 addPermanents :: Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.ObjectId], GameState.GameState)
