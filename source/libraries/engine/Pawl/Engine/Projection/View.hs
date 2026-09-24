@@ -1861,7 +1861,7 @@ controlNames grants visited gs source a = case a of
   -- values, since layer 1 is the only layer before it and CR 613.8a confines
   -- dependency to one layer -- so no layer-4 type change feeds this test, which
   -- is what lets it run without projecting.
-  Affected.Matching f -> Set.filter (matchesLeanly grants visited gs source f) (GameState.battlefield gs)
+  Affected.Matching f -> Set.filter (\oid -> matchesLeanly grants visited gs source f oid && controlReaches grants visited gs source oid) (GameState.battlefield gs)
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.MatchingOffBattlefield _ -> Set.empty
   -- A rider is stored against the object it names (Event.permissionRiders), and
@@ -1905,6 +1905,19 @@ controlNames grants visited gs source a = case a of
        in Set.filter
             (\oid -> controllerOfGiven others Set.empty oid gs == Just pid && matchesLeanly grants visited gs source f oid)
             (GameState.battlefield gs)
+
+-- CR 801.10 for a layer-2 grant: is `oid` within the range of influence of
+-- `source`'s controller, judged on the controller `oid` has WITHOUT this source's
+-- own grants? A grant cannot bring an object into its own reach by taking it:
+-- CR 613.8a's dependency, and the AttachedPlayerControls arm's escape above,
+-- whose strictly shorter grant list is also what makes this terminate. Asked of
+-- the limited-range option first, so a game without it takes no control fold.
+-- Pawl.RangeOfInfluenceSpec's "CR 801.10 a control grant does not take a
+-- permanent outside its controller's range" proves it.
+controlReaches :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> ObjectId -> Bool
+controlReaches grants visited gs source oid =
+  Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs)))
+    || all (\you -> objectInRangeGiven (filter (\g -> cgSource g /= source) grants) you oid gs) (controllerOfGiven grants visited source gs)
 
 -- Does `oid` match a layer-2 affected set's Filter, read at the copiable values
 -- controlNames explains and with CR 109.5's "you" bound to the SOURCE's
