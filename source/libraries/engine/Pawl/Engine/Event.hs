@@ -4858,7 +4858,9 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       mBack = if EntryRiders.transformed riders then mCard >>= Card.backFace else Nothing
       -- CR 708.3 turns a face-down entry over BEFORE it enters, so neither the
       -- front face (CR 712.14b, 712.15) nor the card type (CR 400.4a) is asked
-      -- of it: a manifested or Magar'd instant is a face-down 3/3 as it enters.
+      -- of it: a face-down instant enters with only its listed characteristics
+      -- -- manifest's 2/2 (CR 701.40a), cloak's 2/2 with ward {2} (CR 701.58a),
+      -- Magar's 3/3.
       faceUpEntry = Maybe.isNothing (EntryRiders.faceDown riders)
       -- CR 400.4a / 304.4 / 307.4: an instant or sorcery card entering face up
       -- stays where it was -- Flicker of Fate returning the card under Magar's
