@@ -48,7 +48,8 @@ import qualified System.Directory as Directory
 -- caller supplied the name (#649).
 data Registry m = MkRegistry
   { fetchCard :: CardName.CardName -> m (Maybe Card.Card),
-    -- | Every card the pool holds, once each.
+    -- | Every card of the Oracle card reference the pool holds, once each. A
+    -- synthetic test fixture is in the pool without being such a card.
     cards :: m [Card.Card]
   }
 
@@ -95,7 +96,16 @@ fileRegistry root = do
       loaded <- loadRoot root
       case index loaded of
         Left problems -> Exception.throwIO InvalidCorpus.MkInvalidCorpus {InvalidCorpus.root = root, InvalidCorpus.problems = problems}
-        Right keyed -> pure MkRegistry {fetchCard = \name -> pure (Map.lookup (slugFor name) keyed), cards = pure (Maybe.mapMaybe (either (const Nothing) Just . snd) loaded)}
+        Right keyed -> pure MkRegistry {fetchCard = \name -> pure (Map.lookup (slugFor name) keyed), cards = pure (Maybe.mapMaybe referenceCard loaded)}
+
+-- A parsed card of the Oracle card reference, which a synthetic is not: a card
+-- no printing carries, written only to reach a rule, and filed as
+-- `synthetic-*.json` (docs/design.md section 6).
+referenceCard :: (FilePath, Either Text.Text Card.Card) -> Maybe Card.Card
+referenceCard (path, parsed) =
+  if "synthetic-" `List.isPrefixOf` List.reverse (List.takeWhile (/= '/') (List.reverse path))
+    then Nothing
+    else either (const Nothing) Just parsed
 
 -- The slug a name is looked up by. `named` accepts a name or a slug for the
 -- same reason: slugify is idempotent, so the two are one lookup.

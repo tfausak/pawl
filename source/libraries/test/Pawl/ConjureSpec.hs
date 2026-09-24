@@ -41,6 +41,7 @@
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -824,6 +825,39 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "the lying reference was what offered it"
       offers
       [[goblinPiker, hillGiant, ancientVendetta, giantSpider]]
+  -- The first case's board over the suite's own FILE registry, beside a
+  -- Llanowar Elves so X is 3, a mana value synthetic creature cards in
+  -- data/cards/ share. Randomness names a synthetic wherever one is offered: a
+  -- synthetic is a test fixture and no card of the Oracle card reference, so
+  -- none is, and a real card enters.
+  Spec.it s "a conjure from the file registry's reference never conjures a synthetic card" $ do
+    fear <- S.printingOf s registry "Fear of Change"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (_, withElves) = S.addPermanent elves S.alice (Setup.emptyGame S.bothPlayers)
+        (_, entered) = S.entersWithTrigger fear S.alice withElves
+        lifted = Registry.MkRegistry {Registry.fetchCard = Trans.lift . Registry.fetchCard registry, Registry.cards = Trans.lift (Registry.cards registry)}
+        synthetic name = Text.pack "Synthetic " `Text.isPrefixOf` CardName.unwrap name
+        answer :: (Monad m) => Asked.Asked r -> State.StateT [[CardName.CardName]] m r
+        answer asked = case Asked.prompt asked of
+          Prompt.RandomCard offered -> do
+            State.modify' (NonEmpty.toList offered :)
+            pure (Maybe.fromMaybe (NonEmpty.head offered) (List.find synthetic (NonEmpty.toList offered)))
+          p -> pure (S.identityAnswer p)
+        run = do
+          (_, settled) <- Engine.runGameAsked (Interpreter.lookingUpCards lifted answer) entered Engine.settleForPriority
+          Engine.runGameAsked (Interpreter.lookingUpCards lifted answer) settled Engine.priorityLoop
+    ((_, final), logged) <- State.runStateT run []
+    let arrived = filter (`notElem` [fearOfChange, llanowarElves]) (namesIn Zone.Battlefield final)
+    Spec.assertEqWith
+      s
+      "one creature card entered, and it is no synthetic"
+      (length arrived, filter synthetic arrived)
+      (1, [])
+    Spec.assertEqWith
+      s
+      "the reference offered no synthetic"
+      (concatMap (filter synthetic) logged, length logged)
+      ([], 1)
   -- Smog Smasher ({4}{R} Creature -- Mutant Berserker, 4/4, "Menace / Start
   -- your engines! / Whenever one or more creatures you control deal combat
   -- damage to a player, conjure a duplicate of target nontoken creature into
@@ -880,6 +914,9 @@ moxPearl = CardName.MkCardName (Text.pack "Mox Pearl")
 
 fearOfChange :: CardName.CardName
 fearOfChange = CardName.MkCardName (Text.pack "Fear of Change")
+
+llanowarElves :: CardName.CardName
+llanowarElves = CardName.MkCardName (Text.pack "Llanowar Elves")
 
 -- Smog Smasher attacks bob alone, unblocked, beside bob's Hill Giant, and its
 -- combat damage trigger aims at the Giant, FILTERED out of the offered
