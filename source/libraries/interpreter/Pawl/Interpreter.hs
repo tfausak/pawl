@@ -120,18 +120,21 @@ policingCardNames registry answer asked = case Asked.prompt asked of
      in again
   _ -> answer asked
 
--- CR 108.1: Prompt.LookUpCard and Prompt.ReferenceCards answered from the
--- registry, the reference an interpreter holds; every other prompt goes to the
--- answerer beneath. Installed beside policingCardNames, whose registry it
--- shares.
+-- CR 108.1: Prompt.LookUpCard, Prompt.ReferenceCards and Prompt.ReferenceNames
+-- answered from the registry, the reference an interpreter holds; every other
+-- prompt goes to the answerer beneath. Installed beside policingCardNames, whose
+-- registry it shares.
 --
 -- A reference card is named by its FIRST face, which is the name
 -- Prompt.LookUpCard then fetches it back by. The pick among the names is not
 -- made here: the engine asks it of the answerer beneath, as randomness.
+-- Prompt.ReferenceNames asks about every NAME instead, each judged by the view
+-- Card.referenceViews pairs it with.
 --
 -- Pawl.CastProhibitionSpec's Spy Kit case, where Runed Halo names a card in
 -- no zone, is what proves the lookup; Pawl.ConjureSpec's Fear of Change case
--- proves the enumeration.
+-- proves the enumeration; Pawl.DamageSpec's two legendary Spy Kit hosts prove
+-- the face names, a back face's among them.
 lookingUpCards ::
   (Functor m) =>
   Registry.Registry m ->
@@ -144,4 +147,8 @@ lookingUpCards registry answer asked = case Asked.prompt asked of
     fmap
       (fmap (Face.name . NonEmpty.head . Card.Type.faces) . filter (Projection.referenceAdmits (Game.teams (Asked.game asked)) amount predicate))
       (Registry.cards registry)
+  Prompt.ReferenceNames predicate ->
+    let context = Filter.contextFor (Game.teams (Asked.game asked)) Nothing Nothing
+        admitted face = Filter.matches context (Projection.viewOfCard face) predicate
+     in fmap (concatMap (fmap fst . filter (admitted . snd) . Card.referenceViews)) (Registry.cards registry)
   _ -> answer asked

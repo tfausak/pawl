@@ -31,6 +31,7 @@ import qualified Pawl.Codec.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Codec.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Codec.EventGroup as EventGroup
 import qualified Pawl.Codec.ExtraTurn as ExtraTurn
+import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.GameSettings as GameSettings
 import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.IgnoredAbility as IgnoredAbility
@@ -162,6 +163,7 @@ codec resolve = Fields.object $ do
   nextObjectId <- Fields.required "nextObjectId" ObjectId.codec GameState.nextObjectId
   printings <- Fields.defaulted "printings" Map.empty (Common.naturalMap PrintingId.codec (Printing.reference resolve)) GameState.printings
   lookedUp <- Fields.defaulted "lookedUp" Set.empty (Common.set PrintingId.codec) GameState.lookedUp
+  referenceNames <- Fields.defaulted "referenceNames" Map.empty (Common.keyedList (Common.keyValue (Filter.codec Keyword.codec) (Common.set CardName.codec))) GameState.referenceNames
   outsideCopies <- Fields.defaulted "outsideCopies" Set.empty (Common.set ObjectId.codec) GameState.outsideCopies
   namedCopyChoices <- Fields.defaulted "namedCopyChoices" Map.empty (Common.naturalMap ObjectId.codec (Common.set CardName.codec)) GameState.namedCopyChoices
   nextPrintingId <- Fields.required "nextPrintingId" PrintingId.codec GameState.nextPrintingId
@@ -251,6 +253,7 @@ codec resolve = Fields.object $ do
         GameState.nextObjectId = nextObjectId,
         GameState.printings = printings,
         GameState.lookedUp = lookedUp,
+        GameState.referenceNames = referenceNames,
         GameState.outsideCopies = outsideCopies,
         GameState.namedCopyChoices = namedCopyChoices,
         GameState.nextPrintingId = nextPrintingId,

@@ -12,10 +12,11 @@
 -- is a returned value rather than an exception for the same reason: a pure
 -- registry cannot throw. How a registry answers is not part of the type.
 --
--- Enumerating the pool is in the interface for ONE question a game asks: which
--- cards of the reference an Alchemy conjure picks over
--- (Pawl.Interpreter.lookingUpCards). A lint of the corpus pawl ships is a claim
--- about the data rather than a question for a registry, and that lives in the
+-- Enumerating the pool is in the interface for the questions a game asks about
+-- the whole reference: which cards an Alchemy conjure picks over, and which
+-- names Spy Kit's CR 612.7 grant reaches (Pawl.Interpreter.lookingUpCards). A
+-- lint of the corpus pawl ships is a claim about the data rather than a
+-- question for a registry, and that lives in the
 -- test suite, which borrows cardPath, loadRoot and filedAs -- facts about the
 -- on-disk format rather than about looking a card up. parseCard is an internal
 -- helper of loadRoot and has no test-suite caller of its own.

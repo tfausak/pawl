@@ -123,6 +123,12 @@ data Prompt r where
   -- the pick is then RandomCard's. LookUpCard's reasons for carrying neither
   -- Decider nor PlayerId.
   ReferenceCards :: Filter.Filter Keyword.Keyword -> Maybe Integer -> Prompt [CardName.CardName]
+  -- | CR 612.7 / 108.1: every name in the Oracle card reference the filter
+  -- admits, judged off printed characteristics. Asked of the interpreter once per filter a live
+  -- Pawl.Types.Modification's AddNamesMatching carries, since the projection
+  -- that reads the answer cannot ask. LookUpCard's reasons for carrying neither
+  -- Decider nor PlayerId.
+  ReferenceNames :: Filter.Filter Keyword.Keyword -> Prompt [CardName.CardName]
   -- | CR 706.4: which result of one roll instruction the roller uses (Valiant
   -- Endeavor's "roll two d6 and choose one result"); the answer indexes the
   -- results, which are in roll order and may compare equal. A choice and not a

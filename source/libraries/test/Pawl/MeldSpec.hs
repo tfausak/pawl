@@ -39,11 +39,13 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Interpreter as Interpreter
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
@@ -122,6 +124,10 @@ sparing :: ObjectId.ObjectId -> (forall a. Prompt.Prompt a -> a) -> Prompt.Promp
 sparing oid inner p = case p of
   Prompt.ChooseManaSource _ _ candidates -> List.find (/= oid) (NonEmpty.toList candidates)
   _ -> inner p
+
+-- `sparing` over S.identityAnswer, as an interpreter's answerer beneath.
+sparingAsked :: (Applicative m) => ObjectId.ObjectId -> Asked.Asked r -> m r
+sparingAsked oid asked = pure (sparing oid S.identityAnswer (Asked.prompt asked))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Meld" $ do
@@ -501,6 +507,36 @@ spec s registry = Spec.describe s "Meld" $ do
         -- time state-based actions are checked. The land is a card and stays.
         Spec.assertEqWith s "CR 111.8 the token ceases and the land is left exiled alone" (exileNames (S.settleSba after)) [S.nameOf (Printing.card battlements)]
       abilities -> Spec.assertFailure s ("expected three activated abilities on Hanweir Battlements, got " <> show (length abilities))
+
+  -- CR 612.7 with CR 701.42b/c: a Spy Kit host is named Hanweir Garrison with no
+  -- Garrison card anywhere in the game, so the land's condition holds and "exile
+  -- them" happens -- but the host is no meld card, so nothing melds and both stay
+  -- exiled. Two boards differing in one thing: the reference answered by the
+  -- suite's registry (Pawl.Interpreter.lookingUpCards), and never consulted.
+  Spec.it s "CR 612.7 / 701.42c a Spy Kit host is a Hanweir Garrison the game never saw, and both it and the land stay exiled" $ do
+    battlements <- S.printingOf s registry "Hanweir Battlements"
+    kit <- S.printingOf s registry "Spy Kit"
+    giant <- S.printingOf s registry "Hill Giant"
+    mountain <- S.printingOf s registry "Mountain"
+    let (bId, g1) = S.addPermanent battlements S.alice (Setup.emptyGame S.bothPlayers)
+        (giantId, g2) = S.addPermanent giant S.alice g1
+        (kitId, g3) = S.addPermanent kit S.alice g2
+        board = readyFor mountain (S.attachTo kitId (Recipient.ToObject giantId) g3)
+        garrisonName = CardName.MkCardName (Text.pack "Hanweir Garrison")
+        melding settled = case Projection.abilitiesOf bId settled of
+          [_, _, ability] -> Just (Activate.activateAbility S.alice bId ability >> Stack.resolveTop)
+          _ -> Nothing
+    (_, settled) <- Engine.runGameAsked (Interpreter.lookingUpCards registry (sparingAsked bId)) board Engine.settleForPriority
+    let unasked = S.runPure (sparing bId S.identityAnswer) board Engine.settleForPriority
+    case (melding settled, melding unasked) of
+      (Just act, Just actUnasked) -> do
+        (_, after) <- Engine.runGameAsked (Interpreter.lookingUpCards registry (sparingAsked bId)) settled act
+        let afterUnasked = S.runPure (sparing bId S.identityAnswer) unasked actUnasked
+        Spec.assertEqWith s "CR 701.42c the land and the host both stay exiled" (List.sort (exileNames after)) (List.sort [S.nameOf (Printing.card battlements), S.nameOf (Printing.card giant)])
+        Spec.assertEqWith s "CR 701.42b nothing melded" (S.countOnBattlefieldByName townshipName S.alice after) 0
+        Spec.assertEqWith s "with the reference never consulted the land stays on the battlefield" (fmap Object.zone (Game.lookupObject bId afterUnasked)) (Just Zone.Battlefield)
+        Spec.assertBool s (not (Map.member garrisonName (Game.referenceFaces board))) "no Hanweir Garrison card is anywhere in the game"
+      _ -> Spec.assertFailure s "expected three activated abilities on Hanweir Battlements"
 
   -- CR 202.3c: "the mana value of a melded permanent is calculated as though it
   -- had the combined mana cost of the front faces of each card that represents
