@@ -28,8 +28,8 @@ data SpellWasCast = MkSpellWasCast
     -- what Pawl.Types.SpellCast.zone matches against.
     --
     -- Nothing when the cast was proposed for a card no longer findable at that
-    -- point, which is Pawl.Engine.Cast's own `castFrom`: the value is read off
-    -- the object BEFORE the move, so it is Just for every cast that completes.
+    -- point, which is Pawl.Engine.Cast's own `castFrom`, and for a CR 707.13
+    -- copy cast from outside the game (CR 400.11), which was in no zone.
     zone :: Maybe Zone.Zone
   }
   deriving (Eq, Ord, Show)

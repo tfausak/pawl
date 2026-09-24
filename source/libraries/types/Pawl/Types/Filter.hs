@@ -600,7 +600,8 @@ data Filter keyword
     -- Patrician Geist's "spells you cast from your graveyard". Remembered in
     -- Pawl.Types.Object.castFrom precisely because CR 400.7 leaves the spell no
     -- memory of it, so it is never IsInZone above, which reads where the object
-    -- is now. Vacuously False for everything that was never cast.
+    -- is now. Vacuously False for everything that was never cast, and for a
+    -- copy cast from outside the game (CR 400.11).
     WasCastFrom Zone.Zone
   | -- | CR 601.2h read RETROSPECTIVELY off the candidate: mana carrying this
     -- production tag (CR 106.3) was among what paid the candidate's cost --

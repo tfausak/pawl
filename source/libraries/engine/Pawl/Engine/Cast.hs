@@ -1480,7 +1480,9 @@ restrictionMet pid gs restriction = case restriction of
 -- (Filter.WasCastFrom, Aven Interrupter). `stampCastFrom` writes the same value
 -- onto the incarnation the move mints, and the two agreeing is what keeps the
 -- gate's price and the payment's from diverging -- which they did while the only
--- reader was Filter.IsInZone, whose answer the move changes; see #2363.
+-- reader was Filter.IsInZone, whose answer the move changes; see #2363. Read
+-- through Game.zoneOf, so a CR 707.13 copy outside the game (CR 400.11) is cast
+-- from no zone at all.
 --
 -- The object's own ZONE still differs -- Filter.zone says Graveyard at the gate
 -- and Stack at the payment -- and no card in data/cards reads it from a cost
@@ -1502,7 +1504,7 @@ restrictionMet pid gs restriction = case restriction of
 -- come back for both at once.
 asProposed :: ObjectId -> CardName.CardName -> Facing.Facing -> GameState -> GameState
 asProposed oid name facing gs =
-  turnedUpForPlay oid facing gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name, Object.facing = facing, Object.castFrom = Just (Object.zone o)}) oid (GameState.objects gs)}
+  turnedUpForPlay oid facing gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name, Object.facing = facing, Object.castFrom = Game.zoneOf oid gs}) oid (GameState.objects gs)}
 
 -- CR 406.3a: a card exiled face down is turned face up just before the player
 -- announces they are playing it (CR 601.2), which is what gives the
@@ -2048,7 +2050,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
   case proposedFace oid name proposed of
     Nothing -> pure ()
     Just face -> do
-      let castFrom = fmap Object.zone (Game.lookupObject oid before)
+      let castFrom = Game.zoneOf oid before
           -- CR 722.3c's last sentence, captured BEFORE CR 601.2a's move for
           -- `castFrom`'s reason: the move mints a fresh CR 400.7 incarnation and
           -- Object.newIncarnation clears this field with the rest of the

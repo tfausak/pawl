@@ -746,6 +746,7 @@ effectObjectRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> [ref]
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _) -> [ref]
+  Effect.OfferNamedCopy {} -> []
   Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _) -> [ref]
   Effect.GrantLookAtExiled grant -> [GrantLookAtExiled.cards grant]
   Effect.MakePlotted ref -> [ref]
@@ -921,6 +922,7 @@ effectPlayerRefs effect = case effect of
   Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named _) -> Maybe.maybeToList named
   Effect.Shuffle ref -> [ref]
   Effect.OfferCast (OfferCast.MkOfferCast _ caster _ _ _ _) -> [caster]
+  Effect.OfferNamedCopy {} -> []
   -- CR 601.3's "that player", the seat the permission is written for.
   Effect.GrantPlayFromExile x -> durationPlayerRefs (GrantPlayFromExile.duration x) <> [GrantPlayFromExile.player x]
   Effect.GrantLookAtExiled {} -> []
@@ -1267,6 +1269,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- This one is a read, bound by an earlier effect of the list (CR 400.7) where
   -- it names a slot at all.
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _) -> objectRefSlots ref
+  Effect.OfferNamedCopy {} -> Map.empty
   Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)
   -- Everything the BODY reads. The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.
@@ -1843,6 +1846,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   Effect.Shuffle {} -> True
   Effect.OfferCast {} -> True
+  Effect.OfferNamedCopy {} -> True
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
   -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
   -- nested in the DEPTH is one slotsOf cannot see.
@@ -2047,6 +2051,7 @@ readsX =
         Effect.ShuffleIntoLibrary {} -> False
         Effect.Shuffle {} -> False
         Effect.OfferCast {} -> False
+        Effect.OfferNamedCopy {} -> False
         Effect.GrantPlayFromExile {} -> False
         -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
         Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> readsX (Foldable.toList body)
@@ -2265,6 +2270,7 @@ boundSlots effect = case effect of
   Effect.ShuffleIntoLibrary {} -> Set.empty
   Effect.Shuffle {} -> Set.empty
   Effect.OfferCast {} -> Set.empty
+  Effect.OfferNamedCopy {} -> Set.empty
   Effect.GrantPlayFromExile {} -> Set.empty
   -- The loop's member slot, plus every name the BODY authors -- which the loop
   -- really does leave bound once it is over, to the union across its members

@@ -103,6 +103,8 @@ withoutAnnouncement before entry closed = do
   printings <- newest GameState.printings
   printingIds <- newest GameState.printingIds
   lookedUp <- newest GameState.lookedUp
+  outsideCopies <- setOf GameState.outsideCopies
+  namedCopyChoices <- mapOf GameState.namedCopyChoices
   nextPrintingId <- newest GameState.nextPrintingId
   nextTimestamp <- newest GameState.nextTimestamp
   lastChoice <- newest GameState.lastChoice
@@ -193,6 +195,8 @@ withoutAnnouncement before entry closed = do
         GameState.printings = printings,
         GameState.printingIds = printingIds,
         GameState.lookedUp = lookedUp,
+        GameState.outsideCopies = outsideCopies,
+        GameState.namedCopyChoices = namedCopyChoices,
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,

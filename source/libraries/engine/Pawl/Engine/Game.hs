@@ -110,6 +110,15 @@ poolOf pid gs = Map.findWithDefault (Mana.MkMana []) pid (GameState.manaPool gs)
 lookupObject :: ObjectId -> GameState -> Maybe Object
 lookupObject oid gs = Map.lookup oid (GameState.objects gs)
 
+-- CR 400.1 / 400.11: the zone an object is in, Nothing for an id naming no
+-- object and for one outside the game (GameState.outsideCopies). The zone read
+-- on CR 601.2a's offer and cast road, where a CR 707.13 copy's Object.zone is a
+-- placeholder.
+zoneOf :: ObjectId -> GameState -> Maybe Zone
+zoneOf oid gs
+  | Set.member oid (GameState.outsideCopies gs) = Nothing
+  | otherwise = fmap Object.zone (lookupObject oid gs)
+
 -- CR 601.2a: is this object the card whose cast is being PROPOSED right now? The
 -- card is put onto the stack before CR 601.2f determines the total cost and CR
 -- 601.2h pays it, so no pool a payability gate reads may count it -- neither the
@@ -305,16 +314,21 @@ choose p = do
 -- legitimate member of referenceFaces' domain, so no board tells the guard's
 -- absence apart.
 lookUpChosenName :: CardName.CardName -> Game CardName.CardName
-lookUpChosenName name = do
+lookUpChosenName name = name <$ lookUpCard name
+
+-- CR 108.1: `lookUpChosenName`'s lookup, answering the printing the reference
+-- gave, which CR 707.13's copy is made from. Nothing where it gave none.
+lookUpCard :: CardName.CardName -> Game (Maybe PrintingId.PrintingId)
+lookUpCard name = do
   found <- ask (Prompt.LookUpCard name)
   case found of
     Just card
-      | Maybe.isJust (Card.faceNamed name card) ->
-          State.modify' $ \gs ->
-            let (pid, gs1) = intern (Printing.MkPrinting card) gs
-             in gs1 {GameState.lookedUp = Set.insert pid (GameState.lookedUp gs1)}
-    _ -> pure ()
-  pure name
+      | Maybe.isJust (Card.faceNamed name card) -> do
+          gs <- State.get
+          let (pid, gs1) = intern (Printing.MkPrinting card) gs
+          State.put gs1 {GameState.lookedUp = Set.insert pid (GameState.lookedUp gs1)}
+          pure (Just pid)
+    _ -> pure Nothing
 
 -- CR 400.2: a property of the ZONE and never of the card -- a hand every one of
 -- whose cards is currently revealed is still a hidden zone.

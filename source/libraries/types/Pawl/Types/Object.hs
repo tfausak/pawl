@@ -52,6 +52,8 @@ data Object = MkObject
     -- Per-incarnation state: reset by newIncarnation (CR 400.7).
     enteredUnder :: Maybe PlayerId.PlayerId,
     source :: Source.Source,
+    -- | CR 400.1. A placeholder for an object outside the game
+    -- (GameState.outsideCopies), which Pawl.Engine.Game.zoneOf answers for.
     zone :: Zone.Zone,
     tapped :: TapState.TapState,
     -- | CR 110.5: face up or face down, the second of that rule's status
@@ -688,7 +690,8 @@ data Object = MkObject
     -- incarnation by `stampCastFrom`. The two must agree or a card's gate and its
     -- payment price the same spell differently.
     --
-    -- Nothing for every object that was not cast, and forgotten by
+    -- Nothing for every object that was not cast or was cast from outside the
+    -- game (CR 400.11, Pawl.Engine.Game.zoneOf), and forgotten by
     -- newIncarnation: CR 400.7d's exception is about costs paid, and the zone a
     -- spell came from is not one.
     castFrom :: Maybe Zone.Zone,

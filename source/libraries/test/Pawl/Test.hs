@@ -1225,6 +1225,7 @@ spec s registry = do
   Pawl.CopySpec.graveyardTokenCopySpec s registry
   Pawl.CopySpec.flamerushRiderSpec s registry
   Pawl.CopySpec.castCopySpec s registry
+  Pawl.CopySpec.garthSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry

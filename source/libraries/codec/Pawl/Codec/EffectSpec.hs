@@ -26,6 +26,7 @@ import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer.Type
@@ -1074,6 +1075,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Shuffle (PlayerRef.Relative PlayerRelation.You))
       " {\"type\":\"Shuffle\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+  -- CR 707.13: the names Garth One-Eye lists, in printed order.
+  Spec.it s "OfferNamedCopy" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.OfferNamedCopy (CardName.MkCardName (Text.pack "Disenchant") NonEmpty.:| [CardName.MkCardName (Text.pack "Black Lotus")]))
+      " {\"type\":\"OfferNamedCopy\",\"value\":[\"Disenchant\",\"Black Lotus\"]} "
   -- CR 104.3e, a bare PlayerRef too. Door to Nothingness writes the targeted
   -- spelling; this is the self one, which no card in the pool writes yet (#3792).
   Spec.it s "LoseGame" $

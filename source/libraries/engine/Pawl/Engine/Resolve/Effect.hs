@@ -269,6 +269,7 @@ import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PreventNextDamageInstance as PreventNextDamageInstance
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.PreventionRider as PreventionRider
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
@@ -1115,6 +1116,31 @@ castableCopy caster original = do
                 }
         State.put (Game.insertIntoZone (Object.zone obj) LibraryPosition.Top caster copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
         pure (Just copyId)
+
+-- CR 707.13: offer the cast of a copy of this printing created outside the game
+-- (Event.mintOutside), bracketing `offerCast` with the mint and the discard. An
+-- uncast copy is deleted as the offer returns: CR 109.1 and CR 400.11c leave
+-- nothing able to observe it afterwards, and it bounds Object.zone's placeholder
+-- to one resolution, in which no player gets priority and no SBA is checked.
+offerOutsideCopy :: Filter.Context -> PlayerId -> PrintingId.PrintingId -> Game ()
+offerOutsideCopy context caster printingId = do
+  copyId <- State.state (Event.mintOutside caster printingId)
+  offerCast context [copyId] caster CastObligation.Optional CastRepetition.Once False ordinary
+  State.modify' $ \g ->
+    if Set.member copyId (GameState.outsideCopies g)
+      then g {GameState.objects = Map.delete copyId (GameState.objects g), GameState.outsideCopies = Set.delete copyId (GameState.outsideCopies g)}
+      else g
+  where
+    -- "You still pay its costs": an ordinary cast of the copy.
+    ordinary =
+      CastOffer.MkCastOffer
+        { CastOffer.transformed = False,
+          CastOffer.withoutPayingManaCost = False,
+          CastOffer.payingInstead = Nothing,
+          CastOffer.spending = ManaSpending.AsProduced,
+          CastOffer.restriction = Nothing,
+          CastOffer.offeredBy = Nothing
+        }
 
 -- One round of the offer above: CR 601.3's choice among the cards `named` still
 -- holds, and the cast if it is taken. Answers the id of the card that was cast,
@@ -2745,6 +2771,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.ShuffleIntoLibrary {} -> False
   Effect.Shuffle {} -> False
   Effect.OfferCast {} -> False
+  Effect.OfferNamedCopy {} -> False
   Effect.GrantPlayFromExile {} -> False
   Effect.GrantLookAtExiled {} -> False
   Effect.MakePlotted {} -> False
@@ -4815,6 +4842,35 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- cast to nobody.
     Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
       offerCast context named pid optionality repetition copied offer
+  -- CR 707.13 (Garth One-Eye): choose one of the listed names not yet chosen for
+  -- this source, look the card up (CR 108.1), create a copy of it outside the
+  -- game, and offer its controller the cast. The names are card data; nothing
+  -- here asks which one it holds.
+  --
+  -- The memory is GameState.namedCopyChoices under the SOURCE's id, so it holds
+  -- across a change of control and after the source has left (CR 113.7a), and
+  -- CR 400.7's new object starts empty. The name is spent whether or not the
+  -- copy is cast, and with none left the arm does nothing (rulings, 2021-06-18).
+  --
+  -- ChooseCardName, CR 201.4's prompt, with the unchosen names as CR 201.4a's
+  -- restriction; asked only for two or more. Filtered, not trusted: an answer
+  -- outside them chooses nothing.
+  Effect.OfferNamedCopy names -> do
+    gs <- State.get
+    let spent = Map.findWithDefault Set.empty source (GameState.namedCopyChoices gs)
+        remaining = NonEmpty.filter (`Set.notMember` spent) names
+    picked <- case remaining of
+      [] -> pure Nothing
+      [only] -> pure (Just only)
+      _ -> do
+        answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller source (Filter.Type.Or (fmap Filter.Type.HasName remaining)))
+        pure (List.find (== answer) remaining)
+    Monad.forM_ picked $ \name -> do
+      State.modify' $ \g -> g {GameState.namedCopyChoices = Map.insertWith Set.union source (Set.singleton name) (GameState.namedCopyChoices g)}
+      found <- Game.lookUpCard name
+      Monad.forM_ found $ \printingId -> do
+        g <- State.get
+        offerOutsideCopy (effectContext g controller source legal (slotBindings resolving g)) controller printingId
   -- CR 601.3: write the standing permission onto every object the ObjectRef names,
   -- for the player the PlayerRef names and the stated duration.
   --
@@ -6215,8 +6271,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- CR 707.10's three nouns: a spell (Game.isSpell) and an activated or
       -- triggered ability (Game.isAbility), each classifying off the object's
       -- ZONE and its Source and never off which card it is. Every other LIVE
-      -- object copies nothing -- an ObjectRef that named a card in a graveyard
-      -- reaches CR 707.13's different act (#888), and a permanent on the
+      -- object copies nothing -- a copy of a CARD is CR 707.12's act (OfferCast's
+      -- `copied`) or CR 707.13's (Effect.OfferNamedCopy), and a permanent on the
       -- battlefield is the CreateCopy and BecomeCopy opcodes' subject rather
       -- than this one's.
       --

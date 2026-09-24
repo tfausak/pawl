@@ -167,7 +167,9 @@ data Player = MkPlayer
     -- Pawl.Engine.Event.eligible offering dungeon cards to Burning Wish.
     --
     -- Where the rest of what is outside the game will land: CR 727.2's restart
-    -- cards (#135) and CR 707.13's copy created outside the game (#888). CR
+    -- cards (#135). CR 707.13's copy created outside the game did NOT land here:
+    -- CR 109.1 makes it no card, so no wish may reach it, and it is an object for
+    -- the one resolution that offers its cast (GameState.outsideCopies). CR
     -- 729.4's other half -- the main game's cards, which a subgame sees as
     -- outside it -- deliberately did NOT land here: those are objects in a game
     -- that is on hold rather than a count of printings a player set aside, so
