@@ -1210,6 +1210,22 @@ entryOf pending =
       TriggerEntry.ability = PendingTrigger.ability pending
     }
 
+-- CR 612.7 / 108.1: ask the interpreter, once per filter, for the reference
+-- face names each live name grant's filter admits (Projection.referenceQueries),
+-- and remember them in GameState.referenceNames for the projection, which
+-- cannot ask. Asked, not chosen: nobody decides what the reference says, so CR
+-- 104.4b's lastChoice does not move. The reference does not change during a
+-- game, so a filter is never asked about again. A grant is gathered while its
+-- source is on the battlefield, whatever that source is attached to, so the
+-- answer is in hand from the first settle after the source arrives.
+learnReferenceNames :: Game ()
+learnReferenceNames = do
+  gs <- State.get
+  let unasked = Set.filter (`Map.notMember` GameState.referenceNames gs) (Projection.referenceQueries gs)
+  Monad.forM_ unasked $ \predicate -> do
+    names <- Game.ask (Prompt.ReferenceNames predicate)
+    State.modify' (\g -> g {GameState.referenceNames = Map.insert predicate (Set.fromList names) (GameState.referenceNames g)})
+
 -- CR 117.5's settle, discarding the report; `performSettle` below is the same act.
 settleForPriority :: Game ()
 settleForPriority = Monad.void performSettle
@@ -1231,6 +1247,9 @@ settleForPriority = Monad.void performSettle
 -- trigger, which is what `cleanupException` (CR 514.3a) asks about.
 performSettle :: Game Bool
 performSettle = do
+  -- CR 612.7: FIRST, so every state-based action and state trigger below reads
+  -- a name grant's whole reference.
+  learnReferenceNames
   -- CR 614.1c: an as-enters rewrite that ran an effect queued it, Event being
   -- unable to run one. Drained FIRST, so the effects land before the SBA pass --
   -- Monstrous War-Leech's mill decides what CR 704.5f then reads.
