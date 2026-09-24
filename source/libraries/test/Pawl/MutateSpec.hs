@@ -78,6 +78,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -456,6 +457,54 @@ spec s registry = Spec.describe s "Mutate" $ do
         Spec.assertEqWith s "setup: the target projected the name Falcon Abomination before the merge" (Projection.namesOf host board) (Set.singleton (CardName.MkCardName (Text.pack "Falcon Abomination")))
         Spec.assertBool s (host /= original) "setup: and it is the Clone, not the creature it copied"
         Spec.assertEqWith s "setup: the copied original is untouched" (Projection.namesOf original after) (Set.singleton (CardName.MkCardName (Text.pack "Falcon Abomination")))
+  -- The case above's STORED twin: the copy effect on the target has a duration.
+  -- Mirrorweave makes the Falcon Abomination a Hill Giant until end of turn, and
+  -- Cubwarden merges with it afterwards. CR 730.2a timestamps the merge then, so
+  -- CR 613.7 applies it after Mirrorweave's copy and the merge shows at once; and
+  -- CR 514.2 / 611.2a end Mirrorweave's copy at cleanup, so the merge is then
+  -- applied over the Falcon Abomination alone and nothing of the Hill Giant is
+  -- left.
+  --
+  -- A pair of boards differing only in CR 702.140c's side, since each side has
+  -- its own wrong answer: over, the Hill Giant's lack of abilities hides the
+  -- Falcon Abomination's flying; under, the Hill Giant's name and box are what
+  -- the topmost component shows. Distinct boxes throughout: the Falcon
+  -- Abomination's 2/2, the Hill Giant's 3/3, Cubwarden's 3/5.
+  Spec.it s "CR 730.2a/613.7 a merge outranks Mirrorweave's copy at once and is recomputed when it ends" $ do
+    plains <- S.printingOf s registry "Plains"
+    falcon <- S.printingOf s registry "Falcon Abomination"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    cubwarden <- S.printingOf s registry "Cubwarden"
+    mirrorweave <- S.printingOf s registry "Mirrorweave"
+    let base = S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers)
+        (host, withHost) = S.addPermanent falcon S.alice base
+        (giant, withGiant) = S.addPermanent hillGiant S.alice withHost
+        (staged, weaveId) = S.handOne mirrorweave withGiant
+        woven = S.runPure (mutatingAt MutateSide.Over giant) staged (S.cast S.alice weaveId >> Stack.resolveTop >> Engine.settleForPriority)
+        (board, spellId) = S.handOne cubwarden woven
+        step g = S.runPure S.identityAnswer g Engine.runStep
+        ending gs = step (step gs {GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]})
+        cleanedUp = step . ending
+        over = merging MutateSide.Over host board spellId
+        under = merging MutateSide.Under host board spellId
+        named = Set.singleton . CardName.MkCardName . Text.pack
+    -- THE GAMEPLAY ASSERTIONS, over: the merge is what layer 1a leaves while
+    -- Mirrorweave's copy stands, and once it ends the flying from under is back.
+    Spec.assertEqWith s "CR 613.7 mutated over under Mirrorweave, it is Cubwarden at once" (Projection.namesOf host over, S.powerToughnessOf host over) (named "Cubwarden", Just (3, 5))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying host over)) "CR 702.140e while Mirrorweave stands, the abilities from under are the Hill Giant's, and it has none"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying host (cleanedUp over)) "CR 611.2a after cleanup it has the Falcon Abomination's flying from under"
+    Spec.assertEqWith s "and is still Cubwarden" (Projection.namesOf host (cleanedUp over), S.powerToughnessOf host (cleanedUp over)) (named "Cubwarden", Just (3, 5))
+    -- Under: the copy shows through the topmost component until cleanup, and the
+    -- Falcon Abomination after it, carrying Cubwarden's lifelink throughout.
+    Spec.assertEqWith s "CR 730.2a mutated under, it is the Hill Giant Mirrorweave made the topmost component" (Projection.namesOf host under, S.powerToughnessOf host under) (named "Hill Giant", Just (3, 3))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink host under) "CR 613.7 with Cubwarden's lifelink from under at once"
+    Spec.assertEqWith s "CR 611.2a after cleanup it is the Falcon Abomination, nothing of the Hill Giant left" (Projection.namesOf host (cleanedUp under), S.powerToughnessOf host (cleanedUp under)) (named "Falcon Abomination", Just (2, 2))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Lifelink host (cleanedUp under)) "and still with Cubwarden's lifelink"
+    -- The proxies, after the behaviours: Mirrorweave's copy really covered the
+    -- target before the merge, both spells resolved, and cleanup ran.
+    Spec.assertEqWith s "setup: under Mirrorweave the Falcon Abomination was the Hill Giant" (Projection.namesOf host board, S.powerToughnessOf host board) (named "Hill Giant", Just (3, 3))
+    Spec.assertEqWith s "setup: both merges happened" (componentNames host over, componentNames host under) ([CardName.MkCardName (Text.pack "Cubwarden"), CardName.MkCardName (Text.pack "Falcon Abomination")], [CardName.MkCardName (Text.pack "Falcon Abomination"), CardName.MkCardName (Text.pack "Cubwarden")])
+    Spec.assertEqWith s "setup: the cleanup step ran" (GameState.phase (ending over)) (Phase.Ending EndingStep.Cleanup)
   -- CR 702.140e read by the gatherer rather than by the projection: a static
   -- ability under the topmost component has to reach Projection.permanentParts,
   -- which walks Projection.View.staticAbilitiesOf and not the seed record. Lord
