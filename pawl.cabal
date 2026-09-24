@@ -1941,6 +1941,7 @@ library types
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType
     Pawl.Types.ManaUnit
+    Pawl.Types.ManaWindow
     Pawl.Types.Meld
     Pawl.Types.MeldSource
     Pawl.Types.Mentored
