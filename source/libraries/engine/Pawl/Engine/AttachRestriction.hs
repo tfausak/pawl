@@ -136,6 +136,11 @@ barredBy mint pcs subject host gs =
       subjectView = Projection.viewOfObject subject gs
       hostView = Projection.project host gs
       grants = Projection.controlGrants gs
+      -- CR 613.1f: what a stored grant gave the permanent, whose gates
+      -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
+      -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
+      grantedRules = Projection.grantedRuleAbilities gs
+      fromGrant source = any (fromRestriction source []) (RuleAbilities.attachRestrictions (grantedRules source))
       fromPermanent source = case RuleAbilities.attachRestrictions (Projection.ruleAbilitiesOf source gs) of
         -- Every permanent in almost every game.
         [] -> False
@@ -196,4 +201,4 @@ barredBy mint pcs subject host gs =
         any
           (fromRestriction host [])
           (mint (Projection.keywordsGiven pcs host gs))
-   in fromKeywords || any fromPermanent (Set.toList (GameState.battlefield gs))
+   in fromKeywords || any (\source -> fromPermanent source || fromGrant source) (Set.toList (GameState.battlefield gs))

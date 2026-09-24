@@ -4,6 +4,7 @@ import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
+import qualified Pawl.Codec.RuleAbilities as RuleAbilities
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -26,6 +27,7 @@ codec cardCodec =
     [ Arm.payload "Activated" (ActivatedAbility.codec cardCodec (codec cardCodec)) GrantedAbility.Activated (\x -> case x of GrantedAbility.Activated y -> Just y; _ -> Nothing),
       Arm.payload "Triggered" (TriggeredAbility.codec cardCodec (codec cardCodec)) GrantedAbility.Triggered (\x -> case x of GrantedAbility.Triggered y -> Just y; _ -> Nothing),
       Arm.payload "Static" (StaticAbility.codec (codec cardCodec)) GrantedAbility.Static (\x -> case x of GrantedAbility.Static y -> Just y; _ -> Nothing),
+      Arm.payload "Rules" RuleAbilities.codec GrantedAbility.Rules (\x -> case x of GrantedAbility.Rules y -> Just y; _ -> Nothing),
       Arm.payload "Replacement" (PrintedReplacement.codec cardCodec (codec cardCodec) (Effect.codec cardCodec (codec cardCodec))) GrantedAbility.Replacement (\x -> case x of GrantedAbility.Replacement y -> Just y; _ -> Nothing)
     ]
 
@@ -34,4 +36,5 @@ tagOf x = case x of
   GrantedAbility.Activated {} -> "Activated"
   GrantedAbility.Triggered {} -> "Triggered"
   GrantedAbility.Static {} -> "Static"
+  GrantedAbility.Rules {} -> "Rules"
   GrantedAbility.Replacement {} -> "Replacement"

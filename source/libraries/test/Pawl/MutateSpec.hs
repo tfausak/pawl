@@ -1400,6 +1400,7 @@ componentKinds oid gs =
 componentKind :: MergeComponent.MergeComponent -> Text.Text
 componentKind component = case component of
   MergeComponent.OfCard _ -> Text.pack "OfCard"
+  MergeComponent.OfDuplicate _ -> Text.pack "OfDuplicate"
   MergeComponent.OfToken _ -> Text.pack "OfToken"
   MergeComponent.OfMeld _ -> Text.pack "OfMeld"
   MergeComponent.OfSpellCopy _ -> Text.pack "OfSpellCopy"

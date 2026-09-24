@@ -85,6 +85,11 @@ costsOn attacker target gs =
       -- read against the FULL projection rather than a partial one.
       view = Projection.project attacker gs
       grants = Projection.controlGrants gs
+      -- CR 613.1f: what a stored grant gave the permanent, whose gates
+      -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
+      -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
+      grantedRules = Projection.grantedRuleAbilities gs
+      fromGrant source = concatMap (fromCost source) (RuleAbilities.attackCosts (grantedRules source))
       fromPermanent source = case RuleAbilities.attackCosts (Projection.ruleAbilitiesOf source gs) of
         -- Every permanent in almost every game.
         [] -> []
@@ -144,7 +149,7 @@ costsOn attacker target gs =
           && Projection.affectsUnder grants source attacker (AttackCost.subject ac) view gs
           then fmap ((,) source) (shareOf source ac)
           else []
-   in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+   in concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs))
 
 -- CR 508.1h: every printed cost in force on every announced attack, determined
 -- together. Ghostly Prison's "{2} for each creature" is performed rather than

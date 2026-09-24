@@ -41,6 +41,7 @@ import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -136,25 +137,26 @@ faceDownFace listed =
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],
-      Face.blockRequirements = [],
-      Face.blockPermissions = [],
-      Face.attackRequirements = [],
-      Face.combatRestrictions = [],
-      Face.sacrificeRestrictions = [],
-      Face.untapRestrictions = [],
-      Face.attachRestrictions = [],
-      Face.counterRestrictions = [],
-      Face.crewRestrictions = [],
-      Face.activationProhibitions = [],
-      Face.entryRestrictions = [],
-      Face.attackCosts = [],
-      Face.blockCosts = [],
+      Face.blockRequirements = RuleAbilities.blockRequirements listedRules,
+      Face.blockPermissions = RuleAbilities.blockPermissions listedRules,
+      Face.attackRequirements = RuleAbilities.attackRequirements listedRules,
+      Face.combatRestrictions = RuleAbilities.combatRestrictions listedRules,
+      Face.sacrificeRestrictions = RuleAbilities.sacrificeRestrictions listedRules,
+      Face.untapRestrictions = RuleAbilities.untapRestrictions listedRules,
+      Face.attachRestrictions = RuleAbilities.attachRestrictions listedRules,
+      Face.counterRestrictions = RuleAbilities.counterRestrictions listedRules,
+      Face.crewRestrictions = RuleAbilities.crewRestrictions listedRules,
+      Face.activationProhibitions = RuleAbilities.activationProhibitions listedRules,
+      Face.entryRestrictions = RuleAbilities.entryRestrictions listedRules,
+      Face.attackCosts = RuleAbilities.attackCosts listedRules,
+      Face.blockCosts = RuleAbilities.blockCosts listedRules,
       Face.mulliganActions = [],
       Face.openingHandActions = [],
       Face.specialActions = []
     }
   where
     listedAbilities = FaceDownCharacteristics.abilities listed
+    listedRules = mconcat [a | GrantedAbility.Rules a <- listedAbilities]
 
 -- The face a card shows where nothing has singled out one half for itself. WHICH
 -- face that is, is exactly what the layout decides, and the three rules disagree:
