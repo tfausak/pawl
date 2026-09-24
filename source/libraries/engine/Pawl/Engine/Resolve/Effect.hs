@@ -3862,7 +3862,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         payForModifier payer oid cost = do
           (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer oid pure cost
           began <- State.get
-          outcome <- Cost.pay performManaAbility (Just began) PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
+          outcome <- Cost.pay performManaAbility began PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
           pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
         -- Goblin Bookie's "Activate only any time it makes sense", read as a
         -- window inside CR 706.2's modification step, once the static offers
@@ -9271,11 +9271,10 @@ activateWhileRolling pid oid ability = do
       totalled = Cost.plusComponents gathered (ActivatedAbility.cost ability)
   (announced, _) <- Cost.announce (PaymentSubject.Activating oid) ManaSpending.AsProduced pid oid (Cost.substitutedManas (Cost.activationManaSubstitutions (Cost.Type.components totalled) Map.empty pid oid before) (Cost.totalManas gathered)) totalled
   adjustments <- Cost.announceReductions pid oid before announced gathered
-  (payment, _) <- Cost.paySubstituting performManaAbility Nothing PaymentMoment.OutsideResolution (PaymentSubject.Activating oid) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.activationManaSubstitutions pid oid) (Cost.totalWith adjustments announced)
+  (payment, _) <- Cost.paySubstituting performManaAbility before PaymentMoment.OutsideResolution (PaymentSubject.Activating oid) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.activationManaSubstitutions pid oid) (Cost.totalWith adjustments announced)
   case payment of
-    Payment.Unpaid -> do
-      Cost.restoreKeepingLibraryActions before
-      pure False
+    -- CR 733.1: the payment reversed the activation back to `before` itself.
+    Payment.Unpaid -> pure False
     Payment.Paid _ -> do
       State.modify' (ActivationRestriction.recordActivation oid ability)
       let modal = ActivatedAbility.modal ability

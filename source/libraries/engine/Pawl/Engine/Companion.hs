@@ -214,7 +214,7 @@ take perform pid = do
         -- payable in multiple ways and no prompt is ever raised.
         noSource <- State.state Game.freshObjectId
         (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid noSource pure actionCost
-        payment <- Cost.pay perform (Just before) PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid noSource announced
+        payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid noSource announced
         case payment of
           -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
           -- special action IS the whole of what failed, so `before` goes to
