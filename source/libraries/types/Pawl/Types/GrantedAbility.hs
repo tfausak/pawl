@@ -36,7 +36,6 @@ data GrantedAbility card
   | Triggered (TriggeredAbility.TriggeredAbility card (GrantedAbility card))
   | -- | CR 113.3d.
     Static (StaticAbility.StaticAbility (GrantedAbility card))
-  | -- | CR 614.1: Magar of the Magic Strings' listed "If this creature would
-    -- leave the battlefield, exile it instead of putting it anywhere else."
+  | -- | CR 614.1a: a replacement ability.
     Replacement (PrintedReplacement.PrintedReplacement card (GrantedAbility card) (Effect.Effect card (GrantedAbility card)))
   deriving (Eq, Ord, Show)

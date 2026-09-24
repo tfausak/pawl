@@ -1119,10 +1119,11 @@ castableCopy caster original = do
         pure (Just copyId)
 
 -- CR 707.13 / 707.14: offer the cast of a copy of this printing created outside
--- the game (Event.mintOutside), bracketing `offerCast` with the mint and the discard. An
--- uncast copy is deleted as the offer returns: CR 109.1 and CR 400.11c leave
--- nothing able to observe it afterwards, and it bounds Object.zone's placeholder
--- to one resolution, in which no player gets priority and no SBA is checked.
+-- the game (Event.mintOutside), bracketing `offerCast` with the mint and the
+-- discard. An uncast copy is deleted as the offer returns: CR 109.1 and CR
+-- 400.11c leave nothing able to observe it afterwards, and it bounds
+-- Object.zone's placeholder to one resolution, in which no player gets priority
+-- and no SBA is checked.
 offerOutsideCopy :: Filter.Context -> PlayerId -> PrintingId.PrintingId -> CastOffer.CastOffer -> Game ()
 offerOutsideCopy context caster printingId offer = do
   copyId <- State.state (Event.mintOutside caster printingId)
