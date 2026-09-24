@@ -48,6 +48,7 @@ import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -6063,6 +6064,23 @@ assistSpec s registry = Spec.describe s "Charging Binox" $ do
     Spec.assertEqWith s "both reversing: nothing tapped" (S.tappedCount S.bob neither + S.tappedCount S.alice neither) 0
     Spec.assertEqWith s "CR 601.2a the Binox is back in alice's hand whatever they answered" (fmap (\g -> (GameState.stack g, Game.zoneMembers Zone.Hand S.alice g)) [bobKeeps, aliceKeeps, bothKeep, neither]) (replicate 4 ([], [spell]))
     Spec.assertEqWith s "CR 101.4 alice then bob, each once" asked [S.alice, S.bob]
+  -- CR 101.4b: bob answers second, knowing alice's answer. The pair differs
+  -- only in what alice answered; the board bob is asked on is what shows it.
+  Spec.it s "CR 101.4b the helper is asked on the board the caster's answer left" $ do
+    binox <- S.printingOf s registry "Charging Binox"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, forestId, plainsIds, gs) = assistBoard 0 7 forest mountain plains binox
+        run alice bob = State.runState (Engine.runGameAsked (seeingAssist alice bob forestId (take 3 plainsIds)) gs (S.cast S.alice spell)) []
+        (_, seenKeep) = run OptionalDecision.Declines OptionalDecision.Declines
+        (_, seenReverse) = run OptionalDecision.Exercises OptionalDecision.Declines
+        ((_, neither), seenNeither) = run OptionalDecision.Exercises OptionalDecision.Exercises
+    Spec.assertEqWith s "bob is asked with alice's reversed Forest untapped" (fmap (isTapped forestId) seenReverse) [False]
+    Spec.assertEqWith s "and with her kept Forest tapped" (fmap (isTapped forestId) seenKeep) [True]
+    -- CR 104.4b: the stamp bob's question wrote survives the final restore,
+    -- which for two reversals goes back to a state from before the cast.
+    Spec.assertEqWith s "CR 104.4b the last question's stamp stands" (fmap GameState.lastChoice seenNeither) [GameState.lastChoice neither]
 
 -- Answer CR 702.132a's two prompts with `helper` and `amount`, and each mana
 -- window with the lands that window's player is meant to tap -- alice the one
@@ -6089,6 +6107,17 @@ assisting helper amount forestId plainsIds p =
 -- `assisting` with bob chosen to pay as much as his tapped Plains made, and CR
 -- 733.1's question answered `alice` or `bob` by whoever is asked, the askers
 -- recorded in order.
+-- `reversingAssist` over the whole question, recording the game bob is asked
+-- in.
+seeingAssist :: OptionalDecision.OptionalDecision -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Asked.Asked r -> State.State [GameState.GameState] r
+seeingAssist alice bob forestId plainsIds asked = case Asked.prompt asked of
+  Prompt.ReverseManaAbilities _ player _
+    | player == S.bob -> do
+        State.modify' (<> [Asked.game asked])
+        pure bob
+    | otherwise -> pure alice
+  p -> pure (assisting (Just S.bob) (Natural.Extra.length plainsIds) forestId plainsIds p)
+
 reversingAssist :: OptionalDecision.OptionalDecision -> OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
 reversingAssist alice bob forestId plainsIds p = case p of
   Prompt.ReverseManaAbilities _ player _ -> do

@@ -16,7 +16,7 @@
 -- SPELLBOOK rather than one card; the eighth casts a printed Follow the Tracks,
 -- the same spellbook shape with the other question asked of it; the ninth enters
 -- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
--- take; the tenth to thirteenth cast a printed Sinister Reflections, whose
+-- take; the tenth to sixteenth cast a printed Sinister Reflections, whose
 -- conjure names an object already in the game rather than writing its card out;
 -- the next two begin alice's second main phase under a printed Pearl Collector,
 -- the one conjure in the corpus behind CR 603.4's intervening "if"; the next three
@@ -37,7 +37,8 @@
 -- 707.1's token, and the second points the conjure at a Clone, which is where
 -- the printed card under an object and its CR 707.2 copiable values disagree.
 -- The third carries that duplicate through three zone changes (CR 400.7), and
--- the fourth prices it off its copiable mana cost.
+-- the fourth prices it off its copiable mana cost. The last three merge it with
+-- a printed Cubwarden and split it back out (CR 730.3, CR 727.2).
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
@@ -52,6 +53,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -68,15 +70,22 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -680,6 +689,71 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "and resolves into a second Goblin Piker beside the Clone"
           (fmap (\oid -> Set.toList (Projection.namesOf oid played)) (clonesOnBattlefield played))
           [[goblinPiker], [goblinPiker]]
+  -- CR 730.3 / 400.7: the duplicate, cast and resolved as the Piker, is the
+  -- permanent Cubwarden ({3}{W} 3/5 Cat, "Mutate {2}{W}{W}", lifelink) mutates
+  -- OVER, and the merged permanent is then destroyed. Its two components are put
+  -- into the graveyard as two new objects, and the duplicate's copiable values
+  -- are its own card's (CR 707.2), so the one printed Clone is the Piker again
+  -- there. Read beside the original Clone, which is a Clone in the graveyard.
+  Spec.it s "CR 730.3/707.2 a duplicate of a Clone split out of a merge is the Piker again" $ do
+    fixture <- duplicateFixture s registry
+    case mergedOntoDuplicate fixture of
+      Nothing -> Spec.assertFailure s "the duplicate did not resolve onto the battlefield"
+      Just (host, merged) -> do
+        let died = S.settleSba (S.runPure S.identityAnswer merged (Event.destroy Regenerability.Regenerable [host]))
+        Spec.assertEqWith
+          s
+          "CR 730.3 the duplicate component is a Goblin Piker in the graveyard, beside the original Clone"
+          (List.sort (fmap (\oid -> Set.toList (Projection.namesOf oid died)) (namedIn cloneName Zone.Graveyard died)))
+          (List.sort [[cloneName], [goblinPiker]])
+        -- The values are the duplicate's alone: the Cubwarden, the merged
+        -- permanent's other component, is its printed self.
+        Spec.assertEqWith
+          s
+          "CR 730.3 and the Cubwarden component is a Cubwarden there"
+          (fmap (\oid -> Set.toList (Projection.namesOf oid died)) (namedIn cubwardenName Zone.Graveyard died))
+          [[cubwardenName]]
+        Spec.assertEqWith s "setup: the merged permanent held the Cubwarden and the duplicate" (fmap (Seq.length . Game.componentsOf . Object.source) (Game.lookupObject host merged)) (Just 2)
+  -- CR 727.2's rebuild, the other road a merged permanent is split on
+  -- (Pawl.Engine.Setup.splitComponents): the restart shuffles every card into
+  -- its owner's library and draws, so the duplicate is a card among them and is
+  -- still the Piker. Hand and library both, since the draw decides
+  -- which it is in.
+  Spec.it s "CR 727.2/707.2 a duplicate of a Clone rebuilt out of a merge by a restart is the Piker again" $ do
+    fixture <- duplicateFixture s registry
+    case mergedOntoDuplicate fixture of
+      Nothing -> Spec.assertFailure s "the duplicate did not resolve onto the battlefield"
+      Just (_, merged) -> do
+        let restarted = snd (Engine.runGamePure S.identityAnswer merged (Setup.restartGame S.performer Set.empty S.alice))
+            clones = namedIn cloneName Zone.Library restarted <> namedIn cloneName Zone.Hand restarted
+        Spec.assertEqWith
+          s
+          "CR 727.2 the duplicate is a Goblin Piker in the new game, beside the original Clone"
+          (List.sort (fmap (\oid -> Set.toList (Projection.namesOf oid restarted)) clones))
+          (List.sort [[cloneName], [goblinPiker]])
+  -- The other side of CR 730.2: the duplicate is the mutating SPELL. A Clone
+  -- copies a Cubwarden, Sinister Reflections duplicates it, so the card in hand
+  -- is a Cubwarden printed Clone, and it is cast for its mutate cost over a
+  -- Goblin Piker. CR 730.2b takes the spell's object away, so what carries its
+  -- values through the merge is the component alone; destroyed, it is a
+  -- Cubwarden in the graveyard.
+  Spec.it s "CR 730.2/730.3 a duplicate of a Clone that merged as the spell is the Cubwarden again" $ do
+    (island, mountain, plains, piker, clone, reflections, cubwarden) <- duplicatePrintings s registry
+    let board0 = S.landsFor plains S.alice 8 (S.landsFor mountain S.alice 4 (S.landsInPlay island 4))
+        (cubwardenId, board1) = S.addPermanent cubwarden S.alice board0
+        (pikerId, board2) = S.addPermanent piker S.alice board1
+    case duplicateInHand clone reflections cubwardenId board2 of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, gone) -> do
+        let merged = mergingOnto pikerId gone duplicate
+            died = S.settleSba (S.runPure S.identityAnswer merged (Event.destroy Regenerability.Regenerable [pikerId]))
+        Spec.assertEqWith
+          s
+          "CR 730.3 the duplicate component is a Cubwarden in the graveyard, beside the original Clone"
+          (List.sort (fmap (\oid -> Set.toList (Projection.namesOf oid died)) (namedIn cloneName Zone.Graveyard died)))
+          (List.sort [[cloneName], [cubwardenName]])
+        Spec.assertEqWith s "setup: CR 730.2a the merged permanent was the Cubwarden on top" (Set.toList (Projection.namesOf pikerId merged)) [cubwardenName]
+        Spec.assertEqWith s "setup: and the Piker under it" (fmap (Seq.length . Game.componentsOf . Object.source) (Game.lookupObject pikerId merged)) (Just 2)
   -- Pearl Collector ({2}{B} Creature -- Human Warlock 3/3, "Deathtouch,
   -- Lifelink. At the beginning of your second main phase, if you gained 4 or
   -- more life this turn, conjure a card named Mox Pearl into your hand. This
@@ -1072,6 +1146,83 @@ aimingAtAll oids p = case p of
   -- recipient assembled here would carry the wrong tag for the slot's pool.
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, rs) -> Set.filter (maybe False (`elem` oids) . Recipient.objectOf) rs) asked
   _ -> S.identityAnswer p
+
+-- Island, Mountain, Plains, Goblin Piker, Clone, Sinister Reflections and
+-- Cubwarden, which the merge-split cases share.
+duplicatePrintings ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (Printing.Printing, Printing.Printing, Printing.Printing, Printing.Printing, Printing.Printing, Printing.Printing, Printing.Printing)
+duplicatePrintings s registry =
+  (,,,,,,)
+    <$> S.printingOf s registry "Island"
+    <*> S.printingOf s registry "Mountain"
+    <*> S.printingOf s registry "Plains"
+    <*> S.printingOf s registry "Goblin Piker"
+    <*> S.printingOf s registry "Clone"
+    <*> S.printingOf s registry "Sinister Reflections"
+    <*> S.printingOf s registry "Cubwarden"
+
+-- The Piker case's board, with Cubwarden's printing beside it and the duplicate
+-- of a Clone copying the Piker in alice's hand.
+duplicateFixture :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Printing.Printing, Maybe (ObjectId.ObjectId, GameState.GameState))
+duplicateFixture s registry = do
+  (island, mountain, plains, piker, clone, reflections, cubwarden) <- duplicatePrintings s registry
+  let board0 = S.landsFor plains S.alice 8 (S.landsFor mountain S.alice 4 (S.landsInPlay island 4))
+      (pikerId, board1) = S.addPermanent piker S.alice board0
+  pure (cubwarden, duplicateInHand clone reflections pikerId board1)
+
+-- The duplicate cast and resolved as the Piker, with Cubwarden then cast from
+-- hand for its mutate cost OVER it: the merged permanent's id and the board.
+mergedOntoDuplicate :: (Printing.Printing, Maybe (ObjectId.ObjectId, GameState.GameState)) -> Maybe (ObjectId.ObjectId, GameState.GameState)
+mergedOntoDuplicate (cubwarden, found) = do
+  (duplicate, gone) <- found
+  let played = S.settleSba (S.runPure S.identityAnswer gone (S.cast S.alice duplicate >> Stack.resolveTop))
+  host <- Maybe.listToMaybe (clonesOnBattlefield played)
+  let (withCubwarden, spellId) = S.handOne cubwarden played
+  pure (host, mergingOnto host withCubwarden spellId)
+
+-- A Clone resolved as a copy of `original`, duplicated into alice's hand by
+-- Sinister Reflections, then `original` and the Clone destroyed, so the
+-- duplicate's printed card says Clone and nothing left on the battlefield
+-- carries the values it was conjured with. Nothing where the Clone did not stay.
+duplicateInHand :: Printing.Printing -> Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ObjectId.ObjectId, GameState.GameState)
+duplicateInHand clone reflections original board0 = do
+  let (_, staged) = S.spellOnStack clone S.alice board0
+      entered = S.settleSba (copyingPiker original staged)
+  cloneId <- Maybe.listToMaybe (clonesOnBattlefield entered)
+  let (spell, board1) = S.addHandCard reflections S.alice entered
+      board = board1 {GameState.phase = Phase.PrecombatMain}
+      resolved = S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop)
+      gone = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [original, cloneId]))
+  duplicate <- Maybe.listToMaybe (namedIn cloneName Zone.Hand gone)
+  pure (duplicate, gone)
+
+-- Casts `spellId` for Cubwarden's mutate cost at `host`, merging OVER, and
+-- drains the stack. Pawl.MutateSpec's `merging`, duplicated rather than hoisted:
+-- the cost is NAMED rather than indexed and the target FILTERED out of the
+-- offered set, since CR 608.2b's re-read drops a hand-built recipient.
+mergingOnto :: ObjectId.ObjectId -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+mergingOnto host board spellId =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseCost _ _ _ candidates ->
+          Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just cubwardenMutateCost) . Cost.Type.mana) candidates)
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just host) . Recipient.objectOf) . snd) sets
+        Prompt.ChooseMutateSide {} -> MutateSide.Over
+        _ -> S.identityAnswer p
+      cast = S.runPure answer board (S.cast S.alice spellId)
+   in S.runPure answer cast (Monad.replicateM_ 6 (Engine.settleForPriority >> Stack.resolveTop) >> Engine.settleForPriority)
+
+-- Cubwarden's mutate cost, {2}{W}{W}, as the announcement names it.
+cubwardenMutateCost :: ManaCost.ManaCost
+cubwardenMutateCost = ManaCost.MkManaCost [ManaSymbol.Generic 2, white, white]
+  where
+    white = ManaSymbol.OfType (ManaType.Colored Color.White)
+
+cubwardenName :: CardName.CardName
+cubwardenName = CardName.MkCardName (Text.pack "Cubwarden")
 
 -- Resolves the staged Clone with its CR 614.12 as-enters copy pinned to the
 -- named permanent, Pawl.CopySpec's copyNamed for its reason: a searching

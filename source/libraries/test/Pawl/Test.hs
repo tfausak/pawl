@@ -198,6 +198,7 @@ import qualified Pawl.Codec.DrawRewriteSpec
 import qualified Pawl.Codec.DrawSpec
 import qualified Pawl.Codec.DrewSpec
 import qualified Pawl.Codec.DungeonRoomSpec
+import qualified Pawl.Codec.DuplicateCardSpec
 import qualified Pawl.Codec.DurationRefSpec
 import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.DuringPhaseSpec
@@ -885,6 +886,7 @@ spec s registry = do
   Pawl.Codec.DrawSpec.spec s
   Pawl.Codec.DrewSpec.spec s
   Pawl.Codec.DungeonRoomSpec.spec s
+  Pawl.Codec.DuplicateCardSpec.spec s
   Pawl.Codec.DurationRefSpec.spec s
   Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.DuringPhaseSpec.spec s
