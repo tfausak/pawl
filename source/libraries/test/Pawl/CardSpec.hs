@@ -170,6 +170,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
@@ -1177,7 +1178,7 @@ ownCounts effect = case effect of
   -- The floor beside it is a printed literal and holds no Count.
   Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
   Effect.Create (Create.MkCreate quantity card _ _ _) -> quantityCounts quantity <> overFaces cardCounts card
-  Effect.Conjure (Conjure.MkConjure quantity cards _ _) -> quantityCounts quantity <> foldMap (overFaces cardCounts) (ConjureCards.written cards)
+  Effect.Conjure (Conjure.MkConjure quantity cards _ _) -> quantityCounts quantity <> foldMap quantityCounts (conjureCardsAmount cards) <> foldMap (overFaces cardCounts) (ConjureCards.written cards)
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's. The riders are skipped for the reason Create's
   -- arm above skips its own: a rider count is a Quantity, and effectFilters below
@@ -3428,11 +3429,29 @@ copyTargetsFilters = concatMap objectRefFilters . copyTargetsRefs
 
 -- objectRefFilters below asked of an Alchemy conjure's card half: a written list
 -- names no object and carries no ref, and a duplicate's ref is the only Filter
--- position that half has.
+-- position that half has. A reference pick names no object either:
+-- conjureReferenceFilters below takes its Filters.
 conjureCardsRefFilters :: ConjureCards.ConjureCards Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 conjureCardsRefFilters cards = case cards of
   ConjureCards.Written {} -> []
   ConjureCards.Duplicate ref -> objectRefFilters ref
+  ConjureCards.Reference {} -> []
+
+-- A conjure reference pick's own Filters, Unframed:
+-- Pawl.Engine.Projection.View.referenceAdmits reads the filter in a context
+-- carrying the bound alone, and the bound is a Quantity like any other.
+conjureReferenceFilters :: ConjureCards.ConjureCards card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+conjureReferenceFilters cards = case cards of
+  ConjureCards.Written {} -> []
+  ConjureCards.Duplicate {} -> []
+  ConjureCards.Reference from -> (Unframed, FromReference.filter from) : foldMap quantityFilters (FromReference.amount from)
+
+-- A conjure reference pick's bound, the one Quantity the card half carries.
+conjureCardsAmount :: ConjureCards.ConjureCards card -> [Quantity.Type.Quantity]
+conjureCardsAmount cards = case cards of
+  ConjureCards.Written {} -> []
+  ConjureCards.Duplicate {} -> []
+  ConjureCards.Reference from -> Maybe.maybeToList (FromReference.amount from)
 
 -- TAGGED pairs, PR #2739's reader's test: a path from here reaches
 -- keywordFilters, through the CounterKind a depth's Quantity may name.
@@ -5343,7 +5362,7 @@ effectFilters effect = case effect of
   -- A DUPLICATE names an object rather than writing a card out, so the Filters
   -- it can carry are the ref's, framed the way CreateCopy's arm below frames its
   -- own.
-  Effect.Conjure (Conjure.MkConjure quantity cards _ _) -> frame Unframed (quantityFilters quantity) <> foldMap (overFaces cardFilters) (ConjureCards.written cards) <> frame SourceHostFramed (conjureCardsRefFilters cards)
+  Effect.Conjure (Conjure.MkConjure quantity cards _ _) -> frame Unframed (quantityFilters quantity <> conjureReferenceFilters cards) <> foldMap (overFaces cardFilters) (ConjureCards.written cards) <> frame SourceHostFramed (conjureCardsRefFilters cards)
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's and the riders' Filters are as much card text as Create's. The
   -- exceptions frame themselves, BecomeCopy's arm below.

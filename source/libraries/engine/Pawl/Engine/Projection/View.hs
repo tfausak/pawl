@@ -78,6 +78,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Teams as Teams
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -103,8 +104,10 @@ lastKnownView peers oid gs lk =
 -- only an OBJECT can have are Nothing or empty, and each says so at its field.
 --
 -- Its readers are Pawl.ProjectionSpec's, which ask about a printed face with no
--- game around it, and Pawl.Engine.Replacement.matchesTokenLot, which asks about
--- a token that is proposed and not yet minted (CR 614.12). A reader that holds
+-- game around it, Pawl.Engine.Replacement.matchesTokenLot, which asks about a
+-- token that is proposed and not yet minted (CR 614.12), and the readers of a
+-- card outside the game -- Pawl.Engine.Event.eligible, referenceAdmits below,
+-- Pawl.Interpreter.legalCardName. A reader that holds
 -- an OBJECT takes viewOfObject instead, in whatever zone the object sits -- see
 -- #1911, which moved the last of them.
 viewOfCard :: Face.Face Card.Type.Card -> Filter.View
@@ -297,6 +300,22 @@ viewOfCard face =
           -- a printed FACE with no controller and no board to grant it one.
           Filter.grantsStationToughness = False
         }
+
+-- CR 108.1 / 400.11: does a card of the Oracle card reference, which no game
+-- holds, match the filter a conjure picks over it by
+-- (Pawl.Types.ConjureCards.Reference)? Read off the printed card through
+-- viewOfCard, Pawl.Engine.Event.eligible's posture for a card outside the game.
+-- The amount is the bound Filter.ManaValueEqualToAmount reads.
+--
+-- The one judgement both sides make: Pawl.Interpreter.lookingUpCards narrows the
+-- reference by it, and the conjure filters the card it is handed back through
+-- it rather than trusting the answer.
+referenceAdmits :: Teams.Teams -> Maybe Integer -> Filter.Type.Filter Keyword -> Card.Type.Card -> Bool
+referenceAdmits teams amount predicate card =
+  Filter.matches
+    ((Filter.contextFor teams Nothing Nothing) {Filter.slotAmount = amount})
+    (viewOfCard (Game.resolveFaceFor Nothing card))
+    predicate
 
 -- CR 208.1's PRINTED power box, for a card off the battlefield. Nothing for a
 -- face with no power box, since CR 208.1 gives power only to creature cards.

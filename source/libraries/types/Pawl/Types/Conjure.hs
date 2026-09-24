@@ -23,16 +23,13 @@ import qualified Pawl.Types.Quantity as Quantity
 -- writes that card out. A DUPLICATE names no card at all --
 -- 'Pawl.Types.ConjureCards.Duplicate' names an object already in the game and
 -- the resolver reads the card off it -- so that road needs no registry either.
+-- A REFERENCE pick (Fear of Change\'s "a random creature card with mana value
+-- X") asks the interpreter, which holds the registry, for the cards a filter
+-- admits ('Pawl.Types.Prompt.ReferenceCards').
 --
 -- Parametric in @card@ for 'Pawl.Types.Effect.Effect''s reason: the conjured
 -- card is card DATA nested inside card data, and the parameter is what keeps
 -- 'Pawl.Types.Effect' from naming a concrete card type.
---
--- Not implemented: a conjure whose card is picked from OUTSIDE THE GAME (Anina,
--- Natural Parallelist\'s "conjure a random creature card with mana value X"),
--- which wants the card registry a filter narrows (#3063). That is neither a
--- written-out list nor an object already in the game, so it is no arm
--- 'Pawl.Types.ConjureCards.ConjureCards' holds.
 --
 -- Not implemented: a conjurer other than the resolving controller. That is a
 -- SHAPE and not one card -- a chosen player (Juggernaut Peddler\'s "that player

@@ -18,8 +18,11 @@
 -- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
 -- take; the tenth to thirteenth cast a printed Sinister Reflections, whose
 -- conjure names an object already in the game rather than writing its card out;
--- the last two begin alice's second main phase under a printed Pearl Collector,
--- the one conjure in the corpus behind CR 603.4's intervening "if".
+-- the next two begin alice's second main phase under a printed Pearl Collector,
+-- the one conjure in the corpus behind CR 603.4's intervening "if"; the next three
+-- enter a printed Fear of Change, whose conjure picks from the Oracle card
+-- reference an interpreter holds; the last three connect with a printed Smog
+-- Smasher, whose conjure puts its duplicate into exile.
 --
 -- The first four CAST what the conjure created, which is the point -- conjure
 -- creates a CARD and not CR 111.1's token, and a token in a hand, a library or a
@@ -38,13 +41,16 @@
 module Pawl.ConjureSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -54,17 +60,23 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Interpreter as Interpreter
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -755,9 +767,232 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "the intervening if is what held it back: the rider is unspent"
       (Set.size (GameState.triggeredThisGame fired))
       0
+  -- Fear of Change ({G}{U} Enchantment Creature -- Nightmare, 2/3, "When this
+  -- creature enters or dies, exile another creature you control. If you do,
+  -- conjure a duplicate of a random creature card with mana value X onto the
+  -- battlefield, where X is 2 plus the exiled creature's mana value."), Oracle
+  -- text verified on Scryfall 2026-09-24. The REFERENCE pick (CR 108.1): no card
+  -- is written out, and the candidates come off the interpreter's registry.
+  --
+  -- The reference is a fixture of four, so the filter has something to refuse
+  -- on each axis: a Goblin Piker is a creature at the exiled Piker's own mana
+  -- value, 2 rather than 2 plus 2, and Ancient Vendetta is mana value 4 but no
+  -- creature. The answerer names the first of Goblin Piker, Ancient Vendetta and
+  -- Giant Spider it is offered, so an offer the filter did not narrow conjures
+  -- no Spider, and an engine that rolled the pick itself lands on the offer's
+  -- head, Hill Giant.
+  Spec.it s "a conjure from the reference offers the creature cards at 2 plus the exiled mana value, and conjures the one randomness named" $ do
+    (final, offers) <- fearOfChangeRun s registry True False
+    Spec.assertEqWith
+      s
+      "the Giant Spider randomness named entered the battlefield under alice"
+      (length (namedIn giantSpider Zone.Battlefield final))
+      1
+    Spec.assertEqWith
+      s
+      "the other Goblin Piker is what the trigger exiled"
+      (length (namedIn goblinPiker Zone.Exile final), length (namedIn goblinPiker Zone.Battlefield final))
+      (1, 0)
+    -- Supporting, and LAST: the offer, recorded off the prompt since the
+    -- candidate list is not readable off the board.
+    Spec.assertEqWith
+      s
+      "offered the mana value 4 creature cards of the reference, once"
+      offers
+      [[hillGiant, giantSpider]]
+  -- The pair above with the one difference: no other creature to exile, so the
+  -- "if you do" fails and nothing is conjured.
+  Spec.it s "a conjure from the reference behind an exile that found nothing conjures nothing" $ do
+    (final, _) <- fearOfChangeRun s registry False False
+    Spec.assertEqWith
+      s
+      "nothing but Fear of Change is on alice's battlefield"
+      (namesIn Zone.Battlefield final)
+      [fearOfChange]
+  -- The first case's board with a reference that LIES, offering all four cards;
+  -- randomness names the Goblin Piker, which the filter does not admit. Filtered,
+  -- not trusted: the conjure checks the card it is handed back and conjures
+  -- nothing.
+  Spec.it s "a conjure from the reference refuses a card the reference offered outside its filter" $ do
+    (final, offers) <- fearOfChangeRun s registry True True
+    Spec.assertEqWith
+      s
+      "the offered Goblin Piker did not enter, and nothing else did"
+      (namesIn Zone.Battlefield final)
+      [fearOfChange]
+    Spec.assertEqWith
+      s
+      "the lying reference was what offered it"
+      offers
+      [[goblinPiker, hillGiant, ancientVendetta, giantSpider]]
+  -- The first case's board over the suite's own FILE registry, beside a
+  -- Llanowar Elves so X is 3, a mana value synthetic creature cards in
+  -- data/cards/ share. Randomness names a synthetic wherever one is offered: a
+  -- synthetic is a test fixture and no card of the Oracle card reference, so
+  -- none is, and a real card enters.
+  Spec.it s "a conjure from the file registry's reference never conjures a synthetic card" $ do
+    fear <- S.printingOf s registry "Fear of Change"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (_, withElves) = S.addPermanent elves S.alice (Setup.emptyGame S.bothPlayers)
+        (_, entered) = S.entersWithTrigger fear S.alice withElves
+        lifted = Registry.MkRegistry {Registry.fetchCard = Trans.lift . Registry.fetchCard registry, Registry.cards = Trans.lift (Registry.cards registry)}
+        synthetic name = Text.pack "Synthetic " `Text.isPrefixOf` CardName.unwrap name
+        answer :: (Monad m) => Asked.Asked r -> State.StateT [[CardName.CardName]] m r
+        answer asked = case Asked.prompt asked of
+          Prompt.RandomCard offered -> do
+            State.modify' (NonEmpty.toList offered :)
+            pure (Maybe.fromMaybe (NonEmpty.head offered) (List.find synthetic (NonEmpty.toList offered)))
+          p -> pure (S.identityAnswer p)
+        run = do
+          (_, settled) <- Engine.runGameAsked (Interpreter.lookingUpCards lifted answer) entered Engine.settleForPriority
+          Engine.runGameAsked (Interpreter.lookingUpCards lifted answer) settled Engine.priorityLoop
+    ((_, final), logged) <- State.runStateT run []
+    let arrived = filter (`notElem` [fearOfChange, llanowarElves]) (namesIn Zone.Battlefield final)
+    Spec.assertEqWith
+      s
+      "one creature card entered, and it is no synthetic"
+      (length arrived, filter synthetic arrived)
+      (1, [])
+    Spec.assertEqWith
+      s
+      "the reference offered no synthetic"
+      (concatMap (filter synthetic) logged, length logged)
+      ([], 1)
+  -- Smog Smasher ({4}{R} Creature -- Mutant Berserker, 4/4, "Menace / Start
+  -- your engines! / Whenever one or more creatures you control deal combat
+  -- damage to a player, conjure a duplicate of target nontoken creature into
+  -- exile. / Max speed -- At the beginning of combat on your turn, put all cards
+  -- exiled with this creature onto the battlefield. They gain haste. Sacrifice
+  -- them at the beginning of the next end step."), Oracle text verified on
+  -- Scryfall 2026-09-24. The EXILE arrival: the Smasher connects, and the
+  -- duplicate of bob's Hill Giant lands in alice's exile while the original
+  -- stays on bob's battlefield.
+  Spec.it s "conjure into exile puts the duplicate in the conjurer's exile, exiled with the conjuring creature" $ do
+    (final, smasher, giant) <- smogSmasherCombat s registry
+    let duplicates = namedIn hillGiant Zone.Exile final
+    Spec.assertEqWith
+      s
+      "one Hill Giant is in alice's exile, and it is no Hill Giant of bob's"
+      (length duplicates, fmap Object.zone (Game.lookupObject giant final))
+      (1, Just Zone.Battlefield)
+    -- CR 607.2a: exiled BY the ability, so "exiled with this creature" names it.
+    Spec.assertEqWith
+      s
+      "CR 607.2a it is exiled with Smog Smasher"
+      (fmap (`Map.lookup` GameState.exiledWith final) duplicates)
+      [Just smasher]
+  -- The card the exile arm is for, the rest of its text: at max speed (CR
+  -- 702.178a) the beginning of alice's combat returns what the Smasher exiled,
+  -- with haste, and the next end step sacrifices it.
+  Spec.it s "CR 702.178a at max speed the Smasher returns the duplicate with haste, and the end step sacrifices it" $ do
+    (exiled, _, _) <- smogSmasherCombat s registry
+    let returned = stepBegins (Phase.Combat CombatStep.BeginningOfCombat) (atSpeed 4 exiled)
+        onBattlefield = namedIn hillGiant Zone.Battlefield returned
+        ended = stepBegins (Phase.Ending EndingStep.EndStep) returned
+    Spec.assertEqWith
+      s
+      "the duplicate entered alice's battlefield, hasty"
+      (fmap (\oid -> Projection.hasKeyword Keyword.Haste oid returned) onBattlefield, namedIn hillGiant Zone.Exile returned)
+      ([True], [])
+    Spec.assertEqWith
+      s
+      "and the end step sacrificed it into alice's graveyard"
+      (namedIn hillGiant Zone.Battlefield ended, length (namedIn hillGiant Zone.Graveyard ended))
+      ([], 1)
+  -- The pair: speed 3 is one short, so the Smasher has no such ability.
+  Spec.it s "CR 702.178a one short of max speed, the duplicate stays in exile" $ do
+    (exiled, _, _) <- smogSmasherCombat s registry
+    let returned = stepBegins (Phase.Combat CombatStep.BeginningOfCombat) (atSpeed 3 exiled)
+    Spec.assertEqWith
+      s
+      "the duplicate is still in alice's exile"
+      (length (namedIn hillGiant Zone.Exile returned), namedIn hillGiant Zone.Battlefield returned)
+      (1, [])
 
 moxPearl :: CardName.CardName
 moxPearl = CardName.MkCardName (Text.pack "Mox Pearl")
+
+fearOfChange :: CardName.CardName
+fearOfChange = CardName.MkCardName (Text.pack "Fear of Change")
+
+llanowarElves :: CardName.CardName
+llanowarElves = CardName.MkCardName (Text.pack "Llanowar Elves")
+
+-- Smog Smasher attacks bob alone, unblocked, beside bob's Hill Giant, and its
+-- combat damage trigger aims at the Giant, FILTERED out of the offered
+-- recipients. The finished board comes back with the Smasher's id and the
+-- Giant's.
+smogSmasherCombat :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+smogSmasherCombat s registry = do
+  smasher <- S.printingOf s registry "Smog Smasher"
+  giant <- S.printingOf s registry "Hill Giant"
+  let (gs, mine, theirs) = S.combatBoardOf [smasher] [giant]
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.DeclareAttackers _ _ ids -> ids
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> aimingAtAll theirs p
+  case (mine, theirs) of
+    ([smasherId], [giantId]) -> pure (S.runCombat answer gs, smasherId, giantId)
+    _ -> Spec.assertFailure s "combatBoardOf placed one creature a side"
+
+-- The step begins on alice's turn (CR 500.2's StepBegan is what a "beginning of"
+-- trigger reads) and whatever triggered resolves.
+stepBegins :: Phase.Phase -> GameState.GameState -> GameState.GameState
+stepBegins phase gs =
+  settleTriggers
+    ( Event.recordEvent
+        (GameEvent.StepBegan (StepBegan.MkStepBegan phase S.alice))
+        (gs {GameState.phase = phase, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+    )
+
+-- Pawl.SpeedSpec's atSpeed: alice at exactly this speed.
+atSpeed :: Numeric.Natural.Natural -> GameState.GameState -> GameState.GameState
+atSpeed n gs =
+  gs {GameState.players = Map.adjust (\p -> p {Player.speed = Just n}) S.alice (GameState.players gs)}
+
+giantSpider :: CardName.CardName
+giantSpider = CardName.MkCardName (Text.pack "Giant Spider")
+
+ancientVendetta :: CardName.CardName
+ancientVendetta = CardName.MkCardName (Text.pack "Ancient Vendetta")
+
+-- Fear of Change enters under alice, beside a Goblin Piker of hers where
+-- `withPiker` says so, and its trigger resolves through
+-- Pawl.Interpreter.lookingUpCards over a FIXTURE reference: Goblin Piker, Hill
+-- Giant, Ancient Vendetta and Giant Spider, in that order. Where `lying` says
+-- so, Prompt.ReferenceCards is answered with all four instead. Randomness is
+-- answered with the first of Goblin Piker, Ancient Vendetta and Giant Spider
+-- offered, FILTERED out of the offer, and the head otherwise; every offer is
+-- logged.
+fearOfChangeRun :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> Bool -> m (GameState.GameState, [[CardName.CardName]])
+fearOfChangeRun s registry withPiker lying = do
+  fear <- S.printingOf s registry "Fear of Change"
+  piker <- S.printingOf s registry "Goblin Piker"
+  reference <- mapM (S.cardOf s registry) ["Goblin Piker", "Hill Giant", "Ancient Vendetta", "Giant Spider"]
+  let board0 = if withPiker then snd (S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)) else Setup.emptyGame S.bothPlayers
+      (_, entered) = S.entersWithTrigger fear S.alice board0
+      fixture =
+        Registry.MkRegistry
+          { Registry.fetchCard = \name -> pure (List.find (\card -> S.nameOf card == name) reference),
+            Registry.cards = pure reference
+          }
+      answer :: Asked.Asked r -> State.State [[CardName.CardName]] r
+      answer asked = case Asked.prompt asked of
+        Prompt.RandomCard offered -> do
+          State.modify' (NonEmpty.toList offered :)
+          pure (Maybe.fromMaybe (NonEmpty.head offered) (List.find (`elem` NonEmpty.toList offered) [goblinPiker, ancientVendetta, giantSpider]))
+        p -> pure (S.identityAnswer p)
+      asking :: Asked.Asked r -> State.State [[CardName.CardName]] r
+      asking asked = case Asked.prompt asked of
+        Prompt.ReferenceCards {}
+          | lying -> pure (fmap S.nameOf reference)
+        _ -> Interpreter.lookingUpCards fixture answer asked
+      run = do
+        (_, settled) <- Engine.runGameAsked asking entered Engine.settleForPriority
+        Engine.runGameAsked asking settled Engine.priorityLoop
+      ((_, final), logged) = State.runState run []
+  pure (final, reverse logged)
 
 -- Pearl Collector's fixture: the Collector on alice's battlefield, both
 -- life-gain spells in her hand, and the six lands that pay for either, at the

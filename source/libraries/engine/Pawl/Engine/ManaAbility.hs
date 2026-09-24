@@ -575,8 +575,8 @@ movesLibraryCard effect = case effect of
   -- whether it "moves" a card. Answered by the DESTINATION, because CR 605.1a's
   -- clause is about a library being one end of the arrival -- a conjured card
   -- was in no zone, so strictly nothing moves, but a library gains a card, which
-  -- is what the clause exists to keep out of a mana ability. A hand, a graveyard
-  -- and the battlefield are libraries no more than the battlefield Create's
+  -- is what the clause exists to keep out of a mana ability. A hand, a graveyard,
+  -- the battlefield and exile are libraries no more than the battlefield Create's
   -- token below reaches is.
   --
   -- Unproven either way: no printing conjures inside an ability that could add
@@ -587,6 +587,7 @@ movesLibraryCard effect = case effect of
     ConjureDestination.Library -> True
     ConjureDestination.Graveyard -> False
     ConjureDestination.Battlefield _ -> False
+    ConjureDestination.Exile -> False
   Effect.CreateCopy {} -> False
   -- CR 707.4 says so in as many words: the permanent remains on the
   -- battlefield, so no card moves out of a library or anywhere else.

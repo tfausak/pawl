@@ -1,0 +1,166 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Fear of Change",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "AnyOf",
+            "value": [
+              {
+                "type": "SelfEnters"
+              },
+              {
+                "type": "SelfDies"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "ChosenPermanent",
+                            "value": {
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Creature"
+                                    }
+                                  },
+                                  {
+                                    "type": "ControlledBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  },
+                                  {
+                                    "type": "Not",
+                                    "value": {
+                                      "type": "IsSource"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "slot": "exiled",
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "Conjure",
+                        "value": {
+                          "cards": {
+                            "type": "Reference",
+                            "value": {
+                              "amount": {
+                                "type": "Plus",
+                                "value": {
+                                  "left": {
+                                    "type": "Literal",
+                                    "value": 2
+                                  },
+                                  "right": {
+                                    "type": "AgainstSlot",
+                                    "value": {
+                                      "quantity": {
+                                        "type": "ManaValue"
+                                      },
+                                      "slot": "exiled"
+                                    }
+                                  }
+                                }
+                              },
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Creature"
+                                    }
+                                  },
+                                  {
+                                    "type": "ManaValueEqualToAmount"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "destination": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      }
+                    ],
+                    "ifTaken": [
+                      0
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Nightmare"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          },
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
