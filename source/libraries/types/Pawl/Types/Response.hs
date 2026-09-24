@@ -109,7 +109,7 @@ data Response
     -- for Pawl.Types.Prompt's LookUpCard.
     LookedUpCard (Maybe Card.Card)
   | -- | CR 108.1: the names the Oracle card reference answered a filter with,
-    -- for Pawl.Types.Prompt's ReferenceCards.
+    -- for Pawl.Types.Prompt's ReferenceCards and ReferenceNames.
     ReferenceCardNames [CardName.CardName]
   | -- | CR 705.1: the face a flipped coin came up, for Pawl.Types.Effect's
     -- FlipCoin (Winter Sky's "Flip a coin").

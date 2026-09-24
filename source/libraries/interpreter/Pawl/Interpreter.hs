@@ -120,18 +120,23 @@ policingCardNames registry answer asked = case Asked.prompt asked of
      in again
   _ -> answer asked
 
--- CR 108.1: Prompt.LookUpCard and Prompt.ReferenceCards answered from the
--- registry, the reference an interpreter holds; every other prompt goes to the
--- answerer beneath. Installed beside policingCardNames, whose registry it
--- shares.
+-- CR 108.1: Prompt.LookUpCard, Prompt.ReferenceCards and Prompt.ReferenceNames
+-- answered from the registry, the reference an interpreter holds; every other
+-- prompt goes to the answerer beneath. Installed beside policingCardNames, whose
+-- registry it shares.
 --
 -- A reference card is named by its FIRST face, which is the name
 -- Prompt.LookUpCard then fetches it back by. The pick among the names is not
 -- made here: the engine asks it of the answerer beneath, as randomness.
+-- Prompt.ReferenceNames asks about FACES instead, every face of every card, each
+-- judged off its own printed characteristics: CR 612.7's "nonlegendary creature
+-- cards" reaches a back face (CR 201.4d), which a card judged by its front face
+-- would miss.
 --
 -- Pawl.CastProhibitionSpec's Spy Kit case, where Runed Halo names a card in
 -- no zone, is what proves the lookup; Pawl.ConjureSpec's Fear of Change case
--- proves the enumeration.
+-- proves the enumeration; Pawl.CastProhibitionSpec's "CR 612.7 / 206.3a" case
+-- proves the face names.
 lookingUpCards ::
   (Functor m) =>
   Registry.Registry m ->
@@ -144,4 +149,8 @@ lookingUpCards registry answer asked = case Asked.prompt asked of
     fmap
       (fmap (Face.name . NonEmpty.head . Card.Type.faces) . filter (Projection.referenceAdmits (Game.teams (Asked.game asked)) amount predicate))
       (Registry.cards registry)
+  Prompt.ReferenceNames predicate ->
+    let context = Filter.contextFor (Game.teams (Asked.game asked)) Nothing Nothing
+        admitted face = Filter.matches context (Projection.viewOfCard face) predicate
+     in fmap (concatMap (fmap Face.name . filter admitted . NonEmpty.toList . Card.Type.faces)) (Registry.cards registry)
   _ -> answer asked

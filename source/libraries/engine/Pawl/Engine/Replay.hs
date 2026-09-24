@@ -58,6 +58,7 @@ encode p answer = case p of
   Prompt.RollDie _ -> Response.RolledDie answer
   Prompt.LookUpCard _ -> Response.LookedUpCard answer
   Prompt.ReferenceCards {} -> Response.ReferenceCardNames answer
+  Prompt.ReferenceNames _ -> Response.ReferenceCardNames answer
   Prompt.ChooseDieResult {} -> Response.ChoseDieResult answer
   Prompt.RerollDie {} -> Response.ChoseReroll answer
   Prompt.AdjustDieRoll {} -> Response.ChoseRollAdjustment answer
@@ -228,6 +229,9 @@ decode p response = case p of
     Response.LookedUpCard card -> Just card
     _ -> Nothing
   Prompt.ReferenceCards {} -> case response of
+    Response.ReferenceCardNames names -> Just names
+    _ -> Nothing
+  Prompt.ReferenceNames _ -> case response of
     Response.ReferenceCardNames names -> Just names
     _ -> Nothing
   Prompt.ChooseDieResult {} -> case response of
@@ -672,6 +676,9 @@ defaultAnswer p = case p of
   -- A reference holding no such card, LookUpCard's answer: the conjure then
   -- conjures nothing.
   Prompt.ReferenceCards {} -> []
+  -- A reference holding no such face: the name grant then reaches only the
+  -- faces the game holds (Pawl.Engine.Game.referenceFaces).
+  Prompt.ReferenceNames _ -> []
   -- CR 706.4: the prompt is only raised where one instruction's results are not
   -- all the same number, and every position in them is a legal choice.
   -- Answering 0 takes the first die rolled, ChooseDelayedTriggerEvent's posture

@@ -1947,6 +1947,32 @@ runedHaloSpec s registry =
       Spec.assertEqWith s "a legendary creature card's name is not the host's, so alice takes 4" (S.lifeOf S.alice legend) (fmap (subtract 4) (S.lifeOf S.alice beforeLegend))
       Spec.assertEqWith s "with the reference never asked, alice takes 4" (S.lifeOf S.alice unasked) (fmap (subtract 4) (S.lifeOf S.alice beforeUnasked))
       Spec.assertBool s (not (Map.member pikerName (Game.referenceFaces board))) "no Goblin Piker card is anywhere in the game before the Halo names it"
+    -- CR 612.7 / 206.3a: City in a Bottle's state trigger (CR 603.8) sweeps the
+    -- other nontoken permanents with a name originally printed in Arabian Nights,
+    -- and a Spy Kit host has every such nonlegendary creature card's name --
+    -- Kird Ape's among them -- though no such card is in the game. Two boards
+    -- differing in one thing: the reference answered by the suite's registry
+    -- (Pawl.Interpreter.lookingUpCards), and never consulted.
+    Spec.it s "CR 612.7 / 206.3a a Spy Kit host has the Arabian Nights names of cards the game has never seen, and City in a Bottle sweeps it" $ do
+      bottle <- S.printingOf s registry "City in a Bottle"
+      kit <- S.printingOf s registry "Spy Kit"
+      giant <- S.printingOf s registry "Hill Giant"
+      let (bottleId, g1) = S.addPermanent bottle S.alice S.threePlayerGame
+          (giantId, g2) = S.addPermanent giant S.alice g1
+          (kitId, g3) = S.addPermanent kit S.alice g2
+          board =
+            (S.attachTo kitId (Recipient.ToObject giantId) g3)
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          kirdApe = CardName.MkCardName (Text.pack "Kird Ape")
+          unasked = S.runPure S.identityAnswer board Engine.priorityLoop
+      (_, asked) <- Engine.runGameAsked (Interpreter.lookingUpCards registry (pure . S.identityAnswer . Asked.prompt)) board Engine.priorityLoop
+      Spec.assertBool s (not (S.onBattlefield giantId asked)) "CR 603.8 the host, named Kird Ape among others, was sacrificed"
+      Spec.assertBool s (S.onBattlefield giantId unasked) "with the reference never consulted it survives"
+      Spec.assertBool s (S.onBattlefield bottleId asked && S.onBattlefield kitId asked) "the Bottle and the Kit themselves stay"
+      Spec.assertBool s (not (Map.member kirdApe (Game.referenceFaces board))) "no Kird Ape card is anywhere in the game"
 
 -- The Stasis Coffin {3} Legendary Artifact: "{2}, {T}, Exile The Stasis Coffin:
 -- You gain protection from everything until your next turn." The pool's one card
