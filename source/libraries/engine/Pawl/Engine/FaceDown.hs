@@ -300,8 +300,9 @@ turnFaceUp perform pid procedure oid = do
 -- half of its first sentence, and its second sentence.
 --
 -- EnteredFaceDown joins them on Magar of the Magic Strings' ruling (2022-10-07),
--- which gives its face-down instant or sorcery card the same treatment; Yedora,
--- Grave Gardener's other producer returns only a nonland permanent card.
+-- which gives its face-down instant or sorcery card the same treatment. Yedora,
+-- Grave Gardener's EnteredFaceDown returns whatever card died, so a manifested
+-- Divination it brings back stays face down by the same reading.
 --
 -- CR 730.2g is the same replacement for a face-down MERGED permanent, asked of
 -- every card component (Game.componentsOf) with no reason at all, and read off
