@@ -2,8 +2,10 @@ module Pawl.Codec.MergeComponentSpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Codec.MergeComponent as MergeComponent
+import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.DuplicateCard as DuplicateCard
 import qualified Pawl.Types.MeldSource as MeldSource
 import qualified Pawl.Types.MergeComponent as MergeComponent
 import qualified Pawl.Types.PrintingId as PrintingId
@@ -17,6 +19,13 @@ spec s = Spec.describe s "Pawl.Codec.MergeComponent" $ do
       MergeComponent.codec
       (MergeComponent.OfCard (PrintingId.MkPrintingId 11))
       " {\"type\":\"OfCard\",\"value\":11} "
+  -- CR 108.2 / 707.2: a card component with the values it was conjured with.
+  Spec.it s "OfDuplicate" $
+    Common.assertCodec
+      s
+      MergeComponent.codec
+      (MergeComponent.OfDuplicate DuplicateCard.MkDuplicateCard {DuplicateCard.printing = PrintingId.MkPrintingId 18, DuplicateCard.values = ProjectedCharacteristicsSpec.minimalCharacteristics})
+      " {\"type\":\"OfDuplicate\",\"value\":{\"printing\":18,\"values\":{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}}} "
   -- CR 111.3 / 730.2d: a DIFFERENT tag on the same payload shape, which is the
   -- whole of what rule 730.2d asks of a component.
   Spec.it s "OfToken" $

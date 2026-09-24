@@ -1,5 +1,6 @@
 module Pawl.Codec.MergeComponent where
 
+import qualified Pawl.Codec.DuplicateCard as DuplicateCard
 import qualified Pawl.Codec.MeldSource as MeldSource
 import qualified Pawl.Codec.PrintingId as PrintingId
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -11,6 +12,7 @@ codec =
   Arm.tagged
     tagOf
     [ Arm.payload "OfCard" PrintingId.codec MergeComponent.OfCard (\x -> case x of MergeComponent.OfCard y -> Just y; _ -> Nothing),
+      Arm.payload "OfDuplicate" DuplicateCard.codec MergeComponent.OfDuplicate (\x -> case x of MergeComponent.OfDuplicate y -> Just y; _ -> Nothing),
       Arm.payload "OfToken" PrintingId.codec MergeComponent.OfToken (\x -> case x of MergeComponent.OfToken y -> Just y; _ -> Nothing),
       Arm.payload "OfMeld" MeldSource.codec MergeComponent.OfMeld (\x -> case x of MergeComponent.OfMeld y -> Just y; _ -> Nothing),
       Arm.payload "OfSpellCopy" PrintingId.codec MergeComponent.OfSpellCopy (\x -> case x of MergeComponent.OfSpellCopy y -> Just y; _ -> Nothing)
@@ -19,6 +21,7 @@ codec =
 tagOf :: MergeComponent.MergeComponent -> String
 tagOf x = case x of
   MergeComponent.OfCard {} -> "OfCard"
+  MergeComponent.OfDuplicate {} -> "OfDuplicate"
   MergeComponent.OfToken {} -> "OfToken"
   MergeComponent.OfMeld {} -> "OfMeld"
   MergeComponent.OfSpellCopy {} -> "OfSpellCopy"
