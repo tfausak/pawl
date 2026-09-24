@@ -62,6 +62,7 @@ import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
 import qualified Pawl.Types.Affected as Affected
@@ -7540,10 +7541,6 @@ meldable victims gs = do
 -- sides read again through Projection.copiableCharacteristicsTurned, which
 -- Game.turnFaceOver swaps in when the merged permanent transforms -- for the
 -- flipped reading's reason.
---
--- Not implemented: CR 730.2a's timestamp against a stored copy row already
--- covering the permanent, which still outranks the merge, and recomputing the
--- merge once that row ends rather than keeping the row's values (#4033).
 merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
@@ -7561,42 +7558,51 @@ merge sid target side = do
             facing = case side of
               MutateSide.Over -> Object.facing spell
               MutateSide.Under -> Object.facing permanent
-            -- What layer 1a had left each side, read off the PRE-merge board:
-            -- the spell's own record and the permanent's, which is that
-            -- permanent's copy snapshot where an earlier copy effect gave it one
-            -- and its printed seed otherwise.
-            spellPc = Projection.copiableCharacteristicsFaceUp sid gs
-            hostPc = Projection.copiableCharacteristicsFaceUp target gs
-            -- CR 730.2h's reading of the same two sides: each flip component's
-            -- alternative characteristics in place of its normal ones, and every
-            -- other component's record unchanged.
-            spellFlippedPc = Projection.copiableCharacteristicsFlipped sid gs
-            hostFlippedPc = Projection.copiableCharacteristicsFlipped target gs
             -- CR 730.2a's base is the TOPMOST side and CR 702.140e's union comes
             -- from the other, which is the whole of what the side decides.
             fold ofSpell ofHost = case side of
               MutateSide.Over -> Projection.withMergedAbilities ofHost ofSpell
               MutateSide.Under -> Projection.withMergedAbilities ofSpell ofHost
-            resulting = fold spellPc hostPc
-            resultingFlipped = fold spellFlippedPc hostFlippedPc
+            -- What layer 1a had left each side, read off the PRE-merge board
+            -- with no stored copy row covering the permanent: the spell's own
+            -- record and the permanent's, which is its copy stamp where an
+            -- earlier copy effect gave it one and its printed seed otherwise.
+            unrowed = Game.supersedeStoredCopies (Set.singleton target) gs
+            reading ask board = fold (ask sid board) (ask target board)
+            resulting = reading Projection.copiableCharacteristicsFaceUp unrowed
+            -- CR 730.2h's reading of the same two sides: each flip component's
+            -- alternative characteristics in place of its normal ones, and every
+            -- other component's record unchanged.
+            resultingFlipped = reading Projection.copiableCharacteristicsFlipped unrowed
             -- CR 730.2i's reading: each double-faced component turned over.
-            resultingTurned = fold (Projection.copiableCharacteristicsTurned sid gs) (Projection.copiableCharacteristicsTurned target gs)
+            resultingTurned = reading Projection.copiableCharacteristicsTurned unrowed
+            -- CR 613.7 / 611.2a: a stored copy row covering the permanent is
+            -- earlier than the merge, so while it lasts the merge applies OVER
+            -- it, and once it ends over the stamp above. Each row keeps its own
+            -- expiry and timestamp and carries the merge read over it.
+            -- Pawl.MutateSpec's "CR 730.2a/613.7 a merge outranks Mirrorweave's
+            -- copy at once and is recomputed when it ends" proves both.
+            alone row = row {ActiveCopy.objects = Set.singleton target}
+            rewoven row = (alone row) {ActiveCopy.snapshot = reading Projection.copiableCharacteristicsFaceUp unrowed {GameState.copyEffects = alone row : GameState.copyEffects unrowed}}
+            rows = fmap rewoven (filter (Set.member target . ActiveCopy.objects) (GameState.copyEffects gs))
         State.modify' (`forgetObject` sid)
         State.modify'
           ( \g ->
-              g
-                { GameState.objects =
-                    Map.adjust
-                      ( \o ->
-                          o
-                            { Object.source = Source.OfMerge merged,
-                              Object.facing = facing,
-                              Object.bindings = Binding.setMergeCopy resulting resultingFlipped resultingTurned (Object.bindings o)
-                            }
-                      )
-                      target
-                      (GameState.objects g)
-                }
+              let u = Game.supersedeStoredCopies (Set.singleton target) g
+               in u
+                    { GameState.copyEffects = rows <> GameState.copyEffects u,
+                      GameState.objects =
+                        Map.adjust
+                          ( \o ->
+                              o
+                                { Object.source = Source.OfMerge merged,
+                                  Object.facing = facing,
+                                  Object.bindings = Binding.setMergeCopy resulting resultingFlipped resultingTurned (Object.bindings o)
+                                }
+                          )
+                          target
+                          (GameState.objects u)
+                    }
           )
         State.modify' (recordEvent (GameEvent.Mutated target))
         pure True

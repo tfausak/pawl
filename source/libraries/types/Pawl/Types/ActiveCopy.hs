@@ -52,7 +52,8 @@ data ActiveCopy = MkActiveCopy
     expiry :: Expiry.Expiry,
     -- | The objects that became copies.
     objects :: Set.Set ObjectId.ObjectId,
-    -- | CR 707.2: the copiable values they took on.
+    -- | CR 707.2: the copiable values they took on, with any later merge
+    -- applied over them (CR 730.2a).
     snapshot :: ProjectedCharacteristics.ProjectedCharacteristics
   }
   deriving (Eq, Ord, Show)

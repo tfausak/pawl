@@ -1422,9 +1422,10 @@ flipsOver oid gs = Set.member oid (GameState.battlefield gs) && hasFlipHalf oid 
 -- The LATEST row wins (CR 613.7), because a copy effect REPLACES copiable values
 -- rather than adding to them -- so nothing below the newest one is observable
 -- while it stands, and a row that ends first reveals an older one still running.
--- A row still covering an object is always newer than that object's stamp, since
+-- A row still covering an object always outranks that object's stamp, since
 -- `supersedeStoredCopies` below takes the object out of every row as a later
--- stamp is written.
+-- stamp is written, and a merge re-reads each row it keeps with the merge
+-- applied over it (Pawl.Engine.Event.merge).
 --
 -- HERE rather than beside its main caller
 -- (Pawl.Engine.Projection.View.stampedSnapshotOf) so that `hasFlipHalf` below
