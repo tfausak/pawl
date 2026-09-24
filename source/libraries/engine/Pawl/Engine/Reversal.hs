@@ -427,8 +427,19 @@ libraryOrder :: (Eq a) => [a] -> [a] -> [a] -> [a]
 libraryOrder before entry closed =
   let stayed = filter (\x -> elem x before || notElem x entry) closed
       taken = [(i, x) | (i, x) <- zip [0 :: Int ..] before, notElem x entry, notElem x closed]
-      putBack held (i, x) = let (above, below) = splitAt i held in above <> (x : below)
-   in Foldable.foldl' putBack stayed taken
+   in putBackAt stayed taken
+
+-- A library the WHOLE action is reversed over, CR 733.1's last sentence still
+-- standing: `since`'s order, less what it gained, with what it lost back at the
+-- index `snapshot` gave it. Pawl.Engine.Cost.keepingLibraryActions is the
+-- caller. Where the membership is unchanged this is `since` itself.
+restoredOrder :: (Eq a) => [a] -> [a] -> [a]
+restoredOrder snapshot since =
+  putBackAt (filter (`elem` snapshot) since) [(i, x) | (i, x) <- zip [0 :: Int ..] snapshot, notElem x since]
+
+-- Each card at its index, in ascending order of index.
+putBackAt :: [a] -> [(Int, a)] -> [a]
+putBackAt = Foldable.foldl' (\held (i, x) -> let (above, below) = splitAt i held in above <> (x : below))
 
 -- `leaf` reached through a map's keys, with a missing key read as a value of its
 -- own so that an inserted key and a deleted one take the same rule as a changed

@@ -123,3 +123,11 @@ withoutAnnouncementSpec s registry = Spec.describe s "withoutAnnouncement" $ do
         closed = [4, 3, 1] :: [Int]
     Spec.assertEqWith s "the window's order, with the cast card back at its index" (Reversal.libraryOrder before entry closed) [4, 2, 3, 1]
     Spec.assertEqWith s "and a card the window milled stays milled" (Reversal.libraryOrder before before closed) closed
+
+  -- The WHOLE reversal's library (Pawl.Engine.Cost.keepingLibraryActions): the
+  -- cast card goes back at its index and the window's shuffle stands.
+  Spec.it s "CR 733.1 reversing the whole action still keeps the window's shuffle" $ do
+    let snapshot = [1, 2, 3, 4] :: [Int]
+        since = [4, 3, 1] :: [Int]
+    Spec.assertEqWith s "the window's order, with the cast card back at its index" (Reversal.restoredOrder snapshot since) [4, 2, 3, 1]
+    Spec.assertEqWith s "and an unchanged membership is the window's order outright" (Reversal.restoredOrder snapshot [3, 1, 4, 2]) [3, 1, 4, 2]

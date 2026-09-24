@@ -3583,20 +3583,24 @@ criteriaOf component = case component of
 -- abilities performed stands even though the rest of it goes back. The
 -- no-activation arm reads the LIVE state rather than `closed`, which is what the
 -- callers it took this restore over from did.
-reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> GameState -> Game ()
+--
+-- The answer is the sources whose activations STAND, empty unless the payer
+-- kept them: a nested window's caller (`tapForManaWith`) hands them to the
+-- window it is nested in, whose own reversal then offers them too.
+reverseIllegal :: PlayerId -> [ObjectId] -> GameState -> GameState -> GameState -> Game [ObjectId]
 reverseIllegal pid activated closed entry before = case NonEmpty.nonEmpty activated of
-  Nothing -> restoreKeepingLibraryActions before
+  Nothing -> [] <$ restoreKeepingLibraryActions before
   Just sources -> case Reversal.withoutAnnouncement before entry closed of
     -- No state answers "keep them" where both sides wrote one leaf to two
     -- values, so the whole action goes back unasked (Pawl.Engine.Reversal says
     -- why that is conservative rather than invented).
-    Nothing -> restoreKeepingLibraryActions before
+    Nothing -> [] <$ restoreKeepingLibraryActions before
     Just kept -> do
       State.put kept
       answer <- Game.choose (Prompt.ReverseManaAbilities (Decide.deciderFor pid kept) pid sources)
       case answer of
-        OptionalDecision.Exercises -> State.put (keepingLibraryActions closed before)
-        OptionalDecision.Declines -> pure ()
+        OptionalDecision.Exercises -> [] <$ State.put (keepingLibraryActions closed before)
+        OptionalDecision.Declines -> pure (NonEmpty.toList sources)
 
 -- CR 733.1's last sentence: shuffling a library or revealing cards from one is
 -- never reversed, even where the mana ability that did it is. Restoring
@@ -3604,19 +3608,21 @@ reverseIllegal pid activated closed entry before = case NonEmpty.nonEmpty activa
 -- window closed, still carrying them) keeps every OTHER write reversed while
 -- these two stand.
 --
--- A library is kept from `since` only where its MEMBERSHIP is unchanged -- a
--- shuffle reorders and moves nothing, and a window of mana abilities cannot
--- move a library card (CR 605.1a). A library whose members differ is one the
--- surrounding action itself changed, which CR 733.1 DOES reverse: a spell cast
--- from a library (Panglacial Wurm) went to the stack, and a MillCards cost went
--- to a graveyard. Pawl.CastSpec's "a refused library cast puts Panglacial back"
--- is the proof; keeping such a library wholesale left the card in no zone.
---
+-- A library takes `since`'s ORDER, with whatever `snapshot` held that `since`
+-- lacks put back at the index it held (Pawl.Engine.Reversal.restoredOrder). The
+-- card that goes back is one the reversed action took, and CR 733.1 reverses a
+-- move from a library to the stack: a spell cast from a library (Panglacial
+-- Wurm) returns, and a shuffle a mana ability performed beside it stands.
+-- Pawl.CastSpec's "a refused library cast puts Panglacial back" is the proof
+-- that the card comes back; ReversalSpec's `restoredOrder` case that the shuffle
+-- stands. A MillCards cost never reaches this: CR 601.2h pays it in a second pass
+-- that nothing can refuse after (`pay`).
+
 -- `events` keeps only the Revealed entries `since` gained past `snapshot`'s own
 -- length whose card is in a library on BOTH sides, not the whole suffix: a tap
 -- or a mana addition the window performed is exactly what the surrounding
 -- reversal DOES undo, and a card revealed from a hand (CR 602.2a's activation
--- reveal, logged ahead of Pawl.Engine.Activate's own snapshot) is not what the
+-- reveal, logged inside Pawl.Engine.Activate's announcement) is not what the
 -- rule's "revealed from a library" protects. `nextEventGroup` rides at
 -- `since`'s value, since a carried-over entry may already hold a group
 -- `snapshot`'s own counter would otherwise repeat -- GameState.events' groups
@@ -3624,9 +3630,8 @@ reverseIllegal pid activated closed entry before = case NonEmpty.nonEmpty activa
 keepingLibraryActions :: GameState -> GameState -> GameState
 keepingLibraryActions since snapshot =
   let keep pid held = case Map.lookup pid (GameState.library since) of
-        Just reordered | members reordered == members held -> reordered
-        _ -> held
-      members held = Set.fromList (Foldable.toList held)
+        Just reordered -> Seq.fromList (Reversal.restoredOrder (Foldable.toList held) (Foldable.toList reordered))
+        Nothing -> held
       inLibraryOf gs oid = any (Foldable.elem oid) (GameState.library gs)
       revealedFromLibrary logged = case LoggedEvent.event logged of
         GameEvent.Revealed revealed -> inLibraryOf snapshot (Revealed.card revealed) && inLibraryOf since (Revealed.card revealed)
@@ -3825,7 +3830,7 @@ paySubstituting perform began moment subject announced spending pid oid substitu
         -- CR 733.1: the action is reversed back to `began`, and the window is
         -- the payer's to keep.
         Payment.Unpaid -> do
-          undoWindow began
+          Monad.void (undoWindow began)
           pure (Payment.Unpaid, Map.empty)
 
 -- CR 508.1h-508.1j and CR 509.1d-509.1f: pay a COMBAT TOLL -- the costs to attack
@@ -3882,7 +3887,7 @@ payToll perform began pid charges =
       let pooled = ManaCost.MkManaCost (concatMap (foldMap ManaCost.unwrap . Cost.mana . snd) announced)
       (paidMana, undo) <-
         if null (ManaCost.unwrap pooled)
-          then pure (True, restoreKeepingLibraryActions)
+          then pure (True, \b -> [] <$ restoreKeepingLibraryActions b)
           -- No subject (ForNeither), so CR 106.6-restricted mana cannot pay a
           -- combat toll. Exact: every printed restriction names a cast, an
           -- activation or a special action, and CR 508.1j's toll is none of
@@ -3892,7 +3897,7 @@ payToll perform began pid charges =
             pure (paid, undoWindow)
       if not paidMana
         then do
-          undo began
+          Monad.void (undo began)
           pure False
         else do
           let tagged = fmap (fmap Cost.components) announced
@@ -3910,7 +3915,7 @@ payToll perform began pid charges =
           case outcome of
             Payment.Paid _ -> pure True
             Payment.Unpaid -> do
-              undo began
+              Monad.void (undo began)
               pure False
 
 -- Which way each of the toll's symbols payable in more than one way will be
@@ -4346,7 +4351,7 @@ payManaExcept perform inFlight record subject spending pid cost = do
   (paid, _, undo) <- payManaWindow perform inFlight record subject spending pid (\mc -> pure (mc, [])) cost
   -- CR 733.1, this payment being the whole of what failed: the payer may keep
   -- what the window activated.
-  Monad.unless paid (undo before)
+  Monad.unless paid (Monad.void (undo before))
   pure paid
 
 -- payManaExcept's window, handing back what CR 733.1 needs to reverse it: the
@@ -4364,7 +4369,7 @@ payManaExcept perform inFlight record subject spending pid cost = do
 -- The window LOOP still reads the unsubstituted cost, which is what `covered`
 -- below asks about: nothing has been substituted yet while the window is open,
 -- so CR 118.3c's question is put against the whole of it.
-payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> (ManaCost.ManaCost -> Game (ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])) -> ManaCost.ManaCost -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game ())
+payManaWindow :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> Maybe ObjectId -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> (ManaCost.ManaCost -> Game (ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])) -> ManaCost.ManaCost -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game [ObjectId])
 payManaWindow perform inFlight record subject spending pid substituting cost = do
   -- Where the window OPENED, which is the far end of the announcement's diff:
   -- everything between the caller's own snapshot and this is what the
@@ -4410,17 +4415,19 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
             case answer of
               Nothing -> settle activated
               Just oid -> do
-                produced <- tapForManaWith perform inFlight oid
+                (produced, kept) <- tapForManaWith perform inFlight oid
                 -- An activation that FAILED reversed itself already (payActivation
-                -- below), so it is not one of rule 733.1's to offer back.
-                window (if produced then refused else Set.insert oid refused) (if produced then oid : activated else activated)
+                -- below), so it is not one of rule 733.1's to offer back -- but
+                -- the sources its own nested window activated and the payer KEPT
+                -- are, since their activations stand in this window.
+                window (if produced then refused else Set.insert oid refused) (if produced then oid : activated else reverse kept <> activated)
       -- CR 601.2h: the window is closed, so the cost is paid out of what is there
       -- -- and simply is not paid when the player floated too little.
       --
       -- WHICH mana goes is the payer's (Mana.spendChosen), so this asks rather
       -- than reading `settlement`'s assignment: that one answers only whether the
       -- pool pays.
-      settle :: [ObjectId] -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game ())
+      settle :: [ObjectId] -> Game (Bool, [CostComponent.CostComponent Keyword.Type.Keyword], GameState -> Game [ObjectId])
       settle activated = do
         -- CR 601.2g then the reminder text: the substitutes are offered HERE,
         -- with the window shut and nothing spent, so the payer answers knowing
@@ -4676,7 +4683,7 @@ payAssist helper subject sid cost = case Cost.mana cost of
 -- Pawl.Types.ManaAbilityPerformer rather than a call into Pawl.Engine.Resolve,
 -- which sits above this module.
 tapForMana :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game Bool
-tapForMana perform = tapForManaWith perform Set.empty
+tapForMana perform oid = fmap fst (tapForManaWith perform Set.empty oid)
 
 -- The same activation carrying the abilities already mid-activation (CR
 -- 605.3c), which is payManaExcept's one narrowing: the route CHOSEN here joins
@@ -4686,11 +4693,11 @@ tapForMana perform = tapForManaWith perform Set.empty
 -- than in `payActivation`, which is the only caller and cannot see which route
 -- was chosen. CR 605.3a's priority window starts from the empty set, nothing
 -- being in flight there.
-tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> ObjectId -> Game Bool
+tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> ObjectId -> Game (Bool, [ObjectId])
 tapForManaWith perform inFlight oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
-    Nothing -> pure False
+    Nothing -> pure (False, [])
     Just obj -> do
       -- CR 109.4a/110.2: the mana ability's controller is the permanent's
       -- controller, and that player makes the colour choice and pays the cost.
@@ -4707,7 +4714,7 @@ tapForManaWith perform inFlight oid = do
           -- own, and that walk is the shape #1073 was about.
           capacity = manaActivationsGiven (PlayerEffect.applying controller gs)
       case filter (\option -> not (Mana.inFlightRoute inFlight oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
-        [] -> pure False
+        [] -> pure (False, [])
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
           -- CR 601.2f, reached by CR 602.2b: what is paid is the TOTAL, and the
@@ -4736,9 +4743,9 @@ tapForManaWith perform inFlight oid = do
           -- elided by announceReductions wherever the answers cannot differ,
           -- which is every board `data/cards/` can build today.
           announced <- announceReductions controller oid gs announcedCost gathered
-          outcome <- payActivation perform (Set.insert (oid, ManaOption.ability chosen) inFlight) controller oid (totalWith announced announcedCost)
+          (outcome, kept) <- payActivation perform (Set.insert (oid, ManaOption.ability chosen) inFlight) controller oid (totalWith announced announcedCost)
           case outcome of
-            Payment.Unpaid -> pure False
+            Payment.Unpaid -> pure (False, kept)
             -- CR 605.3b: a mana ability's cost binds nothing this path could
             -- read, so the payment's own slots are dropped here. The ability
             -- itself has no object either -- see `perform` below.
@@ -4820,7 +4827,7 @@ tapForManaWith perform inFlight oid = do
                   -- CR 106.4 sent it to.
                   manaAbilityResolved = GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = oid, ManaAbilityResolved.amount = Natural.length (Mana.yieldUnits chosen)})
               applyManaTriggers perform (tappedForMana <> manaAdded <> [manaAbilityResolved])
-              pure True
+              pure (True, [])
 
 -- CR 605.4a: record the events one activated mana ability wrote -- CR 106.12a's
 -- tap for mana, CR 605.1b's mana being added and CR 605.3b's own resolution --
@@ -4889,11 +4896,11 @@ applyManaTriggers perform events = do
 --
 -- The recursion CR 602.2b makes of that window is bounded by the in-flight set
 -- `tapForManaWith` added this route to (CR 605.3c), not by the order.
-payActivation :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+payActivation :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, [ObjectId])
 payActivation perform inFlight pid oid cost = do
   before <- State.get
   (paid, undo) <- case Cost.mana cost of
-    Just (ManaCost.MkManaCost []) -> pure (True, restoreKeepingLibraryActions)
+    Just (ManaCost.MkManaCost []) -> pure (True, \b -> [] <$ restoreKeepingLibraryActions b)
     -- CR 118.14's permission is granted to CAST a spell and never to activate an
     -- ability, so an activation cost is paid with the mana it is. CR 106.6 is a
     -- different sentence and answers differently: this is CR 602.2b's payment,
@@ -4904,7 +4911,7 @@ payActivation perform inFlight pid oid cost = do
       (windowPaid, _, undoWindow) <- payManaWindow perform inFlight Nothing (PaymentSubject.Activating oid) ManaSpending.AsProduced pid (\mc -> pure (mc, [])) manaCost
       pure (windowPaid, undoWindow)
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
-    Nothing -> pure (False, restoreKeepingLibraryActions)
+    Nothing -> pure (False, \b -> [] <$ restoreKeepingLibraryActions b)
   -- CR 602.2b sends this through CR 601.2h, so the payment is made while the
   -- ability is being ACTIVATED and no resolution is behind it.
   --
@@ -4915,10 +4922,11 @@ payActivation perform inFlight pid oid cost = do
   let settled = case outcome of
         Payment.Paid _ -> paid
         Payment.Unpaid -> False
-  Monad.unless settled (undo before)
+  kept <- if settled then pure [] else undo before
   -- `outcome` and not a fresh Paid: the components' bound slots are what the
-  -- payment bound, the mana half binding none of its own.
-  pure (if settled then outcome else Payment.Unpaid)
+  -- payment bound, the mana half binding none of its own. `kept` is what the
+  -- payer chose to keep of a refused payment's window.
+  pure (if settled then outcome else Payment.Unpaid, kept)
 
 -- Which way this source is tapped -- which mana ability, in which mode, and
 -- which colour each of that mode's AddMana effects makes -- asked as ONE

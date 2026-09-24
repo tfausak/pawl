@@ -5240,6 +5240,31 @@ announcedReversalSpec s registry = Spec.describe s "Reversal after an announceme
     Spec.assertBool s (not paid) "CR 601.2h the {W/U} activation itself was refused"
     Spec.assertEqWith s "alice was asked once" asked 1
 
+  -- The same Gate activated INSIDE a cast's window: its nested window refuses,
+  -- alice keeps the Gate's {C} and the Island's {U}, and the outer window closes
+  -- with nothing else activated -- the Mountain, there so the cast is offered
+  -- at all, is left untapped. {U}{C} cannot pay the Piker's {1}{R}, so the
+  -- cast is reversed -- and the two kept activations are still the payer's to
+  -- keep, since they were activated while making the illegal play.
+  Spec.it s "CR 733.1 what a nested window kept is offered again when the outer payment fails" $ do
+    gate <- S.printingOf s registry "Mystic Gate"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gateId, g1) = S.addPermanent gate S.alice (Setup.emptyGame S.bothPlayers)
+        (islandId, g2) = S.addPermanent island S.alice g1
+        (g3, pikerId) = S.handOne piker (snd (S.addPermanent mountain S.alice g2))
+        gs = g3 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        run decision = State.runState (Engine.runGame (keepingOrNot decision [gateId, islandId] gateRoute) gs (S.cast S.alice pikerId)) 0
+        ((_, kept), asked) = run OptionalDecision.Declines
+        ((_, reversed), _) = run OptionalDecision.Exercises
+    Spec.assertEqWith s "CR 106.4 the {C} and the {U} are still floating" (poolSize S.alice kept) 2
+    Spec.assertBool s (isTapped gateId kept && isTapped islandId kept) "CR 107.5 and both lands stay tapped"
+    Spec.assertEqWith s "CR 601.2a the Piker is back in hand" (Game.zoneMembers Zone.Hand S.alice kept) [pikerId]
+    Spec.assertEqWith s "the payer who reverses gets nothing floating" (poolSize S.alice reversed) 0
+    Spec.assertBool s (not (isTapped gateId reversed || isTapped islandId reversed)) "and both lands untapped"
+    Spec.assertEqWith s "alice was asked twice: once by the nested window, once by the cast" asked 2
+
 -- `n` copies of one printing onto alice's battlefield, ids in creation order.
 addPermanents :: Printing.Printing -> Int -> GameState.GameState -> ([ObjectId.ObjectId], GameState.GameState)
 addPermanents printing n gs =
