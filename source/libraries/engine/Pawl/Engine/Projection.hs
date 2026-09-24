@@ -432,9 +432,10 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
           Nothing -> pc
           Just other -> exchangeTextBoxFrom (textBoxOf other) pc
         -- CR 612.7: every name in the Oracle card reference whose card face
-        -- matches, in addition to the object's own. Each face is judged off its
-        -- printed characteristics, so a token's name and a noncreature card
-        -- that has become a creature stay out.
+        -- matches, in addition to the object's own. Each name is judged off the
+        -- printed characteristics Card.referenceViews pairs it with, so a
+        -- token's name and a noncreature card that has become a creature stay
+        -- out.
         --
         -- The reference is the faces the game holds (Game.referenceFaces) and
         -- the names the interpreter answered the filter with

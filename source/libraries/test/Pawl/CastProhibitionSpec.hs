@@ -1973,6 +1973,25 @@ runedHaloSpec s registry =
       Spec.assertBool s (S.onBattlefield giantId unasked) "with the reference never consulted it survives"
       Spec.assertBool s (S.onBattlefield bottleId asked && S.onBattlefield kitId asked) "the Bottle and the Kit themselves stay"
       Spec.assertBool s (not (Map.member kirdApe (Game.referenceFaces board))) "no Kird Ape card is anywhere in the game"
+    -- CR 612.7 / 709.4a/c: a split card with a creature half is a nonlegendary
+    -- creature card with two names, so a Spy Kit host has its instant half's
+    -- name too. The split card sits in bob's hand, since a synthetic is no card
+    -- of the registry's reference. Two boards differing in one thing: the split
+    -- card in the game, and not.
+    Spec.it s "CR 612.7 / 709.4a a Spy Kit host has both names of a split card with a creature half" $ do
+      plains <- S.printingOf s registry "Plains"
+      halo <- S.printingOf s registry "Runed Halo"
+      curse <- S.printingOf s registry "Curse of Vitality"
+      kit <- S.printingOf s registry "Spy Kit"
+      giant <- S.printingOf s registry "Hill Giant"
+      split <- S.printingOf s registry "Synthetic Mirror Rite"
+      let (haloId, _, board) = runedHaloBoard plains halo curse
+          (_, withSplit) = S.addHandCard split S.bob board
+          rite = CardName.MkCardName (Text.pack "Synthetic Mirror Rite")
+          (beforeSplit, withSplitAfter) = spyKitCombat giant (Just kit) (castHalo rite withSplit haloId)
+          (beforeAbsent, absent) = spyKitCombat giant (Just kit) (castHalo rite board haloId)
+      Spec.assertEqWith s "the host is named Synthetic Mirror Rite, so alice takes none of its 4" (S.lifeOf S.alice withSplitAfter) (S.lifeOf S.alice beforeSplit)
+      Spec.assertEqWith s "with no such split card in the game, alice takes 4" (S.lifeOf S.alice absent) (fmap (subtract 4) (S.lifeOf S.alice beforeAbsent))
 
 -- The Stasis Coffin {3} Legendary Artifact: "{2}, {T}, Exile The Stasis Coffin:
 -- You gain protection from everything until your next turn." The pool's one card

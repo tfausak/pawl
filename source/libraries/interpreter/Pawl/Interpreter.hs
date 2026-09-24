@@ -128,9 +128,8 @@ policingCardNames registry answer asked = case Asked.prompt asked of
 -- A reference card is named by its FIRST face, which is the name
 -- Prompt.LookUpCard then fetches it back by. The pick among the names is not
 -- made here: the engine asks it of the answerer beneath, as randomness.
--- Prompt.ReferenceNames asks about FACES instead, every face of every card, each
--- judged off its own printed characteristics: a back face's name is a name of
--- its own (CR 201.4d), and Spy Kit's ruling counts it among CR 612.7's.
+-- Prompt.ReferenceNames asks about every NAME instead, each judged by the view
+-- Card.referenceViews pairs it with.
 --
 -- Pawl.CastProhibitionSpec's Spy Kit case, where Runed Halo names a card in
 -- no zone, is what proves the lookup; Pawl.ConjureSpec's Fear of Change case
@@ -151,5 +150,5 @@ lookingUpCards registry answer asked = case Asked.prompt asked of
   Prompt.ReferenceNames predicate ->
     let context = Filter.contextFor (Game.teams (Asked.game asked)) Nothing Nothing
         admitted face = Filter.matches context (Projection.viewOfCard face) predicate
-     in fmap (concatMap (fmap Face.name . filter admitted . NonEmpty.toList . Card.Type.faces)) (Registry.cards registry)
+     in fmap (concatMap (fmap fst . filter (admitted . snd) . Card.referenceViews)) (Registry.cards registry)
   _ -> answer asked

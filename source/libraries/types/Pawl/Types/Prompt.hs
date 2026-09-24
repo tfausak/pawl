@@ -123,9 +123,8 @@ data Prompt r where
   -- the pick is then RandomCard's. LookUpCard's reasons for carrying neither
   -- Decider nor PlayerId.
   ReferenceCards :: Filter.Filter Keyword.Keyword -> Maybe Integer -> Prompt [CardName.CardName]
-  -- | CR 612.7 / 108.1: the name of every card face in the Oracle card
-  -- reference the filter admits, each face judged off its own printed
-  -- characteristics. Asked of the interpreter once per filter a live
+  -- | CR 612.7 / 108.1: every name in the Oracle card reference the filter
+  -- admits, judged off printed characteristics. Asked of the interpreter once per filter a live
   -- Pawl.Types.Modification's AddNamesMatching carries, since the projection
   -- that reads the answer cannot ask. LookUpCard's reasons for carrying neither
   -- Decider nor PlayerId.
