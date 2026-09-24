@@ -7,8 +7,11 @@
 -- Pawl.Engine.Activate's activatableGiven (CR 801.6), Pawl.Engine.Sba's
 -- fallsOff and becomesUnattached (CR 801.8 / CR 801.9),
 -- Pawl.Engine.Projection's affectsWith and Pawl.Engine.PlayerEffect's applies
--- (CR 801.10 for static abilities) and Sba's worldVictims (CR 801.12); and CR
--- 801.2c's turn-start seating, Pawl.Types.GameState's departedThisTurn.
+-- (CR 801.10 for static abilities), Pawl.Engine.Projection.View's
+-- controlNames (CR 801.10 for a layer-2 grant), Pawl.Engine.CombatRestriction's
+-- attackLimit and blockLimit (CR 801.10 for a declaration's bound) and Sba's
+-- worldVictims (CR 801.12); and CR 801.2c's turn-start seating,
+-- Pawl.Types.GameState's departedThisTurn.
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
 -- carol, dave]: bob and dave sit next to alice and carol sits two seats away.
@@ -26,6 +29,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
@@ -33,6 +37,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -190,6 +195,50 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 801.10 at range 1 carol keeps a maximum hand size of seven" (PlayerEffect.maximumHandSize S.carol (S.withRange 1 board)) (Just 7)
     Spec.assertEqWith s "at an unlimited range hers is six" (PlayerEffect.maximumHandSize S.carol board) (Just 6)
     Spec.assertEqWith s "and bob's, in range, is six at range 1" (PlayerEffect.maximumHandSize S.bob (S.withRange 1 board)) (Just 6)
+
+  -- CR 801.10 for a layer-2 grant: alice's Synthetic Goblin Dominion ("You
+  -- control all Goblins.") over a Goblin Piker each for bob, one seat away, and
+  -- carol, two seats away.
+  Spec.it s "CR 801.10 a control grant does not take a permanent outside its controller's range" $ do
+    dominion <- S.printingOf s registry "Synthetic Goblin Dominion"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent dominion S.alice S.fourPlayerGame
+        (bobs, g1) = S.addPermanent piker S.bob g0
+        (carols, board) = S.addPermanent piker S.carol g1
+    Spec.assertEqWith s "CR 801.10 at range 1 carol keeps her Goblin" (Projection.controllerOf carols (S.withRange 1 board)) (Just S.carol)
+    Spec.assertEqWith s "at an unlimited range alice takes it" (Projection.controllerOf carols board) (Just S.alice)
+    Spec.assertEqWith s "and at range 1 alice takes bob's, in range" (Projection.controllerOf bobs (S.withRange 1 board)) (Just S.alice)
+
+  -- CR 801.10 for a bound on a declaration: alice's Silent Arbiter ("No more
+  -- than one creature can attack each combat. No more than one creature can
+  -- block each combat.") over carol, two seats away. Carol attacks dave, beside
+  -- her, with two Goblin Pikers; and when bob attacks carol, carol blocks with
+  -- two.
+  Spec.it s "CR 801.10 a limit on attackers or blockers does not bind a player outside its controller's range" $ do
+    arbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent arbiter S.alice S.fourPlayerGame
+        (first, g1) = S.addPermanent piker S.carol g0
+        (second, g2) = S.addPermanent piker S.carol g1
+        (attacker, g3) = S.addPermanent piker S.bob g2
+        attackBoard =
+          g3
+            { GameState.activePlayer = S.carol,
+              GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.dave, S.bob]}
+            }
+        blockBoard =
+          g3
+            { GameState.activePlayer = S.bob,
+              GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.carol], Combat.Type.attackers = Map.singleton attacker (AttackTarget.OfPlayer S.carol)}
+            }
+        both = fmap (\oid -> (oid, AttackTarget.OfPlayer S.dave)) [first, second]
+        doubleBlock = Map.fromList [(first, Set.singleton attacker), (second, Set.singleton attacker)]
+    Spec.assertBool s (Combat.legalAttackDeclarationAs S.carol both (S.withRange 1 attackBoard)) "CR 801.10 at range 1 carol attacks dave with both Pikers"
+    Spec.assertBool s (not (Combat.legalAttackDeclarationAs S.carol both attackBoard)) "at an unlimited range the Arbiter holds her to one"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.carol doubleBlock (S.withRange 1 blockBoard)) "CR 801.10 at range 1 carol blocks with both"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol doubleBlock blockBoard)) "at an unlimited range she may block with only one"
 
   -- CR 801.12: alice's Living Plane, then a newer Concordant Crossroads, each
   -- stamped by the settle that follows its entry (Engine.sampleWorldSince).

@@ -57,6 +57,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -65,6 +66,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -306,7 +308,7 @@ data AttackLimits = MkAttackLimits
 -- was already rewritten and asked in `lifted`.
 attackLimit :: GameState -> AttackLimits
 attackLimit gs =
-  let rows = gathered gs
+  let rows = filter (reachesDeclarer (Just (GameState.activePlayer gs)) gs) (gathered gs)
       tighter acc n = Just (maybe n (min n) acc)
       unscoped (_, _, restriction) = case attackingMoreThan restriction of
         Just (n, Nothing) -> Just n
@@ -1010,4 +1012,18 @@ cantAttackPlayer candidates players gs =
 bounded :: (CombatRestriction.CombatRestriction -> Maybe Natural) -> Maybe PlayerId -> GameState -> Maybe Natural
 bounded select defending gs =
   let tighter acc n = Just (maybe n (min n) acc)
-   in List.foldl' tighter Nothing (Maybe.mapMaybe (\(_, _, restriction) -> select restriction) (inForce defending gs))
+   in List.foldl' tighter Nothing (Maybe.mapMaybe (\(_, _, restriction) -> select restriction) (filter (reachesDeclarer defending gs) (inForce defending gs)))
+
+-- CR 801.10: a bound constrains the declaring player's own creatures, so it is
+-- in force only when that player is within the range of influence of the
+-- source's controller. `attackLimit` names the active player (CR 508.1),
+-- `blockLimit` the defending player declaring blockers (CR 509.1). A source with
+-- no controller, or no declarer named, cuts nothing.
+-- Pawl.RangeOfInfluenceSpec's "CR 801.10 a limit on attackers or blockers does
+-- not bind a player outside its controller's range" proves both.
+reachesDeclarer :: Maybe PlayerId -> GameState -> (ObjectId, a, b) -> Bool
+reachesDeclarer declarer gs (source, _, _) = case declarer of
+  Just pid
+    | not (Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs)))) ->
+        all (\you -> Game.inRangeOf you pid gs) (Projection.controllerOf source gs)
+  _ -> True
