@@ -1189,6 +1189,10 @@ specialActionsOf carrier gs =
 --
 -- Pawl.MutateSpec's "CR 702.140e a Silent Arbiter under a Cubwarden still holds
 -- alice to one attacker" is what proves the merged read.
+--
+-- Copiable text only: what a stored grant gave the object is
+-- Pawl.Engine.Projection.grantedRuleAbilities, which each gatherer reads beside
+-- this.
 ruleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
 ruleAbilitiesOf carrier gs =
   let oid = textBoxHolderOf carrier gs

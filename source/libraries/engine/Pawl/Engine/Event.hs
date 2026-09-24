@@ -4858,7 +4858,9 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
       mBack = if EntryRiders.transformed riders then mCard >>= Card.backFace else Nothing
       -- CR 708.3 turns a face-down entry over BEFORE it enters, so neither the
       -- front face (CR 712.14b, 712.15) nor the card type (CR 400.4a) is asked
-      -- of it: a manifested or Magar'd instant is a face-down 3/3 as it enters.
+      -- of it: a face-down instant enters with only its listed characteristics
+      -- -- manifest's 2/2 (CR 701.40a), cloak's 2/2 with ward {2} (CR 701.58a),
+      -- Magar's 3/3.
       faceUpEntry = Maybe.isNothing (EntryRiders.faceDown riders)
       -- CR 400.4a / 304.4 / 307.4: an instant or sorcery card entering face up
       -- stays where it was -- Flicker of Fate returning the card under Magar's
@@ -5838,7 +5840,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               --
               -- Each component goes through the same `mkObj`, so CR 400.7's
               -- forgetting (Object.newIncarnation) is what the two cards arrive
-              -- with; only Object.source differs, since each component
+              -- with; only Object.source and a conjured duplicate's values
+              -- differ (Game.representComponent), since each component
               -- represents itself again and not the permanent it was. CR 730.3's
               -- merged permanent can have a TOKEN component, which arrives as a
               -- token (Game.sourceOfComponent) and is then removed by CR 111.7's
@@ -5886,11 +5889,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                   asComponent zone mComponent ts =
                     ( case mComponent of
                         Nothing -> mkObj entrySeed ts
-                        -- Object.duplicate is the merged object's, not each
-                        -- component's, so no component keeps it. Not implemented:
-                        -- a conjured duplicate's values as a merge component
-                        -- (#4037).
-                        Just component -> (mkObj entrySeed ts) {Object.source = Game.sourceOfComponent component, Object.duplicate = Nothing}
+                        Just component -> Game.representComponent component (mkObj entrySeed ts)
                     )
                       { Object.zone = zone
                       }
@@ -7562,7 +7561,7 @@ merge :: ObjectId -> ObjectId -> MutateSide.MutateSide -> Game Bool
 merge sid target side = do
   gs <- State.get
   case (Game.lookupObject sid gs, Game.lookupObject target gs) of
-    (Just spell, Just permanent) -> case (mergingComponent (Object.source spell), mergeComponents (Object.source permanent)) of
+    (Just spell, Just permanent) -> case (mergingComponent spell, mergeComponents permanent) of
       (Just component, Just existing) -> do
         let merged = case side of
               MutateSide.Over -> component NonEmpty.:| existing
@@ -7627,8 +7626,8 @@ merge sid target side = do
     _ -> pure False
 
 -- CR 730.2's "any other components that were representing it", in top-to-bottom
--- order: one printing for an ordinary card (CR 108.2), and the existing stack
--- for a permanent already merged.
+-- order: one card for an ordinary card (CR 108.2, Game.cardComponentOf), and the
+-- existing stack for a permanent already merged.
 --
 -- The TOKEN arm is CR 730.2d's own subject: a token is a component like any
 -- other, and what its being on top decides is only whether the merged permanent
@@ -7638,9 +7637,9 @@ merge sid target side = do
 -- answer -- Pawl.Types.MergeComponent's OfMeld arm derives it -- so a melded
 -- permanent that is mutated under keeps CR 712.8g's combined back face and one
 -- that is mutated over contributes that face's abilities (CR 702.140e).
-mergeComponents :: Source.Source -> Maybe [MergeComponent.MergeComponent]
-mergeComponents source = case source of
-  Source.OfCard pid -> Just [MergeComponent.OfCard pid]
+mergeComponents :: Object.Object -> Maybe [MergeComponent.MergeComponent]
+mergeComponents permanent = case Object.source permanent of
+  Source.OfCard pid -> Just [Game.cardComponentOf permanent pid]
   Source.OfMerge components -> Just (NonEmpty.toList components)
   Source.OfMeld melded -> Just [MergeComponent.OfMeld melded]
   Source.OfToken pid -> Just [MergeComponent.OfToken pid]
@@ -7670,9 +7669,9 @@ mergeComponents source = case source of
 --
 -- Nothing where the object is no spell at all, which `merge` and `mergeable`
 -- both report as a refusal.
-mergingComponent :: Source.Source -> Maybe MergeComponent.MergeComponent
-mergingComponent source = case source of
-  Source.OfCard pid -> Just (MergeComponent.OfCard pid)
+mergingComponent :: Object.Object -> Maybe MergeComponent.MergeComponent
+mergingComponent spell = case Object.source spell of
+  Source.OfCard pid -> Just (Game.cardComponentOf spell pid)
   Source.OfSpellCopy pid -> Just (MergeComponent.OfSpellCopy pid)
   -- A copy of a card is a spell once cast, and no such spell pawl mints is a
   -- mutating creature spell: CR 722.3c's "has only the characteristics of that
@@ -7699,7 +7698,7 @@ mergingComponent source = case source of
 -- named.
 mergeable :: ObjectId -> ObjectId -> GameState -> Bool
 mergeable sid target gs = case (Game.lookupObject sid gs, Game.lookupObject target gs) of
-  (Just spell, Just permanent) -> case (mergingComponent (Object.source spell), mergeComponents (Object.source permanent)) of
+  (Just spell, Just permanent) -> case (mergingComponent spell, mergeComponents permanent) of
     (Just _, Just _) -> True
     _ -> False
   _ -> False

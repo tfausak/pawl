@@ -441,6 +441,8 @@ library codec
     Pawl.Codec.DrewSpec
     Pawl.Codec.DungeonRoom
     Pawl.Codec.DungeonRoomSpec
+    Pawl.Codec.DuplicateCard
+    Pawl.Codec.DuplicateCardSpec
     Pawl.Codec.Duration
     Pawl.Codec.DurationRef
     Pawl.Codec.DurationRefSpec
@@ -1821,6 +1823,7 @@ library types
     Pawl.Types.DrawRewrite
     Pawl.Types.Drew
     Pawl.Types.DungeonRoom
+    Pawl.Types.DuplicateCard
     Pawl.Types.Duration
     Pawl.Types.DurationRef
     Pawl.Types.DuringPhase
@@ -1941,6 +1944,7 @@ library types
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType
     Pawl.Types.ManaUnit
+    Pawl.Types.ManaWindow
     Pawl.Types.Meld
     Pawl.Types.MeldSource
     Pawl.Types.Mentored

@@ -82,6 +82,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
+import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
@@ -228,15 +229,18 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         --
         -- A STATIC ability joins none: its effect is gathered before this fold
         -- runs, which is permanentParts' reading of a stored grant through
-        -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf. Not implemented:
-        -- a static granted by another static ability rather than by a
-        -- resolution, whose recipients only this fold knows (#1942).
+        -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf. Nor does a RULE
+        -- ability, which CR 613.11 applies after the layers: the gatherers read
+        -- a stored grant of one through grantedRuleAbilities. Not implemented:
+        -- a static or rule ability granted by another static ability rather
+        -- than by a resolution, whose recipients only this fold knows (#1942).
         Modification.GainAbility g -> case g of
           GrantedAbility.Activated a ->
             pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
           GrantedAbility.Triggered t ->
             pc {PC.triggeredAbilities = PC.triggeredAbilities pc <> [t]}
           GrantedAbility.Static _ -> pc
+          GrantedAbility.Rules _ -> pc
           -- Not implemented: a replacement ability granted by a continuous
           -- effect (#1942).
           GrantedAbility.Replacement _ -> pc
@@ -2173,6 +2177,32 @@ abilityRemovalAfter gs =
    in if any (removesAbilities . gModification) gated
         then \ts -> abilitiesRemovedBy ((> ts) . gTimestamp) gated gs
         else \_ _ -> False
+
+-- CR 613.11 / 613.1f: the rule abilities stored layer-6 grants give `oid`
+-- (Chomping Kavu's backup), which each of the thirteen gatherers
+-- (Pawl.Engine.CombatRestriction and its siblings) reads next to the object's
+-- own (ruleAbilitiesOf). Hoisted over the whole game like abilityRemoval, and no
+-- work on a board that stores no such grant.
+--
+-- CR 613.1f's removal is asked in CR 613.7 timestamp order: only a removal
+-- later than the grant takes it (abilityRemovalAfter). Three gates a printed row
+-- passes are not asked: CR 305.7's strip "doesn't remove any abilities that were
+-- granted to the land by other effects", CR 612.3 keeps a text change affecting
+-- the host out of a granted ability, and it is read off `oid` itself rather
+-- than textBoxHolderOf, for grantedStaticAbilitiesOf's reason.
+-- Pawl.KeywordTriggerSpec's Backup group proves the removal order and the CR
+-- 305.7 exemption, through the combat restriction; the other twelve families
+-- are regression fences, no printing with backup granting one.
+grantedRuleAbilities :: GameState -> ObjectId -> RuleAbilities.RuleAbilities
+grantedRuleAbilities gs =
+  let grant eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
+        (Modification.GainAbility (GrantedAbility.Rules rules), Affected.TheseObjects holders) -> Just (ContinuousEffect.timestamp eff, holders, rules)
+        _ -> Nothing
+      grants = List.sortOn (\(ts, _, _) -> ts) (Maybe.mapMaybe grant (GameState.continuousEffects gs))
+      removedAfter = abilityRemovalAfter gs
+      heldBy oid (ts, holders, rules) =
+        if Set.member oid holders && not (removedAfter ts oid) then rules else mempty
+   in if null grants then const mempty else \oid -> foldMap (heldBy oid) grants
 
 -- CR 613.1f: does this modification remove abilities? Total: a new
 -- ability-removing Modification must break this build rather than silently answer
@@ -4837,6 +4867,8 @@ grantedStaticWrites p g = case g of
   GrantedAbility.Static sa -> any p (StaticAbility.modifications sa)
   GrantedAbility.Activated _ -> False
   GrantedAbility.Triggered _ -> False
+  -- CR 613.11: a rule ability writes no Modification.
+  GrantedAbility.Rules _ -> False
   GrantedAbility.Replacement _ -> False
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?

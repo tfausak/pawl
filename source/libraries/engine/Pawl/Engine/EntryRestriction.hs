@@ -69,6 +69,11 @@ prohibited oid origin gs =
           affected
           view
           gs
+      -- CR 613.1f: what a stored grant gave the permanent, whose gates
+      -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
+      -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
+      grantedRules = Projection.grantedRuleAbilities gs
+      fromGrant source = any (fromRestriction source []) (RuleAbilities.entryRestrictions (grantedRules source))
       fromPermanent source = case RuleAbilities.entryRestrictions (Projection.ruleAbilitiesOf source gs) of
         -- Every permanent in almost every game.
         [] -> False
@@ -89,4 +94,4 @@ prohibited oid origin gs =
         let affected = EntryRestriction.affected restriction
          in Set.member origin (EntryRestriction.origins restriction)
               && named source (if null changes then affected else Projection.rewriteAffected changes affected)
-   in any fromPermanent (Set.toList (GameState.battlefield gs))
+   in any (\source -> fromPermanent source || fromGrant source) (Set.toList (GameState.battlefield gs))

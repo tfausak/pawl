@@ -114,17 +114,21 @@ additionalBlocks candidates gs =
               -- rather than hoisted for CombatRestriction.inForce's reason: the
               -- empty case above already turned away every permanent that
               -- prints no permission.
-              let changes = Projection.textChangesAffecting source gs
-               in do
-                    permission <- permissions
-                    Monad.guard (granted source changes permission)
-                    -- Bound here rather than in the pair, so a counted
-                    -- permission folds the battlefield once per permission and
-                    -- not once per candidate.
-                    let extra = amount source changes permission
-                        affected = BlockPermission.affected permission
-                    creature <- candidates
-                    Monad.guard (named source (if null changes then affected else Projection.rewriteAffected changes affected) creature)
-                    pure (creature, extra)
+              rowsOf source (Projection.textChangesAffecting source gs) permissions
             else []
-   in Map.fromListWith (\a b -> (+) <$> a <*> b) (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
+      rowsOf source changes permissions = do
+        permission <- permissions
+        Monad.guard (granted source changes permission)
+        -- Bound here rather than in the pair, so a counted permission folds
+        -- the battlefield once per permission and not once per candidate.
+        let extra = amount source changes permission
+            affected = BlockPermission.affected permission
+        creature <- candidates
+        Monad.guard (named source (if null changes then affected else Projection.rewriteAffected changes affected) creature)
+        pure (creature, extra)
+      -- CR 613.1f: what a stored grant gave the permanent, whose gates
+      -- Projection.grantedRuleAbilities has asked already, with no CR 612.1
+      -- word swap (CR 612.3) -- CombatRestriction.gathered's reading.
+      grantedRules = Projection.grantedRuleAbilities gs
+      fromGrant source = rowsOf source [] (RuleAbilities.blockPermissions (grantedRules source))
+   in Map.fromListWith (\a b -> (+) <$> a <*> b) (concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs)))

@@ -433,7 +433,7 @@ activateAbility pid srcId ability = do
               -- (Cost.paySubstituting). The bindings the substitution makes are
               -- dropped -- no printing reads back which permanents a waterbend
               -- cost tapped, where CR 702.51c's convoke does.
-              (payment, _) <- Cost.paySubstituting Resolve.performManaAbility before PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.activationManaSubstitutions pid srcId) paidCost
+              (payment, _) <- Cost.paySubstituting Resolve.performManaAbility before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.activationManaSubstitutions pid srcId) paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage
