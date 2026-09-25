@@ -189,6 +189,10 @@ data Filter keyword
     -- player target answers a player view (Pawl.Engine.Count.playerView), so
     -- "a single player" is IsPlayer and needs no separate arm.
     TargetsOnlyOne (Filter keyword)
+  | -- | CR 115.9b: the candidate, a stack object, targets at least one thing
+    -- this Filter matches (Rebuff the Wicked's "spell that targets a permanent
+    -- you control"). TargetsOnlyOne without the arity.
+    TargetsMatching (Filter keyword)
   | -- | CR 115.1 / 115.10a: the candidate has a player in this relation to the
     -- perspective among its targets, a ToPlayer alone counting (Shell of the
     -- Last Kappa's "spell that targets you").

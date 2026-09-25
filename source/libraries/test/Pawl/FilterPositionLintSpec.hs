@@ -251,6 +251,7 @@ canHostSubjects predicate = case predicate of
   -- carries the one target's description, a Filter position a card author
   -- writes into like any other.
   Filter.Type.TargetsOnlyOne f -> canHostSubjects f
+  Filter.Type.TargetsMatching f -> canHostSubjects f
   Filter.Type.TargetsPlayer _ -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
