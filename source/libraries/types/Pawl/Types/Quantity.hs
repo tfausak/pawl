@@ -210,6 +210,10 @@ data Quantity
   | -- | CR 701.9a / 608.2i: how many cards that player discarded this turn,
     -- folded from the turn-scoped GameEvent.Discarded log.
     CardsDiscardedThisTurn PlayerRef.PlayerRef
+  | -- | CR 603.1b / 608.2i: how many of the four bending verbs (CR 701.65b,
+    -- 701.66b, 701.67c, 702.189b) that player has done this turn -- Avatar
+    -- Aang's "if you've done all four this turn".
+    BendingsThisTurn PlayerRef.PlayerRef
   | -- | CR 119.3 / 608.2i: how much life that player gained this turn, summed
     -- from the turn-scoped GameEvent.LifeGained log.
     LifeGainedThisTurn PlayerRef.PlayerRef

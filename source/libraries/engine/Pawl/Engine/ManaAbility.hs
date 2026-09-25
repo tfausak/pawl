@@ -285,6 +285,7 @@ costMovesLibraryCard component = case component of
 manaProduced :: Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe ManaAddition.ManaAddition
 manaProduced effect = case effect of
   Effect.AddMana addition -> Just addition
+  Effect.Firebend addition -> Just addition
   -- The mana comes from the abilities this makes a player activate, each of
   -- which is its own CR 605.1a ability with its own AddMana; this instruction
   -- adds none. CR 605.1a's first criterion excludes it from being a mana
@@ -508,6 +509,7 @@ movesLibraryCard effect = case effect of
   -- question the ref asks above.
   Effect.Meld (Meld.MkMeld ref _) -> refReachesLibrary ref
   Effect.AddMana _ -> False
+  Effect.Firebend _ -> False
   Effect.ActivateManaAbilities {} -> False
   Effect.MoveMana {} -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False

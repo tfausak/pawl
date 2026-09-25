@@ -566,6 +566,10 @@ data Effect card ability
     -- creature, and record that it trained. Evolve's shape, over
     -- Binding.triggerSource rather than a chosen target.
     Train SlotName.SlotName
+  | -- | CR 702.189a and CR 702.189b together: add the mana, and record that
+    -- this ability's controller firebent. Train's shape: one opcode so a
+    -- firebending ability resolving is told apart from any other red added.
+    Firebend ManaAddition.ManaAddition
   | -- | CR 702.110a's sacrifice and CR 702.110b's marker together: this effect's
     -- controller sacrifices a creature they control, chosen as the effect is
     -- applied (CR 608.2d), and that records the source as having exploited it.

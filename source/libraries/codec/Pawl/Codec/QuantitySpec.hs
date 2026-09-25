@@ -470,6 +470,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.CardsDiscardedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"CardsDiscardedThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- CR 603.1b, on CardsDiscardedThisTurn's terms. Avatar Aang's is the Relative
+  -- arm.
+  Spec.it s "BendingsThisTurn" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.BendingsThisTurn (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"BendingsThisTurn\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 119.3, on CardsDiscardedThisTurn's terms: a PlayerRef and nothing else,
   -- with the same recursive-decoder pair. Fortifying Draught's is the Relative
   -- arm.
