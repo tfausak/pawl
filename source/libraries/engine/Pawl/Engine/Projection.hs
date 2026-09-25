@@ -310,10 +310,11 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         -- here keeps out: flying has no family, so no family removal reaches it.
         Modification.LoseKeywordFamily f ->
           pc {PC.keywords = Map.filterWithKey (\k _ -> Keyword.familyOf k /= Just f) (PC.keywords pc)}
+        -- An absent half is not set at all (CR 613.4b's "and/or").
         Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) ->
           pc
-            { PC.power = setPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
-              PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
+            { PC.power = maybe (PC.power pc) (setPT (PC.power pc) . Quantity.evaluate viewOf context gs oid) p,
+              PC.toughness = maybe (PC.toughness pc) (setPT (PC.toughness pc) . Quantity.evaluate viewOf context gs oid) t
             }
         Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) ->
           pc
@@ -1165,7 +1166,7 @@ freezeQuantities gs announcedOn source context m =
   let viewOf = fullView gs
       freeze q = fmap Quantity.Type.Literal (Quantity.evaluateFor viewOf context gs announcedOn source q)
    in case m of
-        Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> fmap Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness <$> freeze p <*> freeze t)
+        Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> fmap Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness <$> traverse freeze p <*> traverse freeze t)
         Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> fmap Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness <$> freeze p <*> freeze t)
         -- No quantity to freeze; named explicitly per the exhaustiveness discipline.
         Modification.GainKeyword _ -> Just m
@@ -1214,7 +1215,7 @@ freezeQuantities gs announcedOn source context m =
 -- as well as in freezeQuantities -- the compiler forces the arm, not its content.
 quantitiesOf :: Modification.Modification ability -> [Quantity.Type.Quantity]
 quantitiesOf m = case m of
-  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> [p, t]
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> Maybe.maybeToList p <> Maybe.maybeToList t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> [p, t]
   Modification.GainKeyword _ -> []
   Modification.GainFlashbackAtManaCost -> []
@@ -3085,6 +3086,7 @@ filterReads f = case f of
   Filter.Type.IsRingBearer -> Set.empty
   Filter.Type.IsPaired -> Set.empty
   Filter.Type.IsPairedWithSource -> Set.empty
+  Filter.Type.IsBlockedBySource -> Set.empty
   -- Reads nothing, for that atom's reason. What CR 701.60c hangs off `Suspected`
   -- IS in layer 6, but that is what the designation WRITES, not what this reads.
   Filter.Type.HasDesignation _ -> Set.empty
@@ -3259,6 +3261,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsRingBearer -> False
   Filter.Type.IsPaired -> False
   Filter.Type.IsPairedWithSource -> False
+  Filter.Type.IsBlockedBySource -> False
   Filter.Type.HasDesignation _ -> False
   Filter.Type.HasCounters _ -> False
   Filter.Type.HasCountersOfAnyKind -> False
@@ -3398,7 +3401,7 @@ modificationWrites m = case m of
 -- seen.
 modificationReads :: Modification -> Set Aspect
 modificationReads m = case m of
-  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityReads p <> quantityReads t
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityReads p <> foldMap quantityReads t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityReads p <> quantityReads t
   Modification.GainKeyword _ -> Set.empty
   -- Carries no Quantity either. It DOES read the receiver's mana cost, which is

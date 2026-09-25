@@ -1,0 +1,130 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Offering",
+          "value": {
+            "type": "HasSubtype",
+            "value": {
+              "type": "Goblin"
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Patron of the Akki",
+      "power": {
+        "type": "Literal",
+        "value": 5
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 5
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfAttacks",
+            "value": {
+              "type": "EveryTime"
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "modification": {
+                            "type": "ModifyPowerToughness",
+                            "value": {
+                              "power": {
+                                "type": "Literal",
+                                "value": 2
+                              },
+                              "toughness": {
+                                "type": "Literal",
+                                "value": 0
+                              }
+                            }
+                          },
+                          "ref": {
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Spirit"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

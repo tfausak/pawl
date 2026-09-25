@@ -329,6 +329,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsRingBearer -> 0
   Filter.Type.IsPaired -> 0
   Filter.Type.IsPairedWithSource -> 0
+  Filter.Type.IsBlockedBySource -> 0
   Filter.Type.HasDesignation _ -> 0
 
 -- Does this position's evaluator supply CR 303.4b's host? Two constructors

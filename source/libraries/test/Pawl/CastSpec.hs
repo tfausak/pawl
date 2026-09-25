@@ -3852,6 +3852,73 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
     Spec.assertEqWith s "CR 608.2g the Divination was cast free and resolved: alice drew two, and it is in bob's graveyard" (length (Game.zoneMembers Zone.Hand S.alice after), namesOf Zone.Graveyard S.bob) (2, [Just (named divination)])
     Spec.assertEqWith s "and bob's exile holds the other five cards the two resolutions took" (List.sort (namesOf Zone.Exile S.bob)) (List.sort (fmap (Just . named) [recall, signInBlood, bolt, forest, plains]))
 
+-- CR 702.48a on Patron of the Akki {4}{R}{R}, "Goblin offering" (Oracle text
+-- checked on Scryfall, 2026-09-25), with priority passed to alice in bob's
+-- precombat main phase, where CR 117.1a alone shuts a creature out.
+--
+-- The positive board is alice's Clone {3}{U} copying bob's Goblin Piker {1}{R}
+-- and FOUR lands, ONE of them a Mountain. {4}{R}{R} less the copied {1}{R} is
+-- {3}{R}, which they pay; less the Piker's mana value as generic ({2}{R}{R}) or
+-- less the Clone's printed {3}{U} ({R}{R}) is not, so the cast resolving proves
+-- CR 702.48c's red symbol reduced the red requirement, read through CR 707.2.
+--
+-- The negatives stand on two Mountains and four Plains, enough for the printed
+-- cost. With a Hill Giant that is no Goblin the cast is asked in bob's turn and
+-- then in alice's own; with a Piker beside it, an answerer asking for the
+-- printed cost in bob's turn still gets the offering, the only one on offer.
+offeringSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+offeringSpec s registry = Spec.describe s "Offering" $ do
+  let onBobsTurn gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
+  Spec.it s "CR 702.48a in bob's turn alice casts the Patron by sacrificing a Goblin, reduced by its mana cost" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    patron <- S.printingOf s registry "Patron of the Akki"
+    let (pikerId, gs1) = S.addPermanent piker S.bob (S.landsInPlay island 4)
+        (cloneId, gs2) = S.addHandCard clone S.alice gs1
+        cloned = castResolved (aimedAt pikerId) cloneId (aliceOnTurn gs2)
+        (_, gs3) = S.addPermanent mountain S.alice (S.landsFor plains S.alice 3 cloned)
+        (spellId, gs4) = S.addHandCard patron S.alice gs3
+        board = onBobsTurn gs4
+        after = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith
+      s
+      "CR 702.48c a Mountain and three Plains paid {4}{R}{R} less the copied {1}{R}: the Patron resolved, the Clone was sacrificed, and the gate offered the cast"
+      (length (namedOnBattlefield "Patron of the Akki" after), length (namedInGraveyard "Clone" after), S.castable S.alice spellId board)
+      (1, 1, True)
+  Spec.it s "CR 702.48a only the offering widens the Patron's window" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    giant <- S.printingOf s registry "Hill Giant"
+    patron <- S.printingOf s registry "Patron of the Akki"
+    let (_, gs1) = S.addPermanent mountain S.alice (S.landsInPlay plains 4)
+        (_, gs2) = S.addPermanent mountain S.alice gs1
+        (_, gs3) = S.addPermanent giant S.alice gs2
+        (spellId, board) = S.addHandCard patron S.alice gs3
+    Spec.assertEqWith
+      s
+      "CR 117.1a not castable in bob's turn, castable for the printed cost in alice's"
+      (S.castable S.alice spellId (onBobsTurn board), S.castable S.alice spellId (aliceOnTurn board))
+      (False, True)
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, withPiker) = S.addPermanent piker S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer prompt = case prompt of
+          Prompt.ChooseCost _ _ _ payable ->
+            let sacrifices = any (\c -> case c of CostComponent.Sacrifice _ -> True; _ -> False) . Cost.Type.components
+             in case filter (not . sacrifices) payable of
+                  printed : _ -> printed
+                  [] -> S.identityAnswer prompt
+          _ -> S.identityAnswer prompt
+        after = S.runPure answer (S.runPure answer (onBobsTurn withPiker) (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith
+      s
+      "CR 702.48a the printed cost is not announceable in bob's turn, so the Patron resolved by sacrificing the Piker"
+      (length (namedOnBattlefield "Patron of the Akki" after), length (namedInGraveyard "Goblin Piker" after))
+      (1, 1)
+
 -- CR 702.180a on Unending Whisper {U} Sorcery, "Draw a card." with "Harmonize
 -- {5}{U}" (Oracle text checked on Scryfall, 2026-09-13). Chosen over Nature's
 -- Rhythm, the issue's card, for its effect and its cost alike: both are
@@ -6052,6 +6119,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   escapeSpec s registry
   evokeSpec s registry
   emergeSpec s registry
+  offeringSpec s registry
   harmonizeSpec s registry
   dashSpec s registry
   blitzSpec s registry

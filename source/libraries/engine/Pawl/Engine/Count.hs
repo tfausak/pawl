@@ -430,6 +430,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.IsRingBearer -> predicate
         Filter.Type.IsPaired -> predicate
         Filter.Type.IsPairedWithSource -> predicate
+        Filter.Type.IsBlockedBySource -> predicate
         Filter.Type.HasDesignation _ -> predicate
         Filter.Type.HasCounters _ -> predicate
         Filter.Type.HasCountersOfAnyKind -> predicate
@@ -1085,6 +1086,7 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       Filter.declaredAttackedThisCombat = False,
       Filter.blocking = False,
       Filter.blocked = False,
+      Filter.blockers = Set.empty,
       Filter.attackedThisTurn = False,
       -- CR 508.1a / 509.1a: a snapshot is CR 608.2h's record of an object, and
       -- combat status is no characteristic of one (CR 109.3), so it has nothing

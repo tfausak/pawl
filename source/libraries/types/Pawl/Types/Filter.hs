@@ -574,6 +574,9 @@ data Filter keyword
     -- one relation over. Vacuously False where the candidate is unpaired or where
     -- no source frames the match.
     IsPairedWithSource
+  | -- | CR 509.1g: the candidate is an attacking creature the evaluation's SOURCE
+    -- is blocking (Serene Master's "target creature it's blocking").
+    IsBlockedBySource
   | -- | Does the CANDIDATE have this designation? Aragorn, Hornburg Hero's
     -- "renowned creature you control" and Rune-Brand Juggler's "suspected
     -- creature". Not Pawl.Types.Quantity.HasDesignation, which asks the same

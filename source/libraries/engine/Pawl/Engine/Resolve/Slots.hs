@@ -93,6 +93,8 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
+import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Fight as Fight
@@ -629,6 +631,7 @@ effectObjectRefs effect = case effect of
   Effect.LoseLife {} -> []
   Effect.GainLife {} -> []
   Effect.ExchangeLifeTotals {} -> []
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other _) -> foldMap exchangedObjectRefs [one, other]
   Effect.SetLifeTotal {} -> []
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -831,6 +834,7 @@ effectPlayerRefs effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss ref _ _ _) -> [ref]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.ExchangeLifeTotals {} -> []
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> foldMap exchangedPlayerRefs [one, other] <> durationPlayerRefs duration
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.LoseGame ref -> [ref]
   Effect.RedistributeLifeTotals -> []
@@ -961,6 +965,21 @@ exchangeSidesSlots sides = case sides of
   ExchangeSides.WithController slot -> Map.singleton slot SlotArity.One
   ExchangeSides.BetweenTargets slot -> Map.singleton slot SlotArity.Many
 
+-- The ObjectRef one side of a CR 701.12g exchange holds: a power or a
+-- toughness names its creature, a life total names none.
+exchangedObjectRefs :: ExchangedValue.ExchangedValue -> [ObjectRef]
+exchangedObjectRefs value = case value of
+  ExchangedValue.LifeTotal _ -> []
+  ExchangedValue.Power ref -> [ref]
+  ExchangedValue.Toughness ref -> [ref]
+
+-- exchangedObjectRefs' twin one type over: a life total names its player.
+exchangedPlayerRefs :: ExchangedValue.ExchangedValue -> [PlayerRef]
+exchangedPlayerRefs value = case value of
+  ExchangedValue.LifeTotal ref -> [ref]
+  ExchangedValue.Power _ -> []
+  ExchangedValue.Toughness _ -> []
+
 -- exchangeSidesSlots one type over: BetweenTargets takes both permanents out of
 -- one instance of the word "target" (CR 601.2c) and so must see the whole set,
 -- where WithSource reads the one permanent beside CR 113.7's source object.
@@ -1090,6 +1109,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> quantitySlots quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
+  -- Both sides' references are effectObjectRefs' and effectPlayerRefs' halves.
+  Effect.ExchangeValues x -> durationSlots (ExchangeValues.duration x)
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.LoseGame {} -> Map.empty
   Effect.RedistributeLifeTotals -> Map.empty
@@ -1735,6 +1756,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
+  Effect.ExchangeValues x -> durationSlotsAreExhaustive (ExchangeValues.duration x)
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.LoseGame {} -> True
   Effect.RedistributeLifeTotals -> True
@@ -1982,6 +2004,7 @@ readsX =
         Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> Quantity.readsX quantity
         Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.ExchangeLifeTotals _ -> False
+        Effect.ExchangeValues _ -> False
         Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.LoseGame {} -> False
         Effect.RedistributeLifeTotals -> False
@@ -2212,6 +2235,7 @@ boundSlots effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _ mTally) -> foldMap Set.singleton mTally
   Effect.GainLife {} -> Set.empty
   Effect.ExchangeLifeTotals _ -> Set.empty
+  Effect.ExchangeValues _ -> Set.empty
   Effect.SetLifeTotal {} -> Set.empty
   Effect.LoseGame {} -> Set.empty
   Effect.RedistributeLifeTotals -> Set.empty

@@ -3670,6 +3670,7 @@ stubView table oid =
                 Filter.declaredAttackedThisCombat = False,
                 Filter.blocking = False,
                 Filter.blocked = False,
+                Filter.blockers = Set.empty,
                 Filter.attackedThisTurn = False,
                 Filter.declaredAttackerThisCombat = False,
                 Filter.declaredBlockerThisCombat = False,

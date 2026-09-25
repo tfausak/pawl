@@ -1,0 +1,106 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 4
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ExchangeValues",
+                        "value": {
+                          "one": {
+                            "type": "LifeTotal",
+                            "value": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
+                          },
+                          "other": {
+                            "type": "Power",
+                            "value": {
+                              "type": "InSlot",
+                              "value": "self"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Lifelink"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Evra, Halcyon Witness",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Avatar"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

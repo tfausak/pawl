@@ -4,6 +4,7 @@ module Pawl.Codec.SetBasePowerToughness where
 
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 
@@ -11,8 +12,8 @@ import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 -- array this payload used to be (#1464).
 codec :: Codec.Codec SetBasePowerToughness.SetBasePowerToughness
 codec = Fields.object $ do
-  power <- Fields.required "power" Quantity.codec SetBasePowerToughness.power
-  toughness <- Fields.required "toughness" Quantity.codec SetBasePowerToughness.toughness
+  power <- Fields.defaulted "power" Nothing (Common.maybe Quantity.codec) SetBasePowerToughness.power
+  toughness <- Fields.defaulted "toughness" Nothing (Common.maybe Quantity.codec) SetBasePowerToughness.toughness
   pure
     SetBasePowerToughness.MkSetBasePowerToughness
       { SetBasePowerToughness.power = power,
