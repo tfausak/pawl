@@ -857,6 +857,7 @@ library codec
     Pawl.Codec.QuantitySpec
     Pawl.Codec.RandomCardInGraveyard
     Pawl.Codec.RandomCardInHand
+    Pawl.Codec.RandomCardInLibrary
     Pawl.Codec.RangeOfInfluence
     Pawl.Codec.RangeOfInfluenceSpec
     Pawl.Codec.Recipient
@@ -2076,6 +2077,7 @@ library types
     Pawl.Types.Quantity
     Pawl.Types.RandomCardInGraveyard
     Pawl.Types.RandomCardInHand
+    Pawl.Types.RandomCardInLibrary
     Pawl.Types.RangeOfInfluence
     Pawl.Types.Recipient
     Pawl.Types.RedirectDamage

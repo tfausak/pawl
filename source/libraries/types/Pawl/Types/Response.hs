@@ -64,7 +64,8 @@ data Response
   | -- | The object randomness named for a
     -- Pawl.Types.ObjectRef.RandomCardInHand -- Merfolk Spy's "a card at random
     -- from their hand" -- or for a Pawl.Types.ObjectRef.RandomCardInGraveyard,
-    -- Ghoulraiser's "a Zombie card at random from your graveyard".
+    -- Ghoulraiser's "a Zombie card at random from your graveyard", or for a
+    -- Pawl.Types.ObjectRef.RandomCardInLibrary, Gate to Seatower's seek.
     --
     -- Its own constructor rather than ChoseCardInHand reused, though both may
     -- name one card in one hand: this type's rule at the top, and here the

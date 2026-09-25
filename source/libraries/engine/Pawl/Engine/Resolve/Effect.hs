@@ -68,7 +68,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, matchingFromAmong, objectRefObjects, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -285,6 +285,7 @@ import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
+import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
@@ -952,6 +953,8 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- No recipients: the arm above's answer, for its reason -- only
   -- randomCardsInGraveyard can ask.
   ObjectRef.RandomCardInGraveyard _ -> []
+  -- No recipients, for the same reason: only randomCardsInLibrary can ask.
+  ObjectRef.RandomCardInLibrary _ -> []
   -- No recipients: the answer needs the chooser asked, and only
   -- turnPermanentsOver's gather and the Effect.MoveToZone gather can ask.
   ObjectRef.AnyNumberMatching _ -> []
@@ -2119,18 +2122,7 @@ randomCardsInHand resolving source controller legal (RandomCardInHand.MkRandomCa
   let viewOf = effectViewOf source legal gs
       context = effectContext gs controller source legal (slotBindings resolving gs)
       wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
-      pick remaining candidates =
-        if remaining <= (0 :: Natural)
-          then pure []
-          else case candidates of
-            [] -> pure []
-            [only] -> pure [only]
-            first : second : more -> do
-              answer <- Game.ask (Prompt.RandomObject (first NonEmpty.:| (second : more)))
-              let named = if List.elem answer candidates then answer else first
-              rest <- pick (remaining - 1) (filter (/= named) candidates)
-              pure (named : rest)
-  fmap concat . Monad.mapM (\pid -> fmap (fmap ((,) pid)) (pick wanted (handCardsOf context gs pid filter_))) $
+  fmap concat . Monad.mapM (\pid -> fmap (fmap ((,) pid)) (pickAtRandom wanted (handCardsOf context gs pid filter_))) $
     handChoosers legal controller gs player
 
 -- CR 404.1 / 608.2c: the cards randomness names out of each graveyard the ref
@@ -2161,19 +2153,50 @@ randomCardsInGraveyard resolving source controller legal (RandomCardInGraveyard.
   let viewOf = effectViewOf source legal gs
       context = effectContext gs controller source legal (slotBindings resolving gs)
       wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
-      pick remaining candidates =
-        if remaining <= (0 :: Natural)
-          then pure []
-          else case candidates of
-            [] -> pure []
-            [only] -> pure [only]
-            first : second : more -> do
-              answer <- Game.ask (Prompt.RandomObject (first NonEmpty.:| (second : more)))
-              let named = if List.elem answer candidates then answer else first
-              rest <- pick (remaining - 1) (filter (/= named) candidates)
-              pure (named : rest)
-  fmap concat . Monad.mapM (\pid -> pick wanted (graveyardCardsOf context gs pid filter_)) $
+  fmap concat . Monad.mapM (\pid -> pickAtRandom wanted (graveyardCardsOf context gs pid filter_)) $
     zoneScopePlayers legal controller gs scope
+
+-- Alchemy's seek: the cards randomness names out of each library the ref
+-- reaches. The ONE asking read of ObjectRef.RandomCardInLibrary, made by
+-- Effect.MoveToZone's gather alone.
+--
+-- randomCardsInHand's posture one hidden zone over, seats and all
+-- (handChoosers). What seek's Arena text leaves out is the point: nobody
+-- looks at the library, nothing is revealed and nothing is shuffled, so this
+-- asks the interpreter and nothing else.
+randomCardsInLibrary ::
+  ObjectId ->
+  ObjectId ->
+  PlayerId ->
+  Map.Map SlotName (Set Recipient) ->
+  RandomCardInLibrary.RandomCardInLibrary ->
+  Game [ObjectId]
+randomCardsInLibrary resolving source controller legal (RandomCardInLibrary.MkRandomCardInLibrary player filter_ count) = do
+  gs <- State.get
+  let viewOf = effectViewOf source legal gs
+      context = effectContext gs controller source legal (slotBindings resolving gs)
+      wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source count)
+  fmap concat . Monad.mapM (\pid -> pickAtRandom wanted (libraryCardsOf context gs pid filter_)) $
+    handChoosers legal controller gs player
+
+-- The random pick the three functions above share. The question goes to the
+-- INTERPRETER rather than to a player or a roll, the answer is FILTERED against
+-- the offer rather than trusted, Game.ask and not Game.choose (randomness is not
+-- CR 104.4b's optional action), elided at one candidate and skipped at none (CR
+-- 101.3, CR 609.3), and the count names DISTINCT cards, so each card named is
+-- dropped from the candidates before the next ask.
+pickAtRandom :: Natural -> [ObjectId] -> Game [ObjectId]
+pickAtRandom remaining candidates =
+  if remaining <= 0
+    then pure []
+    else case candidates of
+      [] -> pure []
+      [only] -> pure [only]
+      first : second : more -> do
+        answer <- Game.ask (Prompt.RandomObject (first NonEmpty.:| (second : more)))
+        let named = if List.elem answer candidates then answer else first
+        rest <- pickAtRandom (remaining - 1) (filter (/= named) candidates)
+        pure (named : rest)
 
 -- One effect, applied, wrapped in the window CR 607.2a's link is filed from:
 -- what was in exile before, and what is in it after.
@@ -4575,6 +4598,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- are already face up, CR 400.2) nor discarded (CR 701.9a
               -- moves a card out of a HAND).
               ObjectRef.RandomCardInGraveyard random -> randomCardsInGraveyard resolving source controller legal random
+              -- Seek: the Gates' "seek a nonland card". The ONE asking read of
+              -- the ref, for the arm above's reason -- a sought card is not
+              -- revealed, and CR 701.9a discards out of a hand.
+              ObjectRef.RandomCardInLibrary random -> randomCardsInLibrary resolving source controller legal random
               -- CR 608.2d: Glorious Protector's "any number of non-Angel creatures
               -- you control", announced while the effect is applied and so asked
               -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
