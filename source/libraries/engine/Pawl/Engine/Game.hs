@@ -328,11 +328,14 @@ choose p = do
 -- CR 801.16: record that an object this player controls took part in what the
 -- game is doing now (GameState.loopInvolvement). Called where a triggered
 -- ability is put on the stack (Pawl.Engine.Engine.placeOne), which every cycle
--- of a mandatory loop does: nothing else acts with no player choosing.
+-- of a mandatory loop does: nothing else acts with no player choosing. That
+-- call names the ability's controller and, under limited range, the
+-- controllers of the continuous effects applying to what its event bound.
 --
--- Not implemented: an object whose part in a loop is a static ability, or being
--- acted on (moved, created, damaged), is not recorded, so its controller is
--- named only if a triggered ability of theirs is in the loop too (#4148).
+-- Not implemented: an object the loop only acts on (moves, creates, damages),
+-- and an effect applying only to a trigger's source, are not recorded, so
+-- their controllers are named only if something else of theirs is in the loop
+-- too (#4148).
 involve :: PlayerId -> GameState -> GameState
 involve pid gs = gs {GameState.loopInvolvement = Map.insert pid (GameState.nextTimestamp gs) (GameState.loopInvolvement gs)}
 
