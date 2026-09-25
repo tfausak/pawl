@@ -2663,6 +2663,10 @@ representativeEvents cond =
         TriggerCondition.PlayerRollsResult watched -> one (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = DieResult.result watched})
         -- CR 701.52a's own event, and the only one this condition admits.
         TriggerCondition.Visit -> one (GameEvent.RolledToVisit DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = 3})
+        -- CR 701.51c's and CR 702.159b's own events, each the only one its
+        -- condition admits.
+        TriggerCondition.PlayerOpensAttraction _ -> one (GameEvent.AttractionOpened S.bob)
+        TriggerCondition.PlayerClaimsPrize _ -> one (GameEvent.PrizeClaimed S.bob)
         -- CR 705.2's own event, and the only one this condition admits. A WON
         -- flip, since neither a lost one nor rule 705.2's winnerless one matches
         -- at all -- and bob rather than the perspective player, on the
@@ -2911,6 +2915,10 @@ everyTriggerCondition =
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6},
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.Opponent, DieResult.result = 6},
     TriggerCondition.Visit,
+    TriggerCondition.PlayerOpensAttraction PlayerRelation.You,
+    TriggerCondition.PlayerOpensAttraction PlayerRelation.Opponent,
+    TriggerCondition.PlayerClaimsPrize PlayerRelation.You,
+    TriggerCondition.PlayerClaimsPrize PlayerRelation.Opponent,
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.You,
     TriggerCondition.PlayerWinsCoinFlip PlayerRelation.Opponent,
     TriggerCondition.PlayerLosesCoinFlip PlayerRelation.You,

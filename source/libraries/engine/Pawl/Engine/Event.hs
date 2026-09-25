@@ -639,6 +639,8 @@ damageOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.AttractionOpened _ -> Nothing
+  GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
@@ -715,6 +717,8 @@ revealOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.AttractionOpened _ -> Nothing
+  GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
@@ -8066,6 +8070,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
+  TriggerCondition.PlayerOpensAttraction _ -> False
+  TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- The same answer for the same reason: CR 701.43a's exert is a keyword action a
@@ -8278,6 +8284,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
+  TriggerCondition.PlayerOpensAttraction _ -> False
+  TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- False for the SelfAttacks arm's reason below, which is exactly this case one

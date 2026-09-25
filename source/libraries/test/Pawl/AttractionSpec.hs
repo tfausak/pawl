@@ -4,12 +4,15 @@
 -- Covers: CR 717 Attractions -- Pawl.Engine.Attraction, CR 701.51's
 -- Effect.OpenAttraction, CR 701.52a's roll to visit (Resolve.rollToVisit, run by
 -- Engine.runTurnBasedActions as CR 703.4g's action), CR 702.159a's
--- TriggerCondition.Visit, CR 717.6's junkyard (Event.toJunkyard), and the
--- Attraction deck across CR 727's restart and CR 729's subgames.
+-- TriggerCondition.Visit, CR 717.6's junkyard (Event.toJunkyard), the
+-- Attraction deck across CR 727's restart and CR 729's subgames, and the two
+-- Attraction triggers: CR 701.51c's PlayerOpensAttraction and CR 702.159b's
+-- Effect.ClaimPrize read by PlayerClaimsPrize.
 --
 -- Deadbeat Attendant ("When this creature enters, open an Attraction") and
 -- Bumper Cars ("Visit -- Target creature must be blocked this turn if able") are
--- the producers. Bumper Cars is printed with six light patterns (CR 717.1);
+-- the producers, with Pick-a-Beeble's prize and The Most Dangerous Gamer's
+-- triggers. Bumper Cars is printed with six light patterns (CR 717.1);
 -- 202a lights 2, 3 and 6 and 202f lights 4, 5 and 6, so a 3 visits the one and
 -- not the other.
 module Pawl.AttractionSpec where
@@ -34,13 +37,20 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterName as CounterName
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Phase as Phase
@@ -48,7 +58,14 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Attraction" $ do
@@ -56,6 +73,8 @@ spec s registry = Spec.describe s "Attraction" $ do
   visitSpec s registry
   junkyardSpec s registry
   newGameSpec s registry
+  openTriggerSpec s registry
+  prizeSpec s registry
 
 bumperCars :: CardName.CardName
 bumperCars = CardName.MkCardName (Text.pack "Bumper Cars")
@@ -296,3 +315,99 @@ newGameSpec s registry = Spec.describe s "A new game" $ do
     Spec.assertEqWith s "CR 729.5a: the deck is back" (fmap (`Game.lightsOf` back) (Attraction.deckOf S.alice back)) [Set.fromList [4, 5, 6]]
     Spec.assertEqWith s "not in the library" (filter (\oid -> Game.lightsOf oid back /= Set.empty) (Game.zoneMembers Zone.Library S.alice back)) []
     Spec.assertEqWith s "and the face-up one never moved" (Game.zoneOf faceUp back) (Just Zone.Battlefield)
+
+gamerName :: CardName.CardName
+gamerName = CardName.MkCardName (Text.pack "The Most Dangerous Gamer")
+
+-- The battlefield objects whose printed card has this name.
+namedOn :: CardName.CardName -> GameState.GameState -> [ObjectId]
+namedOn wanted gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just wanted) (Set.toList (GameState.battlefield gs))
+
+-- The Most Dangerous Gamer's power on this board, the +1/+1 counters its
+-- "whenever you open an Attraction" puts on it included.
+gamerPower :: GameState.GameState -> [Maybe Integer]
+gamerPower gs = fmap (`Projection.powerOf` gs) (namedOn gamerName gs)
+
+-- A floating "an Attraction that would enter the battlefield is exiled instead",
+-- seeded straight onto the board: a replaced entry for CR 701.51c's second
+-- sentence. Scryfall (o:"can't enter" or o:"would enter") (o:artifact or
+-- o:permanent or o:nonland), 2026-09-25, finds only self-replacements and
+-- graveyard or library prohibitions; a card stopping an artifact entering from
+-- the command zone would replace this fixture.
+exileEnteringAttractions :: ObjectId -> ActiveReplacement.ActiveReplacement
+exileEnteringAttractions src =
+  ActiveReplacement.MkActiveReplacement
+    { ActiveReplacement.effect = ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Battlefield) ControllerRelation.Anyones (Filter.Type.HasSubtype Subtype.Attraction)) Zone.Exile False False),
+      ActiveReplacement.source = src,
+      ActiveReplacement.controller = S.bob,
+      ActiveReplacement.timestamp = Timestamp.MkTimestamp 0,
+      ActiveReplacement.expiry = Expiry.Never,
+      ActiveReplacement.uses = Uses.Unlimited,
+      ActiveReplacement.origin = ReplacementOrigin.Other,
+      ActiveReplacement.condition = Nothing,
+      ActiveReplacement.rider = Nothing,
+      ActiveReplacement.slots = Map.empty
+    }
+
+-- CR 701.51c: "whenever you open an Attraction".
+openTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+openTriggerSpec s registry = Spec.describe s "Whenever you open an Attraction" $ do
+  Spec.it s "CR 701.51c The Most Dangerous Gamer enters, opens an Attraction, and gets a counter" $ do
+    gamer <- S.printingOf s registry "The Most Dangerous Gamer"
+    cars <- S.printingOf s registry "Bumper Cars"
+    let (spellId, gs) = S.spellOnStack gamer S.alice (withAttractions S.alice [carsA cars] (Setup.emptyGame S.bothPlayers))
+        resolved board = S.runPure S.identityAnswer board (Stack.resolveTop >> Engine.priorityLoop)
+        opened = resolved gs
+        -- The paired board: the same entry, but the Attraction is exiled instead.
+        replaced = resolved (S.addReplacement (exileEnteringAttractions spellId) gs)
+        -- And the empty deck, which opens nothing (CR 609.3).
+        (_, bare) = S.spellOnStack gamer S.alice (Setup.emptyGame S.bothPlayers)
+    -- THE GAMEPLAY ASSERTION: opening put a +1/+1 counter on the Gamer.
+    Spec.assertEqWith s "CR 701.51c: the Gamer is a 3/3" (gamerPower opened) [Just 3]
+    Spec.assertEqWith s "CR 701.51c: a replaced entry opens nothing that triggers" (gamerPower replaced) [Just 2]
+    Spec.assertEqWith s "CR 609.3: an empty deck opens nothing" (gamerPower (resolved bare)) [Just 2]
+    Spec.assertEqWith s "Bumper Cars entered" (S.countOnBattlefieldByName bumperCars S.alice opened) 1
+    Spec.assertEqWith s "and, replaced, went to exile" (length (Game.zoneMembers Zone.Exile S.alice replaced)) 1
+  Spec.it s "CR 701.51c an opponent opening an Attraction does not trigger \"you\"" $ do
+    gamer <- S.printingOf s registry "The Most Dangerous Gamer"
+    cars <- S.printingOf s registry "Bumper Cars"
+    let (_, g1) = S.addPermanent gamer S.alice (Setup.emptyGame S.bothPlayers)
+        gs = withAttractions S.bob [carsF cars] (withAttractions S.alice [carsA cars] g1)
+        openedBy pid = S.runPure S.identityAnswer gs (Attraction.open pid >> Engine.priorityLoop)
+    Spec.assertEqWith s "alice opening grows her Gamer" (gamerPower (openedBy S.alice)) [Just 3]
+    Spec.assertEqWith s "bob opening does not" (gamerPower (openedBy S.bob)) [Just 2]
+    Spec.assertEqWith s "though bob's Attraction entered" (S.countOnBattlefieldByName bumperCars S.bob (openedBy S.bob)) 1
+
+luck :: CounterKind.CounterKind Keyword.Keyword
+luck = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "luck"))
+
+treasure :: CardName.CardName
+treasure = CardName.MkCardName (Text.pack "Treasure Token")
+
+-- CR 702.159b: claiming the prize.
+prizeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+prizeSpec s registry = Spec.describe s "Claim the prize" $ do
+  Spec.it s "CR 702.159b Pick-a-Beeble's sixth luck counter claims the prize, and the Gamer destroys" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    beeble <- S.printingOf s registry "Pick-a-Beeble"
+    gamer <- S.printingOf s registry "The Most Dangerous Gamer"
+    cars <- S.printingOf s registry "Bumper Cars"
+    -- Pick-a-Beeble 223a lights 2, 3 and 6. alice controls it and the Gamer, and
+    -- her Attraction deck holds Bumper Cars; bob's Piker is the target.
+    let (board, _, theirs, beebleId) = visitBoard piker (lit [2, 3, 6] beeble)
+        gs = withAttractions S.alice [carsF cars] (snd (S.addPermanent gamer S.alice board))
+        -- The roll to visit is a 2; the Beeble's own die is the second answer.
+        (six, _) = visitWith [2, 6] theirs gs
+        (five, _) = visitWith [2, 5] theirs gs
+        pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+    -- THE GAMEPLAY ASSERTION: the prize was claimed, so the Gamer's third
+    -- ability destroyed bob's Piker; with five counters it was not.
+    Spec.assertEqWith s "CR 702.159b: bob's Piker was destroyed" (S.countOnBattlefieldByName pikerName S.bob six) 0
+    Spec.assertEqWith s "CR 702.159b: five luck counters claim nothing" (S.countOnBattlefieldByName pikerName S.bob five) 1
+    Spec.assertEqWith s "the prize's two Treasures beside the visit's one" (S.countOnBattlefieldByName treasure S.alice six) 3
+    Spec.assertEqWith s "against the visit's one alone" (S.countOnBattlefieldByName treasure S.alice five) 1
+    Spec.assertEqWith s "the Beeble was sacrificed" (Set.member beebleId (GameState.battlefield six)) False
+    Spec.assertEqWith s "and stayed, with five luck counters" (S.counterOf luck beebleId five) 5
+    Spec.assertEqWith s "CR 701.51b: the prize opened Bumper Cars" (S.countOnBattlefieldByName bumperCars S.alice six) 1
+    Spec.assertEqWith s "CR 701.51c: which grew the Gamer" (gamerPower six) [Just 3]
+    Spec.assertEqWith s "which five counters did not" (gamerPower five) [Just 2]
