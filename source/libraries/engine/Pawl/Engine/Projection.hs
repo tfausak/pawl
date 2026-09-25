@@ -1583,6 +1583,13 @@ textLayerOf oid gs =
               else Nothing
    in fst (projectDecidingFrom copiableCharacteristics (<= Layer.Text) (Maybe.mapMaybe candidate (GameState.continuousEffects gs)) oid gs)
 
+-- The CR 612 word swap a modification makes, for CR 613.8a's exact test between
+-- two of them (projectDecidingFrom's changesText).
+wordSwapOf :: Modification -> Maybe (Subtype.Type.Subtype, Subtype.Type.Subtype)
+wordSwapOf m = case m of
+  Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) -> Just (from, to)
+  _ -> Nothing
+
 -- Swaps applied in order, as one table: each word any swap names, paired with
 -- the word the whole sequence leaves it as, and dropped where that is itself.
 composeWordChanges :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
@@ -3566,8 +3573,18 @@ data Unit = MkUnit
     uReads :: Set Aspect,
     uWrites :: Set Aspect,
     uMovable :: Maybe (Set Aspect),
-    uApply :: Count.ViewOf -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
+    -- CR 613.8a's exact test between two CR 612 word swaps: the swap this
+    -- unit makes, when it makes one.
+    uWordSwap :: Maybe (Subtype.Type.Subtype, Subtype.Type.Subtype),
+    -- The Boxes are CR 612.5's partners as the order has left them; see
+    -- applyUnit.
+    uApply :: Count.ViewOf -> Boxes -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
   }
+
+-- CR 612.5: another object's characteristics as the layer being folded has so
+-- far left them, where the fold is tracking that object -- Nothing where it is
+-- not, and the caller falls back to CR 613.7's timestamp reading.
+type Boxes = ObjectId -> Maybe ProjectedCharacteristics
 
 -- Which aspects a P/T-defining ability's two quantities read -- modificationReads
 -- for CR 613.4a's sublayer, and over-declaring for the same reason.
@@ -3760,13 +3777,20 @@ projectDecidingFrom seedOf admits cands =
                   -- lets a card name the subtype ahead of the card type that
                   -- licenses it, which is how both Song of the Dryads and Life and
                   -- Limb are printed.
-                  applyUnit viewOf o pc cs =
+                  applyUnit viewOf boxes o pc cs =
                     let parts = NonEmpty.toList cs
                         unitTypes = List.foldl' (\ts c -> cardTypesAfter (gModification c) ts) (PC.cardTypes pc) parts
                         -- CR 613.7 within layer 3, for the one arm that reads
                         -- another object's rules text (CR 612.5). A thunk: an
                         -- effect that never asks pays nothing.
-                        textBoxOf = textBoxAt (gTimestamp (NonEmpty.head cs)) gs
+                        --
+                        -- `resolve`'s running board first, since CR 613.8 may
+                        -- have applied a LATER effect to the partner already, or
+                        -- held back an earlier one; timestamp order is the
+                        -- answer only off that board. Pawl.ProjectionSpec's "CR
+                        -- 613.8b a later Hack on one Kird Ape moves with the
+                        -- exchange" proves it.
+                        textBoxOf other = Maybe.fromMaybe (textBoxAt (gTimestamp (NonEmpty.head cs)) gs other) (boxes other)
                      in List.foldl' (\p c -> applyModification textBoxOf viewOf (gSource c) gs o unitTypes (gAffected c) (gModification c) p) pc parts
                   -- A gathered effect's parts at this layer, as CR 613.8's ordering
                   -- asks about them. The head part answers for the unit's affected
@@ -3781,7 +3805,8 @@ projectDecidingFrom seedOf admits cands =
                             uReads = unitReads cs,
                             uWrites = unitWrites cs,
                             uMovable = movableAspects c,
-                            uApply = \viewOf o pc -> applyUnit viewOf o pc cs
+                            uWordSwap = wordSwapOf (gModification c),
+                            uApply = \viewOf boxes o pc -> applyUnit viewOf boxes o pc cs
                           }
                   -- One object's own P/T-defining ability as a unit (CR 613.4a).
                   -- CR 604.3a(3) makes its affected set the object alone, which is
@@ -3800,7 +3825,8 @@ projectDecidingFrom seedOf admits cands =
                         uReads = definingReads cda,
                         uWrites = Set.singleton PowerA,
                         uMovable = Nothing,
-                        uApply = \viewOf o2 pc -> applyCharacteristicPT viewOf gs o2 pc
+                        uWordSwap = Nothing,
+                        uApply = \viewOf _ o2 pc -> applyCharacteristicPT viewOf gs o2 pc
                       }
                   -- CR 613.6's per-object half of movableAspects: an effect whose
                   -- set this object already settled cannot be moved at it.
@@ -3809,12 +3835,12 @@ projectDecidingFrom seedOf admits cands =
                     Nothing -> False
                   -- Apply one effect, recording its decision the first time.
                   -- Re-inserting an existing key rewrites the value just read.
-                  applyOne viewOf o (pc, ds) u =
+                  applyOne viewOf boxes o (pc, ds) u =
                     let answer = appliesTo viewOf o ds pc u
                         ds2 = case uEffect u of
                           Nothing -> ds
                           Just k -> Map.insert k answer ds
-                     in (if answer then uApply u viewOf o pc else pc, ds2)
+                     in (if answer then uApply u viewOf boxes o pc else pc, ds2)
                   -- Every OTHER battlefield object's state as this layer begins,
                   -- so all of them derive the same order. Lazy, and scanned after
                   -- the projected object. Terminates for projectUpTo's reason: a
@@ -3889,6 +3915,13 @@ projectDecidingFrom seedOf admits cands =
                             Just (p, _) -> Just (viewOfCharacteristics (viewOfBoard board) o (noValueAt lyr (noncreaturePT o gs p)) (controllerOf o gs) (countersOf o gs) gs)
                             Nothing -> bounded o
                           view = viewOfBoard running
+                          -- CR 612.5's partners off the same board, before the
+                          -- effect this round applies. Not a partner that has
+                          -- LEFT, which the board tracks as a blank: textBoxAt
+                          -- reads the copiable values it left with (CR 608.2h).
+                          boxes o
+                            | Map.member o (GameState.objects gs) = fmap fst (Map.lookup o running)
+                            | otherwise = Nothing
                           -- Every object CR 613.8a's question ranges over, the
                           -- projected one first.
                           boards = (oid, pc, ds, answersAt oid pc ds) : fmap (\(o, (p, d)) -> (o, p, d, answersAt o p d)) (Map.toList others)
@@ -3924,7 +3957,7 @@ projectDecidingFrom seedOf admits cands =
                           changesHere b j (i, a) (o, p, d, ans) =
                             not (decidedAt d a)
                               && answerFor ans j
-                              && appliesTo view o d (uApply b view o p) a /= answerFor ans i
+                              && appliesTo view o d (uApply b view boxes o p) a /= answerFor ans i
                           -- `a` depends on `b` when that holds ANYWHERE: CR 613.8a
                           -- asks about the whole affected SET, which is also how CR
                           -- 613.8b's loop becomes visible. Clause (c)'s CDA
@@ -3952,21 +3985,27 @@ projectDecidingFrom seedOf admits cands =
                              in any
                                   ( \(o, p, _, ans) ->
                                       answerFor ans i
-                                        && writtenPT (uApply a view o p) /= writtenPT (uApply a afterView o p)
+                                        && writtenPT (uApply a view boxes o p) /= writtenPT (uApply a afterView boxes o p)
                                   )
                                   boards
                           -- CR 613.8a clause (b)'s last limb again, for an
                           -- effect that reads the TEXT of the things it applies
                           -- to rather than a magnitude: applying `b` can change
                           -- what `a` does to an object by changing the text `a`
-                          -- rewrites there. `a` is not consulted
-                          -- beyond where it applies, so this over-admits -- it
-                          -- does not ask whether the word `a` replaces is among
-                          -- what `b` moved. That is the safe direction here:
-                          -- over-admission makes both edges hold, and CR 613.8b
-                          -- hands a dependency loop back to CR 613.7's
-                          -- timestamp order, which is the answer an independent
-                          -- pair wants anyway.
+                          -- rewrites there.
+                          --
+                          -- Between two CR 612 word swaps the test is exact: `b`
+                          -- changes what `a` does exactly when it rewrites
+                          -- something and its word in or out is the one `a`
+                          -- replaces. Over-admitting there turns a one-way
+                          -- dependency into a loop that CR 613.8b hands back to
+                          -- timestamp order, which Pawl.ProjectionSpec's "CR
+                          -- 613.8b a swap waits for the later one that makes
+                          -- its word" proves wrong. Against an exchange it still
+                          -- over-admits, not asking whether `a`'s word is among
+                          -- what `b` moved; where the word is in neither text
+                          -- `a` does nothing either way, so the edge moves no
+                          -- result.
                           --
                           -- The compared fields are the TEXT BOX (CR 612.1),
                           -- not the whole record: PC.subtypeWordChanges and
@@ -3987,7 +4026,7 @@ projectDecidingFrom seedOf admits cands =
                           -- never reach the fold. Sound because the three
                           -- PowerA-only arms (modificationWrites) write none of
                           -- the fields textOf reads.
-                          changesText (i, _) (j, b) =
+                          changesText (i, a) (j, b) =
                             let textOf p =
                                   ( PC.keywords p,
                                     PC.subtypes p,
@@ -4000,19 +4039,23 @@ projectDecidingFrom seedOf admits cands =
                                     PC.playerAbilities p,
                                     PC.ruleAbilities p
                                   )
+                                reachesWord = case (uWordSwap a, uWordSwap b) of
+                                  (Just (from, _), Just (bFrom, bTo)) -> from == bFrom || from == bTo
+                                  _ -> True
                              in not (Set.disjoint (uWrites b) (Set.fromList [Keywords, Subtypes]))
+                                  && reachesWord
                                   && any
                                     ( \(o, p, _, ans) ->
                                         answerFor ans i
                                           && answerFor ans j
-                                          && textOf (uApply b view o p) /= textOf p
+                                          && textOf (uApply b view boxes o p) /= textOf p
                                     )
                                     boards
                           -- `b` applied to every object whose set holds it, judged
                           -- against the board as it stands (CR 613.6).
                           appliedEverywhere b =
                             Map.mapWithKey
-                              (\o (p, d) -> (if appliesTo view o d p b then uApply b view o p else p, d))
+                              (\o (p, d) -> (if appliesTo view o d p b then uApply b view boxes o p else p, d))
                               running
                           dependsOnOne x@(i, a) y@(j, b) =
                             j /= i
@@ -4044,7 +4087,7 @@ projectDecidingFrom seedOf admits cands =
                           -- CR 613.7a gives every part of one ability the source
                           -- permanent's timestamp.
                           (chosen, next) = List.minimumBy (Ord.comparing (uTimestamp . snd)) batch
-                       in resolve (applyOne view oid (pc, ds) next) (Map.mapWithKey (\o st -> applyOne view o st next) others) (filter ((/= chosen) . fst) pending)
+                       in resolve (applyOne view boxes oid (pc, ds) next) (Map.mapWithKey (\o st -> applyOne view boxes o st next) others) (filter ((/= chosen) . fst) pending)
                   -- Is there anything at this layer CR 613.8 could reorder?
                   movableHere = Set.member lyr movableLayers || definingMovable
                   -- CR 613.8a clause (c) at layer 7a: two P/T-defining abilities
@@ -4107,7 +4150,7 @@ projectDecidingFrom seedOf admits cands =
                             Nothing -> affectsWith grants bounded (gSource c) oid (gAffected c) seeded gs
                             Just k -> Map.findWithDefault False k decided2
                           ordered = effectUnits (List.sortOn gTimestamp (filter applies here))
-                       in (List.foldl' (applyUnit bounded oid) seeded ordered, decided2)
+                       in (List.foldl' (applyUnit bounded (const Nothing) oid) seeded ordered, decided2)
             (folded, decisions) = List.foldl' applyLayer (seedOf oid gs, Map.empty) layers
          in (noncreaturePT oid gs folded, decisions)
    in forObject
@@ -5046,6 +5089,15 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 -- printing afterlife and granted afterlife again mints its printed instance with
 -- the swapped word and its granted one with rule 702.135a's own.
 --
+-- The pairs are composed (textChangesAffecting's composeWordChanges), since the
+-- rewrite looks each word up once. A keyword's payload word (Champion's
+-- quality) was already rewritten at layer 3 and meets the table a second time
+-- here; outside a dependency loop that is the identity, because CR 613.8b puts
+-- every swap after any swap that makes its word, so no word the table produces
+-- is one it maps again.
+-- Pawl.KeywordTriggerSpec's "CR 613.7 two Evolutions on Wanderwine Prophets
+-- champion a Merfolk" proves it.
+--
 -- `min` keeps `live - changed` total. It cannot bite today, and the mutation that
 -- removes it leaves the suite green: every layer-6 write to PC.keywords either
 -- adds one instance, DELETES whole keys (Modification.LoseKeyword and
@@ -5056,7 +5108,7 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 -- instances being interchangeable.
 mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
 mintedTriggeredAbilitiesOf pc =
-  let pairs = fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc)
+  let pairs = composeWordChanges (fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc))
       mint keyword count = Keyword.triggeredAbilitiesOf (Map.singleton keyword count)
       instances (keyword, live) =
         let changed = min live (Map.findWithDefault 0 keyword (PC.textChangedKeywords pc))

@@ -4955,6 +4955,64 @@ textChangeDependencySpec s registry = Spec.describe s "TextChangeDependency" $ d
     -- restriction away.
     Spec.assertBool s (Combat.canAttack S.alice galleonId bobSwamp) "while the Galleon, with the Piker's empty text, may attack"
 
+  -- The exchange FIRST, between two Kird Apes (same check), and a Magical Hack
+  -- (Forest -> Island) on one of them afterwards, with alice controlling an
+  -- Island and no Forest. The two text boxes are the same, so the exchange
+  -- changes nothing the Hack does and the Hack is independent of it; the Hack
+  -- does change the text the exchange moves, so the exchange depends on the
+  -- Hack. CR 613.8b applies the Hack first: its Island travels to the OTHER
+  -- Ape, and the hacked one receives the printed Forest.
+  Spec.it s "CR 613.8b a later Hack on one Kird Ape moves with the exchange" $ do
+    island <- S.printingOf s registry "Island"
+    ape <- S.printingOf s registry "Kird Ape"
+    hack <- S.printingOf s registry "Magical Hack"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (hackedId, b0) = S.addPermanent ape S.alice (S.landsInPlay island 1)
+        (otherId, b1) = S.addPermanent ape S.alice b0
+        (_, entered) = S.entersWithTrigger exchange S.alice b1
+        -- Inlined rather than bound, for exchangeOfWordsBoard's reason.
+        staged = S.runPure (exchangeAnswer hackedId otherId) entered Engine.settleForPriority
+        exchanged = S.runPure (exchangeAnswer hackedId otherId) staged Stack.resolveTop
+        (withHack, hackId) = S.handOne hack exchanged
+        swap = (Subtype.Type.Forest, Subtype.Type.Island)
+        cast = S.runPure (hackSwapping hackedId swap) withHack (S.cast S.alice hackId)
+        after = S.runPure (hackSwapping hackedId swap) cast Stack.resolveTop
+    Spec.assertEqWith s "CR 613.8b the other Ape receives the hacked pump and asks for alice's Island" (S.powerToughnessOf otherId after) (Just (2, 3))
+    Spec.assertEqWith s "while the hacked Ape receives the printed Forest" (S.powerToughnessOf hackedId after) (Just (1, 1))
+    -- The anti-vacuity check, after the behaviour: the exchange really had
+    -- resolved before the Hack, with neither Ape pumped.
+    Spec.assertEqWith s "before the Hack the other Ape is unpumped" (S.powerToughnessOf otherId exchanged) (Just (1, 1))
+    Spec.assertEqWith s "and holds the named Ape's text box" (Projection.textBoxHolderOf otherId exchanged) hackedId
+
+  -- Two Magical Hacks on Stalker Hag ({B/G}{B/G}{B/G} Creature -- Hag 3/2,
+  -- "Swampwalk, forestwalk", same check): Swamp -> Island, then Forest ->
+  -- Swamp. The earlier depends on the later, which makes a Swamp word for it;
+  -- the later does not depend on the earlier, which neither makes nor takes a
+  -- Forest. So the later applies first, and both walks end as islandwalk.
+  -- Timestamp order would leave islandwalk and swampwalk.
+  Spec.it s "CR 613.8b a swap waits for the later one that makes its word" $ do
+    island <- S.printingOf s registry "Island"
+    hag <- S.printingOf s registry "Stalker Hag"
+    hack <- S.printingOf s registry "Magical Hack"
+    let (hagId, b0) = S.addPermanent hag S.alice (S.landsInPlay island 2)
+        (b1, firstId) = S.handOne hack b0
+        (b2, secondId) = S.handOne hack b1
+        toIsland = (Subtype.Type.Swamp, Subtype.Type.Island)
+        toSwamp = (Subtype.Type.Forest, Subtype.Type.Swamp)
+        -- Inlined rather than bound, for exchangeOfWordsBoard's reason.
+        castFirst = S.runPure (hackSwapping hagId toIsland) b2 (S.cast S.alice firstId)
+        first = S.runPure (hackSwapping hagId toIsland) castFirst Stack.resolveTop
+        castSecond = S.runPure (hackSwapping hagId toSwamp) first (S.cast S.alice secondId)
+        both = S.runPure (hackSwapping hagId toSwamp) castSecond Stack.resolveTop
+        islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)
+        swampwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)
+        forestwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Forest)
+    Spec.assertEqWith s "CR 613.8b the Hag walks Islands twice over" (Map.lookup islandwalk (PC.keywords (Projection.project hagId both))) (Just 2)
+    Spec.assertBool s (not (Projection.hasKeyword swampwalk hagId both)) "and not the swampwalk timestamp order would leave"
+    -- The anti-vacuity check, after the behaviour: the first Hack alone left
+    -- the forestwalk the second one rewrites.
+    Spec.assertBool s (Projection.hasKeyword forestwalk hagId first) "after the first Hack alone the Hag still walks Forests"
+
   -- Two Magical Hacks on Kird Ape, Forest -> Island and then Island -> Swamp,
   -- over two Islands and no Swamp. The later one depends on the earlier (it
   -- finds its Island only after the earlier has run), so both orders agree
