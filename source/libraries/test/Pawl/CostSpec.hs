@@ -2587,6 +2587,73 @@ collectsEvidenceFrom oid action = case action of
         (Cost.Type.components (ActivatedAbility.cost ability))
   _ -> False
 
+-- Vitu-Ghazi Inspector {1}{G} Creature -- Elf Detective 1/3: "As an additional
+-- cost to cast this spell, you may collect evidence 6. / Reach / When this
+-- creature enters, if evidence was collected, put a +1/+1 counter on target
+-- creature and you gain 2 life." Izoni, Center of the Web {4}{B}{G}: "Whenever
+-- Izoni enters or attacks, you may collect evidence 4. If you do, create two 2/1
+-- black and green Spider creature tokens with reach and menace." (Oracle checked
+-- against Scryfall 2026-09-25.)
+--
+-- CR 701.59c's linked "if evidence was collected", read by the PERMANENT the
+-- spell became (CR 400.7d), and CR 118.12's "you may [cost]. If you do" over the
+-- same action paid at resolution. Each pair is one board and differs only in
+-- the answer to the optional cost.
+--
+-- alice's graveyard is two Acidic Soils (mana value 3 each), so it totals 6:
+-- enough for either card's collection. bob's Goblin Piker (2/1) is the
+-- Inspector's target. Distinct numbers: 2 life onto 20, a +1/+1 counter onto a
+-- 2-power Piker, two Spiders.
+evidenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+evidenceSpec s registry =
+  let play held = S.cast S.alice held >> Stack.resolveTop >> Engine.placePendingTriggers >> Stack.resolveTop
+      spiders = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Spider Token")) S.alice
+   in Spec.describe s "Collect evidence (CR 701.59)" $ do
+        Spec.it s "CR 701.59c Vitu-Ghazi Inspector's enters ability reads the evidence its spell collected" $ do
+          (gs, held, piker) <- evidenceBoard s registry "Vitu-Ghazi Inspector" 2
+          let collected = S.runPure (collectingEvidence True piker) gs (play held)
+              declined = S.runPure (collectingEvidence False piker) gs (play held)
+          Spec.assertEqWith s "CR 701.59c evidence was collected, so alice gained 2 life" (S.lifeOf S.alice collected) (Just 22)
+          Spec.assertEqWith s "CR 118.8b evidence was not collected, so she gained nothing" (S.lifeOf S.alice declined) (Just 20)
+          Spec.assertEqWith s "and only the collecting run put a +1/+1 counter on the Piker" (Projection.powerOf piker collected, Projection.powerOf piker declined) (Just 3, Just 2)
+        Spec.it s "CR 118.12 Izoni makes its Spiders only when alice collects evidence" $ do
+          (gs, held, _) <- evidenceBoard s registry "Izoni, Center of the Web" 6
+          let collected = S.runPure (collectingEvidence True S.noSource) gs (play held)
+              declined = S.runPure (collectingEvidence False S.noSource) gs (play held)
+          Spec.assertEqWith s "CR 118.12 collecting evidence made two Spiders, declining made none" (spiders collected, spiders declined) (2, 0)
+          Spec.assertEqWith s "CR 701.59a and the collection exiled both Soils" (length (Game.zoneMembers Zone.Exile S.alice collected), length (Game.zoneMembers Zone.Exile S.alice declined)) (2, 0)
+
+-- `card` in alice's hand over `lands` Forests and a Swamp, two Acidic Soils in
+-- her graveyard, and bob's Goblin Piker, in her precombat main phase with
+-- priority. Returns the state, the card and the Piker.
+evidenceBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Int -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+evidenceBoard s registry card lands = do
+  forest <- S.printingOf s registry "Forest"
+  swamp <- S.printingOf s registry "Swamp"
+  soil <- S.printingOf s registry "Acidic Soil"
+  piker <- S.printingOf s registry "Goblin Piker"
+  held <- S.printingOf s registry card
+  let withLands = S.landsFor swamp S.alice 1 (S.landsFor forest S.alice (lands - 1) (Setup.emptyGame S.bothPlayers))
+      (_, oneSoil) = S.addGraveyardCard soil S.alice withLands
+      (_, twoSoils) = S.addGraveyardCard soil S.alice oneSoil
+      (pikerId, withPiker) = S.addPermanent piker S.bob twoSoils
+      (heldId, gs) = S.addHandCard held S.alice withPiker
+  pure
+    ( gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice},
+      heldId,
+      pikerId
+    )
+
+-- Collect evidence or decline it, at either moment the card offers it: CR
+-- 601.2b's choice among the costs (the Inspector) and CR 118.12's offer at
+-- resolution (Izoni). The collection takes every card offered, FILTERED out of
+-- the candidates; the Inspector's target is `victim`, `announcing`'s filter.
+collectingEvidence :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+collectingEvidence collects victim p = case p of
+  Prompt.ChooseToPay {} -> if collects then PaymentDecision.Pays else PaymentDecision.Declines
+  Prompt.ChooseCollectEvidence _ _ _ candidates _ -> Set.fromList candidates
+  _ -> announcing collects victim p
+
 -- CR 115.4's "any target" pointed at a PLAYER, FILTERED out of the offered
 -- recipients for `targeting`'s reason: a hand-built Recipient.ToPlayer is a
 -- different recipient from the one the engine offered, and CR 608.2b's re-read
@@ -2859,6 +2926,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   causticExhaleSpec s registry
   osseousExhaleSpec s registry
   forensicResearcherSpec s registry
+  evidenceSpec s registry
   flingSpec s registry
   frailExhumationSpec s registry
   everbarkShamanSpec s registry

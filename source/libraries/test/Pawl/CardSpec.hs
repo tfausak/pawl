@@ -1410,6 +1410,19 @@ beholdsAsCost =
         _ -> False
    in any isBehold . Cost.Type.components
 
+-- Does this cost COLLECT EVIDENCE? beholdsAsCost's shape exactly: CR 601.2h's
+-- payment binds Binding.collectedEvidence (Pawl.Engine.Cost.payComponent's
+-- CollectEvidence arm), which is CR 701.59c's linkage -- "if evidence was
+-- collected" is printed only on a card whose own cost collects it. Read by the
+-- spell lint below and by AbilitySlotLintSpec's triggered-ability sweep, CR
+-- 400.7d carrying the record onto the permanent the spell becomes.
+collectsEvidenceAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+collectsEvidenceAsCost =
+  let isCollect component = case component of
+        CostComponent.CollectEvidence _ -> True
+        _ -> False
+   in any isCollect . Cost.Type.components
+
 -- Does this cost sacrifice a permanent the payer CHOOSES? revealsAsCost's shape
 -- exactly: CR 601.2h's payment binds Binding.sacrificedPermanent
 -- (Pawl.Engine.Cost.payComponent's Sacrifice arm), and both carriers fold it on --
@@ -2395,6 +2408,7 @@ reservedSlots =
       Binding.tappedForTotalPower,
       Binding.revealedCard,
       Binding.beheldObject,
+      Binding.collectedEvidence,
       Binding.crewedVehicle,
       Binding.crewers,
       Binding.manaSource,
@@ -6005,6 +6019,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         --     folds it onto the spell, so Osseous Exhale's "if a Dragon was
         --     beheld" is an ordinary slot read -- of the BINDING alone, which is
         --     what CR 701.4b asks for.
+        --   * Binding.collectedEvidence, and only when the cost collects
+        --     evidence, per `collectsEvidenceAsCost`: CR 701.59c's "if evidence
+        --     was collected", beheldObject's reasoning exactly.
         --   * Binding.sacrificedPermanent, and only when the cost sacrifices a
         --     permanent the payer chooses, per `sacrificesAsCost`. CR 601.2h's
         --     payment binds it and Pawl.Engine.Cast folds it onto the spell, so
@@ -6030,7 +6047,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 if any beholdsAsCost (spellCostsOf card)
                   then Set.singleton Binding.beheldObject
                   else Set.empty
-           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed, beheld]) (Face.spell card)
+              collected =
+                if any collectsEvidenceAsCost (spellCostsOf card)
+                  then Set.singleton Binding.collectedEvidence
+                  else Set.empty
+           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed, beheld, collected]) (Face.spell card)
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

@@ -5723,8 +5723,10 @@ payComponent moment slots pid oid component = case component of
   -- cost that emptied the graveyard leaves this Unpaid. The exile goes through
   -- Event.changeZone, ExileCardsFromGraveyard's route above.
   --
-  -- Binds nothing. Not implemented: CR 701.59c's linked "if evidence was
-  -- collected", which is what would want the collection recorded here (#3895).
+  -- BINDS the exiled cards under Binding.collectedEvidence, which is what CR
+  -- 701.59c's linked "if evidence was collected" is read off, through
+  -- Quantity.WasBound -- Behold's route above. Pawl.CostSpec's Vitu-Ghazi
+  -- Inspector group is the proof.
   CostComponent.CollectEvidence n -> do
     gs <- State.get
     let candidates = evidenceCandidates slots pid gs
@@ -5734,7 +5736,7 @@ payComponent moment slots pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && collected >= toInteger n
       then do
         Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
-        pure bindsNothing
+        pure (Payment.Paid (Map.singleton Binding.collectedEvidence (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 406.2 with no prompt: CR 404.2's order determines the card. Unpaid where
   -- the graveyard holds no matching card, agreeing with canPayComponent above.

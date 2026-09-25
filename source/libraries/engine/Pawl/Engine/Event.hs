@@ -5575,6 +5575,14 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- about a permanent. Nothing else reads the record off an
                     -- object outside the stack.
                     Object.paidCosts = if dest == Zone.Battlefield then Object.paidCosts obj else Map.empty,
+                    -- CR 400.7d again, for a cost record a payment BOUND rather
+                    -- than a keyword declared: CR 701.59c's "if evidence was
+                    -- collected" on Vitu-Ghazi Inspector's enters ability.
+                    -- `paidCosts`' gate, for its reason.
+                    Object.bindings =
+                      if dest == Zone.Battlefield
+                        then Map.union (Binding.paidCostRecord (Object.bindings obj)) (Object.bindings arriving)
+                        else Object.bindings arriving,
                     -- CR 702.103b: "these effects last until the SPELL OR THE
                     -- PERMANENT IT BECOMES ceases to be bestowed", so the
                     -- designation crosses this one move with the object the rule
