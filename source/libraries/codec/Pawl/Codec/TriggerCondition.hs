@@ -86,6 +86,7 @@ codec =
           Arm.nullary "SelfExiledForMadness" TriggerCondition.SelfExiledForMadness,
           Arm.nullary "SelfDiscarded" TriggerCondition.SelfDiscarded,
           Arm.payload "PlayerDiscards" PlayerRelation.codec TriggerCondition.PlayerDiscards (\x -> case x of TriggerCondition.PlayerDiscards y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerDiscardsCards" PlayerRelation.codec TriggerCondition.PlayerDiscardsCards (\x -> case x of TriggerCondition.PlayerDiscardsCards y -> Just y; _ -> Nothing),
           Arm.payload "PlayerCycles" PlayerRelation.codec TriggerCondition.PlayerCycles (\x -> case x of TriggerCondition.PlayerCycles y -> Just y; _ -> Nothing),
           Arm.payload "PlayerDrawsNthCard" PlayerDrawsNthCard.codec TriggerCondition.PlayerDrawsNthCard (\x -> case x of TriggerCondition.PlayerDrawsNthCard y -> Just y; _ -> Nothing),
           Arm.nullary "SelfPutIntoGraveyardFromLibrary" TriggerCondition.SelfPutIntoGraveyardFromLibrary,
@@ -103,6 +104,7 @@ codec =
           Arm.payload "CardsLeaveZone" CardLeavesZone.codec TriggerCondition.CardsLeaveZone (\x -> case x of TriggerCondition.CardsLeaveZone y -> Just y; _ -> Nothing),
           Arm.nullary "AttachedCreatureDies" TriggerCondition.AttachedCreatureDies,
           Arm.nullary "AttachedCreatureBecomesTapped" TriggerCondition.AttachedCreatureBecomesTapped,
+          Arm.payload "PermanentsBecomeTapped" filterCodec TriggerCondition.PermanentsBecomeTapped (\x -> case x of TriggerCondition.PermanentsBecomeTapped y -> Just y; _ -> Nothing),
           Arm.nullary "SelfBecomesUntapped" TriggerCondition.SelfBecomesUntapped,
           Arm.nullary "AttachedPermanentTappedForMana" TriggerCondition.AttachedPermanentTappedForMana,
           Arm.payload "PermanentTappedForMana" PermanentTappedForMana.codec TriggerCondition.PermanentTappedForMana (\x -> case x of TriggerCondition.PermanentTappedForMana y -> Just y; _ -> Nothing),
@@ -225,6 +227,7 @@ tagOf x = case x of
   TriggerCondition.SelfExiledForMadness {} -> "SelfExiledForMadness"
   TriggerCondition.SelfDiscarded {} -> "SelfDiscarded"
   TriggerCondition.PlayerDiscards {} -> "PlayerDiscards"
+  TriggerCondition.PlayerDiscardsCards {} -> "PlayerDiscardsCards"
   TriggerCondition.PlayerCycles {} -> "PlayerCycles"
   TriggerCondition.PlayerDrawsNthCard {} -> "PlayerDrawsNthCard"
   TriggerCondition.SelfPutIntoGraveyardFromLibrary {} -> "SelfPutIntoGraveyardFromLibrary"
@@ -242,6 +245,7 @@ tagOf x = case x of
   TriggerCondition.CardsLeaveZone {} -> "CardsLeaveZone"
   TriggerCondition.AttachedCreatureDies {} -> "AttachedCreatureDies"
   TriggerCondition.AttachedCreatureBecomesTapped {} -> "AttachedCreatureBecomesTapped"
+  TriggerCondition.PermanentsBecomeTapped {} -> "PermanentsBecomeTapped"
   TriggerCondition.SelfBecomesUntapped {} -> "SelfBecomesUntapped"
   TriggerCondition.AttachedPermanentTappedForMana {} -> "AttachedPermanentTappedForMana"
   TriggerCondition.PermanentTappedForMana {} -> "PermanentTappedForMana"

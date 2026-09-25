@@ -1892,7 +1892,8 @@ attemptAttackDeclaration perform pid rejected = do
         -- only 508.1k makes the creatures attacking. The order is observable -- a
         -- Birds of Paradise just declared as an attacker is tapped, so it is no
         -- longer a mana source for the very cost its attack incurred.
-        Monad.forM_ attacking tapIt
+        -- One event group: rule 508.1f taps the chosen creatures as one action.
+        Event.simultaneously (Monad.forM_ attacking tapIt)
         -- CR 508.1g: the OPTIONAL costs to attack, after CR 508.1f's tapping and
         -- before CR 508.1h's determination. Asked per creature, and of `attacking`
         -- rather than `chosen` so a creature the CR 508.1d degradation dropped is

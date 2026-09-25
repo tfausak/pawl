@@ -108,6 +108,9 @@ data TriggerCondition
   | -- | CR 701.9a read by a bystander: "whenever [a player] discards a card"
     -- (Megrim).
     PlayerDiscards PlayerRelation.PlayerRelation
+  | -- | CR 603.2c's batch reading of the arm above: "whenever you discard one or
+    -- more cards" (Magmakin Artillerist), once per discard event.
+    PlayerDiscardsCards PlayerRelation.PlayerRelation
   | -- | "Whenever you cycle a card" (Prickly Marmoset) -- PlayerDiscards
     -- narrowed to Pawl.Types.DiscardCause.ToPayCyclingCost by CR 702.29a.
     PlayerCycles PlayerRelation.PlayerRelation
@@ -302,6 +305,10 @@ data TriggerCondition
   | -- | CR 701.26a's "became tapped" read off the permanent the bearer is
     -- attached to (Betrayal), live rather than through last known information.
     AttachedCreatureBecomesTapped
+  | -- | CR 701.26a's batch reading, by a bystander: "whenever one or more
+    -- nontoken Merfolk you control become tapped" (Deeproot Pilgrimage), once
+    -- per tapping event (CR 603.2c).
+    PermanentsBecomeTapped (Filter.Filter Keyword.Keyword)
   | -- | CR 701.26b's "becomes untapped" read off the bearer itself (Oreskos Sun
     -- Guide), the other direction of the status the arm above watches.
     SelfBecomesUntapped
