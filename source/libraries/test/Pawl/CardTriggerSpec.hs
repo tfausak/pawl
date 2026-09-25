@@ -3594,10 +3594,9 @@ raidBoard =
 -- The third line is TriggerCondition.SelfDealsDamageToCreature, and this group
 -- is what proves it.
 --
--- COMBAT damage rather than the card's own fight, because the fight's "when you
--- do" half never arms (#3165) -- Pawl.ResolveSpec's Strax group is where that is
--- recorded. The condition is not combat-scoped, which is why it is the arm
--- beside SelfDealsDamageToPlayer rather than beside
+-- COMBAT damage here; Pawl.ResolveSpec's Strax group shows the card's own fight
+-- adding the counter too. The condition is not combat-scoped, which is why it is
+-- the arm beside SelfDealsDamageToPlayer rather than beside
 -- SelfDealsCombatDamageToPlayer.
 --
 -- Wall of Stone 0/8 is the blocker: it survives all five, so a counter here is

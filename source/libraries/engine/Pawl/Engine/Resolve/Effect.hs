@@ -463,12 +463,19 @@ targetSlotsOf obj oid gs face =
 -- ability armed after it hangs off a trigger event that never occurred, and rule
 -- 603.12 creates it only "based on whether the trigger event or events occurred".
 --
--- WHAT ANSWERS IT is the event log rather than the opcode: an instruction that
--- took place recorded a game event, an ignored one recorded none. A board
--- difference, the posture applyEffectWith's CR 607.2a filing already takes, so
--- the rules core reads the ACT rather than which effect it was. Ratchet, Field
--- Medic's two trigger instances are Pawl.TransformSpec's "CR 701.28e / 603.12 an
--- ignored convert arms no reflexive", the case that proves it.
+-- WHAT ANSWERS IT is the act rather than the opcode: an instruction HAPPENED
+-- when it recorded a game event or left the game state different
+-- (`happenedBetween`), and an ignored one did neither. A board difference, the
+-- posture applyEffectWith's CR 607.2a filing already takes, so the rules core
+-- never asks which effect it was. Ratchet, Field Medic's two trigger instances
+-- are Pawl.TransformSpec's "CR 701.28e / 603.12 an ignored convert arms no
+-- reflexive", the event-log half; Strax, Sontaran Nurse's random choice records
+-- no event and only binds a slot, and Pawl.ResolveSpec's "CR 603.12 a choice
+-- that records no event still arms its when you do" is the state half.
+--
+-- The comparison runs only where the NEXT instruction arms a reflexive, so the
+-- fold carries the previous instruction's before and after states rather than
+-- a verdict, and a clause with no arm never compares.
 --
 -- Effect.ForEach's body (below) runs its instructions through this SAME fold,
 -- reset per member rather than carried across members. Synthetic Communal Toll
@@ -481,22 +488,67 @@ targetSlotsOf obj oid gs face =
 -- about, not whichever earlier instruction the reflexive's own wording names
 -- ("do A. do B. when you do A" would read B's outcome instead); no card in
 -- `data/cards/` writes an arm that is not second in its clause or its ForEach
--- body (#3057). "Happened" is read as "recorded a game event", which misses an
--- effect that mutates the board without one -- Effect.Detain and Effect.Goad
--- are two -- and would wrongly suppress an arm that follows it (#3165).
+-- body (#3057).
 applyClauseEffects ::
   ObjectId ->
   (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()) ->
   [Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] ->
   Game ()
 applyClauseEffects source applyOne =
-  let step happened effect = do
-        skipped <- if happened then pure False else State.gets (armsReflexive source effect)
-        before <- State.gets (Seq.length . GameState.events)
+  let step previous effect = do
+        arms <- State.gets (armsReflexive source effect)
+        let skipped = arms && maybe False (not . uncurry happenedBetween) previous
+        before <- State.get
         Monad.unless skipped (applyOne effect)
-        after <- State.gets (Seq.length . GameState.events)
-        pure (after > before)
-   in Monad.foldM_ step True
+        after <- State.get
+        pure (Just (before, after))
+   in Monad.foldM_ step Nothing
+
+-- CR 603.12: did the instruction that took the game from `before` to `after`
+-- HAPPEN? Yes when it recorded a game event, or when anything but bookkeeping
+-- changed. A field is bookkeeping, and copied across from `before` here, iff an
+-- instruction that did NOT happen can still write it: the event log and its
+-- CR 603.10 samples (read by the first disjunct, and the samples are
+-- deliberately unforced), the allocators, interning and Oracle-reference memos
+-- an instruction advances before finding nothing to do, CR 104.4b's lastChoice
+-- (an offer answered with nothing), CR 121.4's drewFromEmpty (an attempted
+-- draw), and every bound AMOUNT, since a tally binds zero for an instruction
+-- that did nothing. Everything else is compared, so a new GameState field
+-- counts as state by default.
+--
+-- The copied-across fields are a REGRESSION FENCE rather than a proved line:
+-- no pool card puts an offering, drawing or tallying instruction directly
+-- before a reflexive arm, so un-copying lastChoice leaves the suite green.
+-- Miasma Demon ("you may discard any number of cards. When you do, ...",
+-- answered with zero) is the card that would observe it.
+happenedBetween :: GameState -> GameState -> Bool
+happenedBetween before after =
+  let tallyless :: Map.Map SlotName Binding.Type.Binding -> Map.Map SlotName Binding.Type.Binding
+      tallyless = Map.map (\binding -> binding {Binding.Type.amount = Nothing})
+      objectTallyless :: Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+      objectTallyless = Map.map (\obj -> obj {Object.bindings = tallyless (Object.bindings obj)})
+      comparable gs =
+        gs
+          { GameState.events = Seq.empty,
+            GameState.battlefieldWhenTriggered = Map.empty,
+            GameState.nextEventGroup = GameState.nextEventGroup before,
+            GameState.eventGroupDepth = GameState.eventGroupDepth before,
+            GameState.nextTimestamp = GameState.nextTimestamp before,
+            GameState.nextObjectId = GameState.nextObjectId before,
+            GameState.nextPrintingId = GameState.nextPrintingId before,
+            GameState.printings = GameState.printings before,
+            GameState.printingIds = GameState.printingIds before,
+            GameState.lookedUp = GameState.lookedUp before,
+            GameState.referenceNames = GameState.referenceNames before,
+            GameState.lastChoice = GameState.lastChoice before,
+            GameState.drewFromEmpty = GameState.drewFromEmpty before,
+            GameState.ambientAmounts = GameState.ambientAmounts before,
+            GameState.objects = objectTallyless (GameState.objects gs),
+            GameState.stackArchive = objectTallyless (GameState.stackArchive gs),
+            GameState.detachedBindings = fmap tallyless (GameState.detachedBindings gs)
+          }
+   in Seq.length (GameState.events after) > Seq.length (GameState.events before)
+        || comparable before /= comparable after
 
 -- CR 603.12: does this instruction create a REFLEXIVE triggered ability? The name
 -- is resolved exactly as the arm itself resolves it (declaredDelayedAbility, then
@@ -1312,9 +1364,10 @@ offerCastOnce context named caster optionality verb retake offer = do
         | verb == PermissionVerb.Play && Cast.landDropOpen caster gs =
             [ (oid, mName, Face.name face)
             | oid <- named,
+              Just obj <- [Game.lookupObject oid gs],
               Just card <- [Game.cardOf oid gs],
-              not (PlayerEffect.prohibitsPlayingLand caster (Card.combinedNames card) oid gs),
-              (mName, face) <- Card.landFaces card
+              not (PlayerEffect.prohibitsPlayingLand caster (Game.copiableNamesOf obj card) oid gs),
+              (mName, face) <- Game.landFacesOf obj card
             ]
         | otherwise = []
       everything = fmap Left landOffers <> fmap Right offers
