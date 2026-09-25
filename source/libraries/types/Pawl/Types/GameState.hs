@@ -282,10 +282,15 @@ data GameState = MkGameState
     -- continuous effects. See Timestamp.
     nextTimestamp :: Timestamp.Timestamp,
     -- | CR 104.4b: the timestamp as of the last optional action offered to a
-    -- player, advanced only by Pawl.Engine.Game.choose (conceding excepted, CR
-    -- 104.3a); its gap from nextTimestamp is
-    -- Pawl.Engine.Engine.checkMandatoryLoop's heuristic.
+    -- player, advanced by Pawl.Engine.Game.choose (conceding excepted, CR
+    -- 104.3a) and by CR 801.16's draw of a loop's players; its gap from
+    -- nextTimestamp is Pawl.Engine.Engine.checkMandatoryLoop's heuristic.
     lastChoice :: Timestamp.Timestamp,
+    -- | CR 801.16: for each player, nextTimestamp as a triggered ability of
+    -- theirs was last put on the stack (Pawl.Engine.Game.involve).
+    -- Pawl.Engine.Engine.checkMandatoryLoop reads the recent ones as the loop's
+    -- players.
+    loopInvolvement :: Map.Map PlayerId.PlayerId Timestamp.Timestamp,
     drewFromEmpty :: Set.Set PlayerId.PlayerId,
     -- | CR 305.2a: how many lands each player has played this turn, a count
     -- because CR 305.2 lets an effect raise the allowance; cleared per player

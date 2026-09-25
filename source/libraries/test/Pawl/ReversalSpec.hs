@@ -60,7 +60,8 @@ withoutAnnouncementSpec s registry = Spec.describe s "withoutAnnouncement" $ do
               GameState.printingIds = GameState.printingIds closed,
               GameState.nextPrintingId = GameState.nextPrintingId closed,
               GameState.nextTimestamp = GameState.nextTimestamp closed,
-              GameState.lastChoice = GameState.lastChoice closed
+              GameState.lastChoice = GameState.lastChoice closed,
+              GameState.loopInvolvement = GameState.loopInvolvement closed
             }
     Spec.assertBool s (Reversal.withoutAnnouncement began closed closed == Just expected) "every field the cast wrote is back at where the action began, the monotone counters apart"
     Spec.assertNeWith s "the transition wrote something, so the law above is not vacuous" (Seq.length (GameState.events closed)) (Seq.length (GameState.events began))

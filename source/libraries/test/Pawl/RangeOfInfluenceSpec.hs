@@ -17,8 +17,8 @@
 -- playerRefPlayers, zoneScopePlayers and battlefieldMatching, Pawl.Engine.Count's
 -- playersFor and the choice offers Game.reachableBy feeds (CR 801.5a, 801.10,
 -- 801.11), and Pawl.Engine.Resolve.Effect's WinGame and DrawGame (CR 801.14,
--- 801.15); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
--- departedThisTurn.
+-- 801.15), and Pawl.Engine.Engine's checkMandatoryLoop (CR 801.16); and CR
+-- 801.2c's turn-start seating, Pawl.Types.GameState's departedThisTurn.
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
 -- carol, dave]: bob and dave sit next to alice and carol sits two seats away.
@@ -44,6 +44,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Sba as Sba
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -71,6 +72,7 @@ import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -641,7 +643,65 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "one upkeep leaves the game running" (GameState.result (upkeepOf S.alice (played id))) Nothing
     Spec.assertEqWith s "CR 801.15 at range 1 only carol is still playing" (Game.stillPlaying limited) [S.carol]
     Spec.assertEqWith s "CR 104.4c at an unlimited range the game is a draw" (GameState.result (twice (played id))) (Just Result.Drawn)
+
+  -- CR 801.16: Pawl.GameSpec's CR 104.4b loop -- alice's Sporemound mints a
+  -- Saproling, her Life and Limb makes it a Forest land, and another player's
+  -- Aether Flash buries it -- at SIX seats, so that two players can sit outside
+  -- every loop player's range and play on together. With bob's Aether Flash the
+  -- draw takes alice and bob and their neighbours frank and carol. Dave and erin
+  -- are still in a game that has no result: the gap restarts for them rather
+  -- than drawing them at the next check.
+  --
+  -- Aether Flash is never alice's: two triggers of hers on one Saproling would
+  -- be hers to order (CR 603.3b), a choice, and then no loop is mandatory.
+  Spec.it s "CR 801.16 a mandatory loop draws its players and those within their range" $ do
+    flash <- S.printingOf s registry "Aether Flash"
+    limb <- S.printingOf s registry "Life and Limb"
+    sporemound <- S.printingOf s registry "Sporemound"
+    forest <- S.printingOf s registry "Forest"
+    let looped flashOwner ranged = resolveAll (ranged (loopBoard flash limb sporemound forest flashOwner))
+        limited = looped S.bob (S.withRange 1)
+    Spec.assertEqWith s "CR 801.16 at range 1 dave and erin are still playing" (Game.stillPlaying limited) [S.dave, erin]
+    Spec.assertEqWith s "and the game goes on" (GameState.result limited) Nothing
+    -- The same board with frank's Aether Flash: it is his triggers in the loop
+    -- now, so his neighbour erin draws in carol's place. (An Aether Flash out of
+    -- alice's range sees no Saproling enter, CR 801.7, and is in no loop.)
+    Spec.assertEqWith s "CR 801.16 with frank's Aether Flash carol and dave are still playing" (Game.stillPlaying (looped frank (S.withRange 1))) [S.carol, S.dave]
+    Spec.assertEqWith s "CR 104.4b at an unlimited range the game is a draw" (GameState.result (looped S.bob id)) (Just Result.Drawn)
+
+  -- CR 801.16's "involved in that loop", at the guard itself: carol's stamp
+  -- predates the gap's later half, which a loop's every cycle reaches, so it
+  -- was a lead-in rather than the loop. Only alice's players draw.
+  Spec.it s "CR 801.16 a player stamped only before the loop is not in it" $ do
+    let limit = Engine.mandatoryLoopLimit
+        board =
+          (S.withRange 1 S.fourPlayerGame)
+            { GameState.nextTimestamp = Timestamp.MkTimestamp limit,
+              GameState.lastChoice = Timestamp.MkTimestamp 0,
+              GameState.loopInvolvement = Map.fromList [(S.alice, Timestamp.MkTimestamp (limit - 1)), (S.carol, Timestamp.MkTimestamp (div limit 2 - 1))]
+            }
+        after = S.runPure S.identityAnswer board Engine.checkMandatoryLoop
+    Spec.assertEqWith s "CR 801.16 carol, the last one playing, wins" (GameState.result after) (Just (Result.Won S.carol))
   where
+    -- Pawl.GameSpec's loopBoard at six seats: alice, active, in her precombat
+    -- main phase, with Life and Limb, Sporemound and a tapped Forest entering,
+    -- and `flashOwner`'s Aether Flash. Seeded ten events short of the limit.
+    loopBoard flash limb sporemound forest flashOwner =
+      let base = Setup.emptyGame (S.alice NonEmpty.:| [S.bob, S.carol, S.dave, erin, frank])
+          (_, gs1) = S.addPermanent flash flashOwner base
+          (_, gs2) = S.addPermanent limb S.alice gs1
+          (_, gs3) = S.addPermanent sporemound S.alice gs2
+          (forestId, gs4) = S.entersWithTrigger forest S.alice gs3
+          seeded =
+            gs4
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.remaining = Seq.empty,
+                GameState.nextTimestamp = Timestamp.MkTimestamp (Engine.mandatoryLoopLimit - 10),
+                GameState.lastChoice = Timestamp.MkTimestamp 0
+              }
+       in S.tapObject forestId seeded
+    erin = PlayerId.MkPlayerId 4
+    frank = PlayerId.MkPlayerId 5
     resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
     -- Pawl.LifeTriggerSpec's entry staging: the permanent is placed, its Moved
     -- event recorded, and the CR 603.6a scan runs at the next settle.
