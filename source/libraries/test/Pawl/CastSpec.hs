@@ -18,6 +18,7 @@ import Numeric.Natural (Natural)
 import qualified Numeric.Natural as Natural
 import qualified Pawl.CardSpec as CardSpec
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -4030,6 +4031,11 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
 -- One board: four Plains and four Islands pay either cost, so the printed-cost
 -- control had the impending cost available and declined it. Both libraries are
 -- stocked for the four turns the counters take to run out.
+--
+-- The third case is CR 707.2's: Copy Enchantment's copy was not cast for
+-- impending, and Resourceful Defense then moves one of the original's time
+-- counters onto it, so the copy has a time counter and the paid conjunct alone
+-- keeps it a creature.
 impendingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 impendingSpec s registry = Spec.describe s "Impending" $ do
   Spec.it s "CR 702.176a cast for impending, the Overlord is not a creature until alice's fourth end step removes its last time counter" $ do
@@ -4037,7 +4043,9 @@ impendingSpec s registry = Spec.describe s "Impending" $ do
     island <- S.printingOf s registry "Island"
     overlord <- S.printingOf s registry "Overlord of the Mistmoors"
     copyEnchantment <- S.printingOf s registry "Copy Enchantment"
-    let (overlordId, gs1) = S.addHandCard overlord S.alice (S.landsFor island S.alice 4 (S.landsInPlay plains 4))
+    defense <- S.printingOf s registry "Resourceful Defense"
+    let (overlordId, gs0) = S.addHandCard overlord S.alice (S.landsFor island S.alice 4 (S.landsInPlay plains 9))
+        (defenseId, gs1) = S.addPermanent defense S.alice gs0
         (copyId, gs2) = S.addHandCard copyEnchantment S.alice gs1
         stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard plains pid h)) g [1 :: Int .. 10]
         board = scheduled (stock S.bob (stock S.alice gs2))
@@ -4052,11 +4060,31 @@ impendingSpec s registry = Spec.describe s "Impending" $ do
         let afterOne = throughEndStepOf S.alice impended
             afterFour = iterate (throughEndStepOf S.alice) impended !! 4
             copied = castResolved (aimedAt original) copyId impended
-            copies = filter (/= original) (namedOnBattlefield "Overlord of the Mistmoors" copied)
+            moved = case (filter (/= original) (namedOnBattlefield "Overlord of the Mistmoors" copied), Activatable.abilitiesFor defenseId copied) of
+              ([copy], [only]) -> [reading copy (S.runPure (movingTime original copy) copied (Activate.activateAbility S.alice defenseId only >> Stack.resolveTop))]
+              _ -> []
         Spec.assertEqWith s "CR 702.176a impended, it entered with four time counters as a non-creature and still made its two Insects; hard-cast, a creature with none" ((reading original impended, length (S.tokensOf impended)), (overlordOf hardCast, length (S.tokensOf hardCast))) (((False, 4), 2), ((True, 0), 2))
         Spec.assertEqWith s "CR 702.176a alice's first end step removes one counter, and her fourth the last, making it a creature" (reading original afterOne, reading original afterFour) ((False, 3), (True, 0))
-        Spec.assertEqWith s "CR 707.2 a Copy Enchantment copying it was not cast for impending, so it is a creature with no time counters" (fmap (`reading` copied) copies) [(True, 0)]
+        Spec.assertEqWith s "CR 707.2 a Copy Enchantment copying it was not cast for impending, so it is a creature even with a time counter moved onto it" moved [(True, 1)]
       other -> Spec.assertFailure s ("expected one Overlord, got " <> show (length other))
+
+-- Resourceful Defense's "move any number of counters from target permanent you
+-- control onto a second target permanent you control", aimed from `giver` to
+-- `taker` by slot name and answered with one time counter.
+movingTime :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+movingTime giver taker p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let target
+                | slot == SlotName.MkSlotName (Text.pack "from") = Just giver
+                | slot == SlotName.MkSlotName (Text.pack "to") = Just taker
+                | otherwise = Nothing
+           in Set.filter ((==) target . Recipient.objectOf) offered
+      )
+      asked
+  Prompt.ChooseMovedCounters {} -> Map.singleton CounterKind.Time 1
+  _ -> payingFor [] p
 
 -- CR 702.113a on Part the Waterveil {4}{U}{U} Sorcery, "Take an extra turn after
 -- this one. Exile Part the Waterveil. / Awaken 6--{6}{U}{U}{U}" (Oracle text

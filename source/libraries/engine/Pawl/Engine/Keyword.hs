@@ -3064,8 +3064,9 @@ castOverloaded castUsing = case castUsing of
 
 -- CR 702.74a, 702.96a, 702.109a, 702.113a, 702.148a, 702.152a, 702.176a,
 -- 702.188a and 702.190a: every evoke, overload, dash, blitz, cleave, awaken,
--- impending, web-slinging and sneak cost this card may be cast for, each beside the keyword that offers
--- it -- the tag CR 601.2b records as Object.castUsing -- in ascending Set order.
+-- impending, web-slinging and sneak cost this card may be cast for, each beside
+-- the keyword that offers it -- the tag CR 601.2b records as Object.castUsing --
+-- in ascending Set order.
 -- Read by Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is
 -- offered, bestowCosts' reading: evoke's static ability functions "in any zone
 -- from which the card with evoke can be cast", dash and blitz name no zone, and
@@ -3082,8 +3083,8 @@ castOverloaded castUsing = case castUsing of
 -- Pawl.Engine.Cast.candidateTimingOk reads rule 702.190a's window off.
 --
 -- UNGATED, where surgeCosts' and spectacleCosts' callers gate: rules 702.113a,
--- 702.148a, 702.176a and 702.188a state no clause of their own. Rule 702.190a's clause is
--- a WINDOW rather than a condition on the board, so it
+-- 702.148a, 702.176a and 702.188a state no clause of their own. Rule 702.190a's
+-- clause is a WINDOW rather than a condition on the board, so it
 -- gates in Pawl.Engine.Cast beside the card's own timing and not here -- an offer
 -- withheld here would still leave the printed cost castable in that window, which
 -- is the opposite of what that rule says. A list and a wildcard for
@@ -4105,8 +4106,9 @@ reconfigured =
 -- CR 702.176a's THIRD ability: "as long as this permanent's impending cost was
 -- paid and it has a time counter on it, it's not a creature" -- a CR 613.1d
 -- layer 4 removal, reconfigured's modification. The paid half is whilePaid's
--- Quantity.CastUsing, so a Clone of an impending permanent (CR 707.2) is a
--- creature; Pawl.CastSpec's "Impending" group proves both.
+-- Quantity.CastUsing, so a copy of an impending permanent (CR 707.2) is a
+-- creature even with a time counter on it; Pawl.CastSpec's "Impending" group
+-- proves both halves.
 impendingNotCreature :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card)
 impendingNotCreature =
   StaticAbility.MkStaticAbility
@@ -4147,8 +4149,12 @@ mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toA
 -- cost, it enters with N time counters on it", a CR 614.1c row minted only when
 -- the entering object's CR 601.2b tag (Object.castUsing) names impending and the
 -- permanent still has the keyword, Projection.intrinsicReplacementsOf's
--- compleated shape. The tag is not copiable (CR 707.2), so a Clone of an
+-- compleated shape. The tag is not copiable (CR 707.2), so a copy of an
 -- impending permanent enters with none.
+--
+-- The keyword half is CR 614.12's look-ahead, and nothing in the suite
+-- observes it: dropping it leaves every case green, so it is a regression
+-- fence resting on that rule rather than a proved behaviour.
 castForReplacementsOf :: Maybe Keyword -> Map Keyword Natural -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 castForReplacementsOf castUsing counts = case castUsing of
   Just keyword@(Keyword.Impending impending)
