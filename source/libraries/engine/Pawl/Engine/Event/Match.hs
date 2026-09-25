@@ -14,6 +14,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import Pawl.Engine.Event.Binding (admittedDepartures)
 import qualified Pawl.Engine.Filter as Filter
@@ -2914,6 +2915,15 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- creature, even if it blocks multiple creatures": a blocker declared against
   -- two attackers makes two BecameBlocking and one BlocksDeclared, so matching
   -- the pairwise one here would fire twice.
+  -- CR 508.3a narrowed by a state, SelfAttacksWhileSaddled's posture: the
+  -- declaration SelfAttacks matches, and the condition asked of the live board
+  -- when triggers are collected, through the view Event.interveningHolds reads.
+  -- Not `board`, CR 603.10's post-event battlefield, so a legendary Monkey lost
+  -- to state-based actions the declaration itself caused reads as absent; no
+  -- card in the pool reaches that.
+  TriggerCondition.SelfAttacksWhile condition ->
+    matchesTriggerGiven bindings board gs bearer you (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) event
+      && Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Game.teams gs) (Just you) (Just bearer) Map.empty) gs bearer condition
   -- CR 702.171b: SelfAttacks' declaration event, narrowed by the bearer
   -- carrying the saddled designation AT THAT MOMENT. Read off
   -- Object.designations rather than through the projection, rule 702.171b

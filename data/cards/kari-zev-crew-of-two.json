@@ -1,0 +1,417 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": {
+        "return that card": {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
+                }
+              },
+              "scope": {
+                "type": "EachTurn"
+              }
+            }
+          },
+          "intervening": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "Count",
+                "value": {
+                  "aggregation": {
+                    "type": "Members"
+                  },
+                  "filter": {
+                    "type": "IsBound",
+                    "value": "ragavan"
+                  },
+                  "scope": {
+                    "type": "InZone",
+                    "value": {
+                      "player": {
+                        "type": "EachPlayer"
+                      },
+                      "zone": {
+                        "type": "Battlefield"
+                      }
+                    }
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "ragavan"
+                          },
+                          "zone": {
+                            "type": "Hand"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "keywords": [
+        {
+          "type": "Haste"
+        },
+        {
+          "type": "Menace"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Kari Zev, Crew of Two",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfAttacksWhile",
+            "value": {
+              "type": "Compares",
+              "value": {
+                "comparison": {
+                  "type": "Exactly"
+                },
+                "measured": {
+                  "type": "Count",
+                  "value": {
+                    "aggregation": {
+                      "type": "Members"
+                    },
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        },
+                        {
+                          "type": "HasSupertype",
+                          "value": {
+                            "type": "Legendary"
+                          }
+                        },
+                        {
+                          "type": "HasSubtype",
+                          "value": {
+                            "type": "Monkey"
+                          }
+                        }
+                      ]
+                    },
+                    "scope": {
+                      "type": "InZone",
+                      "value": {
+                        "player": {
+                          "type": "EachPlayer"
+                        },
+                        "zone": {
+                          "type": "Battlefield"
+                        }
+                      }
+                    }
+                  }
+                },
+                "threshold": {
+                  "type": "Literal",
+                  "value": 0
+                }
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Conjure",
+                        "value": {
+                          "cards": {
+                            "type": "Written",
+                            "value": [
+                              {
+                                "faces": [
+                                  {
+                                    "keywords": [
+                                      {
+                                        "type": "Dash",
+                                        "value": {
+                                          "mana": [
+                                            {
+                                              "type": "Generic",
+                                              "value": 1
+                                            },
+                                            {
+                                              "type": "OfType",
+                                              "value": {
+                                                "type": "Colored",
+                                                "value": {
+                                                  "type": "Red"
+                                                }
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ],
+                                    "manaCost": [
+                                      {
+                                        "type": "OfType",
+                                        "value": {
+                                          "type": "Colored",
+                                          "value": {
+                                            "type": "Red"
+                                          }
+                                        }
+                                      }
+                                    ],
+                                    "name": "Ragavan, Nimble Pilferer",
+                                    "power": {
+                                      "type": "Literal",
+                                      "value": 2
+                                    },
+                                    "toughness": {
+                                      "type": "Literal",
+                                      "value": 1
+                                    },
+                                    "triggeredAbilities": [
+                                      {
+                                        "condition": {
+                                          "type": "SelfDealsCombatDamageToPlayer",
+                                          "value": {
+                                            "type": "AnyPlayer"
+                                          }
+                                        },
+                                        "modal": {
+                                          "modes": [
+                                            {
+                                              "clauses": [
+                                                {
+                                                  "effects": [
+                                                    {
+                                                      "type": "Create",
+                                                      "value": {
+                                                        "card": {
+                                                          "faces": [
+                                                            {
+                                                              "activatedAbilities": [
+                                                                {
+                                                                  "cost": {
+                                                                    "components": [
+                                                                      {
+                                                                        "type": "TapThis"
+                                                                      },
+                                                                      {
+                                                                        "type": "SacrificeThis"
+                                                                      }
+                                                                    ],
+                                                                    "mana": []
+                                                                  },
+                                                                  "modal": {
+                                                                    "modes": [
+                                                                      {
+                                                                        "clauses": [
+                                                                          {
+                                                                            "effects": [
+                                                                              {
+                                                                                "type": "AddMana",
+                                                                                "value": {
+                                                                                  "production": {
+                                                                                    "type": "AnyColor"
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            ]
+                                                                          }
+                                                                        ]
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                }
+                                                              ],
+                                                              "name": "Treasure Token",
+                                                              "typeLine": {
+                                                                "subtypes": [
+                                                                  {
+                                                                    "type": "Treasure"
+                                                                  }
+                                                                ],
+                                                                "types": [
+                                                                  {
+                                                                    "type": "Artifact"
+                                                                  }
+                                                                ]
+                                                              }
+                                                            }
+                                                          ]
+                                                        },
+                                                        "quantity": {
+                                                          "type": "Literal",
+                                                          "value": 1
+                                                        }
+                                                      }
+                                                    },
+                                                    {
+                                                      "type": "MoveToZone",
+                                                      "value": {
+                                                        "ref": {
+                                                          "type": "TopOfLibrary",
+                                                          "value": {
+                                                            "count": {
+                                                              "type": "Literal",
+                                                              "value": 1
+                                                            },
+                                                            "player": {
+                                                              "type": "InSlot",
+                                                              "value": "thatPlayer"
+                                                            }
+                                                          }
+                                                        },
+                                                        "zone": {
+                                                          "type": "Exile"
+                                                        }
+                                                      }
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ],
+                                    "typeLine": {
+                                      "subtypes": [
+                                        {
+                                          "type": "Monkey"
+                                        },
+                                        {
+                                          "type": "Pirate"
+                                        }
+                                      ],
+                                      "supertypes": [
+                                        {
+                                          "type": "Legendary"
+                                        }
+                                      ],
+                                      "types": [
+                                        {
+                                          "type": "Creature"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          "destination": {
+                            "type": "Battlefield",
+                            "value": {
+                              "attacking": true,
+                              "tapped": {
+                                "type": "Tapped"
+                              }
+                            }
+                          },
+                          "slot": "ragavan"
+                        }
+                      },
+                      {
+                        "type": "ArmDelayedTrigger",
+                        "value": {
+                          "name": "return that card"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Pirate"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
