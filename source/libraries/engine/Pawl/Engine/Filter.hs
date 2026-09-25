@@ -410,7 +410,7 @@ data View = MkView
     -- in Context: it needs the subject's enchant ability (CR 702.5a) AND the
     -- candidate's projected characteristics, so it has a different answer per
     -- candidate. Context.sourcePower is the other half of that division -- one
-    -- reading of the source, the same for every candidate in the match. Pawl.Engine.Attach.hostsFor is the only
+    -- reading of the source, the same for every candidate in the match. Pawl.Engine.Attach.hostsAmong is the only
     -- site that fills it, from Attach.attachmentFor -- the same function that
     -- performs the move, so the offer and the move cannot disagree.
     --
@@ -1218,9 +1218,9 @@ data Context = MkContext
     -- the division that field's own note draws: this is one reading of the
     -- subject's host, the same for every candidate in the match, which is
     -- `sourcePower`'s side of it. Keyed by nothing, because the subject is not a
-    -- slot the caller bound but the permanent Pawl.Engine.Attach.hostsFor was
-    -- handed -- so hostsFor fills it into the Context it took from its caller
-    -- rather than the caller filling it, and hostsFor is the one filler.
+    -- slot the caller bound but the permanent Pawl.Engine.Attach.hostsAmong was
+    -- handed -- so hostsAmong fills it into the Context it took from its caller
+    -- rather than the caller filling it, and hostsAmong is the one filler.
     --
     -- EMPTY everywhere else, where the atom is a silent False, and
     -- Pawl.FilterPositionLintSpec's "CR 205.2a no card asks
@@ -1341,6 +1341,12 @@ data Context = MkContext
     -- IsHostOfSource where the source's host is unknown", the sweep sourcePower's
     -- and slotNames' siblings each have.
     sourceAttachedTo :: Maybe ObjectId.ObjectId,
+    -- CR 400.7: the objects an effect of the SOURCE put onto the battlefield, as
+    -- those objects, for EnteredWithSource. Filled from GameState.enteredWith by
+    -- Pawl.Engine.Target.slotContext, where an enchant ability is matched; empty
+    -- everywhere else, and the atom then matches nothing. LAZY: filling it scans
+    -- the relation.
+    sourceEntrants :: Set.Set ObjectId.ObjectId,
     -- CR 108.3: the OWNER of the SOURCE, for the one atom that compares a
     -- candidate's owner against it (SameOwnerAsSource, CR 702.140a's "with the
     -- same owner as this spell"). sourceNames' sibling, though CR 109.3 makes an
@@ -1550,7 +1556,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1588,7 +1594,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -2081,6 +2087,7 @@ matches context view predicate = case predicate of
   Filter.IsHostOfSource -> case (identity view, sourceAttachedTo context) of
     (Just oid, Just host) -> oid == host
     _ -> False
+  Filter.EnteredWithSource -> maybe False (`Set.member` sourceEntrants context) (identity view)
   -- CR 701.3a: a live read of the legality of the attach this match is framing,
   -- computed by the caller that knows what is moving. Vacuously False outside one.
   Filter.CanHostSubject -> canHostSubject view
@@ -2348,6 +2355,7 @@ rewrite pairs predicate = case predicate of
   Filter.HasAttached f -> Filter.HasAttached (rewrite pairs f)
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
+  Filter.EnteredWithSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
   Filter.HostOfSubjectHasCardType _ -> predicate
@@ -3068,6 +3076,7 @@ bakeBound players predicate = case predicate of
   Filter.HasAttached f -> Filter.HasAttached (bakeBound players f)
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
+  Filter.EnteredWithSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
   Filter.HostOfSubjectHasCardType _ -> predicate
@@ -3234,6 +3243,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasAttached f -> manaValueThresholds f
   Filter.IsAttachedToSource -> []
   Filter.IsHostOfSource -> []
+  Filter.EnteredWithSource -> []
   Filter.CanHostSubject -> []
   Filter.CanAttachToSubject -> []
   Filter.HostOfSubjectHasCardType _ -> []
@@ -3402,6 +3412,7 @@ statesAQuality predicate = case predicate of
   Filter.HasAttached _ -> True
   Filter.IsAttachedToSource -> True
   Filter.IsHostOfSource -> True
+  Filter.EnteredWithSource -> True
   Filter.CanHostSubject -> True
   Filter.CanAttachToSubject -> True
   -- True for the two atoms above's reason and not because it describes the

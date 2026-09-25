@@ -435,6 +435,9 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- leaves open. Pawl.CardSpec's position lint is what keeps that true,
             -- and widening it here would be a capability no card asks for.
             Filter.sourceAttachedTo = Nothing,
+            -- CR 400.7: what the source put onto the battlefield, for an enchant
+            -- ability naming it (Animate Dead). A THUNK, one scan of the relation.
+            Filter.sourceEntrants = Map.keysSet (Map.filter (== source) (GameState.enteredWith gs)),
             -- THE one site that fills it, sourcePower's and slotAmount's sibling
             -- above and for their reason: CR 702.140a's owner comparison lives in
             -- a target slot's Filter -- the one rule 702.140a MINTS
