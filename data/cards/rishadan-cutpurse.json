@@ -43,11 +43,14 @@
                             "type": "And",
                             "value": []
                           },
+                          "players": {
+                            "type": "EachInSlot",
+                            "value": "thosePlayers"
+                          },
                           "quantity": {
                             "type": "Literal",
                             "value": 1
-                          },
-                          "slot": "thosePlayers"
+                          }
                         }
                       }
                     ],
