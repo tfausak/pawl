@@ -911,6 +911,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 700.4's is nullary as well, for the same reason.
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  TriggerCondition.PermanentsBecomeTapped _ -> []
   TriggerCondition.SelfBecomesUntapped -> []
   TriggerCondition.AttachedPermanentTappedForMana -> []
   -- CR 106.12a's bystander reading carries a PlayerRelation and a Filter,
@@ -1010,6 +1011,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfExiledForMadness -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
+  TriggerCondition.PlayerDiscardsCards _ -> []
   -- CR 702.29a's cycling read as a discard: the same PlayerRelation, so no Count
   -- either.
   TriggerCondition.PlayerCycles _ -> []
@@ -3846,6 +3848,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- them too, so this condition carries no Filter either.
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  -- Deeproot Pilgrimage's "nontoken Merfolk you control" is card text, swept
+  -- like PermanentsDie's.
+  TriggerCondition.PermanentsBecomeTapped f -> unframed [f]
   TriggerCondition.SelfBecomesUntapped -> []
   TriggerCondition.AttachedPermanentTappedForMana -> []
   -- CR 702.149c's carries none either: it names "this creature" and nothing about
@@ -3978,6 +3983,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfDiscarded -> []
   TriggerCondition.SelfExiledForMadness -> []
   TriggerCondition.PlayerDiscards _ -> []
+  TriggerCondition.PlayerDiscardsCards _ -> []
   TriggerCondition.PlayerCycles _ -> []
   TriggerCondition.PlayerDrawsNthCard {} -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.
@@ -4109,6 +4115,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfDiscarded -> []
   TriggerCondition.SelfExiledForMadness -> []
   TriggerCondition.PlayerDiscards _ -> []
+  TriggerCondition.PlayerDiscardsCards _ -> []
   TriggerCondition.PlayerCycles _ -> []
   TriggerCondition.PlayerDrawsNthCard _ -> []
   TriggerCondition.SelfAttacks _ -> []
@@ -4149,6 +4156,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.CardsLeaveZone {} -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
+  TriggerCondition.PermanentsBecomeTapped _ -> []
   TriggerCondition.SelfBecomesUntapped -> []
   TriggerCondition.AttachedPermanentTappedForMana -> []
   TriggerCondition.PermanentTappedForMana {} -> []

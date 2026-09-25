@@ -310,8 +310,8 @@ combatDamagerAgainst victim gs logged = case LoggedEvent.event logged of
 -- The group is spent on exit whether or not the body recorded anything, so a
 -- bracket leaves a gap rather than leaking its group to the next event.
 --
--- Not bracketed: token creation and CR 508.1's attacker declaration, so the
--- events each records are read as a sequence: a token minted partway through a
+-- Not bracketed: token creation and CR 508.1's attacker declaration (rule
+-- 508.1f's taps aside), so the events each records are read as a sequence: a token minted partway through a
 -- batch enters at a group of its own, which is what
 -- Pawl.Engine.Event.Trigger's `arrivedOnBattlefieldLater` reads to keep it from
 -- witnessing the batch's earlier events. CR 510.2's combat damage IS: Pawl.Engine.Damage.dealWave
@@ -8068,6 +8068,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfDiscarded -> False
   TriggerCondition.SelfExiledForMadness -> False
   TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.PlayerDiscardsCards _ -> False
   TriggerCondition.PlayerCycles _ -> False
   -- CR 121.1's draw is something that happens to a player, not an ability
   -- triggering.
@@ -8183,6 +8184,7 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 701.26a's tap is a first-pass event as well, and not an ability
   -- triggering.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  TriggerCondition.PermanentsBecomeTapped _ -> False
   -- CR 701.26b's untap is a first-pass event as well.
   TriggerCondition.SelfBecomesUntapped -> False
   -- CR 106.12a is a first-pass event as well, and not an ability triggering.
@@ -8310,6 +8312,7 @@ controllerTurnScoped cond = case cond of
   -- and Betrayal's whole point is that the Aura's controller is not the tapping
   -- creature's.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  TriggerCondition.PermanentsBecomeTapped _ -> False
   -- Nor CR 701.26b: CR 502.3's untap step is the active player's, but an
   -- Effect.Untap and CR 107.6's untap symbol reach any turn.
   TriggerCondition.SelfBecomesUntapped -> False
@@ -8354,6 +8357,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfDiscarded -> False
   TriggerCondition.SelfExiledForMadness -> False
   TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.PlayerDiscardsCards _ -> False
   TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
   -- CR 508.1a makes this the ACTIVE player's turn, which is not the same thing:

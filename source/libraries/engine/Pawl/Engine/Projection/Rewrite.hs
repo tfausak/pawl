@@ -1681,6 +1681,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted f kind) -> TriggerCondition.PermanentsBecomeTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted (Filter.rewrite pairs f) kind)
   TriggerCondition.PermanentBecomesTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted f kind) -> TriggerCondition.PermanentBecomesTargeted (PermanentsBecomeTargeted.MkPermanentsBecomeTargeted (Filter.rewrite pairs f) kind)
   TriggerCondition.PlayerDiscards _ -> condition
+  TriggerCondition.PlayerDiscardsCards _ -> condition
   TriggerCondition.PlayerCycles _ -> condition
   TriggerCondition.PlayerDrawsNthCard {} -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition
@@ -1748,6 +1749,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.AttachedCreatureMentors -> condition
   TriggerCondition.AttachedCreatureDies -> condition
   TriggerCondition.AttachedCreatureBecomesTapped -> condition
+  TriggerCondition.PermanentsBecomeTapped f -> TriggerCondition.PermanentsBecomeTapped (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesUntapped -> condition
   TriggerCondition.AttachedPermanentTappedForMana -> condition
   TriggerCondition.PermanentTappedForMana payload -> TriggerCondition.PermanentTappedForMana payload {PermanentTappedForMana.filter = Filter.rewrite pairs (PermanentTappedForMana.filter payload)}
