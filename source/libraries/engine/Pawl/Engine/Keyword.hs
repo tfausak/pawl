@@ -441,6 +441,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
+  Keyword.Offering _ -> []
   Keyword.Emerge _ -> []
   -- CR 702.124a: deck-construction abilities, which function before the game
   -- begins and mint nothing in it. Pawl.Engine.Commander.designations reads them.
@@ -671,6 +672,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Champion _ -> []
+  Keyword.Offering _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -1249,6 +1251,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Champion _ -> []
+  Keyword.Offering _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -1895,6 +1898,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Champion _ -> []
+  Keyword.Offering _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -2628,6 +2632,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Champion _ -> []
+  Keyword.Offering _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -3086,7 +3091,7 @@ castOverloaded castUsing = case castUsing of
 -- returning a creature you control to its owner's hand", so the return rides in
 -- the SECOND component while the first stays the keyword as printed -- which is
 -- what Quantity.CastUsing compares against (Spiders-Man, Heroic Horde) and what
--- Pawl.Engine.Cast.candidateTimingOk reads rule 702.190a's window off.
+-- Pawl.Engine.Cast.windowedCandidates reads rule 702.190a's window off.
 --
 -- UNGATED, where surgeCosts' and spectacleCosts' callers gate: rules 702.113a,
 -- 702.148a, 702.176a and 702.188a state no clause of their own. Rule 702.190a's
@@ -3145,10 +3150,9 @@ plainAlternativeCosts keywords =
 
 -- CR 702.190a: does this CR 601.2b tag name the one alternative cost that brings
 -- a casting window of its own -- "any time you could cast an instant during your
--- declare blockers step"? Pawl.Engine.Cast.candidateTimingOk asks it of one
--- candidate, in place of the card's own window rather than beside it, and
--- windowedCandidates asks it of the whole list to decide whether the two windows
--- differ at all; hasSneak below asks it of a keyword set.
+-- declare blockers step"? Pawl.Engine.Cast.windowedCandidates asks it of each
+-- candidate, in place of the card's own window rather than beside it; hasSneak
+-- below asks it of a keyword set.
 --
 -- A question about the keyword's IDENTITY rather than a classification, which is
 -- what rule 702.190a is: the window is the rulebook's, stated nowhere but on this
@@ -3206,6 +3210,16 @@ emergeCosts keywords =
         Keyword.Emerge emerge -> Just emerge
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- CR 702.48a: the quality of each offering this card has, in ascending Set
+-- order. Pawl.Engine.Cost.candidateCostsGiven draws the sacrifice from it and
+-- Pawl.Engine.Cast.cardTimingOk asks whether it is empty.
+offeringQualities :: Set Keyword -> [Filter Keyword]
+offeringQualities keywords =
+  let qualityOf keyword = case keyword of
+        Keyword.Offering quality -> Just quality
+        _ -> Nothing
+   in Maybe.mapMaybe qualityOf (Set.toAscList keywords)
 
 -- CR 702.137a: surgeCosts' twin over spectacle, whose static ability "functions
 -- on the stack" and whose gate is rule 702.137a's "if an opponent lost life this
@@ -4402,6 +4416,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Champion _ -> []
+  Keyword.Offering _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -4763,6 +4778,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Champion _ -> []
+  Keyword.Offering _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -5069,6 +5085,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Champion _ -> []
+  Keyword.Offering _ -> []
   Keyword.Cascade -> []
   Keyword.Storm -> []
   Keyword.Gravestorm -> []
@@ -5306,6 +5323,7 @@ familyOf keyword = case keyword of
   Keyword.Absorb _ -> Just KeywordFamily.Absorb
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Champion _ -> Just KeywordFamily.Champion
+  Keyword.Offering _ -> Just KeywordFamily.Offering
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Mobilize _ -> Just KeywordFamily.Mobilize
   Keyword.Firebending _ -> Just KeywordFamily.Firebending

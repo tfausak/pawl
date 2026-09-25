@@ -2601,6 +2601,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- entry ability Pawl.Engine.Keyword.championEnters mints reads the rewritten
   -- quality.
   Keyword.Type.Champion quality -> Keyword.Type.Champion (rewrite pairs quality)
+  Keyword.Type.Offering quality -> Keyword.Type.Offering (rewrite pairs quality)
   Keyword.Type.Renown _ -> keyword
   -- CR 702.85a is payload-free, so CR 612.2 has nothing to swap; the walk's
   -- nonland filter is in the ability Pawl.Engine.Keyword.cascade mints.

@@ -230,6 +230,10 @@ data Keyword
   | -- | 702.47a: splice onto [quality] [cost] -- a static ability functioning
     -- from a hand, read by Pawl.Engine.Cast's CR 601.2b announcement.
     Splice (Splice.Splice Keyword)
+  | -- | 702.48a: [quality] offering -- an optional additional cost sacrificing a
+    -- [quality] permanent, which reduces the total by its mana cost and lets the
+    -- spell be cast any time its caster could cast an instant.
+    Offering (Filter.Filter Keyword)
   | -- | 702.49a: ninjutsu [cost] -- an activated ability functioning only from a
     -- hand, whose cost returns an unblocked attacker you control and whose effect
     -- puts this card onto the battlefield tapped and attacking.
@@ -939,7 +943,7 @@ data Keyword
     WebSlinging (Cost.Cost Keyword)
   | -- | 702.190a: sneak [cost] -- web-slinging's alternative cost two rules over,
     -- returning an unblocked creature instead of a tapped one and carrying a
-    -- casting window of its own (Pawl.Engine.Cast.candidateTimingOk).
+    -- casting window of its own (Pawl.Engine.Cast.windowedCandidates).
     --
     -- CR 702.190b's rider -- the permanent enters tapped and attacking whatever
     -- the returned creature was attacking -- is minted by

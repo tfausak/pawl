@@ -123,7 +123,7 @@ isMainPhase phase = case phase of
 -- words are "any time you could cast an INSTANT", which CR 117.1a gives its
 -- controller at every priority, stack or no stack. The readers are
 -- Pawl.Engine.Cast's cardTimingOk, which disjoins it to widen WHEN the cast may
--- begin, and candidateTimingOk, which substitutes it to narrow WHICH cost may
+-- begin, and windowedCandidates, which substitutes it to narrow WHICH cost may
 -- begin it; priority is implicit in both for sorcerySpeedWindow's reason.
 declareBlockersWindow :: PlayerId -> GameState -> Bool
 declareBlockersWindow pid gs =
