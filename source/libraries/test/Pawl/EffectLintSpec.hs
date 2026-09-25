@@ -88,6 +88,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
@@ -276,6 +277,7 @@ ownQuantities effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> [quantity]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.ExchangeLifeTotals _ -> []
+  Effect.ExchangeValues _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -1302,6 +1304,7 @@ effectObjectRefs effect =
         Effect.LoseLife {} -> []
         Effect.GainLife {} -> []
         Effect.ExchangeLifeTotals {} -> []
+        Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) -> read_ (foldMap Resolve.exchangedObjectRefs [one, other])
         Effect.SetLifeTotal {} -> []
         Effect.LoseGame {} -> []
         Effect.RedistributeLifeTotals -> []

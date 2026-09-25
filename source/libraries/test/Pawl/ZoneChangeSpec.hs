@@ -1524,6 +1524,63 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
         after = S.runPure (conduitAnswer [S.bob, S.carol]) board Engine.runStep
     Spec.assertEqWith s "carol took bob's 27" (S.lifeOf S.carol after) (Just 27)
 
+-- CR 701.12g on alice's upkeep, three seats, the exchanger carrying a +1/+1
+-- counter so that CR 613.4b's layer 7b and CR 613.4c's layer 7c tell apart:
+-- the life side reaches the PROJECTED value, and the creature side's new base
+-- still takes the counter on top (Tree of Redemption's 2018-03-16 ruling).
+exchangeValuesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exchangeValuesSpec s registry = Spec.describe s "ExchangeValues" $ do
+  -- Tree of Redemption, a 0/13 made 1/14, with alice at 7: she reaches 14 and
+  -- its base toughness becomes 7, so it is a 1/8.
+  Spec.it s "CR 701.12g Tree of Redemption exchanges its controller's life with its toughness" $ do
+    tree <- S.printingOf s registry "Tree of Redemption"
+    let (treeId, board) = exchangerBoard tree Nothing 7
+        after = S.runPure (conduitAnswer []) board Engine.runStep
+    Spec.assertEqWith s "alice took the Tree's previous toughness, counter included" (S.lifeOf S.alice after) (Just 14)
+    Spec.assertEqWith s "the Tree's base toughness became 7, the counter on top, its power untouched" (S.powerToughnessOf treeId after) (Just (1, 8))
+    Spec.assertEqWith s "and the Tree paid its own {T}" (fmap Object.tapped (Game.lookupObject treeId after)) (Just TapState.Tapped)
+
+  -- CR 119.7 through CR 701.12a: the board above with bob's Giant Cindermaw
+  -- ("Players can't gain life"). alice's side is barred, so the Tree's side
+  -- does not happen either.
+  Spec.it s "CR 119.7 a player who can't gain life doesn't exchange, and neither does the toughness" $ do
+    tree <- S.printingOf s registry "Tree of Redemption"
+    cindermaw <- S.printingOf s registry "Giant Cindermaw"
+    let (treeId, board) = exchangerBoard tree (Just cindermaw) 7
+        after = S.runPure (conduitAnswer []) board Engine.runStep
+    Spec.assertEqWith s "alice keeps her 7" (S.lifeOf S.alice after) (Just 7)
+    Spec.assertEqWith s "and the Tree is still a 1/14" (S.powerToughnessOf treeId after) (Just (1, 14))
+    Spec.assertEqWith s "though the Tree paid its own {T}" (fmap Object.tapped (Game.lookupObject treeId after)) (Just TapState.Tapped)
+
+  -- Evra, Halcyon Witness, a 4/4 made 5/5, with alice at 9: the power side.
+  -- She reaches 5 and Evra's base power becomes 9, so it is a 10/5.
+  Spec.it s "CR 701.12g Evra, Halcyon Witness exchanges its controller's life with its power" $ do
+    evra <- S.printingOf s registry "Evra, Halcyon Witness"
+    island <- S.printingOf s registry "Island"
+    let (evraId, plain) = exchangerBoard evra Nothing 9
+        board = List.foldl' (\gs _ -> snd (S.addPermanent island S.alice gs)) plain [1 .. 4 :: Int]
+        after = S.runPure (conduitAnswer []) board Engine.runStep
+    Spec.assertEqWith s "alice took Evra's previous power, counter included" (S.lifeOf S.alice after) (Just 5)
+    Spec.assertEqWith s "Evra's base power became 9, the counter on top, its toughness untouched" (S.powerToughnessOf evraId after) (Just (10, 5))
+
+-- `exchanger` on alice's battlefield with one +1/+1 counter, alice at `life`,
+-- bob at 20 and optionally controlling `bobs`, in alice's upkeep with priority.
+-- The schedule surgery is mirrorBoard's.
+exchangerBoard :: Printing.Printing -> Maybe Printing.Printing -> Integer -> (ObjectId.ObjectId, GameState.GameState)
+exchangerBoard exchanger bobs life =
+  let (exchangerId, gs0) = S.addPermanent exchanger S.alice S.threePlayerGame
+      gs1 = maybe gs0 (\printing -> snd (S.addPermanent printing S.bob gs0)) bobs
+      gs2 = S.addCounter CounterKind.PlusOnePlusOne 1 exchangerId gs1
+   in ( exchangerId,
+        gs2
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.drop 1 (GameState.remaining gs2),
+            GameState.players = Map.adjust (\pl -> pl {Player.life = life}) S.alice (GameState.players gs2)
+          }
+      )
+
 -- CR 119.5: "If an effect sets a player's life total to a specific number, the
 -- player gains or loses the necessary amount of life to end up with the new
 -- total." So a set is NOT a third kind of life event: it is a gain or a loss,
@@ -2618,6 +2675,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   loseLifeSpec s registry
   perRecipientAmountSpec s registry
   exchangeLifeTotalsSpec s registry
+  exchangeValuesSpec s registry
   setLifeTotalSpec s registry
   doubleLifeTotalSpec s registry
   redistributeLifeTotalsSpec s registry

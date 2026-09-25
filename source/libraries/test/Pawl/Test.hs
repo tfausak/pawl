@@ -222,6 +222,8 @@ import qualified Pawl.Codec.EventGroupSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExcessDestinationSpec
 import qualified Pawl.Codec.ExchangeSidesSpec
+import qualified Pawl.Codec.ExchangeValuesSpec
+import qualified Pawl.Codec.ExchangedValueSpec
 import qualified Pawl.Codec.ExileCardsFromGraveyardSpec
 import qualified Pawl.Codec.ExileHauntingSpec
 import qualified Pawl.Codec.ExileLookerSpec
@@ -915,6 +917,8 @@ spec s registry = do
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExcessDestinationSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
+  Pawl.Codec.ExchangeValuesSpec.spec s
+  Pawl.Codec.ExchangedValueSpec.spec s
   Pawl.Codec.CraftSpec.spec s
   Pawl.Codec.ImpendingSpec.spec s
   Pawl.Codec.SpliceSpec.spec s

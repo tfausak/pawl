@@ -14,9 +14,20 @@ spec s = Spec.describe s "Pawl.Codec.SetBasePowerToughness" $ do
       s
       SetBasePowerToughness.codec
       ( SetBasePowerToughness.MkSetBasePowerToughness
-          { SetBasePowerToughness.power = Quantity.Literal 1,
-            SetBasePowerToughness.toughness = Quantity.Literal 2
+          { SetBasePowerToughness.power = Just (Quantity.Literal 1),
+            SetBasePowerToughness.toughness = Just (Quantity.Literal 2)
           }
       )
       " {\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":2}} "
+  -- CR 613.4b's "and/or": an absent half is omitted, not written as null.
+  Spec.it s "toughness only" $
+    Common.assertCodec
+      s
+      SetBasePowerToughness.codec
+      ( SetBasePowerToughness.MkSetBasePowerToughness
+          { SetBasePowerToughness.power = Nothing,
+            SetBasePowerToughness.toughness = Just (Quantity.Literal 2)
+          }
+      )
+      " {\"toughness\":{\"type\":\"Literal\",\"value\":2}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SetBasePowerToughness.codec

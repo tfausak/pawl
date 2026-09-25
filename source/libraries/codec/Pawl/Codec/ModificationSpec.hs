@@ -111,7 +111,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
     Common.assertCodec
       s
       codec
-      (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))
+      (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Literal 1)) (Just (Quantity.Literal 1))))
       " {\"type\":\"SetBasePowerToughness\",\"value\":{\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1}}} "
   -- layer 7c (Giant Growth +3/+3).
   Spec.it s "ModifyPowerToughness" $

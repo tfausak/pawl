@@ -179,6 +179,8 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
+import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExileLooker as ExileLooker
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -303,6 +305,7 @@ import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
@@ -2759,6 +2762,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals {} -> False
+  Effect.ExchangeValues {} -> False
   Effect.SetLifeTotal {} -> False
   -- CR 608.2d: never impossible. Every player the reference can name is one
   -- Game.stillPlaying answered, and a target who has already left the game is an
@@ -5847,6 +5851,58 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- CR 701.12a: if the entire exchange can't be completed, no part of it
       -- occurs.
       Nothing -> pure ()
+  -- CR 701.12g: both values are read off the one pre-exchange `gs` before
+  -- either is written, so each reaches the other's PREVIOUS value. A life total
+  -- moves through changeLifeByDelta, the ExchangeLifeTotals arm's road; a power
+  -- or toughness is set by a layer-7b effect (CR 613.4b) holding the other value
+  -- as a literal, for no stated duration (CR 611.2a).
+  --
+  -- CR 701.12a's all-or-nothing: a side naming no single player, or no creature
+  -- on the battlefield, or a life total CR 119.7-8 forbids reaching, cancels the
+  -- whole exchange. Pawl.ZoneChangeSpec's ExchangeValues group is the proof.
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) -> do
+    gs <- State.get
+    let single xs = case xs of
+          [x] -> Just x
+          _ -> Nothing
+        -- A side's previous value, and what writing a new one does -- Nothing
+        -- when CR 119.7-8 forbid it.
+        side value = case value of
+          ExchangedValue.LifeTotal ref -> do
+            pid <- single (playerRefPlayers legal controller gs ref)
+            life <- Player.life <$> Map.lookup pid (GameState.players gs)
+            let barred new
+                  | new > life = PlayerEffect.prohibitsGainingLife pid gs
+                  | new < life = PlayerEffect.prohibitsLosingLife pid gs
+                  | otherwise = False
+            pure (life, \new -> if barred new then Nothing else Just (changeLifeByDelta pid (new - life)))
+          ExchangedValue.Power ref -> creature ref Projection.powerOf (\new -> SetBasePowerToughness.MkSetBasePowerToughness (Just new) Nothing)
+          ExchangedValue.Toughness ref -> creature ref Projection.toughnessOf (SetBasePowerToughness.MkSetBasePowerToughness Nothing . Just)
+        creature ref characteristic setting = do
+          oid <- single (objectRefObjects legal resolving controller source gs ref)
+          Monad.guard (Set.member oid (GameState.battlefield gs))
+          Monad.guard (Projection.isCreatureOf oid gs)
+          previous <- characteristic oid gs
+          pure (previous, Just . setBase oid . setting . Quantity.Type.Literal)
+        -- CR 611.2c: the one creature is frozen into the stored effect.
+        setBase oid setting = State.modify' $ \g -> case Expiry.arm legal controller source Duration.Indefinite g of
+          Nothing -> g
+          Just expiry ->
+            let (ts, g1) = Game.freshTimestamp g
+                eff =
+                  ContinuousEffect.MkContinuousEffect
+                    { ContinuousEffect.source = source,
+                      ContinuousEffect.timestamp = ts,
+                      ContinuousEffect.expiry = expiry,
+                      ContinuousEffect.modification = Modification.SetBasePowerToughness setting,
+                      ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+                    }
+             in g1 {GameState.continuousEffects = eff : GameState.continuousEffects g1}
+    -- CR 608.2f's bracket, the ExchangeLifeTotals arm's: one exchange is one
+    -- action.
+    Monad.forM_ (side one) $ \(oneValue, oneWrite) ->
+      Monad.forM_ (side other) $ \(otherValue, otherWrite) ->
+        Monad.forM_ ((>>) <$> oneWrite otherValue <*> otherWrite oneValue) Event.simultaneously
   -- CR 119.5: a DELTA per player against that player's own current total, so one
   -- seat may gain while another loses. Through Event.changeLife rather than a raw
   -- write to Player.life, for the sake of the log the rule describes.
