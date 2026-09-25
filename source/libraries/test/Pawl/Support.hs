@@ -3435,6 +3435,7 @@ oneMountainState mountain ph =
           GameState.haunting = Map.empty,
           GameState.encoded = Map.empty,
           GameState.exiledWith = Map.empty,
+          GameState.enteredWith = Map.empty,
           GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],
           GameState.subgamesThisMatch = 0,

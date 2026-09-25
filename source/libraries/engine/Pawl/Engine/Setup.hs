@@ -269,6 +269,7 @@ emptyGame order =
           GameState.haunting = Map.empty,
           GameState.encoded = Map.empty,
           GameState.exiledWith = Map.empty,
+          GameState.enteredWith = Map.empty,
           GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],
           -- CR 100.6a: pawl models no match around this game, so the match it
@@ -839,6 +840,8 @@ restartGame perform exempt starter = do
             -- Every other entry names a card the rebuild shuffled into a
             -- library, where CR 400.7 has already made it a different object.
             GameState.exiledWith = Map.restrictKeys (GameState.exiledWith gs) exempt,
+            -- CR 727.1: nothing stays on the battlefield through a restart.
+            GameState.enteredWith = Map.empty,
             -- CR 406.4's pile, kept for exactly the cards the line above keeps
             -- and cleared with the rest: a pile is about a card still in exile.
             GameState.exilePiles = Map.restrictKeys (GameState.exilePiles gs) exempt,
@@ -1060,6 +1063,7 @@ subgameStateFrom starter parent =
           GameState.haunting = Map.empty,
           GameState.encoded = Map.empty,
           GameState.exiledWith = Map.empty,
+          GameState.enteredWith = Map.empty,
           GameState.exilePiles = Map.empty,
           -- CR 729.1a: the subgame is its own game and starts from turn 1, so
           -- the main game's pending extra turns are not in it. Its own copy

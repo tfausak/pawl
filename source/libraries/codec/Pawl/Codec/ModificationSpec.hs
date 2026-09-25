@@ -66,6 +66,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.GainEnchant (TargetSlot.required Pool.Creatures Nothing))
       " {\"type\":\"GainEnchant\",\"value\":{\"pool\":{\"type\":\"Creatures\"}}} "
+  -- layer 6, CR 702.5a: the removal of one enchant instance (Animate Dead).
+  Spec.it s "LoseEnchant" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.LoseEnchant (TargetSlot.required Pool.Creatures Nothing))
+      " {\"type\":\"LoseEnchant\",\"value\":{\"pool\":{\"type\":\"Creatures\"}}} "
   -- layer 6 (Humility).
   Spec.it s "LoseAllAbilities" $
     Common.assertCodec

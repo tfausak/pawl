@@ -1281,6 +1281,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   sigardasAidSpec s registry
   equipmentTokenSpec s registry
   auraTokenSpec s registry
+  animateDeadSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -4314,3 +4315,139 @@ enchantmentAlterationSpec s registry =
           Spec.assertEqWith s "alice controls the Mammoth now" (Projection.controllerOf lastCreature takingLast) (Just S.alice)
           Spec.assertEqWith s "bob keeps his Forest, which was never offered" (Projection.controllerOf land takingLast) (Just S.bob)
           Spec.assertEqWith s "and his Piker, which the Aura left" (Projection.controllerOf host takingLast) (Just S.bob)
+
+-- Animate Dead {1}{B} Enchantment -- Aura -- "Enchant creature card in a
+-- graveyard / When this Aura enters, if it's on the battlefield, it loses
+-- 'enchant creature card in a graveyard' and gains 'enchant creature put onto the
+-- battlefield with this Aura.' Return enchanted creature card to the battlefield
+-- under your control and attach this Aura to it. When this Aura leaves the
+-- battlefield, that creature's controller sacrifices it. / Enchanted creature
+-- gets -1/-0." (Oracle text checked against api.scryfall.com, 2026-09-25.)
+--
+-- Bob's Goblin Piker (2/1) is the target, so "under your control" and the
+-- owner's graveyard it is sacrificed into are two different players. Between
+-- the Aura entering and its trigger resolving it enchants a graveyard card,
+-- which CR 303.4c / 704.5m must not bury: settleSba runs in that window.
+animateDeadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+animateDeadSpec s registry = Spec.describe s "Animate Dead" $ do
+  let setUp = do
+        swamp <- S.printingOf s registry "Swamp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        animate <- S.printingOf s registry "Animate Dead"
+        let (pikerCard, base0) = S.addGraveyardCard piker S.bob (S.landsInPlay swamp 2)
+            (gs, spellId) = S.handOne animate base0
+            cast = snd (Engine.runGamePure (aimedAtObject pikerCard) gs (S.cast S.alice spellId))
+        pure (pikerCard, cast)
+      step game gs = snd (Engine.runGamePure S.identityAnswer gs game)
+      pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      animateName = CardName.MkCardName (Text.pack "Animate Dead")
+      named name zone pid gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just name) (Game.zoneMembers zone pid gs)
+  Spec.it s "CR 303.4c / 400.7: the returned creature is alice's, enchanted, at -1/-0; leaving sacrifices it" $ do
+    (_, cast) <- setUp
+    let entered = S.settleSba (step Stack.resolveTop cast)
+        returned = S.settleSba (step Stack.resolveTop (step Engine.placePendingTriggers entered))
+        creatures = named pikerName Zone.Battlefield S.bob returned
+        -- FIRST, and read off every returned Piker rather than a matched one, so
+        -- an Aura that fell off or a creature left in the graveyard reddens THIS.
+        enchantedBy creature = fmap (\aura -> fmap Face.name (Game.faceOf aura returned)) (attachedTo creature returned)
+    Spec.assertEqWith
+      s
+      "the Piker is back under alice's control, Animate Dead on it, at 1 power"
+      (fmap (\creature -> (Projection.controllerOf creature returned, enchantedBy creature, Projection.powerOf creature returned)) creatures)
+      [(Just S.alice, [Just animateName], Just 1)]
+    let gone = S.settleSba (step (Foldable.traverse_ (`Event.changeZone` Zone.Graveyard) (concatMap (`attachedTo` returned) creatures)) returned)
+        sacrificed = S.settleSba (step Stack.resolveTop (step Engine.placePendingTriggers gone))
+    Spec.assertEqWith
+      s
+      "the leaves trigger sacrifices it into bob's graveyard"
+      (named pikerName Zone.Battlefield S.bob sacrificed, length (named pikerName Zone.Graveyard S.bob sacrificed))
+      ([], 1)
+  -- The Gatherer ruling's case: protection from black refuses the attach (CR
+  -- 702.16c), so CR 704.5m buries the Aura, and the delayed ability the trigger
+  -- created (CR 603.7a) still sacrifices "that creature" -- the returned one,
+  -- which the Aura was never attached to.
+  Spec.it s "CR 603.7a: a returned creature the Aura cannot enchant is still sacrificed" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    animate <- S.printingOf s registry "Animate Dead"
+    let apostleName = CardName.MkCardName (Text.pack "Apostle of Purifying Light")
+        (apostleCard, base0) = S.addGraveyardCard apostle S.bob (S.landsInPlay swamp 2)
+        (gs, spellId) = S.handOne animate base0
+        cast = snd (Engine.runGamePure (aimedAtObject apostleCard) gs (S.cast S.alice spellId))
+        entered = S.settleSba (step Stack.resolveTop cast)
+        returned = S.settleSba (step Stack.resolveTop (step Engine.placePendingTriggers entered))
+        sacrificed = S.settleSba (step Stack.resolveTop (step Engine.placePendingTriggers returned))
+    Spec.assertEqWith
+      s
+      "the Apostle is sacrificed into bob's graveyard"
+      (named apostleName Zone.Battlefield S.bob sacrificed, length (named apostleName Zone.Graveyard S.bob sacrificed))
+      ([], 1)
+    -- After the read above, so it absorbs nothing: the Apostle really came back,
+    -- and Animate Dead really was buried.
+    Spec.assertEqWith
+      s
+      "it had returned under alice's control, and Animate Dead was buried"
+      (fmap (`Projection.controllerOf` returned) (named apostleName Zone.Battlefield S.bob returned), length (named animateName Zone.Graveyard S.alice returned))
+      ([Just S.alice], 1)
+  -- CR 702.5c: a copy of the trigger (Lithoform Engine, CR 707.10) returns the
+  -- Piker, and the original then grants a second "enchant creature put onto the
+  -- battlefield with this Aura" -- which the Piker satisfies too.
+  Spec.it s "CR 702.5c: a copied trigger's second granted enchant still admits the returned creature" $ do
+    (_, cast0) <- setUp
+    engine <- S.printingOf s registry "Lithoform Engine"
+    swamp <- S.printingOf s registry "Swamp"
+    let (engineId, cast1) = S.addPermanent engine S.alice cast0
+        cast = S.landsFor swamp S.alice 2 cast1
+        entered = S.settleSba (step Stack.resolveTop cast)
+        placed = step Engine.placePendingTriggers entered
+        copier = List.find ((== Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) . Cost.Type.mana . ActivatedAbility.cost) (Projection.abilitiesOf engineId placed)
+        settle g = S.settleSba (step (Stack.resolveTop >> Engine.settleForPriority) g)
+    case (GameState.stack placed, copier) of
+      (etb : _, Just ability) -> do
+        let staged = S.runPure (aimedAtObject etb) placed {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId ability)
+            returned = settle (settle (settle staged))
+            creatures = named pikerName Zone.Battlefield S.bob returned
+            enchantedBy creature = fmap (\aura -> fmap Face.name (Game.faceOf aura returned)) (attachedTo creature returned)
+        Spec.assertEqWith
+          s
+          "the Piker stays, Animate Dead on it"
+          (fmap (\creature -> (Projection.controllerOf creature returned, enchantedBy creature)) creatures)
+          [(Just S.alice, [Just animateName])]
+        Spec.assertEqWith s "and every trigger resolved" (GameState.stack returned) []
+        -- The copy really ran: two granted instances, one per resolution.
+        Spec.assertEqWith s "and the Aura holds two granted enchant instances" (fmap (length . (`Projection.enchantOf` returned)) (concatMap (`attachedTo` returned) creatures)) [2]
+      _ -> Spec.assertFailure s "Animate Dead's trigger should be on the stack, and Lithoform Engine should have its {2} ability"
+  Spec.it s "CR 608.3b: the Aura spell whose graveyard target left does not resolve" $ do
+    (pikerCard, cast) <- setUp
+    let exiled = step (Event.changeZone pikerCard Zone.Exile) cast
+        resolved = S.settleSba (step Stack.resolveTop exiled)
+    Spec.assertEqWith
+      s
+      "Animate Dead is in alice's graveyard, not on the battlefield"
+      (named animateName Zone.Battlefield S.alice resolved, length (named animateName Zone.Graveyard S.alice resolved))
+      ([], 1)
+  -- CR 303.4f's entry choice reaches a graveyard card: Replenish returns Animate
+  -- Dead, which alice attaches to bob's Piker card as it enters. Two creature
+  -- cards in two graveyards, so the choice is a real one, pinned by id.
+  Spec.it s "CR 303.4f Replenish returns Animate Dead enchanting a graveyard card, which it returns" $ do
+    plains <- S.printingOf s registry "Plains"
+    replenish <- S.printingOf s registry "Replenish"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    animate <- S.printingOf s registry "Animate Dead"
+    let (_, base0) = S.addGraveyardCard mammoth S.alice (S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers))
+        (pikerCard, base1) = S.addGraveyardCard piker S.bob base0
+        (_, base2) = S.addGraveyardCard animate S.alice base1
+        (gs, spell) = S.handOne replenish base2
+        choosing :: Prompt.Prompt r -> r
+        choosing p = case p of
+          Prompt.ChooseAttachment _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== pikerCard) (NonEmpty.toList offered))
+          _ -> S.castAnswer p
+        entered = S.settleSba (snd (Engine.runGamePure choosing gs (S.cast S.alice spell >> Stack.resolveTop)))
+        returned = S.settleSba (step Stack.resolveTop (step Engine.placePendingTriggers entered))
+        enchantedBy creature = fmap (\aura -> fmap Face.name (Game.faceOf aura returned)) (attachedTo creature returned)
+    Spec.assertEqWith
+      s
+      "bob's Piker is on the battlefield under alice's control, Animate Dead on it"
+      (fmap (\creature -> (Projection.controllerOf creature returned, enchantedBy creature)) (named pikerName Zone.Battlefield S.bob returned))
+      [(Just S.alice, [Just animateName])]

@@ -250,6 +250,7 @@ rewriteModification pairs m =
         -- printed on the GRANTER (CR 612.3) exactly as the keyword above is.
         -- rewriteTargetSlot is the same descent a mode's target slots take.
         Modification.GainEnchant slot -> Modification.GainEnchant (rewriteTargetSlot [(from, to)] slot)
+        Modification.LoseEnchant slot -> Modification.LoseEnchant (rewriteTargetSlot [(from, to)] slot)
         -- CR 612.1 through the names' own Filter, printed on the granter (CR
         -- 612.3) as the enchant's is.
         Modification.AddNamesMatching f -> Modification.AddNamesMatching (Filter.rewrite [(from, to)] f)

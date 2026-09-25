@@ -457,8 +457,8 @@ data Object = MkObject
     -- from the half that was cast every time the permanent enters.
     unlockedHalves :: Set.Set CardName.CardName,
     -- | Every designation this permanent has: CR 702.112b's renowned, CR 701.37b's
-    -- monstrous, CR 701.60b's suspected, CR 719.3b's solved and CR 722.3b's
-    -- prepared, which
+    -- monstrous, CR 701.60b's suspected, CR 719.3b's solved, CR 722.3b's
+    -- prepared and CR 701.64b's harnessed, which
     -- Pawl.Types.Designation holds as one type because those rules word the mark
     -- identically. A Set where ringBearerFor above is a Maybe PlayerId, none of
     -- those rules naming a player.

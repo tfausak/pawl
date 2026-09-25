@@ -4552,6 +4552,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   fmap Object.zone (Game.lookupObject target before)
             Monad.forM_ watched $ \from ->
               State.modify' (\g -> g {GameState.movedUntilSourceLeaves = Map.insert newId (ReturnWatch.MkReturnWatch {ReturnWatch.source = source, ReturnWatch.zone = from}) (GameState.movedUntilSourceLeaves g)})
+            -- CR 400.7: which object's effect put this permanent onto the
+            -- battlefield, for Filter.EnteredWithSource. Read off where the
+            -- incarnation landed, so a redirected move records nothing.
+            landed <- State.gets (fmap Object.zone . Game.lookupObject newId)
+            Monad.when (landed == Just Zone.Battlefield) $
+              State.modify' (\g -> g {GameState.enteredWith = Map.insert newId source (GameState.enteredWith g)})
           pure (foldr Set.insert sofar mNew, mNew : acc)
         -- The context a CHOICE's candidates are filtered in, off the board the
         -- choice is being made on: the resolution's own slots ride along, so a

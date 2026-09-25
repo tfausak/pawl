@@ -35,6 +35,7 @@ codec abilityCodec =
           Arm.payload "GainKeyword" Keyword.codec Modification.GainKeyword (\x -> case x of Modification.GainKeyword y -> Just y; _ -> Nothing),
           Arm.nullary "GainFlashbackAtManaCost" Modification.GainFlashbackAtManaCost,
           Arm.payload "GainEnchant" TargetSlot.codec Modification.GainEnchant (\x -> case x of Modification.GainEnchant y -> Just y; _ -> Nothing),
+          Arm.payload "LoseEnchant" TargetSlot.codec Modification.LoseEnchant (\x -> case x of Modification.LoseEnchant y -> Just y; _ -> Nothing),
           Arm.nullary "GainAbilitiesOfSource" Modification.GainAbilitiesOfSource,
           Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
           Arm.payload "LoseNamedAbility" AbilityName.codec Modification.LoseNamedAbility (\x -> case x of Modification.LoseNamedAbility y -> Just y; _ -> Nothing),
@@ -74,6 +75,7 @@ tagOf x = case x of
   Modification.GainKeyword {} -> "GainKeyword"
   Modification.GainFlashbackAtManaCost {} -> "GainFlashbackAtManaCost"
   Modification.GainEnchant {} -> "GainEnchant"
+  Modification.LoseEnchant {} -> "LoseEnchant"
   Modification.GainAbilitiesOfSource {} -> "GainAbilitiesOfSource"
   Modification.LoseAllAbilities {} -> "LoseAllAbilities"
   Modification.LoseNamedAbility {} -> "LoseNamedAbility"

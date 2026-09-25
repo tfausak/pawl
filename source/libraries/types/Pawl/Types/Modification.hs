@@ -87,6 +87,10 @@ data Modification ability
     -- alike. A "ControlledBy You" conjunct, the shape
     -- Old-Growth Troll prints, is answered honestly.
     GainEnchant TargetSlot.TargetSlot
+  | -- | layer 6, CR 613.1f / CR 702.5a: this object loses every enchant instance
+    -- equal to this one (Animate Dead's "loses 'enchant creature card in a
+    -- graveyard'").
+    LoseEnchant TargetSlot.TargetSlot
   | -- | layer 6, CR 613.1f: this object gains a whole quoted ability, authored on
     -- the granting card (Presence of Gond's "Enchanted creature has '{T}: Create
     -- a 1/1 green Elf Warrior creature token.'", Sixth Sense's "Enchanted

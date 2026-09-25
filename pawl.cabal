@@ -1548,6 +1548,7 @@ library test
     Pawl.ForageSpec
     Pawl.GameSpec
     Pawl.GoadSpec
+    Pawl.HarnessSpec
     Pawl.HealSpec
     Pawl.InitiativeSpec
     Pawl.InvestigateSpec

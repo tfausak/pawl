@@ -2,7 +2,8 @@ module Pawl.Types.Designation where
 
 -- | A designation A PERMANENT can have and nothing else about it: CR 702.112b's
 -- renowned, CR 701.37b's monstrous, CR 701.60b's suspected, CR 719.3b's solved,
--- CR 722.3b's prepared and CR 702.171b's saddled. Every one of those rules words
+-- CR 722.3b's prepared, CR 702.171b's saddled and CR 701.64b's harnessed. Every
+-- one of those rules words
 -- the mark the same way -- only a permanent can have it, and it is "neither an
 -- ability nor part of the permanent's copiable values" -- so they are one
 -- payload rather than a field, an opcode and a read atom apiece
@@ -10,7 +11,7 @@ module Pawl.Types.Designation where
 -- Quantity.HasDesignation, Filter.HasDesignation).
 --
 -- WHERE THE MARK ENDS is the one axis they do not share, and it is a sweep
--- rather than a field: five of the six last until the permanent leaves the
+-- rather than a field: all but saddled last until the permanent leaves the
 -- battlefield, which CR 400.7's new object gives for free, and CR 702.171b adds
 -- "or the end of the turn" to saddled alone -- Pawl.Engine.Expiry.dropAtCleanup's
 -- clearedSaddles. That is not the objection that keeps goaded out below, which is
@@ -63,8 +64,8 @@ module Pawl.Types.Designation where
 -- Pawl.Engine.CombatRestriction case on this constructor for it), and CR 701.60a
 -- lets a SPELL OR ABILITY end `Suspected`, which is why Effect.Unsuspect is its
 -- own opcode rather than a designation-parameterised inverse of Effect.Designate
--- -- no rule takes renowned, monstrous, solved or saddled away, the last of those
--- ending on the clock instead.
+-- -- no rule takes renowned, monstrous, solved, harnessed or saddled away, the
+-- last of those ending on the clock instead.
 -- `Prepared` is `Suspected`'s shape in the second respect and not the first: CR
 -- 722.3c ends it too, at the moment the copy is cast, but no opcode takes it --
 -- Pawl.Engine.Cast does, at CR 601.2i. What it adds that no other mark has is a
@@ -98,6 +99,9 @@ data Designation
     -- Gaining it is not only a write, either: CR 722.3c mints a copy of the
     -- permanent in exile at the same moment, which is
     -- Pawl.Engine.Prepare.mintOnDesignated, run in the same breath as the
-    -- set-insert the other four take alone.
+    -- set-insert the others take alone.
     Prepared
+  | -- | CR 701.64b: harnessed, which CR 701.64a's harness instruction sets and CR
+    -- 702.186b's infinity ability is gated on.
+    Harnessed
   deriving (Bounded, Enum, Eq, Ord, Show)
