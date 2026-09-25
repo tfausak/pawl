@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, sacrificesAsCost, triggerConditionSlots)
+import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, sacrificesAsCost, spellCostsOf, triggerConditionSlots)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -221,10 +221,16 @@ modalCountsOffend modal =
 -- The first two are what this passes to modalSlotsOffend as `abilityBound`: they
 -- are stamped for the ability, not for a mode, so every mode gets them.
 triggeredAbilityOffends :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
-triggeredAbilityOffends ability =
+triggeredAbilityOffends = triggeredAbilityOffendsGiven Set.empty
+
+-- triggeredAbilityOffends with `inherited` answering reads too: the slots the
+-- bearer's FACE guarantees rather than the condition, CR 400.7d's cost record.
+triggeredAbilityOffendsGiven :: Set.Set SlotName.SlotName -> TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
+triggeredAbilityOffendsGiven inherited ability =
   modalSlotsOffend
     ( Set.unions
-        [ Set.fromList [Binding.triggerSource, Binding.you],
+        [ inherited,
+          Set.fromList [Binding.triggerSource, Binding.you],
           Event.eventBindingSlots (TriggeredAbility.condition ability),
           Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)
         ]
@@ -690,7 +696,15 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- read there.
   Spec.it s "every slot a triggered ability reads is bound for its condition, and every slot it declares is read" $ do
     ps <- S.allPrintings s
-    let cardOffends = any triggeredAbilityOffends . Face.triggeredAbilities
+    let -- CR 400.7d: the permanent a spell becomes keeps the record its own
+        -- cost bound (Binding.paidCostRecord), and every ability it triggers
+        -- carries it -- so a face whose cost collects evidence may read the
+        -- slot there (Vitu-Ghazi Inspector).
+        inherited face =
+          if any collectsEvidenceAsCost (spellCostsOf face)
+            then Set.singleton Binding.collectedEvidence
+            else Set.empty
+        cardOffends face = any (triggeredAbilityOffendsGiven (inherited face)) (Face.triggeredAbilities face)
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling triggered-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sweep above passes VACUOUSLY: no committed card misauthors the

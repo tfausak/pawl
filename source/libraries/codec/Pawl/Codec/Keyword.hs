@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Emerge as Emerge
 import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Gift as Gift
+import qualified Pawl.Codec.Impending as Impending
 import qualified Pawl.Codec.Morph as Morph
 import qualified Pawl.Codec.PartnerText as PartnerText
 import qualified Pawl.Codec.Protection as Protection
@@ -129,6 +130,7 @@ codec =
       Arm.payload "Surge" (Cost.codec codec) Keyword.Surge (\x -> case x of Keyword.Surge y -> Just y; _ -> Nothing),
       Arm.payload "Prowl" (Cost.codec codec) Keyword.Prowl (\x -> case x of Keyword.Prowl y -> Just y; _ -> Nothing),
       Arm.payload "Freerunning" (Cost.codec codec) Keyword.Freerunning (\x -> case x of Keyword.Freerunning y -> Just y; _ -> Nothing),
+      Arm.payload "Impending" (Impending.codec codec) Keyword.Impending (\x -> case x of Keyword.Impending y -> Just y; _ -> Nothing),
       Arm.payload "Spectacle" (Cost.codec codec) Keyword.Spectacle (\x -> case x of Keyword.Spectacle y -> Just y; _ -> Nothing),
       Arm.nullary "Ravenous" Keyword.Ravenous,
       Arm.payload "Squad" (Cost.codec codec) Keyword.Squad (\x -> case x of Keyword.Squad y -> Just y; _ -> Nothing),
@@ -324,6 +326,7 @@ tagOf x = case x of
   Keyword.Surge {} -> "Surge"
   Keyword.Prowl {} -> "Prowl"
   Keyword.Freerunning {} -> "Freerunning"
+  Keyword.Impending {} -> "Impending"
   Keyword.Spectacle {} -> "Spectacle"
   Keyword.Ravenous {} -> "Ravenous"
   Keyword.Squad {} -> "Squad"
