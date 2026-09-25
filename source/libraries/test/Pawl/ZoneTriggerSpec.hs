@@ -2277,6 +2277,9 @@ representativeEvents cond =
         -- it either: the designation is read off the bearer's own object and
         -- never named.
         TriggerCondition.SelfAttacksWhileSaddled -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        -- The same declaration event, and the state it is narrowed by is read off
+        -- the board rather than bound.
+        TriggerCondition.SelfAttacksWhile _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
         -- The GROUPED blocking event, which is CR 509.3a's arity: one per blocking
         -- creature, whatever it was declared against.
         TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
@@ -2754,6 +2757,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerAttacksPlayer (PlayerAttacksPlayer.MkPlayerAttacksPlayer PlayerRelation.AnyPlayer PlayerRelation.Opponent),
     TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfAttacksWhileSaddled,
+    TriggerCondition.SelfAttacksWhile (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
     TriggerCondition.SelfBlocksCreature (Filter.Type.And []),

@@ -974,9 +974,9 @@ markDuplicate oid snapshot =
 -- untapped default, Foundry Groundbreaker states "tapped". It rides mintCard
 -- rather than a tap after the mint, that function's own note saying why.
 --
--- CR 508.4's combat state is still this road's default and nothing here puts the
--- arrival into combat; Pawl.Types.ConjureDestination's Battlefield arm names
--- the printings that state otherwise (#3973).
+-- CR 508.4's combat state is the caller's to apply after this returns, as
+-- createTokens' callers do: Pawl.Engine.Resolve's Conjure arm hands the ids to
+-- Combat.putOntoBattlefieldAttacking.
 --
 -- CR 110.2a's `Just controller` is correct by construction and unobservable: a
 -- conjured card's OWNER is the player who conjured it (mintCard's `pid`, the
@@ -8090,6 +8090,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerAttacksPlayer {} -> False
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfAttacksWhileSaddled -> False
+  TriggerCondition.SelfAttacksWhile _ -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
@@ -8393,6 +8394,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerAttacksPlayer subjects -> PlayerAttacksPlayer.attacker subjects == PlayerRelation.You
   TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfAttacksWhileSaddled -> False
+  TriggerCondition.SelfAttacksWhile _ -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False

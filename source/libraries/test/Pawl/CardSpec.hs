@@ -988,6 +988,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 702.105a compares life totals rather than counting objects, so no Count.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfAttacksWhileSaddled -> []
+  TriggerCondition.SelfAttacksWhile condition -> conditionCounts condition
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names the attacker without counting anything, and its Filter holds
   -- no Count for PermanentEnters' reason.
@@ -1188,7 +1189,7 @@ ownCounts effect = case effect of
   -- The floor beside it is a printed literal and holds no Count.
   Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
   Effect.Create (Create.MkCreate quantity card _ _ _) -> quantityCounts quantity <> overFaces cardCounts card
-  Effect.Conjure (Conjure.MkConjure quantity cards _ _) -> quantityCounts quantity <> foldMap quantityCounts (conjureCardsAmount cards) <> foldMap (overFaces cardCounts) (ConjureCards.written cards)
+  Effect.Conjure (Conjure.MkConjure quantity cards _ _ _) -> quantityCounts quantity <> foldMap quantityCounts (conjureCardsAmount cards) <> foldMap (overFaces cardCounts) (ConjureCards.written cards)
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's. The riders are skipped for the reason Create's
   -- arm above skips its own: a rider count is a Quantity, and effectFilters below
@@ -2027,7 +2028,7 @@ effectReplacements :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbilit
 effectReplacements effect = case effect of
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementPrintedEffects replacement) <> concatMap (overFaces cardReplacementEffects) (replacementMintedCards replacement)
   Effect.Create (Create.MkCreate _ token _ _ _) -> overFaces cardReplacementEffects token
-  Effect.Conjure (Conjure.MkConjure _ cards _ _) -> foldMap (overFaces cardReplacementEffects) (ConjureCards.written cards)
+  Effect.Conjure (Conjure.MkConjure _ cards _ _ _) -> foldMap (overFaces cardReplacementEffects) (ConjureCards.written cards)
   Effect.CreateCopy {} -> []
   Effect.BecomeCopy {} -> []
   Effect.CopyStackObject {} -> []
@@ -2481,7 +2482,7 @@ data MintedKind
 effectMintedFaces :: Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [(MintedKind, Face.Face Card.Type.Card)]
 effectMintedFaces effect = case effect of
   Effect.Create (Create.MkCreate _ token _ _ _) -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
-  Effect.Conjure (Conjure.MkConjure _ cards _ _) -> fmap ((,) MintedCard) (concatMap (NonEmpty.toList . Card.Type.faces) (ConjureCards.written cards))
+  Effect.Conjure (Conjure.MkConjure _ cards _ _ _) -> fmap ((,) MintedCard) (concatMap (NonEmpty.toList . Card.Type.faces) (ConjureCards.written cards))
   -- Mints no face of its own: the token's text is the copied permanent's.
   Effect.CreateCopy {} -> []
   -- Mints nothing at all: it rewrites an existing permanent's copiable values.
@@ -3958,6 +3959,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfAttacksWhileSaddled -> []
+  TriggerCondition.SelfAttacksWhile condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names a quality the attacker blocked must have, so this one DOES
   -- carry a Filter -- Netcaster Spider's "with flying".
@@ -4134,6 +4136,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerAttacksPlayer _ -> []
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfAttacksWhileSaddled -> []
+  TriggerCondition.SelfAttacksWhile _ -> []
   TriggerCondition.SelfBlocks -> []
   TriggerCondition.SelfBlocksCreature _ -> []
   TriggerCondition.SelfBlocksAtLeast _ -> []
@@ -5399,7 +5402,7 @@ effectFilters effect = case effect of
   -- A DUPLICATE names an object rather than writing a card out, so the Filters
   -- it can carry are the ref's, framed the way CreateCopy's arm below frames its
   -- own.
-  Effect.Conjure (Conjure.MkConjure quantity cards _ _) -> frame Unframed (quantityFilters quantity <> conjureReferenceFilters cards) <> foldMap (overFaces cardFilters) (ConjureCards.written cards) <> frame SourceHostFramed (conjureCardsRefFilters cards)
+  Effect.Conjure (Conjure.MkConjure quantity cards _ _ _) -> frame Unframed (quantityFilters quantity <> conjureReferenceFilters cards) <> foldMap (overFaces cardFilters) (ConjureCards.written cards) <> frame SourceHostFramed (conjureCardsRefFilters cards)
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's and the riders' Filters are as much card text as Create's. The
   -- exceptions frame themselves, BecomeCopy's arm below.

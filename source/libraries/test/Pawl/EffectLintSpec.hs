@@ -281,7 +281,7 @@ ownQuantities effect = case effect of
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.DecreaseSpeed d -> [SpeedDecrease.quantity d]
   Effect.Create (Create.MkCreate quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
-  Effect.Conjure (Conjure.MkConjure quantity cards _ _) ->
+  Effect.Conjure (Conjure.MkConjure quantity cards _ _ _) ->
     quantity : case cards of
       ConjureCards.Written {} -> []
       ConjureCards.Duplicate {} -> []
@@ -1311,7 +1311,7 @@ effectObjectRefs effect =
         -- The WRITTEN arm is a token's case above: the card is minted text, not a
         -- ref. A DUPLICATE names an object already in the game, and reads it the
         -- way CreateCopy's arm below reads its own.
-        Effect.Conjure (Conjure.MkConjure _ cards _ _) -> case cards of
+        Effect.Conjure (Conjure.MkConjure _ cards _ _ _) -> case cards of
           ConjureCards.Written {} -> []
           ConjureCards.Duplicate ref -> read_ [ref]
           -- A reference pick names no object at all.

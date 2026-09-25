@@ -7,7 +7,9 @@ import qualified Pawl.Codec.ConjureCards as ConjureCards
 import qualified Pawl.Codec.ConjureDestination as ConjureDestination
 import qualified Pawl.Codec.ConjureSelection as ConjureSelection
 import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Conjure as Conjure
 
@@ -34,10 +36,12 @@ codec cardCodec = Fields.object $ do
   cards <- Fields.required "cards" (ConjureCards.codec cardCodec) Conjure.cards
   selection <- Fields.defaulted "selection" Conjure.defaultSelection ConjureSelection.codec Conjure.selection
   destination <- Fields.required "destination" ConjureDestination.codec Conjure.destination
+  slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Conjure.slot
   pure
     Conjure.MkConjure
       { Conjure.quantity = quantity,
         Conjure.cards = cards,
         Conjure.selection = selection,
-        Conjure.destination = destination
+        Conjure.destination = destination,
+        Conjure.slot = slot
       }

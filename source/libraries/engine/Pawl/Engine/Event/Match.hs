@@ -14,6 +14,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import Pawl.Engine.Event.Binding (admittedDepartures)
 import qualified Pawl.Engine.Filter as Filter
@@ -2922,6 +2923,12 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- Rule 702.171a is what sets it, and it can only have been set earlier this
   -- turn: Pawl.Engine.Expiry.dropAtCleanup ends it at CR 514.2 and CR 400.7
   -- drops it on a zone change.
+  -- CR 508.3a narrowed by a state read AT THAT MOMENT, SelfAttacksWhileSaddled's
+  -- posture: the declaration SelfAttacks matches, and the condition asked of the
+  -- board the declaration left, through the view Event.interveningHolds reads.
+  TriggerCondition.SelfAttacksWhile condition ->
+    matchesTriggerGiven bindings board gs bearer you (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) event
+      && Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Game.teams gs) (Just you) (Just bearer) Map.empty) gs bearer condition
   TriggerCondition.SelfAttacksWhileSaddled -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) ->
       oid == bearer && maybe False (Set.member Designation.Saddled . Object.designations) (Game.lookupObject bearer gs)
