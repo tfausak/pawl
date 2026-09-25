@@ -132,6 +132,9 @@ codec =
       -- rather than from anything the card names, and the turn is the log's
       -- extent rather than a window a card could state.
       Arm.payload "CardsDiscardedThisTurn" PlayerRef.codec Quantity.CardsDiscardedThisTurn (\x -> case x of Quantity.CardsDiscardedThisTurn y -> Just y; _ -> Nothing),
+      -- CR 603.1b's four bending verbs, with only a PlayerRef on the wire for
+      -- CardsDiscardedThisTurn's reason above.
+      Arm.payload "BendingsThisTurn" PlayerRef.codec Quantity.BendingsThisTurn (\x -> case x of Quantity.BendingsThisTurn y -> Just y; _ -> Nothing),
       -- CR 119.3's life gained, with only a PlayerRef on the wire for
       -- CardsDiscardedThisTurn's reason above. What is SUMMED is the amounts and
       -- not the events, which is the arm's own reading rather than anything on
@@ -244,6 +247,7 @@ tagOf x = case x of
   Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
   Quantity.AttackersDeclaredThisTurn {} -> "AttackersDeclaredThisTurn"
   Quantity.CardsDiscardedThisTurn {} -> "CardsDiscardedThisTurn"
+  Quantity.BendingsThisTurn {} -> "BendingsThisTurn"
   Quantity.LifeGainedThisTurn {} -> "LifeGainedThisTurn"
   Quantity.PlayersDealtDamageThisTurn {} -> "PlayersDealtDamageThisTurn"
   Quantity.DamageDealtToPlayersThisTurn {} -> "DamageDealtToPlayersThisTurn"

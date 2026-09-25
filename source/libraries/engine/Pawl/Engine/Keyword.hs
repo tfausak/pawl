@@ -5808,9 +5808,13 @@ warriorToken = creatureToken (Text.pack "Warrior Token") (Set.singleton Subtype.
 
 -- CR 702.189a, battle cry's condition again (CR 508.3a).
 --
--- ONE AddMana of count N rather than N of them, which is what
+-- ONE addition of count N rather than N of them, which is what
 -- Pawl.Types.ManaAddition's haddock asks for: rule 702.189a fixes the type, so
 -- there is no CR 105.4 choice for separate instructions to answer differently.
+--
+-- Through Effect.Firebend rather than Effect.AddMana, training's reason: CR
+-- 702.189b's "whenever a player firebends" is this ability resolving, so it has
+-- to be told apart from any other red being added.
 --
 -- ManaRetention.UntilEndOfCombat is rule 702.189a's second sentence in as many
 -- words, and Pawl.Engine.Mana.endRetentionAtEndOf is what ends it.
@@ -5822,7 +5826,7 @@ warriorToken = creatureToken (Text.pack "Warrior Token") (Set.singleton Subtype.
 firebending :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 firebending n =
   let added =
-        Effect.AddMana
+        Effect.Firebend
           ManaAddition.MkManaAddition
             { -- CR 109.5: rule 702.189a's "you" is the ability's controller.
               ManaAddition.player = PlayerRef.Relative PlayerRelation.You,

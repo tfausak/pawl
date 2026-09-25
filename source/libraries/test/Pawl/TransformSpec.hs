@@ -256,8 +256,43 @@ sweepFrom resolving gs = S.runPure S.identityAnswer gs (Resolve.applyEffect reso
 sweep :: GameState.GameState -> GameState.GameState
 sweep = sweepFrom S.noSource
 
+-- CR 608.2d and CR 701.27c: "you may transform Aang, Master of Elements. If you
+-- do, ..." is not offered to a Clone of him. A Clone copying the back face is
+-- not a double-faced card, so the transform would do nothing, and a player can't
+-- choose an impossible option. The pair is on one board. At alice's upkeep her
+-- real Aang, back face up, and bob's Clone of it both trigger, and both players
+-- answer yes. Hers turns over and pays out: she gains 4 and deals 4 to bob.
+-- Bob's can't turn over, so he gains nothing and deals nothing to alice.
+masterOfElementsCloneSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+masterOfElementsCloneSpec s registry = Spec.describe s "Aang, Master of Elements" $ do
+  Spec.it s "CR 608.2d a Clone of Aang, Master of Elements is not offered the transform" $ do
+    aang <- S.printingOf s registry "Avatar Aang"
+    clone <- S.printingOf s registry "Clone"
+    mountain <- S.printingOf s registry "Mountain"
+    let (aangId, g0) = S.addPermanent aang S.alice emptyBoard
+        (now, g1) = Game.freshTimestamp g0
+        backUp = Game.turnFaceOver now aangId g1
+        stocked = List.foldl' (\g pid -> List.foldl' (\h _ -> snd (S.addLibraryCard mountain pid h)) g [1 :: Int .. 5]) backUp [S.alice, S.bob]
+        (_, staged) = S.spellOnStack clone S.bob stocked
+        yes :: Prompt.Prompt r -> r
+        yes p = case p of
+          Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== aangId) legal
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          _ -> S.identityAnswer p
+        cloned = S.runPure yes staged Stack.resolveTop
+        upkeep = Phase.Beginning BeginningStep.Upkeep
+        began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (cloned {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+        after = S.runPure yes began (Engine.placePendingTriggers *> Stack.resolveTop *> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2d bob's Clone could not transform, so bob gained no life and only lost alice's 4" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "and alice took no damage from bob's Clone, only gaining her own 4" (S.lifeOf S.alice after) (Just 24)
+    -- The preconditions, after the behaviour: the Clone really copied the back
+    -- face, and alice's real Aang really turned over.
+    Spec.assertEqWith s "the Clone copied Aang, Master of Elements" (fmap (`Projection.namesOf` after) (Game.zoneMembers Zone.Battlefield S.bob after)) [Set.singleton (CardName.MkCardName (Text.pack "Aang, Master of Elements"))]
+    Spec.assertEqWith s "alice's Aang turned back to Avatar Aang" (Projection.namesOf aangId after) (Set.singleton (CardName.MkCardName (Text.pack "Avatar Aang")))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Transform" $ do
+  masterOfElementsCloneSpec s registry
   enterTransformedSpec s registry
   transformedPermanentSpec s registry
   transformTriggerSpec s registry

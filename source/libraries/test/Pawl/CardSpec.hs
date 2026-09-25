@@ -648,6 +648,7 @@ playerRefPositions =
       playerQuantity stem = PlayerQuantity.MkPlayerQuantity (plantedPlayer stem) one
       affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
    in [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
+        ("firebend", Effect.Firebend (ManaAddition.MkManaAddition (plantedPlayer "fb") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "fb"]),
         ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
         ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
         ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
@@ -1048,6 +1049,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerForages _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
+  TriggerCondition.PlayerAirbends _ -> []
+  TriggerCondition.PlayerFirebends _ -> []
   -- CR 701.43d carries nothing at all, so no Count either.
   TriggerCondition.SelfExerted -> []
   -- CR 701.3a's carries a Filter, and a Filter holds no Count for
@@ -1122,6 +1125,7 @@ ownCounts effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
+  Effect.Firebend _ -> []
   Effect.ActivateManaAbilities _ -> []
   Effect.MoveMana _ -> []
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
@@ -1568,6 +1572,7 @@ effectNestedEffects effect = case effect of
   Effect.DealDamage {} -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana {} -> []
+  Effect.Firebend {} -> []
   Effect.ActivateManaAbilities {} -> []
   Effect.MoveMana {} -> []
   Effect.Search {} -> []
@@ -2051,6 +2056,7 @@ effectReplacements effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
+  Effect.Firebend _ -> []
   Effect.ActivateManaAbilities _ -> []
   Effect.MoveMana _ -> []
   Effect.Search {} -> []
@@ -2510,6 +2516,7 @@ effectMintedFaces effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
+  Effect.Firebend _ -> []
   Effect.ActivateManaAbilities _ -> []
   Effect.MoveMana _ -> []
   Effect.Search {} -> []
@@ -3689,6 +3696,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.OpponentsAttacked _ -> []
   Quantity.Type.AttackersDeclaredThisTurn _ -> []
   Quantity.Type.CardsDiscardedThisTurn _ -> []
+  Quantity.Type.BendingsThisTurn _ -> []
   Quantity.Type.LifeGainedThisTurn _ -> []
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> []
@@ -4036,6 +4044,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerForages _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
+  TriggerCondition.PlayerAirbends _ -> []
+  TriggerCondition.PlayerFirebends _ -> []
   -- CR 701.44b DOES carry one, a predicate over the explorer -- Wildgrowth
   -- Walker's "a creature you control" -- which the card lint must sweep.
   TriggerCondition.PermanentExplores f -> unframed [f]
@@ -4249,6 +4259,8 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerForages _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
+  TriggerCondition.PlayerAirbends _ -> []
+  TriggerCondition.PlayerFirebends _ -> []
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
@@ -5270,6 +5282,14 @@ restrictionFilters restriction =
 manaRiderFilters :: ManaRider.ManaRider -> [Filter.Type.Filter Keyword.Keyword]
 manaRiderFilters rider = [ManaRider.condition rider]
 
+-- AddMana's and Firebend's shared payload: CR 106.6's restriction and rider.
+manaAdditionFilters :: ManaAddition.ManaAddition -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+manaAdditionFilters addition =
+  unframed
+    ( concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition))
+        <> concatMap manaRiderFilters (Maybe.maybeToList (ManaAddition.rider addition))
+    )
+
 -- Every Filter one effect carries, paired with its Framing. Two arms answer
 -- AttachDestination -- Effect.AttachTarget's destination and
 -- Effect.AttachTargetToEach's, which with EntryRewrite.EntersAttachedTo's host
@@ -5307,11 +5327,8 @@ effectFilters effect = case effect of
   -- (Pawl.Engine.Mana.admitsUnder for the restriction,
   -- Pawl.Engine.ManaRider.uncounterable for the rider), which is neither an
   -- attach destination nor a target slot.
-  Effect.AddMana addition ->
-    unframed
-      ( concatMap restrictionFilters (Maybe.maybeToList (ManaAddition.restriction addition))
-          <> concatMap manaRiderFilters (Maybe.maybeToList (ManaAddition.rider addition))
-      )
+  Effect.AddMana addition -> manaAdditionFilters addition
+  Effect.Firebend addition -> manaAdditionFilters addition
   -- THE one search-framed position. CR 701.3a from the candidate's side:
   -- Auratouched Mage's "an Aura card that could enchant it", where the host is
   -- fixed for the whole evaluation and the Aura varies per candidate.
