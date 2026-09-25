@@ -2411,7 +2411,7 @@ libraryDrawn gs = 10 - length (Game.zoneMembers Zone.Library S.alice gs)
 
 -- alice's turn with Avatar Aang, four Forests, three Plains, a Geyser Leaper and
 -- three Goblin Pikers, and ten Mountains in her library; bob controls a Sol
--- Ring. When `earthbends`, she first casts Earthbending Lesson on a Forest; then
+-- Ring. When `earthbends`, she first casts Earthbending Lesson on a land; then
 -- Airbending Lesson on the Sol Ring, the Leaper's waterbend {4} paid by tapping
 -- it and the Pikers, and combat with Aang attacking. Returns Aang and the state
 -- at the declare blockers step, each trigger resolved.
@@ -2433,7 +2433,7 @@ aangTurn s registry earthbends = do
             answer = aimedAt target
          in settle (S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop)
       g0 = S.landsFor plains S.alice 3 (S.landsInPlay forest 4)
-      forestId = lastLand g0
+      landId = lastLand g0
       (aangId, g1) = S.addPermanent aang S.alice g0
       (leaperId, g2) = S.addPermanent leaper S.alice g1
       (pikers, g3) = List.foldl' (\(ids, g) _ -> let (oid, next) = S.addPermanent piker S.alice g in (ids <> [oid], next)) ([], g2) [1 :: Int .. 3]
@@ -2442,7 +2442,7 @@ aangTurn s registry earthbends = do
       (earthId, g6) = S.addHandCard earthLesson S.alice g5
       (airId, g7) = S.addHandCard airLesson S.alice g6
       main = g7 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
-      earthbent = if earthbends then castAt forestId earthId main else main
+      earthbent = if earthbends then castAt landId earthId main else main
       airbent = castAt ringId airId earthbent
   waterbent <- activateLeaper s (ManaCost.MkManaCost []) (leaperId : pikers) leaperId airbent
   let combat =
