@@ -12,8 +12,8 @@
 -- controlNames (CR 801.10 for a layer-2 grant), Pawl.Engine.CombatRestriction's
 -- attackLimit and blockLimit (CR 801.10 for a declaration's bound) and Sba's
 -- worldVictims (CR 801.12), Pawl.Engine.Event.Trigger's eventWithinRange (CR
--- 801.7), Pawl.Engine.Replacement's preventsInRange and redirectDestination
--- (CR 801.13); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
+-- 801.7), Pawl.Engine.Replacement's reaches, preventsInRange and
+-- redirectDestination (CR 801.13); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
 -- departedThisTurn.
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
@@ -476,6 +476,35 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (S.onBattlefield aimed (after (S.withRange 1))) "and carol's Piker is untouched"
     Spec.assertEqWith s "at an unlimited range alice takes nothing" (S.lifeOf S.alice (after id)) (Just 20)
     Spec.assertBool s (not (S.onBattlefield aimed (after id))) "and the 2 kills carol's Piker"
+
+  -- CR 801.13a for a zone change: alice's Leyline of the Void ("If a card would
+  -- be put into an opponent's graveyard from anywhere, exile it instead.") while
+  -- a Goblin Piker dies under carol, two seats away, and one under bob, one seat
+  -- away.
+  Spec.it s "CR 801.13a a zone-change replacement does not reach a card outside its controller's range" $ do
+    leyline <- S.printingOf s registry "Leyline of the Void"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent leyline S.alice S.fourPlayerGame
+        diesUnder pid gs =
+          let (victim, placed) = S.addPermanent piker pid gs
+              after = resolveAll (snd (Engine.runGamePure S.identityAnswer (S.markDamage victim 1 placed) Engine.settleForPriority))
+           in fmap ZoneChange.to (filter ((== victim) . ZoneChange.departed) (S.zoneChangesOf after))
+    Spec.assertEqWith s "CR 801.13a at range 1 carol's Piker goes to her graveyard" (diesUnder S.carol (S.withRange 1 g0)) [Zone.Graveyard]
+    Spec.assertEqWith s "at an unlimited range it is exiled" (diesUnder S.carol g0) [Zone.Exile]
+    Spec.assertEqWith s "and at range 1 bob's, in range, is exiled" (diesUnder S.bob (S.withRange 1 g0)) [Zone.Exile]
+
+  -- CR 801.13a for a damage amount: alice's Furnace of Rath ("If a source would
+  -- deal damage to a permanent or player, it deals double that damage to that
+  -- permanent or player instead.") while bob's Goblin Piker attacks carol, two
+  -- seats from alice, and then alice.
+  Spec.it s "CR 801.13a a damage-doubling replacement does not reach a recipient outside its controller's range" $ do
+    furnace <- S.printingOf s registry "Furnace of Rath"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent furnace S.alice S.fourPlayerGame
+        (bobs, board) = S.addPermanent piker S.bob g0
+    Spec.assertEqWith s "CR 801.13a at range 1 carol takes 2" (S.lifeOf S.carol (strike S.bob [bobs] S.carol (S.withRange 1 board))) (Just 18)
+    Spec.assertEqWith s "at an unlimited range she takes 4" (S.lifeOf S.carol (strike S.bob [bobs] S.carol board)) (Just 16)
+    Spec.assertEqWith s "and at range 1 alice, in range, takes 4" (S.lifeOf S.alice (strike S.bob [bobs] S.alice (S.withRange 1 board))) (Just 16)
   where
     resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
     -- Pawl.LifeTriggerSpec's entry staging: the permanent is placed, its Moved

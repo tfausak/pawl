@@ -421,24 +421,24 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- Read off the event rather than derived, which is what makes this arm possible
   -- at all: this function takes no game state, and both the planeswalker and the
   -- battle forms of CR 508.5 need the board.
-  (TriggerCondition.SelfAttacks _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _ _)) ->
+  (TriggerCondition.SelfAttacks _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _ _ _)) ->
     Binding.setTriggerPlayer defending Map.empty
   -- CR 702.83a's "that creature": the creature that attacked alone, which is the
   -- id the same event names -- and NOT the bearer, since rule 702.83a's condition
   -- watches every creature its controller has. The defending player the event
   -- also carries is not bound, because rule 702.83a names no player.
-  (TriggerCondition.CreatureAttacksAlone _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _)) ->
+  (TriggerCondition.CreatureAttacksAlone _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _ _)) ->
     Binding.setAttackingCreature attacker Map.empty
   -- The same slot off the same event, for Marchesa's Decree's "that creature's
   -- controller" -- again not the bearer, which is a bystanding enchantment. CR
   -- 508.5's defending player goes unbound here where the SelfAttacks arm above
   -- binds it: matchesTrigger has already required that player to be CR 109.5's
   -- "you", so a slot would be a second name for a seat the ability has.
-  (TriggerCondition.CreatureAttacksYou, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _)) ->
+  (TriggerCondition.CreatureAttacksYou, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _ _)) ->
     Binding.setAttackingCreature attacker Map.empty
   -- The same slot once more: Fervent Charge's "it" and Conjurer's Mantle's "that
   -- creature" are the attacker, never the bearer.
-  (TriggerCondition.CreatureAttacks _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _)) ->
+  (TriggerCondition.CreatureAttacks _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _ _)) ->
     Binding.setAttackingCreature attacker Map.empty
   -- CR 508.3b's subject, under the same reserved slot every other "that player"
   -- takes: whom the Curse enchants, which matchesTrigger has already required the
@@ -1211,8 +1211,9 @@ eventBindingSlots cond = case cond of
   -- Empty where the arm above binds three, by decision, PermanentsDie's reason
   -- one event family over: the trigger event is a whole CR 510.2 step, and Pia
   -- Nalaar, Chief Mechanic's payload names none of it. Not implemented: a slot for the damagers' CONTROLLER, which Norn's
-  -- Decree's "that opponent" reads and which IS one seat per step, CR 508.1
-  -- letting only the active player declare attackers (#2930).
+  -- Decree's "that opponent" reads and which is one seat per step but under the
+  -- shared team turns option, where each active player may have attacked (CR
+  -- 805.10a) (#2930).
   TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> Set.empty
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this

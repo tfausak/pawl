@@ -123,7 +123,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 declarationsOf :: ObjectId -> GameState -> Int
 declarationsOf bearer gs =
   let declaredIt event = case event of
-        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) -> oid == bearer
+        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _) -> oid == bearer
         _ -> False
    in length (Seq.filter (declaredIt . LoggedEvent.event) (GameState.events gs))
 
@@ -1886,7 +1886,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- sentence true -- a creature put onto the battlefield attacking is in the
   -- record and has no event here.
   TriggerCondition.SelfAttacks frequency -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) ->
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _) ->
       oid == bearer && case frequency of
         TriggerFrequency.EveryTime -> True
         -- "For the first time each turn". The declaration being matched is
@@ -1989,7 +1989,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- a REGRESSION FENCE rather than a live path: the bearer was declared an
   -- attacker a moment ago and nothing has had priority since.
   TriggerCondition.SelfAttacksWithAnother f -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _)
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _)
       | oid == bearer ->
           let viewOf = Projection.viewWithLastKnown bearer gs
               context = Filter.contextComparingPower (Game.teams gs) (Just you) bearer (Filter.power =<< viewOf bearer)
@@ -2090,7 +2090,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- BEARER as the source, the attacked permanent being a different object, so CR
   -- 608.2h's last known information does not stand in for it.
   TriggerCondition.SelfAttacksPermanent f -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ target _)
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ target _ _)
       | oid == bearer ->
           let admits attacked = case Projection.viewWithLastKnown bearer gs attacked of
                 Nothing -> False
@@ -2185,7 +2185,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- and CR 508.2's triggers go on the stack before any player gets priority.
   -- viewWithLastKnown for PermanentEnters' reason.
   TriggerCondition.CreatureAttacksAlone f -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ count)
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ count _)
       | count == 1 ->
           case Projection.viewWithLastKnown attacker gs attacker of
             Nothing -> False
@@ -2280,7 +2280,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- which is PlayerAttacks (CR 508.3d) and AttachedPlayerIsAttacked (CR 508.3b)
   -- below, each against its own event.
   TriggerCondition.CreatureAttacksYou -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _ _) -> defending == you
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _ _ _) -> defending == you
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
@@ -2363,7 +2363,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- HasAttached IsSource (Conjurer's Mantle). IsHostOfSource would answer False:
   -- this context leaves Filter.Context.sourceAttachedTo unfilled.
   TriggerCondition.CreatureAttacks f -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _) ->
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _ _ _) ->
       case Projection.viewWithLastKnown attacker gs attacker of
         Nothing -> False
         Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
@@ -2448,9 +2448,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   --
   -- Rule 508.3d's "[a player]" as the card printed it, against CR 109.5's `you`.
   -- Read off the event, which Combat.declareAttackers stamps with CR 508.1's
-  -- declaring player, rather than off GameState.activePlayer: the two agree
-  -- today, CR 508.1 letting only the active player declare, but the rule asks
-  -- who declared and the event is the record of that.
+  -- declaring player, rather than off GameState.activePlayer: under the shared
+  -- team turns option each player on the active team is an attacking player
+  -- (CR 805.10a), and the event is the record of who declared.
   --
   -- No bearer test, where SelfAttacks pins one: rule 508.3d's subject is a
   -- player, so the bearer only frames whose declaration this is --
@@ -2570,10 +2570,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- had priority since.
   --
   -- Rule 508.3c's "that player CONTROLS" is Combat.joinedUnder, CR 506.4's
-  -- record of who controlled each combatant as it joined. Not independently
-  -- observable: CR 508.1a lets only the active player declare, so every id in
-  -- declaredAttackers joined under the declarer, and dropping the comparison
-  -- leaves the suite green. It is here because the rule says it.
+  -- record of who controlled each combatant as it joined. It tells a teammate's
+  -- attackers apart under the shared team turns option (CR 805.10a), which
+  -- Pawl.TeamSpec's Military Intelligence case proves.
   --
   -- viewWithLastKnown and the Filter context framed by the bearer, exactly as
   -- SelfBlocksOneOrMore's arm below does it. Nothing is bound, so the context's
@@ -2853,9 +2852,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   --
   -- Both sides come off the EVENT. Combat.declareAttackers stamps CR 508.1's
   -- declaring player onto it beside the target, which is what lets this arm ask
-  -- rule 508.3e's question at all; reading GameState.activePlayer for the
-  -- attacker would agree today, rule 508.1 letting only the active player
-  -- declare, but the rule asks who declared.
+  -- rule 508.3e's question at all; GameState.activePlayer is not it, since
+  -- under the shared team turns option each player on the active team is an
+  -- attacking player (CR 805.10a).
   --
   -- Both sides are QUALIFIED, each by its own relation: Lulu, Stern Guardian's
   -- "whenever an opponent attacks you" is Opponent over the declarer and You
@@ -2969,7 +2968,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- Game.stillPlaying rather than every seat the game began with: a player who has
   -- left (CR 800.4a) has no life total left to be beaten.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _)
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _)
       | oid == bearer ->
           case Map.lookup bearer (Combat.attackers (GameState.combat gs)) of
             Just (AttackTarget.OfPlayer attacked) ->
@@ -3084,7 +3083,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- turn: Pawl.Engine.Expiry.dropAtCleanup ends it at CR 514.2 and CR 400.7
   -- drops it on a zone change.
   TriggerCondition.SelfAttacksWhileSaddled -> case event of
-    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) ->
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _) ->
       oid == bearer && maybe False (Set.member Designation.Saddled . Object.designations) (Game.lookupObject bearer gs)
     GameEvent.BecameBlocking {} -> False
     GameEvent.BlocksDeclared {} -> False

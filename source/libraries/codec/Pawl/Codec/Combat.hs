@@ -36,6 +36,7 @@ codec = Fields.object $ do
   attackedControlledBy <- Fields.defaulted "attackedControlledBy" Map.empty (Common.naturalMap ObjectId.codec PlayerId.codec) Combat.attackedControlledBy
   attacked <- Fields.defaulted "attacked" Set.empty (Common.set AttackTarget.codec) Combat.attacked
   declaredAttacked <- Fields.defaulted "declaredAttacked" Set.empty (Common.set AttackTarget.codec) Combat.declaredAttacked
+  declaredAttackedBy <- Fields.defaulted "declaredAttackedBy" Map.empty (Common.naturalMap PlayerId.codec (Common.set AttackTarget.codec)) Combat.declaredAttackedBy
   declaredAttackedThisStep <- Fields.defaulted "declaredAttackedThisStep" Set.empty (Common.set AttackTarget.codec) Combat.declaredAttackedThisStep
   declaredAttackers <- Fields.defaulted "declaredAttackers" Set.empty (Common.set ObjectId.codec) Combat.declaredAttackers
   declaredBlockers <- Fields.defaulted "declaredBlockers" Set.empty (Common.set ObjectId.codec) Combat.declaredBlockers
@@ -52,6 +53,7 @@ codec = Fields.object $ do
         Combat.attackedControlledBy = attackedControlledBy,
         Combat.attacked = attacked,
         Combat.declaredAttacked = declaredAttacked,
+        Combat.declaredAttackedBy = declaredAttackedBy,
         Combat.declaredAttackedThisStep = declaredAttackedThisStep,
         Combat.declaredAttackers = declaredAttackers,
         Combat.declaredBlockers = declaredBlockers,

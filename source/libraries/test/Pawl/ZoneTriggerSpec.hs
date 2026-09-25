@@ -2225,26 +2225,26 @@ representativeEvents cond =
         -- controller: eventBindings binds this field under `thatPlayer`, so an
         -- arm that bound the attacking side instead would still agree with
         -- eventBindingSlots here if the two coincided.
-        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1 S.alice))
         -- The same declaration event. This one binds NOTHING off it, which is
         -- what eventBindingSlots claims and what the pin here checks -- the
         -- defending player the event carries is not rule 702.149a's to read.
-        TriggerCondition.SelfAttacksWithAnother _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        TriggerCondition.SelfAttacksWithAnother _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1 S.alice))
         -- The same declaration event, aimed at a PERMANENT rather than at a
         -- player: this condition matches nothing else, and it binds NOTHING off
         -- it, which is what eventBindingSlots claims.
-        TriggerCondition.SelfAttacksPermanent _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlaneswalker departed) 1))
+        TriggerCondition.SelfAttacksPermanent _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlaneswalker departed) 1 S.alice))
         -- The same declaration event, with the count that makes it CR 506.5's
         -- alone -- and the ATTACKER is what this one binds, where SelfAttacks
         -- above binds the defending player off the very same event.
-        TriggerCondition.CreatureAttacksAlone _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        TriggerCondition.CreatureAttacksAlone _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1 S.alice))
         -- The same declaration event again, and the ATTACKER is what this one
         -- binds too -- CR 508.5's defending player is the thing it MATCHES on, so
         -- an arm that bound that player instead would disagree with
         -- eventBindingSlots here.
-        TriggerCondition.CreatureAttacksYou -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        TriggerCondition.CreatureAttacksYou -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1 S.alice))
         -- The same declaration event, binding the attacker as the arm above does.
-        TriggerCondition.CreatureAttacks _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 2))
+        TriggerCondition.CreatureAttacks _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 2 S.alice))
         -- The GROUPED declaration event instead, which is CR 508.3b's arity: one
         -- per target the declaration named. carol again, and it is the PLAYER this
         -- one binds -- the arm above binds the attacker off its own event, and the
@@ -2272,14 +2272,14 @@ representativeEvents cond =
         -- The same declaration event once more. Rule 702.105a binds NOTHING off
         -- it, SelfAttacksWithAnother's case: the player it compares is read from
         -- Combat.attackers and then never named again.
-        TriggerCondition.SelfAttacksPlayerWithMostLife -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        TriggerCondition.SelfAttacksPlayerWithMostLife -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1 S.alice))
         -- The same declaration event again, and rule 702.171b binds nothing off
         -- it either: the designation is read off the bearer's own object and
         -- never named.
-        TriggerCondition.SelfAttacksWhileSaddled -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        TriggerCondition.SelfAttacksWhileSaddled -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1 S.alice))
         -- The same declaration event, and the state it is narrowed by is read off
         -- the board rather than bound.
-        TriggerCondition.SelfAttacksWhile _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1))
+        TriggerCondition.SelfAttacksWhile _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol (AttackTarget.OfPlayer S.carol) 1 S.alice))
         -- The GROUPED blocking event, which is CR 509.3a's arity: one per blocking
         -- creature, whatever it was declared against.
         TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))

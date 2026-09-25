@@ -287,7 +287,7 @@ scanSpec s registry =
     -- so "the first time" is "this is the only one so far".
     Spec.it s "SelfAttacks FirstTimeEachTurn matches only the first declaration" $ do
       let bearer = ObjectId.MkObjectId 1
-          declared = GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared bearer S.bob (AttackTarget.OfPlayer S.bob) 1)
+          declared = GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared bearer S.bob (AttackTarget.OfPlayer S.bob) 1 S.alice)
           gsWith events = S.withEvents events (Setup.emptyGame S.bothPlayers)
           matches frequency events =
             Event.matchesTrigger (gsWith events) bearer S.alice (TriggerCondition.SelfAttacks frequency) declared
@@ -298,7 +298,7 @@ scanSpec s registry =
       Spec.assertBool s (matches TriggerFrequency.EveryTime [declared, declared]) "EveryTime matches the second too"
       -- The count is per bearer, not per turn: two creatures declared
       -- together are each attacking for the first time.
-      Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 2) S.bob (AttackTarget.OfPlayer S.bob) 1), declared]) "another creature's declaration does not spend this one's first time"
+      Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 2) S.bob (AttackTarget.OfPlayer S.bob) 1 S.alice), declared]) "another creature's declaration does not spend this one's first time"
       -- CR 508.3a's last sentence, unchanged by the frequency: a
       -- non-declaration event never matches.
       Spec.assertBool s (not (Event.matchesTrigger (gsWith [declared]) bearer S.alice (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn) (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.DeclareAttackers) S.alice)))) "a step beginning is not an attack"
