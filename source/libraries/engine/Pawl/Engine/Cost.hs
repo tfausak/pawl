@@ -1100,9 +1100,8 @@ totalManas adjustments =
 --
 -- The keywords are read off the object's own face rather than through the
 -- projection, selfReductions' posture and for its reason (#1859): this is the
--- half Cast.asProposed stamped. So this reads the PRINTED face, and a spell that
--- is a copy of a convoke spell finds no convoke here -- the pre-existing bound
--- that carrier has, see #1859, and not something this function narrows.
+-- half Cast.asProposed stamped, under any copy stamp's keywords
+-- (Game.castingKeywordsOf, CR 707.2).
 --
 -- The OFFERS come in two provenances and this function holds only the keywords'.
 -- CR 701.67a's waterbend is the other, and it rides the COST (CostComponent.Waterbend)
@@ -1111,7 +1110,7 @@ totalManas adjustments =
 -- generic amount where a keyword's offer is capped only by the symbol.
 manaSubstitutions :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [(ManaCost.ManaCost, [CostComponent.CostComponent Keyword.Type.Keyword])]
 manaSubstitutions components slots pid oid gs =
-  let keywords = maybe Set.empty Face.keywordSet (Game.faceOf oid gs)
+  let keywords = Game.castingKeywordsOf oid gs
    in substitutionsOffering (\symbol -> fmap (\substitute -> (substitute, Nothing)) (Keyword.manaSubstitutesFor symbol keywords) <> waterbendOffers components symbol) slots pid oid gs
 
 -- CR 701.67a's half of the offer alone, which is what an ACTIVATION gets: CR
