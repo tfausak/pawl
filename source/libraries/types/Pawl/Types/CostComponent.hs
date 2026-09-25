@@ -161,8 +161,10 @@ data CostComponent keyword
     -- picks them, which is why this is not ExileCardsFromGraveyard with a number.
     -- CR 701.59b is what makes it unpayable below the threshold.
     --
-    -- Not implemented: CR 701.59c's linked "if evidence was collected", which
-    -- needs the collection recorded for a later clause to read (#3895).
+    -- BINDS the exiled cards under Pawl.Engine.Binding.collectedEvidence, which
+    -- is what CR 701.59c's "if evidence was collected" is read off through
+    -- Quantity.WasBound; CR 118.8b's optional "you may collect evidence" is a
+    -- Pawl.Types.CostChoice, Behold's shape below.
     CollectEvidence Natural.Natural
   | -- | CR 406.2 out of a hidden zone / Cadaverous Bloom: the paying player
     -- exiles one card matching the Filter from their own hand, which the payer

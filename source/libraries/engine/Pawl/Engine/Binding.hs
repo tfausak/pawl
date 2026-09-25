@@ -563,6 +563,30 @@ revealedCard = SlotName.MkSlotName (Text.pack "thatRevealedCard")
 beheldObject :: SlotName
 beheldObject = SlotName.MkSlotName (Text.pack "thatBeheldObject")
 
+-- CR 701.59a: the reserved slot under which the cards a
+-- CostComponent.CollectEvidence payment exiled are bound -- what CR 701.59c's
+-- linked "if evidence was collected" asks after, through Quantity.WasBound.
+-- beheldObject's route onto a spell, and carried onto the permanent the spell
+-- becomes by paidCostRecord below.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as the slots above.
+collectedEvidence :: SlotName
+collectedEvidence = SlotName.MkSlotName (Text.pack "thatCollectedEvidence")
+
+-- CR 400.7d: the part of a spell's binding environment the permanent it
+-- becomes keeps -- "information about the spell ... including what costs were
+-- paid to cast that spell". Pawl.Engine.Event.changeZoneAttaching writes it
+-- onto the permanent, and Pawl.Engine.Event.Trigger stamps it onto every
+-- ability that permanent triggers. Vitu-Ghazi Inspector is the reader.
+--
+-- Only collectedEvidence: beheldObject is the other slot a cost binds for a
+-- later "if" to read, and Scryfall `o:beheld -t:instant -t:sorcery`,
+-- 2026-09-25, returns no permanent that reads it. A permanent printing "if a
+-- [quality] was beheld" would want it here.
+paidCostRecord :: Map SlotName Binding -> Map SlotName Binding
+paidCostRecord bindings = Map.restrictKeys bindings (Set.singleton collectedEvidence)
+
 -- CR 702.122b: the reserved slot under which the VEHICLE a creature just crewed
 -- is bound -- the "that Vehicle" in Gearshift Ace's "whenever this creature crews
 -- a Vehicle, that Vehicle gains first strike until end of turn". Stamped by
@@ -1147,9 +1171,19 @@ setUnattachedHost oid = Map.insert unattachedHost (toObject oid)
 -- there is nothing of the card's to clobber.
 --
 -- Set-valued like a target slot, so a payment that sacrificed SEVERAL permanents
--- lands on `onlyOne`'s Nothing rather than on one of them.
+-- lands on `onlyOne`'s Nothing rather than on one of them. Those several are
+-- also bound as a GROUP (toObjects), a payment's slot being a definition rather
+-- than a target (CR 115.10a), so a reader of the whole set sees it: CR 701.59c's
+-- "if evidence was collected" after a collection of two cards is Vitu-Ghazi
+-- Inspector's.
 setPaid :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName Binding
-setPaid paid = Map.union (fmap toRecipients paid)
+setPaid paid =
+  let bind recipients =
+        let oids = Maybe.mapMaybe Recipient.objectOf (Set.toAscList recipients)
+         in if length oids >= 2
+              then (toRecipients recipients) {Binding.objects = Just (Seq.fromList oids)}
+              else toRecipients recipients
+   in Map.union (fmap bind paid)
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding
