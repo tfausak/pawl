@@ -3891,7 +3891,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           _ -> pure ()
       recordRoll controller throwers results
   -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
-  -- the RollDie arm's window above: the same die, the new face filtered back to
+  -- throwDice's window: the same die, the new face filtered back to
   -- CR 706.1a's range, and handed back through GameState.rerolledTo. No window
   -- open, no die to reroll, and nothing happens.
   --
@@ -9455,7 +9455,7 @@ performManaAbilityEffects source controller =
             manaAbilityBindings
         )
 
--- Activate an ability inside the RollDie arm's window and resolve it at once,
+-- Activate an ability inside throwDice's window and resolve it at once,
 -- answering whether it was paid for. The payment is Pawl.Engine.Activate's
 -- activateAbility without the stack object: CR 602.2b's cost, with CR 601.2f's
 -- adjustments, charged against the activator's own mana window. Pawl.CardSpec

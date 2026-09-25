@@ -3710,8 +3710,8 @@ apply batch candidate event =
     -- THIS row off the modified event it just made.
     --
     -- WHICH roll is ignored is not decided here. The rewrite says how many dice
-    -- the instruction throws and how many of the lowest go, and Resolve's
-    -- Effect.RollDie arm throws them all before Pawl.Engine.Dice.ignoreLowest
+    -- the instruction throws and how many of the lowest go, and
+    -- Resolve.Effect.throwDice throws them all before Pawl.Engine.Dice.ignoreLowest
     -- takes any -- the order CR 706.6 requires, since the lowest roll is not
     -- known until every die has come up.
     (ReplacementEffect.DieRollR (DieRollR.MkDieRollR _ rewrite), ProposedEvent.WouldRollDice roll) -> case rewrite of
@@ -4699,9 +4699,9 @@ flipOneCoin mFlipper stated = do
   pure (Maybe.fromMaybe actual (Coin.statedFace stated), any StatedFlip.wins stated)
 
 -- CR 706.1's instruction to roll dice, as a replaceable event. The ONE road every
--- roll in the engine takes: Pawl.Engine.Resolve's Effect.RollDie arm calls it once
--- per instruction, before the first die, and nothing else rolls -- no cost and no
--- turn-based action names a roll.
+-- roll in the engine takes: Pawl.Engine.Resolve.Effect.throwDice calls it once per
+-- roll, before the first die -- for Effect.RollDie and for CR 703.4g's roll to
+-- visit. No cost names a roll.
 --
 -- HERE rather than in Pawl.Engine.Dice, `flipOneCoin` above and for its reason:
 -- the roll is a replaceable event, CR 614's loop lives in this module, and this

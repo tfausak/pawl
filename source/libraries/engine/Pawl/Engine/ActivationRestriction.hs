@@ -196,7 +196,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
     Nothing -> False
     Just this -> Set.notMember this (Map.findWithDefault Set.empty srcId (GameState.activatedThisTurn gs))
   -- Goblin Bookie's "any time it makes sense", read as CR 706.2's modification
-  -- step: open only while Pawl.Engine.Resolve.Effect's RollDie arm is asking
+  -- step: open only while Pawl.Engine.Resolve.Effect.throwDice is asking
   -- about a die, so never at priority (CR 117.1b).
   ActivationRestriction.DuringDieRoll -> Maybe.isJust (GameState.rollingDie gs)
 

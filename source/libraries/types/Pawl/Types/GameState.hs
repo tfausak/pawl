@@ -423,7 +423,7 @@ data GameState = MkGameState
     -- ordinary turn order resumes from; Nothing on an ordinary turn.
     turnAnchor :: Maybe PlayerId.PlayerId,
     -- | CR 706.2: the sides of the die whose modification step is open, while
-    -- Pawl.Engine.Resolve.Effect's RollDie arm asks about it; Nothing otherwise.
+    -- Pawl.Engine.Resolve.Effect.throwDice asks about it; Nothing otherwise.
     rollingDie :: Maybe Natural.Natural,
     -- | CR 706.2b: the natural result a reroll made inside that step threw.
     rerolledTo :: Maybe Natural.Natural

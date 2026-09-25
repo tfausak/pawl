@@ -225,8 +225,8 @@ data ProposedEvent
   | -- | CR 706.1 / 614.1a: this player would be instructed to roll this many
     -- dice, with this many of the lowest rolls ignored (CR 706.6). Raised by
     -- Pawl.Engine.Event.proposeDiceRoll, the one funnel every roll in the engine
-    -- goes through -- today that is Resolve's Effect.RollDie arm and nothing
-    -- else, since no cost and no turn-based action rolls.
+    -- goes through -- today that is Resolve.Effect.throwDice, for Effect.RollDie
+    -- and CR 703.4g's roll to visit, since no cost rolls.
     --
     -- ONE event for the whole INSTRUCTION, where a flip of several coins raises
     -- WouldFlipCoin per coin: Pixie Guide's sentence is scoped to the
