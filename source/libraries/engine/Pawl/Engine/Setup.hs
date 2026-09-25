@@ -249,6 +249,7 @@ emptyGame order =
           GameState.nextPrintingId = PrintingId.MkPrintingId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
+          GameState.loopInvolvement = Map.empty,
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
           GameState.drawsThisTurn = mempty,
@@ -1076,6 +1077,7 @@ subgameStateFrom starter parent =
           -- which the timestamp supply is not: a copied parent marker would
           -- have the subgame draw itself on entry for events at another level.
           GameState.lastChoice = GameState.nextTimestamp parent,
+          GameState.loopInvolvement = Map.empty,
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
           GameState.drawsThisTurn = mempty,

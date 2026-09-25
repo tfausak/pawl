@@ -113,6 +113,9 @@ withoutAnnouncement before entry closed = do
   nextPrintingId <- newest GameState.nextPrintingId
   nextTimestamp <- newest GameState.nextTimestamp
   lastChoice <- newest GameState.lastChoice
+  -- CR 801.16: stamps, which only ever rise; the announcement's are no later
+  -- than the choice that began it, so no loop's window can reach them.
+  loopInvolvement <- newest GameState.loopInvolvement
   drewFromEmpty <- setOf GameState.drewFromEmpty
   landsPlayed <- mapOf GameState.landsPlayed
   drawsThisTurn <- mapOf GameState.drawsThisTurn
@@ -210,6 +213,7 @@ withoutAnnouncement before entry closed = do
         GameState.nextPrintingId = nextPrintingId,
         GameState.nextTimestamp = nextTimestamp,
         GameState.lastChoice = lastChoice,
+        GameState.loopInvolvement = loopInvolvement,
         GameState.drewFromEmpty = drewFromEmpty,
         GameState.landsPlayed = landsPlayed,
         GameState.drawsThisTurn = drawsThisTurn,

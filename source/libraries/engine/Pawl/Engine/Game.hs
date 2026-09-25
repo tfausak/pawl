@@ -325,6 +325,17 @@ choose p = do
   State.modify' (\gs -> gs {GameState.lastChoice = GameState.nextTimestamp gs})
   ask p
 
+-- CR 801.16: record that an object this player controls took part in what the
+-- game is doing now (GameState.loopInvolvement). Called where a triggered
+-- ability is put on the stack (Pawl.Engine.Engine.placeOne), which every cycle
+-- of a mandatory loop does: nothing else acts with no player choosing.
+--
+-- Not implemented: an object whose part in a loop is a static ability, or being
+-- acted on (moved, created, damaged), is not recorded, so its controller is
+-- named only if a triggered ability of theirs is in the loop too (#4148).
+involve :: PlayerId -> GameState -> GameState
+involve pid gs = gs {GameState.loopInvolvement = Map.insert pid (GameState.nextTimestamp gs) (GameState.loopInvolvement gs)}
+
 -- CR 108.1: a name a player just chose (CR 201.4), looked up in the Oracle card
 -- reference and the card it names remembered in GameState.lookedUp, then handed
 -- back. Every Prompt.ChooseCardName answer goes through here.
