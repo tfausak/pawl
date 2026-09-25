@@ -24,6 +24,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
+import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -362,6 +363,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) (Filter.And []) (Quantity.Literal 2)))
       " {\"type\":\"RandomCardInGraveyard\",\"value\":{\"players\":{\"type\":\"Scoped\",\"value\":{\"type\":\"You\"}},\"count\":{\"type\":\"Literal\",\"value\":2}}} "
+  -- Gate to Seatower's "seek a nonland card": the filter narrows and the
+  -- defaulted count writes no key.
+  Spec.it s "RandomCardInLibrary" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) (Filter.Not (Filter.HasCardType CardType.Land)) (Quantity.Literal 1)))
+      " {\"type\":\"RandomCardInLibrary\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   -- The bare PlayerRef this arm used to take is not a whole payload any more,
   -- ChosenCardFromAmong's slot-name case above and for its reason.
   Spec.it s "RandomCardInHand rejects a bare player reference" $
@@ -423,7 +432,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a chosen subset of the battlefield, one chosen permanent and the source with one chosen permanent all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a random card in a graveyard, a random card in a library, a chosen subset of the battlefield, one chosen permanent and the source with one chosen permanent all encode differently"
       ( Set.size
           ( Set.fromList
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -449,13 +458,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong (SlotName.MkSlotName (Text.pack "revealed")) (Filter.HasCardType CardType.Land))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) (Filter.And []) (Quantity.Literal 1))),
+                Codec.encode ObjectRef.codec (ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You))),
                 Codec.encode ObjectRef.codec (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature))
               ]
           )
       )
-      26
+      27
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

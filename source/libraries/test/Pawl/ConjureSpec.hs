@@ -14,7 +14,8 @@
 -- casts a noncreature spell under a printed Lam, Storm Crane Elder; the seventh
 -- activates a printed Tome of the Infinite, whose card file writes a printed
 -- SPELLBOOK rather than one card; the eighth casts a printed Follow the Tracks,
--- the same spellbook shape with the other question asked of it; the ninth enters
+-- the same spellbook shape with the other question asked of it, and a case
+-- beside it activates the seek one of its Gates prints; the ninth enters
 -- a printed Foundry Groundbreaker, whose conjure STATES the status its arrivals
 -- take; the tenth to sixteenth cast a printed Sinister Reflections, whose
 -- conjure names an object already in the game rather than writing its card out;
@@ -522,10 +523,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- on Scryfall 2026-09-14. The Tome's case one group above with the other
   -- question asked: the same printed spellbook shape, picked BY CHOICE.
   --
-  -- Not implemented: each of the five Gates prints "{3}{C}, {T}: Seek a nonland
-  -- card. Activate only once." No effect seeks, so pawl's Gates are stricter
-  -- than the printing, never weaker (#3734).
-  --
   -- The answerer pins the pick to Gate to Seatower, which the offered list's
   -- head is not: Pawl.Engine.Replay.defaultAnswer takes the head, so an engine
   -- that picked for alice -- or asked for randomness here, whose default answer
@@ -623,6 +620,52 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "asked once, offering every card of the printed spellbook"
       offers
       [tracksSpellbook]
+  -- Gate to Seatower, the spellbook's Island Gate, Oracle text verified on
+  -- Scryfall 2026-09-25: "{3}{U}, {T}: Seek a nonland card. Activate only once."
+  -- Seek is Alchemy's: a card at random from your library matching the
+  -- description goes to your hand, with no search, no reveal and no shuffle.
+  --
+  -- alice's library holds three nonland cards among three Islands, and the pick
+  -- is pinned to Think Twice, which is neither the offer's head (the default
+  -- answer), nor the library's top or bottom card (a draw, or a walk from
+  -- either end), nor a land (an unfiltered pick). A shuffle is answered
+  -- reversed, so one would move every card left behind.
+  Spec.it s "Gate to Seatower's seek puts the nonland card randomness named into the hand, leaving the library's order" $ do
+    islandPrinting <- S.printingOf s registry "Island"
+    tracks <- S.printingOf s registry "Follow the Tracks"
+    stock <- Monad.mapM (S.printingOf s registry) ["Island", "Lightning Bolt", "Island", "Think Twice", "Ornithopter", "Island"]
+    gate <- case filter ((== gateToSeatower) . Face.name . NonEmpty.head . Card.faces) (spellConjures tracks) of
+      [card] -> pure (Printing.ofCard card)
+      _ -> Spec.assertFailure s "expected one Gate to Seatower in Follow the Tracks's spellbook"
+    let (gateId, board0) = S.addPermanent gate S.alice (S.landsInPlay islandPrinting 4)
+        stocked = List.foldl' (\gs printing -> snd (S.addLibraryCard printing S.alice gs)) board0 stock
+        board = stocked {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        before = Game.zoneMembers Zone.Library S.alice board
+        pinned = namedIn thinkTwice Zone.Library board
+        who = Maybe.fromMaybe gateId (Maybe.listToMaybe pinned)
+        logging :: Prompt.Prompt r -> State.State [[CardName.CardName]] r
+        logging p = case p of
+          Prompt.RandomObject offered -> do
+            State.modify' (fmap (`S.soleFaceName` board) (NonEmpty.toList offered) :)
+            pure (gateAnswer gateId who p)
+          _ -> pure (gateAnswer gateId who p)
+        (offers, final) = case State.runState (Engine.runGame logging board Engine.priorityLoop) [] of
+          ((_, gs), asked) -> (reverse asked, gs)
+    -- THE GAMEPLAY ASSERTION: the card randomness named is in alice's hand, and
+    -- every other card is still in her library in the order it was.
+    Spec.assertEqWith
+      s
+      "the sought Think Twice is in alice's hand, and her library is the rest in its old order"
+      (namesIn Zone.Hand final, Game.zoneMembers Zone.Library S.alice final)
+      ([thinkTwice], filter (`notElem` pinned) before)
+    -- Supporting, and LAST so they cannot absorb a mutation the assertion above
+    -- should catch: randomness was asked once, over the nonland cards alone, and
+    -- nothing was revealed.
+    Spec.assertEqWith
+      s
+      "asked once, offering the three nonland cards and no land, and revealing nothing"
+      (offers, [() | GameEvent.Revealed _ <- S.eventsOf final])
+      ([[lightningBolt, thinkTwice, ornithopter]], [])
   -- Sinister Reflections ({1}{U} Instant, "Conjure a duplicate of each of up to
   -- two target nontoken creatures you control into your hand."), Oracle text
   -- verified on Scryfall 2026-09-21. The conjure whose card is no longer written
@@ -1721,6 +1764,33 @@ manaActivation :: Action.Action -> Bool
 manaActivation action = case action of
   Action.ActivateManaAbility _ -> True
   _ -> False
+
+-- The cards a printing's SPELL conjures, conjuredBy's read one ability kind over.
+spellConjures :: Printing.Printing -> [Card.Card]
+spellConjures printing =
+  [ card
+  | face <- NonEmpty.toList (Card.faces (Printing.card printing)),
+    mode <- Foldable.toList (Modal.modes (Face.spell face)),
+    clause <- Foldable.toList (Mode.clauses mode),
+    Effect.Conjure conjure <- Foldable.toList (Clause.effects clause),
+    card <- ConjureCards.written (Conjure.cards conjure)
+  ]
+
+-- Activates the Gate the first time its ability is offered, taps any OTHER land
+-- for mana until it is, and pins the random pick to `who`, filtered out of the
+-- offer for tomeAnswer's reason. Never the Gate's own mana ability, which would
+-- tap away its {T} cost. A shuffle is answered REVERSED, so one the engine asked
+-- for would show in the library's order.
+gateAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+gateAnswer gate who p = case p of
+  Prompt.ChooseAction _ _ actions -> case List.find (activationOf gate) actions of
+    Just action -> action
+    Nothing -> case List.find (maybe False (/= gate) . manaSource) actions of
+      Just action -> action
+      Nothing -> Action.Pass
+  Prompt.RandomObject offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== who) (NonEmpty.toList offered))
+  Prompt.Shuffle cards -> reverse cards
+  _ -> S.identityAnswer p
 
 -- The five Gates data/cards/follow-the-tracks.json prints as the spellbook, in
 -- the order the card file writes them.

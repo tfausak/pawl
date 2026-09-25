@@ -153,6 +153,7 @@ import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
+import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -1175,6 +1176,7 @@ chooserRef ref = case ref of
   ObjectRef.ChosenCardFromAmong {} -> True
   ObjectRef.RandomCardInHand {} -> True
   ObjectRef.RandomCardInGraveyard {} -> True
+  ObjectRef.RandomCardInLibrary {} -> True
   ObjectRef.AnyNumberMatching {} -> True
   ObjectRef.ChosenPermanent {} -> True
   ObjectRef.SourceAndChosenPermanent {} -> True
@@ -1193,6 +1195,7 @@ asksFor asks ref = case asks of
     ObjectRef.ChosenCardFromAmong {} -> True
     ObjectRef.RandomCardInHand {} -> True
     ObjectRef.RandomCardInGraveyard {} -> True
+    ObjectRef.RandomCardInLibrary {} -> True
     ObjectRef.ChosenPermanent {} -> True
     ObjectRef.SourceAndChosenPermanent {} -> True
     ObjectRef.AnyNumberMatching {} -> True
@@ -1827,6 +1830,11 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard scope _ count) -> case count of
             Quantity.Type.Literal n -> n <= 1 && namesOneGraveyard scope
             _ -> False
+          -- One card per SEAT, RandomCardInHand's answer one hidden zone over
+          -- and for its reason.
+          ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary player _ count) -> case count of
+            Quantity.Type.Literal n -> n <= 1 && namesOneSeat player
+            _ -> False
           -- FALSE, EachCardFromAmong's answer over the battlefield: "any number"
           -- states no bound, so nothing about the ref caps how many permanents
           -- the chooser may name.
@@ -2382,6 +2390,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
         atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
         atRandomInGraveyard = ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) anyCard (Quantity.Type.Literal 1))
+        sought = ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
         anyNumber = ObjectRef.AnyNumberMatching anyCard
         onePermanent = ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent anyCard (PlayerRef.Relative PlayerRelation.You))
         sourceAndOne = ObjectRef.SourceAndChosenPermanent anyCard
@@ -2459,6 +2468,14 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
       s
       "a random graveyard card is asked by the move gather alone"
       (inert [moves atRandomInGraveyard, reveals atRandomInGraveyard, Effect.Discard (Discard.These atRandomInGraveyard), Effect.Tap atRandomInGraveyard])
+      [False, True, True, True]
+    -- The at-random arm over a LIBRARY, the Gates' seek, and the same row for
+    -- the same reasons: seek reveals nothing, and CR 701.9a discards out of a
+    -- HAND. Its own assertion for the row above's reason.
+    Spec.assertEqWith
+      s
+      "a sought card is asked by the move gather alone"
+      (inert [moves sought, reveals sought, Effect.Discard (Discard.These sought), Effect.Tap sought])
       [False, True, True, True]
     -- CR 701.28a's convert, classified with Transform because it IS Transform's
     -- gather (Pawl.Engine.Resolve.Effect.turnPermanentsOver): the same four card-shaped

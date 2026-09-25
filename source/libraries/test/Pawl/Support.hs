@@ -3416,6 +3416,7 @@ oneMountainState mountain ph =
           GameState.nextPrintingId = PrintingId.MkPrintingId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
+          GameState.loopInvolvement = Map.empty,
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
           GameState.drawsThisTurn = mempty,

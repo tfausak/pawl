@@ -154,6 +154,7 @@ import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
+import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
@@ -444,6 +445,9 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- ChosenCardInGraveyard's read with the chooser struck out: the graveyards
   -- come through the scope, and the COUNT is TopOfLibrary's read.
   ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard scope _ count) -> joinTwo (zoneScopeSlots scope) (quantitySlots count)
+  -- RandomCardInHand's read one hidden zone over: the seat is reported where
+  -- that arm's is, and the COUNT is TopOfLibrary's read.
+  ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary _ _ count) -> quantitySlots count
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
   -- names them and the chooser is CR 608.2c's resolving controller.
   ObjectRef.AnyNumberMatching _ -> Map.empty
@@ -504,6 +508,9 @@ objectRefQuantities ref = case ref of
   -- How many cards randomness names out of each graveyard -- Make a Wish's
   -- printed two. The arm above's regression fence, for its reason.
   ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard _ _ count) -> [count]
+  -- How many cards a seek names -- the Gates' printed one. The arm above's
+  -- regression fence, for its reason.
+  ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary _ _ count) -> [count]
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
@@ -552,6 +559,8 @@ objectRefPlayerRefs ref = case ref of
   -- ChosenCardInGraveyard's answer: the graveyards are named by a ZoneScope,
   -- which is not a PlayerRef, and randomness names no seat at all.
   ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard _ _ _) -> []
+  -- RandomCardInHand's answer: the one seat whose library is reached.
+  ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary player _ _) -> [player]
   ObjectRef.AnyNumberMatching _ -> []
   -- The seat that picks one permanent off the battlefield -- Wormfang Crab's
   -- opponent, and by default CR 608.2c's resolving controller. Reported for
@@ -2791,6 +2800,9 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- Answered for real by randomCardsInGraveyard, over the graveyards
   -- zoneScopePlayers names -- Effect.MoveToZone's gather, and that alone.
   ObjectRef.RandomCardInGraveyard _ -> []
+  -- Answered for real by randomCardsInLibrary -- Effect.MoveToZone's gather,
+  -- and that alone.
+  ObjectRef.RandomCardInLibrary _ -> []
 
 -- The players a ZoneScope names, in APNAP order -- whose graveyards is
 -- Target.zoneScopePlayers, the same answer a target pool over CR 400.1's
@@ -2835,6 +2847,18 @@ handCardsOf context gs pid filter_ =
    in filter
         (\oid -> Filter.matches context (viewOf oid) filter_)
         (Game.zoneMembers Zone.Hand pid gs)
+
+-- The cards in ONE player's library matching the filter: handCardsOf one
+-- hidden zone over, and SORTED, graveyardCardsOf's order: CR 401.2 keeps the
+-- library's order from everyone, so the candidates must not carry it.
+libraryCardsOf :: Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+libraryCardsOf context gs pid filter_ =
+  let viewOf = Projection.viewsOf gs
+   in List.sort
+        ( filter
+            (\oid -> Filter.matches context (viewOf oid) filter_)
+            (Game.zoneMembers Zone.Library pid gs)
+        )
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING
 -- stack object's live bindings rather than out of `chosen`, which projects CR

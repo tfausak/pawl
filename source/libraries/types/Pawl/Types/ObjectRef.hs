@@ -12,6 +12,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
+import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
@@ -145,6 +146,11 @@ data ObjectRef
     -- arm's single PlayerRef does. Carried out by Effect.MoveToZone's gather,
     -- through randomCardsInGraveyard.
     RandomCardInGraveyard RandomCardInGraveyard.RandomCardInGraveyard
+  | -- | Alchemy's seek / Gate to Seatower: the cards randomness names out of the
+    -- library the PlayerRef names, asked of the interpreter through
+    -- Prompt.RandomObject -- no search, no reveal, no shuffle. Carried out by
+    -- Effect.MoveToZone's gather, through randomCardsInLibrary.
+    RandomCardInLibrary RandomCardInLibrary.RandomCardInLibrary
   | -- | CR 608.2d / Tovolar, Dire Overlord: any number of the permanents on the
     -- battlefield matching the Filter, offered rather than swept, the empty answer
     -- legal.
