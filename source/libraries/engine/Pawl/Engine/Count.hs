@@ -538,7 +538,9 @@ aggregate quantityOf aggregation members = case aggregation of
 -- folds nothing either way.
 playersFor :: ViewOf -> Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
 playersFor viewOf context gs ref =
-  let everyone = Game.stillPlaying gs
+  let -- CR 801.11: information from within the perspective's range only. An
+      -- unframed evaluation has no controller to measure from, and cuts nothing.
+      everyone = maybe (Game.stillPlaying gs) (`Game.reachableBy` gs) (Filter.perspective context)
    in case ref of
         PlayerRef.EachPlayer -> Just everyone
         -- EachPlayer minus the seat the slot names, read through slotPlayers below
