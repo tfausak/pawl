@@ -908,6 +908,45 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in (fmap (\pid -> Map.member pid (GameState.pendingControl armed)) [S.alice, S.bob], S.lifeOf S.carol after)
     Spec.assertEqWith s "carol controlled alice's attack, so no Piker hit her" (run True) ([True, True], Just 20)
     Spec.assertEqWith s "without Mindslaver alice's Piker dealt carol 2" (run False) ([False, False], Just 18)
+  -- CR 702.22k / 805.9: with bob's banding Hero among the creatures carol's
+  -- Brigade blocks, an active player divides the Brigade's damage, and bob, the
+  -- banding ability's controller, names which. He names himself, then alice.
+  -- Without the option bob's creatures cannot attack on alice's turn, so the
+  -- control gives alice them: she is the one active player, and nobody is asked.
+  -- With a Hero each, the two banding controllers leave the choice to their
+  -- team, and CR 805.2 gives it to alice, the team's primary player.
+  --
+  -- Benalish Hero, {W} 1/1 Creature -- Human Soldier, banding. Foriysian
+  -- Brigade, {3}{W} 2/4 Creature -- Human Soldier, "This creature can block an
+  -- additional creature each combat."
+  Spec.it s "CR 805.9 the banding creature's controller names the active player who divides" $ do
+    hero <- S.printingOf s registry "Benalish Hero"
+    piker <- S.printingOf s registry "Goblin Piker"
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    let run option owner (other, otherOwner) named =
+          let (heroId, g1) = S.addPermanent hero owner (atCombat (option (twoTeams S.fourPlayerGame)))
+              (otherId, g2) = S.addPermanent other otherOwner g1
+              (_, board) = S.addPermanent brigade S.carol g2
+              blocked = Set.fromList [heroId, otherId]
+              record :: Prompt.Prompt r -> State.State [(Bool, PlayerId.PlayerId)] r
+              record p = case p of
+                Prompt.ChoosePlayer _ pid _ offer -> do
+                  State.modify' (<> [(False, pid)])
+                  pure (Maybe.fromMaybe (NonEmpty.head offer) (List.find (== named) (NonEmpty.toList offer)))
+                Prompt.AssignCombatDamage _ pid _ thresholds n -> do
+                  State.modify' (<> [(True, pid)])
+                  pure $ case filter S.isCreatureRecipient (Map.keys thresholds) of
+                    r : _ -> Map.singleton r n
+                    [] -> Map.empty
+                Prompt.DeclareBlockers _ _ mine _ -> pure (Map.fromList (fmap (\b -> (b, blocked)) mine))
+                _ -> pure (S.attackTo S.carol p)
+           in snd (State.runState (Engine.runGame record board S.combatGame) [])
+    -- Each entry is (was it the division, who was asked); False is CR 805.9's
+    -- choice of active player.
+    Spec.assertEqWith s "bob named himself, so bob divided" (run sharedTurns S.bob (piker, S.bob) S.bob) [(False, S.bob), (True, S.bob)]
+    Spec.assertEqWith s "bob named alice, so alice divided" (run sharedTurns S.bob (piker, S.bob) S.alice) [(False, S.bob), (True, S.alice)]
+    Spec.assertEqWith s "without the option alice divided unasked" (run id S.alice (piker, S.alice) S.bob) [(True, S.alice)]
+    Spec.assertEqWith s "a Hero each, so alice named bob" (run sharedTurns S.bob (hero, S.alice) S.bob) [(False, S.alice), (True, S.bob)]
 
 -- alice's beginning of combat step, the rest of her turn to come.
 atCombat :: GameState.GameState -> GameState.GameState

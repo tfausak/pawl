@@ -4,6 +4,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -20,6 +21,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Subtype as Subtype
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AttackTarget (AttackTarget)
@@ -501,13 +503,31 @@ attackerAssignment gs contested (attacker, target) = case Projection.combatDamag
 -- the unmodeled half Pawl.Types.Keyword's Banding note describes: no card in the
 -- pool prints it.
 --
--- Not implemented: CR 805.9's choice of which active player that is under the
--- shared team turns option (#4141).
-blockerChooser :: GameState -> [ObjectId] -> PlayerId -> PlayerId
+-- CR 805.9: under the shared team turns option "the active player" is one
+-- active player, chosen by the banding ability's controller -- the controller
+-- of the banding creature among them. Asked only with two or more active
+-- players still playing; the answer is filtered, not trusted. Banding creatures
+-- with different controllers leave that choice to the team, and CR 805.2 gives
+-- a team's unsettled choice to its primary player. Pawl.TeamSpec's "CR 805.9
+-- the banding creature's controller names the active player who divides"
+-- proves both.
+blockerChooser :: GameState -> [ObjectId] -> PlayerId -> Game PlayerId
 blockerChooser gs attackers controller =
-  if any (\attacker -> Projection.hasKeyword Keyword.Banding attacker gs) attackers
-    then GameState.activePlayer gs
-    else controller
+  case (banding, ListUtils.nubOrd (Maybe.mapMaybe (`Projection.controllerOf` gs) banding)) of
+    ([], _) -> pure controller
+    (source : _, controllers) ->
+      let chooser = case controllers of
+            [one] -> one
+            _ -> Game.primaryOf gs (GameState.activePlayer gs)
+          live = filter (`List.elem` Game.stillPlaying gs) (Turn.activePlayers gs)
+       in case live of
+            [] -> pure (GameState.activePlayer gs)
+            [one] -> pure one
+            first : rest -> do
+              answer <- Game.choose (Prompt.ChoosePlayer (Decide.deciderFor chooser gs) chooser source (first NonEmpty.:| rest))
+              pure (if List.elem answer live then answer else first)
+  where
+    banding = filter (\attacker -> Projection.hasKeyword Keyword.Banding attacker gs) attackers
 
 -- CR 510.1d: a blocking creature assigns combat damage to the creatures it's
 -- blocking, and none at all if it isn't currently blocking any.
@@ -551,13 +571,10 @@ blockerAssignment gs (blocker, attackers) = case Projection.combatDamageAmountOf
                 -- can be: tiersCleared over an all-zero map is vacuous, so a
                 -- blocking creature's division has no gate for the step's other
                 -- assignments to clear.
-                Just pid ->
+                Just pid -> do
+                  chooser <- blockerChooser gs blocked pid
                   fmap fst
-                    . divideAssignment
-                      gs
-                      blocker
-                      power
-                      (blockerChooser gs blocked pid)
+                    . divideAssignment gs blocker power chooser
                     $ fmap (\attacker -> (Recipient.ToCreature attacker, 0)) blocked
 
 -- CR 510.1e / 702.19b: ask `chooser` to divide `source`'s `power` over `entries`,
