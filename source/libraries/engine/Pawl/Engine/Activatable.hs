@@ -1,5 +1,6 @@
 module Pawl.Engine.Activatable where
 
+import Control.Applicative ((<|>))
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -69,12 +70,13 @@ sicknessOkGiven pcs pid srcId ability =
 -- the one place that zone question is asked, so no caller repeats it.
 --
 -- On the battlefield: the PROJECTION's, so Humility (layer 6) strips them. In a
--- hand: the ones rule 702 mints for the card's printed keywords, which is
--- cycling (CR 702.29a) and reinforce (CR 702.77a) today, read off the PRINTED
+-- hand: the ones rule 702 mints for the card's printed keywords -- cycling (CR
+-- 702.29a), reinforce (CR 702.77a) and ninjutsu (CR 702.49a) -- read off the PRINTED
 -- card, which misses an effect that granted one there (#1859); CR 113.6b is the rule
 -- that lets an ability name its own zone -- PLUS the card's own printed
 -- abilities that name the hand, per CR 113.6j and CR 113.6m (Faerie Macabre's
--- "Discard this card: ..."). In a graveyard: the PRINTED abilities
+-- "Discard this card: ...") or through the keyword written on them (CR
+-- 702.57a's forecast). In a graveyard: the PRINTED abilities
 -- whose own cost or effect names the graveyard, per CR 113.6m -- both zones
 -- through zoneAbilitiesOf. In the COMMAND zone: the same reader again, whose CR
 -- 113.6p limb keeps an emblem's (CR 114.4) and a face-up vanguard card's (CR
@@ -272,9 +274,13 @@ zoneAbilitiesOf zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- so the walk answers Nothing there. This reading is therefore a regression
 -- fence; the sentence itself is proved through the TRIGGERED one, on Prized
 -- Amalgam in Pawl.ZoneTriggerSpec.
+--
+-- Ahead of both halves, CR 113.6b: a keyword whose rule names the zone its
+-- printed ability functions from answers first (Keyword.printedZone, CR 702.57a's
+-- forecast).
 zoneFunctionedFrom :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)) -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Maybe Zone.Zone
 zoneFunctionedFrom delayed ability =
-  case Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of
+  case (ActivatedAbility.keyword ability >>= Keyword.printedZone) <|> Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of
     Just zone -> Just zone
     Nothing ->
       Maybe.listToMaybe
@@ -677,7 +683,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         -- this function.
         && not (PlayerEffect.prohibitsActivating pid gs)
         && sicknessOkGiven pcs pid srcId ability gs
-        && ActivationRestriction.restrictionsOk pid srcId (Just ability) (ActivatedAbility.restrictions ability) gs
+        && ActivationRestriction.restrictionsOk pid srcId (Just ability) (Keyword.restrictionsOf ability) gs
         && loyaltyOk pid srcId ability gs
         && Modal.selectionPossible fillable (Modal.Type.selection modal)
         && payableCostAtGiven aimable sources pcs (ActivatedAbility.minimumX ability) (ActivatedAbility.keyword ability) pid srcId gs (ActivatedAbility.cost ability)

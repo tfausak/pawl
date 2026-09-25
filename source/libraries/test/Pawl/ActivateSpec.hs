@@ -552,6 +552,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
   equipSpec s registry
   exhaustSpec s registry
   boastSpec s registry
+  forecastSpec s registry
   reinforceSpec s registry
   ninjutsuSpec s registry
   authoredHandAbilitySpec s registry
@@ -1364,6 +1365,75 @@ boastSpec s registry = Spec.describe s "Boast (CR 702.142)" $ do
     -- The attacking Duskwielder (CR 508.1f) plus exactly one Swamp: the other
     -- Swamp is untapped, so a second {1} was there to be paid.
     Spec.assertEqWith s "one Swamp is still untapped, so the mana is not what refused it" (S.tappedCount S.alice after) 2
+
+-- The offer carrying CR 702.57a's keyword, told apart by the stamp the CARD wrote.
+isForecast :: A.Action -> Bool
+isForecast a = case a of
+  A.Activate _ ability -> ActivatedAbility.keyword ability == Just Keyword.Forecast
+  _ -> False
+
+-- Takes the forecast activation whenever it is offered and passes otherwise, so
+-- a second one is refused by CR 702.57b's rider rather than declined here.
+forecastAnswer :: Prompt.Prompt r -> r
+forecastAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isForecast options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+-- alice holds Steeling Stance with a Goblin Piker (2\/1) and three Plains on the
+-- battlefield, holding priority in `phase` of `active`'s turn -- the only two
+-- things the legs vary. Three Plains, so the instant's {1}{W}{W} is castable and
+-- a refused second {W} is the rider and not the mana. GameState.remaining is emptied so Engine.priorityLoop stops at the
+-- end of this step.
+forecastBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> Phase.Phase -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+forecastBoard piker plains stance active phase =
+  let (pikerId, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = snd (S.addPermanent plains S.alice g1)
+      g3 = snd (S.addPermanent plains S.alice g2)
+      g4 = snd (S.addPermanent plains S.alice g3)
+      (stanceId, g5) = S.addHandCard stance S.alice g4
+   in (stanceId, pikerId, g5 {GameState.activePlayer = active, GameState.phase = phase, GameState.priority = Just S.alice, GameState.remaining = Seq.empty})
+
+-- CR 702.57: forecast. The ability is PRINTED, stamped Keyword.Forecast, and the
+-- keyword supplies the rest: CR 702.57a's hand (Keyword.printedZone) and CR
+-- 702.57b's two riders (Keyword.printedRiders).
+--
+-- Steeling Stance (Dissension) is the producer: "Forecast -- {W}, Reveal this
+-- card from your hand: Target creature gets +1\/+1 until end of turn."
+forecastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+forecastSpec s registry = Spec.describe s "Forecast (CR 702.57)" $ do
+  -- Three legs differing in whose turn it is or which step: CR 702.57b's owner
+  -- axis and its step axis.
+  Spec.it s "CR 702.57b the forecast ability is offered from the hand only during its owner's upkeep" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    stance <- S.printingOf s registry "Steeling Stance"
+    let upkeep = Phase.Beginning BeginningStep.Upkeep
+        legs = [(S.alice, upkeep), (S.bob, upkeep), (S.alice, Phase.Beginning BeginningStep.DrawStep)]
+        offers (active, phase) =
+          let (stanceId, _, gs) = forecastBoard piker plains stance active phase
+              offered = Action.legalActions S.alice gs
+           in (length (activationsOf stanceId offered), any (\a -> case a of A.Cast o _ _ -> o == stanceId; _ -> False) offered)
+    -- The gameplay assertion this group exists to prove, and it is FIRST.
+    Spec.assertEqWith s "offered in alice's upkeep, and not in bob's nor in her draw step" (fmap (fst . offers) legs) [1, 0, 0]
+    -- Anti-vacuity: the instant itself is castable on every leg, so the mana,
+    -- the priority and the card are there each time.
+    Spec.assertEqWith s "while the Stance is castable on every leg" (fmap (snd . offers) legs) [True, True, True]
+
+  -- The gameplay-level proof (design.md section 4), through the priority loop:
+  -- alice takes the forecast every time it is offered.
+  Spec.it s "CR 702.57b whole card: Steeling Stance's forecast pumps once and is refused for the rest of the turn" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    stance <- S.printingOf s registry "Steeling Stance"
+    let (stanceId, pikerId, gs) = forecastBoard piker plains stance S.alice (Phase.Beginning BeginningStep.Upkeep)
+        after = S.runPure forecastAnswer gs Engine.priorityLoop
+    Spec.assertEqWith s "the Piker got +1/+1 once and not twice" (S.powerToughnessOf pikerId after) (Just (3, 2))
+    Spec.assertEqWith s "two Plains are still untapped, so the mana is not what refused it" (S.tappedCount S.alice after) 1
+    Spec.assertEqWith s "CR 702.57a the Stance never left alice's hand" (fmap Object.zone (Game.lookupObject stanceId after)) (Just Zone.Hand)
+    Spec.assertEqWith s "CR 602.2a and alice revealed it to activate" (S.revealsOf after) [(S.alice, Set.singleton (CardName.MkCardName (Text.pack "Steeling Stance")))]
 
 equipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 equipSpec s registry = Spec.describe s "Equip" $ do
