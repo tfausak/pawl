@@ -74,6 +74,7 @@ codec = Fields.object $ do
   costReductions <- Fields.defaulted "costReductions" [] (Common.list CostReduction.codec) PC.costReductions
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   prepare <- Fields.defaulted "prepare" Nothing (Common.maybe (Face.codec Card.codec)) PC.prepare
+  alternativeSpell <- Fields.defaulted "alternativeSpell" Nothing (Common.maybe (Face.codec Card.codec)) PC.alternativeSpell
   flipped <- Fields.defaulted "flipped" Nothing (Common.maybe codec) PC.flipped
   pure
     PC.MkProjectedCharacteristics
@@ -109,5 +110,6 @@ codec = Fields.object $ do
         PC.costReductions = costReductions,
         PC.halves = halves,
         PC.prepare = prepare,
+        PC.alternativeSpell = alternativeSpell,
         PC.flipped = flipped
       }

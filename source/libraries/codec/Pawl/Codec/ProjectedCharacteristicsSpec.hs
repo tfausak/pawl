@@ -100,6 +100,8 @@ testCharacteristics =
       -- the case is about is that the field carries a whole FACE through the
       -- wire (CR 722.2b).
       PC.prepare = Just (NonEmpty.head (Card.Type.faces CardSpec.mountainCard)),
+      -- Synthetic for prepare's reason (CR 715.2b).
+      PC.alternativeSpell = Just (NonEmpty.head (Card.Type.faces CardSpec.mountainCard)),
       -- The recursive field, carrying the all-default record so the nested
       -- object's own defaults are exercised too (CR 707.3).
       PC.flipped = Just minimalCharacteristics
@@ -132,6 +134,7 @@ testCharacteristicsJson =
     <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]},"
     <> "\"prepare\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
+    <> "\"alternativeSpell\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
     <> "\"flipped\":{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}}"
 
 -- | Every field but the two required ones at its default.
@@ -170,6 +173,7 @@ minimalCharacteristics =
       PC.costReductions = [],
       PC.halves = Nothing,
       PC.prepare = Nothing,
+      PC.alternativeSpell = Nothing,
       PC.flipped = Nothing
     }
 

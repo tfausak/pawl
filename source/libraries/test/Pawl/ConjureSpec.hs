@@ -60,6 +60,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Turn as Turn
@@ -860,6 +861,64 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           (castableAs "Flaxen Intruder" duplicate, castableAs "Welcome Home" duplicate)
           (True, False)
       other -> Spec.assertFailure s ("expected one duplicate in hand, got " <> show (length other))
+  -- CR 715.2b / 707.2: the Adventure half is a copiable value, so a duplicate of
+  -- a Clone copying Flaxen Intruder -- printed Clone beneath -- is castable as
+  -- Welcome Home ({5}{G}{G}), and resolves as it: three Bears, and the card
+  -- exiled by CR 715.3d. Seven Forests pay the Adventure; the printed Clone
+  -- offers no Welcome Home at all.
+  Spec.it s "CR 707.2/715.2b a duplicate of a Clone of Flaxen Intruder is cast as Welcome Home" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    intruder <- S.printingOf s registry "Flaxen Intruder"
+    let (intruderId, board0) = S.addPermanent intruder S.alice (S.landsInPlay island 2) {GameState.phase = Phase.PrecombatMain}
+    case duplicateOfCopy clone reflections intruderId board0 of
+      Just (duplicate, conjured) -> do
+        let paid = S.landsFor forest S.alice 7 conjured
+            cast = S.runPure S.identityAnswer paid (Cast.castSpell S.manaPerformer S.alice duplicate welcomeHome Facing.FaceUp)
+            played = S.settleSba (S.runPure S.identityAnswer cast Stack.resolveTop)
+            bears = filter (\oid -> Projection.namesOf oid played == Set.singleton bearToken) (Game.zoneMembers Zone.Battlefield S.alice played)
+        Spec.assertEqWith
+          s
+          "CR 715.3a/715.3b/715.3d (Welcome Home offered as a cast, lands it taps, the spell's names, Bears, cards in exile)"
+          (castOffered duplicate welcomeHome paid, S.tappedCount S.alice cast - S.tappedCount S.alice paid, fmap (\oid -> Projection.namesOf oid cast) (GameState.stack cast), length bears, length (Game.zoneMembers Zone.Exile S.alice played))
+          (True, 7, [Set.singleton welcomeHome], 3, 1)
+      Nothing -> Spec.assertFailure s "expected one Clone and one duplicate"
+  -- CR 709.5b / 707.2: a Room's halves are copiable values, so a Copy
+  -- Enchantment copying Spiked Corridor // Torture Pit, made a creature by
+  -- Opalescence and duplicated by Sinister Reflections, is a card in hand printed
+  -- Copy Enchantment that is cast as a door -- and enters with that door unlocked
+  -- (CR 709.5d). The copy's Torture Pit is unlocked first so Opalescence does not
+  -- make it a 0/0.
+  Spec.it s "CR 707.2/709.5b a duplicate of a copied Room is cast as a door" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    room <- S.printingOf s registry "Spiked Corridor"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    opalescence <- S.printingOf s registry "Opalescence"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    let board0 = (S.landsInPlay mountain 8) {GameState.phase = Phase.PrecombatMain}
+        (roomId, board1) = S.addPermanent room S.alice board0
+        (_, staged) = S.spellOnStack copyEnchantment S.alice board1
+        entered = S.settleSba (copyingPiker roomId staged)
+    case Set.toList (Set.difference (GameState.battlefield entered) (GameState.battlefield board1)) of
+      [copyId] -> do
+        let unlocked = S.settleSba (S.runPure S.identityAnswer entered (Room.unlock S.manaPerformer S.alice copyId torturePit))
+            -- The Islands arrive after the unlock, so its {3} cannot spend the
+            -- {U} Sinister Reflections needs.
+            animated = S.landsFor island S.alice 2 (S.settleSba (snd (S.addPermanent opalescence S.alice unlocked)))
+        case duplicateOf reflections copyId animated of
+          Just (duplicate, conjured) -> do
+            let played = S.settleSba (S.runPure S.identityAnswer conjured (Cast.castSpell S.manaPerformer S.alice duplicate spikedCorridor Facing.FaceUp >> Stack.resolveTop))
+                arrived = Set.toList (Set.difference (GameState.battlefield played) (GameState.battlefield conjured))
+            Spec.assertEqWith
+              s
+              "CR 709.3/709.5d (the door offered as a cast, the names the duplicate enters showing)"
+              (castOffered duplicate spikedCorridor conjured, fmap (\oid -> Projection.namesOf oid played) arrived)
+              (True, [Set.singleton spikedCorridor])
+          Nothing -> Spec.assertFailure s "expected one duplicate in hand"
+      other -> Spec.assertFailure s ("expected one Copy Enchantment, got " <> show (length other))
   -- CR 730.3 / 400.7: the duplicate, cast and resolved as the Piker, is the
   -- permanent Cubwarden ({3}{W} 3/5 Cat, "Mutate {2}{W}{W}", lifelink) mutates
   -- OVER, and the merged permanent is then destroyed. Its two components are put
@@ -1420,6 +1479,44 @@ copyingPiker oid gs =
 -- the same.
 clonesOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
 clonesOnBattlefield gs = filter (\oid -> S.soleFaceName oid gs == cloneName) (Game.zoneMembers Zone.Battlefield S.alice gs)
+
+-- A copier (Clone) resolved as a copy of `original`, then duplicated into
+-- alice's hand by Sinister Reflections: the duplicate and the board. Found by
+-- the board's difference rather than by name, since the copier offers the
+-- copied card's faces.
+duplicateOfCopy :: Printing.Printing -> Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ObjectId.ObjectId, GameState.GameState)
+duplicateOfCopy copier reflections original board0 = do
+  let (_, staged) = S.spellOnStack copier S.alice board0
+      entered = S.settleSba (copyingPiker original staged)
+  copyId <- Maybe.listToMaybe (Set.toList (Set.difference (GameState.battlefield entered) (GameState.battlefield board0)))
+  duplicateOf reflections copyId entered
+
+-- Sinister Reflections cast at `target` and resolved: the one card it added to
+-- alice's hand, and the board.
+duplicateOf :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ObjectId.ObjectId, GameState.GameState)
+duplicateOf reflections target board0 = do
+  let (spell, board1) = S.addHandCard reflections S.alice board0
+      resolved = S.settleSba (S.runPure (aimingAtAll [target]) board1 (S.cast S.alice spell >> Stack.resolveTop))
+  case filter (`notElem` Game.zoneMembers Zone.Hand S.alice board1) (Game.zoneMembers Zone.Hand S.alice resolved) of
+    [duplicate] -> Just (duplicate, resolved)
+    _ -> Nothing
+
+-- Is casting this card as the named half among alice's legal actions, with
+-- priority hers? The offer, which Cast.castable asked of a name does not check.
+castOffered :: ObjectId.ObjectId -> CardName.CardName -> GameState.GameState -> Bool
+castOffered oid name gs = elem (Action.Cast oid name Facing.FaceUp) (Action.legalActions S.alice gs {GameState.priority = Just S.alice})
+
+welcomeHome :: CardName.CardName
+welcomeHome = CardName.MkCardName (Text.pack "Welcome Home")
+
+bearToken :: CardName.CardName
+bearToken = CardName.MkCardName (Text.pack "Bear Token")
+
+spikedCorridor :: CardName.CardName
+spikedCorridor = CardName.MkCardName (Text.pack "Spiked Corridor")
+
+torturePit :: CardName.CardName
+torturePit = CardName.MkCardName (Text.pack "Torture Pit")
 
 cloneName :: CardName.CardName
 cloneName = CardName.MkCardName (Text.pack "Clone")
