@@ -172,6 +172,10 @@ perfectly good-looking line of output. Read the label, then decide.
   that way. Copy the file to a backup and move it back, or let
   `script/mutate.sh` do it; its backup lives under `mktemp -d`, never beside
   the file, where a concurrent session would see it.
+- **Run a mutation alone in its checkout.** `script/mutate.sh` edits the file
+  in place for the length of the run, so a suite build or a commit made beside
+  it picks up the mutated line. Run the suite first, then the mutations one
+  after another.
 - **Build a negative as a pair of boards differing in exactly one thing.** A
   negative assembled on its own board passes for reasons you did not choose.
 - **Keep the mutated binding referenced.** Deleting a use trips
