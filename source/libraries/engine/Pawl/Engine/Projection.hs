@@ -2815,6 +2815,7 @@ filterReads f = case f of
   -- the TARGET's view, so whatever aspect it asks of that object is an aspect a
   -- Modification can move.
   Filter.Type.TargetsOnlyOne g -> filterReads g
+  Filter.Type.TargetsMatching g -> filterReads g
   Filter.Type.TargetsPlayer _ -> Set.empty
   -- Reads an IDENTITY, which CR 109.3 does not count as a characteristic.
   Filter.Type.IsBound _ -> Set.empty
@@ -3080,6 +3081,7 @@ filterReadsPeers f = case f of
   -- CR 115.1's target view comes through `peers` too, whatever the nest asks of
   -- it -- so True outright rather than by descent.
   Filter.Type.TargetsOnlyOne _ -> True
+  Filter.Type.TargetsMatching _ -> True
   -- And the two that reach one through a GATE rather than a field:
   -- abilitiesFromCharacteristics runs CR 604.2's condition through
   -- Condition.holds, which takes `peers` to any object at all.
