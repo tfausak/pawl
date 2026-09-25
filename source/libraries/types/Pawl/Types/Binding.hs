@@ -12,10 +12,11 @@ import qualified Pawl.Types.Recipient as Recipient
 -- on the stack. A record, not a sum: a field per binding kind, and a kind absent
 -- for this slot is Nothing. The record shape is what lets two binding
 -- environments be combined field-by-field (Pawl.Engine.Binding.mergeBinding)
--- without a tag to case on. No slot in this pool populates two fields at once --
--- each reserved name carries exactly one kind, and a target slot carries only
--- its recipients -- so the merge is total and order-independent by construction
--- rather than by luck. Grows a field per future binding (a for-each count).
+-- without a tag to case on. Each reserved name carries one kind and a target
+-- slot only its recipients; the one slot that fills two fields is a payment of
+-- several objects, whose `targets` and `objects` name the same objects
+-- (Pawl.Engine.Binding.setPaid). So the merge is total and order-independent by
+-- construction rather than by luck. Grows a field per future binding (a for-each count).
 --
 -- A CHOICE AN EFFECT OFFERS does not belong here: CR 608.2d has the player
 -- announce it while applying the effect, so it is asked and consumed inside
@@ -51,18 +52,22 @@ data Binding = MkBinding
     -- Revolt's "those tokens", the incarnations CR 400.7 mints in a public zone
     -- under Act on Impulse's "those cards" (CR 400.7j), and the permanents a
     -- destruction destroyed under Rampage of the Clans' "each permanent
-    -- destroyed this way", which are gone by the time anything reads them.
+    -- destroyed this way", which are gone by the time anything reads them. Also
+    -- the several objects one cost payment took (Pawl.Engine.Binding.setPaid),
+    -- Vitu-Ghazi Inspector's collected evidence.
     --
     -- A field of its own rather than more members of `targets` above, because such a slot is a definition, never a
     -- target (CR 115.10a), so nothing here is subject to CR 608.2b's
     -- illegal-target check. Nothing for every other slot.
     --
-    -- No slot carries BOTH this and a target. mergeBinding would keep both, and
-    -- Pawl.Engine.Engine.placeOne's per-field join is where they could meet, so
-    -- the guarantee is a lint rather than a type: a card reaching it would have
-    -- to declare a delayed ability's target slot under a name its own Create or
-    -- MoveToZone defines, which Pawl.CardSpec rejects.
-    -- Pawl.Engine.Resolve.Slots.slotGroup records which way it would fail anyway.
+    -- A payment of several objects fills BOTH this and `targets`, with the same
+    -- objects (setPaid), so the two cannot disagree. No other slot carries both.
+    -- mergeBinding would keep both, and Pawl.Engine.Engine.placeOne's per-field
+    -- join is where two different sets could meet, so that guarantee is a lint
+    -- rather than a type: a card reaching it would have to declare a delayed
+    -- ability's target slot under a name its own Create or MoveToZone defines,
+    -- which Pawl.CardSpec rejects. Pawl.Engine.Resolve.Slots.slotGroup records
+    -- which way it would fail anyway.
     --
     -- A Seq and not a Set: the order is the one the objects were produced in --
     -- mint order for tokens, the batch's own order for a move or a destruction -- and it is not an

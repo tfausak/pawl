@@ -2774,7 +2774,8 @@ handCardsOf context gs pid filter_ =
 -- name what an earlier Create minted.
 --
 -- A Just here wins over the slot's target, which would skip a CR 608.2b
--- re-validation. One Binding can carry both fields, but a Pawl.CardSpec lint
+-- re-validation. A payment of several objects carries both fields, naming the
+-- same objects, and is never a declared target; otherwise a Pawl.CardSpec lint
 -- ("no delayed ability declares a target slot under a name its card defines")
 -- rules the case out, so this arm never actually chooses.
 slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
