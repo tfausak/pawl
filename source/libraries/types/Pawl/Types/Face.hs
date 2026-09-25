@@ -297,7 +297,8 @@ data Face card = MkFace
     -- | CR 118.8: this face's printed additional costs, paid at the same time as
     -- the spell's mana cost (Village Rites). Read directly from the card, the
     -- castingPermissions precedent: a cost is consulted while the object is in
-    -- hand, where this reader takes the printed card (#1859). CR 118.8d: this does not
+    -- hand, where this reader takes the printed card (#1859), or the copy stamp's
+    -- values where it carries one (Game.castingFaceOf). CR 118.8d: this does not
     -- change the card's mana cost, so 'manaCost' above and every reader of mana
     -- value is unaffected.
     --
@@ -409,8 +410,8 @@ data Face card = MkFace
     -- playerAbilities below cannot hold one.
     --
     -- The third member of the additionalCosts/alternativeCosts family above, and
-    -- read the way they are: straight off the card, never through the projection
-    -- (#1859). Pawl.Engine.Cost.selfReductions is the one reader, and it folds these in
+    -- read the way they are: straight off the card or its copy stamp
+    -- (Game.castingFaceOf), never through the projection (#1859). Pawl.Engine.Cost.selfReductions is the one reader, and it folds these in
     -- alongside the CR 613.11 reductions other permanents generate, so CR
     -- 601.2f's "minus all cost reductions" is applied once over both.
     --

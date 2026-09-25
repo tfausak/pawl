@@ -73,6 +73,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -689,6 +690,71 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "and resolves into a second Goblin Piker beside the Clone"
           (fmap (\oid -> Set.toList (Projection.namesOf oid played)) (clonesOnBattlefield played))
           [[goblinPiker], [goblinPiker]]
+  -- CR 707.2 / 601.2b: the additional cost is rules text, so it is copiable too.
+  -- A Clone copying Headless Skaab ({2}{U}, "As an additional cost to cast this
+  -- spell, exile a creature card from your graveyard") is duplicated, and the
+  -- duplicate owes the exile. The pair differs only in a Goblin Piker in the
+  -- graveyard; three Islands pay the Skaab's {2}{U} and not the Clone's {3}{U}.
+  Spec.it s "CR 707.2/601.2b a duplicate of a Clone owes the additional cost of what the Clone copies" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    skaab <- S.printingOf s registry "Headless Skaab"
+    let (skaabId, board) = S.addPermanent skaab S.alice (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections skaabId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) -> do
+        let bare = S.landsFor island S.alice 3 conjured
+            (_, stocked) = S.addGraveyardCard piker S.alice bare
+        Spec.assertEqWith
+          s
+          "CR 601.2b castable only with a creature card to exile: (empty graveyard, a Piker in it)"
+          (S.castable S.alice duplicate bare, S.castable S.alice duplicate stocked)
+          (False, True)
+  -- CR 707.2 / 118.9: the alternative cost is copiable for the same reason. A
+  -- Clone copying Asmoranomardicadaistinaculdacar (no mana cost; "As long as
+  -- you've discarded a card this turn, you may pay {B/R} to cast this spell") is
+  -- duplicated, and the duplicate is castable for {B/R} once a card is
+  -- discarded. Bob controls the original, so CR 704.5j leaves both legends be.
+  Spec.it s "CR 707.2/118.9 a duplicate of a Clone offers the alternative cost of what the Clone copies" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    asmor <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+    let (asmorId, board) = S.addPermanent asmor S.bob (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections asmorId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) -> do
+        let (pikerId, undiscarded) = S.addHandCard piker S.alice (S.landsFor swamp S.alice 1 conjured)
+            discarded = S.runPure S.identityAnswer undiscarded (Event.discard DiscardCause.Ordinary S.alice pikerId)
+        Spec.assertEqWith
+          s
+          "CR 118.9 castable for {B/R} only once a card is discarded: (undiscarded, discarded)"
+          (S.castable S.alice duplicate undiscarded, S.castable S.alice duplicate discarded)
+          (False, True)
+  -- CR 707.2 / 601.2f: the self-reduction is copiable for the same reason. A
+  -- Clone copying Thrasta, Tempest's Roar ({10}{G}{G}, "This spell costs {3} less
+  -- to cast for each other spell cast this turn") is duplicated by the one spell
+  -- cast this turn, so the duplicate costs {7}{G}{G}: nine Forests pay it and
+  -- eight do not. Bob controls the original, the Asmor case's reason.
+  Spec.it s "CR 707.2/601.2f a duplicate of a Clone takes the cost reduction of what the Clone copies" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
+    let (thrastaId, board) = S.addPermanent thrasta S.bob (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections thrastaId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) ->
+        Spec.assertEqWith
+          s
+          "CR 601.2f castable at {7}{G}{G}: (eight Forests, nine Forests)"
+          (S.castable S.alice duplicate (S.landsFor forest S.alice 8 conjured), S.castable S.alice duplicate (S.landsFor forest S.alice 9 conjured))
+          (False, True)
   -- CR 730.3 / 400.7: the duplicate, cast and resolved as the Piker, is the
   -- permanent Cubwarden ({3}{W} 3/5 Cat, "Mutate {2}{W}{W}", lifelink) mutates
   -- OVER, and the merged permanent is then destroyed. Its two components are put
@@ -1189,15 +1255,24 @@ mergedOntoDuplicate (cubwarden, found) = do
 -- carries the values it was conjured with. Nothing where the Clone did not stay.
 duplicateInHand :: Printing.Printing -> Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ObjectId.ObjectId, GameState.GameState)
 duplicateInHand clone reflections original board0 = do
+  (_, conjured) <- conjuredDuplicate clone reflections original board0
+  cloneId <- Maybe.listToMaybe (clonesOnBattlefield conjured)
+  let gone = S.settleSba (S.runPure S.identityAnswer conjured (Event.destroy Regenerability.Regenerable [original, cloneId]))
+  duplicate <- Maybe.listToMaybe (namedIn cloneName Zone.Hand gone)
+  pure (duplicate, gone)
+
+-- duplicateInHand above short of the destruction: the original and the Clone
+-- stay on the battlefield, and the one spell cast is Sinister Reflections.
+conjuredDuplicate :: Printing.Printing -> Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ObjectId.ObjectId, GameState.GameState)
+conjuredDuplicate clone reflections original board0 = do
   let (_, staged) = S.spellOnStack clone S.alice board0
       entered = S.settleSba (copyingPiker original staged)
   cloneId <- Maybe.listToMaybe (clonesOnBattlefield entered)
   let (spell, board1) = S.addHandCard reflections S.alice entered
       board = board1 {GameState.phase = Phase.PrecombatMain}
-      resolved = S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop)
-      gone = S.settleSba (S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable [original, cloneId]))
-  duplicate <- Maybe.listToMaybe (namedIn cloneName Zone.Hand gone)
-  pure (duplicate, gone)
+      resolved = S.settleSba (S.runPure (aimingAtAll [cloneId]) board (S.cast S.alice spell >> Stack.resolveTop))
+  duplicate <- Maybe.listToMaybe (namedIn cloneName Zone.Hand resolved)
+  pure (duplicate, resolved)
 
 -- Casts `spellId` for Cubwarden's mutate cost at `host`, merging OVER, and
 -- drains the stack. Pawl.MutateSpec's `merging`, duplicated rather than hoisted:

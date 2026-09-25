@@ -11,11 +11,16 @@ import qualified Pawl.Codec.RuleAbilitiesSpec as RuleAbilitiesSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostChoice as CostChoice
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -26,6 +31,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
@@ -81,6 +87,11 @@ testCharacteristics =
       PC.textChangedKeywords = Map.singleton Keyword.Trample 1,
       PC.assignsCombatDamageWithToughness = True,
       PC.grantsStationToughness = True,
+      -- Pawl.Codec.FaceSpec's own values for the four cost fields.
+      PC.additionalCosts = [CostComponent.TapThis],
+      PC.additionalCostChoices = [CostChoice.MkCostChoice (Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.TapThis] NonEmpty.:| [Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []])],
+      PC.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
+      PC.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)],
       -- Synthetic like the rest of this value: a Mountain has no halves, and
       -- what the case is about is that the field carries a whole card through
       -- the wire (CR 709.5).
@@ -115,6 +126,10 @@ testCharacteristicsJson =
     <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}],"
     <> "\"assignsCombatDamageWithToughness\":true,"
     <> "\"grantsStationToughness\":true,"
+    <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
+    <> "\"additionalCostChoices\":[[{\"components\":[{\"type\":\"TapThis\"}],\"mana\":[]},{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}]],"
+    <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
+    <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]},"
     <> "\"prepare\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
     <> "\"flipped\":{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}}"
@@ -149,6 +164,10 @@ minimalCharacteristics =
       PC.textChangedKeywords = Map.empty,
       PC.assignsCombatDamageWithToughness = False,
       PC.grantsStationToughness = False,
+      PC.additionalCosts = [],
+      PC.additionalCostChoices = [],
+      PC.alternativeCosts = [],
+      PC.costReductions = [],
       PC.halves = Nothing,
       PC.prepare = Nothing,
       PC.flipped = Nothing
