@@ -2138,6 +2138,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Blight (Blight.MkBlight (PlayerRef.Relative PlayerRelation.Opponent) (Quantity.Literal 2) Nothing))
       " {\"type\":\"Blight\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"Opponent\"}},\"quantity\":{\"type\":\"Literal\",\"value\":2}}} "
+  -- CR 701.51b: nullary, the rule fixing whose deck and which card.
+  Spec.it s "OpenAttraction" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.OpenAttraction
+      " {\"type\":\"OpenAttraction\"} "
   -- CR 701.54a: nullary, because rule 701.54 fixes the chooser, the count and the
   -- qualification, leaving an author nothing to write.
   Spec.it s "TemptWithTheRing" $

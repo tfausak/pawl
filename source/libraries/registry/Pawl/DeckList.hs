@@ -74,7 +74,7 @@ parse registry text = do
         Right (Just (Left next)) -> (next, entries, problems)
         Right (Just (Right (count, card))) -> (section, (section, card, count) : entries, problems)
       (_, found, bad) = List.foldl' step (Main, [], []) results
-      gather want = Map.fromListWith (+) [(Printing.MkPrinting card, count) | (section, card, count) <- found, section == want, count /= 0]
+      gather want = Map.fromListWith (+) [(Printing.ofCard card, count) | (section, card, count) <- found, section == want, count /= 0]
       deck = Deck.fromCards (gather Main)
    in pure $ case List.reverse bad of
         [] -> Right deck {Deck.sideboard = gather Side}

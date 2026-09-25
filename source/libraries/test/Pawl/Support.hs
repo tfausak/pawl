@@ -584,7 +584,7 @@ nightmareJson = do
   TextIO.readFile (root <> "/nightmare.json")
 
 printingOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Printing.Printing
-printingOf s registry = fmap Printing.MkPrinting . cardOf s registry
+printingOf s registry = fmap Printing.ofCard . cardOf s registry
 
 -- How a spec case fetches a card: a Nothing becomes an assertion failure naming
 -- the card, so a missing card fails the case that wanted it rather than
@@ -698,7 +698,7 @@ buildObjects registry zone player objects built = case objects of
       Nothing -> pure (Left (MkUnknownCard (objectName object)))
       Just card -> do
         let owner = setupPlayer player
-            (oid, withObject) = addObjectIn zone (Printing.MkPrinting card) owner (builtState built)
+            (oid, withObject) = addObjectIn zone (Printing.ofCard card) owner (builtState built)
             controller = Maybe.fromMaybe owner (objectController object)
             -- objectSickness says why the arranged seat is discarded.
             readiness = case objectSickness object of
@@ -1185,7 +1185,7 @@ artifactId gs =
 -- when a test needs a token on the board without resolving a maker.
 addToken :: Card.Type.Card -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addToken card pid gs =
-  let (cardId, gsP) = Game.intern (Printing.MkPrinting card) gs
+  let (cardId, gsP) = Game.intern (Printing.ofCard card) gs
       (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
@@ -3359,6 +3359,7 @@ oneMountainState mountain ph =
           GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
+          GameState.attractionDecks = Map.empty,
           GameState.stack = [],
           GameState.players = Map.empty,
           GameState.stackArchive = Map.empty,
@@ -3737,5 +3738,5 @@ allPrintings s = do
   root <- Registry.defaultRoot
   loaded <- Registry.loadRoot root
   case Maybe.mapMaybe (\(path, result) -> case result of Left reason -> Just (path <> ": " <> Text.unpack reason); Right _ -> Nothing) loaded of
-    [] -> pure (Maybe.mapMaybe (\(_, result) -> case result of Right card -> Just (Printing.MkPrinting card); Left _ -> Nothing) loaded)
+    [] -> pure (Maybe.mapMaybe (\(_, result) -> case result of Right card -> Just (Printing.ofCard card); Left _ -> Nothing) loaded)
     errs -> Spec.assertFailure s (List.intercalate "\n" errs)

@@ -24,6 +24,7 @@ import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Engine.Airbend as Airbend
 import qualified Pawl.Engine.Amass as Amass
 import qualified Pawl.Engine.Attach as Attach
+import qualified Pawl.Engine.Attraction as Attraction
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Blight as Blight
 import qualified Pawl.Engine.Card as Card
@@ -2876,6 +2877,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- CR 701.61a: neither half of forage can be carried out by a player holding
   -- fewer than three cards in their graveyard who controls no Food, which is
   -- Pawl.Engine.Forage.canForage. The executing arm reads the same two pools.
+  -- CR 609.3: an empty Attraction deck opens nothing.
+  Effect.OpenAttraction -> null (Attraction.deckOf controller gs)
   Effect.Forage -> not (Forage.canForage controller gs)
   -- CR 701.36b states the empty board's outcome outright -- "if you control no
   -- creature tokens when instructed to populate, you won't create a token" -- so
@@ -3838,260 +3841,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     (RollDie.count rollDie)
                 )
             )
-        -- CR 706.1a's outcomes "numbered from 1 to N", BOTH ends included: the
-        -- answer filtered back to a face the die could show. Its own binding
-        -- because a reroll runs it a second time.
-        faceOf rolled = if rolled >= 1 && rolled <= sides then rolled else 1
-        -- CR 706.2b's FIRST step, taken before the instruction's own modifier
-        -- is added below: a source other than this instruction offers to throw
-        -- the same die again and take the new number as the natural result
-        -- (Clam-I-Am). CR 706.1a's "the same die", so `sides` is unchanged and
-        -- the second answer is filtered back against the same range.
-        --
-        -- RECURSIVE, because the offer is a static ability and its gate is on
-        -- the natural result: a rerolled 3 that comes up 3 again is a 3 the
-        -- Clam sees, and rule 706.2 puts no limit on how many times a roll is
-        -- modified. Terminating because every round costs some player a
-        -- Prompt.RerollDie they may decline.
-        --
-        -- The offers are re-read each round for the same reason, rather than
-        -- captured before the first die.
-        --
-        -- A reroll IS a roll, and records CR 706.1's event again under the
-        -- player who throws it -- Pippa, Duchess of Dice's ruling, which has a
-        -- reroll trigger "whenever you roll a die". The discarded number is not
-        -- CR 706.6's ignored roll: it happened, and its event stands.
-        --
-        -- Answers the natural result with the player who THREW it: the roller,
-        -- or whoever activated a reroll in `window` below.
-        rerolling thrower natural = do
-          gs <- State.get
-          modifiers <- Dice.modifiersFor controller
-          offering (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers))) thrower natural
-        -- CR 109.5's "you" on the modifier, which is the player its "may" and
-        -- its CR 706.2a cost belong to -- Clam-I-Am's own controller, who is
-        -- also the roller, and Wall of Fortune's, who need not be. The ROLLER
-        -- where the carrier names no object, which CR 611.2a's stored form would
-        -- be and no printing of this family is.
-        offerOf gs (stated, offer) = (payerOf gs stated, stated, offer)
-        payerOf gs stated = Maybe.fromMaybe controller (stated >>= \oid -> Projection.controllerOf oid gs)
-        -- Two FREE offers to the same player are the same question asked twice:
-        -- the answers are indistinguishable, and either accepted throws the same
-        -- die. So two Clam-I-Ams ask once. Where CR 706.2a's cost is stated the
-        -- offers stand apart -- what is paid, and the permanent it is paid
-        -- against, are things the payer can tell apart -- so each is asked.
-        distinct seen candidates = case candidates of
-          [] -> []
-          candidate@(payer, _, offer) : rest
-            | Maybe.isJust (ModifiedRoll.cost offer) -> candidate : distinct seen rest
-            | Set.member payer seen -> distinct seen rest
-            | otherwise -> candidate : distinct (Set.insert payer seen) rest
-        -- Not implemented: CR 706.2b's pick among COMPETING modifiers, which is
-        -- the ROLLER's (#3976). The offers are put to their own payers in
-        -- timestamp order instead, and the first taken is the one applied.
-        offering offers thrower natural = case offers of
-          [] -> window thrower natural
-          (payer, stated, offer) : rest -> do
-            gs <- State.get
-            let mCost = ModifiedRoll.cost offer
-            if not (payable gs payer stated mCost)
-              then offering rest thrower natural
-              else do
-                answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor payer gs) payer natural mCost)
-                case answer of
-                  OptionalDecision.Declines -> offering rest thrower natural
-                  OptionalDecision.Exercises -> do
-                    paid <- payModifier payer stated mCost
-                    if not paid
-                      then offering rest thrower natural
-                      else do
-                        again <- Game.ask (Prompt.RollDie sides)
-                        -- The roller throws it: Clam-I-Am's "you may reroll
-                        -- it", Wall of Fortune's "have any player reroll a die
-                        -- that player rolled".
-                        State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
-                        rerolling controller (faceOf again)
-        -- CR 118.3, Prompt.ChooseToPay's posture for CR 118.12: a cost the
-        -- payer has not the resources to pay fully is not offered. A stated
-        -- cost with no object behind it cannot be paid at all -- every
-        -- component is paid against the permanent that printed it -- and is
-        -- skipped for that reason.
-        payable gs payer stated mCost = case (stated, mCost) of
-          (_, Nothing) -> True
-          (Just oid, Just cost) -> Cost.canPay PaymentSubject.ForNeither payer oid cost gs
-          (Nothing, Just _) -> False
-        payModifier payer stated mCost = case (stated, mCost) of
-          (Just oid, Just cost) -> payForModifier payer oid cost
-          _ -> pure True
-        -- CR 706.2b's SECOND step, once every die is up and every reroll done:
-        -- a source other than this instruction offers to move one result up or
-        -- down (Night Shift of the Living Dead). After the rerolls, which is
-        -- the rule's order, so a result an adjustment moved onto Clam-I-Am's 3
-        -- is never offered a reroll. Every result is shown before the choice,
-        -- the printed ruling's reading of "after you roll a die", and the answer
-        -- names the die.
-        --
-        -- Each offer is asked AT MOST ONCE per instruction: a modifier applies
-        -- to a roll once, so the list is not re-read after one is taken. The
-        -- budget and the cost are re-read before each question.
-        --
-        -- Not implemented: CR 706.2b's pick among competing modifiers, which is
-        -- the ROLLER's (#3976); the offers go to their payers in timestamp
-        -- order, as `offering`'s do.
-        adjusting results = do
-          modifiers <- Dice.modifiersFor controller
-          adjustingThrough (Dice.adjustOffers sides modifiers) results
-        adjustingThrough offers results = case (offers, NonEmpty.nonEmpty results) of
-          ([], _) -> pure results
-          (_, Nothing) -> pure results
-          ((stated, offer, amount) : rest, Just shown) -> do
-            gs <- State.get
-            let payer = payerOf gs stated
-                mCost = ModifiedRoll.cost offer
-            if not (Dice.withinLimit gs payer stated offer && payable gs payer stated mCost)
-              then adjustingThrough rest results
-              else do
-                answer <- Game.choose (Prompt.AdjustDieRoll (Decide.deciderFor payer gs) payer shown amount mCost)
-                case answer of
-                  Nothing -> adjustingThrough rest results
-                  Just (index, direction) -> do
-                    paid <- payModifier payer stated mCost
-                    if not paid
-                      then adjustingThrough rest results
-                      else do
-                        State.modify' (Dice.spendLimit stated offer)
-                        -- FILTERED, NOT TRUSTED: an index past the end shifts
-                        -- the first die.
-                        let at = if index < List.genericLength results then index else 0
-                            shift n = case direction of
-                              RollAdjustment.Increase -> n + toInteger amount
-                              RollAdjustment.Decrease -> n - toInteger amount
-                        adjustingThrough rest (zipWith (\i n -> if i == at then shift n else n) [0 :: Natural ..] results)
-        -- CR 706.2a's cost, charged between the offer and the modifier's
-        -- application: a declined or failed payment leaves the number standing.
-        --
-        -- DuringResolution, payGatePaidBy's moment and for its reason -- the
-        -- roll is CR 609.1's effect being followed -- so the payment is CR
-        -- 733.1's own reversible action and the CR 605.3a window it opens is
-        -- the payer's to keep.
-        --
-        -- Not implemented: CR 706.2a's second sentence gives that mana window to
-        -- the player who ROLLED, where Cost.pay opens it for the payer (#3981).
-        -- NO PRINTING tells the two readings apart, and Monitor Monitor -- the
-        -- one printed modifier carrying a mana cost, once CR 717's Attractions
-        -- land (#871) -- will not either: its roller IS its payer, "you may pay
-        -- {1} to reroll one or more dice you rolled". Wall of Fortune is the
-        -- only printing whose payer is not the roller and its cost states no
-        -- mana, so it opens no window at all. The shape that would separate them
-        -- is Wall of Fortune's scope with a mana cost, which nothing prints, so
-        -- this is falsifiable only by a synthetic card.
-        --
-        -- Cost.pay takes ONE seat, for the payment and for the window both, so
-        -- the change is a second seat threaded through paySubstituting and
-        -- payManaWindow -- the path every cast, activation and CR 118.12 gate
-        -- also takes.
-        --
-        -- The bound slots are dropped, payGatePaidBy's elision and its reason:
-        -- a permanent this payment tapped cannot be read by a later clause of
-        -- the same resolution (#1872).
-        payForModifier payer oid cost = do
-          (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer oid pure cost
-          began <- State.get
-          outcome <- Cost.pay performManaAbility began PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
-          pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
-        -- Goblin Bookie's "Activate only any time it makes sense", read as a
-        -- window inside CR 706.2's modification step, once the static offers
-        -- above are spent. No rule grants one: CR 117.1b ties activation to
-        -- priority, which CR 117.3b hands out only after a resolution. Each ability
-        -- ActivationRestriction.DuringDieRoll marks is offered to the player
-        -- who may activate it, through the same gate a priority activation
-        -- takes (Activatable.activatable), and it resolves at once, as CR
-        -- 605.3b's mana ability does -- the only reading in which the reroll
-        -- reaches the die. Pawl.CardSpec keeps such an ability to an untargeted
-        -- Effect.Reroll, which is what lets Prompt.RerollDie ask for it.
-        --
-        -- The stamp on GameState is what DuringDieRoll reads and what
-        -- Effect.Reroll throws against, restored on the way out so a roll
-        -- nested inside the window's own resolution cannot leave it open.
-        --
-        -- Not implemented: CR 706.2b's pick among competing modifiers, the
-        -- roller's (#3976). Players are asked in APNAP order, and within a
-        -- player in object order.
-        window thrower natural = do
-          previous <- State.get
-          State.modify' (\g -> g {GameState.rollingDie = Just sides, GameState.rerolledTo = Nothing})
-          opened <- State.get
-          let candidates =
-                [ (pid, oid, ability)
-                | pid <- Game.apnapOrder opened,
-                  oid <- Activatable.activationSources pid opened,
-                  ability <- Activatable.abilitiesFor oid opened,
-                  elem ActivationRestriction.Type.DuringDieRoll (ActivatedAbility.restrictions ability)
-                ]
-          rerolled <- windowOffering candidates natural
-          State.modify' (\g -> g {GameState.rollingDie = GameState.rollingDie previous, GameState.rerolledTo = GameState.rerolledTo previous})
-          case rerolled of
-            Nothing -> pure (thrower, natural)
-            Just (pid, face) -> rerolling pid face
-        windowOffering candidates natural = case candidates of
-          [] -> pure Nothing
-          (pid, oid, ability) : rest -> do
-            gs <- State.get
-            if not (Activatable.activatable pid oid ability gs)
-              then windowOffering rest natural
-              else do
-                answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor pid gs) pid natural (Just (ActivatedAbility.cost ability)))
-                case answer of
-                  OptionalDecision.Declines -> windowOffering rest natural
-                  OptionalDecision.Exercises -> do
-                    activated <- activateWhileRolling pid oid ability
-                    after <- State.get
-                    case (activated, GameState.rerolledTo after) of
-                      (True, Just face) -> pure (Just (pid, face))
-                      _ -> windowOffering rest natural
-        rollOne = do
-          rolled <- Game.ask (Prompt.RollDie sides)
-          (thrower, natural) <- rerolling controller (faceOf rolled)
+    let perDie :: Game Integer
+        perDie = do
           gs <- State.get
           let viewOf = effectViewOf source legal gs
               context = effectContext gs controller source legal (slotBindings resolving gs)
-              -- CR 706.2, read AFTER the roll as the rule words it, and per die:
-              -- the rule adds the modifier to the natural result of a roll, so a
-              -- count above one adds it to each. CR 107.2's posture for a
-              -- modifier that cannot be evaluated: no modifier at all.
-              --
-              -- After the rerolls above, which is CR 706.2b's order: rerolls are
-              -- considered first, and what they leave is the natural result this
-              -- adds to.
-              modifier = case RollDie.modifier rollDie of
-                Nothing -> 0
-                Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
-          -- Left unclamped: CR 706.2's result is the number after EVERY
-          -- modifier, so a shift from another source applies to this sum as it
-          -- stands, negative or not, and only the final figure is clamped below.
-          pure (toInteger natural + modifier, thrower)
-    -- CR 614.1a over CR 706.1: the instruction's count is offered to the
-    -- replacement effects watching this roller's rolls (Pixie Guide) before the
-    -- first die is thrown, and what comes back is how many dice to throw and how
-    -- many of the lowest rolls CR 706.6 then ignores.
-    (dice, ignored) <- Event.proposeDiceRoll controller named
-    -- CR 706.6: every die is thrown and every face asked for -- an ignored roll
-    -- HAPPENED and is only then treated as never having happened -- so the ignore
-    -- runs on the results and not on the count -- and could not run any earlier
-    -- in any case, the lowest roll not being known until every die has come up.
-    thrown <- traverse (const rollOne) [1 .. dice]
-    -- CR 706.6 before the second step: an ignored roll is one "no effects apply
-    -- to", so it is not offered for an adjustment.
-    --
-    -- CR 107.1b once, on the final figure, after every modifier: The Deck of
-    -- Many Things' natural 3, four cards in hand and a shift up is a 0, not a 1
-    -- (Pawl.DiceSpec's "CR 706.2 a shift applies to the unclamped sum").
-    --
-    -- Each die keeps the player who threw its final natural result, paired by
-    -- position so CR 706.6's tie still drops the first of the lowest.
-    let kept = Dice.ignoreLowest ignored (zip (fmap fst thrown) [0 :: Int ..])
-        throwers = fmap (\(_, i) -> maybe controller snd (Maybe.listToMaybe (drop i thrown))) kept
-    results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (fmap fst kept))
+          -- CR 706.2, read AFTER the roll as the rule words it, and per die:
+          -- the rule adds the modifier to the natural result of a roll, so a
+          -- count above one adds it to each. CR 107.2's posture for a modifier
+          -- that cannot be evaluated: no modifier at all.
+          pure $ case RollDie.modifier rollDie of
+            Nothing -> 0
+            Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
+    (results, throwers) <- throwDice controller sides named perDie
     Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
       gs <- State.get
       -- CR 706.4: WHICH result the instruction uses, where it threw more than
@@ -4118,15 +3880,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         case fmap snd (filter (\(i, _) -> i /= index) (zip [0 ..] results)) of
           [rest] -> State.modify' (bindAmountSlot source other rest)
           _ -> pure ()
-      State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
-      -- CR 706.2's final number, one entry per die the instruction kept, for
-      -- "whenever you roll a 6" -- after every modifier, and never for an
-      -- ignored roll (CR 706.6). Recorded under the player who threw the die's
-      -- final natural result: Pippa, Duchess of Dice's ruling gives a reroll of
-      -- another player's die to the rerolling player's "whenever you roll"
-      -- triggers.
-      Foldable.for_ (zip throwers results) $ \(thrower, result) ->
-        State.modify' (Event.recordEvent (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = thrower, DieResult.result = result}))
+      recordRoll controller throwers results
   -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
   -- the RollDie arm's window above: the same die, the new face filtered back to
   -- CR 706.1a's range, and handed back through GameState.rerolledTo. No window
@@ -8659,6 +8413,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 701.54a: the Ring tempts the resolving controller; the keyword action is
   -- Pawl.Engine.Ring.tempt's.
   Effect.TemptWithTheRing -> Ring.tempt controller
+  Effect.OpenAttraction -> Attraction.open controller
   -- CR 701.61a: the resolving controller forages; the keyword action is
   -- Pawl.Engine.Forage.forage's, prompts and all.
   Effect.Forage -> Monad.void (Forage.forage controller resolving)
@@ -9310,6 +9065,284 @@ performHandAction source player =
         (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
         (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
     )
+
+-- | CR 706.1-706.6: throw `named` dice with `sides` sides for `controller`,
+-- through every modification rule 706 names -- CR 614.1a's replacements, CR
+-- 706.2b's rerolls and adjustments, CR 706.6's ignored rolls -- and answer each
+-- kept die's final result beside the player who threw its final natural result.
+-- `perDie` is the instruction's own modifier (CR 706.2). Shared by
+-- Effect.RollDie's arm and CR 701.52a's roll to visit, which records nothing
+-- here: each caller records its own events.
+-- | CR 706.1's roll, as the log records it once throwDice's results are
+-- settled.
+recordRoll :: PlayerId -> [PlayerId] -> [Natural] -> Game ()
+recordRoll controller throwers results = do
+  State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+  -- CR 706.2's final number, one entry per die the instruction kept, for
+  -- "whenever you roll a 6" -- after every modifier, and never for an ignored
+  -- roll (CR 706.6). Recorded under the player who threw the die's final
+  -- natural result: Pippa, Duchess of Dice's ruling gives a reroll of another
+  -- player's die to the rerolling player's "whenever you roll" triggers.
+  Foldable.for_ (zip throwers results) $ \(thrower, result) ->
+    State.modify' (Event.recordEvent (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = thrower, DieResult.result = result}))
+
+-- | CR 701.52a: roll a six-sided die to visit this player's Attractions. A die
+-- roll like any other (CR 706), then the result the Visit triggers read.
+rollToVisit :: PlayerId -> Game ()
+rollToVisit pid = do
+  (results, throwers) <- throwDice pid 6 1 (pure 0)
+  recordRoll pid throwers results
+  -- CR 706.6 can throw a second die and ignore the lower; one is left.
+  Foldable.for_ (Maybe.listToMaybe results) $ \result ->
+    State.modify' (Event.recordEvent (GameEvent.RolledToVisit DieResult.MkDieResult {DieResult.roller = pid, DieResult.result = result}))
+
+throwDice :: PlayerId -> Natural -> Natural -> Game Integer -> Game ([Natural], [PlayerId])
+throwDice controller sides named perDie = do
+  let -- CR 706.1a's outcomes "numbered from 1 to N", BOTH ends included: the
+      -- answer filtered back to a face the die could show. Its own binding
+      -- because a reroll runs it a second time.
+      faceOf rolled = if rolled >= 1 && rolled <= sides then rolled else 1
+      -- CR 706.2b's FIRST step, taken before the instruction's own modifier
+      -- is added below: a source other than this instruction offers to throw
+      -- the same die again and take the new number as the natural result
+      -- (Clam-I-Am). CR 706.1a's "the same die", so `sides` is unchanged and
+      -- the second answer is filtered back against the same range.
+      --
+      -- RECURSIVE, because the offer is a static ability and its gate is on
+      -- the natural result: a rerolled 3 that comes up 3 again is a 3 the
+      -- Clam sees, and rule 706.2 puts no limit on how many times a roll is
+      -- modified. Terminating because every round costs some player a
+      -- Prompt.RerollDie they may decline.
+      --
+      -- The offers are re-read each round for the same reason, rather than
+      -- captured before the first die.
+      --
+      -- A reroll IS a roll, and records CR 706.1's event again under the
+      -- player who throws it -- Pippa, Duchess of Dice's ruling, which has a
+      -- reroll trigger "whenever you roll a die". The discarded number is not
+      -- CR 706.6's ignored roll: it happened, and its event stands.
+      --
+      -- Answers the natural result with the player who THREW it: the roller,
+      -- or whoever activated a reroll in `window` below.
+      rerolling thrower natural = do
+        gs <- State.get
+        modifiers <- Dice.modifiersFor controller
+        offering (distinct Set.empty (fmap (offerOf gs) (Dice.rerollOffers sides natural modifiers))) thrower natural
+      -- CR 109.5's "you" on the modifier, which is the player its "may" and
+      -- its CR 706.2a cost belong to -- Clam-I-Am's own controller, who is
+      -- also the roller, and Wall of Fortune's, who need not be. The ROLLER
+      -- where the carrier names no object, which CR 611.2a's stored form would
+      -- be and no printing of this family is.
+      offerOf gs (stated, offer) = (payerOf gs stated, stated, offer)
+      payerOf gs stated = Maybe.fromMaybe controller (stated >>= \oid -> Projection.controllerOf oid gs)
+      -- Two FREE offers to the same player are the same question asked twice:
+      -- the answers are indistinguishable, and either accepted throws the same
+      -- die. So two Clam-I-Ams ask once. Where CR 706.2a's cost is stated the
+      -- offers stand apart -- what is paid, and the permanent it is paid
+      -- against, are things the payer can tell apart -- so each is asked.
+      distinct seen candidates = case candidates of
+        [] -> []
+        candidate@(payer, _, offer) : rest
+          | Maybe.isJust (ModifiedRoll.cost offer) -> candidate : distinct seen rest
+          | Set.member payer seen -> distinct seen rest
+          | otherwise -> candidate : distinct (Set.insert payer seen) rest
+      -- Not implemented: CR 706.2b's pick among COMPETING modifiers, which is
+      -- the ROLLER's (#3976). The offers are put to their own payers in
+      -- timestamp order instead, and the first taken is the one applied.
+      offering offers thrower natural = case offers of
+        [] -> window thrower natural
+        (payer, stated, offer) : rest -> do
+          gs <- State.get
+          let mCost = ModifiedRoll.cost offer
+          if not (payable gs payer stated mCost)
+            then offering rest thrower natural
+            else do
+              answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor payer gs) payer natural mCost)
+              case answer of
+                OptionalDecision.Declines -> offering rest thrower natural
+                OptionalDecision.Exercises -> do
+                  paid <- payModifier payer stated mCost
+                  if not paid
+                    then offering rest thrower natural
+                    else do
+                      again <- Game.ask (Prompt.RollDie sides)
+                      -- The roller throws it: Clam-I-Am's "you may reroll
+                      -- it", Wall of Fortune's "have any player reroll a die
+                      -- that player rolled".
+                      State.modify' (Event.recordEvent (GameEvent.DiceRolled controller))
+                      rerolling controller (faceOf again)
+      -- CR 118.3, Prompt.ChooseToPay's posture for CR 118.12: a cost the
+      -- payer has not the resources to pay fully is not offered. A stated
+      -- cost with no object behind it cannot be paid at all -- every
+      -- component is paid against the permanent that printed it -- and is
+      -- skipped for that reason.
+      payable gs payer stated mCost = case (stated, mCost) of
+        (_, Nothing) -> True
+        (Just oid, Just cost) -> Cost.canPay PaymentSubject.ForNeither payer oid cost gs
+        (Nothing, Just _) -> False
+      payModifier payer stated mCost = case (stated, mCost) of
+        (Just oid, Just cost) -> payForModifier payer oid cost
+        _ -> pure True
+      -- CR 706.2b's SECOND step, once every die is up and every reroll done:
+      -- a source other than this instruction offers to move one result up or
+      -- down (Night Shift of the Living Dead). After the rerolls, which is
+      -- the rule's order, so a result an adjustment moved onto Clam-I-Am's 3
+      -- is never offered a reroll. Every result is shown before the choice,
+      -- the printed ruling's reading of "after you roll a die", and the answer
+      -- names the die.
+      --
+      -- Each offer is asked AT MOST ONCE per instruction: a modifier applies
+      -- to a roll once, so the list is not re-read after one is taken. The
+      -- budget and the cost are re-read before each question.
+      --
+      -- Not implemented: CR 706.2b's pick among competing modifiers, which is
+      -- the ROLLER's (#3976); the offers go to their payers in timestamp
+      -- order, as `offering`'s do.
+      adjusting results = do
+        modifiers <- Dice.modifiersFor controller
+        adjustingThrough (Dice.adjustOffers sides modifiers) results
+      adjustingThrough offers results = case (offers, NonEmpty.nonEmpty results) of
+        ([], _) -> pure results
+        (_, Nothing) -> pure results
+        ((stated, offer, amount) : rest, Just shown) -> do
+          gs <- State.get
+          let payer = payerOf gs stated
+              mCost = ModifiedRoll.cost offer
+          if not (Dice.withinLimit gs payer stated offer && payable gs payer stated mCost)
+            then adjustingThrough rest results
+            else do
+              answer <- Game.choose (Prompt.AdjustDieRoll (Decide.deciderFor payer gs) payer shown amount mCost)
+              case answer of
+                Nothing -> adjustingThrough rest results
+                Just (index, direction) -> do
+                  paid <- payModifier payer stated mCost
+                  if not paid
+                    then adjustingThrough rest results
+                    else do
+                      State.modify' (Dice.spendLimit stated offer)
+                      -- FILTERED, NOT TRUSTED: an index past the end shifts
+                      -- the first die.
+                      let at = if index < List.genericLength results then index else 0
+                          shift n = case direction of
+                            RollAdjustment.Increase -> n + toInteger amount
+                            RollAdjustment.Decrease -> n - toInteger amount
+                      adjustingThrough rest (zipWith (\i n -> if i == at then shift n else n) [0 :: Natural ..] results)
+      -- CR 706.2a's cost, charged between the offer and the modifier's
+      -- application: a declined or failed payment leaves the number standing.
+      --
+      -- DuringResolution, payGatePaidBy's moment and for its reason -- the
+      -- roll is CR 609.1's effect being followed -- so the payment is CR
+      -- 733.1's own reversible action and the CR 605.3a window it opens is
+      -- the payer's to keep.
+      --
+      -- Not implemented: CR 706.2a's second sentence gives that mana window to
+      -- the player who ROLLED, where Cost.pay opens it for the payer (#3981).
+      -- NO PRINTING tells the two readings apart, and Monitor Monitor -- the
+      -- one printed modifier carrying a mana cost, an Attraction opener -- will
+      -- not either: its roller IS its payer, "you may pay
+      -- {1} to reroll one or more dice you rolled". Wall of Fortune is the
+      -- only printing whose payer is not the roller and its cost states no
+      -- mana, so it opens no window at all. The shape that would separate them
+      -- is Wall of Fortune's scope with a mana cost, which nothing prints, so
+      -- this is falsifiable only by a synthetic card.
+      --
+      -- Cost.pay takes ONE seat, for the payment and for the window both, so
+      -- the change is a second seat threaded through paySubstituting and
+      -- payManaWindow -- the path every cast, activation and CR 118.12 gate
+      -- also takes.
+      --
+      -- The bound slots are dropped, payGatePaidBy's elision and its reason:
+      -- a permanent this payment tapped cannot be read by a later clause of
+      -- the same resolution (#1872).
+      payForModifier payer oid cost = do
+        (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer oid pure cost
+        began <- State.get
+        outcome <- Cost.pay performManaAbility began PaymentMoment.DuringResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced payer oid announced
+        pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
+      -- Goblin Bookie's "Activate only any time it makes sense", read as a
+      -- window inside CR 706.2's modification step, once the static offers
+      -- above are spent. No rule grants one: CR 117.1b ties activation to
+      -- priority, which CR 117.3b hands out only after a resolution. Each ability
+      -- ActivationRestriction.DuringDieRoll marks is offered to the player
+      -- who may activate it, through the same gate a priority activation
+      -- takes (Activatable.activatable), and it resolves at once, as CR
+      -- 605.3b's mana ability does -- the only reading in which the reroll
+      -- reaches the die. Pawl.CardSpec keeps such an ability to an untargeted
+      -- Effect.Reroll, which is what lets Prompt.RerollDie ask for it.
+      --
+      -- The stamp on GameState is what DuringDieRoll reads and what
+      -- Effect.Reroll throws against, restored on the way out so a roll
+      -- nested inside the window's own resolution cannot leave it open.
+      --
+      -- Not implemented: CR 706.2b's pick among competing modifiers, the
+      -- roller's (#3976). Players are asked in APNAP order, and within a
+      -- player in object order.
+      window thrower natural = do
+        previous <- State.get
+        State.modify' (\g -> g {GameState.rollingDie = Just sides, GameState.rerolledTo = Nothing})
+        opened <- State.get
+        let candidates =
+              [ (pid, oid, ability)
+              | pid <- Game.apnapOrder opened,
+                oid <- Activatable.activationSources pid opened,
+                ability <- Activatable.abilitiesFor oid opened,
+                elem ActivationRestriction.Type.DuringDieRoll (ActivatedAbility.restrictions ability)
+              ]
+        rerolled <- windowOffering candidates natural
+        State.modify' (\g -> g {GameState.rollingDie = GameState.rollingDie previous, GameState.rerolledTo = GameState.rerolledTo previous})
+        case rerolled of
+          Nothing -> pure (thrower, natural)
+          Just (pid, face) -> rerolling pid face
+      windowOffering candidates natural = case candidates of
+        [] -> pure Nothing
+        (pid, oid, ability) : rest -> do
+          gs <- State.get
+          if not (Activatable.activatable pid oid ability gs)
+            then windowOffering rest natural
+            else do
+              answer <- Game.choose (Prompt.RerollDie (Decide.deciderFor pid gs) pid natural (Just (ActivatedAbility.cost ability)))
+              case answer of
+                OptionalDecision.Declines -> windowOffering rest natural
+                OptionalDecision.Exercises -> do
+                  activated <- activateWhileRolling pid oid ability
+                  after <- State.get
+                  case (activated, GameState.rerolledTo after) of
+                    (True, Just face) -> pure (Just (pid, face))
+                    _ -> windowOffering rest natural
+      rollOne = do
+        rolled <- Game.ask (Prompt.RollDie sides)
+        (thrower, natural) <- rerolling controller (faceOf rolled)
+        -- After the rerolls above, which is CR 706.2b's order: rerolls are
+        -- considered first, and what they leave is the natural result the
+        -- instruction's own modifier adds to.
+        modifier <- perDie
+        -- Left unclamped: CR 706.2's result is the number after EVERY
+        -- modifier, so a shift from another source applies to this sum as it
+        -- stands, negative or not, and only the final figure is clamped below.
+        pure (toInteger natural + modifier, thrower)
+  -- CR 614.1a over CR 706.1: the instruction's count is offered to the
+  -- replacement effects watching this roller's rolls (Pixie Guide) before the
+  -- first die is thrown, and what comes back is how many dice to throw and how
+  -- many of the lowest rolls CR 706.6 then ignores.
+  (dice, ignored) <- Event.proposeDiceRoll controller named
+  -- CR 706.6: every die is thrown and every face asked for -- an ignored roll
+  -- HAPPENED and is only then treated as never having happened -- so the ignore
+  -- runs on the results and not on the count -- and could not run any earlier
+  -- in any case, the lowest roll not being known until every die has come up.
+  thrown <- traverse (const rollOne) [1 .. dice]
+  -- CR 706.6 before the second step: an ignored roll is one "no effects apply
+  -- to", so it is not offered for an adjustment.
+  --
+  -- CR 107.1b once, on the final figure, after every modifier: The Deck of
+  -- Many Things' natural 3, four cards in hand and a shift up is a 0, not a 1
+  -- (Pawl.DiceSpec's "CR 706.2 a shift applies to the unclamped sum").
+  --
+  -- Each die keeps the player who threw its final natural result, paired by
+  -- position so CR 706.6's tie still drops the first of the lowest.
+  let kept = Dice.ignoreLowest ignored (zip (fmap fst thrown) [0 :: Int ..])
+      throwers = fmap (\(_, i) -> maybe controller snd (Maybe.listToMaybe (drop i thrown))) kept
+  results <- fmap (fmap Integer.toNaturalSaturating) (adjusting (fmap fst kept))
+  pure (results, throwers)
 
 -- The two halves Pawl.Engine.Cost reaches through the
 -- Pawl.Types.ManaAbilityPerformer parameter: CR 405.6c's other effects of the

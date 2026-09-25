@@ -25,13 +25,18 @@ import qualified Pawl.Types.Layout as Layout
 -- The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
 codec :: Codec.Codec Card.Card
-codec = Fields.object $ do
+codec = Fields.object (fields id)
+
+-- | A card's keys, read off whatever record holds it -- Pawl.Codec.Printing
+-- writes them beside a printing's own.
+fields :: (o -> Card.Card) -> Fields.Fields o Card.Card
+fields project = do
   -- Common.nonEmpty rejects an empty array, which is where the at-least-one-face
   -- invariant is enforced -- the UnsafeX posture Pawl.Types.Modal's modes field
   -- documents.
-  faces <- Fields.required "faces" (Common.nonEmpty (Face.codec codec)) Card.faces
+  faces <- Fields.required "faces" (Common.nonEmpty (Face.codec codec)) (Card.faces . project)
   -- CR 709-722: Normal is the absence of a card saying otherwise, so it is a
   -- default rather than a required key and most single-face files say nothing
   -- about it.
-  layout <- Fields.defaulted "layout" Layout.Normal Layout.codec Card.layout
+  layout <- Fields.defaulted "layout" Layout.Normal Layout.codec (Card.layout . project)
   pure Card.MkCard {Card.layout = layout, Card.faces = faces}

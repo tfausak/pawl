@@ -8,6 +8,7 @@ import qualified Pawl.ActivationProhibitionSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AirbendSpec
 import qualified Pawl.AttackKeywordTriggerSpec
+import qualified Pawl.AttractionSpec
 import qualified Pawl.AuraSpec
 import qualified Pawl.BattleSpec
 import qualified Pawl.BindingSpec
@@ -1361,6 +1362,7 @@ spec s registry = do
   Pawl.EntryRestrictionSpec.spec s registry
   Pawl.SacrificeRestrictionSpec.spec s registry
   Pawl.SagaSpec.spec s registry
+  Pawl.AttractionSpec.spec s registry
   Pawl.SaddleSpec.spec s registry
   Pawl.SpecialActionSpec.spec s registry
   Pawl.SpeedSpec.spec s registry

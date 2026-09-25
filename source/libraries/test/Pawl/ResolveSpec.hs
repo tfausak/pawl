@@ -4212,7 +4212,7 @@ nonWinnersLose3 =
 -- the object is a spell like any other.
 subgameSpellOn :: Printing.Printing -> String -> [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 subgameSpellOn borrowed name effects gs0 =
-  let (spellPrintingId, gs0b) = Game.intern (Printing.MkPrinting card) gs0
+  let (spellPrintingId, gs0b) = Game.intern (Printing.ofCard card) gs0
       (spellId, gs1) = Game.freshObjectId gs0b
       (ts, gs2) = Game.freshTimestamp gs1
       card = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}

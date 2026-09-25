@@ -528,6 +528,7 @@ rewriteEffect pairs effect = case effect of
   -- word and the {2} it fixes is not a card's text.
   Effect.Airbend ref -> Effect.Airbend (rewriteObjectRef pairs ref)
   Effect.TemptWithTheRing -> effect
+  Effect.OpenAttraction -> effect
   Effect.Forage -> effect
   Effect.Populate -> effect
   Effect.TimeTravel -> effect
@@ -1784,6 +1785,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
   TriggerCondition.PlayerRollsResult _ -> condition
+  TriggerCondition.Visit -> condition
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
   TriggerCondition.PlayerLosesCoinFlip _ -> condition
   TriggerCondition.SelfBecomesPlotted -> condition

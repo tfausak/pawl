@@ -240,6 +240,7 @@ ownQuantities effect = case effect of
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> [quantity]
   Effect.Airbend {} -> []
   Effect.TemptWithTheRing -> []
+  Effect.OpenAttraction -> []
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.TimeTravel -> []
@@ -1262,6 +1263,7 @@ effectObjectRefs effect =
         -- it unchanged.
         Effect.Airbend ref -> [(AsksMoveGather, ref)]
         Effect.TemptWithTheRing -> []
+        Effect.OpenAttraction -> []
         Effect.Forage -> []
         Effect.Populate -> []
         Effect.TimeTravel -> []

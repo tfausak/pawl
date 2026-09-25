@@ -448,6 +448,9 @@ data GameEvent
     -- instruction left unignored (CR 706.6) -- what "whenever you roll a 6"
     -- reads, where DiceRolled above is one entry per instruction.
     DieResultSettled (DieResult.DieResult PlayerId.PlayerId)
+  | -- | CR 701.52a: a player rolled to visit their Attractions, with the result
+    -- the Visit triggers read (CR 702.159a).
+    RolledToVisit (DieResult.DieResult PlayerId.PlayerId)
   | -- | CR 716.2a: a permanent's class level BECAME something -- the level BEFORE
     -- and the level AFTER, CountersPut's shape and for CR 714.2b's reason, since
     -- "becomes level N" is a threshold crossing. Recorded by Pawl.Engine.Resolve's

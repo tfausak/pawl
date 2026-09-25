@@ -660,6 +660,9 @@ data Effect card ability
     -- Pawl.Engine.Ring.tempt as one procedure that cannot stop early (CR
     -- 701.54d). Nullary, rule 701.54a fixing everything.
     TemptWithTheRing
+  | -- | CR 701.51b: the resolving controller opens an Attraction, performed by
+    -- Pawl.Engine.Attraction.open.
+    OpenAttraction
   | -- | CR 701.61a: the resolving controller forages, performed by
     -- Pawl.Engine.Forage.forage as one procedure. Nullary, rule 701.61a fixing
     -- everything but the forager's own two choices.

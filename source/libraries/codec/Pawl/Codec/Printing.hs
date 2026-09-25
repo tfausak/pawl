@@ -1,12 +1,16 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.Printing where
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName.Type
 import qualified Pawl.Types.Face as Face
@@ -15,10 +19,13 @@ import qualified Pawl.Types.Printing as Printing
 -- | The whole record, which is what a card FILE holds and what
 -- Pawl.CodecIntegrationSpec's honesty round trip over the corpus reads.
 --
--- The wire format is unchanged by the conversion to a bundle; what it adds is
--- a @$defs@ entry under this newtype's own name.
+-- The card's own keys plus CR 717.1's `lights`, which a card file never writes:
+-- Pawl.Registry reads files as cards, and the lights belong to a printing.
 codec :: Codec.Codec Printing.Printing
-codec = Common.wrapper Card.codec Printing.MkPrinting Printing.card
+codec = Fields.object $ do
+  card <- Card.fields Printing.card
+  lights <- Fields.defaulted "lights" Set.empty (Common.set Common.natural) Printing.lights
+  pure Printing.MkPrinting {Printing.card = card, Printing.lights = lights}
 
 -- | A printing in a game state's intern table: its NAME where a resolver can
 -- reproduce it, and the whole record where none can.
@@ -42,7 +49,8 @@ codec = Common.wrapper Card.codec Printing.MkPrinting Printing.card
 --
 -- The equality check is what makes @Named@ safe: a resolver answering with a
 -- DIFFERENT card under this name would decode to that other card, so the name is
--- not written. Pawl.Codec.PrintingSpec's "a name the resolver answers
+-- not written. A printing with lights is inlined for the same reason: a name
+-- resolves to a card, never to which printing of it (CR 717.1). Pawl.Codec.PrintingSpec's "a name the resolver answers
 -- differently for is written out in full" is that case.
 reference :: (CardName.Type.CardName -> Maybe Card.Type.Card) -> Codec.Codec Printing.Printing
 reference resolve =
@@ -55,11 +63,11 @@ reference resolve =
               name <- Common.withValue mv (Codec.decode CardName.codec)
               case resolve name of
                 Nothing -> Left (Text.pack ("no such card: " <> Text.unpack (CardName.Type.unwrap name)))
-                Just card -> Right (Printing.MkPrinting card),
+                Just card -> Right (Printing.ofCard card),
             Arm.valueSchema = Arm.RequiredValue (Codec.schema CardName.codec),
             Arm.projectValue = \printing ->
               let name = firstFaceName (Printing.card printing)
-               in if resolve name == Just (Printing.card printing)
+               in if resolve name == Just (Printing.card printing) && Set.null (Printing.lights printing)
                     then Just (Just (Codec.encode CardName.codec name))
                     else Nothing
           }

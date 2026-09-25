@@ -112,6 +112,7 @@ codec =
       Arm.payload "Surveiled" PlayerId.codec GameEvent.Surveiled (\x -> case x of GameEvent.Surveiled y -> Just y; _ -> Nothing),
       Arm.payload "DiceRolled" PlayerId.codec GameEvent.DiceRolled (\x -> case x of GameEvent.DiceRolled y -> Just y; _ -> Nothing),
       Arm.payload "DieResultSettled" (DieResult.codec PlayerId.codec) GameEvent.DieResultSettled (\x -> case x of GameEvent.DieResultSettled y -> Just y; _ -> Nothing),
+      Arm.payload "RolledToVisit" (DieResult.codec PlayerId.codec) GameEvent.RolledToVisit (\x -> case x of GameEvent.RolledToVisit y -> Just y; _ -> Nothing),
       Arm.payload "ClassLevelSet" ClassLevelChange.codec GameEvent.ClassLevelSet (\x -> case x of GameEvent.ClassLevelSet y -> Just y; _ -> Nothing),
       Arm.payload "Plotted" ObjectId.codec GameEvent.Plotted (\x -> case x of GameEvent.Plotted y -> Just y; _ -> Nothing),
       Arm.payload "Explored" ObjectId.codec GameEvent.Explored (\x -> case x of GameEvent.Explored y -> Just y; _ -> Nothing),
@@ -194,6 +195,7 @@ tagOf x = case x of
   GameEvent.Surveiled {} -> "Surveiled"
   GameEvent.DiceRolled {} -> "DiceRolled"
   GameEvent.DieResultSettled {} -> "DieResultSettled"
+  GameEvent.RolledToVisit {} -> "RolledToVisit"
   GameEvent.ClassLevelSet {} -> "ClassLevelSet"
   GameEvent.Plotted {} -> "Plotted"
   GameEvent.Explored {} -> "Explored"
