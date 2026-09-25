@@ -9482,6 +9482,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 702.159a / 701.52a: its controller rolled to visit, and the result is
@@ -10706,6 +10708,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
@@ -10780,6 +10783,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Surveiled _ -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
     GameEvent.ClassLevelSet _ -> False
     GameEvent.Plotted _ -> False
     GameEvent.Explored _ -> False
