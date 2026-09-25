@@ -56,11 +56,15 @@ data Expiry
     -- only "has this ended" sees this row from the moment it is stored and
     -- applies it a turn early.
     --
-    -- Not implemented: every carrier but GameState.attackProhibitions,
-    -- GameState.playerEffects and Object.playableFromExile reads its rows
-    -- without asking `begun`, so one stored under this arm applies from the
-    -- moment it is stored (#3983). Wall of Dust, Galvanic Relay and Sphinx's
-    -- Decree are the pool's producers, one per gated carrier.
+    -- Four carriers ask `begun`, one per producer: GameState.attackProhibitions
+    -- (Wall of Dust), GameState.attackRequirements (Taunt),
+    -- GameState.playerEffects (Sphinx's Decree) and Object.playableFromExile
+    -- (Galvanic Relay). No printing states such a window on any other carrier
+    -- (Scryfall o:"during your next turn", o:"during that player's next turn",
+    -- o:"during its controller's next turn", o:"during target player's next
+    -- turn", o:"during their next turn", 2026-09-25; the rest are CR 723's
+    -- player control), and a row stored on one would apply from the moment it is
+    -- stored.
     DuringTurnOf AfterTurn.AfterTurn
   | -- | CR 500.5: effects lasting until the end of a step or phase expire as it
     -- ends. A Pawl.Types.PhaseSelector because CR 500.5 names both grains and

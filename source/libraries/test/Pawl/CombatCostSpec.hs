@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -54,6 +55,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -2210,7 +2212,7 @@ alluringSirenSpec s registry = Spec.describe s "AlluringSiren" $ do
     case sirenBoard siren jace piker centaur of
       Nothing -> Spec.assertFailure s "fixture should build"
       Just (control, lured, _, _, activated) -> do
-        Spec.assertEqWith s "stored once the ability has resolved" (fmap ActiveAttackRequirement.attacker (GameState.attackRequirements activated)) [lured]
+        Spec.assertEqWith s "stored once the ability has resolved" (fmap ActiveAttackRequirement.attacker (GameState.attackRequirements activated)) [RestrictedCreatures.Named lured]
         Spec.assertEqWith s "and gone at cleanup (CR 514.2)" (GameState.attackRequirements (Expiry.dropAtCleanup activated)) []
         Spec.assertEqWith s "nothing was stored without the ability" (GameState.attackRequirements control) []
   Spec.it s "CR 508.1d whole cards: a real declare attackers step sends the lured creature at bob" $ do
@@ -2270,6 +2272,55 @@ sirenBoard siren jace piker centaur =
               activated = snd (Engine.runGamePure (aimingAt lured) ready (Activate.activateAbility S.bob sirenId ability))
            in Just (control, lured, free, jaceId, snd (Engine.runGamePure (aimingAt lured) activated Stack.resolveTop))
         _ -> Nothing
+
+-- Taunt {U} Sorcery (data/cards/taunt.json; name, cost, type line and Oracle
+-- text checked against api.scryfall.com) -- "During target player's next turn,
+-- creatures that player controls attack you if able." CR 508.1d's requirement on
+-- the STORED carrier under CR 611.2a's window, and over CR 611.2c's class.
+--
+-- alice casts it DURING BOB'S TURN 2, through Vedalken Orrery ("You may cast
+-- spells as though they had flash"), which is the one board where the window's
+-- beginning shows: bob's current turn is not his next one. bob's Hill Giant
+-- enters after the spell resolved, so only a class re-read at each declaration
+-- reaches it. Every declaration is identityAnswer's decline, which CR 508.1d
+-- replaces with the smallest one obeying the requirements in force.
+tauntSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+tauntSpec s registry = Spec.describe s "Taunt" $ do
+  Spec.it s "CR 508.1d / 611.2a / 611.2c whole cards: bob's creatures attack alice on his next turn, and only then" $ do
+    island <- S.printingOf s registry "Island"
+    orrery <- S.printingOf s registry "Vedalken Orrery"
+    taunt <- S.printingOf s registry "Taunt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let stockedWith pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard island pid g)) gs [1 :: Int .. 6]
+        g1 = S.landsFor island S.alice 1 (Setup.emptyGame S.bothPlayers)
+        g2 = snd (S.addPermanent piker S.bob (snd (S.addPermanent orrery S.alice g1)))
+        (g3, spell) = S.handOne taunt (stockedWith S.bob (stockedWith S.alice g2))
+        bobsMain = turnsUntil (\gs -> GameState.turnNumber gs == 2 && GameState.phase gs == Phase.PrecombatMain) g3
+        cast = S.runPure (aimingAtPlayer S.bob) bobsMain (S.cast S.alice spell)
+        resolved = S.runPure (aimingAtPlayer S.bob) cast Engine.priorityLoop
+        withGiant = snd (S.addPermanent giant S.bob resolved)
+        afterTurn n = turnsUntil (\gs -> GameState.turnNumber gs > n) withGiant
+    Spec.assertEqWith s "Taunt resolved on bob's turn 2" (length (GameState.attackRequirements resolved), GameState.turnNumber resolved, GameState.activePlayer resolved) (1, 2, S.bob)
+    Spec.assertEqWith s "CR 611.2a bob's current turn is not his next one, so nothing attacked" (S.lifeOf S.alice (afterTurn 2)) (Just 20)
+    Spec.assertEqWith s "CR 611.2c on his next turn both creatures attacked alice, the Giant too" (S.lifeOf S.alice (afterTurn 4)) (Just 15)
+    Spec.assertEqWith s "and the turn after that, nothing is required" (S.lifeOf S.alice (afterTurn 6)) (Just 15)
+
+-- Whole steps under identityAnswer until `done` holds or the game ends. Bounded
+-- so a rules bug cannot hang the suite.
+turnsUntil :: (GameState.GameState -> Bool) -> GameState.GameState -> GameState.GameState
+turnsUntil done =
+  let go budget gs =
+        if budget <= 0 || done gs || Maybe.isJust (GameState.result gs)
+          then gs
+          else go (budget - 1) (S.runPure S.identityAnswer gs Engine.runStep)
+   in go (160 :: Int)
+
+-- CR 601.2c: aim a spell at one particular player.
+aimingAtPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimingAtPlayer pid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just pid) . Recipient.playerOf) . snd) sets
+  _ -> S.identityAnswer p
 
 -- CR 508.1d's OBJECT axis on the PRINTED carrier, proved by Public Enemy
 -- ("{2}{U} Aura, Enchant creature / All creatures attack enchanted creature's
@@ -2635,7 +2686,7 @@ randomPlayerSpec s registry = Spec.describe s "RandomPlayer" $ do
           s
           "and the attacker is Ruhan"
           (fmap ActiveAttackRequirement.attacker (GameState.attackRequirements atCarol))
-          [ruhanId]
+          [RestrictedCreatures.Named ruhanId]
       _ -> Spec.assertFailure s "fixture should have one Ruhan"
   Spec.it s "CR 104.3a the offer is the opponents still in the game, and never the controller" $ do
     ruhan <- S.printingOf s registry "Ruhan of the Fomori"
@@ -2986,6 +3037,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   switchBlockersSpec s registry
   attackCostSpec s registry
   alluringSirenSpec s registry
+  tauntSpec s registry
   publicEnemySpec s registry
   mostLifeRequirementSpec s registry
   troveOfTemptationSpec s registry
