@@ -2891,8 +2891,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- the pool here exactly as it does in the executing arm, and the amount is read
   -- per victim there too. Pawl.ResolveSpec's "CR 608.2d Giant Opportunity's
   -- sacrifice of two Foods is not offered with one Food" proves the count.
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) ->
-    let victims = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players filter_ quantity) ->
+    let victims = playerRefPlayers legal controller gs players
         tooFewToGive victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
           Just n | n > 0 -> n > List.genericLength (Replacement.sacrificeCandidates (Filter.slotObjects context) victim Nothing filter_ gs)
           _ -> False
@@ -5617,10 +5617,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-    let -- Every player recipient the slot holds, in APNAP order (CR 101.4),
-        -- PlayerSacrifices' own intersection: a slot that is unfilled, illegal
-        -- (CR 608.2b) or names an object contributes nobody, and apnapOrder
-        -- supplies the ORDER while `named` supplies the MEMBERSHIP.
+    let -- Every player recipient the slot holds, in APNAP order (CR 101.4): a
+        -- slot that is unfilled, illegal (CR 608.2b) or names an object
+        -- contributes nobody, and apnapOrder supplies the ORDER while `named`
+        -- supplies the MEMBERSHIP.
         named = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
         victims = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
         -- Read against the VICTIM, not the controller, so "cards equal to the
@@ -5967,13 +5967,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- chosen this way are sacrificed simultaneously" -- so every pick is taken
   -- first, in APNAP order, and only then does anything leave the battlefield.
   -- The candidate lists are read off ONE `gs` for the same reason.
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> do
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players filter_ quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-        -- Every player recipient the slot holds, in APNAP order. A slot that is
-        -- unfilled, illegal (CR 608.2b) or names an object contributes nobody.
-        named = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+        -- Every player the reference names, in APNAP order.
+        named = playerRefPlayers legal controller gs players
         victims = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
         pickFor victim =
           -- Read against the VICTIM: "half the permanents they control" is a

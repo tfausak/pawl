@@ -164,8 +164,7 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- names each opponent makes one offer per opponent and this slot holds every
 -- seat whose answer selected the branch. A reader that takes one recipient
 -- (Pawl.Types.SlotArity.One) therefore reads NOTHING out of it once two seats
--- are in it; Pawl.Engine.Resolve's Effect.PlayerSacrifices arm and
--- PlayerRef.EachInSlot are the readers that take them all. Bellowing Mauler
+-- are in it; PlayerRef.EachInSlot is the reader that takes them all. Bellowing Mauler
 -- aims a life-total opcode at this slot -- "each player loses 4 life unless
 -- they sacrifice a nontoken creature of their choice" -- and Pawl.TriggerSpec's
 -- "CR 118.12a only the seats that did not pay lose the life" is where the

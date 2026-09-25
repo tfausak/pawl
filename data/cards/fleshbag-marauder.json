@@ -4,16 +4,7 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
-        },
-        {
-          "type": "OfType",
-          "value": {
-            "type": "Colored",
-            "value": {
-              "type": "Black"
-            }
-          }
+          "value": 2
         },
         {
           "type": "OfType",
@@ -25,45 +16,19 @@
           }
         }
       ],
-      "name": "Custodi Lich",
+      "name": "Fleshbag Marauder",
       "power": {
         "type": "Literal",
-        "value": 4
+        "value": 3
       },
       "toughness": {
         "type": "Literal",
-        "value": 2
+        "value": 1
       },
       "triggeredAbilities": [
         {
           "condition": {
             "type": "SelfEnters"
-          },
-          "modal": {
-            "modes": [
-              {
-                "clauses": [
-                  {
-                    "effects": [
-                      {
-                        "type": "BecomeMonarch",
-                        "value": {
-                          "type": "TheController"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "condition": {
-            "type": "PlayerBecomesMonarch",
-            "value": {
-              "type": "You"
-            }
           },
           "modal": {
             "modes": [
@@ -81,8 +46,7 @@
                             }
                           },
                           "players": {
-                            "type": "EachInSlot",
-                            "value": "target"
+                            "type": "EachPlayer"
                           },
                           "quantity": {
                             "type": "Literal",
@@ -92,14 +56,7 @@
                       }
                     ]
                   }
-                ],
-                "targetSlots": {
-                  "target": {
-                    "pool": {
-                      "type": "Players"
-                    }
-                  }
-                }
+                ]
               }
             ]
           }
@@ -108,7 +65,7 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Cleric"
+            "type": "Warrior"
           },
           {
             "type": "Zombie"
