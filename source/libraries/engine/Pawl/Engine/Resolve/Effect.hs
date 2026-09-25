@@ -2810,8 +2810,13 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Goad {} -> False
   Effect.Pair {} -> False
   Effect.DoesNotUntapNext {} -> False
-  Effect.Transform {} -> False
-  Effect.Convert {} -> False
+  -- CR 701.27a/c-f and CR 701.28a/c-f: turnPermanentsOver's own membership
+  -- test, so "you may transform" is not offered where nothing named turns over
+  -- -- a Clone of a double-faced permanent (CR 701.27c) above all. Pawl.TransformSpec's
+  -- "CR 608.2d a Clone of Aang, Master of Elements is not offered the
+  -- transform" proves it.
+  Effect.Transform ref -> nothingTurnsOver ref
+  Effect.Convert ref -> nothingTurnsOver ref
   Effect.Flip {} -> False
   Effect.Meld {} -> False
   Effect.PhaseOut {} -> False
@@ -2934,6 +2939,9 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     -- The tap-state half of Effect.Tap's and Effect.Untap's arms: the sweep
     -- names at least one permanent and none of them is in the state the
     -- instruction needs to find.
+    nothingTurnsOver ref =
+      let named = objectRefObjects legal resolving controller source gs ref
+       in not (null named) && not (any (turnsOver (Projection.projectAll gs) resolving gs) named)
     noneNamedIs state ref =
       let named = objectRefObjects legal resolving controller source gs ref
        in not (null named) && not (any ((== Just state) . fmap Object.tapped . flip Game.lookupObject gs) named)
@@ -8577,13 +8585,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- since the move binds ONE arrival as a target and several as a group, and only
   -- that reader answers both shapes.
   Effect.Airbend ref -> do
+    let airbent g = Map.findWithDefault Set.empty Binding.airbentObjects (Binding.slotObjects (slotBindings resolving g))
+    before <- State.gets airbent
     applyEffectWith runSubgame resolving source controller legal chosen (Airbend.exile ref)
-    gs <- State.get
-    let exiled = Map.findWithDefault Set.empty Binding.airbentObjects (Binding.slotObjects (slotBindings resolving gs))
+    exiled <- State.gets airbent
     State.modify' (\g -> foldr (Airbend.grant source) g exiled)
-    -- CR 701.65b: the airbend as a game event, and only when the exile above
-    -- moved one or more objects -- the same read-back the permission uses.
-    Monad.unless (Set.null exiled) (State.modify' (Event.recordEvent (GameEvent.Airbent controller)))
+    -- CR 701.65b: the airbend as a game event, and only when THIS exile moved
+    -- one or more objects -- the binding accumulates across a resolution, so an
+    -- earlier airbend's arrivals are not this one's. A regression fence: no
+    -- card in data/cards/ airbends twice in one resolution.
+    Monad.unless (Set.null (Set.difference exiled before)) (State.modify' (Event.recordEvent (GameEvent.Airbent controller)))
   -- CR 702.189a's mana through AddMana's own arm, then CR 702.189b's marker:
   -- this is a firebending ability resolving, and `controller` is who controls it.
   Effect.Firebend addition -> do
