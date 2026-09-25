@@ -81,6 +81,7 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
@@ -667,7 +668,9 @@ finishSpell oid face controller = do
           ExilePlayPermission.alternativeManaCost = Nothing,
           -- This IS rule 715.3d's permission, and so the one its next sentence
           -- excludes the Adventure half from.
-          ExilePlayPermission.origin = PlayPermissionOrigin.Adventure
+          ExilePlayPermission.origin = PlayPermissionOrigin.Adventure,
+          -- CR 715.3d: "that player may play it".
+          ExilePlayPermission.verb = PermissionVerb.Play
         }
 
 -- The no-subgame spell resolver (Stack's default path and every direct caller).

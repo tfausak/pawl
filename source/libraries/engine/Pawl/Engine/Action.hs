@@ -115,7 +115,7 @@ playableLands pid gs =
       fromPermitted = concatMap (\(zone, owner) -> filter permitted (Cast.pileCandidates zone owner gs)) (PlayerEffect.playPermissionPiles pid gs)
       -- Per card instead, because CR 715.3d's permission is state on ONE exiled
       -- incarnation naming ONE player.
-      fromExile = filter (\oid -> Cast.permitsPlayFromExile pid oid gs) (Cast.zoneCandidates Zone.Exile pid gs)
+      fromExile = filter (\oid -> Cast.permitsLandPlayFromExile pid oid gs) (Cast.zoneCandidates Zone.Exile pid gs)
    in concatMap playable (ListUtils.nubOrd (fromHand <> fromGranted <> fromPermitted <> fromExile))
 
 -- The cards in this player's hand whose own text grants CR 116.2e's special

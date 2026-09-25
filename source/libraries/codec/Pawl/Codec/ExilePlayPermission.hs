@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.ManaSpending as ManaSpending
 import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.Codec.PermissionVerb as PermissionVerb
 import qualified Pawl.Codec.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -29,6 +30,7 @@ codec = Fields.object $ do
   spending <- Fields.required "spending" ManaSpending.codec ExilePlayPermission.spending
   alternativeManaCost <- Fields.required "alternativeManaCost" (Common.maybe ManaCost.codec) ExilePlayPermission.alternativeManaCost
   origin <- Fields.required "origin" PlayPermissionOrigin.codec ExilePlayPermission.origin
+  verb <- Fields.required "verb" PermissionVerb.codec ExilePlayPermission.verb
   pure
     ExilePlayPermission.MkExilePlayPermission
       { ExilePlayPermission.player = player,
@@ -36,5 +38,6 @@ codec = Fields.object $ do
         ExilePlayPermission.expiry = expiry,
         ExilePlayPermission.spending = spending,
         ExilePlayPermission.alternativeManaCost = alternativeManaCost,
-        ExilePlayPermission.origin = origin
+        ExilePlayPermission.origin = origin,
+        ExilePlayPermission.verb = verb
       }

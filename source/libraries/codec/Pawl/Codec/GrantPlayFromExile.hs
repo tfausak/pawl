@@ -5,12 +5,14 @@ module Pawl.Codec.GrantPlayFromExile where
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.ManaSpending as ManaSpending
 import qualified Pawl.Codec.ObjectRef as ObjectRef
+import qualified Pawl.Codec.PermissionVerb as PermissionVerb
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.PermissionVerb as PermissionVerb.Type
 import qualified Pawl.Types.PlayerRef as PlayerRef.Type
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
@@ -28,11 +30,13 @@ codec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec GrantPlayFromExile.ref
   spending <- Fields.defaulted "spending" ManaSpending.AsProduced ManaSpending.codec GrantPlayFromExile.spending
   withoutPayingManaCost <- Fields.defaulted "withoutPayingManaCost" False Common.boolean GrantPlayFromExile.withoutPayingManaCost
+  verb <- Fields.defaulted "verb" PermissionVerb.Type.Play PermissionVerb.codec GrantPlayFromExile.verb
   pure
     GrantPlayFromExile.MkGrantPlayFromExile
       { GrantPlayFromExile.duration = duration,
         GrantPlayFromExile.player = player,
         GrantPlayFromExile.ref = ref,
         GrantPlayFromExile.spending = spending,
-        GrantPlayFromExile.withoutPayingManaCost = withoutPayingManaCost
+        GrantPlayFromExile.withoutPayingManaCost = withoutPayingManaCost,
+        GrantPlayFromExile.verb = verb
       }

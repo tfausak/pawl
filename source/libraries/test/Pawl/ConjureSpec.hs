@@ -542,9 +542,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- attacking (CR 508.4) was never declared and costs her nothing. The paired
   -- board differs only in a Ragavan alice already controls, which is the
   -- "while" failing, so no second Ragavan arrives and bob takes Kari's 3 alone.
-  --
-  -- Not implemented: the conjured Ragavan's "Until end of turn, you may cast
-  -- that card"; pawl's Ragavan is stricter than the printing (#4103).
   Spec.it s "Kari Zev's Ragavan attacks without being declared and goes home at the next end step" $ do
     kari <- S.printingOf s registry "Kari Zev, Crew of Two"
     let ragavans = conjuredBy kari
@@ -566,6 +563,29 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       "CR 603.7c the end step returned the bound card to alice's hand"
       (length (namedIn ragavanName Zone.Hand after), length (namedIn ragavanName Zone.Battlefield after))
       (1, 0)
+  -- The conjured Ragavan's own trigger: "Whenever Ragavan deals combat damage to
+  -- a player, create a Treasure token and exile the top card of that player's
+  -- library. Until end of turn, you may cast that card." CR 601.3 / 305.9: the
+  -- permission's verb is Cast, so a nonland card is castable (the Treasure pays
+  -- its {R}) and a land is not playable. The pair differs only in bob's top card.
+  Spec.it s "CR 305.9 Ragavan's exiled card may be cast, and an exiled land may not be played" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    mountain <- S.printingOf s registry "Mountain"
+    let setup = S.duel S.beginningOfCombat [S.settled "kari" "Kari Zev, Crew of Two"] []
+        script = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "kari"])]
+        exiledAfter top = do
+          built <- S.buildBoardOrFail s registry setup
+          let stocked = built {S.builtState = snd (S.addLibraryCard top S.bob (S.builtState built))}
+          (_, gs) <- S.runScriptOrFail s script stocked (runStepsUntil S.postcombatMain)
+          pure (Game.zoneMembers Zone.Exile S.bob gs, gs {GameState.priority = Just S.alice})
+        playsLand oid gs = any (\action -> case action of Action.Play played _ -> played == oid; _ -> False) (Action.legalActions S.alice gs)
+    (bolts, boltGame) <- exiledAfter bolt
+    (mountains, mountainGame) <- exiledAfter mountain
+    Spec.assertEqWith
+      s
+      "CR 601.3 the exiled Lightning Bolt is castable and the exiled Mountain is not playable"
+      (fmap (\oid -> castOffered oid lightningBolt boltGame) bolts, fmap (`playsLand` mountainGame) mountains)
+      ([True], [False])
   Spec.it s "a printed spellbook picked by choice is offered whole, and the card its controller named is the one conjured" $ do
     forest <- S.printingOf s registry "Forest"
     tracks <- S.printingOf s registry "Follow the Tracks"

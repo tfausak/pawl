@@ -41,6 +41,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Source as Source
@@ -109,7 +110,9 @@ permission source owner =
       ExilePlayPermission.expiry = Expiry.Never,
       ExilePlayPermission.spending = ManaSpending.AsProduced,
       ExilePlayPermission.alternativeManaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
-      ExilePlayPermission.origin = PlayPermissionOrigin.Granted
+      ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
+      -- CR 701.65a: "may cast it".
+      ExilePlayPermission.verb = PermissionVerb.Cast
     }
 
 -- | CR 701.65a's "for each CARD exiled this way": stamp 'permission' onto one
