@@ -570,7 +570,8 @@ beheldObject = SlotName.MkSlotName (Text.pack "thatBeheldObject")
 -- becomes by paidCostRecord below.
 --
 -- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
--- card's targetSlots may name it" sweep as the slots above.
+-- card's targetSlots may name it" sweep as the slots above. Nor a CR 609.7a
+-- referent: Pawl.Engine.Resolve.Effect.referentsOfBindings drops it.
 collectedEvidence :: SlotName
 collectedEvidence = SlotName.MkSlotName (Text.pack "thatCollectedEvidence")
 
@@ -1171,11 +1172,14 @@ setUnattachedHost oid = Map.insert unattachedHost (toObject oid)
 -- there is nothing of the card's to clobber.
 --
 -- Set-valued like a target slot, so a payment that sacrificed SEVERAL permanents
--- lands on `onlyOne`'s Nothing rather than on one of them. Those several are
--- also bound as a GROUP (toObjects), a payment's slot being a definition rather
--- than a target (CR 115.10a), so a reader of the whole set sees it: CR 701.59c's
--- "if evidence was collected" after a collection of two cards is Vitu-Ghazi
--- Inspector's.
+-- lands on `onlyOne`'s Nothing rather than on one of them, and a reader of the
+-- whole recipient set (Pawl.Engine.Resolve.crewersOf) still has it. Those
+-- several are ALSO bound as a GROUP (toObjects), a payment's slot being a
+-- definition rather than a target (CR 115.10a), so the Filter.Context readers,
+-- which see a group but no multi-object target, see them too: CR 701.59c's "if
+-- evidence was collected" after a collection of two cards is Vitu-Ghazi
+-- Inspector's. Such a slot is the one kind that fills BOTH fields; they name the
+-- same objects, so no reader can see them disagree.
 setPaid :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName Binding
 setPaid paid =
   let bind recipients =
@@ -1284,9 +1288,9 @@ slotObjects m = withGroups (objectSlots m) (groupsOf m)
 -- slotObjects over the two halves separately, for the caller that cannot take
 -- the target half off an environment: Pawl.Engine.Resolve reads it out of CR
 -- 608.2b's re-validated recipients instead. An empty group is dropped, so an
--- absent key and "names nothing" stay the same question, and a slot holds one
--- shape or the other -- the union is written for a case the binders do not
--- produce rather than for one they do.
+-- absent key and "names nothing" stay the same question. The union meets both
+-- shapes only for a payment of several objects (setPaid), whose target half
+-- `onlyOne` has already dropped, so the group alone answers.
 withGroups :: Map SlotName ObjectId -> Map SlotName (Seq ObjectId) -> Map SlotName (Set ObjectId)
 withGroups singles groups =
   Map.unionWith
