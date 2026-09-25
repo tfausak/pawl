@@ -34,6 +34,7 @@ module Pawl.TeamSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -77,6 +78,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -668,23 +670,72 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
     Spec.assertEqWith s "bob's Prankster pumped itself and dealt carol 2" (run sharedTurns) (Just 18)
     Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
   -- CR 805.10a / 701.43a: bob exerts his own attacker, so it is his next untap
-  -- step that it skips.
+  -- step that it skips -- his team's next turn, where his tapped Forest untaps
+  -- beside it. The pair differs only in the exert.
   --
   -- Glory-Bound Initiate, {1}{W} 3/1 Creature -- Human Warrior: "You may exert
   -- this creature as it attacks. When you do, it gets +1/+3 and gains lifelink
   -- until end of turn."
-  Spec.it s "CR 701.43a a teammate exerts their own attacker" $ do
+  Spec.it s "CR 701.43a a teammate's exerted attacker skips his next untap step" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
     initiate <- S.printingOf s registry "Glory-Bound Initiate"
-    let exerting :: Prompt.Prompt r -> r
-        exerting p = case p of
-          Prompt.ChooseExert {} -> OptionalDecision.Exercises
+    let exerting :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+        exerting decision p = case p of
+          Prompt.ChooseExert {} -> decision
           _ -> S.attackTo S.carol p
+        tapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
+        run decision =
+          let (mine, staged) = S.addPermanent initiate S.bob (atCombat (stockedWith island sharedTurns))
+              (witness, placed) = S.addPermanent forest S.bob staged
+              after = S.runCombat (exerting decision) (S.tapObject witness placed)
+              -- The rest of alice's turn, carol's, then the untap step of
+              -- alice's team's next one.
+              later = snd (Engine.runGamePure (exerting decision) (fst (TurnSpec.runTurn (exerting decision) (fst (TurnSpec.runTurn (exerting decision) after)))) Engine.runStep)
+           in (S.lifeOf S.carol after, tapped mine later, tapped witness later)
+    Spec.assertEqWith s "the exerted Initiate dealt carol 4 and stayed tapped while bob's Forest untapped" (run OptionalDecision.Exercises) (Just 16, True, False)
+    Spec.assertEqWith s "declined, it dealt 3 and untapped beside the Forest" (run OptionalDecision.Declines) (Just 17, False, False)
+  -- CR 805.10a / 702.154a: bob enlists a creature he controls, which is a
+  -- creature of an attacking player.
+  --
+  -- Yavimaya Steelcrusher, {1}{R} 2/2 Creature -- Ape Warrior: "Enlist (As this
+  -- creature attacks, you may tap a nonattacking creature you control without
+  -- summoning sickness. When you do, add its power to this creature's until end
+  -- of turn.)" Hill Giant, 3/3, stays home to be enlisted.
+  Spec.it s "CR 702.154a a teammate enlists a creature he controls" $ do
+    steelcrusher <- S.printingOf s registry "Yavimaya Steelcrusher"
+    giant <- S.printingOf s registry "Hill Giant"
+    let run option =
+          let (ape, staged) = S.addPermanent steelcrusher S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
+              (_, board) = S.addPermanent giant S.bob staged
+              enlisting :: Prompt.Prompt r -> r
+              enlisting p = case p of
+                Prompt.DeclareAttackers _ _ ids -> filter (== ape) ids
+                Prompt.ChooseEnlist _ _ _ offer -> Just (NonEmpty.head offer)
+                _ -> S.attackTo S.carol p
+           in S.lifeOf S.carol (S.runCombat enlisting board)
+    Spec.assertEqWith s "the Steelcrusher took the Giant's 3 and dealt carol 5" (run sharedTurns) (Just 15)
+    Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
+  -- CR 805.10b / 805.2 / 800.4j: with alice gone her team still attacks, and
+  -- bob, now its primary player, declares it.
+  Spec.it s "CR 805.2 a departed active player's teammate declares the attack" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let asking :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+        asking p = case p of
+          Prompt.DeclareAttackers _ pid _ -> State.modify' (<> [pid]) >> pure (S.attackTo S.carol p)
+          _ -> pure (S.attackTo S.carol p)
         run option =
-          let (mine, board) = S.addPermanent initiate S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
-              after = S.runCombat exerting board
-           in (S.lifeOf S.carol after, fmap Object.exertedBy (Game.lookupObject mine after))
-    Spec.assertEqWith s "bob exerted the Initiate, which dealt carol 4" (run sharedTurns) (Just 16, Just (Set.singleton S.bob))
-    Spec.assertEqWith s "without the option it neither attacked nor exerted" (run id) (Just 20, Just Set.empty)
+          let teamed = option (twoTeams S.fourPlayerGame)
+              (_, staged) = S.addPermanent piker S.bob (atCombat teamed)
+              board =
+                staged
+                  { GameState.priority = Just S.bob,
+                    GameState.players = Map.adjust (\player -> player {Player.status = Status.Departed Departure.Lost}) S.alice (GameState.players staged)
+                  }
+              ((_, after), asked) = State.runState (Engine.runGame asking board S.combatGame) []
+           in (S.lifeOf S.carol after, asked)
+    Spec.assertEqWith s "bob declared and his Piker dealt carol 2" (run sharedTurns) (Just 18, [S.bob])
+    Spec.assertEqWith s "without the option nobody declared" (run id) (Just 20, [])
   -- CR 805.10a / 506.3b: bob is an attacking player, so tokens he is told to put
   -- onto the battlefield attacking do attack.
   --
