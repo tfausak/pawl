@@ -618,7 +618,7 @@ objectRefPositions =
         ("forbid-activation", Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (plantedRef "fv")), [plantedRef "fv"]),
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
-        ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional CastOffer.defaultValue CastRepetition.Once False), [plantedRef "oc"]),
+        ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional PermissionVerb.Cast CastOffer.defaultValue CastRepetition.Once False False), [plantedRef "oc"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (PlayerRef.Relative PlayerRelation.You) (plantedRef "gp") ManaSpending.AsProduced False), [plantedRef "gp"]),
         ("grant-look-at-exiled", Effect.GrantLookAtExiled (GrantLookAtExiled.MkGrantLookAtExiled (plantedRef "gl") False), [plantedRef "gl"]),
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
@@ -668,7 +668,7 @@ playerRefPositions =
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
         ("cloak", Effect.Cloak (plantedPlayer "ck"), [plantedPlayer "ck"]),
         ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
-        ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional CastOffer.defaultValue CastRepetition.Once False), [plantedPlayer "oc-caster"]),
+        ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional PermissionVerb.Cast CastOffer.defaultValue CastRepetition.Once False False), [plantedPlayer "oc-caster"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedPlayer "gp-player") (plantedRef "gp-ref") ManaSpending.AsProduced False), [plantedPlayer "gp-player"]),
         -- CR 611.2a's reference nested in the DURATION rather than in a field of
         -- the opcode -- the seat the window is counted against (Suspend

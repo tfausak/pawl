@@ -120,6 +120,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -1108,7 +1109,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               OfferCast.optionality = CastObligation.Optional,
               OfferCast.offer = CastOffer.defaultValue,
               OfferCast.repetition = CastRepetition.Once,
-              OfferCast.copied = False
+              OfferCast.copied = False,
+              OfferCast.verb = PermissionVerb.Cast,
+              OfferCast.controlWhileResolving = False
             }
       )
       " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
@@ -1132,7 +1135,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
                     CastOffer.Type.offeredBy = Nothing
                   },
               OfferCast.repetition = CastRepetition.Once,
-              OfferCast.copied = False
+              OfferCast.copied = False,
+              OfferCast.verb = PermissionVerb.Cast,
+              OfferCast.controlWhileResolving = False
             }
       )
       " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}}} "

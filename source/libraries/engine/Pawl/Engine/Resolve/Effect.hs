@@ -251,6 +251,7 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -1045,15 +1046,15 @@ entryAttack legal resolving entry gs = case EntryRiders.attacking entry of
 -- the creation one act and the casting a decision per object, so a repeated
 -- offer asks about the same copies over again. A copy nobody casts is left where
 -- it was made, for CR 704.5e to sweep at the next check (Pawl.Engine.Sba).
-offerCast :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastRepetition.CastRepetition -> Bool -> CastOffer.CastOffer -> Game ()
-offerCast context named caster optionality repetition copied offer = do
+offerCast :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> PermissionVerb.PermissionVerb -> Maybe PlayerId -> CastRepetition.CastRepetition -> Bool -> CastOffer.CastOffer -> Game ()
+offerCast context named caster optionality verb retake repetition copied offer = do
   subjects <- if copied then Maybe.catMaybes <$> traverse (castableCopy caster) named else pure named
   case repetition of
-    CastRepetition.Once -> Monad.void (offerCastOnce context subjects caster optionality offer)
+    CastRepetition.Once -> Monad.void (offerCastOnce context subjects caster optionality verb retake offer)
     CastRepetition.AnyNumber -> again subjects
   where
     again remaining = do
-      taken <- offerCastOnce context remaining caster optionality offer
+      taken <- offerCastOnce context remaining caster optionality verb retake offer
       case taken of
         Nothing -> pure ()
         Just oid -> again (filter (/= oid) remaining)
@@ -1127,7 +1128,7 @@ castableCopy caster original = do
 offerOutsideCopy :: Filter.Context -> PlayerId -> PrintingId.PrintingId -> CastOffer.CastOffer -> Game ()
 offerOutsideCopy context caster printingId offer = do
   copyId <- State.state (Event.mintOutside caster printingId)
-  offerCast context [copyId] caster CastObligation.Optional CastRepetition.Once False offer
+  offerCast context [copyId] caster CastObligation.Optional PermissionVerb.Cast Nothing CastRepetition.Once False offer
   State.modify' $ \g ->
     if Set.member copyId (GameState.outsideCopies g)
       then g {GameState.objects = Map.delete copyId (GameState.objects g), GameState.outsideCopies = Set.delete copyId (GameState.outsideCopies g)}
@@ -1178,8 +1179,19 @@ ordinaryOffer =
 -- The caster is a parameter and not the resolving controller: CR 608.2g says "a
 -- player". Everything above is a CLASSIFICATION carried by the opcode's
 -- CastOffer and its CastObligation; nothing here asks which card is offered.
-offerCastOnce :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> CastOffer.CastOffer -> Game (Maybe ObjectId)
-offerCastOnce context named caster optionality offer = do
+--
+-- Under PermissionVerb.Play a named land is offered too, as CR 305.2a's land
+-- play during a resolution (CR 601.1a's "play"), under the special action's
+-- per-player limits (Cast.landDropOpen: CR 305.2b, 305.3) and CR 305.1's
+-- prohibitions, and not its phase or empty stack, which an instruction lifts.
+-- Pawl.GameSpec's "CR 305.2a gameplay: Word of Command makes bob play a land
+-- on his turn" proves it.
+--
+-- `retake` is CR 723.2's second span: the player who controls the caster while
+-- the spell this cast makes resolves (Word of Command). Keyed to the spell's
+-- own id, which is the one object CR 608.2g puts on top of the stack.
+offerCastOnce :: Filter.Context -> [ObjectId] -> PlayerId -> CastObligation.CastObligation -> PermissionVerb.PermissionVerb -> Maybe PlayerId -> CastOffer.CastOffer -> Game (Maybe ObjectId)
+offerCastOnce context named caster optionality verb retake offer = do
   gs <- State.get
   let -- Whether this offer states CR 118.9's alternative cost, in either of the
       -- two wordings `applied` below reads. NOT `transformed`, which is CR
@@ -1292,36 +1304,78 @@ offerCastOnce context named caster optionality offer = do
               fmap (Maybe.mapMaybe (proposal oid)) (faces oid card)
           )
           named
+      -- One entry per land face (CR 712.12), beside the spells above, which
+      -- hold no land face (CR 305.9, Cast.printedRestrictionsOk), so no pair is
+      -- offered both ways.
+      landOffers
+        | verb == PermissionVerb.Play && Cast.landDropOpen caster gs =
+            [ (oid, mName, Face.name face)
+            | oid <- named,
+              Just card <- [Game.cardOf oid gs],
+              not (PlayerEffect.prohibitsPlayingLand caster (Card.combinedNames card) oid gs),
+              (mName, face) <- Card.landFaces card
+            ]
+        | otherwise = []
+      everything = fmap Left landOffers <> fmap Right offers
+      keyOf entry = case entry of
+        Left (oid, _, name) -> (oid, name)
+        Right (oid, name, _, _) -> (oid, name)
   -- No survivor is no offer; one survivor is one outcome, so CR 601.3's choice is
   -- elided there rather than asked.
-  chosen <- case offers of
+  chosen <- case everything of
     [] -> pure Nothing
     [sole] -> pure (Just sole)
     first : rest -> do
       let decider = Decide.deciderFor caster gs
-          keyOf (oid, name, _, _) = (oid, name)
       picked <- Game.choose (Prompt.ChooseOfferedCastSpell decider caster (fmap keyOf (first NonEmpty.:| rest)))
       -- Reject-not-repair: a pair the offer did not include is no cast at all.
       -- The PAIR and not the name alone, for castWhileSearching's reason: one
       -- card's half must not answer another card's.
-      pure (List.find ((== picked) . keyOf) offers)
+      pure (List.find ((== picked) . keyOf) everything)
+  let -- The SAME prompt on both paths: CR 118.8c creates no new decision. A land
+      -- play's "may" is this prompt too.
+      mayDo oid name act = do
+        let decider = Decide.deciderFor caster gs
+        decision <- Game.choose (Prompt.OfferedCast decider caster oid name)
+        case decision of
+          OptionalDecision.Declines -> pure Nothing
+          OptionalDecision.Exercises -> act
   case chosen of
     Nothing -> pure Nothing
-    Just (oid, name, applied, excused) -> do
-      let cast = do
-            Cast.castSpellWith performManaAbility True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
+    Just (Left (oid, mName, name)) -> do
+      let play = do
+            Cast.playLand True caster oid mName
             pure (Just oid)
-          -- The SAME prompt on both paths: CR 118.8c creates no new decision.
-          mayCast = do
-            let decider = Decide.deciderFor caster gs
-            decision <- Game.choose (Prompt.OfferedCast decider caster oid name)
-            case decision of
-              OptionalDecision.Declines -> pure Nothing
-              OptionalDecision.Exercises -> cast
+      case optionality of
+        CastObligation.Mandatory -> play
+        CastObligation.Optional -> mayDo oid name play
+    Just (Right (oid, name, applied, excused)) -> do
+      let cast = do
+            stackBefore <- State.gets GameState.stack
+            Cast.castSpellWith performManaAbility True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
+            -- CR 723.2's second span, dormant until the spell resolves
+            -- (Pawl.Engine.Stack.resolveTopWith). A cast that was reversed put
+            -- nothing new on top, and so waits on nothing.
+            stackAfter <- State.gets GameState.stack
+            case (retake, stackAfter) of
+              (Just controller, sid : _)
+                | notElem sid stackBefore ->
+                    State.modify' $
+                      pushControl
+                        caster
+                        PlayerControl.MkPlayerControl
+                          { PlayerControl.decider = Decider.MkDecider controller,
+                            PlayerControl.duration = ControlDuration.WhileResolving sid,
+                            -- CR 723.7: Word of Command's mana clause is
+                            -- "while doing so", the playing of the card.
+                            PlayerControl.manaFromLandsOnly = False
+                          }
+              _ -> pure ()
+            pure (Just oid)
       case optionality of
         CastObligation.Mandatory | not excused -> cast
-        CastObligation.Mandatory -> mayCast
-        CastObligation.Optional -> mayCast
+        CastObligation.Mandatory -> mayDo oid name cast
+        CastObligation.Optional -> mayDo oid name cast
 
 -- CR 615.3: install one floating damage row, for a duration. Shared by
 -- Effect.PreventNextDamage, Effect.PreventAllDamage,
@@ -4839,7 +4893,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let named = Set.fromList (playerRefPlayers legal controller gs ref)
     Monad.forM_ (filter (`Set.member` named) (Game.apnapOrder gs)) Event.shuffleLibrary
-  Effect.OfferCast (OfferCast.MkOfferCast ref caster optionality offer repetition copied) -> do
+  Effect.OfferCast (OfferCast.MkOfferCast ref caster optionality verb offer repetition copied controlWhileResolving) -> do
     gs <- State.get
     -- The sweep every ObjectRef-taking opcode shares, read HERE rather than
     -- inside offerCast so that one function takes the objects and never the
@@ -4853,7 +4907,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 608.2g names "a player", and a reference resolving to nobody offers the
     -- cast to nobody.
     Monad.forM_ (playerRefPlayers legal controller gs caster) $ \pid ->
-      offerCast context named pid optionality repetition copied offer
+      offerCast context named pid optionality verb (if controlWhileResolving then Just controller else Nothing) repetition copied offer
   -- CR 707.13 (Garth One-Eye): choose one of the listed names not yet chosen for
   -- this source, look the card up (CR 108.1), create a copy of it outside the
   -- game, and offer its controller the cast. The names are card data; nothing

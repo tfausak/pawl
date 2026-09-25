@@ -1414,10 +1414,16 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- Casing on the arms is a classification, not an effect's identity:
 -- Pawl.Engine.Cast is the sole reader of Pawl.Types.CastingRestriction exactly as
 -- it is of CastingPermission.
+--
+-- CR 305.9's "it can't be cast as a spell" rides here too, since it is the one
+-- prohibition every face states by its type line: without it only CR 118.6's
+-- absent mana cost stops a land cast, and a CR 118.9 waiver prices that at zero.
+-- Pawl.ExileSpec's "CR 305.9 a hidden Forest is played as the turn's land and
+-- never cast for free" proves it.
 printedRestrictionsOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 printedRestrictionsOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
-  Just face -> all (restrictionMet pid gs) (Face.castingRestrictions face)
+  Just face -> not (Card.isLand face) && all (restrictionMet pid gs) (Face.castingRestrictions face)
 
 -- Does the game state satisfy this one printed clause?
 restrictionMet :: PlayerId -> GameState -> CastingRestriction.CastingRestriction -> Bool
@@ -2192,6 +2198,76 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
           castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) before
+
+-- CR 305.2a / 305.3: whether `pid` may play a land at all now -- it is their
+-- turn, and the lands they have played this turn fall short of the lands they
+-- can play. The per-PLAYER half of CR 116.2a's window, asked by
+-- Pawl.Engine.Action.legalActions of the special action and by
+-- Pawl.Engine.Resolve.Effect's offer of a land play during a resolution, which
+-- CR 305.2a counts and CR 305.2b and 305.3 hold to the same limits.
+--
+-- A comparison of two counts and never a yes/no, because CR 305.2 lets a
+-- continuous effect raise the first one (Exploration, Azusa Lost but Seeking).
+-- Strictly greater is CR 305.2b read from the other side: it forbids the play
+-- once the allowance is EQUAL TO OR LESS THAN the tally, and less than is
+-- reachable -- Exploration destroyed after the second land leaves an allowance
+-- of one against a tally of two.
+landDropOpen :: PlayerId -> GameState -> Bool
+landDropOpen pid gs =
+  Turn.isActive gs pid
+    && Map.findWithDefault 0 pid (GameState.landsPlayed gs) < PlayerEffect.landPlaysAllowed pid gs
+
+-- CR 116.2a / 305.1: `pid` plays the land `oid`, as the face `mName` names.
+-- Legality is the caller's: Pawl.Engine.Action.legalActions for the special
+-- action, Pawl.Engine.Resolve.Effect's offerCastOnce for a play an effect
+-- instructs.
+--
+-- `offered` is castSpellWith's flag: a play an effect instructs during a
+-- resolution (CR 305.2a) is made under that effect, so it spends neither a CR
+-- 601.3 permission nor a one-shot flash grant, and is asked which of them it is
+-- made under by nobody.
+--
+-- CR 712.12: a modal double-faced card played as a land chooses a land face
+-- first and enters with it up. NOT changeZoneEntering, where CR 712.14b turns a
+-- put-onto-the-battlefield instruction away: playing a land is a special action.
+--
+-- Not implemented: CR 400.7i for an exile permission, the land half of the
+-- sentence followIntoSpell keeps for spells (CR 400.7h) -- the rest of that
+-- effect cannot find the permanent the land card became, so a rider on it has
+-- nothing to attach to (gap #2398). A player permission's rider is `riders`
+-- below.
+playLand :: Bool -> PlayerId -> ObjectId -> Maybe CardName.CardName -> Game ()
+playLand offered pid oid mName = do
+  -- CR 406.3a, the land half of the turn turnedUpForPlay states: a land played
+  -- out of face-down exile is turned face up just before it is played, so the
+  -- reads below see the card rather than that rule's characteristicless object.
+  State.modify' (turnedUpForPlay oid Facing.FaceUp)
+  -- CR 611.2a / 601.1a: the one-shot flash grants this play spends, asked on the
+  -- PRE-MOVE id while Pawl.Engine.PlayerEffect.matchesObjectFrom can still read
+  -- the card -- CR 400.7 gives it a new one below -- and consumed only once the
+  -- land has moved, a CR 616.1 loop that cancels the move having played nothing.
+  spent <- if offered then pure [] else State.gets (PlayerEffect.spentByLandPlay pid oid)
+  -- CR 305.1 / 400.7i: the Play-verb permission this play is made under, which
+  -- says the budget it spends and the riders it hands the land, asked of the
+  -- pre-move board for `spent`'s reason.
+  before <- State.get
+  permission <-
+    if offered
+      then pure Nothing
+      else choosePlayPermission pid oid (PlayerEffect.landPermissionOptions (\src -> not (null (Event.permissionRiders src before oid))) pid oid before)
+  let riders played = foldMap (\(src, _) -> Event.permissionRiders src before played) permission
+  -- CR 110.2 / 305.1: the permanent enters under the player who PLAYED it, which
+  -- is not the card's owner once a permission opens somebody else's hand (Sen
+  -- Triplets); see #2169.
+  moved <- Event.changeZoneShowing (Just pid) oid Zone.Battlefield mName
+  Monad.unless (Seq.null moved) $ do
+    State.modify' (PlayerEffect.consume spent)
+    State.modify' (PlayerEffect.spendCastPermission (PlayerEffect.permissionSpent permission))
+    State.modify' (\g -> g {GameState.continuousEffects = concatMap riders (filter (`Set.member` GameState.battlefield g) (Foldable.toList moved)) <> GameState.continuousEffects g})
+  -- CR 305.2a counts the lands played this turn, so this TALLIES rather than
+  -- flagging. CR 305.4: the only tally, an effect that PUTS a land onto the
+  -- battlefield not being one.
+  State.modify' (\g -> g {GameState.landsPlayed = Map.insertWith (+) pid 1 (GameState.landsPlayed g)})
 
 -- CR 601.3 / 305.1: which of `options` (PlayerEffect.castPermissionOptions,
 -- PlayerEffect.landPermissionOptions) the play of `oid` is made under. Asked

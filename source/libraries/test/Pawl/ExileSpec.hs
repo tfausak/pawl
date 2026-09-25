@@ -48,6 +48,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Exile as Exile
@@ -581,12 +582,8 @@ castExtractPower s registry = do
 --
 -- The ability printed under it is Effect.OfferCast over
 -- ObjectRef.EachCardExiledWithSource -- CR 607.2a's linked set -- under a
--- Clause.condition comparing Quantity.AttackersDeclaredThisTurn against 3.
---
--- Not implemented: CR 116.2a's land drop, which CR 305.2a reaches during a
--- resolution where Effect.OfferCast reaches only CR 601's cast, so a hidden LAND
--- cannot be played and pawl's Windbrisk Heights is stricter than printed there
--- (#3347).
+-- Clause.condition comparing Quantity.AttackersDeclaredThisTurn against 3,
+-- under PermissionVerb.Play so a hidden land is offered as CR 305.2a's land play.
 --
 -- Where Extract Power above tells the look apart from OWNERSHIP, this group
 -- tells it apart from CONTROL OF THE SPELL: the looker is named by a keyword
@@ -809,6 +806,19 @@ windbriskHeights s registry = Spec.describe s "Windbrisk Heights" $ do
   -- same three attackers declared, so the linked set is the only difference: an
   -- ability reading "any card in exile" plays the Piker off either land, and one
   -- reading Game.cardOf finds no ability on Vesuva at all.
+  -- CR 305.9 / 601.1a: a hidden LAND is played, never cast, even under the
+  -- ability's CR 118.9 waiver, which would otherwise price its absent mana cost
+  -- (CR 118.6) at zero. A pair differing only in whether alice's land drop is
+  -- spent: open, the Forest is played as her land; spent, it stays hidden.
+  Spec.it s "CR 305.9 a hidden Forest is played as the turn's land and never cast for free" $ do
+    (_, land, leg) <- attackedHeightsHiding s registry Nothing "Forest"
+    let forests = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice
+        spent = leg 1 3 land
+        open = leg 0 3 land
+    Spec.assertEqWith s "CR 305.2b / 305.9: with the land drop spent the Forest is not cast instead" (forests spent) 0
+    Spec.assertEqWith s "CR 305.2a: with it open the Forest is played" (forests open) 1
+    Spec.assertEqWith s "and counts as her land for the turn" (Map.lookup S.alice (GameState.landsPlayed open)) (Just 1)
+
   Spec.it s "CR 607.2a the play ability names only what THIS permanent exiled, and a copy names what the copy exiled" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     (original, copy, leg) <- attackedHeights s registry (Just "Vesuva")
@@ -866,12 +876,25 @@ attackedHeights ::
   Maybe String ->
   m (ObjectId.ObjectId, ObjectId.ObjectId, Int -> ObjectId.ObjectId -> GameState.GameState)
 attackedHeights s registry copier = do
+  (original, landId, leg) <- attackedHeightsHiding s registry copier "Goblin Piker"
+  pure (original, landId, leg 0)
+
+-- attackedHeights with the hidden card named, and a leg that also says how many
+-- lands alice has already played this turn when she activates (CR 305.2a).
+attackedHeightsHiding ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Maybe String ->
+  String ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, Natural -> Int -> ObjectId.ObjectId -> GameState.GameState)
+attackedHeightsHiding s registry copier hidden = do
   heights <- S.printingOf s registry "Windbrisk Heights"
   played <- maybe (pure heights) (S.printingOf s registry) copier
   plains <- S.printingOf s registry "Plains"
   evangel <- S.printingOf s registry "Cabal Evangel"
   bolt <- S.printingOf s registry "Lightning Bolt"
-  piker <- S.printingOf s registry "Goblin Piker"
+  piker <- S.printingOf s registry hidden
   sentry <- S.printingOf s registry "Ogre Sentry"
   cancel <- S.printingOf s registry "Cancel"
   think <- S.printingOf s registry "Think Twice"
@@ -916,10 +939,10 @@ attackedHeights s registry copier = do
             GameState.remaining = S.phasesAfterThroughPostcombatMain S.beginningOfCombat,
             GameState.priority = Just S.alice
           }
-      leg attackers activated =
+      leg landsAlready attackers activated =
         S.runPure
           (activating activated plainsId)
-          (S.runCombat (attackingWith attackers) combatReady)
+          (S.runCombat (attackingWith attackers) combatReady {GameState.landsPlayed = Map.singleton S.alice landsAlready})
           Engine.priorityLoop
   pure (original, landId, leg)
 

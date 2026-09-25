@@ -11,6 +11,7 @@ import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
@@ -29,7 +30,9 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.optionality = CastObligation.Optional,
             OfferCast.offer = CastOffer.defaultValue,
             OfferCast.repetition = CastRepetition.Once,
-            OfferCast.copied = False
+            OfferCast.copied = False,
+            OfferCast.verb = PermissionVerb.Cast,
+            OfferCast.controlWhileResolving = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
@@ -52,7 +55,9 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                   CastOffer.Type.offeredBy = Nothing
                 },
             OfferCast.repetition = CastRepetition.Once,
-            OfferCast.copied = False
+            OfferCast.copied = False,
+            OfferCast.verb = PermissionVerb.Cast,
+            OfferCast.controlWhileResolving = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}} "
@@ -76,7 +81,9 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
                   CastOffer.Type.offeredBy = Nothing
                 },
             OfferCast.repetition = CastRepetition.Once,
-            OfferCast.copied = False
+            OfferCast.copied = False,
+            OfferCast.verb = PermissionVerb.Cast,
+            OfferCast.controlWhileResolving = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"revealed\"},\"caster\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"optionality\":{\"type\":\"Mandatory\"},\"offer\":{\"withoutPayingManaCost\":true}} "
@@ -92,7 +99,9 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.optionality = CastObligation.Optional,
             OfferCast.offer = CastOffer.defaultValue,
             OfferCast.repetition = CastRepetition.AnyNumber,
-            OfferCast.copied = False
+            OfferCast.copied = False,
+            OfferCast.verb = PermissionVerb.Cast,
+            OfferCast.controlWhileResolving = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"repetition\":{\"type\":\"AnyNumber\"}} "
@@ -107,7 +116,9 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.optionality = CastObligation.Optional,
             OfferCast.offer = CastOffer.defaultValue,
             OfferCast.repetition = CastRepetition.Once,
-            OfferCast.copied = True
+            OfferCast.copied = True,
+            OfferCast.verb = PermissionVerb.Cast,
+            OfferCast.controlWhileResolving = False
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"copied\":true} "
