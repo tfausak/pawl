@@ -14,6 +14,7 @@ module Pawl.Engine.AttackRequirement where
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Goad as Goad
@@ -31,6 +32,7 @@ import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.RequiredDefender as RequiredDefender
 import qualified Pawl.Types.RequirementArity as RequirementArity
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 
 -- CR 508.1d: every requirement in force right now, INSTANTIATED against the
@@ -298,11 +300,19 @@ instances candidates targets gs =
       -- be: Combat.attackableOpponents applied it once when CR 703.4h settled
       -- the designation, and a player who leaves AFTER that stays a defending
       -- player -- CR 800.4e drops the damage, not the attack.
+      --
+      -- A row whose window has not begun (Expiry.begun) requires nothing yet:
+      -- Taunt's "during target player's next turn" is stored as the spell
+      -- resolves. A Matching class is read against the live board, CR 611.2c,
+      -- as Pawl.Engine.CombatRestriction.storedSubjects reads a prohibition's.
       fromStored active =
-        let creature = ActiveAttackRequirement.attacker active
-            target = AttackTarget.OfPlayer (ActiveAttackRequirement.defender active)
-         in ( if elem creature candidates && elem target targets
-                then [(creature, target)]
+        let target = AttackTarget.OfPlayer (ActiveAttackRequirement.defender active)
+            context = Filter.contextFor (Game.teams gs) (Just (ActiveAttackRequirement.controller active)) (Just (ActiveAttackRequirement.source active))
+            creatures = case ActiveAttackRequirement.attacker active of
+              RestrictedCreatures.Named oid -> filter (== oid) candidates
+              RestrictedCreatures.Matching f -> filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) f) candidates
+         in ( if Expiry.begun gs (ActiveAttackRequirement.expiry active) && elem target targets
+                then fmap (\creature -> (creature, target)) creatures
                 else [],
               []
             )

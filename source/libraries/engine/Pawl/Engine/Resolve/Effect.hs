@@ -657,11 +657,12 @@ askedChooser source controller legal ref = do
     [named]
       | List.elem named (Game.stillPlaying gs) -> pure (Just named)
       | otherwise ->
-          let opponents = Game.opponentsOf controller gs
+          let -- CR 801.5a: a player the controller chooses is one in range.
+              opponents = Game.opponentsInReach controller gs
               candidates =
                 if Game.areOpponents gs controller named && not (List.null opponents)
                   then opponents
-                  else Game.stillPlaying gs
+                  else Game.reachableBy controller gs
            in case candidates of
                 [] -> pure Nothing
                 [sole] -> pure (Just sole)
@@ -1339,11 +1340,12 @@ offerCastOnce context named caster optionality verb retake offer = do
             -- costs are why: the face's additional costs ride the applied cost,
             -- and one of them may offer the caster a choice of payments, which
             -- Cost.choiceVariants expands here exactly as it does for a cast the
-            -- board itself offers.
+            -- board itself offers. CR 702.48a's offering is the other optional
+            -- additional cost, and Cost.withOffering adds it the same way.
             appliedOne
               | CastOffer.withoutPayingManaCost offer = Just (CandidateCost.plain (CastOffer.offeredBy offer) (Cost.withoutPayingManaCost face))
               | otherwise = fmap (\c -> CandidateCost.plain (CastOffer.offeredBy offer) (c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face})) (CastOffer.payingInstead offer)
-            applied = concatMap (Cost.choiceVariants face) (Maybe.maybeToList appliedOne)
+            applied = concatMap (Cost.withOffering caster oid proposed) (concatMap (Cost.choiceVariants face) (Maybe.maybeToList appliedOne))
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
@@ -3652,10 +3654,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               State.modify' (reorderLibrary owner (Game.honourShuffle lib shuffleAnswer))
   -- Exile every card in every graveyard (CR 400.7: each move funnels through
   -- changeZone). "Every graveyard" is CR 102.1's players still in the game, not
-  -- the keys of GameState.players, which keep a departed seat's row.
+  -- the keys of GameState.players, which keep a departed seat's row -- and CR
+  -- 801.10's within the controller's range.
   Effect.ExileAllGraveyards -> do
     gs <- State.get
-    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.stillPlaying gs)
+    let gyCards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.reachableBy controller gs)
     Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) gyCards
   -- CR 103.5b (Serum Powder): the count is the hand size BEFORE the exile, which
   -- is why this is one opcode rather than an exile followed by a Draw. Both
@@ -5725,7 +5728,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- is a Two-Headed Giant rule (#2849).
   Effect.RedistributeLifeTotals -> do
     gs <- State.get
-    let candidates = Game.stillPlaying gs
+    let candidates = Game.reachableBy controller gs
         lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
         offered = fmap (\pid -> (pid, lifeOf pid)) candidates
     -- With one candidate or none every assignment is the same, so there is
@@ -5876,7 +5879,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           [] -> controller
         -- turnOrderFrom answers the SEATING roster (CR 800.5), so stillPlaying
         -- is what keeps a departed seat from being asked to vote.
-        voters = filter (\pid -> List.elem pid (Game.stillPlaying gs)) (Game.turnOrderFrom begin gs)
+        voters = filter (\pid -> List.elem pid (Game.reachableBy controller gs)) (Game.turnOrderFrom begin gs)
         -- CR 701.38d: a seat given extra votes casts them ALL here, before the
         -- next seat votes -- "at the same time the player would otherwise have
         -- voted" (Brago's Representative). Each is its own prompt: that card's
@@ -7116,16 +7119,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 subjects
          in gs1 {GameState.attackProhibitions = stored <> GameState.attackProhibitions gs1}
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->
-    -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair the
-    -- two refs name, rule 508.1d counting requirements PER CREATURE. RequireBlock
-    -- above is the twin, and its arguments carry over: both sets are enumerated
-    -- ONCE for CR 608.2f's simultaneity, and an illegal slot (CR 608.2b) stores
-    -- nothing, which is Alluring Siren's fizzle.
+    -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair,
+    -- rule 508.1d counting requirements PER CREATURE. A Named ref is RequireBlock's
+    -- twin: enumerated ONCE for CR 608.2f's simultaneity, and an illegal slot (CR
+    -- 608.2b) stores nothing, which is Alluring Siren's fizzle. A Matching class
+    -- is ForbidAttack's: one row per defender, its bound players baked now, since
+    -- CR 611.2c keeps a requirement on a declaration dynamic.
     State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
-        let attackers = objectRefObjects legal resolving controller source gs attackerRef
+        let attackers = case attackerRef of
+              RestrictedCreatures.Named ref -> fmap RestrictedCreatures.Named (objectRefObjects legal resolving controller source gs ref)
+              RestrictedCreatures.Matching f -> [RestrictedCreatures.Matching (Filter.bakeBound (Binding.playersIn legal) f)]
             -- Through playerRefPlayers so the ref is read exactly as every other
             -- opcode reads one, CR 608.2b's empty answer included.
             defenders = playerRefPlayers legal controller gs defenderRef
@@ -7136,6 +7142,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               pure
                 ActiveAttackRequirement.MkActiveAttackRequirement
                   { ActiveAttackRequirement.source = source,
+                    ActiveAttackRequirement.controller = controller,
                     ActiveAttackRequirement.timestamp = ts,
                     ActiveAttackRequirement.expiry = expiry,
                     ActiveAttackRequirement.attacker = attacker,
@@ -8283,13 +8290,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- departed seats keep counters CR 800.4a does not remove.
   Effect.Proliferate -> do
     gs <- State.get
-    let everyone = Game.stillPlaying gs
+    let everyone = Game.reachableBy controller gs
+        grants = Projection.controlGrants gs
         kindsOn oid = foldMap (Map.keys . Map.filter (> 0) . Object.counters) (Game.lookupObject oid gs)
         kindsFor pid = foldMap (Map.keys . Map.filter (> 0) . Player.counters) (Map.lookup pid (GameState.players gs))
         -- zoneMembers slices the shared battlefield by OWNER, so the union over
         -- every seat is every permanent in play (CR 701.34a).
-        onBattlefield = concatMap (\pid -> Game.zoneMembers Zone.Battlefield pid gs) everyone
-        permanents = filter (not . null . kindsOn) onBattlefield
+        onBattlefield = concatMap (\pid -> Game.zoneMembers Zone.Battlefield pid gs) (Game.stillPlaying gs)
+        -- CR 801.10: a permanent in range, whoever owns it.
+        permanents = filter (\oid -> not (null (kindsOn oid)) && Projection.objectInRangeGiven grants controller oid gs) onBattlefield
         players = filter (not . null . kindsFor) everyone
     Monad.unless (null permanents && null players) $ do
       (pickedPermanents, pickedPlayers) <-
@@ -9935,7 +9944,7 @@ applySurveil (pid, decision) = Monad.forM_ decision $ \(kept, toGraveyard) -> do
 fatesealOne :: ObjectId -> Integer -> PlayerId -> Game ()
 fatesealOne source n pid = do
   gs <- State.get
-  let opponents = Game.opponentsOf pid gs
+  let opponents = Game.opponentsInReach pid gs
   victim <- case opponents of
     [] -> pure Nothing
     [sole] -> pure (Just sole)
@@ -9986,7 +9995,7 @@ fatesealOne source n pid = do
 clash :: ObjectId -> PlayerId -> Game Natural
 clash source controller = do
   gs <- State.get
-  chosen <- case Game.opponentsOf controller gs of
+  chosen <- case Game.opponentsInReach controller gs of
     [] -> pure Nothing
     [sole] -> pure (Just sole)
     first : second : rest -> do

@@ -3918,6 +3918,44 @@ offeringSpec s registry = Spec.describe s "Offering" $ do
       "CR 702.48a the printed cost is not announceable in bob's turn, so the Patron resolved by sacrificing the Piker"
       (length (namedOnBattlefield "Patron of the Akki" after), length (namedInGraveyard "Goblin Piker" after))
       (1, 1)
+  -- CR 118.9d: offering is an ADDITIONAL cost, so a free cast still offers it.
+  -- Apex Devastator {8}{G}{G} cascades into the Patron (mana value 6 < 10), and
+  -- alice controls a Goblin Piker. Two answerers differing only in the cost they
+  -- announce: the sacrifice is hers to make or to decline.
+  Spec.it s "CR 702.48a / 118.9d a Patron cast free by cascade is still offered the Goblin sacrifice" $ do
+    apex <- S.printingOf s registry "Apex Devastator"
+    patron <- S.printingOf s registry "Patron of the Akki"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    let -- Bottom first: three Mountains the later walks pass over, the Patron on top.
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 :: Int .. 3]
+        (_, g1) = S.addLibraryCard patron S.alice stocked
+        g2 = List.foldl' (\g printing -> snd (S.addPermanent printing S.alice g)) g1 (replicate 8 mountain <> replicate 2 forest)
+        (_, g3) = S.addPermanent piker S.alice g2
+        (_, g4) = S.addHandCard apex S.alice g3
+        before = g4 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        sacrifices = any (\c -> case c of CostComponent.Sacrifice _ -> True; _ -> False) . Cost.Type.components
+        cascadingWith :: Bool -> Prompt.Prompt r -> r
+        cascadingWith sacrificing prompt = case prompt of
+          Prompt.ChooseAction _ _ actions -> Maybe.fromMaybe A.Pass (List.find (\a -> case a of A.Cast {} -> True; _ -> False) actions)
+          Prompt.OfferedCast {} -> OptionalDecision.Exercises
+          Prompt.ChooseCost _ _ _ payable -> case filter ((== sacrificing) . sacrifices) payable of
+            wanted : _ -> wanted
+            [] -> S.identityAnswer prompt
+          _ -> S.identityAnswer prompt
+        sacrificed = S.runPure (cascadingWith True) before Engine.priorityLoop
+        declined = S.runPure (cascadingWith False) before Engine.priorityLoop
+    Spec.assertEqWith
+      s
+      "sacrificing: the Patron resolved and the Piker went to the graveyard"
+      (length (namedOnBattlefield "Patron of the Akki" sacrificed), length (namedInGraveyard "Goblin Piker" sacrificed))
+      (1, 1)
+    Spec.assertEqWith
+      s
+      "declining: the Patron resolved and the Piker stayed"
+      (length (namedOnBattlefield "Patron of the Akki" declined), length (namedOnBattlefield "Goblin Piker" declined))
+      (1, 1)
 
 -- CR 702.180a on Unending Whisper {U} Sorcery, "Draw a card." with "Harmonize
 -- {5}{U}" (Oracle text checked on Scryfall, 2026-09-13). Chosen over Nature's

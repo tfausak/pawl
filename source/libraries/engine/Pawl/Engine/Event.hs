@@ -2190,7 +2190,7 @@ apply batch candidate event =
       -- EntryRewrite.ChoosePlayer.
       EntryRewrite.ChoosePlayer -> do
         gs <- State.get
-        let candidates = Game.stillPlaying gs
+        let candidates = maybe (Game.stillPlaying gs) (`Game.reachableBy` gs) (Projection.controllerOf oid gs)
         picked <- case (Projection.controllerOf oid gs, NonEmpty.nonEmpty candidates) of
           -- Nobody left to choose from, a board CR 104.2a has already ended the
           -- game on. Chooses nobody rather than conjuring a seat, the posture

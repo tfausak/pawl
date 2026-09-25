@@ -12,8 +12,11 @@
 -- controlNames (CR 801.10 for a layer-2 grant), Pawl.Engine.CombatRestriction's
 -- attackLimit and blockLimit (CR 801.10 for a declaration's bound) and Sba's
 -- worldVictims (CR 801.12), Pawl.Engine.Event.Trigger's eventWithinRange (CR
--- 801.7), Pawl.Engine.Replacement's preventsInRange and redirectDestination
--- (CR 801.13); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
+-- 801.7), Pawl.Engine.Replacement's reaches, preventsInRange and
+-- redirectDestination (CR 801.13), Pawl.Engine.Resolve.Slots'
+-- playerRefPlayers, zoneScopePlayers and battlefieldMatching, Pawl.Engine.Count's
+-- playersFor and the choice offers Game.reachableBy feeds (CR 801.5a, 801.10,
+-- 801.11); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
 -- departedThisTurn.
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
@@ -24,6 +27,7 @@ module Pawl.RangeOfInfluenceSpec where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -57,6 +61,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
@@ -476,6 +481,131 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertBool s (S.onBattlefield aimed (after (S.withRange 1))) "and carol's Piker is untouched"
     Spec.assertEqWith s "at an unlimited range alice takes nothing" (S.lifeOf S.alice (after id)) (Just 20)
     Spec.assertBool s (not (S.onBattlefield aimed (after id))) "and the 2 kills carol's Piker"
+
+  -- CR 801.13a for a zone change: alice's Leyline of the Void ("If a card would
+  -- be put into an opponent's graveyard from anywhere, exile it instead.") while
+  -- a Goblin Piker dies under carol, two seats away, and one under bob, one seat
+  -- away.
+  Spec.it s "CR 801.13a a zone-change replacement does not reach a card outside its controller's range" $ do
+    leyline <- S.printingOf s registry "Leyline of the Void"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent leyline S.alice S.fourPlayerGame
+        diesUnder pid gs =
+          let (victim, placed) = S.addPermanent piker pid gs
+              after = resolveAll (snd (Engine.runGamePure S.identityAnswer (S.markDamage victim 1 placed) Engine.settleForPriority))
+           in fmap ZoneChange.to (filter ((== victim) . ZoneChange.departed) (S.zoneChangesOf after))
+    Spec.assertEqWith s "CR 801.13a at range 1 carol's Piker goes to her graveyard" (diesUnder S.carol (S.withRange 1 g0)) [Zone.Graveyard]
+    Spec.assertEqWith s "at an unlimited range it is exiled" (diesUnder S.carol g0) [Zone.Exile]
+    Spec.assertEqWith s "and at range 1 bob's, in range, is exiled" (diesUnder S.bob (S.withRange 1 g0)) [Zone.Exile]
+
+  -- CR 801.13a for a damage amount: alice's Furnace of Rath ("If a source would
+  -- deal damage to a permanent or player, it deals double that damage to that
+  -- permanent or player instead.") while bob's Goblin Piker attacks carol, two
+  -- seats from alice, and then alice.
+  Spec.it s "CR 801.13a a damage-doubling replacement does not reach a recipient outside its controller's range" $ do
+    furnace <- S.printingOf s registry "Furnace of Rath"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addPermanent furnace S.alice S.fourPlayerGame
+        (bobs, board) = S.addPermanent piker S.bob g0
+    Spec.assertEqWith s "CR 801.13a at range 1 carol takes 2" (S.lifeOf S.carol (strike S.bob [bobs] S.carol (S.withRange 1 board))) (Just 18)
+    Spec.assertEqWith s "at an unlimited range she takes 4" (S.lifeOf S.carol (strike S.bob [bobs] S.carol board)) (Just 16)
+    Spec.assertEqWith s "and at range 1 alice, in range, takes 4" (S.lifeOf S.alice (strike S.bob [bobs] S.alice (S.withRange 1 board))) (Just 16)
+
+  -- CR 801.10 for objects and for players: alice's Day of Judgment ("Destroy all
+  -- creatures.") over a Goblin Piker each for bob, one seat away, and carol, two
+  -- seats away, and over her own Zulaport Cutthroat ("Whenever this creature or
+  -- another creature you control dies, each opponent loses 1 life and you gain 1
+  -- life.").
+  Spec.it s "CR 801.10 a resolving spell or ability does not affect an object or player outside its controller's range" $ do
+    plains <- S.printingOf s registry "Plains"
+    judgment <- S.printingOf s registry "Day of Judgment"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cutthroat <- S.printingOf s registry "Zulaport Cutthroat"
+    let (spellId, g0) = S.addHandCard judgment S.alice (S.landsFor plains S.alice 4 S.fourPlayerGame)
+        (_, g1) = S.addPermanent cutthroat S.alice g0
+        (bobs, g2) = S.addPermanent piker S.bob g1
+        (carols, g3) = S.addPermanent piker S.carol g2
+        cast ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g3))
+        limited = cast (S.withRange 1)
+    Spec.assertBool s (S.onBattlefield carols limited) "CR 801.10 at range 1 carol's Piker survives"
+    Spec.assertBool s (not (S.onBattlefield bobs limited)) "and bob's, in range, is destroyed"
+    Spec.assertBool s (not (S.onBattlefield carols (cast id))) "at an unlimited range carol's is destroyed too"
+    Spec.assertEqWith s "CR 801.10 at range 1 the Cutthroat costs carol nothing" (S.lifeOf S.carol limited) (Just 20)
+    Spec.assertEqWith s "and bob, in range, 1" (S.lifeOf S.bob limited) (Just 19)
+    Spec.assertEqWith s "at an unlimited range it costs carol 1" (S.lifeOf S.carol (cast id)) (Just 19)
+
+  -- CR 801.10 for every graveyard: alice's Rest in Peace ("When this enchantment
+  -- enters, exile all graveyards.") enters while carol, two seats away, and bob,
+  -- one seat away, each have a Goblin Piker in their graveyard.
+  Spec.it s "CR 801.10 a zone sweep does not reach the zone of a player outside its controller's range" $ do
+    rest <- S.printingOf s registry "Rest in Peace"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (bobs, g0) = S.addObjectIn Zone.Graveyard piker S.bob S.fourPlayerGame
+        (carols, g1) = S.addObjectIn Zone.Graveyard piker S.carol g0
+        stillThere oid gs = fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Graveyard
+        enters ranged =
+          let (entrant, placed) = S.addPermanent rest S.alice (ranged g1)
+           in entering entrant placed
+    Spec.assertBool s (stillThere carols (enters (S.withRange 1))) "CR 801.10 at range 1 carol's graveyard is untouched"
+    Spec.assertBool s (not (stillThere bobs (enters (S.withRange 1)))) "and bob's, in range, is exiled"
+    Spec.assertBool s (not (stillThere carols (enters id))) "at an unlimited range carol's is exiled too"
+
+  -- CR 801.11: alice's Malignus ("Malignus's power and toughness are each equal
+  -- to half the highest life total among your opponents, rounded up.") while
+  -- carol, two seats away, is at 40 and bob and dave, one seat away, at 20.
+  Spec.it s "CR 801.11 an ability gets no information from outside its controller's range" $ do
+    malignus <- S.printingOf s registry "Malignus"
+    let (creature, g0) = S.addPermanent malignus S.alice S.fourPlayerGame
+        board = g0 {GameState.players = Map.adjust (\p -> p {Player.life = 40}) S.carol (GameState.players g0)}
+    Spec.assertEqWith s "CR 801.11 at range 1 Malignus reads only bob's and dave's 20" (S.powerToughnessOf creature (S.withRange 1 board)) (Just (10, 10))
+    Spec.assertEqWith s "at an unlimited range it reads carol's 40" (S.powerToughnessOf creature board) (Just (20, 20))
+
+  -- CR 801.5a for a player: alice casts True-Name Nemesis ("As this creature
+  -- enters, choose a player."), and the choice offers only the players in her
+  -- range.
+  Spec.it s "CR 801.5a a choice of player offers only players within the chooser's range" $ do
+    nemesis <- S.printingOf s registry "True-Name Nemesis"
+    island <- S.printingOf s registry "Island"
+    let (spellId, board) = S.addHandCard nemesis S.alice (S.landsFor island S.alice 3 S.fourPlayerGame)
+        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+        recording p = case p of
+          Prompt.ChoosePlayer _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
+          _ -> pure (S.identityAnswer p)
+        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
+    Spec.assertEqWith s "CR 801.5a at range 1 carol is not offered" (offered (S.withRange 1 board)) [[S.alice, S.bob, S.dave]]
+    Spec.assertEqWith s "at an unlimited range she is" (offered board) [[S.alice, S.bob, S.carol, S.dave]]
+
+  -- CR 801.5a for an opponent: alice's Pulling Teeth ("Clash with an opponent.
+  -- ...") offers only the opponents in her range.
+  Spec.it s "CR 801.5a a choice of opponent offers only opponents within the chooser's range" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    teeth <- S.printingOf s registry "Pulling Teeth"
+    let (spellId, board) = S.addHandCard teeth S.alice (S.landsFor swamp S.alice 2 S.fourPlayerGame)
+        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+        recording p = case p of
+          Prompt.ChooseOpponent _ _ _ offer -> State.modify' (<> [NonEmpty.toList offer]) >> pure (NonEmpty.head offer)
+          _ -> pure (S.identityAnswer p)
+        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
+    Spec.assertEqWith s "CR 801.5a at range 1 carol is not offered" (offered (S.withRange 1 board)) [[S.bob, S.dave]]
+    Spec.assertEqWith s "at an unlimited range she is" (offered board) [[S.bob, S.carol, S.dave]]
+
+  -- CR 801.10 for proliferate: alice's Steady Progress ("Proliferate. Draw a
+  -- card.") while bob, one seat away, and carol, two seats away, each have a
+  -- poison counter.
+  Spec.it s "CR 801.10 proliferate offers only players within its controller's range" $ do
+    island <- S.printingOf s registry "Island"
+    progress <- S.printingOf s registry "Steady Progress"
+    let (spellId, g0) = S.addHandCard progress S.alice (S.landsFor island S.alice 3 S.fourPlayerGame)
+        (_, g1) = S.addLibraryCard island S.alice g0
+        poisoned = Set.fromList [S.bob, S.carol]
+        board = g1 {GameState.players = Map.mapWithKey (\pid p -> if Set.member pid poisoned then p {Player.counters = Map.singleton PlayerCounterKind.Poison 1} else p) (GameState.players g1)}
+        recording :: Prompt.Prompt r -> State.State [[PlayerId.PlayerId]] r
+        recording p = case p of
+          Prompt.ChooseProliferate _ _ _ players -> State.modify' (<> [players]) >> pure (Set.empty, Set.fromList players)
+          _ -> pure (S.identityAnswer p)
+        offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
+    Spec.assertEqWith s "CR 801.10 at range 1 only bob is offered" (offered (S.withRange 1 board)) [[S.bob]]
+    Spec.assertEqWith s "at an unlimited range carol is too" (offered board) [[S.bob, S.carol]]
   where
     resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
     -- Pawl.LifeTriggerSpec's entry staging: the permanent is placed, its Moved

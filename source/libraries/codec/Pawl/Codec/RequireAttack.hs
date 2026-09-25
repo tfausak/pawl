@@ -5,6 +5,7 @@ module Pawl.Codec.RequireAttack where
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.PlayerRef as PlayerRef
+import qualified Pawl.Codec.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -15,7 +16,7 @@ import qualified Pawl.Types.RequireAttack as RequireAttack
 codec :: Codec.Codec RequireAttack.RequireAttack
 codec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec RequireAttack.duration
-  attacker <- Fields.required "attacker" ObjectRef.codec RequireAttack.attacker
+  attacker <- Fields.required "attacker" (RestrictedCreatures.codec ObjectRef.codec) RequireAttack.attacker
   defender <- Fields.required "defender" PlayerRef.codec RequireAttack.defender
   pure
     RequireAttack.MkRequireAttack

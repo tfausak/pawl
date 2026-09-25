@@ -633,8 +633,59 @@ admitsRecipient src rewrite de = case rewrite of
   DamageRewrite.RedirectMatching _ -> True
   DamageRewrite.RunEffects _ -> True
 
+-- CR 614.1: does this replacement apply to this event -- its printed pattern
+-- matches (`matchesPrinted`), and CR 801.13a lets it reach (`reaches`)?
 applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
-applies gs event candidate =
+applies gs event candidate = matchesPrinted gs event candidate && reaches gs event candidate
+
+-- CR 801.13a: a replacement that would affect an object or player outside its
+-- controller's range does nothing to it -- so a row whose event affects one is
+-- not applied, the event being that one portion. Always under an unlimited
+-- range, and for a row with no controller.
+--
+-- A prevention or a redirection answers for itself instead: CR 801.13b
+-- (`preventsInRange`) and the destination (`redirectDestination`). Every other
+-- damage rewrite -- Furnace of Rath's doubling, Kill-Suit Cultist's
+-- "destroy it instead" -- affects the recipient, as `affected` names it.
+reaches :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
+reaches gs event candidate = case (ReplacementCandidate.controller candidate, ReplacementCandidate.effect candidate) of
+  (Nothing, _) -> True
+  (Just _, ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _))
+    | prevents rewrite || redirects rewrite -> True
+  (Just you, _) ->
+    let (objects, players) = affected event
+     in all (\oid -> Projection.objectInRangeGiven (Projection.controlGrants gs) you oid gs) objects
+          && all (\pid -> Game.inRangeOf you pid gs) players
+
+-- CR 801.13a: the objects and players a replaced event would affect. A moving
+-- or entering object is read under the controller it has as the event is
+-- proposed, which for one entering is the one it enters under.
+--
+-- A TOTAL case, Pawl.Engine.Event.Trigger.participants' reason: a new event
+-- class must be read against the rule rather than silently counted in range.
+affected :: ProposedEvent -> ([ObjectId], [PlayerId])
+affected event = case event of
+  ProposedEvent.WouldChangeZone zc -> ([ZoneChange.object zc], [])
+  ProposedEvent.WouldEnter oid -> ([oid], [])
+  ProposedEvent.WouldDealDamage de -> (Maybe.maybeToList (Recipient.objectOf (DamageEvent.target de)), Maybe.maybeToList (Recipient.playerOf (DamageEvent.target de)))
+  ProposedEvent.WouldBeDestroyed oid _ _ -> ([oid], [])
+  ProposedEvent.WouldPutCounters _ oid _ _ -> ([oid], [])
+  ProposedEvent.WouldPutPlayerCounters _ pid _ _ -> ([], [pid])
+  ProposedEvent.WouldCreateTokens pid _ -> ([], [pid])
+  ProposedEvent.WouldBeginPhase _ pid -> ([], [pid])
+  ProposedEvent.WouldTurnFaceUp oid _ -> ([oid], [])
+  ProposedEvent.WouldUntap oid -> ([oid], [])
+  ProposedEvent.WouldLoseLife _ pid _ -> ([], [pid])
+  ProposedEvent.WouldGainLife pid _ -> ([], [pid])
+  ProposedEvent.WouldDraw pid -> ([], [pid])
+  ProposedEvent.WouldDrawCards pid _ -> ([], [pid])
+  ProposedEvent.WouldMillCards pid _ -> ([], [pid])
+  ProposedEvent.WouldFlipCoin pid _ -> ([], [pid])
+  ProposedEvent.WouldRollDice roll -> ([], [DiceRoll.roller roll])
+
+-- CR 614.1: does this replacement's printed pattern match this event?
+matchesPrinted :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
+matchesPrinted gs event candidate =
   let src = ReplacementCandidate.source candidate
    in case (ReplacementCandidate.effect candidate, event) of
         -- CR 614.1a: which zone changes this redirect intercepts -- the
@@ -2941,9 +2992,10 @@ recipientInRange gs you recipient = case (Recipient.objectOf recipient, Recipien
 -- that stopped being a creature and became a planeswalker is redirected to as
 -- what it now is (CR 613.1d).
 --
--- Not implemented, and unreachable: the rule's last sentence, damage redirected
--- to or from a player who has left the game. Pawl has no leave-the-game path, so
--- a ToPlayer destination is always live.
+-- Not implemented: the rule's last sentence, damage redirected to or from a
+-- player who has left the game, outside a limited range -- where the CR 801.13a
+-- filter below retires such a destination, a departed player being in nobody's
+-- range (#3012).
 --
 -- CR 801.13a: a destination outside the redirecting effect's controller's
 -- range is no destination either, so that portion does nothing.

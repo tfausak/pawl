@@ -305,6 +305,26 @@ choiceVariants face =
         ]
    in \candidate -> List.foldl' variants [candidate] (Face.additionalCostChoices face)
 
+-- | CR 702.48a: offering, an optional ADDITIONAL cost, so a candidate is offered
+-- as it stands and once more per sacrificeable [quality] permanent, which
+-- carries the widened window. CR 118.9d applies it to an alternative cost too,
+-- so an effect's applied cost (Pawl.Engine.Resolve.Effect's OfferCast) goes
+-- through this as the board's candidates do. The victim is named outright for
+-- `emerged`'s reason (CR 702.48b), and its mana cost is read off the
+-- projection, so a Clone reduces by what it copied; CR 702.48c sends that
+-- through CR 118.7.
+withOffering :: PlayerId -> ObjectId -> GameState -> CandidateCost.CandidateCost -> [CandidateCost.CandidateCost]
+withOffering pid oid gs candidate =
+  candidate
+    : [ candidate
+          { CandidateCost.cost = (CandidateCost.cost candidate) {Cost.components = Cost.components (CandidateCost.cost candidate) <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.IsObject vid))]},
+            CandidateCost.reductions = CandidateCost.reductions candidate <> [Maybe.fromMaybe (ManaCost.MkManaCost []) (Filter.manaCost (Projection.viewOfObject vid gs))],
+            CandidateCost.instantSpeed = True
+          }
+      | quality <- Keyword.offeringQualities (Map.keysSet (Projection.keywordsOf oid gs)),
+        vid <- Replacement.sacrificeCandidates Map.empty pid (Just oid) quality gs
+      ]
+
 -- | candidateCostsFor, told whether CR 601.3's permission comes from the EFFECT
 -- rather than from the board.
 --
@@ -626,29 +646,13 @@ candidateCostsGiven permitted pid name oid gs =
               -- 702.170d a Mulldrifter Aven Interrupter plotted is offered no evoke
               -- cost" proves it.
               ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> emerged <> surged <> spectacled <> prowled <> freerun
-              -- CR 702.48a: offering, an optional ADDITIONAL cost, so every
-              -- candidate is offered as it stands and once more per sacrificeable
-              -- [quality] permanent, which carries the widened window. The
-              -- victim is named outright for `emerged`'s reason (CR 702.48b), and
-              -- its mana cost is read off the projection, so a Clone reduces by
-              -- what it copied; CR 702.48c sends that through CR 118.7.
-              offered candidate =
-                candidate
-                  : [ candidate
-                        { CandidateCost.cost = (CandidateCost.cost candidate) {Cost.components = Cost.components (CandidateCost.cost candidate) <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.IsObject vid))]},
-                          CandidateCost.reductions = CandidateCost.reductions candidate <> [Maybe.fromMaybe (ManaCost.MkManaCost []) (Filter.manaCost (Projection.viewOfObject vid gs))],
-                          CandidateCost.instantSpeed = True
-                        }
-                    | quality <- Keyword.offeringQualities (Map.keysSet (Projection.keywordsOf oid gs)),
-                      vid <- Replacement.sacrificeCandidates Map.empty pid (Just oid) quality gs
-                    ]
            in -- CR 118.8 / 601.2b: every candidate below owes this face's choice
               -- costs, whichever of them the caster announces, so the expansion
               -- wraps the whole list rather than any one arm of it. The zone is
               -- Game.zoneOf's, so a CR 707.13 copy outside the game (CR 400.11)
               -- takes the `_` arm. A regression fence: none of Garth One-Eye's
               -- six cards prints a cost the graveyard arm offers.
-              concatMap offered . concatMap (choiceVariants face) . orConverted $ case Game.zoneOf oid gs of
+              concatMap (withOffering pid oid gs) . concatMap (choiceVariants face) . orConverted $ case Game.zoneOf oid gs of
                 -- Three shapes, differing in what they do to the printed cost, plus
                 -- an effect's permission. Flashback (CR 702.34a) REPLACES the mana
                 -- cost, so it is wrapped by `withAdditional`, and escape (CR
@@ -5615,7 +5619,7 @@ payComponent moment slots pid oid component = case component of
   -- opponent, and naming one spends nothing that could run out.
   CostComponent.ChooseOpponent -> do
     gs <- State.get
-    case Game.opponentsOf pid gs of
+    case Game.opponentsInReach pid gs of
       -- CR 118.3 asked AGAIN here, TapThis' reason above: the last opponent may
       -- have left (CR 104.2a) since the gate.
       [] -> pure Payment.Unpaid

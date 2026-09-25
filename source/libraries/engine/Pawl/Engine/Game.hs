@@ -2112,6 +2112,17 @@ inRangeSeated seated you candidate gs =
                    in toInteger (min apart (length seats - apart)) <= toInteger range
             _ -> False
 
+-- CR 801.10 / 801.5a: the players still in the game within @you@'s range -- the
+-- table a spell or ability of theirs reaches, and the one a choice they make
+-- offers. stillPlaying, in its order, under an unlimited range.
+reachableBy :: PlayerId -> GameState -> [PlayerId]
+reachableBy you gs = filter (\pid -> inRangeOf you pid gs) (stillPlaying gs)
+
+-- CR 801.5a: opponentsOf narrowed to @you@'s range, for an opponent @you@ is
+-- asked to choose.
+opponentsInReach :: PlayerId -> GameState -> [PlayerId]
+opponentsInReach you gs = filter (\pid -> inRangeOf you pid gs) (opponentsOf you gs)
+
 -- CR 102.3 with CR 104.2a: this player's opponents who are still in the game, in
 -- stillPlaying's PlayerId order -- which is the order the offers built from it
 -- were already in. A caller wanting the seating order filters turnOrderFrom
