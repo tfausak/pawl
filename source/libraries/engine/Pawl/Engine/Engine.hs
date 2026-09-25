@@ -860,6 +860,8 @@ abilityTriggeredOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.AttractionOpened _ -> Nothing
+  GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing

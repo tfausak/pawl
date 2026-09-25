@@ -314,6 +314,7 @@ manaProduced effect = case effect of
   Effect.Airbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.OpenAttraction -> Nothing
+  Effect.ClaimPrize -> Nothing
   Effect.Forage -> Nothing
   Effect.Populate -> Nothing
   Effect.TimeTravel -> Nothing
@@ -535,6 +536,7 @@ movesLibraryCard effect = case effect of
   Effect.Airbend _ -> False
   Effect.TemptWithTheRing -> False
   Effect.OpenAttraction -> False
+  Effect.ClaimPrize -> False
   Effect.Forage -> False
   Effect.Populate -> False
   Effect.TimeTravel -> False

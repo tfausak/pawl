@@ -2164,6 +2164,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.OpenAttraction
       " {\"type\":\"OpenAttraction\"} "
+  -- CR 702.159b: nullary, the prize's actions being the effects after it.
+  Spec.it s "ClaimPrize" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.ClaimPrize
+      " {\"type\":\"ClaimPrize\"} "
   -- CR 701.54a: nullary, because rule 701.54 fixes the chooser, the count and the
   -- qualification, leaving an author nothing to write.
   Spec.it s "TemptWithTheRing" $

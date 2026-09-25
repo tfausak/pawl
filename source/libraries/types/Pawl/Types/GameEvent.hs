@@ -451,6 +451,12 @@ data GameEvent
   | -- | CR 701.52a: a player rolled to visit their Attractions, with the result
     -- the Visit triggers read (CR 702.159a).
     RolledToVisit (DieResult.DieResult PlayerId.PlayerId)
+  | -- | CR 701.51c: this player opened an Attraction, recorded by
+    -- Pawl.Engine.Attraction.open only when the card reached the battlefield.
+    AttractionOpened PlayerId.PlayerId
+  | -- | CR 702.159b: this player claimed an Attraction's prize, recorded by
+    -- Effect.ClaimPrize.
+    PrizeClaimed PlayerId.PlayerId
   | -- | CR 716.2a: a permanent's class level BECAME something -- the level BEFORE
     -- and the level AFTER, CountersPut's shape and for CR 714.2b's reason, since
     -- "becomes level N" is a threshold crossing. Recorded by Pawl.Engine.Resolve's

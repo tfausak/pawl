@@ -746,6 +746,7 @@ effectObjectRefs effect = case effect of
   Effect.Airbend ref -> [ref]
   Effect.TemptWithTheRing -> []
   Effect.OpenAttraction -> []
+  Effect.ClaimPrize -> []
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.TimeTravel -> []
@@ -925,6 +926,7 @@ effectPlayerRefs effect = case effect of
   Effect.Airbend {} -> []
   Effect.TemptWithTheRing -> []
   Effect.OpenAttraction -> []
+  Effect.ClaimPrize -> []
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.TimeTravel -> []
@@ -1051,6 +1053,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Airbend {} -> Map.empty
   Effect.TemptWithTheRing -> Map.empty
   Effect.OpenAttraction -> Map.empty
+  Effect.ClaimPrize -> Map.empty
   Effect.Forage -> Map.empty
   Effect.Populate -> Map.empty
   Effect.TimeTravel -> Map.empty
@@ -1716,6 +1719,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Airbend {} -> True
   Effect.TemptWithTheRing -> True
   Effect.OpenAttraction -> True
+  Effect.ClaimPrize -> True
   Effect.Forage -> True
   Effect.Populate -> True
   Effect.TimeTravel -> True
@@ -1964,6 +1968,7 @@ readsX =
         Effect.Airbend {} -> False
         Effect.TemptWithTheRing -> False
         Effect.OpenAttraction -> False
+        Effect.ClaimPrize -> False
         Effect.Forage -> False
         Effect.Populate -> False
         Effect.TimeTravel -> False
@@ -2192,6 +2197,7 @@ boundSlots effect = case effect of
   Effect.Airbend _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
   Effect.OpenAttraction -> Set.empty
+  Effect.ClaimPrize -> Set.empty
   Effect.Forage -> Set.empty
   Effect.Populate -> Set.empty
   Effect.TimeTravel -> Set.empty

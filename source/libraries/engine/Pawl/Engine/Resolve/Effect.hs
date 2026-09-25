@@ -2884,11 +2884,12 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Earthbend {} -> False
   Effect.Airbend {} -> False
   Effect.TemptWithTheRing {} -> False
+  -- CR 609.3: an empty Attraction deck opens nothing.
+  Effect.OpenAttraction -> null (Attraction.deckOf controller gs)
+  Effect.ClaimPrize -> False
   -- CR 701.61a: neither half of forage can be carried out by a player holding
   -- fewer than three cards in their graveyard who controls no Food, which is
   -- Pawl.Engine.Forage.canForage. The executing arm reads the same two pools.
-  -- CR 609.3: an empty Attraction deck opens nothing.
-  Effect.OpenAttraction -> null (Attraction.deckOf controller gs)
   Effect.Forage -> not (Forage.canForage controller gs)
   -- CR 701.36b states the empty board's outcome outright -- "if you control no
   -- creature tokens when instructed to populate, you won't create a token" -- so
@@ -8490,6 +8491,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Ring.tempt's.
   Effect.TemptWithTheRing -> Ring.tempt controller
   Effect.OpenAttraction -> Attraction.open controller
+  -- CR 702.159b: the prize's actions are the effects after this one, so the
+  -- claim itself is only the event "whenever you claim the prize" reads.
+  Effect.ClaimPrize -> State.modify' (Event.recordEvent (GameEvent.PrizeClaimed controller))
   -- CR 701.61a: the resolving controller forages; the keyword action is
   -- Pawl.Engine.Forage.forage's, prompts and all.
   Effect.Forage -> Monad.void (Forage.forage controller resolving)

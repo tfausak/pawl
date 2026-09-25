@@ -200,6 +200,8 @@ movedOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.AttractionOpened _ -> Nothing
+  GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
@@ -260,6 +262,8 @@ looksBack condition = case condition of
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
+  TriggerCondition.PlayerOpensAttraction _ -> False
+  TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- The same answer once more, and the most plainly: CR 701.43c can only exert a
@@ -545,6 +549,8 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
+  TriggerCondition.PlayerOpensAttraction _ -> False
+  TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   TriggerCondition.SelfExerted -> False
@@ -1038,6 +1044,8 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.AttractionOpened _ -> Map.empty
+        GameEvent.PrizeClaimed _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.Airbent _ -> Map.empty
@@ -1366,6 +1374,8 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.AttractionOpened _ -> Map.empty
+        GameEvent.PrizeClaimed _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.Airbent _ -> Map.empty
@@ -1630,6 +1640,8 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.AttractionOpened _ -> Map.empty
+        GameEvent.PrizeClaimed _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.Airbent _ -> Map.empty
@@ -1785,6 +1797,8 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.AttractionOpened _ -> Map.empty
+        GameEvent.PrizeClaimed _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
         GameEvent.Waterbent _ -> Map.empty
         GameEvent.Airbent _ -> Map.empty
@@ -2205,6 +2219,8 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerRollsDice _ -> battlefield
         TriggerCondition.PlayerRollsResult _ -> battlefield
         TriggerCondition.Visit -> battlefield
+        TriggerCondition.PlayerOpensAttraction _ -> battlefield
+        TriggerCondition.PlayerClaimsPrize _ -> battlefield
         TriggerCondition.PlayerWinsCoinFlip _ -> battlefield
         TriggerCondition.PlayerLosesCoinFlip _ -> battlefield
         -- CR 113.6's default, and CR 701.43c makes it the only possible answer rather
@@ -2649,6 +2665,8 @@ stateTriggers gs
               TriggerCondition.PlayerRollsDice _ -> False
               TriggerCondition.PlayerRollsResult _ -> False
               TriggerCondition.Visit -> False
+              TriggerCondition.PlayerOpensAttraction _ -> False
+              TriggerCondition.PlayerClaimsPrize _ -> False
               TriggerCondition.PlayerWinsCoinFlip _ -> False
               TriggerCondition.PlayerLosesCoinFlip _ -> False
               -- CR 603.2 again: being exerted is something that happens, with its

@@ -671,6 +671,9 @@ data Effect card ability
   | -- | CR 701.51b: the resolving controller opens an Attraction, performed by
     -- Pawl.Engine.Attraction.open.
     OpenAttraction
+  | -- | CR 702.159b: the resolving controller claims the prize; the actions
+    -- after the long dash are the effects that follow this one.
+    ClaimPrize
   | -- | CR 701.61a: the resolving controller forages, performed by
     -- Pawl.Engine.Forage.forage as one procedure. Nullary, rule 701.61a fixing
     -- everything but the forager's own two choices.
