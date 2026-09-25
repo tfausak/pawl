@@ -5615,7 +5615,7 @@ payComponent moment slots pid oid component = case component of
   -- opponent, and naming one spends nothing that could run out.
   CostComponent.ChooseOpponent -> do
     gs <- State.get
-    case Game.opponentsOf pid gs of
+    case Game.opponentsInReach pid gs of
       -- CR 118.3 asked AGAIN here, TapThis' reason above: the last opponent may
       -- have left (CR 104.2a) since the gate.
       [] -> pure Payment.Unpaid

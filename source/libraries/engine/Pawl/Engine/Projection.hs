@@ -765,8 +765,8 @@ affectsGiven peers source oid a partial gs = affectsWith (controlGrants gs) peer
 -- otherwise take two controlGrants walks per pair.
 affectsWith :: [ControlGrant] -> Count.ViewOf -> ObjectId -> ObjectId -> Affected.Affected -> ProjectedCharacteristics -> GameState -> Bool
 affectsWith grants peers source oid a partial gs = case a of
-  -- Not implemented: CR 801.10's cut on this stored set, which is owed as the
-  -- resolution that fixes it (CR 611.2c) chooses its members (#3073).
+  -- CR 801.10 is asked of this stored set as the resolution fixes it (CR
+  -- 611.2c), by Pawl.Engine.Resolve.Slots.battlefieldMatching.
   Affected.TheseObjects s -> Set.member oid s
   -- CR 303.4m: read the SOURCE's attachment, not the candidate's. An unattached
   -- source, or one attached to a player, names no object (CR 702.5d's

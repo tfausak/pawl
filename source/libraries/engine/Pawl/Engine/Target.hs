@@ -1554,14 +1554,15 @@ chooseTargets pid oid source x slots sets = do
 -- answer naming somebody never offered falls back to the first, the announcement
 -- being mandatory.
 --
--- Off Game.stillPlaying, so a seat that has left (CR 104.3a) neither chooses nor
--- is counted towards eliding the question.
+-- Off Game.reachableBy, so a seat that has left (CR 104.3a), or sits outside the
+-- controller's range (CR 801.5a), neither chooses nor is counted towards eliding
+-- the question.
 chooserOf :: PlayerId -> ObjectId -> Maybe PlayerRelation.PlayerRelation -> Game (Maybe PlayerId)
 chooserOf controller oid relation = case relation of
   Nothing -> pure (Just controller)
   Just r -> do
     gs <- State.get
-    case List.filter (PlayerRelation.holds (Game.teams gs) r controller) (Game.stillPlaying gs) of
+    case List.filter (PlayerRelation.holds (Game.teams gs) r controller) (Game.reachableBy controller gs) of
       [] -> pure Nothing
       [sole] -> pure (Just sole)
       first : second : rest -> do
