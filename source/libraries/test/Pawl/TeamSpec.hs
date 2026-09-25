@@ -34,6 +34,7 @@ module Pawl.TeamSpec where
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -67,6 +68,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -76,6 +78,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
@@ -600,3 +603,159 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in fmap (\pid -> Combat.legalAttackDeclarationAs S.alice [(mine, AttackTarget.OfPlayer pid)] settled) [S.bob, S.carol]
     Spec.assertEqWith s "CR 803.1b attacking right, neither bob nor carol" (run AttackOption.Rightward) [False, False]
     Spec.assertEqWith s "CR 803.1a attacking left, bob only" (run AttackOption.Leftward) [True, False]
+  -- CR 805.10a: without the attack multiple players option CR 507.1 asks the
+  -- active player to choose ONE defending player; under the shared team turns
+  -- option the whole nonactive team defends and nobody is asked.
+  Spec.it s "CR 805.10a the nonactive team is the defending team" $ do
+    let run option =
+          let teamed = option (twoTeams S.fourPlayerGame)
+              board = (atCombat teamed) {GameState.settings = (GameState.settings teamed) {GameSettings.attackOption = Nothing}}
+              settled = S.runPure S.identityAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
+           in Combat.Type.defenders (GameState.combat settled)
+    Spec.assertEqWith s "carol and dave both defend" (run sharedTurns) [S.carol, S.dave]
+    Spec.assertEqWith s "without the option alice chose carol alone" (run id) [S.carol]
+  -- CR 805.10b: the active team has one combined attack, so bob's Goblin Piker
+  -- attacks on alice's turn.
+  Spec.it s "CR 805.10b a teammate's creature attacks on the team's turn" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let run option =
+          let (_, board) = S.addPermanent piker S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
+           in S.lifeOf S.carol (S.runCombat (S.attackTo S.carol) board)
+    Spec.assertEqWith s "bob's Piker dealt carol 2" (run sharedTurns) (Just 18)
+    Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
+  -- CR 805.10d: the defending team has one combined block, so dave's creature
+  -- may block a creature attacking his teammate carol, which CR 802.4a forbids
+  -- without the option.
+  --
+  -- Hill Giant, {3}{R} 3/3 Creature -- Giant.
+  Spec.it s "CR 805.10d a teammate's creature blocks an attacker aimed at the team" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let run option =
+          let (mine, staged) = S.addPermanent piker S.alice (atCombat (option (twoTeams S.fourPlayerGame)))
+              (_, board) = S.addPermanent giant S.dave staged
+              after = S.runCombat (S.attackTo S.carol) board
+           in (S.lifeOf S.carol after, S.onBattlefield mine after)
+    Spec.assertEqWith s "dave's Giant blocked and killed the Piker" (run sharedTurns) (Just 20, False)
+    Spec.assertEqWith s "without the option the Piker got through" (run id) (Just 18, True)
+  -- CR 805.10b / 508.1j: each attacking player pays the toll on their own
+  -- creatures. Bob's Forests pay for bob's Piker; alice has no mana, so a toll
+  -- charged to her would rewind the attack.
+  --
+  -- Ghostly Prison, {2}{W} Enchantment: "Creatures can't attack you unless
+  -- their controller pays {2} for each creature they control that's attacking
+  -- you."
+  Spec.it s "CR 805.10b a teammate pays the toll on their own attacker" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    let run option =
+          let (_, staged) = S.addPermanent piker S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
+              (_, imprisoned) = S.addPermanent prison S.carol staged
+              board = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) imprisoned [1 :: Int, 2]
+              after = S.runCombat (S.attackTo S.carol) board
+           in (S.lifeOf S.carol after, S.tappedCount S.bob after)
+    Spec.assertEqWith s "bob tapped both Forests and his Piker, which dealt carol 2" (run sharedTurns) (Just 18, 3)
+    Spec.assertEqWith s "without the option nothing attacked or paid" (run id) (Just 20, 0)
+  -- CR 805.10a / 508.3d: bob is an attacking player, so "whenever you attack"
+  -- triggers for him when a creature he controls is declared.
+  --
+  -- Boggart Prankster, {1}{B} 1/3 Creature -- Goblin Warrior: "Whenever you
+  -- attack, target attacking Goblin you control gets +1/+0 until end of turn."
+  Spec.it s "CR 508.3d a teammate's whenever-you-attack trigger fires" $ do
+    prankster <- S.printingOf s registry "Boggart Prankster"
+    let run option =
+          let (_, board) = S.addPermanent prankster S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
+           in S.lifeOf S.carol (S.runCombat (S.attackTo S.carol) board)
+    Spec.assertEqWith s "bob's Prankster pumped itself and dealt carol 2" (run sharedTurns) (Just 18)
+    Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
+  -- CR 805.10a / 701.43a: bob exerts his own attacker, so it is his next untap
+  -- step that it skips -- his team's next turn, where his tapped Forest untaps
+  -- beside it. The pair differs only in the exert.
+  --
+  -- Glory-Bound Initiate, {1}{W} 3/1 Creature -- Human Warrior: "You may exert
+  -- this creature as it attacks. When you do, it gets +1/+3 and gains lifelink
+  -- until end of turn."
+  Spec.it s "CR 701.43a a teammate's exerted attacker skips his next untap step" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    initiate <- S.printingOf s registry "Glory-Bound Initiate"
+    let exerting :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+        exerting decision p = case p of
+          Prompt.ChooseExert {} -> decision
+          _ -> S.attackTo S.carol p
+        tapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
+        run decision =
+          let (mine, staged) = S.addPermanent initiate S.bob (atCombat (stockedWith island sharedTurns))
+              (witness, placed) = S.addPermanent forest S.bob staged
+              after = S.runCombat (exerting decision) (S.tapObject witness placed)
+              -- The rest of alice's turn, carol's, then the untap step of
+              -- alice's team's next one.
+              later = snd (Engine.runGamePure (exerting decision) (fst (TurnSpec.runTurn (exerting decision) (fst (TurnSpec.runTurn (exerting decision) after)))) Engine.runStep)
+           in (S.lifeOf S.carol after, tapped mine later, tapped witness later)
+    Spec.assertEqWith s "the exerted Initiate dealt carol 4 and stayed tapped while bob's Forest untapped" (run OptionalDecision.Exercises) (Just 16, True, False)
+    Spec.assertEqWith s "declined, it dealt 3 and untapped beside the Forest" (run OptionalDecision.Declines) (Just 17, False, False)
+  -- CR 805.10a / 702.154a: bob enlists a creature he controls, which is a
+  -- creature of an attacking player.
+  --
+  -- Yavimaya Steelcrusher, {1}{R} 2/2 Creature -- Ape Warrior: "Enlist (As this
+  -- creature attacks, you may tap a nonattacking creature you control without
+  -- summoning sickness. When you do, add its power to this creature's until end
+  -- of turn.)" Hill Giant, 3/3, stays home to be enlisted.
+  Spec.it s "CR 702.154a a teammate enlists a creature he controls" $ do
+    steelcrusher <- S.printingOf s registry "Yavimaya Steelcrusher"
+    giant <- S.printingOf s registry "Hill Giant"
+    let run option =
+          let (ape, staged) = S.addPermanent steelcrusher S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
+              (_, board) = S.addPermanent giant S.bob staged
+              enlisting :: Prompt.Prompt r -> r
+              enlisting p = case p of
+                Prompt.DeclareAttackers _ _ ids -> filter (== ape) ids
+                Prompt.ChooseEnlist _ _ _ offer -> Just (NonEmpty.head offer)
+                _ -> S.attackTo S.carol p
+           in S.lifeOf S.carol (S.runCombat enlisting board)
+    Spec.assertEqWith s "the Steelcrusher took the Giant's 3 and dealt carol 5" (run sharedTurns) (Just 15)
+    Spec.assertEqWith s "without the option it was not offered" (run id) (Just 20)
+  -- CR 805.10b / 805.2 / 800.4j: with alice gone her team still attacks, and
+  -- bob, now its primary player, declares it.
+  Spec.it s "CR 805.2 a departed active player's teammate declares the attack" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let asking :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+        asking p = case p of
+          Prompt.DeclareAttackers _ pid _ -> State.modify' (<> [pid]) >> pure (S.attackTo S.carol p)
+          _ -> pure (S.attackTo S.carol p)
+        run option =
+          let teamed = option (twoTeams S.fourPlayerGame)
+              (_, staged) = S.addPermanent piker S.bob (atCombat teamed)
+              board =
+                staged
+                  { GameState.priority = Just S.bob,
+                    GameState.players = Map.adjust (\player -> player {Player.status = Status.Departed Departure.Lost}) S.alice (GameState.players staged)
+                  }
+              ((_, after), asked) = State.runState (Engine.runGame asking board S.combatGame) []
+           in (S.lifeOf S.carol after, asked)
+    Spec.assertEqWith s "bob declared and his Piker dealt carol 2" (run sharedTurns) (Just 18, [S.bob])
+    Spec.assertEqWith s "without the option nobody declared" (run id) (Just 20, [])
+  -- CR 805.10a / 506.3b: bob is an attacking player, so tokens he is told to put
+  -- onto the battlefield attacking do attack.
+  --
+  -- Hanweir Garrison, {2}{R} 2/3 Creature -- Human Soldier: "Whenever this
+  -- creature attacks, create two 1/1 red Human creature tokens that are tapped
+  -- and attacking."
+  Spec.it s "CR 805.10a a teammate's tokens enter attacking" $ do
+    garrison <- S.printingOf s registry "Hanweir Garrison"
+    let run option =
+          let (_, board) = S.addPermanent garrison S.bob (atCombat (option (twoTeams S.fourPlayerGame)))
+           in S.lifeOf S.carol (S.runCombat (S.attackTo S.carol) board)
+    Spec.assertEqWith s "the Garrison and both Humans dealt carol 4" (run sharedTurns) (Just 16)
+    Spec.assertEqWith s "without the option the Garrison was not offered" (run id) (Just 20)
+
+-- alice's beginning of combat step, the rest of her turn to come.
+atCombat :: GameState.GameState -> GameState.GameState
+atCombat gs =
+  gs
+    { GameState.activePlayer = S.alice,
+      GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+      GameState.priority = Just S.alice,
+      GameState.remaining = S.phasesAfter (Phase.Combat CombatStep.BeginningOfCombat)
+    }
