@@ -1183,6 +1183,19 @@ prohibitsAtManaValue pid oid manaValue gs =
         _ -> False
    in any prohibits (applying pid gs)
 
+-- CR 601.2e / 601.3: prohibitsAtManaValue's permission-side twin. Does the CR
+-- 601.3 permission the cast is made under still admit `oid` at `manaValue`?
+-- Judged as castPermissionsFrom judged it, with only the mana value replaced;
+-- Nothing, a cast needing no permission, always does. Pawl.CastPermissionSpec's
+-- "CR 601.2e Serra Paragon admits Protean Hydra at X = 2 and not at X = 3" is
+-- the proof.
+admitsAtManaValue :: Maybe (ObjectId, CastFromZone.CastFromZone) -> ObjectId -> Integer -> GameState -> Bool
+admitsAtManaValue permission oid manaValue gs = case permission of
+  Nothing -> True
+  Just (source, grant) ->
+    let view = (Projection.viewOfObject oid gs) {Filter.manaValue = Just manaValue}
+     in Filter.matches (contextFrom (Just source) oid gs) view (CastFromZone.matching grant)
+
 -- CR 613.11 / 601.2f: the cost increases, the cost reductions and the additional
 -- non-mana components that apply to `pid` CASTING `oid`.
 --
