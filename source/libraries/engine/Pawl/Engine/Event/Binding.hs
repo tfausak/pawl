@@ -406,6 +406,10 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- in for.
   (TriggerCondition.PlayerDiscards _, GameEvent.Discarded (Discarded.MkDiscarded discarder _ _ _)) ->
     Binding.setTriggerPlayer discarder Map.empty
+  -- CR 603.2c's "that much" (Magmakin Artillerist): one card per Discarded
+  -- event, summed across the group by batchBindings.
+  (TriggerCondition.PlayerDiscardsCards _, GameEvent.Discarded _) ->
+    Binding.setEventAmount 1 Map.empty
   -- CR 702.86a's "defending player": CR 508.5 resolves that phrase through what
   -- the attacking creature is attacking, and Pawl.Engine.Combat.declareAttackers
   -- stamped the answer onto the event as the declaration was written down. The
@@ -778,6 +782,9 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- answers the Aura's "you" from Binding.triggerSource. There is no second
   -- object for the payload to name.
   (TriggerCondition.AttachedCreatureBecomesTapped, _) -> Map.empty
+  -- Nothing: Deeproot Pilgrimage's payload names no tapped permanent, and one
+  -- slot could not name a batch of them.
+  (TriggerCondition.PermanentsBecomeTapped _, _) -> Map.empty
   -- Nothing either, and for a plainer reason: the permanent that became
   -- untapped IS the bearer, whom Binding.triggerSource already names.
   (TriggerCondition.SelfBecomesUntapped, _) -> Map.empty
@@ -1229,6 +1236,9 @@ eventBindingSlots cond = case cond of
   -- CR 701.9a's discarding player, which is nobody the bearer already names --
   -- Megrim's "that player" is the opponent whose hand the card left.
   TriggerCondition.PlayerDiscards _ -> Set.singleton Binding.triggerPlayer
+  -- The batch's card count, eventBindings' arm summed by batchBindings; no
+  -- "that player" printing under this condition earns the discarder's slot.
+  TriggerCondition.PlayerDiscardsCards _ -> Set.singleton Binding.eventAmount
   -- NOTHING, where the cause-blind sibling above binds the discarder. Prickly
   -- Marmoset's payload says "this creature", which is CR 113.7's source slot
   -- the placement already stamps, and names no player; a printing under this
@@ -1633,6 +1643,8 @@ eventBindingSlots cond = case cond of
   -- is no arrival for a payload to find. The tapped permanent is still the one
   -- Object.attachedTo names.
   TriggerCondition.AttachedCreatureBecomesTapped -> Set.empty
+  -- Empty, eventBindings' arm.
+  TriggerCondition.PermanentsBecomeTapped _ -> Set.empty
   -- Empty for the arm above's reason once more: nothing moved, and the
   -- permanent that untapped is the bearer.
   TriggerCondition.SelfBecomesUntapped -> Set.empty

@@ -1214,6 +1214,16 @@ fireblastSpec s registry =
 -- for the lot. Vengeful Townsfolk reads the sacrifices; Synthetic Return Ledger
 -- reads the returns, since Tameshi, Reality Architect's once-each-turn rider
 -- hides the difference (Pawl.LeavesTriggerSpec's permanentsReturnedToHandSpec).
+--
+-- Magmakin Artillerist {2}{R} 1/4: "Whenever you discard one or more cards, this
+-- creature deals that much damage to each opponent." Cathartic Reunion {1}{R}:
+-- "As an additional cost to cast this spell, discard two cards. Draw three
+-- cards." Deeproot Pilgrimage {1}{U}: "Whenever one or more nontoken Merfolk you
+-- control become tapped, create a 1/1 blue Merfolk creature token with
+-- hexproof." Adaptive Gemguard {3}{W} 3/3: "Tap two untapped artifacts and/or
+-- creatures you control: Put a +1/+1 counter on this creature. Activate only as
+-- a sorcery." Checked against Scryfall 2026-09-24; the Pilgrimage's ruling names
+-- the Gemguard's cost as one tapping.
 costBatchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 costBatchSpec s registry =
   let mainPhase gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
@@ -1255,6 +1265,49 @@ costBatchSpec s registry =
           -- The proxies, AFTER the assertion above.
           Spec.assertEqWith s "one trigger above Gush" (length (GameState.stack placed)) 2
           Spec.assertEqWith s "and no Island is left in play" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
+        Spec.it s "CR 601.2h Cathartic Reunion's two discards fire Magmakin Artillerist once, for 2" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          magmakin <- S.printingOf s registry "Magmakin Artillerist"
+          reunion <- S.printingOf s registry "Cathartic Reunion"
+          let (_, g0) = S.addPermanent magmakin S.alice (S.landsInPlay mountain 2)
+              (first, g1) = S.addHandCard mountain S.alice g0
+              (second, g2) = S.addHandCard mountain S.alice g1
+              (_, g3) = S.addHandCard mountain S.alice g2
+              stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g3 [1 .. 4 :: Int]
+              (reunionId, gs) = S.addHandCard reunion S.alice (mainPhase stocked)
+              -- Three cards beside the Reunion, so the discard is really asked.
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseDiscard {} -> [first, second]
+                _ -> S.identityAnswer p
+              cast = S.runPure answer gs (S.cast S.alice reunionId)
+              placed = S.runPure answer cast Engine.settleForPriority
+              after = resolveAll placed
+              blows = [DamageEvent.amount ev | GameEvent.DamageDealt ev <- S.eventsOf after, DamageEvent.target ev == Recipient.ToPlayer S.bob]
+          Spec.assertEqWith s "CR 603.2c one trigger dealing 2 to bob, not two dealing 1" blows [2]
+          -- The proxy, AFTER the assertion above.
+          Spec.assertEqWith s "one trigger above the Reunion" (length (GameState.stack placed)) 2
+        Spec.it s "CR 601.2h Adaptive Gemguard's two tapped Merfolk make one Deeproot Pilgrimage token" $ do
+          island <- S.printingOf s registry "Island"
+          gemguard <- S.printingOf s registry "Adaptive Gemguard"
+          pilgrimage <- S.printingOf s registry "Deeproot Pilgrimage"
+          spy <- S.printingOf s registry "Merfolk Spy"
+          let (_, g0) = S.addPermanent pilgrimage S.alice (S.landsInPlay island 1)
+              (gemId, g1) = S.addPermanent gemguard S.alice g0
+              (spy1, g2) = S.addPermanent spy S.alice g1
+              (spy2, g3) = S.addPermanent spy S.alice g2
+              gs = mainPhase g3
+              -- Three candidates for two taps, so the choice is really asked.
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTaps {} -> Set.fromList [spy1, spy2]
+                _ -> S.identityAnswer p
+              activated = S.runPure answer gs (Activate.activateAbility S.alice gemId (theAbility gemguard))
+              placed = S.runPure answer activated Engine.settleForPriority
+              after = resolveAll placed
+          Spec.assertEqWith s "CR 603.2c one Merfolk token, not the two two events would make" (length (S.tokensOf after)) 1
+          -- The precondition, AFTER the assertion above.
+          Spec.assertEqWith s "both Merfolk really became tapped" (S.tappedCount S.alice after) 2
 
 -- alice controls one untapped Swamp -- the {B} half of Asmoranomardicadaistinaculdacar's
 -- {B/R} -- and holds the card itself plus a Circling Vultures, with priority in

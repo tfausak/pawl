@@ -228,6 +228,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerCycles PlayerRelation.Opponent)
       " {\"type\":\"PlayerCycles\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 603.2c's batch reading of PlayerDiscards, carrying the same payload, so
+  -- the tag is all that keeps the two readings apart on the wire.
+  Spec.it s "PlayerDiscardsCards round-trips under its own tag" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerDiscardsCards PlayerRelation.You)
+      " {\"type\":\"PlayerDiscardsCards\",\"value\":{\"type\":\"You\"}} "
   -- CR 121.1's Nth draw of a turn. The relation and the ordinal are both content,
   -- and the ordinal is not 1, so a codec dropping it would fail rather than
   -- round-trip the default.
@@ -568,6 +576,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedCreatureBecomesTapped
       " {\"type\":\"AttachedCreatureBecomesTapped\"} "
+  -- CR 701.26a's tap by a bystander, batch-read (CR 603.2c).
+  Spec.it s "PermanentsBecomeTapped round-trips with its Filter" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PermanentsBecomeTapped (Filter.Not Filter.IsToken))
+      " {\"type\":\"PermanentsBecomeTapped\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}} "
   -- CR 701.26b's untap read off the BEARER. Nullary for the arm above's reason,
   -- and the TAG is the whole difference between the two directions of one status.
   Spec.it s "SelfBecomesUntapped" $

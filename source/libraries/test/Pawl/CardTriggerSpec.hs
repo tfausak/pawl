@@ -3466,6 +3466,22 @@ betrayalSpec s registry = Spec.describe s "CR 701.26a a becomes-tapped trigger" 
 -- Carol's library holds three Islands and alice's one Mountain, so every count
 -- below is a real count rather than a CR 104.3c loss, and `handNames` says WHOSE
 -- library a card came out of.
+-- Deeproot Pilgrimage {1}{U}: "Whenever one or more nontoken Merfolk you control
+-- become tapped, create a 1/1 blue Merfolk creature token with hexproof."
+-- Checked against Scryfall 2026-09-24. Two Merfolk Spies attack together, and
+-- CR 508.1f taps them as one action, so the Pilgrimage fires once.
+deeprootPilgrimageSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deeprootPilgrimageSpec s registry =
+  Spec.describe s "CR 603.2c a batch of permanents becoming tapped" . Spec.it s "CR 508.1f two Merfolk attacking together make one Deeproot Pilgrimage token" $ do
+    spy <- S.printingOf s registry "Merfolk Spy"
+    pilgrimage <- S.printingOf s registry "Deeproot Pilgrimage"
+    let (board, attackers, _) = S.combatBoardOf [spy, spy] []
+        (_, gs) = S.addPermanent pilgrimage S.alice board
+        after = S.runCombat (S.attackTo S.bob) gs
+    Spec.assertEqWith s "CR 603.2c one Merfolk token, not the two two events would make" (length (S.tokensOf after)) 1
+    -- The precondition, AFTER the assertion above.
+    Spec.assertEqWith s "CR 508.1f both Spies really became tapped" (fmap (`tapStatusOf` after) attackers) [Just TapState.Tapped, Just TapState.Tapped]
+
 betrayalBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
 betrayalBoard s registry attached = do
   piker <- S.printingOf s registry "Goblin Piker"
@@ -3904,4 +3920,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   graftedWargearSpec s registry
   sixthSenseSpec s registry
   betrayalSpec s registry
+  deeprootPilgrimageSpec s registry
   marduSkullhunterSpec s registry

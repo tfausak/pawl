@@ -438,7 +438,8 @@ discardToHandSize pid = do
         -- CR 701.9a, through the shared discard funnel, so it records a discard
         -- for a rule 701.9a trigger -- then a trigger waiting during the cleanup
         -- step, CR 514.3a's condition (`cleanupException`).
-        Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) toDiscard
+        -- One event group: rule 514.1's discard is one action.
+        Event.simultaneously (Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) toDiscard)
 
 -- CR 103.8a: in a two-player game the player who plays first skips the draw step
 -- of their first turn; CR 103.8c and CR 800.7, in other multiplayer games nobody

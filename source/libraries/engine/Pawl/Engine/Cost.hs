@@ -5198,6 +5198,8 @@ payComponent moment slots pid oid component = case component of
   -- unconditional here and the crew reading is made where the keyword is known
   -- -- CR 702.122d's prohibition is made there too, as the criterion atom
   -- `tapCandidates` above supplies the set for.
+  --
+  -- The taps are ONE event group, TapPermanents' reason below.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates slots pid oid criterion gs
@@ -5206,7 +5208,7 @@ payComponent moment slots pid oid component = case component of
     let totalPower = sum (fmap (`tapPower` gs) (Set.toAscList chosen))
     if Set.isSubsetOf chosen (Set.fromList candidates) && totalPower >= toInteger n
       then do
-        Monad.mapM_ tapObject (Set.toAscList chosen)
+        Event.simultaneously (Monad.mapM_ tapObject (Set.toAscList chosen))
         pure (Payment.Paid (Map.singleton Binding.tappedForTotalPower (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- The payer chooses WHICH permanents to tap, so this is a prompt. Sacrifice's
@@ -5222,8 +5224,9 @@ payComponent moment slots pid oid component = case component of
   -- is still on the battlefield, so the read is CR 608.2h's CURRENT information
   -- rather than last known.
   --
-  -- Not implemented, here or in TapForTotalPower above: the taps as one event
-  -- group, Sacrifice's bracket (#4010).
+  -- The taps are ONE event group, Sacrifice's reason; Pawl.CostSpec's "CR 601.2h
+  -- Adaptive Gemguard's two tapped Merfolk make one Deeproot Pilgrimage token"
+  -- proves it.
   CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates slots pid oid criterion gs
@@ -5234,7 +5237,7 @@ payComponent moment slots pid oid component = case component of
         else Game.choose (Prompt.ChooseTaps decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
-        Monad.mapM_ tapObject (Set.toAscList chosen)
+        Event.simultaneously (Monad.mapM_ tapObject (Set.toAscList chosen))
         pure (Payment.Paid (Map.singleton Binding.tappedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 118.1 as a cost: the payer chooses WHICH permanents go back, so this is a
@@ -5280,7 +5283,9 @@ payComponent moment slots pid oid component = case component of
   -- incarnation, Rest in Peace's redirect composes, and the discard is recorded
   -- for a rule 701.9a trigger to read.
   --
-  -- Not implemented: the discards as one event group, Sacrifice's bracket (#4009).
+  -- The discards are ONE event group, Sacrifice's reason; Pawl.CostSpec's "CR
+  -- 601.2h Cathartic Reunion's two discards fire Magmakin Artillerist once, for 2"
+  -- proves it.
   CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> do
     gs <- State.get
     let held = discardCandidates slots pid oid criterion gs
@@ -5292,7 +5297,7 @@ payComponent moment slots pid oid component = case component of
     let distinct = ListUtils.nubOrd chosen
     if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do
-        Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) distinct
+        Event.simultaneously (Monad.mapM_ (Event.discard DiscardCause.Ordinary pid) distinct)
         pure bindsNothing
       else pure Payment.Unpaid
   -- CR 701.9a's move, through the funnel DiscardCards uses above. No prompt: the
