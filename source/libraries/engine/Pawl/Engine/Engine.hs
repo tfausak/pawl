@@ -87,6 +87,7 @@ import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -107,6 +108,7 @@ import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import Pawl.Types.Prompt (Prompt)
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
@@ -902,11 +904,14 @@ perGameRecord pending = case TriggeredAbility.limit (PendingTrigger.ability pend
 -- every step is keyed to that object -- CR 113.7's reserved source binding, and
 -- the fillableModes/legalSets pair. A sourceless ability has no such object.
 placeOne :: PendingTrigger.PendingTrigger -> Game ()
-placeOne pending = case PendingTrigger.source pending of
-  -- Monarch.placeInherent names no rule of its own: it is the generic sourceless
-  -- placement, which rule 702.179d's ability rides too.
-  TriggerSource.Sourceless -> Monarch.placeInherent pending
-  TriggerSource.OfObject srcId -> placeBorne srcId pending
+placeOne pending = do
+  -- CR 801.16: the ability is an object its controller controls.
+  State.modify' (Game.involve (PendingTrigger.controller pending))
+  case PendingTrigger.source pending of
+    -- Monarch.placeInherent names no rule of its own: it is the generic sourceless
+    -- placement, which rule 702.179d's ability rides too.
+    TriggerSource.Sourceless -> Monarch.placeInherent pending
+    TriggerSource.OfObject srcId -> placeBorne srcId pending
 
 -- Put one object-borne triggered ability on the stack as a fresh OfTrigger
 -- object, choosing its mode(s) and their targets as it is placed (CR 603.3d).
@@ -1344,17 +1349,32 @@ mandatoryLoopLimit = 1000
 -- overwrites a result the game already has -- a won game is not looping, and CR
 -- 104.4a's simultaneous loss is a different draw.
 --
--- Not implemented: CR 801.16's draw under limited range, for the players whose
--- objects are in the loop and those within their range only. This heuristic
--- names no objects, so a ranged game gets CR 104.4b's whole-table draw (#4144). The subtraction cannot
--- underflow: GameState.lastChoice only ever takes a past GameState.nextTimestamp,
--- and that supply only counts up.
+-- CR 801.16 under limited range: a draw for the loop's players and every player
+-- within any of their ranges, who leave the game while the rest play on. The
+-- loop's players are those GameState.loopInvolvement stamped in the gap's later
+-- half, which every cycle of a loop reaches and a lead-in shorter than half the
+-- limit does not. The survivors start owing nobody a choice, so the gap
+-- restarts rather than drawing them at the next check. A ranged loop naming
+-- nobody still playing falls back to the whole table.
+--
+-- The subtractions cannot underflow: GameState.lastChoice only ever takes a past
+-- GameState.nextTimestamp, that supply only counts up, and `recent` is forced
+-- only once the gap has reached the limit.
 checkMandatoryLoop :: Game ()
-checkMandatoryLoop = State.modify' $ \gs ->
-  let gap = Timestamp.unwrap (GameState.nextTimestamp gs) - Timestamp.unwrap (GameState.lastChoice gs)
-   in if Maybe.isNothing (GameState.result gs) && gap >= mandatoryLoopLimit
-        then gs {GameState.result = Just Result.Drawn}
-        else gs
+checkMandatoryLoop = do
+  gs <- State.get
+  let now = Timestamp.unwrap (GameState.nextTimestamp gs)
+      gap = now - Timestamp.unwrap (GameState.lastChoice gs)
+      recent = Timestamp.MkTimestamp (now - div mandatoryLoopLimit 2)
+      involved = Map.keys (Map.filter (>= recent) (GameState.loopInvolvement gs))
+      drawn = Set.fromList (concatMap (`Game.reachableBy` gs) involved)
+      ranged = GameSettings.rangeOfInfluence (GameState.settings gs) /= RangeOfInfluence.unlimited
+  Monad.when (Maybe.isNothing (GameState.result gs) && gap >= mandatoryLoopLimit) $
+    if ranged && not (Set.null drawn)
+      then do
+        Departure.leaveGameTogether Departure.Type.Drew (filter (`Set.member` drawn) (Game.apnapOrder gs))
+        State.modify' (\g -> g {GameState.lastChoice = GameState.nextTimestamp g})
+      else State.put gs {GameState.result = Just Result.Drawn}
 
 -- Ask the priority holder for an action until every still-playing player has
 -- passed in succession (CR 117.4). A full round of passes resolves the top of the
