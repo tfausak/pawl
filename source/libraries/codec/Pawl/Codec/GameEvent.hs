@@ -135,6 +135,8 @@ codec =
       Arm.payload "Foraged" PlayerId.codec GameEvent.Foraged (\x -> case x of GameEvent.Foraged y -> Just y; _ -> Nothing),
       Arm.payload "Earthbent" PlayerId.codec GameEvent.Earthbent (\x -> case x of GameEvent.Earthbent y -> Just y; _ -> Nothing),
       Arm.payload "Waterbent" PlayerId.codec GameEvent.Waterbent (\x -> case x of GameEvent.Waterbent y -> Just y; _ -> Nothing),
+      Arm.payload "Airbent" PlayerId.codec GameEvent.Airbent (\x -> case x of GameEvent.Airbent y -> Just y; _ -> Nothing),
+      Arm.payload "Firebent" PlayerId.codec GameEvent.Firebent (\x -> case x of GameEvent.Firebent y -> Just y; _ -> Nothing),
       -- CR 608.2n. The source object and the ability, which is the pair CR
       -- 707.10b counts by, so the payload is the same record Pawl.Types.Source's
       -- own OfAbility arm carries.
@@ -212,4 +214,6 @@ tagOf x = case x of
   GameEvent.Foraged {} -> "Foraged"
   GameEvent.Earthbent {} -> "Earthbent"
   GameEvent.Waterbent {} -> "Waterbent"
+  GameEvent.Airbent {} -> "Airbent"
+  GameEvent.Firebent {} -> "Firebent"
   GameEvent.ActivatedAbilityResolved {} -> "ActivatedAbilityResolved"

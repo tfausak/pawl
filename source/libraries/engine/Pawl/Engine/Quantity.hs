@@ -703,6 +703,12 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.CardsDiscardedThisTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
           _ -> Nothing
+        -- CR 603.1b: how many of the four bending verbs that player has done this
+        -- turn. CardsDiscardedThisTurn's arm in footing and in arity; Game.bendingsThisTurn
+        -- is the fold.
+        Quantity.BendingsThisTurn ref -> case playersOf ref of
+          Just [pid] -> Just (toInteger (Game.bendingsThisTurn gs pid))
+          _ -> Nothing
         -- CR 119.3 / 608.2i: how much life that player has gained this turn.
         -- CardsDiscardedThisTurn's arm in footing -- a live fold over GameState.events,
         -- whose extent Engine.beginTurnOf's clearing makes "this turn" -- and in ARITY:
@@ -1210,6 +1216,7 @@ objectSlots quantity = case quantity of
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.AttackersDeclaredThisTurn _ -> Set.empty
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
+  Quantity.BendingsThisTurn _ -> Set.empty
   Quantity.LifeGainedThisTurn _ -> Set.empty
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.DamageDealtToPlayersThisTurn _ -> Set.empty
@@ -1474,6 +1481,7 @@ readsX quantity = case quantity of
   Quantity.OpponentsAttacked _ -> False
   Quantity.AttackersDeclaredThisTurn _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
+  Quantity.BendingsThisTurn _ -> False
   Quantity.LifeGainedThisTurn _ -> False
   Quantity.PlayersDealtDamageThisTurn _ -> False
   Quantity.DamageDealtToPlayersThisTurn _ -> False

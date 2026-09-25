@@ -641,6 +641,8 @@ damageOf event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -715,6 +717,8 @@ revealOf event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -8055,6 +8059,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerForages _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
+  TriggerCondition.PlayerAirbends _ -> False
+  TriggerCondition.PlayerFirebends _ -> False
   -- CR 706.1's roll is something a resolving effect INSTRUCTS a player to do,
   -- never an ability triggering, so it takes CR 603.3b's first pass as well.
   TriggerCondition.PlayerRollsDice _ -> False
@@ -8266,6 +8272,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerForages _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
+  TriggerCondition.PlayerAirbends _ -> False
+  TriggerCondition.PlayerFirebends _ -> False
   -- CR 706.1 names no turn either.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False

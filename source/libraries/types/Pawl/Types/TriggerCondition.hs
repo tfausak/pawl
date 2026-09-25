@@ -640,4 +640,11 @@ data TriggerCondition
     -- that cost", so a waterbend cost paid entirely in mana fires it exactly as
     -- one paid by rule 701.67a's taps does.
     PlayerWaterbends PlayerRelation.PlayerRelation
+  | -- | CR 701.65b: "whenever you airbend" (Avatar Aang), against
+    -- GameEvent.Airbent.
+    PlayerAirbends PlayerRelation.PlayerRelation
+  | -- | CR 702.189b: "whenever you firebend" (Avatar Aang), against
+    -- GameEvent.Firebent -- a firebending ability resolving, not the attack
+    -- that triggered it.
+    PlayerFirebends PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

@@ -2276,6 +2276,8 @@ castOf event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -2354,6 +2356,8 @@ activatedAbilityResolved event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved activated -> Just activated
   GameEvent.CardArrived _ -> Nothing
 
@@ -2442,6 +2446,8 @@ discardOf event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -2559,6 +2565,8 @@ movedChange event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -2666,6 +2674,8 @@ damageDealt event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -2937,6 +2947,8 @@ lifeGainOf event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
@@ -2950,6 +2962,15 @@ lifeGainOf event = case event of
 lifeGainedThisTurn :: GameState -> PlayerId -> Natural
 lifeGainedThisTurn gs pid =
   sum (fmap snd (filter ((== pid) . fst) (Maybe.mapMaybe (lifeGainOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
+
+-- CR 603.1b: how many DISTINCT bending verbs this player has done this turn --
+-- CR 701.65b's airbend, CR 701.66b's earthbend, CR 702.189b's firebend and CR
+-- 701.67c's waterbend. lifeGainedThisTurn's footing. Each event names only its
+-- player, so the distinct events for one player are the distinct verbs.
+bendingsThisTurn :: GameState -> PlayerId -> Int
+bendingsThisTurn gs pid =
+  let bends = Set.fromList [GameEvent.Airbent pid, GameEvent.Earthbent pid, GameEvent.Firebent pid, GameEvent.Waterbent pid]
+   in Set.size (Set.intersection bends (Set.fromList (fmap LoggedEvent.event (Foldable.toList (GameState.events gs)))))
 
 -- CR 508.1a / 608.2i: how many creatures this player declared as attackers this
 -- turn. lifeGainedThisTurn's footing -- a fold over GameState.events, whose

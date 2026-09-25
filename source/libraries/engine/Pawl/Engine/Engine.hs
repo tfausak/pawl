@@ -862,6 +862,8 @@ abilityTriggeredOf event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 

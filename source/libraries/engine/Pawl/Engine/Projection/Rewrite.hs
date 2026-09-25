@@ -455,6 +455,16 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantGainLife -> effect
   PlayerEffect.CantLoseLife -> effect
 
+-- CR 612.1: AddMana's and Firebend's shared payload, each quantity and Filter
+-- in it rewritten.
+rewriteManaAddition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ManaAddition.ManaAddition -> ManaAddition.ManaAddition
+rewriteManaAddition pairs addition =
+  addition
+    { ManaAddition.count = rewriteQuantity pairs (ManaAddition.count addition),
+      ManaAddition.restriction = fmap (rewriteManaRestriction pairs) (ManaAddition.restriction addition),
+      ManaAddition.rider = fmap (rewriteManaRider pairs) (ManaAddition.rider addition)
+    }
+
 -- CR 612's subtype word swap over an effect's AST. Cases on an effect's
 -- STRUCTURE -- does this arm carry a word a swap could reach -- never on which
 -- effect it is.
@@ -489,13 +499,8 @@ rewriteEffect pairs effect = case effect of
   -- behaviour: every printing in `data/cards/` writing one says "artifact
   -- spells" or "abilities of artifacts", CR 205.2a card types a subtype pair
   -- cannot swap, so neutralising these two lines leaves the whole suite green.
-  Effect.AddMana addition ->
-    Effect.AddMana
-      addition
-        { ManaAddition.count = rewriteQuantity pairs (ManaAddition.count addition),
-          ManaAddition.restriction = fmap (rewriteManaRestriction pairs) (ManaAddition.restriction addition),
-          ManaAddition.rider = fmap (rewriteManaRider pairs) (ManaAddition.rider addition)
-        }
+  Effect.AddMana addition -> Effect.AddMana (rewriteManaAddition pairs addition)
+  Effect.Firebend addition -> Effect.Firebend (rewriteManaAddition pairs addition)
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref (Filter.rewrite pairs filter_))
   Effect.MoveMana _ -> effect
   Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination subject) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject)
@@ -1781,6 +1786,8 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerForages _ -> condition
   TriggerCondition.PlayerEarthbends _ -> condition
   TriggerCondition.PlayerWaterbends _ -> condition
+  TriggerCondition.PlayerAirbends _ -> condition
+  TriggerCondition.PlayerFirebends _ -> condition
   TriggerCondition.PlayerCompletesDungeon _ -> condition
   TriggerCondition.PlayerSurveils _ -> condition
   TriggerCondition.PlayerRollsDice _ -> condition
@@ -1937,6 +1944,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.OpponentsAttacked _ -> quantity
   Quantity.Type.AttackersDeclaredThisTurn _ -> quantity
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity
+  Quantity.Type.BendingsThisTurn _ -> quantity
   Quantity.Type.LifeGainedThisTurn _ -> quantity
   Quantity.Type.PlayersDealtDamageThisTurn _ -> quantity
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> quantity

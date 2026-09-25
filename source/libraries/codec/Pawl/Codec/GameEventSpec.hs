@@ -728,6 +728,18 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Waterbent (PlayerId.MkPlayerId 7))
       " {\"type\":\"Waterbent\",\"value\":7} "
+  Spec.it s "Airbent" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Airbent (PlayerId.MkPlayerId 8))
+      " {\"type\":\"Airbent\",\"value\":8} "
+  Spec.it s "Firebent" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Firebent (PlayerId.MkPlayerId 9))
+      " {\"type\":\"Firebent\",\"value\":9} "
   -- CR 608.2n. The source object and the ability, in that order, which is the
   -- pair CR 707.10b counts by: a swap would file the resolution under the
   -- ability's own id.

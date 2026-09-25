@@ -871,6 +871,8 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   -- CR 712.21e's second half: every arrival AFTER the leading one, which is what
   -- makes a melded permanent two cards where the Moved arm above makes it one

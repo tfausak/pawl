@@ -583,6 +583,12 @@ data GameEvent
     -- cost paid entirely in mana fires it just the same" is the half a
     -- tap-reading condition would miss.
     Waterbent PlayerId.PlayerId
+  | -- | CR 701.65b: this player airbent, written only when rule 701.65a's exile
+    -- actually moved one or more objects.
+    Airbent PlayerId.PlayerId
+  | -- | CR 702.189b: a firebending ability this player controls resolved,
+    -- written by Effect.Firebend.
+    Firebent PlayerId.PlayerId
   | -- | CR 608.2n: an ACTIVATED ability RESOLVED -- the source object and the
     -- ability, which is the pair CR 707.10b's third sentence counts by. Appended
     -- by Pawl.Engine.Resolve.resolveModesWith, the one loop every ability's

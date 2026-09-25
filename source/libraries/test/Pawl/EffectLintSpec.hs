@@ -225,6 +225,7 @@ ownQuantities effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationQuantities duration <> Projection.quantitiesOf modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
+  Effect.Firebend _ -> []
   Effect.ActivateManaAbilities _ -> []
   Effect.MoveMana _ -> []
   Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> Maybe.maybeToList quantity
@@ -430,6 +431,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.AttackersDeclaredThisTurn {} -> False
   Quantity.Type.CardsDiscardedThisTurn {} -> False
+  Quantity.Type.BendingsThisTurn {} -> False
   Quantity.Type.LifeGainedThisTurn {} -> False
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False
   Quantity.Type.DamageDealtToPlayersThisTurn {} -> False
@@ -1243,6 +1245,7 @@ effectObjectRefs effect =
         Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
         Effect.ChangeText {} -> []
         Effect.AddMana {} -> []
+        Effect.Firebend {} -> []
         Effect.ActivateManaAbilities {} -> []
         Effect.MoveMana {} -> []
         Effect.Search {} -> []
