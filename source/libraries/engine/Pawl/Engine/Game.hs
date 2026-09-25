@@ -2434,7 +2434,8 @@ discardOf event = case event of
 -- for CR 603.6a, so a trigger and this reader agree on what entered.
 --
 -- castOf's and discardOf's sibling, and here for their import-graph reason: the
--- caller is Pawl.Engine.Quantity's EnteredThisTurn arm.
+-- callers are Pawl.Engine.Quantity's EnteredThisTurn arm and
+-- Pawl.Engine.Projection.View's enteredThisTurn field.
 enteredBattlefield :: GameEvent -> Maybe ObjectId
 enteredBattlefield = fmap ZoneChange.object . enteredBattlefieldChange
 

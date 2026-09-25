@@ -294,6 +294,10 @@ data View = MkView
     -- all for a wither or infect source, so the marks are a strict subset of
     -- what was dealt.
     dealtDamageThisTurn :: Bool,
+    -- CR 400.7 / 608.2i: did this candidate, as the object it is now, enter the
+    -- battlefield earlier this turn? The same log again, and LAZY for its reason
+    -- -- nothing forces it unless a Filter contains EnteredThisTurn.
+    enteredThisTurn :: Bool,
     -- CR 702.122c: which objects did this candidate crew earlier this turn? The
     -- same log the three fields above read, and LAZY for their reason -- nothing
     -- forces it unless a Filter contains CrewedSourceThisTurn.
@@ -823,6 +827,8 @@ playerView pid =
       -- Pawl.Engine.Target.admittedGiven's Recipient.ToPlayer arm -- build the
       -- view through it. Pawl.DamageSpec's Needle Drop case is what proves it.
       dealtDamageThisTurn = False,
+      -- CR 110.1: only a permanent is on the battlefield, and a player is not one.
+      enteredThisTurn = False,
       -- CR 702.122b crews with a CREATURE, and a player is not one -- CR 506.3
       -- rules the combat fields above out for the same kind of reason.
       crewedThisTurn = Set.empty,
@@ -2011,6 +2017,10 @@ matches context view predicate = case predicate of
   -- CantCrewVehicles sits between them and is neither: a prohibition lifts the
   -- moment its source leaves.
   Filter.DealtDamageThisTurn -> dealtDamageThisTurn view
+  -- CR 400.7 / 608.2i: the same look-back over the entries. A permanent that
+  -- left and came back is a new object whose entry this is; one that phased in
+  -- or turned face up made no entry at all (CR 702.26d, CR 708.8).
+  Filter.EnteredThisTurn -> enteredThisTurn view
   -- CR 702.122c: the same look-back asked of a RELATION rather than of one
   -- subject -- the candidate's own field says which Vehicles it crewed, and the
   -- SOURCE on the context says which one the card's "it" names. Vacuously False
@@ -2311,6 +2321,7 @@ rewrite pairs predicate = case predicate of
   Filter.MilledThisTurn -> predicate
   Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
+  Filter.EnteredThisTurn -> predicate
   Filter.CrewedSourceThisTurn -> predicate
   Filter.ConvokedSourceThisTurn -> predicate
   -- Untouched for AttackedThisTurn's reason: the atom names no subtype.
@@ -3027,6 +3038,7 @@ bakeBound players predicate = case predicate of
   Filter.MilledThisTurn -> predicate
   Filter.CantCrewVehicles -> predicate
   Filter.DealtDamageThisTurn -> predicate
+  Filter.EnteredThisTurn -> predicate
   Filter.CrewedSourceThisTurn -> predicate
   Filter.ConvokedSourceThisTurn -> predicate
   -- Untouched: the atom names no slot for CR 603.2's map to substitute into.
@@ -3193,6 +3205,7 @@ manaValueThresholds predicate = case predicate of
   Filter.MilledThisTurn -> []
   Filter.CantCrewVehicles -> []
   Filter.DealtDamageThisTurn -> []
+  Filter.EnteredThisTurn -> []
   Filter.CrewedSourceThisTurn -> []
   Filter.ConvokedSourceThisTurn -> []
   Filter.ControlledSinceTurnBegan -> []
@@ -3363,6 +3376,7 @@ statesAQuality predicate = case predicate of
   Filter.MilledThisTurn -> True
   Filter.CantCrewVehicles -> True
   Filter.DealtDamageThisTurn -> True
+  Filter.EnteredThisTurn -> True
   Filter.CrewedSourceThisTurn -> True
   Filter.ConvokedSourceThisTurn -> True
   Filter.ControlledSinceTurnBegan -> True

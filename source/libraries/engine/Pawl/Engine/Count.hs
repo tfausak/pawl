@@ -381,6 +381,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.MilledThisTurn -> predicate
         Filter.Type.CantCrewVehicles -> predicate
         Filter.Type.DealtDamageThisTurn -> predicate
+        Filter.Type.EnteredThisTurn -> predicate
         Filter.Type.CrewedSourceThisTurn -> predicate
         Filter.Type.ConvokedSourceThisTurn -> predicate
         Filter.Type.ControlledSinceTurnBegan -> predicate
@@ -1091,6 +1092,9 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- CR 120.1 damages an OBJECT, and this view describes a snapshot rather
       -- than one -- there is no id here for the turn's damage to have named.
       Filter.dealtDamageThisTurn = False,
+      -- CR 400.7 enters an OBJECT, and this view describes a snapshot rather
+      -- than one -- `milledThisTurn` above's reason again.
+      Filter.enteredThisTurn = False,
       -- CR 702.122c relates two OBJECTS, and this view describes a snapshot
       -- rather than one -- `milledThisTurn` above's reason again.
       Filter.crewedThisTurn = Set.empty,
