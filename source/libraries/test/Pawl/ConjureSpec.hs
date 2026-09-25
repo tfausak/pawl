@@ -57,6 +57,7 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -757,6 +758,61 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "CR 601.2f castable at {7}{G}{G}: (eight Forests, nine Forests)"
           (S.castable S.alice duplicate (S.landsFor forest S.alice 8 conjured), S.castable S.alice duplicate (S.landsFor forest S.alice 9 conjured))
           (False, True)
+  -- CR 707.2 / 702.41a: keywords are copiable, affinity among them. A Clone
+  -- copying Frogmite ({4}, "Affinity for artifacts") is duplicated, and the
+  -- duplicate costs {1} less for each of the two artifacts alice controls --
+  -- Frogmite and the Clone copying it -- so two fresh Islands pay it and one
+  -- does not.
+  Spec.it s "CR 707.2/702.41a a duplicate of a Clone has the affinity of what the Clone copies" $ do
+    island <- S.printingOf s registry "Island"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    frogmite <- S.printingOf s registry "Frogmite"
+    let (frogmiteId, board) = S.addPermanent frogmite S.alice (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections frogmiteId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) ->
+        Spec.assertEqWith
+          s
+          "CR 702.41a castable at {2} off two artifacts: (one Island, two Islands)"
+          (S.castable S.alice duplicate (S.landsFor island S.alice 1 conjured), S.castable S.alice duplicate (S.landsFor island S.alice 2 conjured))
+          (False, True)
+  -- CR 707.2 / 702.51a: convoke, likewise. A Clone copying Siege Wurm
+  -- ({5}{G}{G}, convoke, trample) is duplicated, and alice's two green creatures
+  -- -- the Wurm and the Clone copying it -- pay two of the seven, so five Forests
+  -- are enough and four are not.
+  Spec.it s "CR 707.2/702.51a a duplicate of a Clone has the convoke of what the Clone copies" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    wurm <- S.printingOf s registry "Siege Wurm"
+    let (wurmId, board) = S.addPermanent wurm S.alice (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections wurmId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) ->
+        Spec.assertEqWith
+          s
+          "CR 702.51a castable with two creatures convoking: (four Forests, five Forests)"
+          (S.castable S.alice duplicate (S.landsFor forest S.alice 4 conjured), S.castable S.alice duplicate (S.landsFor forest S.alice 5 conjured))
+          (False, True)
+  -- CR 707.2 / 702.143a: foretell, likewise. A Clone copying Augury Raven
+  -- ({3}{U}, flying, foretell {1}{U}) is duplicated, and the duplicate is a card
+  -- with foretell in alice's hand, so two fresh Islands let her foretell it.
+  Spec.it s "CR 707.2/702.143a a duplicate of a Clone has the foretell of what the Clone copies" $ do
+    island <- S.printingOf s registry "Island"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    raven <- S.printingOf s registry "Augury Raven"
+    let (ravenId, board) = S.addPermanent raven S.alice (S.landsInPlay island 2)
+    case conjuredDuplicate clone reflections ravenId board of
+      Nothing -> Spec.assertFailure s "the Clone left the battlefield unexpectedly"
+      Just (duplicate, conjured) ->
+        Spec.assertEqWith
+          s
+          "CR 702.143a the duplicate is among the cards alice may foretell"
+          (elem duplicate (Foretell.foretellable S.alice (S.landsFor island S.alice 2 conjured)))
+          True
   -- CR 702.140e: a mutated permanent has every component's abilities, and the
   -- Skaab's additional cost is one. Cubwarden mutates over alice's Headless
   -- Skaab and Sinister Reflections duplicates the merged creature, so the

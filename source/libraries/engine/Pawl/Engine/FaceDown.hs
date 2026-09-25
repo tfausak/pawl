@@ -89,6 +89,9 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- permanent under a layer-6 ability removal can still be turned face up, since
 -- the ability rule 702.37e consults is the one the CARD would have. That is what
 -- "would be if it were face up" says, and nothing in the pool observes it.
+--
+-- Not implemented: a copy stamp's morph or disguise, which this and the two
+-- readers below miss by reading the printed card (#4083).
 morphCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 morphCostOf oid gs = do
   face <- Game.faceUpFaceOf oid gs

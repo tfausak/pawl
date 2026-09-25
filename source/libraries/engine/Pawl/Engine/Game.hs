@@ -42,6 +42,7 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -901,11 +902,12 @@ halvesCardOf obj card = case copyStampOf obj of
 copyStampOf :: Object.Object -> Maybe PC.ProjectedCharacteristics
 copyStampOf obj = Binding.copyOf (Object.bindings obj) Applicative.<|> Object.duplicate obj
 
--- CR 707.2 / 601.2b-f: `face` with the cast-time costs its copy stamp carries
--- laid over it -- mana cost, additional and alternative costs, and its own cost
--- reductions -- so a card carrying copiable values other than its printing's is
--- cast at the copied card's price. Pawl.ConjureSpec's "a duplicate of a Clone
--- costs / owes / offers / takes" cases prove every field but the cost choices.
+-- CR 707.2 / 601.2b-f: `face` with the cast-time values its copy stamp carries
+-- laid over it -- mana cost, additional and alternative costs, its own cost
+-- reductions and its keywords -- so a card carrying copiable values other than
+-- its printing's is cast at the copied card's price. Pawl.ConjureSpec's "a
+-- duplicate of a Clone costs / owes / offers / takes / has" cases prove every
+-- field but the cost choices.
 --
 -- The stamp describes the card's NORMAL characteristics alone, so it is laid
 -- over the front face and nothing else: CR 715.3a casts an Adventure with only
@@ -914,20 +916,29 @@ copyStampOf obj = Binding.copyOf (Object.bindings obj) Applicative.<|> Object.du
 -- the first.
 --
 -- Not implemented: a stamp with halves, whose half is still chosen off the
--- printed card (#4078), and the cast-time keywords (affinity, convoke, assist),
--- still read off the printed face (#4079).
+-- printed card (#4078); the face-down cast and turn-face-up costs, still read
+-- off the printed card (#4083); and a stamp's Adventure half, which the stamp
+-- does not carry (#4087).
 castingFaceOf :: Object.Object -> Card -> Face Card -> Face Card
 castingFaceOf obj card face = case copyStampOf obj of
   Just stamp
     | Maybe.isNothing (PC.halves stamp) && Face.name face == Face.name (Card.frontFace card) ->
         face
           { Face.manaCost = PC.manaCost stamp,
+            Face.keywords = PC.keywords stamp,
             Face.additionalCosts = PC.additionalCosts stamp,
             Face.additionalCostChoices = PC.additionalCostChoices stamp,
             Face.alternativeCosts = PC.alternativeCosts stamp,
             Face.costReductions = PC.costReductions stamp
           }
   _ -> face
+
+-- castingFaceOf's keywords for a caller that holds only the id: the printed
+-- face's (faceOf, so the half CR 709.3b stamped) under any copy stamp's.
+castingKeywordsOf :: ObjectId -> GameState -> Set.Set Keyword.Keyword
+castingKeywordsOf oid gs = case (lookupObject oid gs, cardOf oid gs, faceOf oid gs) of
+  (Just obj, Just card, Just face) -> Face.keywordSet (castingFaceOf obj card face)
+  _ -> Set.empty
 
 -- CR 722.2a / 722.2b: the PREPARE SPELL this object has -- the copy snapshot's
 -- when the object is copying something, and its own printed card's otherwise.

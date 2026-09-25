@@ -71,7 +71,8 @@ actionCost =
 -- Does this object have foretell at all? Nothing for a hand member with no card
 -- behind it -- a token, an ability.
 --
--- Read off the CARD (Card.combined) and never a projection, the reading
+-- Read off the CARD (Card.combined), under any copy stamp's keywords
+-- (Game.castingFaceOf, CR 707.2), and never a projection, the reading
 -- Pawl.Engine.Plot.plotCostOf gives one rule over: the ability functions in the
 -- hand, where this reader takes the printed card (#1859).
 --
@@ -81,7 +82,8 @@ actionCost =
 foretellCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 foretellCostOf oid gs = do
   card <- Game.cardOfHandMember oid gs
-  Keyword.foretellCost (Face.keywordSet (Card.combined card))
+  obj <- Game.lookupObject oid gs
+  Keyword.foretellCost (Face.keywordSet (Game.castingFaceOf obj card (Card.combined card)))
 
 -- CR 702.143a / 116.2h: may this player foretell this card right now? Three
 -- conjuncts, each a clause of the rule:

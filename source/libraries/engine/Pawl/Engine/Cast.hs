@@ -228,7 +228,11 @@ proposedFace :: ObjectId -> CardName.CardName -> GameState -> Maybe (Face.Face C
 proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
   Nothing -> Nothing
   Just (Facing.FaceDown state) -> Just (Card.faceDownFace (FaceDownState.listed state))
-  Just Facing.FaceUp -> fmap (Game.resolveFace (Just name)) (Game.cardOf oid gs)
+  -- CR 707.2: a copy stamp's cast-time values over the printed half.
+  Just Facing.FaceUp -> do
+    obj <- Game.lookupObject oid gs
+    card <- Game.cardOf oid gs
+    pure (Game.castingFaceOf obj card (Game.resolveFace (Just name) card))
 
 -- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
 -- they have priority, rather than only in the sorcery-speed window? Two ways in,
@@ -447,7 +451,7 @@ payableCostAt x extra spending pid oid gs cost =
   let adjustments = Cost.plusReductions extra (Cost.spellAdjustments pid oid gs)
       substituted = Cost.substituteX x cost
       totalled = Cost.plusComponents adjustments substituted
-      assisted = Cost.assistable (maybe Set.empty Face.keywordSet (Game.faceOf oid gs)) (PaymentSubject.Casting oid) pid oid gs
+      assisted = Cost.assistable (Game.castingKeywordsOf oid gs) (PaymentSubject.Casting oid) pid oid gs
       ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
    in if Cost.readsBoundSlot substituted
         then any (any ask . Target.aimings) (castAimable pid oid gs)
@@ -2981,7 +2985,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- no announcement here has a choice it could change.
                   let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments pid sid bestowedGs)
                   let totalledCost = Cost.plusComponents gathered announcedAtX
-                      assistedTotal = Cost.assistable (maybe Set.empty Face.keywordSet (Game.faceOf sid bestowedGs)) (PaymentSubject.Casting sid) pid sid bestowedGs
+                      assistedTotal = Cost.assistable (Game.castingKeywordsOf sid bestowedGs) (PaymentSubject.Casting sid) pid sid bestowedGs
                   (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid bestowedGs) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
@@ -3207,7 +3211,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- whole payment's, which Binding.tappedPermanent would
                           -- have shared with a tap the printed cost demanded.
                           Monad.when
-                            (Set.member Keyword.Type.Convoke (maybe Set.empty Face.keywordSet (Game.faceOf sid pricedGs)))
+                            (Set.member Keyword.Type.Convoke (Game.castingKeywordsOf sid pricedGs))
                             ( let convokers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedPermanent substitutedBindings)))
                                in Monad.unless
                                     (Set.null convokers)
