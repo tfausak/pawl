@@ -109,6 +109,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -1877,6 +1878,14 @@ swapAt oid from to p = case p of
   Prompt.ChooseLandTypeSwap {} -> (from, to)
   _ -> S.identityAnswer p
 
+-- Exchange of Words' two targets, pinned by FILTERING the offered set to `pair`
+-- rather than building recipients, so CR 608.2b's re-read still finds them.
+exchangeBetween :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
+exchangeBetween pair p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 2) offers
+  Prompt.ChooseTargets _ _ _ offers -> S.preferring (maybe False (`Set.member` pair) . Recipient.objectOf) offers
+  _ -> S.identityAnswer p
+
 -- alice controls one Edgewalker, one untapped Plains and one untapped Island;
 -- her hand holds a second Edgewalker ({1}{W}{B} Human Cleric), a Whipstitched
 -- Zombie ({1}{B} Zombie) and the text changer `changerName`. With `swap`, she
@@ -2051,6 +2060,73 @@ textChangedEdgewalkerSpec s registry = Spec.describe s "TextChangedEdgewalker" $
       "and the Cleric spell pays its printed {1}{W}{B}"
       (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
       (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+
+  -- CR 612.5 / 613.7: the evolved Edgewalker's text box then moves to alice's
+  -- Goblin Piker ({1}{R} Creature -- Goblin Warrior 2/1, no rules text --
+  -- checked against Scryfall, 2026-09-24) under Exchange of Words ({1}{U}{U},
+  -- "When this enchantment enters, choose two target creatures. For as long as
+  -- this enchantment remains on the battlefield, exchange the text boxes of
+  -- those creatures.", same check). The Evolution came first, so the discount
+  -- the Piker carries is the evolved one.
+  Spec.it s "CR 612.5 the evolved discount moves to the Piker with the text box" $ do
+    (evolved, walkerId, clericSpell, zombieSpell) <-
+      textChangedEdgewalkerBoard s registry "Artificial Evolution" (Just (Subtype.Cleric, Subtype.Zombie))
+    piker <- S.printingOf s registry "Goblin Piker"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (pikerId, withPiker) = S.addPermanent piker S.alice evolved
+        (_, entered) = S.entersWithTrigger exchange S.alice withPiker
+        pair = Set.fromList [walkerId, pikerId]
+        -- Inlined rather than bound: GADTs implies MonoLocalBinds, so a shared
+        -- binding of the answerer would not generalise over the prompt's type.
+        staged = S.runPure (exchangeBetween pair) entered Engine.settleForPriority
+        gs = S.runPure (exchangeBetween pair) staged Stack.resolveTop
+    Spec.assertEqWith
+      s
+      "CR 612.5 the Zombie spell's {1}{B} becomes {1}, off the Piker"
+      (totalManaCost S.alice zombieSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "and the Cleric spell pays its printed {1}{W}{B}"
+      (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+    -- The anti-vacuity check, after the behaviour: the text box really moved,
+    -- which the Edgewalker's printed discount on an unexchanged board is not.
+    Spec.assertEqWith s "the Edgewalker now carries the Piker's text box" (Projection.textBoxHolderOf walkerId gs) pikerId
+
+  -- CR 613.8b, the other way round: the Evolution resolves on the vanilla Piker
+  -- FIRST and the exchange comes after. The Evolution depends on the exchange,
+  -- which gives the Piker the Cleric word it changes, and not the reverse, so
+  -- the exchange applies first and the discount the Piker receives is evolved.
+  Spec.it s "CR 613.8b an Evolution on the Piker waits for the Edgewalker's text" $ do
+    (ready, walkerId, clericSpell, zombieSpell) <- textChangedEdgewalkerBoard s registry "Artificial Evolution" Nothing
+    piker <- S.printingOf s registry "Goblin Piker"
+    evolution <- S.printingOf s registry "Artificial Evolution"
+    exchange <- S.printingOf s registry "Exchange of Words"
+    let (pikerId, withPiker) = S.addPermanent piker S.alice ready
+        (evolutionId, inHand) = S.addHandCard evolution S.alice withPiker
+        evolved =
+          S.runPure (swapAt pikerId Subtype.Cleric Subtype.Zombie) inHand $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+        (_, entered) = S.entersWithTrigger exchange S.alice evolved
+        pair = Set.fromList [walkerId, pikerId]
+        -- Inlined rather than bound, for the case above's reason.
+        staged = S.runPure (exchangeBetween pair) entered Engine.settleForPriority
+        gs = S.runPure (exchangeBetween pair) staged Stack.resolveTop
+    Spec.assertEqWith
+      s
+      "CR 613.8b the Zombie spell's {1}{B} becomes {1}, off the Piker"
+      (totalManaCost S.alice zombieSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "and the Cleric spell pays its printed {1}{W}{B}"
+      (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+    -- The anti-vacuity check, after the behaviour: the Evolution really
+    -- resolved on the Piker.
+    Spec.assertEqWith s "the Evolution resolved onto the Piker" (Projection.textChangesAffecting pikerId evolved) [(Subtype.Cleric, Subtype.Zombie)]
 
   -- CR 612.2's family gate, at this read point: a text-changing effect "changes
   -- only those words that are used in the correct way", and the rule's own

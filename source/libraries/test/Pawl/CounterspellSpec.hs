@@ -2168,6 +2168,31 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     (wraithId, after) <- turnToFrogChain s registry (Just (Subtype.Frog, Subtype.Elf))
     Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf wraithId after) (Set.singleton Subtype.Elf)
 
+  -- CR 613.7 on the STACK: two Evolutions at the Turn to Frog spell, Frog ->
+  -- Elf and then Elf -> Goblin. The spell's Frog is an Elf and then a Goblin,
+  -- so the Wraith becomes a Goblin; a reader looking each word up once in the
+  -- raw swaps would stop at the first and make an Elf.
+  Spec.it s "CR 613.7 whole card: two Evolutions on the Turn to Frog spell compose" $ do
+    island <- S.printingOf s registry "Island"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    turnToFrog <- S.printingOf s registry "Turn to Frog"
+    artificialEvolution <- S.printingOf s registry "Artificial Evolution"
+    let (wraithId, g1) = S.addPermanent bogWraith S.alice (S.landsInPlay island 4)
+        (turnToFrogId, g2) = S.addHandCard turnToFrog S.alice g1
+        (firstId, g3) = S.addHandCard artificialEvolution S.alice g2
+        (secondId, g4) = S.addHandCard artificialEvolution S.alice g3
+        onStack = S.runPure (aimAtCreature wraithId) g4 (S.cast S.alice turnToFrogId)
+        spellId = case GameState.stack onStack of
+          top : _ -> top
+          [] -> ObjectId.MkObjectId 999
+        first = S.runPure (evolveAt spellId Subtype.Frog Subtype.Elf) onStack (S.cast S.alice firstId >> Stack.resolveTop)
+        both = S.runPure (evolveAt spellId Subtype.Elf Subtype.Goblin) first (S.cast S.alice secondId >> Stack.resolveTop)
+        after = S.runPure S.identityAnswer both Stack.resolveTop
+    Spec.assertEqWith s "CR 613.7 Creature -- Goblin" (Projection.subtypesOf wraithId after) (Set.singleton Subtype.Goblin)
+    -- The anti-vacuity check, after the behaviour: both swaps really landed on
+    -- the spell.
+    Spec.assertEqWith s "the two Evolutions resolved onto the spell" (Projection.textChangesAffecting spellId both) [(Subtype.Elf, Subtype.Goblin), (Subtype.Frog, Subtype.Goblin)]
+
   -- "The new creature type can't be Wall" is printed card text, so it travels
   -- with the card: the data says it, Effect.ChangeText carries it, and the
   -- prompt offers it. Nothing in the engine knows which card is asking.
