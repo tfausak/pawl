@@ -13,7 +13,7 @@ import qualified Pawl.Types.Teams as Teams
 -- CR factors itself: a named format is a preset over these fields, and CR
 -- 903.12a says so outright for the Brawl field ("Brawl is an option for a
 -- different style of Commander game"). Each further option -- CR 804's deploy
--- creatures (#2850) -- is one more field rather than one more name. CR 802's
+-- creatures below -- is one more field rather than one more name. CR 802's
 -- and CR 803's three attack options share ONE field, because CR 806.2b makes
 -- them alternatives rather than independent switches (Pawl.Types.AttackOption).
 --
@@ -74,6 +74,10 @@ data GameSettings = MkGameSettings
     -- 'RangeOfInfluence.unlimited' by default (Pawl.Engine.Setup.emptyGame), since
     -- CR 801.1 makes a limited range an option. Read through
     -- Pawl.Engine.Game.inRangeOf.
-    rangeOfInfluence :: RangeOfInfluence.RangeOfInfluence
+    rangeOfInfluence :: RangeOfInfluence.RangeOfInfluence,
+    -- | CR 804.2: whether each creature has "{T}: Target teammate gains control
+    -- of this creature. Activate only as a sorcery." Off by default
+    -- (Pawl.Engine.Setup.emptyGame), and read through Pawl.Engine.Deploy.
+    deployCreatures :: Bool
   }
   deriving (Eq, Ord, Show)

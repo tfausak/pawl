@@ -7272,6 +7272,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
             Just live ->
               let sampled =
                     Count.overlaySnapshot
+                      (Count.deployIn gs Zone.Battlefield)
                       (Transformed.characteristics transformed)
                       live {Filter.controller = Transformed.controller transformed}
                in Filter.matches

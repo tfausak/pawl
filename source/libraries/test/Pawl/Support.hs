@@ -3348,7 +3348,7 @@ oneMountainState mountain ph =
             Object.activatedOnce = Set.empty
           }
    in GameState.MkGameState
-        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited},
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False},
           GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),

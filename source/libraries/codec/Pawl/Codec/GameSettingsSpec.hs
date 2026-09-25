@@ -19,22 +19,22 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
-      " {\"brawl\":false,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{}} "
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False}
+      " {\"brawl\":false,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false} "
   -- CR 903.12a: the same record with the Brawl option turned on.
   Spec.it s "a Brawl game" $
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = True, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
-      " {\"brawl\":true,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{}} "
+      GameSettings.MkGameSettings {GameSettings.brawl = True, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False}
+      " {\"brawl\":true,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false} "
   -- CR 802.1: and the option every game pawl starts uses.
   Spec.it s "a game using the attack multiple players option" $
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{}} "
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False}
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false} "
   -- CR 803.1a: the option CR 807.2b makes the Grand Melee default. Its sibling
   -- Rightward is Pawl.Codec.AttackOptionSpec's business; what is this record's
   -- is that the field carries a NAMED option rather than a flag.
@@ -42,10 +42,10 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.Leftward, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited}
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"Leftward\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{}} "
-  -- CR 808.1 / 805.1: a Team vs. Team game between two teams of two, each
-  -- taking its turns together.
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.Leftward, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False}
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"Leftward\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false} "
+  -- CR 808.1 / 805.1 / 804.1: a Team vs. Team game between two teams of two,
+  -- each taking its turns together, with the deploy creatures option.
   Spec.it s "a game played between teams" $
     Common.assertCodec
       s
@@ -63,9 +63,10 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
                   ]
               ),
           GameSettings.sharedTeamTurns = True,
-          GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited
+          GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited,
+          GameSettings.deployCreatures = True
         }
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{\"0\":0,\"1\":1,\"2\":0,\"3\":1},\"sharedTeamTurns\":true,\"rangeOfInfluence\":{}} "
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{\"0\":0,\"1\":1,\"2\":0,\"3\":1},\"sharedTeamTurns\":true,\"rangeOfInfluence\":{},\"deployCreatures\":true} "
   -- CR 801.2a: the limited range of influence option, one seat for two players.
   Spec.it s "a game using a limited range of influence" $
     Common.assertCodec
@@ -76,6 +77,7 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
           GameSettings.attackOption = Just AttackOption.MultiplePlayers,
           GameSettings.teams = Teams.none,
           GameSettings.sharedTeamTurns = False,
-          GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(PlayerId.MkPlayerId 0, 1), (PlayerId.MkPlayerId 1, 1)])
+          GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(PlayerId.MkPlayerId 0, 1), (PlayerId.MkPlayerId 1, 1)]),
+          GameSettings.deployCreatures = False
         }
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":1}} "
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":1},\"deployCreatures\":false} "
