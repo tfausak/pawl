@@ -2087,7 +2087,18 @@ areOpponents gs = Teams.areOpponents (teams gs)
 -- began, so a seat emptied mid-turn closes up only when the next turn begins
 -- (GameState.departedThisTurn). A departed player is in nobody's range.
 inRangeOf :: PlayerId -> PlayerId -> GameState -> Bool
-inRangeOf you candidate gs =
+inRangeOf you candidate gs = inRangeSeated (List.elem candidate (stillPlaying gs)) you candidate gs
+
+-- CR 801.7a: inRangeOf asked of an event that has already happened, so a
+-- candidate who left the game this turn is judged by the seat they held.
+wasInRangeOf :: PlayerId -> PlayerId -> GameState -> Bool
+wasInRangeOf you candidate gs =
+  inRangeSeated (List.elem candidate (stillPlaying gs) || Set.member candidate (GameState.departedThisTurn gs)) you candidate gs
+
+-- inRangeOf's seat count, with whether the candidate still counts as seated
+-- answered by the caller.
+inRangeSeated :: Bool -> PlayerId -> PlayerId -> GameState -> Bool
+inRangeSeated seated you candidate gs =
   candidate == you || case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
     Nothing -> True
     Just range ->
@@ -2095,7 +2106,7 @@ inRangeOf you candidate gs =
           seats = filter (\pid -> List.elem pid playing || Set.member pid (GameState.departedThisTurn gs)) (GameState.turnOrder gs)
        in case (List.elemIndex you seats, List.elemIndex candidate seats) of
             (Just mine, Just theirs)
-              | List.elem you playing && List.elem candidate playing ->
+              | List.elem you playing && seated ->
                   let apart = abs (mine - theirs)
                    in toInteger (min apart (length seats - apart)) <= toInteger range
             _ -> False
@@ -2991,8 +3002,11 @@ bendingsThisTurn gs pid =
 -- The ATTACKING PLAYER is resolved through CR 506.2 rather than off the event,
 -- which records the attacker and the defender but not the declarer: the active
 -- player is the attacking player, and one turn's log can only hold one active
--- player's declarations. CR 805.10a's several attacking players would break that
--- (#4002).
+-- player's declarations.
+--
+-- Not implemented: CR 805.10a's several attacking players -- under the shared
+-- team turns option the whole team's declarations count for the active player
+-- and none for a teammate (#4125).
 --
 -- CR 508.4's creature put onto the battlefield attacking stays out, only
 -- Pawl.Engine.Combat.declareAttackers appending the event -- the same scope

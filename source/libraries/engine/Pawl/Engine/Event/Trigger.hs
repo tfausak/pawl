@@ -33,31 +33,65 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve.Slots as Slots
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
+import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
+import qualified Pawl.Types.BecameAttached as BecameAttached
+import qualified Pawl.Types.BecameAttacked as BecameAttacked
+import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BecameDesignated as BecameDesignated
+import qualified Pawl.Types.BecameTarget as BecameTarget
+import qualified Pawl.Types.BecameUnattached as BecameUnattached
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
+import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
+import qualified Pawl.Types.CoinFlipped as CoinFlipped
+import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.Convoking as Convoking
+import qualified Pawl.Types.CounterChange as CounterChange
+import qualified Pawl.Types.Countering as Countering
+import qualified Pawl.Types.Crewing as Crewing
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
+import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.EventGroup as EventGroup
+import qualified Pawl.Types.Exploited as Exploited
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
+import qualified Pawl.Types.ManaAdded as ManaAdded
+import qualified Pawl.Types.Mentored as Mentored
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SlotName as SlotName
@@ -66,6 +100,8 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TappedForMana as TappedForMana
+import qualified Pawl.Types.Transformed as Transformed
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -74,6 +110,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnWindow as TurnWindow
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
@@ -207,6 +244,141 @@ movedOf event = case event of
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
+
+-- CR 801.7: does this event happen entirely within @you@'s range of influence --
+-- every object it involves controlled by (or, a battle, protected by) a player
+-- in range, and every player it involves in range? Always, under an unlimited
+-- range.
+--
+-- CR 801.7a: an object is read as it stood after the event where the board
+-- sample holds it, and otherwise from last known information -- so a permanent
+-- that left the battlefield is read under the controller it left with, whatever
+-- graveyard it went to. A player who left the game after the event is judged by
+-- the seat they held (Game.wasInRangeOf). An object nobody controls cuts
+-- nothing.
+eventWithinRange :: Map.Map ObjectId (BattlefieldCandidate.BattlefieldCandidate PC.ProjectedCharacteristics) -> GameState -> PlayerId -> GameEvent -> Bool
+eventWithinRange board gs you event
+  | Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs))) = True
+  | otherwise =
+      let (objects, players) = participants event
+          reaches pid = Game.wasInRangeOf you pid gs
+          lastKnown oid = Map.lookup oid (GameState.lastKnown gs)
+          controllerAt oid = case Map.lookup oid board of
+            Just candidate -> Just (BattlefieldCandidate.controller candidate)
+            Nothing -> maybe (Projection.controllerOf oid gs) (Just . LastKnown.controller) (lastKnown oid)
+          protectorAt oid = maybe (Object.protector =<< Game.lookupObject oid gs) LastKnown.protector (lastKnown oid)
+          objectWithin oid = case controllerAt oid of
+            Nothing -> True
+            Just pid -> reaches pid || maybe False reaches (protectorAt oid)
+       in all reaches players && all objectWithin objects
+
+-- CR 801.7: the objects and players an event involves, which is what "happens
+-- entirely within" a range is asked of. The event as its trigger event names
+-- it: CR 801.7's example has "becomes blocked" leave out the blocker and the
+-- defending player, so AttackerBlocked names the attacker alone.
+--
+-- A TOTAL case, looksBack's reason: a new event must be read against the rule
+-- rather than silently counted in range.
+participants :: GameEvent -> ([ObjectId], [PlayerId])
+participants event =
+  let recipient r = (Maybe.maybeToList (Recipient.objectOf r), Maybe.maybeToList (Recipient.playerOf r))
+      attacked t = case t of
+        AttackTarget.OfPlayer pid -> ([], [pid])
+        AttackTarget.OfPlaneswalker oid -> ([oid], [])
+        AttackTarget.OfBattle oid -> ([oid], [])
+      -- CR 801.7a: a permanent leaving the battlefield is read before the
+      -- event, under the id last known information files it by; anything else
+      -- as it arrived.
+      moved zc =
+        if ZoneChange.from zc == Zone.Battlefield
+          then ZoneChange.departed zc
+          else ZoneChange.object zc
+      one oid = ([oid], [])
+      player pid = ([], [pid])
+   in case event of
+        GameEvent.Moved m -> one (moved (Moved.change m))
+        GameEvent.CardArrived zc -> one (moved zc)
+        GameEvent.DamageDealt d -> ([DamageEvent.source d], []) <> recipient (DamageEvent.target d)
+        GameEvent.DamagePrevented p -> ([DamagePrevented.source p], []) <> foldMap recipient (Map.keys (DamagePrevented.amounts p))
+        GameEvent.StepBegan b -> player (StepBegan.player b)
+        GameEvent.SpellCast c -> ([SpellWasCast.spell c], [SpellWasCast.player c])
+        GameEvent.BecameMonarch pid -> player pid
+        GameEvent.TookInitiative pid -> player pid
+        GameEvent.Discarded d -> ([Discarded.card d], [Discarded.player d])
+        GameEvent.Milled m -> (Foldable.toList (Milled.cards m), [Milled.player m])
+        GameEvent.Drew d -> player (Drew.player d)
+        GameEvent.AttackerDeclared a -> one (AttackerDeclared.attacker a)
+        GameEvent.BecameAttacked a -> ([], [BecameAttacked.attacker a]) <> attacked (BecameAttacked.target a)
+        GameEvent.AttackersDeclared pid -> player pid
+        GameEvent.BecameBlocking b -> ([BecameBlocking.blocker b, BecameBlocking.attacker b], [])
+        GameEvent.AttackerBlocked b -> one (AttackerBlocked.attacker b)
+        GameEvent.AttackerUnblocked oid -> one oid
+        GameEvent.BlocksDeclared b -> one (BlocksDeclared.blocker b)
+        GameEvent.Revealed r -> ([Revealed.card r], [Revealed.player r])
+        GameEvent.SpellCountered c -> ([Countering.countered c, Countering.source c], [])
+        GameEvent.AbilityCountered c -> ([Countering.countered c, Countering.source c], [])
+        GameEvent.LifeLost c -> player (LifeChange.player c)
+        GameEvent.LifeGained c -> player (LifeChange.player c)
+        GameEvent.LoyaltyAbilityActivated oid -> one oid
+        GameEvent.CountersPut c -> one (CounterChange.object c)
+        GameEvent.CountersRemoved c -> one (CounterChange.object c)
+        GameEvent.HalfUnlocked h -> ([HalfUnlocked.object h], [HalfUnlocked.actor h])
+        GameEvent.TurnedFaceUp oid -> one oid
+        GameEvent.TurnedFaceDown oid -> one oid
+        GameEvent.Transformed t -> one (Transformed.object t)
+        GameEvent.BecameDesignated d -> one (BecameDesignated.object d)
+        GameEvent.Evolved oid -> one oid
+        GameEvent.Mutated oid -> one oid
+        GameEvent.Mentored m -> ([Mentored.mentor m, Mentored.mentored m], [])
+        GameEvent.Exploited e -> ([Exploited.exploiter e, Exploited.exploited e], [])
+        GameEvent.Trained oid -> one oid
+        -- "Becomes crewed" names the Vehicle alone, the way "becomes blocked"
+        -- names the attacker; Crewed is the crewing creatures' own event.
+        GameEvent.BecameCrewed c -> one (Crewing.vehicle c)
+        GameEvent.Convoked c -> (Convoking.spell c : Set.toList (Convoking.convokedBy c), [])
+        GameEvent.Crewed c -> (Crewing.vehicle c : Set.toList (Crewing.crewedBy c), [])
+        GameEvent.PermanentSacrificed p -> ([PermanentWasSacrificed.permanent p], [PermanentWasSacrificed.player p])
+        GameEvent.AbilityTriggered t ->
+          let source = case AbilityTriggered.source t of
+                TriggerSource.OfObject oid -> [oid]
+                TriggerSource.Sourceless -> []
+           in (source, [AbilityTriggered.controller t])
+        -- CR 801.7a: read under the controller it had before the change, which
+        -- is what TriggerCondition.LoseControlOfBound, the one condition this
+        -- event matches, asks about.
+        GameEvent.ControlChanged c -> player (ControlChanged.before c)
+        GameEvent.VentureMarkerEntered v -> ([VentureMarkerEntered.dungeon v], [VentureMarkerEntered.player v])
+        GameEvent.BecameTarget t -> ([BecameTarget.source t], []) <> recipient (BecameTarget.targeted t)
+        GameEvent.BecameAttached a -> ([BecameAttached.attachment a], []) <> recipient (BecameAttached.host a)
+        GameEvent.BecameUnattached a -> ([BecameUnattached.attachment a], []) <> recipient (BecameUnattached.host a)
+        GameEvent.LeftTheGame oid -> one oid
+        GameEvent.Scried pid -> player pid
+        GameEvent.DungeonCompleted pid -> player pid
+        GameEvent.Surveiled pid -> player pid
+        GameEvent.DiceRolled pid -> player pid
+        GameEvent.DieResultSettled r -> player (DieResult.roller r)
+        GameEvent.RolledToVisit r -> player (DieResult.roller r)
+        GameEvent.ClassLevelSet c -> one (ClassLevelChange.object c)
+        GameEvent.Plotted oid -> one oid
+        GameEvent.Explored oid -> one oid
+        GameEvent.Connived oid -> one oid
+        GameEvent.Exerted oid -> one oid
+        GameEvent.BecameTapped oid -> one oid
+        GameEvent.BecameUntapped oid -> one oid
+        GameEvent.TappedForMana t -> one (TappedForMana.permanent t)
+        GameEvent.ManaAdded m -> ([ManaAdded.source m], [ManaAdded.player m])
+        GameEvent.ManaAbilityResolved m -> one (ManaAbilityResolved.permanent m)
+        GameEvent.CoinFlipped c -> player (CoinFlipped.flipper c)
+        GameEvent.RingTempted pid -> player pid
+        GameEvent.Blighted pid -> player pid
+        GameEvent.Foraged pid -> player pid
+        GameEvent.AttractionOpened pid -> player pid
+        GameEvent.PrizeClaimed pid -> player pid
+        GameEvent.Earthbent pid -> player pid
+        GameEvent.Waterbent pid -> player pid
+        GameEvent.Airbent pid -> player pid
+        GameEvent.Firebent pid -> player pid
+        GameEvent.ActivatedAbilityResolved a -> one (ActivatedAbilitySource.source a)
 
 -- CR 603.10a: is this one of the conditions the game "looks back in time" for?
 --
@@ -1815,7 +1987,8 @@ eventTriggers events gs =
             -- Each entry pairs the conditions that function in the bearer's zone
             -- (`functionsIn`) with the ability as printed, which is what the
             -- pending trigger carries.
-            fires (cond, _) = matchesTriggerGiven bindings board gs oid ctrl cond event
+            -- CR 801.7: and the event happened within the controller's range.
+            fires (cond, _) = matchesTriggerGiven bindings board gs oid ctrl cond event && eventWithinRange board gs ctrl event
             -- CR 400.7d: an ability of a permanent may read what costs were
             -- paid for the spell it was, so the bearer's record rides on every
             -- ability it triggers (Binding.paidCostRecord).
@@ -2941,7 +3114,15 @@ delayedPending grouped gs =
             -- arming spell resolved, and the store is the only thing that still
             -- remembers it.
             if armed entry
-              then filter (\logged -> matchesTriggerGiven (DelayedTrigger.bindings entry) (battlefieldAt (LoggedEvent.group logged) gs) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond (LoggedEvent.event logged)) grouped
+              then
+                filter
+                  ( \logged ->
+                      let board = battlefieldAt (LoggedEvent.group logged) gs
+                       in matchesTriggerGiven (DelayedTrigger.bindings entry) board gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond (LoggedEvent.event logged)
+                            -- CR 801.7, as eventTriggers asks it.
+                            && eventWithinRange board gs (DelayedTrigger.controller entry) (LoggedEvent.event logged)
+                  )
+                  grouped
               else []
       -- CR 603.2c's FIRST sentence on the CR 603.7 path, which is eventTriggers'
       -- `oncePerBatch` asked of a delayed entry: a batch-scoped condition names the
