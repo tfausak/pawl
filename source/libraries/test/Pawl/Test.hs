@@ -1320,6 +1320,7 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.ashiokLoyaltySpec s registry
+  Pawl.PlaneswalkerSpec.tamiyoNotebookSpec s registry
   Pawl.PlayerDesignationSpec.spec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.CastProhibitionSpec.spec s registry
