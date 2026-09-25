@@ -78,9 +78,12 @@
                         "type": "RequireAttack",
                         "value": {
                           "attacker": {
-                            "type": "EachMatching",
+                            "type": "Named",
                             "value": {
-                              "type": "IsSource"
+                              "type": "EachMatching",
+                              "value": {
+                                "type": "IsSource"
+                              }
                             }
                           },
                           "defender": {

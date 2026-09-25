@@ -160,6 +160,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -1743,7 +1744,7 @@ encore cost =
         Effect.RequireAttack
           RequireAttack.MkRequireAttack
             { RequireAttack.duration = Duration.UntilEndOfTurn,
-              RequireAttack.attacker = ObjectRef.InSlot encoreTokenSlot,
+              RequireAttack.attacker = RestrictedCreatures.Named (ObjectRef.InSlot encoreTokenSlot),
               RequireAttack.defender = PlayerRef.InSlot encoreOpponentSlot
             }
       loop =

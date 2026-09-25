@@ -9,6 +9,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.RequireAttack as RequireAttack
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.SlotName as SlotName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -20,9 +21,9 @@ spec s = Spec.describe s "Pawl.Codec.RequireAttack" $ do
       RequireAttack.codec
       ( RequireAttack.MkRequireAttack
           { RequireAttack.duration = Duration.UntilEndOfTurn,
-            RequireAttack.attacker = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+            RequireAttack.attacker = RestrictedCreatures.Named (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
             RequireAttack.defender = PlayerRef.Relative PlayerRelation.You
           }
       )
-      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"InSlot\",\"value\":\"target\"},\"defender\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}},\"defender\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RequireAttack.codec

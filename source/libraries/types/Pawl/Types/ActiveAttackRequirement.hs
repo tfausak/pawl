@@ -3,6 +3,7 @@ module Pawl.Types.ActiveAttackRequirement where
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Timestamp as Timestamp
 
 -- | CR 508.1d / 613.11: a stored, resolution-generated ATTACKING REQUIREMENT,
@@ -15,10 +16,9 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- its object as a Pawl.Types.RequiredDefender rather than a bare PlayerId for
 -- the reason given below.
 --
--- Both axes are bare, one ObjectId and one PlayerId, for
--- ActiveBlockRequirement's reason: rule 508.1d's producer here names its
--- creature by TARGETING it (CR 115.1), so there is no set for CR 611.2c's
--- carve-out to keep dynamic.
+-- The subject axis is Pawl.Types.ActiveAttackProhibition's: a Named id the
+-- resolution froze (Alluring Siren TARGETS its creature, CR 115.1), or a Matching
+-- class CR 611.2c keeps dynamic (Taunt's "creatures that player controls").
 --
 -- The object is a PlayerId rather than a Pawl.Types.AttackTarget, and the
 -- narrowing is the rule rather than a convenience: Alluring Siren's ruling is
@@ -44,11 +44,13 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- progress has to be writable to JSON (#126).
 data ActiveAttackRequirement = MkActiveAttackRequirement
   { source :: ObjectId.ObjectId,
+    -- | CR 109.5's "you" for a Matching class, baked at resolution: the source
+    -- is a sorcery in a graveyard by the time the class is read.
+    controller :: PlayerId.PlayerId,
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
-    -- | The creature that must attack -- CR 508.1d's subject axis, which the
-    -- printed carrier states as an Affected for the reason given above.
-    attacker :: ObjectId.ObjectId,
+    -- | The creatures that must attack -- CR 508.1d's subject axis.
+    attacker :: RestrictedCreatures.RestrictedCreatures ObjectId.ObjectId,
     -- | The player it must attack -- CR 508.1d's object axis, read through CR
     -- 508.1b's announcement.
     defender :: PlayerId.PlayerId

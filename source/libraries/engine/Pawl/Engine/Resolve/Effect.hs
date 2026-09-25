@@ -1340,11 +1340,12 @@ offerCastOnce context named caster optionality verb retake offer = do
             -- costs are why: the face's additional costs ride the applied cost,
             -- and one of them may offer the caster a choice of payments, which
             -- Cost.choiceVariants expands here exactly as it does for a cast the
-            -- board itself offers.
+            -- board itself offers. CR 702.48a's offering is the other optional
+            -- additional cost, and Cost.withOffering adds it the same way.
             appliedOne
               | CastOffer.withoutPayingManaCost offer = Just (CandidateCost.plain (CastOffer.offeredBy offer) (Cost.withoutPayingManaCost face))
               | otherwise = fmap (\c -> CandidateCost.plain (CastOffer.offeredBy offer) (c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face})) (CastOffer.payingInstead offer)
-            applied = concatMap (Cost.choiceVariants face) (Maybe.maybeToList appliedOne)
+            applied = concatMap (Cost.withOffering caster oid proposed) (concatMap (Cost.choiceVariants face) (Maybe.maybeToList appliedOne))
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
@@ -7114,16 +7115,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 subjects
          in gs1 {GameState.attackProhibitions = stored <> GameState.attackProhibitions gs1}
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attackerRef defenderRef) ->
-    -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair the
-    -- two refs name, rule 508.1d counting requirements PER CREATURE. RequireBlock
-    -- above is the twin, and its arguments carry over: both sets are enumerated
-    -- ONCE for CR 608.2f's simultaneity, and an illegal slot (CR 608.2b) stores
-    -- nothing, which is Alluring Siren's fizzle.
+    -- CR 508.1d / 613.11: store one requirement per (attacker, defender) pair,
+    -- rule 508.1d counting requirements PER CREATURE. A Named ref is RequireBlock's
+    -- twin: enumerated ONCE for CR 608.2f's simultaneity, and an illegal slot (CR
+    -- 608.2b) stores nothing, which is Alluring Siren's fizzle. A Matching class
+    -- is ForbidAttack's: one row per defender, its bound players baked now, since
+    -- CR 611.2c keeps a requirement on a declaration dynamic.
     State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
-        let attackers = objectRefObjects legal resolving controller source gs attackerRef
+        let attackers = case attackerRef of
+              RestrictedCreatures.Named ref -> fmap RestrictedCreatures.Named (objectRefObjects legal resolving controller source gs ref)
+              RestrictedCreatures.Matching f -> [RestrictedCreatures.Matching (Filter.bakeBound (Binding.playersIn legal) f)]
             -- Through playerRefPlayers so the ref is read exactly as every other
             -- opcode reads one, CR 608.2b's empty answer included.
             defenders = playerRefPlayers legal controller gs defenderRef
@@ -7134,6 +7138,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               pure
                 ActiveAttackRequirement.MkActiveAttackRequirement
                   { ActiveAttackRequirement.source = source,
+                    ActiveAttackRequirement.controller = controller,
                     ActiveAttackRequirement.timestamp = ts,
                     ActiveAttackRequirement.expiry = expiry,
                     ActiveAttackRequirement.attacker = attacker,

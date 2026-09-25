@@ -284,11 +284,9 @@ follows expiry = case expiry of
 -- that turn's cleanup, so no LATER turn of theirs can be mistaken for it and the
 -- bound needs no upper half.
 --
--- Not implemented: only Pawl.Engine.CombatRestriction,
--- Pawl.Engine.Cast.permitsPlayFromExile and Pawl.Engine.PlayerEffect.applying
--- ask this, so a row stored under DuringTurnOf on any other carrier applies
--- from the moment it is stored (#3983). A gate this narrow is safe only while
--- the pool's producers reach those carriers alone -- see Pawl.Types.Expiry.
+-- Asked by Pawl.Engine.CombatRestriction, Pawl.Engine.AttackRequirement,
+-- Pawl.Engine.Cast.permitsPlayFromExile and Pawl.Engine.PlayerEffect.applying;
+-- Pawl.Types.Expiry says why no other carrier asks.
 begun :: GameState -> Expiry -> Bool
 begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->
