@@ -3278,6 +3278,44 @@ greenSlimeSpec s registry = Spec.describe s "Green Slime" $ do
     Spec.assertEqWith s "both triggers went on the stack" (length (GameState.stack placed)) 2
     Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
 
+-- Rebuff the Wicked (PLC 12) {W} Instant, Oracle text checked against Scryfall
+-- 2026-09-25: "Counter target spell that targets a permanent you control."
+--
+-- One board, two runs differing only in which Goblin Piker bob's Lightning Bolt
+-- is aimed at. "You" is the Rebuff's controller (CR 109.5), never the Bolt's:
+-- read from bob's seat, the pair would come out the other way round.
+rebuffBoard :: S.Board
+rebuffBoard =
+  let alice =
+        (S.battlefield S.alice [S.aliased "plains" (S.permanent "Plains"), S.aliased "alice's Piker" (S.permanent "Goblin Piker")])
+          { S.setupHand = Seq.singleton (S.aliased "rebuff" (S.cardSetup "Rebuff the Wicked"))
+          }
+      bob =
+        (S.battlefield S.bob [S.aliased "mountain" (S.permanent "Mountain"), S.aliased "bob's Piker" (S.permanent "Goblin Piker")])
+          { S.setupHand = Seq.singleton (S.aliased "bolt" (S.cardSetup "Lightning Bolt"))
+          }
+   in S.board (alice NonEmpty.:| [bob]) S.bob S.precombatMain
+
+-- bob Bolts `victim`, then alice casts the Rebuff at the Bolt.
+rebuffScript :: String -> Seq.Seq S.Timed
+rebuffScript victim =
+  S.turn
+    1
+    [ S.on S.precombatMain S.bob (S.castAction (S.aliasRef "bolt") S.noChoices {S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef victim)], S.choiceManaSources = Seq.singleton (Just (S.aliasRef "mountain"))}),
+      S.on S.precombatMain S.alice (S.castAction (S.aliasRef "rebuff") S.noChoices {S.choiceTargets = Just [S.MkObjectTarget (S.namedRef "Lightning Bolt" 1)], S.choiceManaSources = Seq.singleton (Just (S.aliasRef "plains"))})
+    ]
+
+rebuffTheWickedSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+rebuffTheWickedSpec s registry = Spec.describe s "Rebuff the Wicked" $ do
+  Spec.it s "CR 115.9b it counters a Bolt at alice's creature and cannot target one at bob's" $ do
+    built <- S.buildBoardOrFail s registry rebuffBoard
+    case S.runScript (rebuffScript "bob's Piker") built S.priorityGame of
+      Left (S.MkActionNotOffered (S.MkWhen _ _ who) (S.MkCast {}) _) | who == S.alice -> pure ()
+      Left failure -> Spec.assertFailure s ("the Bolt at bob's Piker failed otherwise: " <> S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "CR 115.9b a Bolt at bob's own Piker is no legal target, yet alice cast the Rebuff at it"
+    after <- S.play s registry rebuffBoard (rebuffScript "alice's Piker") S.priorityGame
+    Spec.assertEqWith s "CR 701.6a the Bolt at alice's Piker was countered, so the Piker lives" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+
 fizzleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fizzleSpec s registry = Spec.describe s "Fizzle" $ do
   Spec.it s "CR 608.2b Bolt-vs-Bolt through the priority loop: the second fizzles" $ do
@@ -3409,3 +3447,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   squelchSpec s registry
   weighTheTriggerSpec s registry
   greenSlimeSpec s registry
+  rebuffTheWickedSpec s registry

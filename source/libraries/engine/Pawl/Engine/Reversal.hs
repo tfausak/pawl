@@ -130,6 +130,7 @@ withoutAnnouncement before entry closed = do
   exiledUntilMonarch <- mapOf GameState.exiledUntilMonarch
   movedUntilSourceLeaves <- mapOf GameState.movedUntilSourceLeaves
   haunting <- mapOf GameState.haunting
+  encoded <- mapOf GameState.encoded
   exiledWith <- mapOf GameState.exiledWith
   exilePiles <- mapOf GameState.exilePiles
   extraTurns <- listOf GameState.extraTurns
@@ -224,6 +225,7 @@ withoutAnnouncement before entry closed = do
         GameState.exiledUntilMonarch = exiledUntilMonarch,
         GameState.movedUntilSourceLeaves = movedUntilSourceLeaves,
         GameState.haunting = haunting,
+        GameState.encoded = encoded,
         GameState.exiledWith = exiledWith,
         GameState.exilePiles = exilePiles,
         GameState.extraTurns = extraTurns,

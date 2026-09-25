@@ -350,6 +350,8 @@ bakePerspective viewOf context gs candidate predicate =
         -- Pawl.Engine.Filter answers this atom False for a player candidate whatever
         -- the nest says and never evaluates it.
         Filter.Type.TargetsOnlyOne _ -> predicate
+        -- Not descended into for the atom above's reason.
+        Filter.Type.TargetsMatching _ -> predicate
         Filter.Type.TargetsPlayer _ -> predicate
         Filter.Type.IsBound _ -> predicate
         Filter.Type.SameNameAsBound _ -> predicate

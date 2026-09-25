@@ -909,6 +909,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInHand {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInYourLibrary _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachCardEncodedOnSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfGraveyard _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -4636,6 +4637,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- CR 607.2a, swept once from the PRE-MOVE state (CR 608.2c, CR
               -- 608.2f). CR 400.3 files a hand arrival under Object.owner.
               ObjectRef.EachCardExiledWithSource {} -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- CR 702.99a, swept once from the PRE-MOVE state, the arm above's
+              -- reason.
+              ObjectRef.EachCardEncodedOnSource {} -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
               ObjectRef.EachSpell _ -> do

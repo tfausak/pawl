@@ -465,6 +465,9 @@ data Response
     -- ChoseCopyTarget, the other Maybe-ObjectId answers, for their reason: a
     -- transcript that answered one "may" must not silently answer another.
     ChoseEnlist (Maybe ObjectId.ObjectId)
+  | -- | CR 702.99a: the creature a spell with cipher was encoded on (Nothing =
+    -- declined), ChoseEnlist's reason for being distinct.
+    ChoseEncode (Maybe ObjectId.ObjectId)
   | -- | CR 303.4k: whether an Aura being turned face up exercised its printed
     -- "you may attach it" (Exercises) or left itself unattached (Declines).
     -- Distinct from ChoseRiot and ChosePayLifeOnEntry for their own reason, one

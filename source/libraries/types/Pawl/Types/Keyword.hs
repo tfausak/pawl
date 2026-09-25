@@ -465,7 +465,12 @@ data Keyword
     -- counter on it" and "This permanent can't block as long as it has a +1/+1
     -- counter on it". The second half is not conditional on the first.
     Unleash
-  | -- | 702.100a: whenever a creature you control enters, if that creature's
+  | -- | 702.99a: a spell ability that may exile this card encoded on a creature
+    -- its controller controls, and an exile-zone static ability granting that
+    -- creature a trigger that casts a copy of the card; performed by
+    -- Pawl.Engine.Resolve.applyCipher and Pawl.Engine.Projection.encodedGathered.
+    Cipher
+  | -- | 702.100a:whenever a creature you control enters, if that creature's
     -- power and/or toughness is greater than this creature's, put a +1/+1 counter
     -- on this creature; each instance triggers separately (CR 702.100d).
     Evolve

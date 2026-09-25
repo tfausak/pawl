@@ -84,6 +84,9 @@
 -- goes on the stack, and whose declined copy is swept by CR 704.5e
 -- (castCopySpec).
 --
+-- And CR 702.99's cipher, whose granted trigger casts a CR 707.12 copy of the
+-- encoded card: Last Thoughts (cipherSpec).
+--
 -- And CR 707.13's copy of a card defined by NAME, created outside the game and
 -- then cast: Garth One-Eye (garthSpec).
 --
@@ -4174,6 +4177,92 @@ burningDown victim decision p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer victim) sets
   Prompt.OfferedCast {} -> decision
   _ -> S.identityAnswer p
+
+-- CR 702.99 on Last Thoughts {3}{U} Sorcery, "Draw a card. / Cipher" (Oracle text
+-- checked on Scryfall, 2026-09-25).
+--
+-- TWO PIKERS, so the encode is a real choice: the answerer pins the SECOND, and a
+-- resolver that picked for the player would take the first. Both attack, so the
+-- only difference between them is the encoding.
+--
+-- alice's hand is the observer: one card after Last Thoughts resolves (its own
+-- draw), two once the encoded Piker connects and the COPY is cast and resolves.
+-- The card itself stays in exile, still encoded -- a copy is not represented by a
+-- card, so rule 702.99a's first ability does nothing when it resolves.
+--
+-- THE NEGATIVE is the same board with the encoded Piker flickered between the
+-- encode and combat: CR 702.99c ends the link, and the Piker that returns (CR
+-- 400.7) connects and offers nothing. It is settled by hand so it can attack.
+-- A REGRESSION FENCE for encodedGathered's battlefield read: the returned Piker
+-- is a new object the row never named, so the grant misses it either way.
+cipherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cipherSpec s registry = Spec.describe s "Cipher" $ do
+  let board = do
+        island <- S.printingOf s registry "Island"
+        piker <- S.printingOf s registry "Goblin Piker"
+        thoughts <- S.printingOf s registry "Last Thoughts"
+        let (combatReady, pikers, _) = S.combatBoardOf [piker, piker] []
+            (thoughtsId, gs0) = S.addHandCard thoughts S.alice (S.landsFor island S.alice 4 combatReady)
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) gs0 [1 :: Int .. 3]
+            main = stocked {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        pure (combatReady, pikers, thoughtsId, main)
+      -- Back into CR 508's declare attackers step, the fields combatBoardOf set.
+      toCombat combatReady gs =
+        gs
+          { GameState.phase = GameState.phase combatReady,
+            GameState.combat = GameState.combat combatReady,
+            GameState.remaining = GameState.remaining combatReady,
+            GameState.priority = GameState.priority combatReady
+          }
+      exiledNames gs = List.sort (concatMap (\oid -> Set.toList (PC.names (Projection.project oid gs))) (Set.toList (GameState.exile gs)))
+      thoughtsName = CardName.MkCardName (Text.pack "Last Thoughts")
+  Spec.it s "CR 702.99a Last Thoughts is encoded on the chosen Piker, which casts a copy when it connects" $ do
+    (combatReady, pikers, thoughtsId, main) <- board
+    case pikers of
+      [_, second] -> do
+        let answer :: Prompt.Prompt r -> r
+            answer = encodingOn second
+            encoded = S.runPure answer main (S.cast S.alice thoughtsId >> Stack.resolveTop >> Engine.settleForPriority)
+            after = S.runCombat answer (toCombat combatReady encoded)
+        Spec.assertEqWith
+          s
+          "CR 702.99b the card is in exile encoded on the second Piker, not in the graveyard, and alice drew one"
+          (exiledNames encoded, Map.elems (GameState.encoded encoded), length (Game.zoneMembers Zone.Graveyard S.alice encoded), S.handSize S.alice encoded)
+          ([thoughtsName], [second], 0, 1)
+        Spec.assertEqWith
+          s
+          "CR 707.12 the Piker connected and the copy was cast and drew a card, leaving the card still encoded and nothing else encoded"
+          (S.handSize S.alice after, exiledNames after, Map.elems (GameState.encoded after), length (Game.zoneMembers Zone.Graveyard S.alice after))
+          (2, [thoughtsName], [second], 0)
+      _ -> Spec.assertFailure s "fixture should give alice two Pikers"
+  Spec.it s "CR 702.99c a flickered Piker is no longer encoded and offers nothing" $ do
+    (combatReady, pikers, thoughtsId, main) <- board
+    case pikers of
+      [_, second] -> do
+        let answer :: Prompt.Prompt r -> r
+            answer = encodingOn second
+            encoded = S.runPure answer main (S.cast S.alice thoughtsId >> Stack.resolveTop >> Engine.settleForPriority)
+            flicker = do
+              gone <- Event.changeZoneReturning second Zone.Exile
+              Foldable.for_ gone (\oid -> Event.changeZone oid Zone.Battlefield)
+            flickered = S.runPure answer encoded flicker
+            settledAll g = g {GameState.objects = Map.mapWithKey (\oid o -> if Set.member oid (GameState.battlefield g) then o {Object.sickness = Sickness.Settled S.alice} else o) (GameState.objects g)}
+            after = S.runCombat answer (toCombat combatReady (settledAll flickered))
+        Spec.assertEqWith
+          s
+          "CR 702.99c both Pikers connected for four, yet no copy was cast: alice holds only Last Thoughts' own draw"
+          (S.lifeOf S.bob after, S.handSize S.alice after, exiledNames after)
+          (Just 16, 1, [thoughtsName])
+      _ -> Spec.assertFailure s "fixture should give alice two Pikers"
+
+-- cipherSpec's answerer: encodes on `target`, filtered out of the offer rather
+-- than built, casts the offered copy, attacks with everything and blocks nothing.
+encodingOn :: ObjectId -> Prompt.Prompt r -> r
+encodingOn target p = case p of
+  Prompt.ChooseEncode _ _ _ offered -> List.find (== target) (NonEmpty.toList offered)
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
 
 -- CR 707.13 on Garth One-Eye {W}{U}{B}{R}{G}, "{T}: Choose a card name that
 -- hasn't been chosen from among Disenchant, Braingeyser, Terror, Shivan Dragon,

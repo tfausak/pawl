@@ -270,6 +270,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.TargetsOnlyOne (Filter.HasCardType CardType.Creature))
       " {\"type\":\"TargetsOnlyOne\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  Spec.it s "TargetsMatching" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.TargetsMatching (Filter.ControlledBy PlayerRelation.You))
+      " {\"type\":\"TargetsMatching\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
   Spec.it s "TargetsPlayer You" $
     Common.assertCodec
       s

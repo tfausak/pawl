@@ -7,6 +7,7 @@ module Pawl.Engine.Resolve where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -42,6 +43,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -417,7 +419,8 @@ resolveSpellWith runSubgame oid = do
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
                 applyEpic oid effectController
-                finishSpell oid face effectController
+                encoded <- applyCipher oid effectController
+                Monad.unless encoded (finishSpell oid face effectController)
 
 -- CR 702.174b's instant-and-sorcery half: "If this spell's gift cost was paid,
 -- [effect]". A SPELL ability, where rule 702.174b's permanent half is a triggered
@@ -537,6 +540,44 @@ applyEpic oid controller = do
               Onset.Immediately
               (Just Expiry.Type.Never)
               g {GameState.stackArchive = Map.insert oid archived (GameState.stackArchive g)}
+
+-- CR 702.99a's spell ability, "if this spell is represented by a card, you may
+-- exile this card encoded on a creature you control", performed as the last
+-- part of resolution in applyEpic's place and for its reason. Answers whether
+-- the card left the stack, so finishSpell's move is skipped: the exile IS where
+-- the card goes, and no buyback or rebound row is installed over it.
+--
+-- The keyword is read off the PROJECTION, applyEpic's reading. "Represented by a
+-- card" is Source.OfCard: CR 707.12's cast copy (Source.OfCardCopy) and CR
+-- 707.10's spell copy are not cards, so a copy cast by the granted trigger is
+-- never encoded again.
+--
+-- The creature is CHOSEN, not targeted (CR 115.1), from the permanents the
+-- controller controls that are creatures now -- read through the projection, so
+-- an animated land qualifies. No creature leaves nothing to ask.
+applyCipher :: ObjectId -> PlayerId -> Game Bool
+applyCipher oid controller = do
+  gs <- State.get
+  let represented = case fmap Object.source (Game.lookupObject oid gs) of
+        Just (Source.OfCard _) -> True
+        _ -> False
+      creature c = Projection.controllerOf c gs == Just controller && Set.member CardType.Creature (Projection.cardTypesOf c gs)
+      offered = filter creature (Set.toList (GameState.battlefield gs))
+  case NonEmpty.nonEmpty offered of
+    Just candidates | represented && Map.member Keyword.Cipher (Projection.keywordsOf oid gs) -> do
+      answer <- Game.choose (Prompt.ChooseEncode (Decide.deciderFor controller gs) controller oid candidates)
+      -- Filtered, not trusted: an answer outside the offer declines.
+      case List.find (\c -> Just c == answer) offered of
+        Nothing -> pure False
+        Just chosen -> do
+          landed <- Event.changeZoneReturning oid Zone.Exile
+          -- CR 702.99b: the link is filed only where the card reached exile; a
+          -- replacement that sent it elsewhere leaves nothing encoded.
+          State.modify' $ \g ->
+            let arrived = filter (`Set.member` GameState.exile g) (Foldable.toList landed)
+             in g {GameState.encoded = foldr (`Map.insert` chosen) (GameState.encoded g) arrived}
+          pure (not (null landed))
+    _ -> pure False
 
 -- CR 608.2n / 702.27a / 702.88a / 715.3d / 720.3d: where the spell goes as the
 -- last part of its resolution -- its owner's graveyard, unless one of four riders

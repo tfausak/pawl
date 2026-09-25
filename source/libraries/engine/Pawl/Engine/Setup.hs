@@ -267,6 +267,7 @@ emptyGame order =
           GameState.exiledUntilMonarch = Map.empty,
           GameState.movedUntilSourceLeaves = Map.empty,
           GameState.haunting = Map.empty,
+          GameState.encoded = Map.empty,
           GameState.exiledWith = Map.empty,
           GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],
@@ -829,6 +830,7 @@ restartGame perform exempt starter = do
             GameState.exiledUntilMonarch = Map.empty,
             GameState.movedUntilSourceLeaves = Map.empty,
             GameState.haunting = Map.empty,
+            GameState.encoded = Map.empty,
             -- Kept for the CR 727.5 exemptions alone, and cleared for every
             -- other card: an exempted card never left exile, so what put it
             -- there is still true of it, and CR 727.4's additional instructions
@@ -1056,6 +1058,7 @@ subgameStateFrom starter parent =
           GameState.exiledUntilMonarch = Map.empty,
           GameState.movedUntilSourceLeaves = Map.empty,
           GameState.haunting = Map.empty,
+          GameState.encoded = Map.empty,
           GameState.exiledWith = Map.empty,
           GameState.exilePiles = Map.empty,
           -- CR 729.1a: the subgame is its own game and starts from turn 1, so
@@ -1157,6 +1160,7 @@ applyCrossings finalSub parent =
                   GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
                   GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g1),
                   GameState.haunting = Map.delete oid (GameState.haunting g1),
+                  GameState.encoded = Map.delete oid (GameState.encoded g1),
                   GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
                   GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
                 }

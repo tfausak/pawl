@@ -87,6 +87,7 @@ codec keywordCodec =
       -- Recursive for ControlsMoreThanYou's reason: the payload describes the one
       -- TARGET, and a card author writes it exactly as they write any other filter.
       Arm.payload "TargetsOnlyOne" (codec keywordCodec) Filter.TargetsOnlyOne (\x -> case x of Filter.TargetsOnlyOne y -> Just y; _ -> Nothing),
+      Arm.payload "TargetsMatching" (codec keywordCodec) Filter.TargetsMatching (\x -> case x of Filter.TargetsMatching y -> Just y; _ -> Nothing),
       Arm.payload "TargetsPlayer" PlayerRelation.codec Filter.TargetsPlayer (\x -> case x of Filter.TargetsPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsBound" SlotName.codec Filter.IsBound (\x -> case x of Filter.IsBound y -> Just y; _ -> Nothing),
       Arm.payload "SameNameAsBound" SlotName.codec Filter.SameNameAsBound (\x -> case x of Filter.SameNameAsBound y -> Just y; _ -> Nothing),
@@ -198,6 +199,7 @@ tagOf x = case x of
   Filter.TargetsSource {} -> "TargetsSource"
   Filter.TargetsOnlySource {} -> "TargetsOnlySource"
   Filter.TargetsOnlyOne {} -> "TargetsOnlyOne"
+  Filter.TargetsMatching {} -> "TargetsMatching"
   Filter.TargetsPlayer {} -> "TargetsPlayer"
   Filter.IsBound {} -> "IsBound"
   Filter.SameNameAsBound {} -> "SameNameAsBound"
