@@ -2915,6 +2915,15 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- creature, even if it blocks multiple creatures": a blocker declared against
   -- two attackers makes two BecameBlocking and one BlocksDeclared, so matching
   -- the pairwise one here would fire twice.
+  -- CR 508.3a narrowed by a state, SelfAttacksWhileSaddled's posture: the
+  -- declaration SelfAttacks matches, and the condition asked of the live board
+  -- when triggers are collected, through the view Event.interveningHolds reads.
+  -- Not `board`, CR 603.10's post-event battlefield, so a legendary Monkey lost
+  -- to state-based actions the declaration itself caused reads as absent; no
+  -- card in the pool reaches that.
+  TriggerCondition.SelfAttacksWhile condition ->
+    matchesTriggerGiven bindings board gs bearer you (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) event
+      && Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Game.teams gs) (Just you) (Just bearer) Map.empty) gs bearer condition
   -- CR 702.171b: SelfAttacks' declaration event, narrowed by the bearer
   -- carrying the saddled designation AT THAT MOMENT. Read off
   -- Object.designations rather than through the projection, rule 702.171b
@@ -2923,12 +2932,6 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- Rule 702.171a is what sets it, and it can only have been set earlier this
   -- turn: Pawl.Engine.Expiry.dropAtCleanup ends it at CR 514.2 and CR 400.7
   -- drops it on a zone change.
-  -- CR 508.3a narrowed by a state read AT THAT MOMENT, SelfAttacksWhileSaddled's
-  -- posture: the declaration SelfAttacks matches, and the condition asked of the
-  -- board the declaration left, through the view Event.interveningHolds reads.
-  TriggerCondition.SelfAttacksWhile condition ->
-    matchesTriggerGiven bindings board gs bearer you (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) event
-      && Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Game.teams gs) (Just you) (Just bearer) Map.empty) gs bearer condition
   TriggerCondition.SelfAttacksWhileSaddled -> case event of
     GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) ->
       oid == bearer && maybe False (Set.member Designation.Saddled . Object.designations) (Game.lookupObject bearer gs)
