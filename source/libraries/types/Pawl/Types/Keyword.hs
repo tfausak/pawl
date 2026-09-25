@@ -822,9 +822,7 @@ data Keyword
     -- creature that was then an Assassin or a commander under your control,
     -- which CR 601.2b and CR 601.2f-h price as an alternative cost.
     Freerunning (Cost.Cost Keyword)
-  | -- | 702.176a: impending N--[cost] -- an alternative cost; paid, the permanent
-    -- enters with N time counters, isn't a creature while it has one, and loses
-    -- one at the beginning of its controller's end step.
+  | -- | 702.176a: impending N--[cost], an alternative cost that holds off being a creature.
     Impending (Impending.Impending Keyword)
   | -- | 702.177a: exhaust adds rules to the activated ability printed AFTER it --
     -- "Exhaust -- [Cost]: [Effect]" means "[Cost]: [Effect]. Activate only once".
