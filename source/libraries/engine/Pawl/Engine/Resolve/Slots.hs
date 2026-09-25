@@ -756,7 +756,7 @@ effectObjectRefs effect = case effect of
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _) -> [ref]
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _ _) -> [ref]
   Effect.GrantLookAtExiled grant -> [GrantLookAtExiled.cards grant]
   Effect.MakePlotted ref -> [ref]
   Effect.MakeForetold x -> [MakeForetold.cards x]

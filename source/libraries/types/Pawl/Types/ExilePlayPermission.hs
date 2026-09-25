@@ -4,6 +4,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerId as PlayerId
 
@@ -94,6 +95,10 @@ data ExilePlayPermission = MkExilePlayPermission
     expiry :: Expiry.Expiry,
     spending :: ManaSpending.ManaSpending,
     alternativeManaCost :: Maybe ManaCost.ManaCost,
-    origin :: PlayPermissionOrigin.PlayPermissionOrigin
+    origin :: PlayPermissionOrigin.PlayPermissionOrigin,
+    -- | CR 601.3 / 305.9: whether the permission also lets an exiled land be
+    -- played (Play) or only lets a spell be cast (Cast). Read by
+    -- Pawl.Engine.Cast.permitsLandPlayFromExile.
+    verb :: PermissionVerb.PermissionVerb
   }
   deriving (Eq, Ord, Show)

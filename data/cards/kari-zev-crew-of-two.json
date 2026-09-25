@@ -328,8 +328,24 @@
                                                             }
                                                           }
                                                         },
+                                                        "slot": "exiled",
                                                         "zone": {
                                                           "type": "Exile"
+                                                        }
+                                                      }
+                                                    },
+                                                    {
+                                                      "type": "GrantPlayFromExile",
+                                                      "value": {
+                                                        "duration": {
+                                                          "type": "UntilEndOfTurn"
+                                                        },
+                                                        "ref": {
+                                                          "type": "InSlot",
+                                                          "value": "exiled"
+                                                        },
+                                                        "verb": {
+                                                          "type": "Cast"
                                                         }
                                                       }
                                                     }
