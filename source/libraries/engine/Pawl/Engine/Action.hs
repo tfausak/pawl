@@ -86,12 +86,12 @@ import qualified Pawl.Types.Zone as Zone
 -- this zone shows it, which is the same face the name above is taken from.
 playableLands :: PlayerId -> GameState -> [(ObjectId, Maybe CardName.CardName)]
 playableLands pid gs =
-  let playable oid = case Game.cardOfHandMember oid gs of
-        Nothing -> []
-        Just card ->
-          if PlayerEffect.prohibitsPlayingLand pid (Card.combinedNames card) oid gs
+  let playable oid = case (Game.lookupObject oid gs, Game.cardOfHandMember oid gs) of
+        (Just obj, Just card) ->
+          if PlayerEffect.prohibitsPlayingLand pid (Game.copiableNamesOf obj card) oid gs
             then []
-            else fmap (\(mName, _) -> (oid, mName)) (Card.landFaces card)
+            else fmap (\(mName, _) -> (oid, mName)) (Game.landFacesOf obj card)
+        _ -> []
       -- CR 305.1's own zone, which needs no permission.
       fromHand = Game.zoneMembers Zone.Hand pid gs
       -- The pile or none of it: the grant narrows no land (see

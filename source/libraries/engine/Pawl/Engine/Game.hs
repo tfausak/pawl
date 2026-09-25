@@ -26,6 +26,7 @@ import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -926,9 +927,6 @@ copyStampOf obj = Binding.copyOf (Object.bindings obj) Applicative.<|> Object.du
 --
 -- A stamp's halves and Adventure or Omen half are the copied card's own faces,
 -- so castableFacesOf below offers them as they are and this leaves them alone.
---
--- Not implemented: the face-down cast and turn-face-up costs, still read off the
--- printed card (#4083).
 castingFaceOf :: Object.Object -> Card -> Face Card -> Face Card
 castingFaceOf obj card face = case copyStampOf obj of
   Just stamp
@@ -956,6 +954,25 @@ castableFacesOf obj card = case copyStampOf obj of
   Just stamp -> case PC.halves stamp of
     Just halves -> Card.castableFaces halves
     Nothing -> castingFaceOf obj card (Card.frontFace card) : Maybe.maybeToList (PC.alternativeSpell stamp)
+
+-- CR 305.1 / 707.2: the faces this object may be PLAYED as a land, castableFacesOf's
+-- sibling for Card.landFaces. A copy stamp's card types decide: a card carrying a
+-- land's copiable values plays as that land, and one carrying anything else
+-- offers no land face -- the printed card's back face included (CR 707.8).
+-- Pawl.ConjureSpec's "CR 707.2/305.1 a duplicate of a Clone of Dryad Arbor is
+-- played as a land" proves the first.
+landFacesOf :: Object.Object -> Card -> [(Maybe CardName.CardName, Face Card)]
+landFacesOf obj card = case copyStampOf obj of
+  Nothing -> Card.landFaces card
+  Just stamp
+    | Set.member CardType.Land (PC.cardTypes stamp) -> [(Nothing, castingFaceOf obj card (Card.frontFace card))]
+    | otherwise -> []
+
+-- CR 201.1 / 707.2: the names a card shows off the battlefield -- its copy
+-- stamp's when it has one, CR 709.4's combined names otherwise. What CR 305.1's
+-- land-play prohibitions are asked of.
+copiableNamesOf :: Object.Object -> Card -> Set.Set CardName.CardName
+copiableNamesOf obj card = maybe (Card.combinedNames card) PC.names (copyStampOf obj)
 
 -- castableFacesOf above for a caller that holds only the id.
 castableFacesOfId :: ObjectId -> GameState -> [Face Card]
@@ -1003,6 +1020,19 @@ alternativeSpellOf oid gs = do
     Facing.FaceUp -> do
       card <- cardOf oid gs
       alternativeSpellCardOf obj card
+
+-- CR 702.37e / 702.168d / 701.40b: faceUpFaceOf with the copy stamp's values
+-- laid over it (castingFaceOf), so a face-down card carrying copied values is
+-- turned face up by the copied card's morph or disguise and priced at the copied
+-- mana cost. Pawl.ConjureSpec's "CR 707.2/702.37e a duplicate of a Clone of
+-- Ainok Tracker is cast face down and turned up for its morph cost" proves the
+-- morph read.
+faceUpCastingFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
+faceUpCastingFaceOf oid gs = do
+  obj <- lookupObject oid gs
+  card <- cardOf oid gs
+  face <- faceUpFaceOf oid gs
+  pure (castingFaceOf obj card face)
 
 -- castingFaceOf's keywords for a caller that holds only the id: the printed
 -- face's (faceOf, so the half CR 709.3b stamped) under any copy stamp's.

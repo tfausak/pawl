@@ -67,6 +67,7 @@ import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import Pawl.Types.TurnUpProcedure (TurnUpProcedure)
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
@@ -90,11 +91,11 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- the ability rule 702.37e consults is the one the CARD would have. That is what
 -- "would be if it were face up" says, and nothing in the pool observes it.
 --
--- Not implemented: a copy stamp's morph or disguise, which this and the two
--- readers below miss by reading the printed card (#4083).
+-- CR 707.2: morph is copiable, so a card carrying copied values has the copied
+-- card's (Game.faceUpCastingFaceOf), as do the two readers below.
 morphCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 morphCostOf oid gs = do
-  face <- Game.faceUpFaceOf oid gs
+  face <- Game.faceUpCastingFaceOf oid gs
   Keyword.morphCost (Face.keywordSet face)
 
 -- CR 702.168d: "show all players what the permanent's disguise cost WOULD BE if
@@ -110,7 +111,7 @@ morphCostOf oid gs = do
 -- ability this asks about.
 disguiseCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 disguiseCostOf oid gs = do
-  face <- Game.faceUpFaceOf oid gs
+  face <- Game.faceUpCastingFaceOf oid gs
   Keyword.disguiseCost (Face.keywordSet face)
 
 -- CR 701.40b and CR 701.58b, which say it in the same words: "show all players
@@ -134,8 +135,10 @@ disguiseCostOf oid gs = do
 -- permanent answers a different question.
 creatureCardCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 creatureCardCostOf oid gs = do
-  face <- Game.faceUpFaceOf oid gs
-  Monad.guard (Set.member CardType.Creature (TypeLine.types (Face.typeLine face)))
+  face <- Game.faceUpCastingFaceOf oid gs
+  -- CR 707.2: card types are copiable too, so a copy stamp's types decide.
+  let types = maybe (TypeLine.types (Face.typeLine face)) PC.cardTypes (Game.copyStampOf =<< Game.lookupObject oid gs)
+  Monad.guard (Set.member CardType.Creature types)
   manaCost <- Face.manaCost face
   pure (Cost.Type.MkCost (Just manaCost) [])
 

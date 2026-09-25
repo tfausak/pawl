@@ -1364,9 +1364,10 @@ offerCastOnce context named caster optionality verb retake offer = do
         | verb == PermissionVerb.Play && Cast.landDropOpen caster gs =
             [ (oid, mName, Face.name face)
             | oid <- named,
+              Just obj <- [Game.lookupObject oid gs],
               Just card <- [Game.cardOf oid gs],
-              not (PlayerEffect.prohibitsPlayingLand caster (Card.combinedNames card) oid gs),
-              (mName, face) <- Card.landFaces card
+              not (PlayerEffect.prohibitsPlayingLand caster (Game.copiableNamesOf obj card) oid gs),
+              (mName, face) <- Game.landFacesOf obj card
             ]
         | otherwise = []
       everything = fmap Left landOffers <> fmap Right offers
