@@ -277,7 +277,7 @@ ownQuantities effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> [quantity]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.ExchangeLifeTotals _ -> []
-  Effect.ExchangeValues _ -> []
+  Effect.ExchangeValues x -> durationQuantities (ExchangeValues.duration x)
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -1304,7 +1304,7 @@ effectObjectRefs effect =
         Effect.LoseLife {} -> []
         Effect.GainLife {} -> []
         Effect.ExchangeLifeTotals {} -> []
-        Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) -> read_ (foldMap Resolve.exchangedObjectRefs [one, other])
+        Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other _) -> read_ (foldMap Resolve.exchangedObjectRefs [one, other])
         Effect.SetLifeTotal {} -> []
         Effect.LoseGame {} -> []
         Effect.RedistributeLifeTotals -> []

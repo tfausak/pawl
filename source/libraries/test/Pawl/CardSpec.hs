@@ -631,7 +631,7 @@ objectRefPositions =
         ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") LoopMembers.Every (SlotName.MkSlotName (Text.pack "each")) Seq.empty False), [plantedRef "fe"]),
         ("heal", Effect.Heal (plantedRef "he"), [plantedRef "he"]),
-        ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.Power (plantedRef "xv-power")) (ExchangedValue.Toughness (plantedRef "xv-toughness"))), [plantedRef "xv-power", plantedRef "xv-toughness"])
+        ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.Power (plantedRef "xv-power")) (ExchangedValue.Toughness (plantedRef "xv-toughness")) Duration.Indefinite), [plantedRef "xv-power", plantedRef "xv-toughness"])
       ]
 
 -- The ref plantedRef at one position, named for it so a position answering with
@@ -661,7 +661,7 @@ playerRefPositions =
         ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect Nothing), [plantedPlayer "ll"]),
         ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
         ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
-        ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (plantedPlayer "xv-one")) (ExchangedValue.LifeTotal (plantedPlayer "xv-other"))), [plantedPlayer "xv-one", plantedPlayer "xv-other"]),
+        ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (plantedPlayer "xv-one")) (ExchangedValue.LifeTotal (plantedPlayer "xv-other")) Duration.Indefinite), [plantedPlayer "xv-one", plantedPlayer "xv-other"]),
         ("lose-game", Effect.LoseGame (plantedPlayer "lg"), [plantedPlayer "lg"]),
         ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
         ("decrease-speed", Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease (plantedPlayer "ds") one 0), [plantedPlayer "ds"]),
@@ -1192,7 +1192,7 @@ ownCounts effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
-  Effect.ExchangeValues _ -> []
+  Effect.ExchangeValues x -> durationCounts (ExchangeValues.duration x)
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -4444,6 +4444,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.IsRingBearer -> []
   Filter.Type.IsPaired -> []
   Filter.Type.IsPairedWithSource -> []
+  Filter.Type.IsBlockedBySource -> []
   Filter.Type.HasDesignation _ -> []
   -- The kind may be a whole Keyword hiding a Filter, left alone for the reason
   -- the keyword atom above is.
@@ -5435,7 +5436,7 @@ effectFilters effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> frame Unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
-  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) -> frame SourceHostFramed (foldMap objectRefFilters (foldMap Resolve.exchangedObjectRefs [one, other]))
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (foldMap objectRefFilters (foldMap Resolve.exchangedObjectRefs [one, other]))
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []

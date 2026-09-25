@@ -1563,6 +1563,26 @@ exchangeValuesSpec s registry = Spec.describe s "ExchangeValues" $ do
     Spec.assertEqWith s "alice took Evra's previous power, counter included" (S.lifeOf S.alice after) (Just 5)
     Spec.assertEqWith s "Evra's base power became 9, the counter on top, its toughness untouched" (S.powerToughnessOf evraId after) (Just (10, 5))
 
+  -- Serene Master, a 0/2, blocks alice's Hill Giant, a 3/3, and its trigger
+  -- targets the Giant (CR 509.1g's IsBlockedBySource): the powers swap until
+  -- end of combat (CR 511.2), so the Master deals 3 and takes 0.
+  Spec.it s "CR 701.12g Serene Master swaps powers with the creature it blocks until end of combat" $ do
+    master <- S.printingOf s registry "Serene Master"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (board, giants, masters) = S.combatBoardOf [giant] [master]
+        -- Aims AWAY from the Giant whenever anything else is offered, so a filter
+        -- letting the Master itself in is caught aiming there.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> notElem r (fmap Recipient.ToCreature giants)) sets
+          _ -> S.aggressiveAnswer p
+        after = S.runCombat answer board
+    case (giants, masters) of
+      ([giantId], [masterId]) -> do
+        Spec.assertBool s (not (Set.member giantId (GameState.battlefield after))) "the Giant died to the Master's borrowed 3 power"
+        Spec.assertEqWith s "CR 511.2 the Master survived the Giant's borrowed 0 power and is a 0/2 again after combat" (S.powerToughnessOf masterId after) (Just (0, 2))
+      _ -> Spec.assertFailure s "expected one creature a side"
+
 -- `exchanger` on alice's battlefield with one +1/+1 counter, alice at `life`,
 -- bob at 20 and optionally controlling `bobs`, in alice's upkeep with priority.
 -- The schedule surgery is mirrorBoard's.

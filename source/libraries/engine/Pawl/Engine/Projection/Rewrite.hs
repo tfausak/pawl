@@ -607,12 +607,12 @@ rewriteEffect pairs effect = case effect of
   Effect.GainLife x -> Effect.GainLife (rewritePlayerQuantity pairs x)
   Effect.ExchangeLifeTotals _ -> effect
   -- A creature side's ObjectRef may carry a Filter rule 612 reaches.
-  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) ->
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) ->
     let side value = case value of
           ExchangedValue.LifeTotal _ -> value
           ExchangedValue.Power ref -> ExchangedValue.Power (rewriteObjectRef pairs ref)
           ExchangedValue.Toughness ref -> ExchangedValue.Toughness (rewriteObjectRef pairs ref)
-     in Effect.ExchangeValues (ExchangeValues.MkExchangeValues (side one) (side other))
+     in Effect.ExchangeValues (ExchangeValues.MkExchangeValues (side one) (side other) (rewriteDuration pairs duration))
   Effect.SetLifeTotal x -> Effect.SetLifeTotal (rewritePlayerQuantity pairs x)
   Effect.LoseGame {} -> effect
   Effect.RedistributeLifeTotals -> effect

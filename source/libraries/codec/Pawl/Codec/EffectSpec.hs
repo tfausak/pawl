@@ -708,7 +708,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (PlayerRef.Relative PlayerRelation.You)) (ExchangedValue.Power (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))))
+      (Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (PlayerRef.Relative PlayerRelation.You)) (ExchangedValue.Power (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self")))) Duration.Indefinite))
       " {\"type\":\"ExchangeValues\",\"value\":{\"one\":{\"type\":\"LifeTotal\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"other\":{\"type\":\"Power\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}}}} "
   Spec.it s "SetLifeTotal" $
     Common.assertJsonCodec
