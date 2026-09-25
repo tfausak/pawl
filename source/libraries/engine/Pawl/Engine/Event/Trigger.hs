@@ -1742,7 +1742,7 @@ eventTriggers events gs =
       --
       -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#1859).
       spellCast event = case event of
-        GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _) -> case Game.faceOf spell gs of
+        GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
           Just face -> case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Stack) (Face.triggeredAbilities face) <> fmap whole (Keyword.stackTriggeredAbilitiesOf (Face.keywords face)) of
             [] -> Map.empty

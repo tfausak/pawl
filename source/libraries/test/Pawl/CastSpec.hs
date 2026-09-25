@@ -4521,7 +4521,7 @@ webSlingingCost = [theWhite]
 -- THREE Mountains on the middle board is the negative that says rule 702.185a's
 -- cost is not on offer in exile: its first ability names the HAND, so the only
 -- price there is the printed {9}.
-warpSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+warpSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 warpSpec s registry = Spec.describe s "Warp" $ do
   Spec.it s "CR 702.185a warped for {3} the Colossus enters, is exiled at the next end step, and is castable from exile only on a later turn" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -4545,6 +4545,29 @@ warpSpec s registry = Spec.describe s "Warp" $ do
           (S.castable S.alice exiledId (atTurn castTurn 9), S.castable S.alice exiledId (atTurn (castTurn + 1) 3), S.castable S.alice exiledId (atTurn (castTurn + 1) 9))
           (False, False, True)
       other -> Spec.assertFailure s ("expected one exiled card, got " <> show (length other))
+  -- CR 702.185c on Insatiable Skittermaw {2}{B} Creature -- Insect Horror 2/2,
+  -- "Menace / Void -- At the beginning of your end step, if a nonland permanent
+  -- left the battlefield this turn or a spell was warped this turn, put a +1/+1
+  -- counter on this creature" (Oracle text checked on Scryfall, 2026-09-25).
+  --
+  -- TWO boards differing in ONE thing: the cost alice's answer picks for the
+  -- Colossus. NINE Mountains on both, so either cost is payable. The warped
+  -- Colossus is exiled in the same end step, which is the void's other disjunct;
+  -- the intervening "if" is first asked as the step begins (CR 603.4), before
+  -- that exile, so only the warp can make the trigger.
+  Spec.it s "CR 702.185c a spell warped this turn makes Insatiable Skittermaw's end step trigger; the same Colossus cast for {9} does not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    colossus <- S.printingOf s registry "Bygone Colossus"
+    skittermaw <- S.printingOf s registry "Insatiable Skittermaw"
+    let stocked n gs = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) gs [1 .. (n :: Int)]
+        (skittermawId, withSkittermaw) = S.addPermanent skittermaw S.alice (stocked 3 (S.landsInPlay mountain 9))
+        (colossusId, board) = S.addHandCard colossus S.alice withSkittermaw
+        endOf cost = throughEndStep (castResolved (payingFor cost) colossusId (scheduled board))
+        warped = endOf warpCost
+        hardCast = endOf colossusCost
+        counters = S.counterOf CounterKind.PlusOnePlusOne skittermawId
+    Spec.assertEqWith s "CR 702.185c warped, the Skittermaw gets its counter; cast for {9}, it gets none" (counters warped, counters hardCast) (1, 0)
+    Spec.assertEqWith s "setup: CR 702.185a the warped Colossus was exiled and the hard-cast one stayed" (length (GameState.exile warped), length (GameState.exile hardCast)) (1, 0)
 
 -- Bygone Colossus's printed {9} and its warp {3}.
 colossusCost, warpCost :: [ManaSymbol.ManaSymbol]

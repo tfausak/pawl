@@ -1,5 +1,6 @@
 module Pawl.Types.SpellWasCast where
 
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
@@ -30,6 +31,11 @@ data SpellWasCast = MkSpellWasCast
     -- Nothing when the cast was proposed for a card no longer findable at that
     -- point, which is Pawl.Engine.Cast's own `castFrom`, and for a CR 707.13
     -- copy cast from outside the game (CR 400.11), which was in no zone.
-    zone :: Maybe Zone.Zone
+    zone :: Maybe Zone.Zone,
+    -- | CR 601.2b: the keyword whose cost the spell was cast for, copied off
+    -- Object.castUsing as it became cast, since CR 400.7 leaves no object to
+    -- read it off later -- CR 702.185c's "a spell was warped this turn"
+    -- (Quantity.SpellsCastUsingThisTurn).
+    castUsing :: Maybe Keyword.Keyword
   }
   deriving (Eq, Ord, Show)

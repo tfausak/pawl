@@ -248,6 +248,10 @@ data Quantity
     -- graveyard from the battlefield this turn -- gravestorm's count (CR
     -- 702.69a).
     PermanentsDiedThisTurn
+  | -- | CR 702.185c \/ 608.2i: how many spells, by any player, were cast this
+    -- turn for the cost that keyword family offers -- "a spell was warped this
+    -- turn" is this compared against 1.
+    SpellsCastUsingThisTurn KeywordFamily.KeywordFamily
   | -- | CR 100.6a \/ 729.1a: how many subgames have begun this match, counting one
     -- in progress -- Shahrazad and Sindbad's "if there haven't been any subgames
     -- this match", which is this compared to 0. Read off

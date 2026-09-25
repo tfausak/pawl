@@ -19,6 +19,7 @@ import qualified Pawl.CastRestrictionSpec as CastSpec
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -53,6 +54,7 @@ import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -387,6 +389,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   ebonyOwlNetsukeSpec s registry
   strandcatcherSpec s registry
   raphaelSpec s registry
+  leftBattlefieldSpec s registry
   graveCensusTokenSpec s registry
   ownershipLedgerSpec s registry
 
@@ -1813,6 +1816,64 @@ raphaelSpec s registry =
           let after = endStepOf (exileGraveyard (kill giantId crewed))
           Spec.assertEqWith s "CR 608.2h one creature card this turn, so alice still gets one Devil" (devils after) 1
           Spec.assertEqWith s "setup: that card really did leave alice's graveyard too" (graveyard S.alice after) 0
+
+-- CR 603.6c's origin with no destination: "left the battlefield this turn", read
+-- over EventShape.MovedFrom. Every victim here goes to its owner's HAND, so a
+-- shape that still named a graveyard destination would see none of them.
+--
+-- Insatiable Skittermaw {2}{B} Creature -- Insect Horror 2/2 (Oracle text checked
+-- on Scryfall, 2026-09-25): "Void -- At the beginning of your end step, if a
+-- nonland permanent left the battlefield this turn or a spell was warped this
+-- turn, put a +1/+1 counter on this creature." Pawl.CastSpec's Warp group drives
+-- the second disjunct. Its boards differ in which permanent leaves: bob's Hill
+-- Giant or his Mountain, bounced, or carol's Hill Giant as carol concedes (CR
+-- 800.4a, which is CR 603.6c's other road off the battlefield).
+--
+-- Minthara, Merciless Soul (Oracle text checked on Scryfall, 2026-09-25): "At the
+-- beginning of your end step, if a permanent you controlled left the battlefield
+-- this turn, you get an experience counter." Its pair differs in who CONTROLS
+-- bob's Hill Giant as it is bounced, so an owner read answers neither case.
+leftBattlefieldSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+leftBattlefieldSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      library printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      -- raphaelSpec's endStepOf: the step's event recorded beside the phase.
+      endStepOf gs =
+        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep, GameState.activePlayer = S.alice})
+            settled = S.runPure S.identityAnswer began Engine.settleForPriority
+         in S.runPure S.identityAnswer settled Engine.priorityLoop
+      bounce oid gs = S.runPure S.identityAnswer gs (Event.changeZone oid Zone.Hand)
+      board producer = do
+        watcher <- S.printingOf s registry producer
+        hillGiant <- S.printingOf s registry "Hill Giant"
+        mountain <- S.printingOf s registry "Mountain"
+        let (watcherId, withWatcher) = S.addPermanent watcher S.alice S.threePlayerGame
+            (theirGiant, withTheirs) = S.addPermanent hillGiant S.bob withWatcher
+            (theirMountain, withMountain) = S.addPermanent mountain S.bob withTheirs
+            (_, withCarols) = S.addPermanent hillGiant S.carol withMountain
+            stocked = library mountain S.carol 5 (library mountain S.bob 5 (library mountain S.alice 5 withCarols))
+            ready = stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pure (watcherId, theirGiant, theirMountain, ready)
+   in Spec.describe s "left the battlefield this turn" $ do
+        Spec.it s "CR 603.6c Insatiable Skittermaw counts a nonland permanent bounced or leaving the game with its owner, and not a land" $ do
+          (skittermawId, theirGiant, theirMountain, ready) <- board "Insatiable Skittermaw"
+          let counters = S.counterOf CounterKind.PlusOnePlusOne skittermawId . endStepOf
+              concede gs = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.carol)
+          Spec.assertEqWith
+            s
+            "CR 603.6c bob's Hill Giant bounced and carol's leaving the game each make the counter; bob's Mountain bounced does not"
+            (counters (bounce theirGiant ready), counters (concede ready), counters (bounce theirMountain ready))
+            (1, 1, 0)
+          Spec.assertEqWith s "setup: both went to bob's hand" (length (Game.zoneMembers Zone.Hand S.bob (bounce theirMountain (bounce theirGiant ready)))) 2
+        Spec.it s "CR 603.6c Minthara counts a permanent alice controlled leaving, not the same one while bob controlled it" $ do
+          (_, theirGiant, _, ready) <- board "Minthara, Merciless Soul"
+          let experience = S.playerCounterOf PlayerCounterKind.Experience S.alice . endStepOf
+              stolen = S.giveControl theirGiant S.alice ready
+          Spec.assertEqWith
+            s
+            "CR 603.6c bob's Hill Giant under alice's control gets her an experience counter as it leaves; under bob's it does not"
+            (experience (bounce theirGiant stolen), experience (bounce theirGiant ready))
+            (1, 0)
 
 -- CR 111.7 / 608.2h: the arrival with no object left to read, on the road where
 -- the reader cannot answer for one either. Pawl.Engine.Resolve.Slots'

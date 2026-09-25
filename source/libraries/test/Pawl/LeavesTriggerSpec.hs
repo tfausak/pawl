@@ -2040,12 +2040,9 @@ wardSpec s registry =
 -- "Minthara has ward {X}, where X is the number of experience counters you
 -- have." Its anthem clause -- "creatures you control get +1/+0 for each
 -- experience counter you have" -- is transcribed too, and is what the pair below
--- reads power through. Its middle clause is NOT: that end step trigger's
--- intervening "if a permanent you controlled left the battlefield this turn"
--- names only where the permanent LEFT, which no Pawl.Types.EventShape can say
--- (gap #2991). The omission leaves pawl's Minthara STRICTER than printed -- alice
--- gains fewer experience counters, never more -- so the counter she starts with
--- is placed by the fixture and the one she gains comes from Ezuri.
+-- reads power through. Its end step clause is Pawl.CountSpec's to prove; no
+-- board here reaches an end step, so the counter she starts with is placed by
+-- the fixture and the one she gains comes from Ezuri.
 --
 -- THE COUNTER ARRIVES WHILE THE TRIGGER IS ALREADY ON THE STACK, which is the
 -- whole of rule 702.21b: alice holds one experience counter as bob's Giant Growth
