@@ -36,6 +36,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -119,7 +120,7 @@ arm targets controller source duration gs = case duration of
   Duration.UntilEndOfNextTurnOf ref ->
     fmap
       (\pid -> Expiry.AtEndOfTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
-      (seatOf targets gs ref)
+      (seatOf targets controller source gs ref)
   -- CR 611.2a: the same seat and the same turn number as the arm above, under an
   -- arm that also states a BEGINNING. Sampled through seatOf for that arm's
   -- reasons, and Nothing where the reference names nobody for that arm's reason
@@ -127,7 +128,7 @@ arm targets controller source duration gs = case duration of
   Duration.DuringNextTurnOf ref ->
     fmap
       (\pid -> Expiry.DuringTurnOf (AfterTurn.MkAfterTurn pid (GameState.turnNumber gs)))
-      (seatOf targets gs ref)
+      (seatOf targets controller source gs ref)
   -- CR 611.2a: the arm above's window with the seat taken from CR 109.5's "you",
   -- as UntilYourNextTurn takes it. Never Nothing -- a controller is always a
   -- seat, so this window always begins.
@@ -171,43 +172,75 @@ arm targets controller source duration gs = case duration of
   -- (#3176).
   Duration.UntilUsed -> Just Expiry.WhenUsed
 
--- The ONE seat a Duration.UntilEndOfNextTurnOf reference names, sampled as the
--- window begins. Pawl.Engine.Resolve.Slots.playerRefPlayers is the general road,
--- and this is deliberately not it: that function is a resolution's, and this
--- module sits below it -- every other caller of `arm` (Pawl.Engine.Stack,
--- Pawl.Engine.Event, Pawl.Engine.ManaRider) has no resolution to hand.
+-- The ONE seat a Duration.UntilEndOfNextTurnOf or DuringNextTurnOf reference
+-- names, sampled as the window begins. One stored row names one turn, so a
+-- reference naming several seats arms nothing; no printing states such a window
+-- (Scryfall o:"each opponent's next turn", o:"opponents' next turns",
+-- 2026-09-25, no hit).
 --
--- InSlot is CR 601.2c's targeted player, through Binding.onlyOne, so a slot
--- naming several names nobody. ControllerOfBound is CR 108.4a's substitute read
--- through the projection: Suspend Aggression's "its owner" is asked of a card
--- already in exile, which CR 108.4 leaves with no controller, and that rule then
--- answers with the owner.
+-- InSlot is CR 601.2c's targeted player, through Binding.onlyOne. ControllerOfBound
+-- is CR 108.4a's substitute read through the projection: Suspend Aggression's
+-- "its owner" is asked of a card already in exile, which CR 108.4 leaves with no
+-- controller, and that rule then answers with the owner. Every other arm is
+-- Pawl.Engine.Count.playersFor's, over the resolution's slots and a CR 608.2h
+-- last-known view -- not Pawl.Engine.Resolve.Slots.playerRefPlayers, which sits
+-- above this module and which the callers with no resolution behind them
+-- (Pawl.Engine.Stack, Pawl.Engine.Event, Pawl.Engine.ManaRider) cannot reach.
 --
--- Not implemented: every other arm, which needs a resolution's whole evaluation
--- context -- a perspective, a view and a candidate -- and answers Nothing here
--- (#3950), and no lint refuses one, which is the posture Duration.UntilUsed's own
--- unbuilt carrier takes above.
-seatOf :: Map.Map SlotName (Set.Set Recipient) -> GameState -> PlayerRef.PlayerRef -> Maybe PlayerId
-seatOf targets gs ref = case ref of
+-- Candidate names nobody here: it is the member a per-player fold has reached,
+-- and the one fold that states such a window substitutes the member as Specific
+-- before arming (perSeat).
+seatOf :: Map.Map SlotName (Set.Set Recipient) -> PlayerId -> ObjectId -> GameState -> PlayerRef.PlayerRef -> Maybe PlayerId
+seatOf targets controller source gs ref = case ref of
   PlayerRef.InSlot slot -> Map.lookup slot (Binding.playersIn targets)
   PlayerRef.ControllerOfBound slot ->
     Map.lookup slot targets
       >>= Binding.onlyOne
       >>= Recipient.objectOf
       >>= \oid -> Projection.controllerWithLastKnown oid gs
-  PlayerRef.EachPlayer -> Nothing
-  PlayerRef.EachPlayerExcept _ -> Nothing
-  PlayerRef.EachOpponentExcept _ -> Nothing
-  PlayerRef.Relative _ -> Nothing
-  PlayerRef.EachInSlot _ -> Nothing
-  PlayerRef.Specific _ -> Nothing
   PlayerRef.Candidate -> Nothing
-  -- Not implemented: the same absence as every other arm below, which this
-  -- module's own comment above covers (#3950); no duration writes CR 108.3's
-  -- owner.
-  PlayerRef.OwnerOfBound _ -> Nothing
-  PlayerRef.ChosenPlayerOfBound _ -> Nothing
-  PlayerRef.Attacking _ -> Nothing
+  PlayerRef.EachPlayer -> counted
+  PlayerRef.EachPlayerExcept _ -> counted
+  PlayerRef.EachOpponentExcept _ -> counted
+  PlayerRef.Relative _ -> counted
+  PlayerRef.EachInSlot _ -> counted
+  PlayerRef.Specific _ -> counted
+  PlayerRef.OwnerOfBound _ -> counted
+  PlayerRef.ChosenPlayerOfBound _ -> counted
+  PlayerRef.Attacking _ -> counted
+  where
+    counted = case Count.playersFor (Projection.viewWithLastKnownAnywhere gs) context gs ref of
+      Just [pid] -> Just pid
+      _ -> Nothing
+    slotsOf pick = fmap (Set.fromList . Maybe.mapMaybe pick . Set.toList) targets
+    context =
+      (Filter.contextWithSlots (Game.teams gs) (Just controller) (Just source) (slotsOf Recipient.objectOf))
+        { Filter.slotPlayers = slotsOf Recipient.playerOf
+        }
+
+-- CR 611.2a: "each opponent can't cast instant or sorcery spells during THAT
+-- PLAYER's next turn" (Sphinx's Decree) -- a window whose seat is the member a
+-- per-player fold has reached, so one resolution states one window per member.
+-- Just the duration with that member baked in as PlayerRef.Specific, for a
+-- duration naming the fold's Candidate; Nothing for every other duration, whose
+-- window is the same for every member. Pawl.Engine.Resolve.Effect's
+-- Effect.AffectPlayers arm is the fold.
+perSeat :: Duration -> Maybe (PlayerId -> Duration)
+perSeat duration = case duration of
+  Duration.UntilEndOfNextTurnOf PlayerRef.Candidate -> Just (Duration.UntilEndOfNextTurnOf . PlayerRef.Specific)
+  Duration.UntilEndOfNextTurnOf _ -> Nothing
+  Duration.DuringNextTurnOf PlayerRef.Candidate -> Just (Duration.DuringNextTurnOf . PlayerRef.Specific)
+  Duration.DuringNextTurnOf _ -> Nothing
+  Duration.UntilEndOfTurn -> Nothing
+  Duration.Indefinite -> Nothing
+  Duration.Perpetual -> Nothing
+  Duration.UntilYourNextTurn -> Nothing
+  Duration.UntilEndOfYourNextTurn -> Nothing
+  Duration.DuringYourNextTurn -> Nothing
+  Duration.ForAsLongAs _ -> Nothing
+  Duration.UntilEndOfCombat -> Nothing
+  Duration.UntilPaid _ -> Nothing
+  Duration.UntilUsed -> Nothing
 
 -- Does a stored effect under this duration FOLLOW its objects across a zone
 -- change? CR 400.7's default is no -- the object that arrives is a new object
@@ -243,11 +276,11 @@ follows expiry = case expiry of
 -- that turn's cleanup, so no LATER turn of theirs can be mistaken for it and the
 -- bound needs no upper half.
 --
--- Not implemented: only Pawl.Engine.CombatRestriction and
--- Pawl.Engine.Cast.permitsPlayFromExile ask this, so a row stored under
--- DuringTurnOf on any other carrier applies from the moment it is stored
--- (#3983). A gate this narrow is safe only while Wall of Dust and Galvanic Relay
--- are the pool's producers -- see Pawl.Types.Expiry.
+-- Not implemented: only Pawl.Engine.CombatRestriction,
+-- Pawl.Engine.Cast.permitsPlayFromExile and Pawl.Engine.PlayerEffect.applying
+-- ask this, so a row stored under DuringTurnOf on any other carrier applies
+-- from the moment it is stored (#3983). A gate this narrow is safe only while
+-- the pool's producers reach those carriers alone -- see Pawl.Types.Expiry.
 begun :: GameState -> Expiry -> Bool
 begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->
