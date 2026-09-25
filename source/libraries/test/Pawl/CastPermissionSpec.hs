@@ -2168,6 +2168,23 @@ serraParagonSpec s registry =
           Spec.assertBool s (elem (pbHandForest b, Nothing) (Action.playableLands S.alice after)) "while the Forest in her hand is"
           Spec.assertBool s (elem (pbGraveForest b, Nothing) (Action.playableLands S.alice gs)) "and the graveyard Forest was, before the cast"
 
+        -- CR 601.2e with CR 202.3e: Protean Hydra ({X}{G}) is mana value 1 in
+        -- the graveyard, so the Paragon admits it, and the X alice announces is
+        -- then judged against "mana value 3 or less". Two more Forests make
+        -- five, so X = 3's {3}{G} is payable and mana is never why a cast fails.
+        Spec.it s "CR 601.2e Serra Paragon admits Protean Hydra at X = 2 and not at X = 3" $ do
+          b <- board "Protean Hydra" "Forest" True
+          forest <- S.printingOf s registry "Forest"
+          let gs = S.landsFor forest S.alice 2 (pbState b)
+              announcing :: Natural -> Prompt.Prompt r -> r
+              announcing x p = case p of
+                Prompt.ChooseX {} -> x
+                _ -> S.identityAnswer p
+              castAt x = S.runPure (announcing x) gs (S.cast S.alice (pbBuried b))
+          Spec.assertEqWith s "X = 3: mana value 4, so the cast is taken back and the Hydra stays in the graveyard" (elem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice (castAt 3))) True
+          Spec.assertEqWith s "and the stack is empty" (GameState.stack (castAt 3)) []
+          Spec.assertEqWith s "X = 2: mana value 3, so the Hydra is cast" (length (GameState.stack (castAt 2))) 1
+
         -- The budget comes back at the turn handoff, CR 601.3's "each of your
         -- turns".
         Spec.it s "CR 601.3 the use comes back on her next turn" $ do
