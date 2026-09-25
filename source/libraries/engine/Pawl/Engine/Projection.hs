@@ -111,6 +111,7 @@ layer m = case m of
   -- from ("becomes an Aura enchantment with enchant creature") also changes
   -- types.
   Modification.GainEnchant _ -> Layer.Ability
+  Modification.LoseEnchant _ -> Layer.Ability
   Modification.GainAbility _ -> Layer.Ability
   Modification.GainAbilitiesOfSource -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
@@ -220,6 +221,10 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         -- printed ones.
         Modification.GainEnchant slot ->
           pc {PC.enchant = PC.enchant pc <> [slot]}
+        -- CR 613.1f layer 6: the instance named, and only it -- CR 702.5c's
+        -- other instances stay.
+        Modification.LoseEnchant slot ->
+          pc {PC.enchant = filter (/= slot) (PC.enchant pc)}
         -- CR 613.1f layer 6: one whole quoted ability. Appended to the card's own
         -- printed abilities, which is what makes it the RECEIVER's (CR 113.7, CR
         -- 602.2, CR 603.3a, CR 303.4e) and lets two grants stack in CR 613.7
@@ -556,6 +561,7 @@ cardTypesAfter m types = case m of
   Modification.GainKeyword _ -> types
   Modification.GainFlashbackAtManaCost -> types
   Modification.GainEnchant _ -> types
+  Modification.LoseEnchant _ -> types
   Modification.GainAbility _ -> types
   Modification.GainAbilitiesOfSource -> types
   Modification.LoseAllAbilities -> types
@@ -1166,7 +1172,11 @@ freezeQuantities gs announcedOn source context m =
         -- Its cost is derived at projection time, not evaluated from a Quantity,
         -- so there is nothing here to freeze.
         Modification.GainFlashbackAtManaCost -> Just m
-        Modification.GainEnchant _ -> Just m
+        -- CR 608.2h: a slot the resolution bound, baked to the objects it
+        -- holds, since the grant outlives the bindings -- Animate Dead's
+        -- "enchant creature put onto the battlefield with this Aura".
+        Modification.GainEnchant slot -> Just (Modification.GainEnchant slot {TargetSlot.filter = fmap (Filter.bakeObjects (Filter.slotObjects context)) (TargetSlot.filter slot)})
+        Modification.LoseEnchant _ -> Just m
         -- The granted ability's own quantities are NOT frozen: CR 611.2d fixes a
         -- variable in this effect, not in a quoted ability's own future one.
         Modification.GainAbility _ -> Just m
@@ -1215,6 +1225,7 @@ quantitiesOf m = case m of
   -- where the Filter is matched rather than frozen here -- the answer GainKeyword
   -- gives above, whose keyword can nest one too.
   Modification.GainEnchant _ -> []
+  Modification.LoseEnchant _ -> []
   -- The layer fold evaluates nothing inside a quoted ability.
   Modification.GainAbility _ -> []
   Modification.GainAbilitiesOfSource -> []
@@ -1260,6 +1271,7 @@ referenceQuery m = case m of
   Modification.GainKeyword _ -> Nothing
   Modification.GainFlashbackAtManaCost -> Nothing
   Modification.GainEnchant _ -> Nothing
+  Modification.LoseEnchant _ -> Nothing
   Modification.GainAbility _ -> Nothing
   Modification.GainAbilitiesOfSource -> Nothing
   Modification.LoseAllAbilities -> Nothing
@@ -1313,6 +1325,7 @@ setsLandSubtype m = case m of
   Modification.GainKeyword _ -> False
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
+  Modification.LoseEnchant _ -> False
   -- A control op, not a type change.
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
@@ -2240,6 +2253,7 @@ removesAbilities m = case m of
   -- A grant, the other direction of CR 613.1f, exactly as GainKeyword above and
   -- GainAbility below.
   Modification.GainEnchant _ -> False
+  Modification.LoseEnchant _ -> False
   -- The other direction of CR 613.1f: a grant is not a removal, so timestamp
   -- order alone decides whether a granted ability survives Humility. Proven
   -- through the FOLD by Pawl.ActivateSpec's "Presence of Gond" pair; this arm's
@@ -3291,6 +3305,7 @@ modificationWrites m = case m of
   -- another effect's affected set depend on a granted enchant, so Set.empty here
   -- leaves the suite green.
   Modification.GainEnchant _ -> Set.singleton Keywords
+  Modification.LoseEnchant _ -> Set.singleton Keywords
   -- Writes ProjectedCharacteristics.activatedAbilities or .triggeredAbilities,
   -- which Aspect has no finer grain for than Keywords -- the same answer
   -- LoseNamedAbility gives below, this being the same write in the other
@@ -3391,6 +3406,7 @@ modificationReads m = case m of
   Modification.GainFlashbackAtManaCost -> Set.empty
   -- Carries no Quantity of its own; its Filter is read where the slot is matched.
   Modification.GainEnchant _ -> Set.empty
+  Modification.LoseEnchant _ -> Set.empty
   -- A quoted ability's quantities are read at ITS resolution.
   Modification.GainAbility _ -> Set.empty
   Modification.GainAbilitiesOfSource -> Set.empty
@@ -4994,6 +5010,7 @@ grantsKeywordWhere p m = case m of
   -- Hands out CR 702.5a's enchant, which is not a Pawl.Types.Keyword at all, so
   -- there is nothing here for `p` to be asked about.
   Modification.GainEnchant _ -> False
+  Modification.LoseEnchant _ -> False
   -- Hands out an ability, which is a keyword grant only when it is a static
   -- one whose own modifications grant one.
   Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
@@ -5071,6 +5088,7 @@ grantsMintingType m = case m of
   Modification.GainKeyword _ -> False
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
+  Modification.LoseEnchant _ -> False
   -- A granted static ability's own parts, grantsKeywordWhere's reason.
   Modification.GainAbility g -> grantedStaticWrites grantsMintingType g
   Modification.GainAbilitiesOfSource -> False

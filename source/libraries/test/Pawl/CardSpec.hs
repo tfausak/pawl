@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
@@ -823,6 +824,7 @@ modificationCounts modification = case modification of
   -- and countFilters, never through this sweep, which is the answer GainKeyword
   -- gives above for the Filter inside its keyword.
   Modification.GainEnchant _ -> []
+  Modification.LoseEnchant _ -> []
   -- CR 613.1f's other grant carries a whole ability, so the sweep descends into
   -- it exactly as it does into a printed one, whichever of CR 113.3's kinds it is.
   Modification.GainAbility granted -> case granted of
@@ -3765,11 +3767,12 @@ modificationFilters modification = case modification of
   -- Payload-free, so there is no Filter to sweep -- see modificationCounts.
   Modification.GainFlashbackAtManaCost -> []
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
-  -- other and has to be swept. NOT [] -- this, GainKeyword above, LoseKeyword
-  -- and AddNamesMatching below are the arms that answer with something, and every
-  -- other one carries no Filter at all, LoseKeywordFamily's payload-free family
-  -- included.
+  -- other and has to be swept. NOT [] -- this, LoseEnchant beside it,
+  -- GainKeyword above, LoseKeyword and AddNamesMatching below are the arms that
+  -- answer with something, and every other one carries no Filter at all,
+  -- LoseKeywordFamily's payload-free family included.
   Modification.GainEnchant slot -> targetSlotFilters slot
+  Modification.LoseEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities, grantedTriggeredAbilities and
   -- grantedStaticAbilities below, at the outer level, so they keep the Framing that a printed ability's do. Answering
@@ -5797,6 +5800,18 @@ grantedEnchantSlots card =
     )
     (grantedModifications card)
 
+-- The slots an enchant slot reads (Resolve.targetSlotSlots).
+slotReads :: TargetSlot.TargetSlot -> Set.Set SlotName.SlotName
+slotReads = Map.keysSet . Resolve.targetSlotSlots
+
+-- slotReads for a GRANTED enchant slot, after CR 608.2h's bake at store time
+-- (Projection.freezeQuantities): an IsBound names the objects the granting
+-- resolution bound, and no slot at all once the grant is stored.
+grantedSlotReads :: TargetSlot.TargetSlot -> Set.Set SlotName.SlotName
+grantedSlotReads slot =
+  let stored = Map.fromSet (const Set.empty) (slotReads slot)
+   in slotReads slot {TargetSlot.filter = fmap (Filter.bakeObjects stored) (TargetSlot.filter slot)}
+
 -- Every enchant slot a face declares, by either road. Pawl.Engine.Projection
 -- seeds ProjectedCharacteristics.enchant from Face.enchant and appends the grants
 -- to it, and Pawl.Engine.Card.foldEnchant conjoins the result into the one slot CR
@@ -6083,9 +6098,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- state-based action re-reads CR 702.5a against a permanent. Declaring the name
   -- in the granting mode would not rescue it, which is why this is a "reads
   -- nothing" claim rather than a fold into Resolve.slotsOf's ModifyTarget arm.
+  -- The one exception is a granted IsBound, which Projection.freezeQuantities
+  -- bakes to the objects bound as the grant is stored (grantedSlotReads).
   Spec.it s "an enchant slot reads no slot, printed or granted" $ do
     ps <- S.allPrintings s
-    let reads_ face = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) (enchantSlots face))
+    let reads_ face = Set.unions (fmap slotReads (Face.enchant face) <> fmap grantedSlotReads (grantedEnchantSlots face))
         offenders = filter (anyFace (not . Set.null . reads_) . Printing.card) ps
         prints field = any (anyFace (not . null . field) . Printing.card) ps
     -- One guard per road, because a pool with no enchant slot at all would pass
@@ -6175,12 +6192,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     licid <- S.printingOf s registry "Gliding Licid"
     let face = S.combinedFace licid
         stray = SlotName.MkSlotName (Text.pack "stray")
-        named = fmap (\slot -> slot {TargetSlot.filter = Just (Filter.Type.IsBound stray)}) (enchantSlots face)
-        reads_ slots = Set.unions (fmap (Map.keysSet . Resolve.targetSlotSlots) slots)
+        planted atom = fmap (\slot -> slot {TargetSlot.filter = Just (atom stray)}) (enchantSlots face)
+        reads_ slots = Set.unions (fmap grantedSlotReads slots)
     -- FIRST, because it is the whole of what this case proves: drop the granted
     -- road from enchantSlots and there is no slot left to plant a filter on, so
-    -- this reads Set.empty. The two below are preconditions on the fixture.
-    Spec.assertEqWith s "a granted enchant slot naming a slot is reported" (reads_ named) (Set.singleton stray)
+    -- this reads Set.empty. The rest are preconditions on the fixture, and the
+    -- one atom the granted road bakes rather than reports.
+    Spec.assertEqWith s "a granted enchant slot naming a slot is reported" (reads_ (planted Filter.Type.SameNameAsBound)) (Set.singleton stray)
+    Spec.assertEqWith s "but not an IsBound, baked as the grant is stored" (reads_ (planted Filter.Type.IsBound)) Set.empty
     Spec.assertEqWith s "Gliding Licid prints no enchant ability" (Face.enchant face) []
     Spec.assertEqWith s "the real granted slot reads nothing" (reads_ (enchantSlots face)) Set.empty
   -- The same equality over the two PREGAME windows, which the sweep above does not

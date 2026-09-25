@@ -410,7 +410,7 @@ data View = MkView
     -- in Context: it needs the subject's enchant ability (CR 702.5a) AND the
     -- candidate's projected characteristics, so it has a different answer per
     -- candidate. Context.sourcePower is the other half of that division -- one
-    -- reading of the source, the same for every candidate in the match. Pawl.Engine.Attach.hostsFor is the only
+    -- reading of the source, the same for every candidate in the match. Pawl.Engine.Attach.hostsAmong is the only
     -- site that fills it, from Attach.attachmentFor -- the same function that
     -- performs the move, so the offer and the move cannot disagree.
     --
@@ -1218,9 +1218,9 @@ data Context = MkContext
     -- the division that field's own note draws: this is one reading of the
     -- subject's host, the same for every candidate in the match, which is
     -- `sourcePower`'s side of it. Keyed by nothing, because the subject is not a
-    -- slot the caller bound but the permanent Pawl.Engine.Attach.hostsFor was
-    -- handed -- so hostsFor fills it into the Context it took from its caller
-    -- rather than the caller filling it, and hostsFor is the one filler.
+    -- slot the caller bound but the permanent Pawl.Engine.Attach.hostsAmong was
+    -- handed -- so hostsAmong fills it into the Context it took from its caller
+    -- rather than the caller filling it, and hostsAmong is the one filler.
     --
     -- EMPTY everywhere else, where the atom is a silent False, and
     -- Pawl.FilterPositionLintSpec's "CR 205.2a no card asks
@@ -2956,15 +2956,37 @@ rewriteComponent pairs component = case component of
 -- carry a Filter must fail to compile here instead of silently keeping an
 -- unbaked one.
 bakeBound :: Map.Map SlotName.SlotName PlayerId.PlayerId -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
-bakeBound players predicate = case predicate of
-  Filter.ControlledByBound slot -> maybe predicate Filter.ControlledByPlayer (Map.lookup slot players)
-  Filter.And fs -> Filter.And (fmap (bakeBound players) fs)
-  Filter.Or fs -> Filter.Or (fmap (bakeBound players) fs)
-  Filter.Not f -> Filter.Not (bakeBound players f)
+bakeBound players = bakeAtoms $ \predicate -> case predicate of
+  Filter.ControlledByBound slot -> fmap Filter.ControlledByPlayer (Map.lookup slot players)
+  _ -> Nothing
+
+-- CR 608.2h: replace every IsBound atom whose slot this environment names with
+-- the objects it holds, determined once as a resolution stores a continuous
+-- effect (Pawl.Engine.Projection.freezeQuantities). What makes Animate Dead's
+-- granted "enchant creature put onto the battlefield with this Aura" answerable
+-- after the resolution that bound the creature has ended. Left standing, and so
+-- False, where the slot names nothing: the return did not happen.
+bakeObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
+bakeObjects objects = bakeAtoms $ \predicate -> case predicate of
+  Filter.IsBound slot -> fmap (Filter.Or . fmap Filter.IsObject . Set.toList) (Map.lookup slot objects)
+  _ -> Nothing
+
+-- The descent bakeBound and bakeObjects share: `atom` answers the atoms it bakes,
+-- and every other is rebuilt around its baked nest or kept as it stands.
+bakeAtoms :: (Filter.Filter Keyword.Type.Keyword -> Maybe (Filter.Filter Keyword.Type.Keyword)) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
+bakeAtoms atom predicate = Maybe.fromMaybe (bakeNested atom predicate) (atom predicate)
+
+-- bakeAtoms' one level of descent, for a predicate `atom` left alone.
+bakeNested :: (Filter.Filter Keyword.Type.Keyword -> Maybe (Filter.Filter Keyword.Type.Keyword)) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
+bakeNested atom predicate = case predicate of
+  Filter.ControlledByBound _ -> predicate
+  Filter.And fs -> Filter.And (fmap (bakeAtoms atom) fs)
+  Filter.Or fs -> Filter.Or (fmap (bakeAtoms atom) fs)
+  Filter.Not f -> Filter.Not (bakeAtoms atom f)
   -- Descended into for the reason `rewrite` descends: the nested filter is a
   -- filter like any other, and a slot named inside it must be baked before the
   -- match or it can never be answered.
-  Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (bakeBound players f)
+  Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (bakeAtoms atom f)
   Filter.ControlledByPlayer _ -> predicate
   -- Untouched: CR 603.2's slot is not the recipient an effect has reached, and no
   -- binding could answer this atom -- Pawl.Engine.Filter.Context carries it.
@@ -3009,8 +3031,8 @@ bakeBound players predicate = case predicate of
   -- DESCENDED into for the reason AttachedTo below is: the nest is a description
   -- of another object and may name a bound slot, which this function's pairing
   -- with overBoundSlots requires be baked here and reported there.
-  Filter.TargetsOnlyOne f -> Filter.TargetsOnlyOne (bakeBound players f)
-  Filter.TargetsMatching f -> Filter.TargetsMatching (bakeBound players f)
+  Filter.TargetsOnlyOne f -> Filter.TargetsOnlyOne (bakeAtoms atom f)
+  Filter.TargetsMatching f -> Filter.TargetsMatching (bakeAtoms atom f)
   Filter.TargetsPlayer _ -> predicate
   -- Untouched for the reason IsControllerOfBound below is, and one step shorter:
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
@@ -3057,15 +3079,15 @@ bakeBound players predicate = case predicate of
   -- into the HOST's description is baked exactly as the same atom written at the
   -- top level would be. Pawl.Engine.Filter.boundSlots descends to match, which is
   -- the pairing that function's comment insists on.
-  Filter.AttachedTo f -> Filter.AttachedTo (bakeBound players f)
+  Filter.AttachedTo f -> Filter.AttachedTo (bakeAtoms atom f)
   -- DESCENT, for the atom above's reason: a ControlledByBound written into the
   -- represented card's description is baked exactly as the same atom at the top
   -- level would be, and Pawl.Engine.Filter.boundSlots descends to match.
-  Filter.RepresentedByCard f -> Filter.RepresentedByCard (bakeBound players f)
+  Filter.RepresentedByCard f -> Filter.RepresentedByCard (bakeAtoms atom f)
   -- DESCENT, for the atom above's reason: a ControlledByBound written into the
   -- ATTACHER's description is baked exactly as the same atom at the top level
   -- would be, and Pawl.Engine.Filter.boundSlots descends to match.
-  Filter.HasAttached f -> Filter.HasAttached (bakeBound players f)
+  Filter.HasAttached f -> Filter.HasAttached (bakeAtoms atom f)
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.CanHostSubject -> predicate
@@ -3079,7 +3101,7 @@ bakeBound players predicate = case predicate of
   -- Descended into, HasAttached's reason: the SOURCE's description is baked
   -- exactly as the same atom at the top level would be, and boundSlots descends
   -- to match.
-  Filter.FromSource f -> Filter.FromSource (bakeBound players f)
+  Filter.FromSource f -> Filter.FromSource (bakeAtoms atom f)
   Filter.IsTapped -> predicate
   Filter.IsFaceDown -> predicate
   Filter.IsExiledFaceDown -> predicate
