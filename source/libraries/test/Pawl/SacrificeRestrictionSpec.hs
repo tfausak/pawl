@@ -59,6 +59,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
@@ -224,7 +225,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
             S.bob
             (Map.singleton victimSlot (Set.singleton (Recipient.ToPlayer S.alice)))
             (Map.singleton victimSlot (Set.singleton (Recipient.ToPlayer S.alice)))
-            (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices victimSlot anyCreature (Quantity.Literal 1)))
+            (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (PlayerRef.EachInSlot victimSlot) anyCreature (Quantity.Literal 1)))
         after = S.runPure S.identityAnswer gs edict
         barren = S.runPure S.identityAnswer g3 edict
     Spec.assertBool s (not (S.onBattlefield hers after)) "the creature alice owns is the one that dies"

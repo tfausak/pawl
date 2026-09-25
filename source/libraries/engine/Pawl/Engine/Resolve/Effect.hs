@@ -512,19 +512,31 @@ applyClauseEffects source applyOne =
 -- deliberately unforced), the allocators, interning and Oracle-reference memos
 -- an instruction advances before finding nothing to do, CR 104.4b's lastChoice
 -- (an offer answered with nothing), CR 121.4's drewFromEmpty (an attempted
--- draw), and every bound AMOUNT, since a tally binds zero for an instruction
--- that did nothing. Everything else is compared, so a new GameState field
+-- draw), CR 607.2a's exiledWith and CR 406.4's exilePiles (applyEffectWith
+-- prunes both after EVERY instruction, and a card can leave exile off that
+-- road -- CR 704.5d ceasing a token -- so the prune of a stale key is no act;
+-- a real exile already shows in `exile` and `objects`), and every bound
+-- AMOUNT, since a tally binds zero for an instruction that did nothing -- a
+-- slot that holds nothing else is dropped, so a FIRST zero bind is not a
+-- difference either. Everything else is compared, so a new GameState field
 -- counts as state by default.
 --
--- The copied-across fields are a REGRESSION FENCE rather than a proved line:
--- no pool card puts an offering, drawing or tallying instruction directly
--- before a reflexive arm, so un-copying lastChoice leaves the suite green.
--- Miasma Demon ("you may discard any number of cards. When you do, ...",
--- answered with zero) is the card that would observe it.
+-- A deny-list and not an allow-list: an allow-list fails as the event-log
+-- reading did, on every state-only instruction writing a field it does not
+-- name, which grows with the open half; this one fails only on a closed-half write made whether
+-- or not anything happened, a finite set.
+--
+-- Pawl.ResolveSpec's "CR 603.12 an empty mill after a token ceased in exile
+-- arms no reflexive" proves the exiledWith copy. The rest is a REGRESSION
+-- FENCE rather than a proved line: no pool card puts an offering, drawing or
+-- tallying instruction directly before a reflexive arm, so un-copying
+-- lastChoice leaves the suite green. Miasma Demon ("you may discard any number
+-- of cards. When you do, ...", answered with zero) is the card that would
+-- observe it.
 happenedBetween :: GameState -> GameState -> Bool
 happenedBetween before after =
   let tallyless :: Map.Map SlotName Binding.Type.Binding -> Map.Map SlotName Binding.Type.Binding
-      tallyless = Map.map (\binding -> binding {Binding.Type.amount = Nothing})
+      tallyless = Map.filter (/= Binding.Type.empty) . Map.map (\binding -> binding {Binding.Type.amount = Nothing})
       objectTallyless :: Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
       objectTallyless = Map.map (\obj -> obj {Object.bindings = tallyless (Object.bindings obj)})
       comparable gs =
@@ -542,10 +554,12 @@ happenedBetween before after =
             GameState.referenceNames = GameState.referenceNames before,
             GameState.lastChoice = GameState.lastChoice before,
             GameState.drewFromEmpty = GameState.drewFromEmpty before,
+            GameState.exiledWith = GameState.exiledWith before,
+            GameState.exilePiles = GameState.exilePiles before,
             GameState.ambientAmounts = GameState.ambientAmounts before,
             GameState.objects = objectTallyless (GameState.objects gs),
             GameState.stackArchive = objectTallyless (GameState.stackArchive gs),
-            GameState.detachedBindings = fmap tallyless (GameState.detachedBindings gs)
+            GameState.detachedBindings = Map.filter (not . Map.null) (fmap tallyless (GameState.detachedBindings gs))
           }
    in Seq.length (GameState.events after) > Seq.length (GameState.events before)
         || comparable before /= comparable after
@@ -2877,8 +2891,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- the pool here exactly as it does in the executing arm, and the amount is read
   -- per victim there too. Pawl.ResolveSpec's "CR 608.2d Giant Opportunity's
   -- sacrifice of two Foods is not offered with one Food" proves the count.
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) ->
-    let victims = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players filter_ quantity) ->
+    let victims = playerRefPlayers legal controller gs players
         tooFewToGive victim = case evaluateForRecipient viewOf context gs resolving source victim quantity of
           Just n | n > 0 -> n > List.genericLength (Replacement.sacrificeCandidates (Filter.slotObjects context) victim Nothing filter_ gs)
           _ -> False
@@ -5603,10 +5617,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-    let -- Every player recipient the slot holds, in APNAP order (CR 101.4),
-        -- PlayerSacrifices' own intersection: a slot that is unfilled, illegal
-        -- (CR 608.2b) or names an object contributes nobody, and apnapOrder
-        -- supplies the ORDER while `named` supplies the MEMBERSHIP.
+    let -- Every player recipient the slot holds, in APNAP order (CR 101.4): a
+        -- slot that is unfilled, illegal (CR 608.2b) or names an object
+        -- contributes nobody, and apnapOrder supplies the ORDER while `named`
+        -- supplies the MEMBERSHIP.
         named = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
         victims = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
         -- Read against the VICTIM, not the controller, so "cards equal to the
@@ -5953,13 +5967,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- chosen this way are sacrificed simultaneously" -- so every pick is taken
   -- first, in APNAP order, and only then does anything leave the battlefield.
   -- The candidate lists are read off ONE `gs` for the same reason.
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> do
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players filter_ quantity) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-        -- Every player recipient the slot holds, in APNAP order. A slot that is
-        -- unfilled, illegal (CR 608.2b) or names an object contributes nobody.
-        named = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+        -- Every player the reference names, in APNAP order.
+        named = playerRefPlayers legal controller gs players
         victims = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
         pickFor victim =
           -- Read against the VICTIM: "half the permanents they control" is a

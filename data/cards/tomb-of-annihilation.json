@@ -190,11 +190,14 @@
                               "type": "Creature"
                             }
                           },
+                          "players": {
+                            "type": "EachInSlot",
+                            "value": "you"
+                          },
                           "quantity": {
                             "type": "Literal",
                             "value": 1
-                          },
-                          "slot": "you"
+                          }
                         }
                       },
                       {
@@ -206,11 +209,14 @@
                               "type": "Artifact"
                             }
                           },
+                          "players": {
+                            "type": "EachInSlot",
+                            "value": "you"
+                          },
                           "quantity": {
                             "type": "Literal",
                             "value": 1
-                          },
-                          "slot": "you"
+                          }
                         }
                       },
                       {
@@ -222,11 +228,14 @@
                               "type": "Land"
                             }
                           },
+                          "players": {
+                            "type": "EachInSlot",
+                            "value": "you"
+                          },
                           "quantity": {
                             "type": "Literal",
                             "value": 1
-                          },
-                          "slot": "you"
+                          }
                         }
                       }
                     ]

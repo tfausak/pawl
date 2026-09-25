@@ -8,10 +8,9 @@ import qualified Pawl.Types.SlotName as SlotName
 -- seat, Tinybones Joins Up's "any number of target players each discard a card"
 -- at several.
 --
--- A slot, not a Pawl.Types.PlayerRef, exactly as Pawl.Types.PlayerSacrifices'
--- is: the fold is over whatever the slot holds, so the plural reading is a
--- question about the READ (Pawl.Engine.Resolve reads it with legalMany, in CR
--- 101.4 order) rather than about this field.
+-- A slot, not a Pawl.Types.PlayerRef: the fold is over whatever the slot holds,
+-- so the plural reading is a question about the READ (Pawl.Engine.Resolve reads
+-- it with legalMany, in CR 101.4 order) rather than about this field.
 data CountedDiscard = MkCountedDiscard
   { slot :: SlotName.SlotName,
     quantity :: Quantity.Quantity,
