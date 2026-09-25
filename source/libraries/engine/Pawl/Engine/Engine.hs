@@ -1342,7 +1342,11 @@ mandatoryLoopLimit = 1000
 
 -- CR 104.4b: a game that has entered a loop of mandatory actions is a draw. Never
 -- overwrites a result the game already has -- a won game is not looping, and CR
--- 104.4a's simultaneous loss is a different draw. The subtraction cannot
+-- 104.4a's simultaneous loss is a different draw.
+--
+-- Not implemented: CR 801.16's draw under limited range, for the players whose
+-- objects are in the loop and those within their range only. This heuristic
+-- names no objects, so a ranged game gets CR 104.4b's whole-table draw (#4144). The subtraction cannot
 -- underflow: GameState.lastChoice only ever takes a past GameState.nextTimestamp,
 -- and that supply only counts up.
 checkMandatoryLoop :: Game ()

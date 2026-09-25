@@ -294,6 +294,12 @@ data Effect card ability
   | -- | CR 104.3e: the players the PlayerRef names each lose the game (Door to
     -- Nothingness).
     LoseGame PlayerRef.PlayerRef
+  | -- | CR 104.2b / 801.14: the players the PlayerRef names each win the game --
+    -- each of their opponents within their range loses it (Felidar Sovereign).
+    WinGame PlayerRef.PlayerRef
+  | -- | CR 104.4c / 801.15: the game is a draw -- for the controller and each
+    -- player within their range, who leave it (Divine Intervention).
+    DrawGame
   | -- | Reverse the Sands' "redistribute any number of players' life totals":
     -- CR 119.7 / 119.8's assignment, each new total a CR 119.5 gain or loss.
     -- Choose, not target, so the permutation is picked on resolution.

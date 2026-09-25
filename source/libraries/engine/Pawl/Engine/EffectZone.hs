@@ -183,6 +183,8 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.ExchangeValues _ -> Nothing
   Effect.SetLifeTotal {} -> Nothing
   Effect.LoseGame {} -> Nothing
+  Effect.WinGame {} -> Nothing
+  Effect.DrawGame {} -> Nothing
   Effect.RedistributeLifeTotals -> Nothing
   Effect.IncreaseSpeed {} -> Nothing
   Effect.DecreaseSpeed {} -> Nothing
