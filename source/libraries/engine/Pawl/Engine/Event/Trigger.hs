@@ -1779,7 +1779,10 @@ eventTriggers events gs =
             -- (`functionsIn`) with the ability as printed, which is what the
             -- pending trigger carries.
             fires (cond, _) = matchesTriggerGiven bindings board gs oid ctrl cond event
-            pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event) Nothing (Just event)
+            -- CR 400.7d: an ability of a permanent may read what costs were
+            -- paid for the spell it was, so the bearer's record rides on every
+            -- ability it triggers (Binding.paidCostRecord).
+            pend (cond, ab) = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (Map.union (Binding.paidCostRecord bindings) (eventBindings gs (Map.lookup oid becameInGraveyard) becameInGraveyard oid ctrl cond event)) Nothing (Just event)
             -- CR 805.4d: one trigger per player whose step this is, each naming
             -- its own "that player", where the ability reads that player.
             pends (cond, ab) =
@@ -2837,7 +2840,9 @@ stateTriggers gs
             -- instancesOnStack describes, written without ever needing an Ord on
             -- a triggered ability.
             armed (before, ab) = 1 + length (filter (ab ==) before) > instancesOnStack oid ab
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty Nothing Nothing
+            -- CR 400.7d, the event scan's stamp above on this road too. A
+            -- fence: no state trigger in data/cards/ reads the record.
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (maybe Map.empty (Binding.paidCostRecord . Object.bindings) (Game.lookupObject oid gs)) Nothing Nothing
          in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
 -- CR 603.7: delayed abilities whose trigger event is among these events. An entry
