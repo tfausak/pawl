@@ -905,7 +905,7 @@ copyStampOf obj = Binding.copyOf (Object.bindings obj) Applicative.<|> Object.du
 -- laid over it -- mana cost, additional and alternative costs, and its own cost
 -- reductions -- so a card carrying copiable values other than its printing's is
 -- cast at the copied card's price. Pawl.ConjureSpec's "a duplicate of a Clone
--- costs / owes / offers / takes" cases prove each field.
+-- costs / owes / offers / takes" cases prove every field but the cost choices.
 --
 -- Not implemented: a stamp with halves, whose half is still chosen off the
 -- printed card (#4078), and the cast-time keywords (affinity, convoke, assist),
