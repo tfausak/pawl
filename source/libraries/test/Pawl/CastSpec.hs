@@ -152,7 +152,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
   Spec.it s "CR 709.3a both halves are offered, each priced from its own half" $ do
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
-    let waxWane = Printing.MkPrinting CardSpec.splitCard
+    let waxWane = Printing.ofCard CardSpec.splitCard
         namesOffered gs = Maybe.mapMaybe (\action -> case action of A.Cast _ n _ -> Just n; _ -> Nothing) (Action.legalActions S.alice gs)
         (green, _) = S.handOne waxWane (S.landsInPlay forest 1)
         (both, _) = S.handOne waxWane (snd (S.addPermanent plains S.alice (S.landsInPlay forest 1)))
@@ -172,7 +172,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
   Spec.it s "CR 709.3a only the chosen half is put onto the stack" $ do
     forest <- S.printingOf s registry "Forest"
     let wax = CardName.MkCardName (Text.pack "Wax")
-        (gs, oid) = S.handOne (Printing.MkPrinting CardSpec.splitCard) (S.landsInPlay forest 1)
+        (gs, oid) = S.handOne (Printing.ofCard CardSpec.splitCard) (S.landsInPlay forest 1)
         after = S.runPure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid wax Facing.FaceUp)
     case GameState.stack after of
       [] -> Spec.assertFailure s "expected the spell on the stack"

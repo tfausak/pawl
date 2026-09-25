@@ -431,9 +431,9 @@ data GameEvent
     -- Milled above, a surveil binning a card without milling it -- a reader
     -- folding either would miss a surveil that binned nothing.
     Surveiled PlayerId.PlayerId
-  | -- | CR 706.1: a player rolled a die -- the resolving ability's controller,
-    -- recorded by Pawl.Engine.Resolve's Effect.RollDie arm after CR 706.2's
-    -- result is settled and bound. No result and no die kind: a reader wanting
+  | -- | CR 706.1: a player rolled a die -- the resolving ability's controller or
+    -- the player rolling to visit, recorded by Pawl.Engine.Resolve.Effect's
+    -- recordRoll after CR 706.2's result is settled. No result and no die kind: a reader wanting
     -- the number takes it from Pawl.Types.RollDie's own slot or DieResultSettled
     -- below, CR 706.7's planar die being ignored by every effect reading a
     -- numerical result while still firing this trigger (#934).
@@ -448,6 +448,9 @@ data GameEvent
     -- instruction left unignored (CR 706.6) -- what "whenever you roll a 6"
     -- reads, where DiceRolled above is one entry per instruction.
     DieResultSettled (DieResult.DieResult PlayerId.PlayerId)
+  | -- | CR 701.52a: a player rolled to visit their Attractions, with the result
+    -- the Visit triggers read (CR 702.159a).
+    RolledToVisit (DieResult.DieResult PlayerId.PlayerId)
   | -- | CR 716.2a: a permanent's class level BECAME something -- the level BEFORE
     -- and the level AFTER, CountersPut's shape and for CR 714.2b's reason, since
     -- "becomes level N" is a threshold crossing. Recorded by Pawl.Engine.Resolve's

@@ -551,7 +551,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     built <- S.buildBoardOrFail s registry setup
     (_, after) <- S.runScriptOrFail s script built throughEndStep
     (_, withMonkey) <- case ragavans of
-      [ragavan] -> S.runScriptOrFail s script built {S.builtState = snd (S.addPermanent (Printing.MkPrinting ragavan) S.alice (S.builtState built))} throughEndStep
+      [ragavan] -> S.runScriptOrFail s script built {S.builtState = snd (S.addPermanent (Printing.ofCard ragavan) S.alice (S.builtState built))} throughEndStep
       _ -> pure ((), after)
     Spec.assertEqWith
       s

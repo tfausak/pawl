@@ -15,6 +15,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Attraction as Attraction
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -533,9 +534,13 @@ runTurnBasedActions phase = do
     -- CR 505.4 / 703.4f / 714.3c: a lore counter onto each Saga its controller
     -- has with chapter abilities. A turn-based action, not a trigger, which is why
     -- it lives here and not in the gatherer; the active player's, so it takes the
-    -- CR 800.4j guard. Not implemented: CR 703.4g's Attraction roll, which that
-    -- rule puts immediately after this and which has no producer (#871).
-    Phase.PrecombatMain -> Monad.mapM_ advanceSagas live
+    -- CR 800.4j guard. Then CR 703.4g / 717.4's roll to visit, by each of those
+    -- players who controls an Attraction.
+    Phase.PrecombatMain -> do
+      Monad.mapM_ advanceSagas live
+      Monad.forM_ live $ \pid -> do
+        visits <- State.gets (Attraction.controlsAttraction pid)
+        Monad.when visits (Resolve.rollToVisit pid)
     -- CR 511.1: the end of combat step has no turn-based actions, so no arm here.
     -- CR 511.3's removal from combat is an end-of-STEP action; runStep does it.
     Phase.Ending EndingStep.Cleanup -> do
@@ -838,6 +843,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2207,6 +2213,8 @@ playSubgame = do
   -- own back to their main-game library and shuffles.
   seated <- State.gets Game.stillPlayingInOrder
   Monad.forM_ seated Event.shuffleLibrary
+  -- CR 729.5a: and their Attraction decks.
+  Monad.forM_ seated Event.shuffleAttractionDeck
   pure result
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result

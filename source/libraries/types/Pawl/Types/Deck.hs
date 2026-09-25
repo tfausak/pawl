@@ -8,7 +8,7 @@ import qualified Pawl.Types.Printing as Printing
 -- | A deck: the multiset of printings a player's library is built from, plus the
 -- things a player brings alongside it -- CR 903.3's commander designation, CR
 -- 902.3's vanguard card, CR 309.2's dungeon cards, CR 100.4's sideboard and CR
--- 315.2's conspiracies.
+-- 315.2's conspiracies and CR 717.2's Attraction deck.
 --
 -- The cards are a multiset because a shuffle erases any order among them, so
 -- counts are the honest model. `Printing` and everything beneath it derive `Ord`,
@@ -99,13 +99,17 @@ data Deck = MkDeck
     --
     -- A multiset for `sideboard`'s reason: two copies of one conspiracy are two
     -- cards, and each functions (CR 315.5).
-    conspiracies :: Map.Map Printing.Printing Natural.Natural
+    conspiracies :: Map.Map Printing.Printing Natural.Natural,
+    -- | CR 717.2: the supplementary Attraction deck, which begins in the command
+    -- zone rather than among `cards`. A multiset: CR 717.2b lets a limited deck
+    -- repeat a name.
+    attractions :: Map.Map Printing.Printing Natural.Natural
   }
   deriving (Eq, Ord, Show)
 
--- | A deck with no commander, no vanguard, no dungeons, no sideboard and no
--- conspiracies -- every format but Commander and Vanguard, every game nobody
--- ventures in, every game nobody wishes in, and every game outside Conspiracy
--- Draft.
+-- | A deck with no commander, no vanguard, no dungeons, no sideboard, no
+-- conspiracies and no Attractions -- every format but Commander and Vanguard,
+-- every game nobody ventures in, every game nobody wishes in, and every game
+-- outside Conspiracy Draft.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty}
+fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty, attractions = Map.empty}

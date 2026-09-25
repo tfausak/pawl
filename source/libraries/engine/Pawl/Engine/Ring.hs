@@ -531,7 +531,7 @@ refreshTheRing pid =
         -- refresh that finds the same tier reuses that tier's id; a new tier
         -- mints one, which is what makes the emblem's four incarnations four
         -- entries rather than one mutated in place.
-        (printingId, interned) = Game.intern (Printing.MkPrinting card) gs
+        (printingId, interned) = Game.intern (Printing.ofCard card) gs
         rewrite :: ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
         rewrite = Map.adjust (\o -> o {Object.source = Source.OfEmblem printingId})
      in interned {GameState.objects = foldr rewrite (GameState.objects interned) (theRings pid interned)}

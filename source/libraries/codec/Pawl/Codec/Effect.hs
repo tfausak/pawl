@@ -134,6 +134,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Amass" Amass.codec Effect.Amass (\x -> case x of Effect.Amass y -> Just y; _ -> Nothing),
           Arm.payload "Blight" Blight.codec Effect.Blight (\x -> case x of Effect.Blight y -> Just y; _ -> Nothing),
           Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
+          Arm.nullary "OpenAttraction" Effect.OpenAttraction,
           Arm.nullary "Forage" Effect.Forage,
           Arm.nullary "Populate" Effect.Populate,
           Arm.nullary "TimeTravel" Effect.TimeTravel,
@@ -282,6 +283,7 @@ tagOf x = case x of
   Effect.Amass {} -> "Amass"
   Effect.Blight {} -> "Blight"
   Effect.TemptWithTheRing {} -> "TemptWithTheRing"
+  Effect.OpenAttraction {} -> "OpenAttraction"
   Effect.Forage {} -> "Forage"
   Effect.Populate {} -> "Populate"
   Effect.TimeTravel {} -> "TimeTravel"

@@ -1119,6 +1119,7 @@ library engine
     Pawl.Engine.AttachRestriction
     Pawl.Engine.AttackCost
     Pawl.Engine.AttackRequirement
+    Pawl.Engine.Attraction
     Pawl.Engine.Battle
     Pawl.Engine.Binding
     Pawl.Engine.Blight
@@ -1487,6 +1488,7 @@ library test
     Pawl.AdventureSpec
     Pawl.AirbendSpec
     Pawl.AttackKeywordTriggerSpec
+    Pawl.AttractionSpec
     Pawl.AuraSpec
     Pawl.BattleSpec
     Pawl.BindingSpec

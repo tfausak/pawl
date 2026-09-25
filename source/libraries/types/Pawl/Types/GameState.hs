@@ -79,6 +79,10 @@ data GameState = MkGameState
     exile :: Set.Set ObjectId.ObjectId,
     -- | CR 400.1: the command zone, shared rather than per-player.
     command :: Set.Set ObjectId.ObjectId,
+    -- | CR 717.2: each player's Attraction deck, head on top. Its cards are in
+    -- the command zone (Object.zone) but not in `command`, which holds what is
+    -- face up there.
+    attractionDecks :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     stack :: [ObjectId.ObjectId],
     players :: Map.Map PlayerId.PlayerId Player.Player,
     -- | CR 729.4: the cards outside this game that sit in a game on hold; empty
@@ -419,7 +423,7 @@ data GameState = MkGameState
     -- ordinary turn order resumes from; Nothing on an ordinary turn.
     turnAnchor :: Maybe PlayerId.PlayerId,
     -- | CR 706.2: the sides of the die whose modification step is open, while
-    -- Pawl.Engine.Resolve.Effect's RollDie arm asks about it; Nothing otherwise.
+    -- Pawl.Engine.Resolve.Effect.throwDice asks about it; Nothing otherwise.
     rollingDie :: Maybe Natural.Natural,
     -- | CR 706.2b: the natural result a reroll made inside that step threw.
     rerolledTo :: Maybe Natural.Natural

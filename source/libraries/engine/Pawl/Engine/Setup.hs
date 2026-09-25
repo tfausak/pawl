@@ -191,6 +191,7 @@ emptyGame order =
           GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
+          GameState.attractionDecks = Map.empty,
           GameState.stack = [],
           GameState.players = Map.fromList (fmap newPlayer order_),
           -- CR 729.4: nobody is nested inside another game here.
@@ -403,6 +404,11 @@ createDeck pid deck = do
           -- keeps anything else from reaching these until a card brings one in.
           Map.adjust (\p -> p {Player.life = startingLife (GameState.settings gs) (length (GameState.turnOrder gs)) (Deck.commander deck) (Vanguard.lifeModifierOf pid gs), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
       }
+  -- CR 717.2: the Attraction deck begins in the command zone, and is neither in
+  -- the library nor, below, in the starting deck.
+  attractionIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.attractions deck))
+  Monad.forM_ attractionIds $ \(printingId, n) ->
+    Monad.replicateM_ (Natural.toIntSaturating n) (createInAttractionDeck pid printingId)
   cardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.cards deck))
   Monad.forM_ cardIds $ \(printingId, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
@@ -431,8 +437,9 @@ createDeck pid deck = do
   -- Deck.cards PLUS every commander, which is rule 702.139b's second sentence: "in a
   -- Commander game, this is also before you've set aside your commander". The
   -- sideboard interned above is not among them, which is rule 103.2a's first
-  -- sentence; nor is the vanguard, a conspiracy or a dungeon, none of which CR
-  -- 902.3, CR 315.3 or CR 309.2 puts in the deck to begin with.
+  -- sentence; nor is the vanguard, a conspiracy, a dungeon or an Attraction, none
+  -- of which CR 902.3, CR 315.3, CR 309.2 or CR 717.2 puts in the deck to begin
+  -- with.
   let starting = foldr (\printingId -> Map.insertWith (+) printingId 1) (Map.fromListWith (+) cardIds) commanderIds
   State.modify' $ \gs ->
     gs
@@ -461,6 +468,18 @@ createInCommandZone pid printingId = do
           }
   pure oid
 
+-- CR 717.2: mint one of this player's Attraction cards onto the bottom of their
+-- Attraction deck, createInCommandZone's hand-written move and for its reason.
+createInAttractionDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
+createInAttractionDeck pid printingId = do
+  oid <- createCard pid printingId
+  State.modify' $ \gs ->
+    let moved = Game.removeFromZones pid oid gs
+     in moved
+          { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
+            GameState.attractionDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.attractionDecks moved)
+          }
+
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
   -- CR 103.3: build and shuffle every library before any opening hand is drawn,
@@ -468,6 +487,8 @@ newGame perform matchup = do
   Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
     createDeck pid deck
     Event.shuffleLibrary pid
+    -- CR 717.2 / 103.3a.
+    Event.shuffleAttractionDeck pid
   -- CR 103.2b: the companion reveal round, after every starting deck is recorded
   -- (CR 103.2a, createDeck above) and before CR 103.5's opening hands -- rule
   -- 103.2's steps come first, and rule 702.139b's condition reads the deck rather
@@ -612,12 +633,18 @@ startGameFromCards perform exemptions = do
       conspiracyIds = Map.keysSet (Map.filterWithKey (\oid _ -> Conspiracy.isConspiracy oid gs) rebuilt)
       inCommandIds = Set.unions [commanderIds, vanguardIds, conspiracyIds]
       commandZoneCards = fmap toCommandCard (Map.restrictKeys rebuilt inCommandIds)
-      cards = fmap toLibraryCard (Map.withoutKeys rebuilt inCommandIds)
+      -- CR 727.2 / 717.2: every Attraction card, wherever it was, begins the new
+      -- game in its owner's Attraction deck; CR 729.2a's subgame pool holds only
+      -- the decks.
+      attractionCards = fmap toCommandCard (Map.filterWithKey (\oid _ -> Game.astrotoriumBack oid gs) (Map.withoutKeys rebuilt inCommandIds))
+      cards = fmap toLibraryCard (Map.withoutKeys rebuilt (Set.union inCommandIds (Map.keysSet attractionCards)))
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
+      attractionDeckOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) attractionCards))
   State.put
     gs
-      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards],
+      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
+        GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) owners)),
         GameState.hand = Map.empty,
         GameState.graveyard = Map.empty,
         GameState.battlefield = mempty,
@@ -627,6 +654,7 @@ startGameFromCards perform exemptions = do
         GameState.stack = []
       }
   Monad.forM_ owners Event.shuffleLibrary
+  Monad.forM_ owners Event.shuffleAttractionDeck
   Mulligan.openingHands perform owners
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
@@ -874,6 +902,10 @@ restartGame perform exempt starter = do
 -- Engine.skipsDraw (CR 103.8a) tests the HEAD of the turn order. Total: a
 -- `starter` outside the order leaves it alone, and activePlayer is read back
 -- off the rotated order, so the two cannot disagree.
+-- CR 717.2: every card in every player's Attraction deck.
+attractionDeckIds :: GameState -> Set.Set ObjectId
+attractionDeckIds gs = Set.fromList (foldMap Foldable.toList (GameState.attractionDecks gs))
+
 subgameStateFrom :: PlayerId -> GameState -> GameState
 subgameStateFrom starter parent =
   let libIds =
@@ -884,9 +916,9 @@ subgameStateFrom starter parent =
       -- subgame command zone", and CR 729.2b says the same of a vanguard card.
       -- Nothing ELSE in the main-game command zone moves -- CR 729.2's "no other
       -- cards in a main-game zone are moved" -- and their remaining sibling has no
-      -- format here: CR 729.2a's supplementary decks of nontraditional cards are
-      -- the attraction (#871), planar (#934) and scheme (#935) decks CR 100.2d
-      -- names, neither of them implemented.
+      -- format here but one: CR 729.2a's supplementary decks of nontraditional
+      -- cards are the Attraction deck (`attrIds` below), and the planar (#934)
+      -- and scheme (#935) decks CR 100.2d names, neither of them implemented.
       --
       -- The other command-zone residents pawl DOES have -- an emblem, a
       -- conspiracy, and a dungeon a player has ventured into -- stay in the
@@ -903,7 +935,10 @@ subgameStateFrom starter parent =
       -- 729.2c's "if it's there" because CR 313.2 has kept it in the command zone
       -- all along.
       cmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
-      movedObjects = Map.restrictKeys (GameState.objects parent) (Set.union libIds cmdIds)
+      -- CR 729.2a: each Attraction deck moves in, and startGameFromCards
+      -- shuffles it. The face-up Attractions stay behind.
+      attrIds = attractionDeckIds parent
+      movedObjects = Map.restrictKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, attrIds])
       -- Invariant: `libIds` here and funnelBack's `oldLibIds` MUST compute the
       -- identical id set, and so must `cmdIds` and funnelBack's `oldCmdIds`.
       -- Both draw from the parent's FULL roster
@@ -949,7 +984,7 @@ subgameStateFrom starter parent =
       -- Shahrazad itself still finishes resolving with the winner it bound".
       outside =
         Map.union
-          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.union libIds cmdIds)))
+          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, attrIds])))
           (GameState.outsideObjects parent)
       -- CR 110.5's face-up/face-down status rides along with the printing, and
       -- is the one thing about the parent's object that does. It is not an
@@ -1349,7 +1384,10 @@ funnelBack finalSub parent =
       -- subgame can put in that zone anyway (CR 903.9a, CR 313.2), and an emblem
       -- there is not a card and never was in scope.
       subCmdIds = GameState.command finalSub
-      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys subObjects subCmdIds))
+      -- CR 729.5a: every Attraction card in the subgame began it in an
+      -- Attraction deck (subgameStateFrom's `attrIds`), and goes back to it.
+      subAttractions = Map.filterWithKey (\oid obj -> isCard obj && Game.astrotoriumBack oid finalSub) (Map.withoutKeys subObjects subCmdIds)
+      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys subObjects (Set.union subCmdIds (Map.keysSet subAttractions))))
       backFromSub =
         fmap
           toCommandCard
@@ -1365,13 +1403,19 @@ funnelBack finalSub parent =
       -- and into the library by `returned` if it ended the subgame anywhere else
       -- (CR 729.5's first sentence).
       oldCmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
-      movedIds = Set.union oldLibIds oldCmdIds
+      oldAttrIds = attractionDeckIds parent
+      movedIds = Set.unions [oldLibIds, oldCmdIds, oldAttrIds]
       ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems subObjects))
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
         Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
       recoveredIds = Set.filter removedByDeparture movedIds
-      recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds oldCmdIds))
+      recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds (Set.union oldCmdIds oldAttrIds)))
+      -- An Attraction deck whose owner departed inside the subgame goes back to
+      -- being their deck, the commander's reason below.
+      recoveredAttr = Map.restrictKeys (GameState.objects parent) (Set.intersection recoveredIds oldAttrIds)
+      attractionsBack = Map.union (fmap toCommandCard subAttractions) (fmap toCommandCard recoveredAttr)
+      attractionDeckOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) attractionsBack))
       -- A commander whose owner departed INSIDE the subgame is recovered to the
       -- zone it left the parent from, not to a library: CR 729.1b keeps the
       -- subgame's departure from meaning anything in the main game, where that
@@ -1436,9 +1480,11 @@ funnelBack finalSub parent =
           Status.Departed _ -> player
           Status.Playing -> player {Player.outsideTheGame = Player.outsideTheGame inSub}
    in parent
-        { GameState.objects = Map.unions [allReturned, toCommand, keptParentObjects],
+        { GameState.objects = Map.unions [allReturned, toCommand, attractionsBack, keptParentObjects],
           GameState.players = carriedPools,
           GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
+          -- CR 729.5a; Engine.playSubgame shuffles them.
+          GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) (GameState.turnOrder parent))),
           -- CR 729.5c. The parent's other command-zone residents are untouched:
           -- CR 729.2c moved only the commanders, so only they can come back.
           GameState.command = Set.union (Set.difference (GameState.command parent) oldCmdIds) (Map.keysSet toCommand),

@@ -434,7 +434,7 @@ gameStateRoundTripSpec s registry = do
   Spec.it s "an unnameable printing is written out in full" $ do
     mountain <- S.printingOf s registry "Mountain"
     resolve <- corpusResolver s
-    let emblem = Printing.Type.MkPrinting (Ring.theRingEmblem 1)
+    let emblem = Printing.Type.ofCard (Ring.theRingEmblem 1)
         (_, gs) = S.addToken (Ring.theRingEmblem 1) S.alice (S.oneMountainState mountain Phase.PrecombatMain)
         c = GameState.Codec.codec resolve
         -- The Mountain interns as 0 and the emblem as 1.

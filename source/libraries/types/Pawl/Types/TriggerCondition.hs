@@ -545,6 +545,9 @@ data TriggerCondition
   | -- | CR 706.2: "whenever you roll a 6" (Night Shift of the Living Dead), once
     -- per die whose result, after every modifier, is the stated number.
     PlayerRollsResult (DieResult.DieResult PlayerRelation.PlayerRelation)
+  | -- | CR 702.159a: Visit -- its controller rolled to visit their Attractions
+    -- and the result is lit up on this one.
+    Visit
   | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), reading the
     -- event's win where PlayerRollsDice ignores what the die showed.
     --

@@ -4242,7 +4242,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 709.3b a split spell on the stack has only the half being cast" $ do
     let wax = CardName.MkCardName (Text.pack "Wax")
         card = CardSpec.splitCard
-        (oid, gs0) = S.spellOnStack (Printing.MkPrinting card) S.alice (Setup.emptyGame S.bothPlayers)
+        (oid, gs0) = S.spellOnStack (Printing.ofCard card) S.alice (Setup.emptyGame S.bothPlayers)
         showing n g = g {GameState.objects = Map.adjust (\o -> o {Object.face = Just n}) oid (GameState.objects g)}
     -- CR 709.3b: "While on the stack, only the characteristics of the half being
     -- cast exist. The other half's characteristics are treated as though they

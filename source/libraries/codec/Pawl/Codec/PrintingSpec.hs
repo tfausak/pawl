@@ -1,6 +1,7 @@
 module Pawl.Codec.PrintingSpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CardSpec as CardSpec
 import qualified Pawl.Codec.Printing as Printing
@@ -17,6 +18,14 @@ import qualified Pawl.Types.Printing as Printing
 -- 'Printing.reference'\'s Inline arm.
 mountainJson :: String
 mountainJson = "{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]}"
+
+-- | A Mountain with lights, which no printing has: the codec does not care what
+-- the card is.
+litMountain :: Printing.Printing
+litMountain = (Printing.ofCard CardSpec.mountainCard) {Printing.lights = Set.fromList [2, 5]}
+
+litMountainJson :: String
+litMountainJson = init mountainJson <> ",\"lights\":[2,5]}"
 
 mountainName :: CardName.CardName
 mountainName = CardName.MkCardName (Text.pack "Mountain")
@@ -36,15 +45,15 @@ impostor = Card.MkCard Layout.Normal (NonEmpty.singleton (CardSpec.bareFace moun
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Printing" $ do
-  -- MkPrinting just delegates to Card's own codec, so 'CardSpec.mountainCard' is
-  -- reused rather than a second synthetic Card being built here. The
-  -- registry-backed round-trip over every real Printing stays in
+  -- A printing with no lights writes exactly Card's own keys, so
+  -- 'CardSpec.mountainCard' is reused rather than a second synthetic Card being
+  -- built here. The registry-backed round-trip over every real Printing stays in
   -- Pawl.CodecIntegrationSpec, which this sublibrary sits above.
-  Spec.it s "MkPrinting delegates to Card's own codec" $
+  Spec.it s "a printing with no lights writes Card's own keys" $
     Common.assertCodec
       s
       Printing.codec
-      (Printing.MkPrinting CardSpec.mountainCard)
+      (Printing.ofCard CardSpec.mountainCard)
       (" " <> mountainJson <> " ")
   -- CR 709.4a: the FIRST face's name, which is a key Pawl.Registry.index has,
   -- rather than the joined name, which is a filing convention and a key it does
@@ -54,7 +63,7 @@ spec s = Spec.describe s "Pawl.Codec.Printing" $ do
     Common.assertCodec
       s
       (Printing.reference knowsMountain)
-      (Printing.MkPrinting CardSpec.mountainCard)
+      (Printing.ofCard CardSpec.mountainCard)
       " {\"type\":\"Named\",\"value\":\"Mountain\"} "
   -- The same printing against a resolver that answers for nothing: the whole
   -- record, under the Inline tag. This is the portability knob -- a state
@@ -63,7 +72,7 @@ spec s = Spec.describe s "Pawl.Codec.Printing" $ do
     Common.assertCodec
       s
       (Printing.reference (const Nothing))
-      (Printing.MkPrinting CardSpec.mountainCard)
+      (Printing.ofCard CardSpec.mountainCard)
       (" {\"type\":\"Inline\",\"value\":" <> mountainJson <> "} ")
   -- The pair to the case above, differing in exactly one thing: the resolver
   -- ANSWERS, and with the wrong card. Writing the name would decode to the
@@ -72,8 +81,23 @@ spec s = Spec.describe s "Pawl.Codec.Printing" $ do
     Common.assertCodec
       s
       (Printing.reference (const (Just impostor)))
-      (Printing.MkPrinting CardSpec.mountainCard)
+      (Printing.ofCard CardSpec.mountainCard)
       (" {\"type\":\"Inline\",\"value\":" <> mountainJson <> "} ")
+  -- CR 717.1: lights sit beside the card's keys.
+  Spec.it s "a printing's lights are written beside the card" $
+    Common.assertCodec
+      s
+      Printing.codec
+      litMountain
+      (" " <> litMountainJson <> " ")
+  -- A name resolves to a card and not to a printing of it, so the lit printing
+  -- is inlined even though the resolver knows the card.
+  Spec.it s "a printing with lights is written out in full" $
+    Common.assertCodec
+      s
+      (Printing.reference knowsMountain)
+      litMountain
+      (" {\"type\":\"Inline\",\"value\":" <> litMountainJson <> "} ")
   -- Not a round trip: a Named printing the resolver cannot answer for has no
   -- card to decode to, and guessing is the one thing this format exists to
   -- prevent.
@@ -88,4 +112,4 @@ spec s = Spec.describe s "Pawl.Codec.Printing" $ do
     Spec.assertEq
       s
       (Codec.decode (Printing.reference knowsMountain) (Common.tagged "Named" (Just (Value.text (Text.pack "Mountain")))))
-      (Right (Printing.MkPrinting CardSpec.mountainCard))
+      (Right (Printing.ofCard CardSpec.mountainCard))

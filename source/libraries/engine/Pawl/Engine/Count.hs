@@ -853,6 +853,7 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing

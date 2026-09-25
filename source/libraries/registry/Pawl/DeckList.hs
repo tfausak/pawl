@@ -65,6 +65,9 @@ data Section
 -- commander, CR 902.3's vanguard card and CR 309.2's dungeon cards are brought
 -- alongside a deck rather than written on its list, so a caller in one of those
 -- formats designates them itself.
+--
+-- Not implemented: CR 717.2's Attraction deck, and naming which printing of an
+-- Attraction a line means, whose lights CR 717.1 lets differ (#4118).
 parse :: (Monad m) => Registry.Registry m -> Text.Text -> m (Either [Problem] Deck.Deck)
 parse registry text = do
   results <- mapM (lineOf registry) (List.zip [1 ..] (Text.lines text))
@@ -74,7 +77,7 @@ parse registry text = do
         Right (Just (Left next)) -> (next, entries, problems)
         Right (Just (Right (count, card))) -> (section, (section, card, count) : entries, problems)
       (_, found, bad) = List.foldl' step (Main, [], []) results
-      gather want = Map.fromListWith (+) [(Printing.MkPrinting card, count) | (section, card, count) <- found, section == want, count /= 0]
+      gather want = Map.fromListWith (+) [(Printing.ofCard card, count) | (section, card, count) <- found, section == want, count /= 0]
       deck = Deck.fromCards (gather Main)
    in pure $ case List.reverse bad of
         [] -> Right deck {Deck.sideboard = gather Side}

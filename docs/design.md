@@ -623,7 +623,7 @@ Two different reasons. Worth separating, because the second list might get rever
 - **Ante** — the 9 cards referencing it
 - **Contraptions** — Steamflogger Boss and friends. Not hard: two extra zones (Contraption deck, scrapyard), a battlefield subzone (three sprockets), a wrapping CRANK! counter, one turn-based action at upkeep, optional triggers. XMage punts for the usual reason — zones are an enum and sprockets are a position their permanent model has no room for (§2.11 again).
 
-  **Caveat on leverage:** Contraptions share a substrate with **Attractions (rule 717)**, their black-border descendant — separate deck, separate graveyard (the junkyard, i.e. the scrapyard renamed), scheduled triggers, and a keyword action at 701.49 ("roll to visit"). Attractions are Commander-legal. Contraptions are Attractions with a deterministic scheduler instead of a d6. So: zero leverage *as Contraptions*, real leverage *as the substrate* — if 717 is ever in scope, Contraptions are nearly free.
+  **Caveat on leverage:** Contraptions share a substrate with **Attractions (rule 717)**, their black-border descendant — separate deck, separate graveyard (the junkyard, i.e. the scrapyard renamed), scheduled triggers, and a keyword action at 701.52 ("roll to visit"). Attractions are Commander-legal. Contraptions are Attractions with a deterministic scheduler instead of a d6. So: zero leverage *as Contraptions*, real leverage *as the substrate* — if 717 is ever in scope, Contraptions are nearly free.
 
   Note rule 701.45a defines Assemble and then states that Unstable cards and mechanics aren't included in the rules. WotC drew this scope boundary in the rulebook.
 

@@ -143,6 +143,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Earthbend _ -> Nothing
   Effect.Airbend _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
+  Effect.OpenAttraction -> Nothing
   Effect.Forage -> Nothing
   Effect.Populate -> Nothing
   Effect.TimeTravel -> Nothing

@@ -1129,6 +1129,7 @@ eventBindingSlots cond = case cond of
   -- roller's own resolution, for a later effect of THAT ability to read.
   TriggerCondition.PlayerRollsDice _ -> Set.empty
   TriggerCondition.PlayerRollsResult _ -> Set.empty
+  TriggerCondition.Visit -> Set.empty
   TriggerCondition.PlayerWinsCoinFlip _ -> Set.empty
   TriggerCondition.PlayerLosesCoinFlip _ -> Set.empty
   -- Empty for the same reason, and CR 701.43d is what settles it: the linked

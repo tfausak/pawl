@@ -1153,6 +1153,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6})
       " {\"type\":\"PlayerRollsResult\",\"value\":{\"roller\":{\"type\":\"You\"},\"result\":6}} "
+  -- CR 702.159a: nullary, the lights being the printing's.
+  Spec.it s "Visit" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.Visit
+      " {\"type\":\"Visit\"} "
   -- CR 705.2. Both relations, PlayerRollsDice's shape: Tavern Scoundrel is the
   -- You form.
   Spec.it s "PlayerWinsCoinFlip round-trips both relations" $ do

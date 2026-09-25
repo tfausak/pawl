@@ -622,6 +622,7 @@ damageOf event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -697,6 +698,7 @@ revealOf event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -937,7 +939,7 @@ conjure pid card copied dest position = do
   if List.notElem pid (Game.stillPlaying gs)
     then pure Nothing
     else do
-      printingId <- State.state (Game.intern (Printing.MkPrinting card))
+      printingId <- State.state (Game.intern (Printing.ofCard card))
       oid <- State.state (mintCard pid Nothing printingId dest position TapState.Untapped)
       Monad.forM_ copied (markDuplicate oid)
       pure (Just oid)
@@ -1011,7 +1013,7 @@ conjureOntoBattlefield controller card copied count tapped = do
   if List.notElem controller (Game.stillPlaying gs)
     then pure Seq.empty
     else do
-      printingId <- State.state (Game.intern (Printing.MkPrinting card))
+      printingId <- State.state (Game.intern (Printing.ofCard card))
       ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue tapped))
       Monad.forM_ copied (\snapshot -> Monad.mapM_ (`markDuplicate` snapshot) ids)
       let siblingsOf oid = Set.delete oid (Set.fromList ids)
@@ -1064,7 +1066,7 @@ createEmblem pid card = do
       -- minted here rather than coming from a deck -- interned once for the one
       -- object it backs, and carrying no print-level data because an emblem is not
       -- a card (CR 114.5).
-      emblemId <- State.state (Game.intern (Printing.MkPrinting card))
+      emblemId <- State.state (Game.intern (Printing.ofCard card))
       let mkObj ts =
             Object.MkObject
               { Object.owner = pid,
@@ -1377,8 +1379,19 @@ resolveZoneChange asOf zc = do
   case outcome >>= Replacement.asZoneChange of
     Nothing -> pure (Nothing, exiledBy, shuffling, Nothing)
     Just settled -> do
-      (redirected, splitOff) <- offerCommandZone settled
+      gs <- State.get
+      (redirected, splitOff) <- offerCommandZone (toJunkyard gs settled)
       pure (Just redirected, exiledBy, shuffling, splitOff)
+
+-- CR 717.6: a card with an Astrotorium back bound anywhere but the battlefield,
+-- exile or the command zone goes to the command zone instead, where it is face
+-- up in its owner's junkyard (CR 717.6a). A rules step on the settled
+-- destination, offerCommandZone's posture below and for its reason; mandatory,
+-- so nothing is asked.
+toJunkyard :: GameState -> ZoneChange -> ZoneChange
+toJunkyard gs zc
+  | Game.astrotoriumBack (ZoneChange.departed zc) gs && notElem (ZoneChange.to zc) [Zone.Battlefield, Zone.Exile, Zone.Command] = zc {ZoneChange.to = Zone.Command}
+  | otherwise = zc
 
 -- CR 903.9b: "if a commander would be put into its owner's hand or library from
 -- anywhere, its owner may put it into the command zone instead". The question;
@@ -3697,8 +3710,8 @@ apply batch candidate event =
     -- THIS row off the modified event it just made.
     --
     -- WHICH roll is ignored is not decided here. The rewrite says how many dice
-    -- the instruction throws and how many of the lowest go, and Resolve's
-    -- Effect.RollDie arm throws them all before Pawl.Engine.Dice.ignoreLowest
+    -- the instruction throws and how many of the lowest go, and
+    -- Resolve.Effect.throwDice throws them all before Pawl.Engine.Dice.ignoreLowest
     -- takes any -- the order CR 706.6 requires, since the lowest roll is not
     -- known until every die has come up.
     (ReplacementEffect.DieRollR (DieRollR.MkDieRollR _ rewrite), ProposedEvent.WouldRollDice roll) -> case rewrite of
@@ -4686,9 +4699,9 @@ flipOneCoin mFlipper stated = do
   pure (Maybe.fromMaybe actual (Coin.statedFace stated), any StatedFlip.wins stated)
 
 -- CR 706.1's instruction to roll dice, as a replaceable event. The ONE road every
--- roll in the engine takes: Pawl.Engine.Resolve's Effect.RollDie arm calls it once
--- per instruction, before the first die, and nothing else rolls -- no cost and no
--- turn-based action names a roll.
+-- roll in the engine takes: Pawl.Engine.Resolve.Effect.throwDice calls it once per
+-- roll, before the first die -- for Effect.RollDie and for CR 703.4g's roll to
+-- visit. No cost names a roll.
 --
 -- HERE rather than in Pawl.Engine.Dice, `flipOneCoin` above and for its reason:
 -- the roll is a replaceable event, CR 614's loop lives in this module, and this
@@ -7088,7 +7101,7 @@ createTokens controller card copy n tapped entering attached = do
             -- Interned ONCE per lot, not once per token: a lot's tokens are
             -- copies of one set of effect-defined characteristics (CR 111.3), so
             -- they name one entry.
-            tokenId <- State.state (Game.intern (Printing.MkPrinting (TokenLot.card lot)))
+            tokenId <- State.state (Game.intern (Printing.ofCard (TokenLot.card lot)))
             let mkObj ts =
                   Object.MkObject
                     { Object.owner = owner,
@@ -7300,7 +7313,7 @@ meld controller victims resultCard = do
       -- MeldSource.result -- so the face is interned exactly as createTokens
       -- interns a token's card, and every characteristic read past here is the
       -- ordinary one.
-      resultId <- State.state (Game.intern (Printing.MkPrinting resultCard))
+      resultId <- State.state (Game.intern (Printing.ofCard resultCard))
       -- CR 701.42a's "single object": the melded cards stop being objects BEFORE
       -- the entry loop, so no projection, replacement or trigger scan inside it
       -- can find two cards where one permanent is entering. Each one's CR 608.2h
@@ -7942,6 +7955,17 @@ shuffleLibrary pid = do
   -- so this is defending the invariant rather than fixing a live bug.
   State.modify' (\g -> g {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library g)})
 
+-- CR 717.2 / 103.3a: shuffleLibrary's shuffle, of the Attraction deck. A player
+-- with none is not asked: there is nothing to shuffle.
+shuffleAttractionDeck :: PlayerId -> Game ()
+shuffleAttractionDeck pid = do
+  gs <- State.get
+  let ids = foldMap Foldable.toList (Map.lookup pid (GameState.attractionDecks gs))
+  Monad.unless (null ids) $ do
+    answer <- Game.ask (Prompt.Shuffle ids)
+    let shuffled = Game.honourShuffle ids answer
+    State.modify' (\g -> g {GameState.attractionDecks = Map.insert pid (Seq.fromList shuffled) (GameState.attractionDecks g)})
+
 -- The single reveal funnel (CR 701.20a): `pid` shows `oid` to all players, which
 -- here means appending what was shown to the public log. No-op for an unknown id.
 -- Per CR 701.20b nothing moves and nothing changes, so the event is the whole
@@ -8041,6 +8065,7 @@ reactsToAbilityTriggering cond = case cond of
   -- never an ability triggering, so it takes CR 603.3b's first pass as well.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
+  TriggerCondition.Visit -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- The same answer for the same reason: CR 701.43a's exert is a keyword action a
@@ -8252,6 +8277,7 @@ controllerTurnScoped cond = case cond of
   -- CR 706.1 names no turn either.
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
+  TriggerCondition.Visit -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
   TriggerCondition.PlayerLosesCoinFlip _ -> False
   -- False for the SelfAttacks arm's reason below, which is exactly this case one

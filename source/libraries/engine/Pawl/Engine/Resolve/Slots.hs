@@ -745,6 +745,7 @@ effectObjectRefs effect = case effect of
   -- CR 701.65a's "those objects".
   Effect.Airbend ref -> [ref]
   Effect.TemptWithTheRing -> []
+  Effect.OpenAttraction -> []
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.TimeTravel -> []
@@ -923,6 +924,7 @@ effectPlayerRefs effect = case effect of
   -- Rule 701.65a names the owner of each exiled card, whom no slot can hold.
   Effect.Airbend {} -> []
   Effect.TemptWithTheRing -> []
+  Effect.OpenAttraction -> []
   Effect.Forage -> []
   Effect.Populate -> []
   Effect.TimeTravel -> []
@@ -1048,6 +1050,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> quantitySlots quantity
   Effect.Airbend {} -> Map.empty
   Effect.TemptWithTheRing -> Map.empty
+  Effect.OpenAttraction -> Map.empty
   Effect.Forage -> Map.empty
   Effect.Populate -> Map.empty
   Effect.TimeTravel -> Map.empty
@@ -1712,6 +1715,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Airbend {} -> True
   Effect.TemptWithTheRing -> True
+  Effect.OpenAttraction -> True
   Effect.Forage -> True
   Effect.Populate -> True
   Effect.TimeTravel -> True
@@ -1959,6 +1963,7 @@ readsX =
         Effect.Earthbend (Earthbend.MkEarthbend quantity _) -> Quantity.readsX quantity
         Effect.Airbend {} -> False
         Effect.TemptWithTheRing -> False
+        Effect.OpenAttraction -> False
         Effect.Forage -> False
         Effect.Populate -> False
         Effect.TimeTravel -> False
@@ -2186,6 +2191,7 @@ boundSlots effect = case effect of
   -- mints, and is reserved for the same reason Binding.earthbentLand is.
   Effect.Airbend _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
+  Effect.OpenAttraction -> Set.empty
   Effect.Forage -> Set.empty
   Effect.Populate -> Set.empty
   Effect.TimeTravel -> Set.empty

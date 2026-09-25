@@ -80,6 +80,7 @@ import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
+import qualified Pawl.Types.TypeLine as TypeLine
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -249,6 +250,23 @@ printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
   Just (Source.OfCardCopy pid) -> printingOf pid gs
   Just (Source.OfInherentTrigger _) -> Nothing
 
+-- | CR 717.1: the numbers lit up on this object's card, empty for anything that
+-- is not a card. The PHYSICAL card's printing, never the projection: CR 109.3
+-- makes the lights no characteristic, so a copy of an Attraction lights nothing.
+lightsOf :: ObjectId -> GameState -> Set.Set Natural
+lightsOf oid gs = case fmap Object.source (lookupObject oid gs) of
+  Just (Source.OfCard pid) -> foldMap Printing.lights (printingOf pid gs)
+  _ -> Set.empty
+
+-- | CR 717.1 / 717.6: is this object a card with an Astrotorium back? Every
+-- Attraction card has one, so the printed type line is the answer; the
+-- projection is not, the back being the physical card's.
+astrotoriumBack :: ObjectId -> GameState -> Bool
+astrotoriumBack oid gs = case fmap Object.source (lookupObject oid gs) of
+  Just (Source.OfCard pid) ->
+    any (any (Set.member Subtype.Attraction . TypeLine.subtypes . Face.typeLine) . Card.Type.faces . Printing.card) (printingOf pid gs)
+  _ -> False
+
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
 -- offered indices is honoured. Anything else -- a short answer, a duplicate, an
 -- out-of-range index -- leaves the canonical order standing rather than dropping
@@ -328,7 +346,7 @@ lookUpCard name = do
     Just card
       | Maybe.isJust (Card.faceNamed name card) -> do
           gs <- State.get
-          let (pid, gs1) = intern (Printing.MkPrinting card) gs
+          let (pid, gs1) = intern (Printing.ofCard card) gs
           State.put gs1 {GameState.lookedUp = Set.insert pid (GameState.lookedUp gs1)}
           pure (Just pid)
     _ -> pure Nothing
@@ -520,6 +538,7 @@ removeFromZones pid oid gs =
       GameState.phasedOut = Map.delete oid (GameState.phasedOut gs),
       GameState.exile = Set.delete oid (GameState.exile gs),
       GameState.command = Set.delete oid (GameState.command gs),
+      GameState.attractionDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.attractionDecks gs),
       GameState.stack = filter (/= oid) (GameState.stack gs)
     }
 
@@ -2238,6 +2257,7 @@ castOf event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2317,6 +2337,7 @@ activatedAbilityResolved event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2406,6 +2427,7 @@ discardOf event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2524,6 +2546,7 @@ movedChange event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2632,6 +2655,7 @@ damageDealt event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2904,6 +2928,7 @@ lifeGainOf event = case event of
   GameEvent.Surveiled _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
