@@ -5117,8 +5117,8 @@ throughEndStep :: GameState.GameState -> GameState.GameState
 throughEndStep gs = List.foldl' (\g _ -> S.runPure (payingAttacking []) g Engine.runStep) gs [1 .. (8 :: Int)]
 
 -- Step the game until `pid`'s end step has run, so a CR 603.2b "at the
--- beginning of each end step" ability triggers and resolves. Bounded, so a schedule that never
--- reaches it stops rather than looping.
+-- beginning of each end step" ability triggers and resolves. Bounded, so a
+-- schedule that never reaches it stops rather than looping.
 throughEndStepOf :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 throughEndStepOf pid = go (40 :: Int)
   where
