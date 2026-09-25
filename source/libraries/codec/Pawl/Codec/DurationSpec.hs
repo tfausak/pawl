@@ -99,6 +99,13 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       Duration.UntilEndOfCombat
       " {\"type\":\"UntilEndOfCombat\"} "
+  -- CR 500.5a / 611.2a: until end of combat on your next turn (Brazen Cannonade).
+  Spec.it s "UntilEndOfCombatOnYourNextTurn" $
+    Common.assertCodec
+      s
+      Duration.codec
+      Duration.UntilEndOfCombatOnYourNextTurn
+      " {\"type\":\"UntilEndOfCombatOnYourNextTurn\"} "
   -- CR 611.2a / 116.2c: "You may pay {U} to end this effect" (Gliding Licid).
   Spec.it s "UntilPaid carries the cost" $
     Common.assertCodec

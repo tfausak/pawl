@@ -116,6 +116,18 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       s
       (Codec.encode Expiry.codec (Expiry.AtEndOf PhaseSelector.CombatPhase) /= Codec.encode Expiry.codec (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat))))
       "the phase and its own end-of-combat step encode differently"
+  -- CR 500.5a / 611.2a: AtEndOfTurnOf's pair under its own tag.
+  Spec.it s "AtEndOfCombatOn carries its player and turn" $
+    Common.assertCodec
+      s
+      Expiry.codec
+      ( Expiry.AtEndOfCombatOn
+          AfterTurn.MkAfterTurn
+            { AfterTurn.player = PlayerId.MkPlayerId 1,
+              AfterTurn.turn = 3
+            }
+      )
+      " {\"type\":\"AtEndOfCombatOn\",\"value\":{\"player\":1,\"turn\":3}} "
   -- CR 116.2c, carrying the price the offer quotes and the seat CR 109.5 gives
   -- it. Distinct from Never, which outlasts every window too:
   -- Pawl.Engine.EndEffect finds the effects a payment ends by this arm, so the

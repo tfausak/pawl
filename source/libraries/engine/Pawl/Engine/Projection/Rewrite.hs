@@ -1872,6 +1872,7 @@ rewriteDuration pairs duration = case duration of
   Duration.DuringNextTurnOf _ -> duration
   Duration.DuringYourNextTurn -> duration
   Duration.UntilEndOfCombat -> duration
+  Duration.UntilEndOfCombatOnYourNextTurn -> duration
   -- CR 116.2c's price, which is a Cost and not a Condition. An activated
   -- ability's own cost is left alone by this descent for the same reason: no
   -- Cost arm carries a subtype word outside a Filter, and the Filters a cost's

@@ -25,6 +25,7 @@ codec =
       Arm.payload "AtEndOfTurnOf" AfterTurn.codec Expiry.AtEndOfTurnOf (\x -> case x of Expiry.AtEndOfTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "DuringTurnOf" AfterTurn.codec Expiry.DuringTurnOf (\x -> case x of Expiry.DuringTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOf" PhaseSelector.codec Expiry.AtEndOf (\x -> case x of Expiry.AtEndOf y -> Just y; _ -> Nothing),
+      Arm.payload "AtEndOfCombatOn" AfterTurn.codec Expiry.AtEndOfCombatOn (\x -> case x of Expiry.AtEndOfCombatOn y -> Just y; _ -> Nothing),
       Arm.payload "WhenPaid" PaidExpiry.codec Expiry.WhenPaid (\x -> case x of Expiry.WhenPaid y -> Just y; _ -> Nothing),
       Arm.nullary "WhenUsed" Expiry.WhenUsed
     ]
@@ -39,5 +40,6 @@ tagOf x = case x of
   Expiry.AtEndOfTurnOf {} -> "AtEndOfTurnOf"
   Expiry.DuringTurnOf {} -> "DuringTurnOf"
   Expiry.AtEndOf {} -> "AtEndOf"
+  Expiry.AtEndOfCombatOn {} -> "AtEndOfCombatOn"
   Expiry.WhenPaid {} -> "WhenPaid"
   Expiry.WhenUsed {} -> "WhenUsed"

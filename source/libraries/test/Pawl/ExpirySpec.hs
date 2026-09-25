@@ -4,8 +4,9 @@
 -- Covers Pawl.Engine.Expiry and Pawl.Types.Expiry: the printed Duration -> stored Expiry
 -- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 500.5, 611.2a,
 -- 611.2b), and the gate cards: Master Thief, Hag of Inner Weakness, Jade
--- Statue, Soulfire Eruption for "until the END of your next turn", and Suspend
--- Aggression for that same window counted against a seat a reference names.
+-- Statue, Soulfire Eruption for "until the END of your next turn", Suspend
+-- Aggression for that same window counted against a seat a reference names, and
+-- Brazen Cannonade for "until end of combat on your next turn".
 --
 -- Alchemy's "perpetually" is here too, at the bottom of the file: it is a
 -- duration in card data like any other, and its producer is Pearl Collector.
@@ -21,6 +22,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
@@ -48,8 +50,10 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -1511,6 +1515,113 @@ soulfireSpec s registry = Spec.describe s "SoulfireEruption" $ do
     Spec.assertEqWith s "the card itself is untouched, still in exile" (Game.zoneMembers Zone.Exile S.alice afterwards) [pikerId]
     Spec.assertEqWith s "and alice cannot play it on turn 5 either" (S.creaturesInPlay S.alice later, Game.zoneMembers Zone.Exile S.alice later) (0, [pikerId])
 
+-- Whole steps under `answer` until `done` holds or the game ends, bounded as
+-- runToTurn is.
+runUntil :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState -> Bool) -> GameState.GameState -> GameState.GameState
+runUntil answer done =
+  let go budget gs =
+        if budget <= 0 || done gs || Maybe.isJust (GameState.result gs)
+          then gs
+          else go (budget - 1) (S.runPure answer gs Engine.runStep)
+   in go (128 :: Int)
+
+-- alice, from the start of turn 1, with Brazen Cannonade, a Hill Giant to
+-- attack with, two Mountains for the {1}{R} Goblin Piker on top of her library,
+-- and no creature for bob. Played to the start of turn 2 attacking with
+-- everything, so the raid trigger in her postcombat main phase has exiled the
+-- Piker. Returns the exiled card and that board.
+cannonadeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+cannonadeBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  cannonade <- S.printingOf s registry "Brazen Cannonade"
+  giant <- S.printingOf s registry "Hill Giant"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let stockedWith printing pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 :: Int .. 6]
+      g1 = S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers)
+      g2 = snd (S.addPermanent giant S.alice (snd (S.addPermanent cannonade S.alice g1)))
+      g3 = stockedWith mountain S.bob (stockedWith mountain S.alice g2)
+      armed = runToTurn S.aggressiveAnswer 2 (snd (S.addLibraryCard piker S.alice g3))
+  pure
+    ( case Game.zoneMembers Zone.Exile S.alice armed of
+        [oid] -> oid
+        oids -> error ("Pawl.ExpirySpec: expected one exiled card, got " <> show (length oids)),
+      armed
+    )
+
+-- Brazen Cannonade {3}{R} Enchantment (data/cards/brazen-cannonade.json; name,
+-- cost, type line and Oracle text checked against api.scryfall.com) -- "Raid --
+-- At the beginning of each of your postcombat main phases, if you attacked this
+-- turn, exile the top card of your library. Until end of combat on your next
+-- turn, you may play that card." The pool's one duration of "until end of
+-- combat" armed outside a combat phase.
+cannonadeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cannonadeSpec s registry = Spec.describe s "BrazenCannonade" $ do
+  Spec.it s "CR 611.2a the duration arms against the controller and the current turn" $
+    Spec.assertEqWith
+      s
+      "armed"
+      (Expiry.arm Map.empty S.alice S.noSource Duration.UntilEndOfCombatOnYourNextTurn armGs)
+      (Just (Expiry.Type.AtEndOfCombatOn (AfterTurn.MkAfterTurn S.alice 1)))
+  Spec.it s "CR 500.5a / 500.8 only a combat PHASE of a later turn of that player ends it" $ do
+    let armed = effectWith (Expiry.Type.AtEndOfCombatOn (AfterTurn.MkAfterTurn S.alice 1)) (Setup.emptyGame S.bothPlayers)
+        bobsTurn = handoff armed
+        alicesNext = handoff bobsTurn
+        combatEnds = Expiry.dropAtEndOf PhaseSelector.CombatPhase
+        count = length . GameState.continuousEffects
+    Spec.assertEqWith s "a combat phase added to its own turn leaves it" (count (combatEnds armed)) 1
+    Spec.assertEqWith s "bob's combat phase leaves it" (count (combatEnds bobsTurn)) 1
+    Spec.assertEqWith s "the end of combat STEP of alice's next turn leaves it" (count (Expiry.dropAtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)) alicesNext)) 1
+    Spec.assertEqWith s "and that turn's combat phase takes it" (count (combatEnds alicesNext)) 0
+  Spec.it s "CR 611.2a a next turn with no combat phase takes it at its cleanup" $ do
+    let armed = effectWith (Expiry.Type.AtEndOfCombatOn (AfterTurn.MkAfterTurn S.alice 1)) (Setup.emptyGame S.bothPlayers)
+        count = length . GameState.continuousEffects
+    Spec.assertEqWith s "its own turn's cleanup leaves it" (count (Expiry.dropAtCleanup armed)) 1
+    Spec.assertEqWith s "bob's cleanup leaves it" (count (Expiry.dropAtCleanup (handoff armed))) 1
+    Spec.assertEqWith s "alice's next cleanup takes it" (count (Expiry.dropAtCleanup (handoff (handoff armed)))) 0
+  Spec.it s "CR 800.4m a departed player's duration ends where their turn would have begun" $ do
+    let gone = S.departs Departure.Type.Conceded S.bob S.threePlayerGame
+        armed = effectWith (Expiry.Type.AtEndOfCombatOn (AfterTurn.MkAfterTurn S.bob 1)) gone
+    Spec.assertEqWith s "it ended at bob's seat" (GameState.continuousEffects (handoff armed)) []
+  Spec.it s "CR 500.5a / 611.2a whole card: the permission outlives bob's combat, and the card is played on alice's next turn" $ do
+    (pikerId, armed) <- cannonadeBoard s registry
+    let alicesNext = runToTurn S.identityAnswer 3 armed
+        played = runToTurn (castingFromExile pikerId) 4 alicesNext
+    Spec.assertEqWith s "the raid trigger exiled the Piker" (fmap S.nameOf (Game.cardOf pikerId armed)) (Just (CardName.MkCardName (Text.pack "Goblin Piker")))
+    Spec.assertEqWith s "alice may play it" (permissionOn pikerId armed) (Just S.alice)
+    Spec.assertEqWith s "alice's next turn began" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 3)
+    Spec.assertEqWith s "the permission survived the end of bob's combat phase" (permissionOn pikerId alicesNext) (Just S.alice)
+    Spec.assertEqWith s "alice played the exiled card during that turn" (S.creaturesInPlay S.alice played) 2
+    Spec.assertEqWith s "so it is no longer in exile" (Game.zoneMembers Zone.Exile S.alice played) []
+  Spec.it s "CR 500.5a whole card: the permission ends as alice's next combat phase ends" $ do
+    (pikerId, armed) <- cannonadeBoard s registry
+    let atTurn n phase gs = GameState.turnNumber gs == n && GameState.phase gs == phase
+        beforeCombat = runUntil S.identityAnswer (atTurn 3 (Phase.Combat CombatStep.EndOfCombat)) armed
+        afterCombat = runUntil S.identityAnswer (atTurn 3 Phase.PostcombatMain) beforeCombat
+        later = runToTurn (castingFromExile pikerId) 6 afterCombat
+    Spec.assertEqWith s "the end of combat step of turn 3 began" (GameState.turnNumber beforeCombat, GameState.phase beforeCombat) (3, Phase.Combat CombatStep.EndOfCombat)
+    Spec.assertEqWith s "the permission is live in it" (permissionOn pikerId beforeCombat) (Just S.alice)
+    Spec.assertEqWith s "and gone once the phase is over" (permissionOn pikerId afterCombat) Nothing
+    Spec.assertEqWith s "so alice never plays the card" (S.creaturesInPlay S.alice later, Game.zoneMembers Zone.Exile S.alice later) (1, [pikerId])
+  -- The paired control is the same two creatures with bob attacking: alice's
+  -- Piker then dies blocking, which is not attacking.
+  Spec.it s "CR 603.10a an attacking creature alice controls dying deals 2 to each opponent" $ do
+    cannonade <- S.printingOf s registry "Brazen Cannonade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (fight, _, _) = S.combatBoardOf [piker] [giant]
+        withCannonade = snd (S.addPermanent cannonade S.alice fight)
+        attacked = S.runCombat S.aggressiveAnswer withCannonade
+        bobAttacks =
+          withCannonade
+            { GameState.activePlayer = S.bob,
+              GameState.combat = (GameState.combat withCannonade) {Combat.Type.defenders = [S.alice]}
+            }
+        blocked = S.runCombat S.aggressiveAnswer bobAttacks
+    Spec.assertEqWith s "alice's attacking Piker died" (S.creaturesInPlay S.alice attacked) 0
+    Spec.assertEqWith s "and bob took 2" (S.lifeOf S.bob attacked) (Just 18)
+    Spec.assertEqWith s "alice's blocking Piker died" (S.creaturesInPlay S.alice blocked) 0
+    Spec.assertEqWith s "and bob took nothing" (S.lifeOf S.bob blocked) (Just 20)
+
 -- Suspend Aggression {1}{R}{W} Instant (Secrets of Strixhaven,
 -- data/cards/suspend-aggression.json; name, cost, type line and Oracle text
 -- checked against api.scryfall.com) -- "Exile target nonland permanent and the
@@ -1944,6 +2055,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   endOfNextTurnSpec s
   windowSpec s
   soulfireSpec s registry
+  cannonadeSpec s registry
   suspendAggressionSpec s registry
   dovinSpec s registry
   oldFatSpiderSpec s registry
