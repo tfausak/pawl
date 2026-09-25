@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers: CR 801's limited range of influence option -- Pawl.Types.RangeOfInfluence,
 -- the Pawl.Types.GameSettings field that carries it, Pawl.Engine.Game.inRangeOf,
@@ -11,7 +12,8 @@
 -- controlNames (CR 801.10 for a layer-2 grant), Pawl.Engine.CombatRestriction's
 -- attackLimit and blockLimit (CR 801.10 for a declaration's bound) and Sba's
 -- worldVictims (CR 801.12), Pawl.Engine.Event.Trigger's eventWithinRange (CR
--- 801.7); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
+-- 801.7), Pawl.Engine.Replacement's preventsInRange and redirectDestination
+-- (CR 801.13); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
 -- departedThisTurn.
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
@@ -20,6 +22,7 @@
 -- is paired with the same board at an unlimited range.
 module Pawl.RangeOfInfluenceSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -27,6 +30,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -50,8 +54,10 @@ import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
@@ -392,6 +398,84 @@ spec s registry = Spec.describe s "Range of influence" $ do
            in S.lifeOf S.carol (entering entrant placed)
     Spec.assertEqWith s "CR 801.7 at range 1 carol keeps the 2 she gained" (carolAfter (S.withRange 1 board)) (Just 22)
     Spec.assertEqWith s "at an unlimited range she loses 4 for them" (carolAfter board) (Just 18)
+
+  -- CR 801.13b's third case: alice's Fog ("Prevent all combat damage that would
+  -- be dealt this turn.") names neither source nor recipient, so it reaches
+  -- only damage whose source and recipient are both in alice's range. Carol's
+  -- Goblin Piker attacks dave; bob's attacks alice, then carol.
+  Spec.it s "CR 801.13b a prevention naming neither source nor recipient needs both in range" $ do
+    forest <- S.printingOf s registry "Forest"
+    fog <- S.printingOf s registry "Fog"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (spellId, g0) = S.addHandCard fog S.alice (S.landsFor forest S.alice 1 S.fourPlayerGame)
+        (carols, g1) = S.addPermanent piker S.carol g0
+        (bobs, g2) = S.addPermanent piker S.bob g1
+        fogged ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g2))
+    Spec.assertEqWith s "CR 801.13b at range 1 carol's Piker still deals dave 2" (S.lifeOf S.dave (strike S.carol [carols] S.dave (fogged (S.withRange 1)))) (Just 18)
+    Spec.assertEqWith s "at an unlimited range Fog prevents it" (S.lifeOf S.dave (strike S.carol [carols] S.dave (fogged id))) (Just 20)
+    Spec.assertEqWith s "and at range 1 it prevents bob's, in range, to alice" (S.lifeOf S.alice (strike S.bob [bobs] S.alice (fogged (S.withRange 1)))) (Just 20)
+    Spec.assertEqWith s "but not bob's to carol, whom alice does not reach" (S.lifeOf S.carol (strike S.bob [bobs] S.carol (fogged (S.withRange 1)))) (Just 18)
+
+  -- CR 801.13b's first case: alice's Luminesce ("Prevent all damage that black
+  -- sources and red sources would deal this turn.") names the source, so an
+  -- in-range source is enough. Bob's red Piker attacks carol, whom alice does
+  -- not reach; carol's attacks dave.
+  Spec.it s "CR 801.13b a prevention naming the source needs only the source in range" $ do
+    plains <- S.printingOf s registry "Plains"
+    luminesce <- S.printingOf s registry "Luminesce"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (spellId, g0) = S.addHandCard luminesce S.alice (S.landsFor plains S.alice 1 S.fourPlayerGame)
+        (carols, g1) = S.addPermanent piker S.carol g0
+        (bobs, g2) = S.addPermanent piker S.bob g1
+        cast ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g2))
+    Spec.assertEqWith s "CR 801.13b at range 1 bob's Piker deals carol nothing" (S.lifeOf S.carol (strike S.bob [bobs] S.carol (cast (S.withRange 1)))) (Just 20)
+    Spec.assertEqWith s "but carol's, out of range, deals dave 2" (S.lifeOf S.dave (strike S.carol [carols] S.dave (cast (S.withRange 1)))) (Just 18)
+    Spec.assertEqWith s "at an unlimited range it deals him nothing" (S.lifeOf S.dave (strike S.carol [carols] S.dave (cast id))) (Just 20)
+
+  -- CR 801.13b's second case: alice's Selfless Squire ("When this creature
+  -- enters, prevent all damage that would be dealt to you this turn.") names
+  -- the recipient, so an out-of-range source does not matter. Carol reaches two
+  -- seats and everyone else one, so her Goblin Piker attacks alice (CR 801.3)
+  -- from outside alice's range.
+  Spec.it s "CR 801.13b a prevention naming the recipient needs only the recipient in range" $ do
+    squire <- S.printingOf s registry "Selfless Squire"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (entrant, g0) = S.addPermanent squire S.alice S.fourPlayerGame
+        (carols, g1) = S.addPermanent piker S.carol g0
+        ranges = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(S.alice, 1), (S.bob, 1), (S.carol, 2), (S.dave, 1)])
+        ranged = g1 {GameState.settings = (GameState.settings g1) {GameSettings.rangeOfInfluence = ranges}}
+        shielded = entering entrant ranged
+    Spec.assertBool s (not (Game.inRangeOf S.alice S.carol shielded)) "carol is outside alice's range"
+    Spec.assertEqWith s "CR 801.13b carol's Piker deals alice nothing" (S.lifeOf S.alice (strike S.carol [carols] S.alice shielded)) (Just 20)
+
+  -- CR 801.13a: alice's Turn the Tables ("All combat damage that would be dealt
+  -- to you this turn is dealt to target attacking creature instead.") targets
+  -- one of bob's two attacking Goblin Pikers, and carol then gains control of
+  -- it, taking it out of combat and out of alice's range. The other Piker's
+  -- damage has nowhere in range to go, so it stays on alice.
+  Spec.it s "CR 801.13a a redirection to a destination outside its controller's range does nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    tables <- S.printingOf s registry "Turn the Tables"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (spellId, g0) = S.addHandCard tables S.alice (S.landsFor plains S.alice 5 S.fourPlayerGame)
+        (aimed, g1) = S.addPermanent piker S.bob g0
+        (other, g2) = S.addPermanent piker S.bob g1
+        attacking =
+          (onMain g2)
+            { GameState.activePlayer = S.bob,
+              GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+              GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [S.alice], Combat.Type.attackers = Map.fromList [(aimed, AttackTarget.OfPlayer S.alice), (other, AttackTarget.OfPlayer S.alice)]}
+            }
+        aim :: Prompt.Prompt r -> r
+        aim p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature aimed))) sets
+          _ -> S.identityAnswer p
+        stolen ranged = S.giveControl aimed S.carol (castResolved aim S.alice spellId (ranged attacking))
+        after ranged = S.settleSba (strike S.bob [other] S.alice (stolen ranged))
+    Spec.assertEqWith s "CR 801.13a at range 1 alice takes the 2" (S.lifeOf S.alice (after (S.withRange 1))) (Just 18)
+    Spec.assertBool s (S.onBattlefield aimed (after (S.withRange 1))) "and carol's Piker is untouched"
+    Spec.assertEqWith s "at an unlimited range alice takes nothing" (S.lifeOf S.alice (after id)) (Just 20)
+    Spec.assertBool s (not (S.onBattlefield aimed (after id))) "and the 2 kills carol's Piker"
   where
     resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
     -- Pawl.LifeTriggerSpec's entry staging: the permanent is placed, its Moved
@@ -400,3 +484,18 @@ spec s registry = Spec.describe s "Range of influence" $ do
       let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
           staged = S.withEvents [GameEvent.Moved (Moved.moved moved (Projection.project oid gs))] gs
        in resolveAll (snd (Engine.runGamePure S.identityAnswer staged Engine.settleForPriority))
+    -- A main phase with alice holding priority, for an instant she casts.
+    onMain gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+    castResolved :: (forall r. Prompt.Prompt r -> r) -> PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+    castResolved answer pid spellId gs = snd (Engine.runGamePure answer (S.runPure answer gs (S.cast pid spellId)) Engine.priorityLoop)
+    -- CR 510.2: these creatures, attacking `defender` on `active`'s turn, deal
+    -- their combat damage.
+    strike active attackers defender gs =
+      S.runPure
+        S.identityAnswer
+        gs
+          { GameState.activePlayer = active,
+            GameState.phase = Phase.Combat CombatStep.CombatDamage,
+            GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [defender], Combat.Type.attackers = Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer defender)) attackers)}
+          }
+        (Monad.void Damage.dealCombatDamage)
