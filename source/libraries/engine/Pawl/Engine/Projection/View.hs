@@ -1000,12 +1000,18 @@ copiableSnapshotOf oid gs
 -- two agree: only there do CR 709.5c's designations exist for the subtraction to
 -- read, so a card in a graveyard that became a copy of a Room keeps reading the
 -- frozen snapshot, which is CR 709.4's combined view of the copied card.
+--
+-- The second disjunct is a spell cast as one of its stamp's halves, or as its
+-- Adventure or Omen half (CR 709.3b, 715.3b, 720.3b): it has only that half's
+-- characteristics, which Game.resolveFaceFor hands the seed.
 derivesFromCopiedHalves :: ObjectId -> GameState -> Bool
 derivesFromCopiedHalves oid gs = case stampedSnapshotOf oid gs of
   Nothing -> False
   Just snapshot ->
-    Maybe.isJust (PC.halves snapshot)
-      && fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
+    ( Maybe.isJust (PC.halves snapshot)
+        && fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
+    )
+      || maybe False (Maybe.isJust . Game.copiedHalfOf) (Game.lookupObject oid gs)
 
 -- CR 707.3's raw stamp: what Pawl.Engine.Resolve and Pawl.Engine.Event wrote to
 -- Binding.copyOf, or a conjured duplicate carries (Game.copyStampOf), before
@@ -1300,6 +1306,7 @@ noCharacteristics =
       PC.halves = Nothing,
       -- CR 722.2b, for the same reason one line up.
       PC.prepare = Nothing,
+      PC.alternativeSpell = Nothing,
       -- CR 710.1b, for the same reason again.
       PC.flipped = Nothing
     }
@@ -1438,6 +1445,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- zone, so the inset frame is nowhere in it. Game.prepareSpellOf
               -- decides, and it reads the copy snapshot first for halves' reason.
               PC.prepare = Game.prepareSpellOf oid gs,
+              -- CR 715.2b / 720.2b: the Adventure or Omen half, prepare's reason.
+              PC.alternativeSpell = Game.alternativeSpellOf oid gs,
               -- CR 707.3: a copy stamp's alternative reading, which
               -- Pawl.Engine.Event.copiedSnapshot stamps. A printed flip card's
               -- alternative half is its card's, read at Game.resolveFaceFor.

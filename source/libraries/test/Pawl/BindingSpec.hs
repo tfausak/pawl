@@ -53,6 +53,7 @@ sampleSnapshot =
       PC.costReductions = [],
       PC.halves = Nothing,
       PC.prepare = Nothing,
+      PC.alternativeSpell = Nothing,
       PC.flipped = Nothing
     }
 

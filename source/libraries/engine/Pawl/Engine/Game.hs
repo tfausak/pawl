@@ -778,8 +778,9 @@ resolveFace mName card = case mName of
   -- Cast.asProposed, the gate's speculative
   -- stamp; and Resolve's CR 701.27a Transform arm) store a name they read from
   -- that same card's faces -- or, since fuse landed, the name of the card's
-  -- FUSED view, which the arm below is for. Anything else is a bug in one of
-  -- them.
+  -- FUSED view, which the arm below is for, or a copy stamp's half, which
+  -- resolveFaceFor below answers before asking this. Anything else is a bug in
+  -- one of them.
   Just n -> case Card.faceNamed n card of
     Just face -> face
     -- CR 702.102b: the one name that resolves to no half and is not a bug is a
@@ -833,6 +834,11 @@ resolveFaceFor mObj card = case mObj of
     | Just halves <- halvesCardOf obj card,
       Object.zone obj == Zone.Battlefield ->
         Card.roomFace (Object.unlockedHalves obj) halves
+  -- CR 707.2 / 709.3b / 715.3b: a half its copiable values have and its printed
+  -- card lacks, which is the only place the chosen name then resolves.
+  Just obj
+    | Just half <- copiedHalfOf obj ->
+        half
   _ -> resolveFace (mObj >>= Object.face) card
 
 -- CR 709.4a: the NAMES the object shows, the plural companion of resolveFaceFor
@@ -862,6 +868,9 @@ namesFor mObj card = case mObj of
     | Just halves <- halvesCardOf obj card,
       Object.zone obj == Zone.Battlefield ->
         Card.roomNames (Object.unlockedHalves obj) halves
+  Just obj
+    | Just half <- copiedHalfOf obj ->
+        Set.singleton (Face.name half)
   _ -> case mObj >>= Object.face of
     -- CR 709.4 / 712.8a / 715.4: the layout's own view, whose names are its
     -- contributing halves'.
@@ -915,10 +924,11 @@ copyStampOf obj = Binding.copyOf (Object.bindings obj) Applicative.<|> Object.du
 -- those. Pawl.ConjureSpec's "CR 715.3a a duplicate of Flaxen Intruder" proves
 -- the first.
 --
--- Not implemented: a stamp with halves, whose half is still chosen off the
--- printed card (#4078); the face-down cast and turn-face-up costs, still read
--- off the printed card (#4083); and a stamp's Adventure half, which the stamp
--- does not carry (#4087).
+-- A stamp's halves and Adventure or Omen half are the copied card's own faces,
+-- so castableFacesOf below offers them as they are and this leaves them alone.
+--
+-- Not implemented: the face-down cast and turn-face-up costs, still read off the
+-- printed card (#4083).
 castingFaceOf :: Object.Object -> Card -> Face Card -> Face Card
 castingFaceOf obj card face = case copyStampOf obj of
   Just stamp
@@ -932,6 +942,67 @@ castingFaceOf obj card face = case copyStampOf obj of
             Face.costReductions = PC.costReductions stamp
           }
   _ -> face
+
+-- CR 707.2 / 709.3 / 715.3 / 720.3: the faces this object may be cast as. Off
+-- its copy stamp when it has one, since the halves (CR 709.5b) and the Adventure
+-- or Omen half (CR 715.2b, 720.2b) are copiable values: the stamp's halves, or
+-- the front face under the stamp beside the stamp's alternative spell. The
+-- printed card's otherwise. Pawl.ConjureSpec's "CR 707.2/709.5b a duplicate of
+-- a copied Room is cast as a door" and "CR 707.2/715.2b a duplicate of a Clone
+-- of Flaxen Intruder is cast as Welcome Home" prove the two stamped arms.
+castableFacesOf :: Object.Object -> Card -> [Face Card]
+castableFacesOf obj card = case copyStampOf obj of
+  Nothing -> Card.castableFaces card
+  Just stamp -> case PC.halves stamp of
+    Just halves -> Card.castableFaces halves
+    Nothing -> castingFaceOf obj card (Card.frontFace card) : Maybe.maybeToList (PC.alternativeSpell stamp)
+
+-- castableFacesOf above for a caller that holds only the id.
+castableFacesOfId :: ObjectId -> GameState -> [Face Card]
+castableFacesOfId oid gs = case (lookupObject oid gs, cardOf oid gs) of
+  (Just obj, Just card) -> castableFacesOf obj card
+  _ -> []
+
+-- CR 601.2b-f: the face `name` names among castableFacesOf's, with the stamp's
+-- cast-time values laid over it -- what a proposed cast is gated and priced on.
+castingFaceNamed :: Object.Object -> Card -> CardName.CardName -> Face Card
+castingFaceNamed obj card name = case copyStampOf obj >>= stampHalfNamed name of
+  Just half -> half
+  Nothing -> castingFaceOf obj card (resolveFace (Just name) card)
+
+-- The one of a copy stamp's halves, or its Adventure or Omen half, that `name`
+-- names.
+stampHalfNamed :: CardName.CardName -> PC.ProjectedCharacteristics -> Maybe (Face Card)
+stampHalfNamed name stamp =
+  (PC.halves stamp >>= Card.faceNamed name)
+    Applicative.<|> List.find ((== name) . Face.name) (Maybe.maybeToList (PC.alternativeSpell stamp))
+
+-- CR 709.3b / 715.3b / 720.3b: the stamp's half this object's chosen name
+-- (Object.face) singles out, the one a spell cast off castableFacesOf above has.
+copiedHalfOf :: Object.Object -> Maybe (Face Card)
+copiedHalfOf obj = do
+  name <- Object.face obj
+  stamp <- copyStampOf obj
+  stampHalfNamed name stamp
+
+-- CR 715.2b / 720.2b: the Adventure or Omen half this object has -- its copy
+-- stamp's when it has one, its printed card's otherwise; prepareCardOf's shape.
+alternativeSpellCardOf :: Object.Object -> Card -> Maybe (Face Card)
+alternativeSpellCardOf obj card = case copyStampOf obj of
+  Just snapshot -> PC.alternativeSpell snapshot
+  Nothing -> Card.alternativeSpellFace card
+
+-- alternativeSpellCardOf above for a caller that holds only the id, and the value
+-- Pawl.Engine.Projection.View.baseCharacteristics seeds
+-- ProjectedCharacteristics.alternativeSpell from. FACE UP only, halvesOf's fork.
+alternativeSpellOf :: ObjectId -> GameState -> Maybe (Face Card)
+alternativeSpellOf oid gs = do
+  obj <- lookupObject oid gs
+  case Object.facing obj of
+    Facing.FaceDown _ -> Nothing
+    Facing.FaceUp -> do
+      card <- cardOf oid gs
+      alternativeSpellCardOf obj card
 
 -- castingFaceOf's keywords for a caller that holds only the id: the printed
 -- face's (faceOf, so the half CR 709.3b stamped) under any copy stamp's.

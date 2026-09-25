@@ -1156,7 +1156,7 @@ ordinaryOffer =
 --   1. IS THERE ANYTHING TO OFFER -- an id the reference named (CR 400.7) may no
 --      longer resolve to an object (CR 603.7c).
 --   2. WHICH FACE: CR 712.11a for the `transformed` rider, otherwise
---      Card.castableFaces (CR 709.3, CR 712.11b, CR 715.3, CR 720.3) plus CR
+--      Game.castableFacesOf (CR 709.3, CR 712.11b, CR 715.3, CR 720.3) plus CR
 --      702.102a's fused face for a fuse card in the caster's hand, less the face
 --      CR 702.162a's or CR 702.146a's alternative cost is the only road to, when
 --      this offer states an alternative cost of its own (CR 118.9a).
@@ -1200,7 +1200,7 @@ offerCastOnce context named caster optionality verb retake offer = do
       -- payment.
       alternative = CastOffer.withoutPayingManaCost offer || Maybe.isJust (CastOffer.payingInstead offer)
       -- CR 712.11a for the transformed rider; CR 709.3, CR 712.11b, CR 715.3 and
-      -- CR 720.3 otherwise, via Card.castableFaces. Nothing for a card with no back face
+      -- CR 720.3 otherwise, via Game.castableFacesOf. Nothing for a card with no back face
       -- (CR 712.14a): an offer that cannot be made is not made.
       --
       -- Less Card.convertedFace under an alternative, which is CR 118.9a: a spell
@@ -1214,7 +1214,7 @@ offerCastOnce context named caster optionality verb retake offer = do
       -- rule 702.162a's limb is driven (Pawl.InvestigateSpec's "CR 118.9a a free
       -- offer does not also offer the converted face").
       --
-      -- Card.castableFaces carries the HALVES and never Card.fusedFace, so rule
+      -- Game.castableFacesOf carries the HALVES and never Card.fusedFace, so rule
       -- 702.102a's third offer is added here, beside them and never instead of
       -- them: "if a player casts a split card with fuse FROM THEIR HAND, the
       -- player may choose to cast both halves of that split card rather than
@@ -1238,8 +1238,8 @@ offerCastOnce context named caster optionality verb retake offer = do
         | otherwise = []
       faces oid card
         | CastOffer.transformed offer = fmap pure (Card.backFace card)
-        | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Card.castableFaces card) <> fusedFaces oid card)
-        | otherwise = Just (Card.castableFaces card <> fusedFaces oid card)
+        | alternative = Just (filter (\face -> fmap Face.name (Card.convertedFace card) /= Just (Face.name face)) (Game.castableFacesOfId oid gs) <> fusedFaces oid card)
+        | otherwise = Just (Game.castableFacesOfId oid gs <> fusedFaces oid card)
       -- One proposal per half, gated on its own (CR 709.3a, CR 712.11c), which
       -- is why the whole tuple is built per face rather than once per card.
       --

@@ -228,11 +228,11 @@ proposedFace :: ObjectId -> CardName.CardName -> GameState -> Maybe (Face.Face C
 proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
   Nothing -> Nothing
   Just (Facing.FaceDown state) -> Just (Card.faceDownFace (FaceDownState.listed state))
-  -- CR 707.2: a copy stamp's cast-time values over the printed half.
+  -- CR 707.2: a copy stamp's half, or its cast-time values over the printed one.
   Just Facing.FaceUp -> do
     obj <- Game.lookupObject oid gs
     card <- Game.cardOf oid gs
-    pure (Game.castingFaceOf obj card (Game.resolveFace (Just name) card))
+    pure (Game.castingFaceNamed obj card name)
 
 -- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
 -- they have priority, rather than only in the sorcery-speed window? Two ways in,
@@ -1703,7 +1703,7 @@ castableSpells pid gs =
                    else []
                )
       proposals oid = do
-        face <- foldMap Card.castableFaces (Game.cardOf oid gs)
+        face <- Game.castableFacesOfId oid gs
         facing <- facings face
         pure (oid, Face.name face, facing)
       -- CR 702.102a's third offer, beside the two halves and never instead of
@@ -1876,7 +1876,7 @@ castableWhileSearching pid gs =
             proposed = asProposed oid name Facing.FaceUp gs
          in permitsCastWhileSearching face
               && castableWhenOffered ManaSpending.AsProduced pid oid name (Cost.candidateCostsFor pid name oid proposed) proposed
-      proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (foldMap Card.castableFaces (Game.cardOf oid gs)))
+      proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (Game.castableFacesOfId oid gs))
    in concatMap proposals (Game.zoneMembers Zone.Library pid gs)
 
 -- CR 608.2g: everything a cast an EFFECT offers must still satisfy, given the

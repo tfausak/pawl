@@ -5436,7 +5436,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- neither half was cast as a spell, it enters with neither unlocked
               -- designation." A Room put onto the battlefield by an effect
               -- reaches this with `shown` Nothing and enters with both doors shut.
-              unlocking = dest == Zone.Battlefield && maybe False Card.hasSharedTypeLine (Game.cardOf oid gs)
+              unlocking = dest == Zone.Battlefield && Maybe.isJust (Game.halvesOf oid gs)
               -- CR 110.5's status the ARRIVING incarnation will carry. Named
               -- because two readers want it: mkObj's `facing` field below, whose
               -- comment has the reasoning, and the CR 303.4f gate further down,
