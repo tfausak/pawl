@@ -114,11 +114,14 @@
                               "type": "Creature"
                             }
                           },
+                          "players": {
+                            "type": "EachInSlot",
+                            "value": "thoseFacing"
+                          },
                           "quantity": {
                             "type": "Literal",
                             "value": 1
-                          },
-                          "slot": "thoseFacing"
+                          }
                         }
                       }
                     ],

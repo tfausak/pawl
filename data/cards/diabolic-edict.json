@@ -32,11 +32,14 @@
                           "type": "Creature"
                         }
                       },
+                      "players": {
+                        "type": "EachInSlot",
+                        "value": "target"
+                      },
                       "quantity": {
                         "type": "Literal",
                         "value": 1
-                      },
-                      "slot": "target"
+                      }
                     }
                   }
                 ]

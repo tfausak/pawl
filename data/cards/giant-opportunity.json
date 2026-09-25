@@ -32,11 +32,14 @@
                           "type": "Food"
                         }
                       },
+                      "players": {
+                        "type": "EachInSlot",
+                        "value": "you"
+                      },
                       "quantity": {
                         "type": "Literal",
                         "value": 2
-                      },
-                      "slot": "you"
+                      }
                     }
                   }
                 ],

@@ -2244,8 +2244,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1)))
-      " {\"type\":\"PlayerSacrifices\",\"value\":{\"slot\":\"t\",\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "
+      (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (PlayerRef.EachInSlot (SlotName.MkSlotName (Text.pack "t"))) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1)))
+      " {\"type\":\"PlayerSacrifices\",\"value\":{\"players\":{\"type\":\"EachInSlot\",\"value\":\"t\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1}}} "
   Spec.it s "Vote" $
     Common.assertJsonCodec
       s

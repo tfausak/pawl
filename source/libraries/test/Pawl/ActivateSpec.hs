@@ -5586,11 +5586,8 @@ printedActivationOnlyOnceEachTurnSpec s registry = Spec.describe s "PrintedActiv
 --
 -- Tithing Blade // Consuming Sepulcher {1}{B} Artifact, "Craft with creature
 -- {4}{B}", whose back face is Consuming Sepulcher (Oracle text checked against
--- Scryfall, 2026-09-19). Its front face also prints "When this artifact enters,
--- each opponent sacrifices a creature of their choice"; that clause is not
--- transcribed (#3932), which leaves pawl's card STRICTER than printed and
--- touches nothing below --- no case here puts the Blade onto the battlefield by
--- an entry.
+-- Scryfall, 2026-09-19). Its front face's entry trigger touches nothing below
+-- --- no case here puts the Blade onto the battlefield by an entry.
 --
 -- The BATTLEFIELD material is a Goblin Piker and the GRAVEYARD one an Armored
 -- Galleon, distinct printings, so a case that reads what was exiled names which

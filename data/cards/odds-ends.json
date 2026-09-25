@@ -185,11 +185,14 @@
                           }
                         ]
                       },
+                      "players": {
+                        "type": "EachInSlot",
+                        "value": "target"
+                      },
                       "quantity": {
                         "type": "Literal",
                         "value": 2
-                      },
-                      "slot": "target"
+                      }
                     }
                   }
                 ]
