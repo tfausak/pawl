@@ -1393,7 +1393,9 @@ effectObjectRefs effect =
         Effect.ForbidAttack (ForbidAttack.MkForbidAttack _ affected _) -> case affected of
           RestrictedCreatures.Named ref -> read_ [ref]
           RestrictedCreatures.Matching _ -> []
-        Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> read_ [attacker]
+        Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> case attacker of
+          RestrictedCreatures.Named ref -> read_ [ref]
+          RestrictedCreatures.Matching _ -> []
         Effect.CreateEmblem {} -> []
         Effect.BecomeMonarch {} -> []
         Effect.TakeTheInitiative {} -> []

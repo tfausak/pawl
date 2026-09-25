@@ -3,8 +3,9 @@ module Pawl.Types.RestrictedCreatures where
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 
--- | Which creatures a resolution-generated attack restriction covers
--- (Pawl.Types.ForbidAttack, Pawl.Types.ActiveAttackProhibition). The two arms are
+-- | Which creatures a resolution-generated attack restriction or requirement
+-- covers (Pawl.Types.ForbidAttack and Pawl.Types.RequireAttack, and the rows they
+-- store). The two arms are
 -- CR 611.2c's two readings of a resolving continuous effect: the objects it
 -- named when it began, and a class it re-reads thereafter.
 --

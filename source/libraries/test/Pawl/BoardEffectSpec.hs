@@ -1168,7 +1168,7 @@ actOnImpulseSpec s registry =
 --
 -- The permission lands on Object.playableFromExile under Expiry.DuringTurnOf and
 -- Pawl.Engine.Cast.permitsPlayFromExile is the gate that keeps it inert until
--- that turn -- the second carrier to ask Pawl.Engine.Expiry.begun (#3983).
+-- that turn -- the second carrier to ask Pawl.Engine.Expiry.begun.
 --
 -- THE PAIR is Commune with Lava {X}{R}{R} Instant, announced at X = 1: the same
 -- one card off the same library under a permission for the same player, differing

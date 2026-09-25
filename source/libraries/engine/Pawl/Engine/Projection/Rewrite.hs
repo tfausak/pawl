@@ -837,11 +837,14 @@ rewriteEffect pairs effect = case effect of
           RestrictedCreatures.Named ref -> RestrictedCreatures.Named (rewriteObjectRef pairs ref)
           RestrictedCreatures.Matching f -> RestrictedCreatures.Matching (Filter.rewrite pairs f)
      in Effect.ForbidAttack (ForbidAttack.MkForbidAttack (rewriteDuration pairs duration) rewritten aimedAt)
-  -- CR 612.1 reaches the OBJECT axis's ref and not its player: a word swap
-  -- changes card text, and the defender clause of Alluring Siren's sentence is
-  -- "you" rather than any word a Filter could name.
+  -- CR 612.1 reaches the OBJECT axis on either arm, ForbidAttack's reading, and
+  -- not its player: the defender clause of Alluring Siren's sentence is "you"
+  -- rather than any word a Filter could name.
   Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker defender) ->
-    Effect.RequireAttack (RequireAttack.MkRequireAttack (rewriteDuration pairs duration) (rewriteObjectRef pairs attacker) defender)
+    let rewritten = case attacker of
+          RestrictedCreatures.Named ref -> RestrictedCreatures.Named (rewriteObjectRef pairs ref)
+          RestrictedCreatures.Matching f -> RestrictedCreatures.Matching (Filter.rewrite pairs f)
+     in Effect.RequireAttack (RequireAttack.MkRequireAttack (rewriteDuration pairs duration) rewritten defender)
   -- CR 114.3 leaves an emblem no type line and no name, so its ABILITIES are the
   -- whole of what CR 612.1 can reach.
   Effect.CreateEmblem card -> Effect.CreateEmblem (rewriteCard pairs card)

@@ -704,8 +704,10 @@ effectObjectRefs effect = case effect of
   Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> [blocker, attacker]
   Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated _ ref) -> [ref]
   -- One side only: what a creature attacks is a player (CR 508.1b), so the arm
-  -- beside this one is a PlayerRef.
-  Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> [attacker]
+  -- beside this one is a PlayerRef. ForbidAttack's split below.
+  Effect.RequireAttack (RequireAttack.MkRequireAttack _ attacker _) -> case attacker of
+    RestrictedCreatures.Named ref -> [ref]
+    RestrictedCreatures.Matching _ -> []
   Effect.ForbidBlock (ForbidBlock.MkForbidBlock _ ref) -> [ref]
   -- ForbidBlock's one axis again, one rule away.
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation _ ref) -> [ref]
@@ -890,7 +892,7 @@ effectPlayerRefs effect = case effect of
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ _ playerEffect) -> PlayerEffect.playerRefsIn playerEffect
   Effect.RequireBlock {} -> []
   Effect.CantBeRegenerated {} -> []
-  Effect.RequireAttack (RequireAttack.MkRequireAttack _ _ defender) -> [defender]
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ defender) -> defender : durationPlayerRefs duration
   Effect.ForbidBlock {} -> []
   Effect.ForbidAttack {} -> []
   Effect.ForbidActivation {} -> []
@@ -1252,9 +1254,13 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ForbidBlock {} -> Map.empty
   Effect.ForbidAttack {} -> Map.empty
   Effect.ForbidActivation {} -> Map.empty
-  -- CR 508.1b's two sides are a PlayerRef and an ObjectRef, both reported at the
-  -- head, so this arm has nothing of its own.
-  Effect.RequireAttack {} -> Map.empty
+  -- CR 508.1b's two sides are reported at the head when a ref names the
+  -- creatures; a Matching class is a FILTER read, Search's, and the Duration is
+  -- ModifyTarget's -- Taunt's "target player" is read by both and nothing else.
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration attacker _) ->
+    joinTwo (durationSlots duration) $ case attacker of
+      RestrictedCreatures.Named _ -> Map.empty
+      RestrictedCreatures.Matching f -> filterSlotsOf f
   Effect.CreateEmblem {} -> Map.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm.
   Effect.BecomeMonarch target -> monarchTargetSlots target
@@ -1857,9 +1863,9 @@ ownSlotsAreExhaustive effect = case effect of
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   Effect.ForbidActivation (ForbidActivation.MkForbidActivation duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
-  -- RequireBlock's reason, one axis over.
-  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) ->
-    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- slotsOf reports the Duration and the class's Filter, ModifyTarget's and
+  -- Search's readings.
+  Effect.RequireAttack (RequireAttack.MkRequireAttack duration _ _) -> durationSlotsAreExhaustive duration
   -- CR 114.2's emblem is minted with EMPTY bindings, so its card is literal text.
   Effect.CreateEmblem _ -> True
   Effect.BecomeMonarch MonarchTarget.TheController -> True

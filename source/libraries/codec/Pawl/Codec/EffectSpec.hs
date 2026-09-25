@@ -1839,8 +1839,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     Common.assertCodec
       s
       codec
-      (Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PlayerRef.Relative PlayerRelation.You)))
-      " {\"type\":\"RequireAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"InSlot\",\"value\":\"target\"},\"defender\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
+      (Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))) (PlayerRef.Relative PlayerRelation.You)))
+      " {\"type\":\"RequireAttack\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"attacker\":{\"type\":\"Named\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}},\"defender\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
   Spec.it s "ForbidBlock" $
     Common.assertCodec
       s
