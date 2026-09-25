@@ -2723,11 +2723,13 @@ castGrantGathered gs =
 -- as a layer-6 grant from the card in exile with the card's timestamp (CR
 -- 613.7a). Read off GameState.encoded on every projection, which IS "for as long
 -- as": CR 702.99c's two conditions are the card still in exile under the id the
--- encode filed, and the creature still on the battlefield.
+-- encode filed, and the creature still on the battlefield. Both reads are a
+-- REGRESSION FENCE: CR 400.7 gives a card or creature that comes back a new id
+-- the row never named, so no test can tell either read from its absence.
 --
 -- The keyword is read off the card's PRINTED face, not its projection, which
 -- this gather is part of. The two differ only under an effect that changes the
--- abilities of a card in exile, and nothing in pawl does.
+-- abilities of a card in exile.
 encodedGathered :: GameState -> [Gathered]
 encodedGathered gs =
   let fromRow (card, creature) = case Game.lookupObject card gs of
