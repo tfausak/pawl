@@ -746,7 +746,7 @@ snapshotView viewOf gs shape event = case event of
     -- the shape excludes one.
     EventShape.CardArrivedIn arrival ->
       if arrivalMatches arrival zc
-        then Just (Maybe.fromMaybe (departedView gs zc snapshot) (arrivedView viewOf gs zc))
+        then Just (Maybe.fromMaybe (departedView gs zc snapshot) (arrivedView viewOf gs (ZoneChange.object zc)))
         else Nothing
     EventShape.SpellCast -> Nothing
   GameEvent.DamageDealt _ -> Nothing
@@ -893,7 +893,7 @@ snapshotView viewOf gs shape event = case event of
     -- Case of the Gorgon's Kiss case proves its melded half.
     EventShape.CardArrivedIn arrival ->
       if arrivalMatches arrival zc
-        then case arrivedView viewOf gs zc of
+        then case arrivedView viewOf gs (ZoneChange.object zc) of
           Just view -> Just view
           Nothing -> fmap (departedView gs zc . LastKnown.characteristics) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
         else Nothing
@@ -916,20 +916,19 @@ snapshotView viewOf gs shape event = case event of
 --
 -- Nothing when the id names nothing and nothing was filed -- a token that ceased
 -- to exist (CR 111.7) -- which sends the caller back to the departed record.
-arrivedView :: ViewOf -> GameState -> ZoneChange.ZoneChange -> Maybe Filter.View
-arrivedView viewOf gs zc =
-  let arrived = ZoneChange.object zc
-   in if Maybe.isJust (Game.lookupObject arrived gs)
-        then viewOf arrived
-        else fmap (recordedView (deployIn gs (ZoneChange.to zc))) (Map.lookup arrived (GameState.lastKnown gs))
+arrivedView :: ViewOf -> GameState -> ObjectId -> Maybe Filter.View
+arrivedView viewOf gs arrived =
+  if Maybe.isJust (Game.lookupObject arrived gs)
+    then viewOf arrived
+    else fmap (recordedView gs) (Map.lookup arrived (GameState.lastKnown gs))
 
 -- CR 608.2h's record read as a view, the way departedView reads the one filed
 -- under the departing id -- the same four non-characteristic fields off the same
 -- record, over the characteristics the record itself carries.
-recordedView :: Bool -> LastKnown.LastKnown -> Filter.View
-recordedView deploy lastKnown =
+recordedView :: GameState -> LastKnown.LastKnown -> Filter.View
+recordedView gs lastKnown =
   viewOfSnapshot
-    deploy
+    (deployIn gs (LastKnown.zone lastKnown))
     (Just (LastKnown.controller lastKnown))
     (Just (LastKnown.owner lastKnown))
     (Game.sourceIsToken (LastKnown.source lastKnown))

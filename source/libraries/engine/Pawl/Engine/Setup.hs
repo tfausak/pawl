@@ -1199,6 +1199,7 @@ applyCrossings finalSub parent =
                 -- CR 702.30a's echo window, the sibling read: per-incarnation, so
                 -- this is the last moment it exists.
                 (Object.controlClock obj)
+                (Object.zone obj)
             )
       -- One crossing: file, delete, then record. The event LAST, so that
       -- Event.recordEvent's CR 603.10 sample is of the board immediately after

@@ -12,6 +12,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Zone as Zone
 
 -- | CR 608.2h: what an object WAS, filed under the id it had while it existed.
 -- Written by the one zone-change funnel (Pawl.Engine.Event.changeZoneAttaching)
@@ -185,6 +186,10 @@ data LastKnown = MkLastKnown
     -- prints no "if this permanent is on the battlefield", so a permanent that
     -- left in response still owes its controller the choice, and this is the
     -- only place the answer still is.
-    controlClock :: !(Map.Map PlayerId.PlayerId ControlClock.ControlClock)
+    controlClock :: !(Map.Map PlayerId.PlayerId ControlClock.ControlClock),
+    -- | CR 400.1: the zone it was in as it ceased, so a reader can tell a
+    -- permanent's record (CR 109.2) from a card's or a spell's -- CR 804.2's
+    -- ability is a permanent's alone (Pawl.Engine.Projection.View).
+    zone :: !Zone.Zone
   }
   deriving (Eq, Ord, Show)

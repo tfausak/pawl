@@ -1667,10 +1667,11 @@ abilitiesFromCharacteristics peers pc oid gs =
             <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords pc))
             <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords pc))
             -- CR 804.2's, minted off the POST-LAYER types for the same reason, and
-            -- for a creature on the battlefield only (CR 109.2).
+            -- for a creature on the battlefield only (CR 109.2) -- or, for an id
+            -- that has ceased, one whose CR 608.2h record was filed there.
             <> [ Deploy.ability
                | Deploy.grants (GameSettings.deployCreatures (GameState.settings gs)) pc,
-                 fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
+                 lastZoneOf oid gs == Just Zone.Battlefield
                ]
         )
 
@@ -2022,3 +2023,10 @@ leanViewOf grants visited gs oid =
 -- controller, leaving CR 108.4a's owner.
 defaultControllerOf :: Object.Object -> PlayerId.PlayerId
 defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnder obj)
+
+-- CR 400.1 / 608.2h: the zone an object is in, or for an id that has ceased the
+-- zone its last-known record was filed from.
+lastZoneOf :: ObjectId -> GameState -> Maybe Zone.Zone
+lastZoneOf oid gs = case Game.lookupObject oid gs of
+  Just obj -> Just (Object.zone obj)
+  Nothing -> fmap LastKnown.zone (Map.lookup oid (GameState.lastKnown gs))
