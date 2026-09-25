@@ -37,11 +37,11 @@ Copy `cabal.project.local` in from the primary checkout, as a BARE command of
 its own, and confirm it is there. The worktree-isolation guard refuses a
 compound command wholesale, and its error names the other half.
 
-Then, before anything runs `cabal`, seed `dist-newstyle` from the warm
-worktree: `/abs/path/to/primary/script/warm-worktree.sh seed "$PWD"`. It
-refuses if the warm build is missing, in which case build cold and say so in
-the PR. Never build in the warm worktree yourself; the orchestrator refreshes
-it.
+Then, before anything runs `cabal`, seed `dist-newstyle` and `dist-mutate`
+from the warm worktree: `/abs/path/to/primary/script/warm-worktree.sh seed
+"$PWD"`. It refuses if the warm build is missing, in which case build cold and
+say so in the PR. Never build in the warm worktree yourself; the orchestrator
+refreshes it.
 
 ## Running the suite
 
@@ -54,8 +54,8 @@ open. Redirect output to a file and read the file, and keep
 `--hide-successes`: a passing run otherwise prints a line per test, more than a
 whole unit's token budget. Build with `cabal build -v0`, which drops cabal's
 progress noise and still prints GHC's errors in full. One build at a time; no
-`cabal clean`; keep the optimizer on (`-O0` saves under a minute cold and then
-blows the suite's timeouts).
+`cabal clean`; keep the optimizer on for the suite (`-O0` saves under a minute
+cold and then blows the suite's timeouts). Mutations are the exception, below.
 
 The timeout catches infinite loops; it is not an assertion about speed. The
 machine is shared, so a lone TIMEOUT is background noise --- re-run it unloaded
@@ -129,6 +129,15 @@ restores the file from a `trap`. Its exit status is the outcome --- red,
 nothing red, did not compile, or pattern matched nothing, which tasty otherwise
 reports as a pass. `--help` has the codes. Run it, like every `cabal` call,
 through `script/with-build-lock.sh`.
+
+It builds at `-O0` in `dist-mutate/`, apart from the suite's `-O1` build. At
+`-O1` a body-only mutation of a core module recompiles everything downstream
+of it, twice over once the file is restored --- about twenty minutes for one
+mutation of `Pawl.Engine.Event`, where `-O0` takes seconds (#4122). The first
+`-O0` build after a real edit that changes an interface --- a new
+constructor, field or top-level binding --- still recompiles every importer,
+about three minutes; each mutation after it is fast again. Keep the pattern
+narrow: unoptimized tests are slow.
 
 What it does **not** do is judge whether the assertion it names is the
 gameplay-level one. A proxy ahead of the behavioural assertion produces a

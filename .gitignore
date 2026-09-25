@@ -3,4 +3,5 @@
 /.superpowers/
 /_scratch/
 /cabal.project.*
+/dist-mutate/
 /dist-newstyle/
