@@ -179,6 +179,7 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.HandAction as HandAction
+import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
@@ -2938,6 +2939,7 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.76a and CR 702.173a: the prowl and freerunning costs, flashback's shape.
   Keyword.Prowl cost -> costFilters cost
   Keyword.Freerunning cost -> costFilters cost
+  Keyword.Impending (Impending.MkImpending _ cost) -> costFilters cost
   -- CR 702.103a: the bestow cost, whose components may hold a Filter exactly as
   -- flashback's may.
   Keyword.Bestow cost -> costFilters cost
