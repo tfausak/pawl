@@ -1341,6 +1341,12 @@ data Context = MkContext
     -- IsHostOfSource where the source's host is unknown", the sweep sourcePower's
     -- and slotNames' siblings each have.
     sourceAttachedTo :: Maybe ObjectId.ObjectId,
+    -- CR 400.7: the objects an effect of the SOURCE put onto the battlefield, as
+    -- those objects, for EnteredWithSource. Filled from GameState.enteredWith by
+    -- Pawl.Engine.Target.slotContext, where an enchant ability is matched; empty
+    -- everywhere else, and the atom then matches nothing. LAZY: filling it scans
+    -- the relation.
+    sourceEntrants :: Set.Set ObjectId.ObjectId,
     -- CR 108.3: the OWNER of the SOURCE, for the one atom that compares a
     -- candidate's owner against it (SameOwnerAsSource, CR 702.140a's "with the
     -- same owner as this spell"). sourceNames' sibling, though CR 109.3 makes an
@@ -1550,7 +1556,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1588,7 +1594,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -2081,6 +2087,7 @@ matches context view predicate = case predicate of
   Filter.IsHostOfSource -> case (identity view, sourceAttachedTo context) of
     (Just oid, Just host) -> oid == host
     _ -> False
+  Filter.EnteredWithSource -> maybe False (`Set.member` sourceEntrants context) (identity view)
   -- CR 701.3a: a live read of the legality of the attach this match is framing,
   -- computed by the caller that knows what is moving. Vacuously False outside one.
   Filter.CanHostSubject -> canHostSubject view
@@ -2348,6 +2355,7 @@ rewrite pairs predicate = case predicate of
   Filter.HasAttached f -> Filter.HasAttached (rewrite pairs f)
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
+  Filter.EnteredWithSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
   Filter.HostOfSubjectHasCardType _ -> predicate
@@ -2956,37 +2964,15 @@ rewriteComponent pairs component = case component of
 -- carry a Filter must fail to compile here instead of silently keeping an
 -- unbaked one.
 bakeBound :: Map.Map SlotName.SlotName PlayerId.PlayerId -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
-bakeBound players = bakeAtoms $ \predicate -> case predicate of
-  Filter.ControlledByBound slot -> fmap Filter.ControlledByPlayer (Map.lookup slot players)
-  _ -> Nothing
-
--- CR 608.2h: replace every IsBound atom whose slot this environment names with
--- the objects it holds, determined once as a resolution stores a continuous
--- effect (Pawl.Engine.Projection.freezeQuantities). What makes Animate Dead's
--- granted "enchant creature put onto the battlefield with this Aura" answerable
--- after the resolution that bound the creature has ended. Left standing, and so
--- False, where the slot names nothing: the return did not happen.
-bakeObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId.ObjectId) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
-bakeObjects objects = bakeAtoms $ \predicate -> case predicate of
-  Filter.IsBound slot -> fmap (Filter.Or . fmap Filter.IsObject . Set.toList) (Map.lookup slot objects)
-  _ -> Nothing
-
--- The descent bakeBound and bakeObjects share: `atom` answers the atoms it bakes,
--- and every other is rebuilt around its baked nest or kept as it stands.
-bakeAtoms :: (Filter.Filter Keyword.Type.Keyword -> Maybe (Filter.Filter Keyword.Type.Keyword)) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
-bakeAtoms atom predicate = Maybe.fromMaybe (bakeNested atom predicate) (atom predicate)
-
--- bakeAtoms' one level of descent, for a predicate `atom` left alone.
-bakeNested :: (Filter.Filter Keyword.Type.Keyword -> Maybe (Filter.Filter Keyword.Type.Keyword)) -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
-bakeNested atom predicate = case predicate of
-  Filter.ControlledByBound _ -> predicate
-  Filter.And fs -> Filter.And (fmap (bakeAtoms atom) fs)
-  Filter.Or fs -> Filter.Or (fmap (bakeAtoms atom) fs)
-  Filter.Not f -> Filter.Not (bakeAtoms atom f)
+bakeBound players predicate = case predicate of
+  Filter.ControlledByBound slot -> maybe predicate Filter.ControlledByPlayer (Map.lookup slot players)
+  Filter.And fs -> Filter.And (fmap (bakeBound players) fs)
+  Filter.Or fs -> Filter.Or (fmap (bakeBound players) fs)
+  Filter.Not f -> Filter.Not (bakeBound players f)
   -- Descended into for the reason `rewrite` descends: the nested filter is a
   -- filter like any other, and a slot named inside it must be baked before the
   -- match or it can never be answered.
-  Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (bakeAtoms atom f)
+  Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (bakeBound players f)
   Filter.ControlledByPlayer _ -> predicate
   -- Untouched: CR 603.2's slot is not the recipient an effect has reached, and no
   -- binding could answer this atom -- Pawl.Engine.Filter.Context carries it.
@@ -3031,8 +3017,8 @@ bakeNested atom predicate = case predicate of
   -- DESCENDED into for the reason AttachedTo below is: the nest is a description
   -- of another object and may name a bound slot, which this function's pairing
   -- with overBoundSlots requires be baked here and reported there.
-  Filter.TargetsOnlyOne f -> Filter.TargetsOnlyOne (bakeAtoms atom f)
-  Filter.TargetsMatching f -> Filter.TargetsMatching (bakeAtoms atom f)
+  Filter.TargetsOnlyOne f -> Filter.TargetsOnlyOne (bakeBound players f)
+  Filter.TargetsMatching f -> Filter.TargetsMatching (bakeBound players f)
   Filter.TargetsPlayer _ -> predicate
   -- Untouched for the reason IsControllerOfBound below is, and one step shorter:
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
@@ -3079,17 +3065,18 @@ bakeNested atom predicate = case predicate of
   -- into the HOST's description is baked exactly as the same atom written at the
   -- top level would be. Pawl.Engine.Filter.boundSlots descends to match, which is
   -- the pairing that function's comment insists on.
-  Filter.AttachedTo f -> Filter.AttachedTo (bakeAtoms atom f)
+  Filter.AttachedTo f -> Filter.AttachedTo (bakeBound players f)
   -- DESCENT, for the atom above's reason: a ControlledByBound written into the
   -- represented card's description is baked exactly as the same atom at the top
   -- level would be, and Pawl.Engine.Filter.boundSlots descends to match.
-  Filter.RepresentedByCard f -> Filter.RepresentedByCard (bakeAtoms atom f)
+  Filter.RepresentedByCard f -> Filter.RepresentedByCard (bakeBound players f)
   -- DESCENT, for the atom above's reason: a ControlledByBound written into the
   -- ATTACHER's description is baked exactly as the same atom at the top level
   -- would be, and Pawl.Engine.Filter.boundSlots descends to match.
-  Filter.HasAttached f -> Filter.HasAttached (bakeAtoms atom f)
+  Filter.HasAttached f -> Filter.HasAttached (bakeBound players f)
   Filter.IsAttachedToSource -> predicate
   Filter.IsHostOfSource -> predicate
+  Filter.EnteredWithSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.CanAttachToSubject -> predicate
   Filter.HostOfSubjectHasCardType _ -> predicate
@@ -3101,7 +3088,7 @@ bakeNested atom predicate = case predicate of
   -- Descended into, HasAttached's reason: the SOURCE's description is baked
   -- exactly as the same atom at the top level would be, and boundSlots descends
   -- to match.
-  Filter.FromSource f -> Filter.FromSource (bakeAtoms atom f)
+  Filter.FromSource f -> Filter.FromSource (bakeBound players f)
   Filter.IsTapped -> predicate
   Filter.IsFaceDown -> predicate
   Filter.IsExiledFaceDown -> predicate
@@ -3256,6 +3243,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasAttached f -> manaValueThresholds f
   Filter.IsAttachedToSource -> []
   Filter.IsHostOfSource -> []
+  Filter.EnteredWithSource -> []
   Filter.CanHostSubject -> []
   Filter.CanAttachToSubject -> []
   Filter.HostOfSubjectHasCardType _ -> []
@@ -3424,6 +3412,7 @@ statesAQuality predicate = case predicate of
   Filter.HasAttached _ -> True
   Filter.IsAttachedToSource -> True
   Filter.IsHostOfSource -> True
+  Filter.EnteredWithSource -> True
   Filter.CanHostSubject -> True
   Filter.CanAttachToSubject -> True
   -- True for the two atoms above's reason and not because it describes the

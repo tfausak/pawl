@@ -126,6 +126,7 @@ codec keywordCodec =
       Arm.payload "HasAttached" (codec keywordCodec) Filter.HasAttached (\x -> case x of Filter.HasAttached y -> Just y; _ -> Nothing),
       Arm.nullary "IsAttachedToSource" Filter.IsAttachedToSource,
       Arm.nullary "IsHostOfSource" Filter.IsHostOfSource,
+      Arm.nullary "EnteredWithSource" Filter.EnteredWithSource,
       Arm.nullary "CanHostSubject" Filter.CanHostSubject,
       Arm.nullary "CanAttachToSubject" Filter.CanAttachToSubject,
       Arm.payload "HostOfSubjectHasCardType" CardType.codec Filter.HostOfSubjectHasCardType (\x -> case x of Filter.HostOfSubjectHasCardType y -> Just y; _ -> Nothing),
@@ -234,6 +235,7 @@ tagOf x = case x of
   Filter.HasAttached {} -> "HasAttached"
   Filter.IsAttachedToSource {} -> "IsAttachedToSource"
   Filter.IsHostOfSource {} -> "IsHostOfSource"
+  Filter.EnteredWithSource {} -> "EnteredWithSource"
   Filter.CanHostSubject {} -> "CanHostSubject"
   Filter.CanAttachToSubject {} -> "CanAttachToSubject"
   Filter.HostOfSubjectHasCardType {} -> "HostOfSubjectHasCardType"

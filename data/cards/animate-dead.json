@@ -1,6 +1,37 @@
 {
   "faces": [
     {
+      "delayedAbilities": {
+        "sacrifice the returned creature": {
+          "condition": {
+            "type": "SelfLeavesTheBattlefield"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Sacrifice",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "returned"
+                          },
+                          "sacrificer": {
+                            "type": "PermanentController"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
       "enchant": [
         {
           "filter": {
@@ -121,40 +152,6 @@
                   {
                     "effects": [
                       {
-                        "type": "MoveToZone",
-                        "value": {
-                          "ref": {
-                            "type": "EachCardInGraveyard",
-                            "value": {
-                              "filter": {
-                                "type": "And",
-                                "value": [
-                                  {
-                                    "type": "HasCardType",
-                                    "value": {
-                                      "type": "Creature"
-                                    }
-                                  },
-                                  {
-                                    "type": "IsHostOfSource"
-                                  }
-                                ]
-                              },
-                              "graveyards": {
-                                "type": "Scoped",
-                                "value": {
-                                  "type": "EachPlayer"
-                                }
-                              }
-                            }
-                          },
-                          "slot": "returned",
-                          "zone": {
-                            "type": "Battlefield"
-                          }
-                        }
-                      },
-                      {
                         "type": "ModifyTarget",
                         "value": {
                           "duration": {
@@ -196,8 +193,7 @@
                             "type": "GainEnchant",
                             "value": {
                               "filter": {
-                                "type": "IsBound",
-                                "value": "returned"
+                                "type": "EnteredWithSource"
                               },
                               "pool": {
                                 "type": "Creatures"
@@ -211,38 +207,47 @@
                         }
                       },
                       {
-                        "type": "Attach",
-                        "value": "returned"
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "condition": {
-            "type": "SelfLeavesTheBattlefield"
-          },
-          "modal": {
-            "modes": [
-              {
-                "clauses": [
-                  {
-                    "effects": [
-                      {
-                        "type": "Sacrifice",
+                        "type": "MoveToZone",
                         "value": {
                           "ref": {
-                            "type": "EachMatching",
+                            "type": "EachCardInGraveyard",
                             "value": {
-                              "type": "IsHostOfSource"
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Creature"
+                                    }
+                                  },
+                                  {
+                                    "type": "IsHostOfSource"
+                                  }
+                                ]
+                              },
+                              "graveyards": {
+                                "type": "Scoped",
+                                "value": {
+                                  "type": "EachPlayer"
+                                }
+                              }
                             }
                           },
-                          "sacrificer": {
-                            "type": "PermanentController"
+                          "slot": "returned",
+                          "zone": {
+                            "type": "Battlefield"
                           }
+                        }
+                      },
+                      {
+                        "type": "Attach",
+                        "value": "returned"
+                      },
+                      {
+                        "type": "ArmDelayedTrigger",
+                        "value": {
+                          "name": "sacrifice the returned creature"
                         }
                       }
                     ]

@@ -878,7 +878,6 @@ lastKnownRiderSpec s registry =
                     -- is filed under a still-live id by hand rather than by the
                     -- funnel, and nothing here reads the look-back.
                     LastKnown.attached = Set.empty,
-                    LastKnown.host = Nothing,
                     -- CR 201.4: nothing named a card here.
                     LastKnown.chosenNames = Set.empty,
                     -- CR 508.1k / 509.1g: this board declares no combat at all.

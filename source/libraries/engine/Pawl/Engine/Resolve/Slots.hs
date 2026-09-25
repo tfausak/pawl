@@ -112,7 +112,6 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
-import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
@@ -2418,8 +2417,9 @@ playerRefPlayers legal controller gs ref =
 -- CANDIDATES ObjectRef.AnyNumberMatching offers -- shared so a card cannot find
 -- the sweep and the offer disagreeing about what matches.
 --
--- CR 303.4b's host is supplied by sourceHost below. Read live, so an Aura moved
--- between the trigger and its resolution acts on the host it has now.
+-- CR 303.4b's host is supplied here and for EachCardInGraveyard below. Read
+-- live, so an Aura moved between the trigger and its resolution acts on the host
+-- it has now.
 --
 -- Through effectContext, so the resolution's own slot bindings ride along and a
 -- sweep can exclude what another slot already named: Showstopping Surprise's
@@ -2428,17 +2428,9 @@ playerRefPlayers legal controller gs ref =
 -- leave such a card silently sweeping in its own target. It is also what answers
 -- a CONTROLLER-relative conjunct -- Tovolar's "Human Werewolves you control" is
 -- `ControlledBy You`, read against CR 109.5's perspective.
--- CR 303.4b / 608.2h: what the SOURCE enchants, live, or as it last existed once
--- it has left -- Animate Dead's leaves-the-battlefield trigger sacrificing "that
--- creature". Pawl.AuraSpec's Animate Dead group proves the look-back.
-sourceHost :: ObjectId -> GameState -> Maybe ObjectId
-sourceHost source gs = case Game.lookupObject source gs of
-  Just _ -> Projection.hostOf source gs
-  Nothing -> Projection.lastKnownOf source gs >>= LastKnown.host
-
 battlefieldMatching :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 battlefieldMatching legal resolving controller source gs filter_ =
-  let context = (effectContext gs controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = sourceHost source gs}
+  let context = (effectContext gs controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
       viewOf = Projection.viewsOf gs
       -- CR 603.2's player slots baked in, exactly as Pawl.Engine.Target.bakeSlots
       -- does it for a MODE's target filter and off the same map: Filter.matches
@@ -2524,7 +2516,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) ->
     -- With CR 303.4b's host filled for Animate Dead's "return enchanted
     -- creature card".
-    let context = (effectContext gs controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = sourceHost source gs}
+    let context = (effectContext gs controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
      in concatMap (\pid -> graveyardCardsOf context gs pid filter_) (zoneScopePlayers legal controller gs scope)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,

@@ -4362,6 +4362,61 @@ animateDeadSpec s registry = Spec.describe s "Animate Dead" $ do
       "the leaves trigger sacrifices it into bob's graveyard"
       (named pikerName Zone.Battlefield S.bob sacrificed, length (named pikerName Zone.Graveyard S.bob sacrificed))
       ([], 1)
+  -- The Gatherer ruling's case: protection from black refuses the attach (CR
+  -- 702.16c), so CR 704.5m buries the Aura, and the delayed ability the trigger
+  -- created (CR 603.7a) still sacrifices "that creature" -- the returned one,
+  -- which the Aura was never attached to.
+  Spec.it s "CR 603.7a: a returned creature the Aura cannot enchant is still sacrificed" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    apostle <- S.printingOf s registry "Apostle of Purifying Light"
+    animate <- S.printingOf s registry "Animate Dead"
+    let apostleName = CardName.MkCardName (Text.pack "Apostle of Purifying Light")
+        (apostleCard, base0) = S.addGraveyardCard apostle S.bob (S.landsInPlay swamp 2)
+        (gs, spellId) = S.handOne animate base0
+        cast = snd (Engine.runGamePure (aimedAtObject apostleCard) gs (S.cast S.alice spellId))
+        entered = S.settleSba (step Stack.resolveTop cast)
+        returned = S.settleSba (step Stack.resolveTop (step Engine.placePendingTriggers entered))
+        sacrificed = S.settleSba (step Stack.resolveTop (step Engine.placePendingTriggers returned))
+    Spec.assertEqWith
+      s
+      "the Apostle is sacrificed into bob's graveyard"
+      (named apostleName Zone.Battlefield S.bob sacrificed, length (named apostleName Zone.Graveyard S.bob sacrificed))
+      ([], 1)
+    -- After the read above, so it absorbs nothing: the Apostle really came back,
+    -- and Animate Dead really was buried.
+    Spec.assertEqWith
+      s
+      "it had returned under alice's control, and Animate Dead was buried"
+      (fmap (`Projection.controllerOf` returned) (named apostleName Zone.Battlefield S.bob returned), length (named animateName Zone.Graveyard S.alice returned))
+      ([Just S.alice], 1)
+  -- CR 702.5c: a copy of the trigger (Lithoform Engine, CR 707.10) returns the
+  -- Piker, and the original then grants a second "enchant creature put onto the
+  -- battlefield with this Aura" -- which the Piker satisfies too.
+  Spec.it s "CR 702.5c: a copied trigger's second granted enchant still admits the returned creature" $ do
+    (_, cast0) <- setUp
+    engine <- S.printingOf s registry "Lithoform Engine"
+    swamp <- S.printingOf s registry "Swamp"
+    let (engineId, cast1) = S.addPermanent engine S.alice cast0
+        cast = S.landsFor swamp S.alice 2 cast1
+        entered = S.settleSba (step Stack.resolveTop cast)
+        placed = step Engine.placePendingTriggers entered
+        copier = List.find ((== Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) . Cost.Type.mana . ActivatedAbility.cost) (Projection.abilitiesOf engineId placed)
+        settle g = S.settleSba (step (Stack.resolveTop >> Engine.settleForPriority) g)
+    case (GameState.stack placed, copier) of
+      (etb : _, Just ability) -> do
+        let staged = S.runPure (aimedAtObject etb) placed {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId ability)
+            returned = settle (settle (settle staged))
+            creatures = named pikerName Zone.Battlefield S.bob returned
+            enchantedBy creature = fmap (\aura -> fmap Face.name (Game.faceOf aura returned)) (attachedTo creature returned)
+        Spec.assertEqWith
+          s
+          "the Piker stays, Animate Dead on it"
+          (fmap (\creature -> (Projection.controllerOf creature returned, enchantedBy creature)) creatures)
+          [(Just S.alice, [Just animateName])]
+        Spec.assertEqWith s "and every trigger resolved" (GameState.stack returned) []
+        -- The copy really ran: two granted instances, one per resolution.
+        Spec.assertEqWith s "and the Aura holds two granted enchant instances" (fmap (length . (`Projection.enchantOf` returned)) (concatMap (`attachedTo` returned) creatures)) [2]
+      _ -> Spec.assertFailure s "Animate Dead's trigger should be on the stack, and Lithoform Engine should have its {2} ability"
   Spec.it s "CR 608.3b: the Aura spell whose graveyard target left does not resolve" $ do
     (pikerCard, cast) <- setUp
     let exiled = step (Event.changeZone pikerCard Zone.Exile) cast

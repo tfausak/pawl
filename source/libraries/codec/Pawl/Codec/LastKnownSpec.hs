@@ -45,7 +45,6 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.counters = Map.singleton CounterKind.PlusOnePlusOne 3,
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.attached = Set.singleton (ObjectId.MkObjectId 9),
-          LastKnown.host = Just (ObjectId.MkObjectId 11),
           LastKnown.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")),
           LastKnown.attacking = False,
           LastKnown.attackTarget = Nothing,
@@ -61,7 +60,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"counters\":[{\"key\":{\"type\":\"PlusOnePlusOne\"},\"value\":3}]"
           <> ",\"copiable\":"
           <> minimalJson
-          <> ",\"attached\":[9],\"host\":11"
+          <> ",\"attached\":[9]"
           <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]"
           <> ",\"controlClock\":[{\"player\":1,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]"
@@ -82,7 +81,6 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.counters = Map.empty,
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.attached = Set.empty,
-          LastKnown.host = Nothing,
           LastKnown.chosenNames = Set.empty,
           LastKnown.attacking = True,
           LastKnown.attackTarget = Just (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),

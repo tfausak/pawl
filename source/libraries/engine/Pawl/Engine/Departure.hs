@@ -265,7 +265,6 @@ objectsLeaveWith pid gs =
                 -- CR 303.4b / 301.5a with the arrow turned round, taken
                 -- while the answer still exists (CR 603.10a).
                 (Game.attachments oid gs)
-                (Projection.hostOf oid gs)
                 (Object.chosenNames obj)
                 -- CR 508.1k, the sibling read of the same record.
                 (Game.isAttacking oid gs)

@@ -1172,10 +1172,7 @@ freezeQuantities gs announcedOn source context m =
         -- Its cost is derived at projection time, not evaluated from a Quantity,
         -- so there is nothing here to freeze.
         Modification.GainFlashbackAtManaCost -> Just m
-        -- CR 608.2h: a slot the resolution bound, baked to the objects it
-        -- holds, since the grant outlives the bindings -- Animate Dead's
-        -- "enchant creature put onto the battlefield with this Aura".
-        Modification.GainEnchant slot -> Just (Modification.GainEnchant slot {TargetSlot.filter = fmap (Filter.bakeObjects (Filter.slotObjects context)) (TargetSlot.filter slot)})
+        Modification.GainEnchant _ -> Just m
         Modification.LoseEnchant _ -> Just m
         -- The granted ability's own quantities are NOT frozen: CR 611.2d fixes a
         -- variable in this effect, not in a quoted ability's own future one.
@@ -2253,6 +2250,8 @@ removesAbilities m = case m of
   -- A grant, the other direction of CR 613.1f, exactly as GainKeyword above and
   -- GainAbility below.
   Modification.GainEnchant _ -> False
+  -- FALSE for LoseKeyword's reason: it takes one enchant instance out of the
+  -- projected list and leaves every other ability, so nothing is gated.
   Modification.LoseEnchant _ -> False
   -- The other direction of CR 613.1f: a grant is not a removal, so timestamp
   -- order alone decides whether a granted ability survives Humility. Proven
@@ -2981,6 +2980,7 @@ filterReads f = case f of
   Filter.Type.HasAttached g -> filterReads g
   Filter.Type.IsAttachedToSource -> Set.empty
   Filter.Type.IsHostOfSource -> Set.empty
+  Filter.Type.EnteredWithSource -> Set.empty
   -- Over-declared deliberately, per the note on Aspect above: the characteristics
   -- behind this atom are the candidate's (CR 301.5) and the subject's (CR
   -- 702.5a), and nothing distinguishes the two here.
@@ -3243,6 +3243,7 @@ filterReadsPeers f = case f of
   Filter.Type.ControlledSinceTurnBegan -> False
   Filter.Type.IsAttachedToSource -> False
   Filter.Type.IsHostOfSource -> False
+  Filter.Type.EnteredWithSource -> False
   Filter.Type.IsToken -> False
   Filter.Type.IsCommander -> False
   Filter.Type.IsActivatedAbility -> False
@@ -5010,6 +5011,7 @@ grantsKeywordWhere p m = case m of
   -- Hands out CR 702.5a's enchant, which is not a Pawl.Types.Keyword at all, so
   -- there is nothing here for `p` to be asked about.
   Modification.GainEnchant _ -> False
+  -- Takes CR 702.5a's enchant away, and hands out nothing.
   Modification.LoseEnchant _ -> False
   -- Hands out an ability, which is a keyword grant only when it is a static
   -- one whose own modifications grant one.

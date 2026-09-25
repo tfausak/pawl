@@ -19,8 +19,8 @@ import qualified Pawl.Types.Zone as Zone
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Fifteen things rather than the characteristics alone, because the other
--- fourteen questions CR 608.2h is asked have no home in that fold. Control is not a
+-- Fourteen things rather than the characteristics alone, because the other
+-- thirteen questions CR 608.2h is asked have no home in that fold. Control is not a
 -- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
 -- SOURCE: the projection folds characteristics, and CR 603.7's delayed-ability
@@ -29,7 +29,7 @@ import qualified Pawl.Types.Zone as Zone
 -- Nor are COUNTERS -- CR 109.3's list has none -- and unlike the other two the
 -- projection actively CONSUMES them (CR 613.4c), so the record has to be taken
 -- beside it rather than out of it. The COPIABLE values are the fourth, for the
--- reason its own field gives. Nor is the ATTACHMENT, the fifth, in either direction -- CR 109.3
+-- reason its own field gives. Nor is the ATTACHMENT, the fifth -- CR 109.3
 -- names "what an Aura enchants" as an example of what is not one. Nor are the
 -- CHOSEN NAMES, the sixth, for the reason its own field gives. Nor is the
 -- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
@@ -38,7 +38,7 @@ import qualified Pawl.Types.Zone as Zone
 -- reason its own field gives. Nor are the COSTS PAID, the twelfth, nor the
 -- CONTROL CLOCK, the thirteenth, for the reasons their own fields give.
 --
--- Every field STRICT (!): entries are keyed by an id that no longer exists
+-- All fourteen fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -114,10 +114,6 @@ data LastKnown = MkLastKnown
     --
     -- Empty for everything nothing was attached to, which is most objects.
     attached :: !(Set.Set ObjectId.ObjectId),
-    -- | CR 303.4b / 608.2h: the OBJECT this one was attached to as it left --
-    -- Animate Dead's "that creature", read by Filter.IsHostOfSource once the Aura
-    -- is gone. Nothing where it was attached to nothing or to a player.
-    host :: !(Maybe ObjectId.ObjectId),
     -- | CR 201.4: the card names that had been chosen for it -- the same
     -- Object.chosenNames the live object carried. What CR 608.2h answers for a
     -- CR 611.2c effect whose source chose a name and then left the zone it was
