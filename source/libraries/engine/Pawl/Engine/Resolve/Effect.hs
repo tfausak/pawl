@@ -1975,6 +1975,15 @@ pushControl pid row gs =
   let after new old = old <> new
    in gs {GameState.control = Map.insertWith after pid (pure row) (GameState.control gs)}
 
+-- CR 723.1 / 805.8: the players an effect making `controller` control `target`
+-- reaches -- `target`, and under the shared team turns option each of their
+-- teammates but `controller`, who cannot be made to control themselves through
+-- their team. `target` itself stays even when it is `controller`, which is CR
+-- 723.1a's way of taking one's own decisions back.
+controlledTeam :: PlayerId -> PlayerId -> GameState -> [PlayerId]
+controlledTeam controller target gs =
+  filter (\pid -> pid == target || (pid /= controller && Turn.sharesTurn gs target pid)) (GameState.turnOrder gs)
+
 -- CR 402.3 with a CR 608.2d choice: each hand the reference names is offered to
 -- its OWN owner (a hand's cards are that player's alone), who picks one card
 -- matching the filter. The candidates are read as the instruction is reached (CR
@@ -4028,7 +4037,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Just (Recipient.ToPlayer target) ->
           -- CR 723.1: schedule control of `target` by this ability's controller
           -- (CR 723.5). Map.insert overwrites a prior pending control (CR 723.1a).
-          gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
+          let schedule g pid = g {GameState.pendingControl = Map.insert pid (Decider.MkDecider controller) (GameState.pendingControl g)}
+           in List.foldl' schedule gs (controlledTeam controller target gs)
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
   -- CR 723.2: control that takes hold NOW and lapses when this object finishes
@@ -4044,14 +4054,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     State.modify' $ \gs ->
       case legalOne slot legal of
         Just (Recipient.ToPlayer target) ->
-          pushControl
-            target
-            PlayerControl.MkPlayerControl
-              { PlayerControl.decider = Decider.MkDecider controller,
-                PlayerControl.duration = ControlDuration.UntilResolutionEnds,
-                PlayerControl.manaFromLandsOnly = landsOnly
-              }
-            gs
+          let row =
+                PlayerControl.MkPlayerControl
+                  { PlayerControl.decider = Decider.MkDecider controller,
+                    PlayerControl.duration = ControlDuration.UntilResolutionEnds,
+                    PlayerControl.manaFromLandsOnly = landsOnly
+                  }
+           in List.foldl' (\g pid -> pushControl pid row g) gs (controlledTeam controller target gs)
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot mBuried mPermanents) -> do
