@@ -427,7 +427,9 @@ applying pid gs =
           ActivePlayerEffect.scope active,
           ActivePlayerEffect.effect active
         )
-      stored = fmap storedOne (GameState.playerEffects gs)
+      -- CR 611.2a: a row whose window has not begun applies to nobody yet --
+      -- Sphinx's Decree's "during that player's next turn" (Expiry.begun).
+      stored = fmap storedOne (filter (Expiry.begun gs . ActivePlayerEffect.expiry) (GameState.playerEffects gs))
       -- CR 116.2d: a player who has paid to ignore a permanent's static ability
       -- sees no row that ability produced -- "the effect from that ability",
       -- matched by the name its face gives it, so a permanent's OTHER abilities

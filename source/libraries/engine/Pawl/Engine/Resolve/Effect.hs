@@ -7068,50 +7068,60 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- re-resolved on every read. A NAMED set is baked, the bindings that answer a
     -- target slot (CR 601.2c) being gone once this resolution is over; an
     -- unfilled or illegal slot stores nothing (CR 608.2b).
-    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
-      -- CR 611.2b: the duration never started, so nothing is stored.
-      Nothing -> gs
-      Just expiry ->
-        let baked = case affected of
-              AffectedPlayers.Scoped scope -> [AffectedPlayers.Scoped scope]
-              -- Through playerRefPlayers so the slot is read exactly as every
-              -- other opcode reads one, CR 608.2b's empty answer included.
-              AffectedPlayers.Named slot ->
-                fmap AffectedPlayers.Named (playerRefPlayers legal controller gs (PlayerRef.InSlot slot))
-            -- CR 601.2c / 608.2b: a zone reference inside the payload is a read of
-            -- this resolution's bindings, so it is baked here for the reason the
-            -- Named set above is -- Sen Triplets' "that player's hand" is the
-            -- targeted opponent, and the slot is gone once this resolution is.
-            -- Pawl.Engine.Condition.bakeBound is the precedent, and its posture
-            -- for a slot naming nobody: the reference is left standing and reads
-            -- as naming nobody, rather than falling back to some other seat.
-            withPlayers = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
-            -- CR 601.2c / 608.2b again, one payload over: a DamagePattern's
-            -- `boundRecipient` names the slot this resolution filled, and the
-            -- recipient it named is written into `whichRecipient` here --
-            -- Whippoorwill's "damage that would be dealt to THAT CREATURE this
-            -- turn can't be prevented". The slot dies with the resolution, so
-            -- nothing later could read it; installDamageRow bakes a shield's
-            -- recipient at the same moment and for the same reason.
-            --
-            -- Through the LIST applicative, so a slot naming several recipients
-            -- stores one effect apiece and a slot naming none stores nothing at
-            -- all, which is rule 608.2b's answer for an illegal target. A
-            -- pattern naming no slot yields exactly one effect, unchanged.
-            bakedEffects = PlayerEffect.overDamagePatterns (bakeDamagePatternRecipient legal resolving controller source gs) withPlayers
-            install g (scope, bakedEffect) =
-              let (ts, g1) = Game.freshTimestamp g
-                  active =
-                    ActivePlayerEffect.MkActivePlayerEffect
-                      { ActivePlayerEffect.source = source,
-                        ActivePlayerEffect.controller = controller,
-                        ActivePlayerEffect.timestamp = ts,
-                        ActivePlayerEffect.expiry = expiry,
-                        ActivePlayerEffect.scope = scope,
-                        ActivePlayerEffect.effect = bakedEffect
-                      }
-               in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
-         in List.foldl' install gs ((,) <$> baked <*> bakedEffects)
+    State.modify' $ \gs ->
+      let baked = case affected of
+            AffectedPlayers.Scoped scope -> [AffectedPlayers.Scoped scope]
+            -- Through playerRefPlayers so the slot is read exactly as every
+            -- other opcode reads one, CR 608.2b's empty answer included.
+            AffectedPlayers.Named slot ->
+              fmap AffectedPlayers.Named (playerRefPlayers legal controller gs (PlayerRef.InSlot slot))
+          -- CR 601.2c / 608.2b: a zone reference inside the payload is a read of
+          -- this resolution's bindings, so it is baked here for the reason the
+          -- Named set above is -- Sen Triplets' "that player's hand" is the
+          -- targeted opponent, and the slot is gone once this resolution is.
+          -- Pawl.Engine.Condition.bakeBound is the precedent, and its posture
+          -- for a slot naming nobody: the reference is left standing and reads
+          -- as naming nobody, rather than falling back to some other seat.
+          withPlayers = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
+          -- CR 601.2c / 608.2b again, one payload over: a DamagePattern's
+          -- `boundRecipient` names the slot this resolution filled, and the
+          -- recipient it named is written into `whichRecipient` here --
+          -- Whippoorwill's "damage that would be dealt to THAT CREATURE this
+          -- turn can't be prevented". The slot dies with the resolution, so
+          -- nothing later could read it; installDamageRow bakes a shield's
+          -- recipient at the same moment and for the same reason.
+          --
+          -- Through the LIST applicative, so a slot naming several recipients
+          -- stores one effect apiece and a slot naming none stores nothing at
+          -- all, which is rule 608.2b's answer for an illegal target. A
+          -- pattern naming no slot yields exactly one effect, unchanged.
+          bakedEffects = PlayerEffect.overDamagePatterns (bakeDamagePatternRecipient legal resolving controller source gs) withPlayers
+          -- CR 611.2b: a duration that never started stores nothing. A window
+          -- naming "that player" (Expiry.perSeat) is one window per affected
+          -- player, each its own row over that one seat: Sphinx's Decree's
+          -- opponents each have a different next turn, so the set is fixed as
+          -- the effect begins.
+          armed = case Expiry.perSeat duration of
+            Nothing -> [(scope, expiry) | expiry <- Maybe.maybeToList (Expiry.arm legal controller source duration gs), scope <- baked]
+            Just seated ->
+              [ (AffectedPlayers.Named pid, expiry)
+              | pid <- Game.stillPlaying gs,
+                any (PlayerEffect.applies pid controller gs) baked,
+                expiry <- Maybe.maybeToList (Expiry.arm legal controller source (seated pid) gs)
+              ]
+          install g ((scope, expiry), bakedEffect) =
+            let (ts, g1) = Game.freshTimestamp g
+                active =
+                  ActivePlayerEffect.MkActivePlayerEffect
+                    { ActivePlayerEffect.source = source,
+                      ActivePlayerEffect.controller = controller,
+                      ActivePlayerEffect.timestamp = ts,
+                      ActivePlayerEffect.expiry = expiry,
+                      ActivePlayerEffect.scope = scope,
+                      ActivePlayerEffect.effect = bakedEffect
+                    }
+             in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
+       in List.foldl' install gs ((,) <$> armed <*> bakedEffects)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blockerRef attackerRef) ->
     -- CR 509.1c / 613.11: store one requirement per (blocker, attacker) pair the
     -- two refs name, rule 509.1c counting requirements PER CREATURE. Both sets are
