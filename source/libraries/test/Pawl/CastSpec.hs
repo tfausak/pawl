@@ -3787,8 +3787,8 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
   -- may cast a spell from among cards exiled this way without paying its mana
   -- cost."
   --
-  -- "This way" is THIS resolution's three cards (CR 608.2c), not every card
-  -- linked to Crabomination by CR 607.2a, so the card reads the link through
+  -- "This way" is the three cards this resolution moved (CR 400.7j), not every
+  -- card linked to Crabomination by CR 607.2a, so the card narrows the link by
   -- Filter.IsBound on the three slots. Lithoform Engine's copy of the trigger
   -- keeps its source (CR 707.10b) and resolves first, which is what files a
   -- second pile against the same Crabomination: its library card, Ancestral
@@ -3801,7 +3801,7 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
   -- three, while every land stays off both offers (CR 305.1: a land is never a
   -- spell). alice holds eight Swamps: six for the creature, two for the Engine,
   -- none for Divination, so its cast is the free one (CR 118.9).
-  Spec.it s "CR 608.2c Crabomination offers a spell from its own three exiled cards alone" $ do
+  Spec.it s "CR 400.7j Crabomination offers a spell from its own three exiled cards alone" $ do
     swamp <- S.printingOf s registry "Swamp"
     engine <- S.printingOf s registry "Lithoform Engine"
     crab <- S.printingOf s registry "Crabomination"
@@ -3846,7 +3846,7 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
         named = S.printingName
     Spec.assertEqWith
       s
-      "CR 608.2c each offer reached its own resolution's spells: the Recall the copy exiled, then the original's three, the linked Recall and every land left off"
+      "CR 400.7j each offer reached its own resolution's spells: the Recall the copy exiled, then the original's three, the linked Recall and every land left off"
       offers
       [Right (named recall), Left (fmap named [divination, signInBlood, bolt]), Right (named divination)]
     Spec.assertEqWith s "CR 608.2g the Divination was cast free and resolved: alice drew two, and it is in bob's graveyard" (length (Game.zoneMembers Zone.Hand S.alice after), namesOf Zone.Graveyard S.bob) (2, [Just (named divination)])
