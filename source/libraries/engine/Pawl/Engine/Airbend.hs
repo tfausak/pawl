@@ -19,10 +19,8 @@
 -- card's OWNER -- whom no slot holds -- and fixes the {2} itself; no card states
 -- either, so no opcode field carries them and 'permission' mints them here.
 --
--- Not implemented: CR 701.65b's "whenever a player airbends", which has no arm
--- anywhere and no GameEvent to hang one on. Avatar Aang is the printing that
--- wants it (#3918); rule 701.66b's earthbend and rule 701.67c's waterbend are
--- the siblings that have theirs.
+-- CR 701.65b's "whenever a player airbends" is GameEvent.Airbent, which the
+-- Effect.Airbend arm writes once the exile has run.
 module Pawl.Engine.Airbend where
 
 import qualified Data.Map.Strict as Map

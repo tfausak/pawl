@@ -287,6 +287,8 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
   GameEvent.Moved {} -> Nothing
@@ -411,6 +413,8 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.Foraged _ -> False
   GameEvent.Earthbent _ -> False
   GameEvent.Waterbent _ -> False
+  GameEvent.Airbent _ -> False
+  GameEvent.Firebent _ -> False
   GameEvent.ActivatedAbilityResolved _ -> False
   GameEvent.CardArrived _ -> False
 
@@ -496,6 +500,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
@@ -593,6 +599,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits, and -- for a card
@@ -668,6 +676,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
@@ -755,6 +765,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 603.2 / 120.1: the bearer dealt damage of ANY kind to a PLAYER the
@@ -838,6 +850,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 603.2 / 120.3: the same arm with rule 120.3's other recipient -- a CREATURE
@@ -922,6 +936,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 120.3: the bearer was DEALT damage -- enrage's event. The arm above with the
@@ -1004,6 +1020,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- The same event read by a BYSTANDER (CR 510.1b / 510.2): a permanent the Filter
@@ -1094,6 +1112,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
@@ -1190,6 +1210,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 702.94a: the bearer IS the card that was revealed, and the reveal was
@@ -1283,6 +1305,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.9a: the bearer IS the card that was discarded. SelfCycled's shape
@@ -1363,6 +1387,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 702.35a's "when this card is exiled THIS WAY": the same discard the arm
@@ -1442,6 +1468,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
@@ -1530,6 +1558,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 603.2c's batch reading of the arm above, delegated for CardsLeaveZone's
@@ -1618,6 +1648,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 121.1: a card was DRAWN, by a player the relation admits, and it was that
@@ -1703,6 +1735,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 725.1: a player BECAME the monarch. Matched against the event the
@@ -1787,6 +1821,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 508.3a: the bearer was DECLARED as an attacker. Matched against the
@@ -1872,6 +1908,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 702.149a: the bearer was declared as an attacker, and at least one OTHER
@@ -1969,6 +2007,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 508.3a's second sentence, self-scoped: the bearer was declared as an
@@ -2064,6 +2104,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 506.5: a creature the Filter admits was declared as an attacker, and it
@@ -2150,6 +2192,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 508.3a's second sentence: some creature was declared as an attacker, and CR
@@ -2235,6 +2279,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 508.3a read by a bystander: a creature the Filter admits was declared as an
@@ -2316,6 +2362,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 508.3d: the player the payload names declared one or more attackers. The
@@ -2362,6 +2410,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.AttackerDeclared {} -> False
@@ -2471,6 +2521,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.AttackerDeclared {} -> False
@@ -2614,6 +2666,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 508.3b's other two subjects: the ability's own source is the planeswalker
@@ -2700,6 +2754,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 508.3e: the player the payload names declared attackers, and at least one
@@ -2807,6 +2863,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 702.105a: the bearer was declared attacking A PLAYER, and no player still in
@@ -2898,6 +2956,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 509.3a: the bearer was DECLARED as a blocker. SelfAttacks' mirror, and
@@ -2991,6 +3051,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   TriggerCondition.SelfBlocks -> case event of
@@ -3063,6 +3125,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 509.3b: the PAIRWISE event, which is that rule's "once for each attacking
@@ -3163,6 +3227,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 509.3e: the bearer blocked at least `n` creatures. SelfBlocks with the
@@ -3242,6 +3308,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 509.3e: the bearer blocked at least one creature the Filter admits. The
@@ -3337,6 +3405,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 509.3c: the bearer BECAME a blocked creature, which CR 509.1h makes the
@@ -3419,6 +3489,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 509.3d: a creature the Filter admits became a blocking creature FOR the
@@ -3512,6 +3584,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 509.3d read by a BYSTANDER: the Filter is asked of the ATTACKER, where
@@ -3600,6 +3674,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 509.3e read from the attacking side: the bearer became blocked, by at
@@ -3749,6 +3825,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Foraged _ -> False
           GameEvent.Earthbent _ -> False
           GameEvent.Waterbent _ -> False
+          GameEvent.Airbent _ -> False
+          GameEvent.Firebent _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.CardArrived _ -> False
   -- CR 509.3e read by a BYSTANDER on the attacking side: a creature attacking a
@@ -3893,6 +3971,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Foraged _ -> False
           GameEvent.Earthbent _ -> False
           GameEvent.Waterbent _ -> False
+          GameEvent.Airbent _ -> False
+          GameEvent.Firebent _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.CardArrived _ -> False
   -- CR 509.1h: the bearer became an UNBLOCKED creature, which the glossary's
@@ -3973,6 +4053,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 603.6: a zone-change trigger matched on BOTH ends of the move, library to
@@ -4053,6 +4135,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     -- Unreachable rather than elided: Pawl.Engine.Event records this event only
     -- in CR 730.3's departure split, whose origin is the battlefield, so `from`
@@ -4139,6 +4223,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     -- CR 712.21 / CR 730.3: every component card after the leading one is put
     -- into the graveyard too and announces itself here, so a component printing
@@ -4233,6 +4319,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     -- CR 712.21 / CR 730.3: every component card after the leading one is put
     -- into the graveyard too and announces itself here, so a component printing
@@ -4351,6 +4439,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Foraged _ -> False
           GameEvent.Earthbent _ -> False
           GameEvent.Waterbent _ -> False
+          GameEvent.Airbent _ -> False
+          GameEvent.Firebent _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
   -- CR 603.6c narrowed by CR 700.4's definition of "dies": the bearer was put into
   -- a graveyard from the battlefield. Both ends are load-bearing -- `from` keeps a
@@ -4433,6 +4523,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- The same rule and zone pair as SelfDies, watched by a BYSTANDER. The bearer
@@ -4529,6 +4621,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 700.4's "dies" against CR 603.7c's captured object: Whippoorwill's "when
@@ -4662,6 +4756,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.26a's tap, asked of the permanent the bearer is attached to
@@ -4758,6 +4854,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.26a by a bystander: a permanent the filter admits became tapped,
@@ -4833,6 +4931,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.26b through CR 603.2: the bearer is the permanent that rotated
@@ -4895,6 +4995,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -4994,6 +5096,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 106.12a read by a BYSTANDER, where the arm above reads it off an
@@ -5093,6 +5197,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   TriggerCondition.PermanentTappedForMana (PermanentTappedForMana.MkPermanentTappedForMana relation f specified) -> case event of
@@ -5172,6 +5278,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 605.1b's "mana being added to a player's mana pool", read by a
@@ -5254,6 +5362,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 603.6c taken whole. The `from` half matches SelfDies'; the `to` half is
@@ -5306,6 +5416,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.DamageDealt _ -> False
@@ -5393,6 +5505,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Foraged _ -> False
           GameEvent.Earthbent _ -> False
           GameEvent.Waterbent _ -> False
+          GameEvent.Airbent _ -> False
+          GameEvent.Firebent _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.CardArrived _ -> False
           GameEvent.DamageDealt _ -> False
@@ -5490,6 +5604,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Foraged _ -> False
           GameEvent.Earthbent _ -> False
           GameEvent.Waterbent _ -> False
+          GameEvent.Airbent _ -> False
+          GameEvent.Firebent _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.CardArrived _ -> False
           GameEvent.DamageDealt _ -> False
@@ -5617,6 +5733,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- PermanentReturnedToHand's match with the zone pinned on the DEPARTURE side
@@ -5675,6 +5793,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Foraged _ -> False
           GameEvent.Earthbent _ -> False
           GameEvent.Waterbent _ -> False
+          GameEvent.Airbent _ -> False
+          GameEvent.Firebent _ -> False
           GameEvent.ActivatedAbilityResolved _ -> False
           GameEvent.CardArrived _ -> False
           GameEvent.DamageDealt _ -> False
@@ -5807,6 +5927,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.6a from the VICTIM's side: an ability was countered, whoever did it.
@@ -5890,6 +6012,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 615.13: a prevention effect was applied and prevented some damage, and the
@@ -5995,6 +6119,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 615.13's other reading: the damage was prevented THIS WAY -- by a
@@ -6094,6 +6220,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- Its batch sibling delegates to it, PermanentsGetCounters' posture below:
@@ -6187,6 +6315,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- A player the relation admits LOST life -- Exquisite Blood's "whenever an
@@ -6280,6 +6410,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 714.2b: counters of this kind were put onto the BEARER, and the count
@@ -6342,6 +6474,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.Moved {} -> False
@@ -6432,6 +6566,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.Moved {} -> False
@@ -6552,6 +6688,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.Moved {} -> False
@@ -6680,6 +6818,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -6781,6 +6921,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 601.2c, self-scoped: the object that became a target IS the bearer, a bare
@@ -6826,6 +6968,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.SpellCast {} -> False
@@ -6916,6 +7060,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.SpellCast {} -> False
@@ -7016,6 +7162,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.SpellCast {} -> False
@@ -7116,6 +7264,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7199,6 +7349,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7284,6 +7436,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7403,6 +7557,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7504,6 +7660,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7579,6 +7737,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7658,6 +7818,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7732,6 +7894,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7817,6 +7981,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -7890,6 +8056,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     -- The event the RULE distinguishes this condition from: +1/+1 counters arriving
@@ -7969,6 +8137,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     -- The event the RULE distinguishes this condition from: +1/+1 counters arriving
@@ -8057,6 +8227,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -8135,6 +8307,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -8211,6 +8385,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -8301,6 +8477,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -8398,6 +8576,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -8520,6 +8700,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.CountersPut {} -> False
@@ -8595,6 +8777,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8673,6 +8857,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
     GameEvent.ControlChanged {} -> False
@@ -8789,6 +8975,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.54d: "whenever the Ring tempts you" (Nazgul). PlayerScries' shape
@@ -8867,6 +9055,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 309.7: this player completed a dungeon. The relation reads the
@@ -8944,6 +9134,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.25d, the arm above's twin and Matoya, Archon Elder's other branch.
@@ -9017,6 +9209,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 706.1: this player rolled a die, the relation reading the roller against
@@ -9101,6 +9295,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 706.2: one die's RESULT, after every modifier, was the stated number,
@@ -9176,6 +9372,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 705.2: this player WON a coin flip, the relation reading the flipper
@@ -9256,6 +9454,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 705.2: this player LOST a coin flip -- they called, and the face did not
@@ -9335,6 +9535,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 702.170a / 702.170c: the bearer's own card became plotted. Self-scoped, so the
@@ -9410,6 +9612,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.44b: a permanent the Filter admits completed an explore.
@@ -9494,6 +9698,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.50f: a permanent the Filter admits completed a connive. Iron Monger,
@@ -9574,6 +9780,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.43d / 607.2h: the BEARER was exerted. SelfEvolves' arm above, line
@@ -9649,6 +9857,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.3a read from the HOST: something became attached to the BEARER, and
@@ -9740,6 +9950,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.3a read from the ATTACHMENT: the BEARER became attached, and the
@@ -9830,6 +10042,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.3d read from the attachment: the BEARER became unattached, and the
@@ -9915,6 +10129,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.68d: this player blighted. The relation reads the blighting
@@ -9994,6 +10210,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.61a: this player foraged. The relation reads the foraging player
@@ -10072,6 +10290,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged forager -> PlayerRelation.holds (Game.teams gs) relation you forager
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.66b: this player earthbent. The relation reads the earthbending
@@ -10151,6 +10371,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
     GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
   -- CR 701.67c: this player paid a waterbend cost. The relation reads the
@@ -10228,6 +10450,155 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Foraged _ -> False
     GameEvent.Earthbent _ -> False
     GameEvent.Waterbent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 701.65b: this player airbent, PlayerWaterbends' shape above.
+  TriggerCondition.PlayerAirbends relation -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 702.189b: a firebending ability this player controls resolved,
+  -- PlayerWaterbends' shape above.
+  TriggerCondition.PlayerFirebends relation -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
 

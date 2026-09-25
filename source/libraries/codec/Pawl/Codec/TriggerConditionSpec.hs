@@ -1292,6 +1292,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerWaterbends PlayerRelation.Opponent)
       " {\"type\":\"PlayerWaterbends\",\"value\":{\"type\":\"Opponent\"}} "
+  -- CR 701.65b and CR 702.189b, the same shape again.
+  Spec.it s "PlayerAirbends round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerAirbends PlayerRelation.You)
+      " {\"type\":\"PlayerAirbends\",\"value\":{\"type\":\"You\"}} "
+  Spec.it s "PlayerFirebends round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerFirebends PlayerRelation.AnyPlayer)
+      " {\"type\":\"PlayerFirebends\",\"value\":{\"type\":\"AnyPlayer\"}} "
   -- CR 509.3d's bystander form. A real Filter rather than the trivial `And []`:
   -- the payload is over the ATTACKER, and CR 701.54c's is a Ring-bearer test.
   Spec.it s "PermanentBecomesBlockedBy round-trips" $

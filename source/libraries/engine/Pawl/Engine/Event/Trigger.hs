@@ -201,6 +201,8 @@ movedOf event = case event of
   GameEvent.Foraged _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
   GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
 
 -- CR 603.10a: is this one of the conditions the game "looks back in time" for?
@@ -250,6 +252,8 @@ looksBack condition = case condition of
   TriggerCondition.PlayerForages _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
+  TriggerCondition.PlayerAirbends _ -> False
+  TriggerCondition.PlayerFirebends _ -> False
   -- Not on CR 603.10a's list, and CR 706.1's roll is no zone change: it moves
   -- no object at all, so CR 603.10's first sentence governs.
   TriggerCondition.PlayerRollsDice _ -> False
@@ -522,6 +526,8 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerForages _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
+  TriggerCondition.PlayerAirbends _ -> False
+  TriggerCondition.PlayerFirebends _ -> False
   TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
@@ -1028,6 +1034,8 @@ eventTriggers events gs =
         GameEvent.Foraged _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
         GameEvent.Waterbent _ -> Map.empty
+        GameEvent.Airbent _ -> Map.empty
+        GameEvent.Firebent _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
         GameEvent.Moved {} -> Map.empty
@@ -1353,6 +1361,8 @@ eventTriggers events gs =
         GameEvent.Foraged _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
         GameEvent.Waterbent _ -> Map.empty
+        GameEvent.Airbent _ -> Map.empty
+        GameEvent.Firebent _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
@@ -1614,6 +1624,8 @@ eventTriggers events gs =
         GameEvent.Foraged _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
         GameEvent.Waterbent _ -> Map.empty
+        GameEvent.Airbent _ -> Map.empty
+        GameEvent.Firebent _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       -- CR 114.4 / CR 113.6p: "abilities of emblems function in the command zone".
@@ -1766,6 +1778,8 @@ eventTriggers events gs =
         GameEvent.Foraged _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
         GameEvent.Waterbent _ -> Map.empty
+        GameEvent.Airbent _ -> Map.empty
+        GameEvent.Firebent _ -> Map.empty
         GameEvent.ActivatedAbilityResolved _ -> Map.empty
         GameEvent.CardArrived _ -> Map.empty
       forOne board event (oid, (ctrl, abilities)) =
@@ -2166,6 +2180,8 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerForages _ -> battlefield
         TriggerCondition.PlayerEarthbends _ -> battlefield
         TriggerCondition.PlayerWaterbends _ -> battlefield
+        TriggerCondition.PlayerAirbends _ -> battlefield
+        TriggerCondition.PlayerFirebends _ -> battlefield
         -- CR 113.6's default again, and NOT the graveyard, though Dungeon Crawler
         -- watches from there: completing a dungeon is a condition a battlefield
         -- permanent could watch perfectly well, so CR 113.6k's exception does not
@@ -2615,6 +2631,8 @@ stateTriggers gs
               TriggerCondition.PlayerForages _ -> False
               TriggerCondition.PlayerEarthbends _ -> False
               TriggerCondition.PlayerWaterbends _ -> False
+              TriggerCondition.PlayerAirbends _ -> False
+              TriggerCondition.PlayerFirebends _ -> False
               -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
               -- entry, never a CR 603.8 state that could be true standing still.
               TriggerCondition.PlayerRollsDice _ -> False

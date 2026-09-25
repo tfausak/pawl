@@ -173,6 +173,7 @@ overSlots f quantity =
         Quantity.OpponentsAttacked _ -> pure quantity
         -- And a tenth, CR 701.9a's tally having nothing beside its PlayerRef either.
         Quantity.CardsDiscardedThisTurn _ -> pure quantity
+        Quantity.BendingsThisTurn _ -> pure quantity
         -- And another, CR 508.1a's declaration tally likewise.
         Quantity.AttackersDeclaredThisTurn _ -> pure quantity
         -- And another, CR 119.3's life-gain tally likewise.
@@ -337,6 +338,7 @@ nestedRefs quantity = case quantity of
   Quantity.OpponentsAttacked ref -> Set.singleton (Left ref)
   Quantity.AttackersDeclaredThisTurn ref -> Set.singleton (Left ref)
   Quantity.CardsDiscardedThisTurn ref -> Set.singleton (Left ref)
+  Quantity.BendingsThisTurn ref -> Set.singleton (Left ref)
   Quantity.LifeGainedThisTurn ref -> Set.singleton (Left ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Set.singleton (Left ref)
   Quantity.DamageDealtToPlayersThisTurn ref -> Set.singleton (Left ref)
@@ -444,6 +446,7 @@ nestedCounts quantity = case quantity of
   Quantity.OpponentsAttacked _ -> []
   Quantity.AttackersDeclaredThisTurn _ -> []
   Quantity.CardsDiscardedThisTurn _ -> []
+  Quantity.BendingsThisTurn _ -> []
   Quantity.LifeGainedThisTurn _ -> []
   Quantity.PlayersDealtDamageThisTurn _ -> []
   Quantity.DamageDealtToPlayersThisTurn _ -> []
@@ -582,6 +585,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
         Quantity.AttackersDeclaredThisTurn ref -> Quantity.AttackersDeclaredThisTurn (f ref)
         Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
+        Quantity.BendingsThisTurn ref -> Quantity.BendingsThisTurn (f ref)
         Quantity.LifeGainedThisTurn ref -> Quantity.LifeGainedThisTurn (f ref)
         Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
         Quantity.DamageDealtToPlayersThisTurn ref -> Quantity.DamageDealtToPlayersThisTurn (f ref)

@@ -2646,6 +2646,8 @@ representativeEvents cond =
         TriggerCondition.PlayerForages _ -> one (GameEvent.Foraged S.bob)
         TriggerCondition.PlayerEarthbends _ -> one (GameEvent.Earthbent S.bob)
         TriggerCondition.PlayerWaterbends _ -> one (GameEvent.Waterbent S.bob)
+        TriggerCondition.PlayerAirbends _ -> one (GameEvent.Airbent S.bob)
+        TriggerCondition.PlayerFirebends _ -> one (GameEvent.Firebent S.bob)
         -- CR 309.7's own event, and the only one this condition admits. bob
         -- rather than the perspective player, on the PlayerScries arm's reasoning.
         TriggerCondition.PlayerCompletesDungeon _ -> one (GameEvent.DungeonCompleted S.bob)
@@ -2933,7 +2935,13 @@ everyTriggerCondition =
     TriggerCondition.PlayerEarthbends PlayerRelation.AnyPlayer,
     TriggerCondition.PlayerWaterbends PlayerRelation.You,
     TriggerCondition.PlayerWaterbends PlayerRelation.Opponent,
-    TriggerCondition.PlayerWaterbends PlayerRelation.AnyPlayer
+    TriggerCondition.PlayerWaterbends PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerAirbends PlayerRelation.You,
+    TriggerCondition.PlayerAirbends PlayerRelation.Opponent,
+    TriggerCondition.PlayerAirbends PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerFirebends PlayerRelation.You,
+    TriggerCondition.PlayerFirebends PlayerRelation.Opponent,
+    TriggerCondition.PlayerFirebends PlayerRelation.AnyPlayer
   ]
 
 -- CR 702.46 soulshift N, the first minted keyword ability that TARGETS A CARD IN

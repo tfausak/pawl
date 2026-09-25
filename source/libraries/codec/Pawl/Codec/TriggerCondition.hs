@@ -181,7 +181,9 @@ codec =
           -- CR 701.61a's "whenever you forage", the arm above's shape.
           Arm.payload "PlayerForages" PlayerRelation.codec TriggerCondition.PlayerForages (\x -> case x of TriggerCondition.PlayerForages y -> Just y; _ -> Nothing),
           Arm.payload "PlayerEarthbends" PlayerRelation.codec TriggerCondition.PlayerEarthbends (\x -> case x of TriggerCondition.PlayerEarthbends y -> Just y; _ -> Nothing),
-          Arm.payload "PlayerWaterbends" PlayerRelation.codec TriggerCondition.PlayerWaterbends (\x -> case x of TriggerCondition.PlayerWaterbends y -> Just y; _ -> Nothing)
+          Arm.payload "PlayerWaterbends" PlayerRelation.codec TriggerCondition.PlayerWaterbends (\x -> case x of TriggerCondition.PlayerWaterbends y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerAirbends" PlayerRelation.codec TriggerCondition.PlayerAirbends (\x -> case x of TriggerCondition.PlayerAirbends y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerFirebends" PlayerRelation.codec TriggerCondition.PlayerFirebends (\x -> case x of TriggerCondition.PlayerFirebends y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: TriggerCondition.TriggerCondition -> String
@@ -315,3 +317,5 @@ tagOf x = case x of
   TriggerCondition.PlayerForages {} -> "PlayerForages"
   TriggerCondition.PlayerEarthbends {} -> "PlayerEarthbends"
   TriggerCondition.PlayerWaterbends {} -> "PlayerWaterbends"
+  TriggerCondition.PlayerAirbends {} -> "PlayerAirbends"
+  TriggerCondition.PlayerFirebends {} -> "PlayerFirebends"

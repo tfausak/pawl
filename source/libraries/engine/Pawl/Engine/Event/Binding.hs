@@ -1119,6 +1119,8 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerForages _ -> Set.empty
   TriggerCondition.PlayerEarthbends _ -> Set.empty
   TriggerCondition.PlayerWaterbends _ -> Set.empty
+  TriggerCondition.PlayerAirbends _ -> Set.empty
+  TriggerCondition.PlayerFirebends _ -> Set.empty
   -- Nothing here either. CR 706.1's event names the roller, but Feywild
   -- Trickster's payload points at no one -- it creates a token for its own
   -- controller -- and a card printing "that player" is what would earn a slot.
