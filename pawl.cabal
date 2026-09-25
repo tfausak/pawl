@@ -292,6 +292,7 @@ library codec
     Pawl.Codec.ConjureCardsSpec
     Pawl.Codec.ConjureDestination
     Pawl.Codec.ConjureDestinationSpec
+    Pawl.Codec.ConjureEntry
     Pawl.Codec.ConjureSelection
     Pawl.Codec.ConjureSelectionSpec
     Pawl.Codec.ConjureSpec
@@ -1745,6 +1746,7 @@ library types
     Pawl.Types.Conjure
     Pawl.Types.ConjureCards
     Pawl.Types.ConjureDestination
+    Pawl.Types.ConjureEntry
     Pawl.Types.ConjureSelection
     Pawl.Types.Connive
     Pawl.Types.ContinuousEffect

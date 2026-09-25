@@ -171,6 +171,12 @@ data TriggerCondition
     -- an intervening "if" on resolution, where this clause asks only what was
     -- true as the creature attacked.
     SelfAttacksWhileSaddled
+  | -- | CR 508.3a narrowed by a state that holds as the bearer attacks -- Kari
+    -- Zev, Crew of Two\'s "whenever Kari Zev attacks while you don\'t control a
+    -- legendary Monkey". SelfAttacksWhileSaddled\'s reading and for its reason:
+    -- the event\'s own qualifier, never re-checked as TriggeredAbility.intervening
+    -- would be (CR 603.4).
+    SelfAttacksWhile Condition.Condition
   | -- | CR 509.3a: "whenever [a creature] blocks" (Pride Guardian).
     -- Self-scoped, and once per blocking creature however many it blocked.
     SelfBlocks

@@ -1325,6 +1325,7 @@ eventBindingSlots cond = case cond of
   -- pointed at. That is also why this condition needs no arm in eventBindings.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> Set.empty
   TriggerCondition.SelfAttacksWhileSaddled -> Set.empty
+  TriggerCondition.SelfAttacksWhile _ -> Set.empty
   -- Nothing, unlike SelfAttacks above: the blocker is the bearer, already bound
   -- as CR 113.7a's source, and the attacker the event also carries is what CR
   -- 509.3b's condition names rather than this one, below. CR 509.1a makes the

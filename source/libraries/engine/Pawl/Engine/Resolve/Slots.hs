@@ -639,7 +639,7 @@ effectObjectRefs effect = case effect of
   -- does a reference pick, whose candidates are in no game; a duplicate names
   -- the object it is a duplicate OF, which is the arm that makes a conjure able
   -- to target (Sinister Reflections).
-  Effect.Conjure (Conjure.MkConjure _ cards _ _) -> case cards of
+  Effect.Conjure (Conjure.MkConjure _ cards _ _ _) -> case cards of
     ConjureCards.Written {} -> []
     ConjureCards.Duplicate ref -> [ref]
     ConjureCards.Reference {} -> []
@@ -2086,11 +2086,8 @@ boundSlots effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _ _) -> foldMap Set.singleton mSlot
   -- The tokens this Create minted, for CR 603.7c's delayed trigger to name.
   Effect.Create (Create.MkCreate _ _ _ mSlot _) -> foldMap Set.singleton mSlot
-  -- Not implemented: Pawl.Types.Conjure carries no slot, so a printing that DOES
-  -- name the conjured card later in its own instruction list (Kari Zev, Crew of
-  -- Two's "if that card is on the battlefield, return it to its owner's hand")
-  -- cannot be transcribed and this binds nothing (#3971).
-  Effect.Conjure {} -> Set.empty
+  -- Create's reason: the conjured cards, for CR 603.7c.
+  Effect.Conjure (Conjure.MkConjure _ _ _ _ mSlot) -> foldMap Set.singleton mSlot
   -- Create's reason: the copy tokens minted, for CR 603.7c.
   Effect.CreateCopy (CreateCopy.MkCreateCopy _ _ _ mSlot _) -> foldMap Set.singleton mSlot
   -- Binds nothing: no new object comes into existence.

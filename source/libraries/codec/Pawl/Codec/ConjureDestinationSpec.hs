@@ -5,6 +5,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.ConjureEntry as ConjureEntry
 import qualified Pawl.Types.TapState as TapState
 
 -- | A case PER CONSTRUCTOR, where an 'Pawl.JsonCodec.Arm.enum' codec needed
@@ -44,7 +45,7 @@ spec s = Spec.describe s "Pawl.Codec.ConjureDestination" $ do
     Common.assertCodec
       s
       ConjureDestination.codec
-      (ConjureDestination.Battlefield TapState.Untapped)
+      (ConjureDestination.Battlefield ConjureEntry.defaultValue)
       " {\"type\":\"Battlefield\"} "
   -- Foundry Groundbreaker's "onto the battlefield tapped", the arm's whole
   -- reason for carrying a payload at all.
@@ -52,8 +53,16 @@ spec s = Spec.describe s "Pawl.Codec.ConjureDestination" $ do
     Common.assertCodec
       s
       ConjureDestination.codec
-      (ConjureDestination.Battlefield TapState.Tapped)
-      " {\"type\":\"Battlefield\",\"value\":{\"type\":\"Tapped\"}} "
+      (ConjureDestination.Battlefield ConjureEntry.defaultValue {ConjureEntry.tapped = TapState.Tapped})
+      " {\"type\":\"Battlefield\",\"value\":{\"tapped\":{\"type\":\"Tapped\"}}} "
+  -- Kari Zev, Crew of Two's "onto the battlefield tapped and attacking" (CR
+  -- 508.4).
+  Spec.it s "Battlefield tapped and attacking" $
+    Common.assertCodec
+      s
+      ConjureDestination.codec
+      (ConjureDestination.Battlefield (ConjureEntry.MkConjureEntry TapState.Tapped True))
+      " {\"type\":\"Battlefield\",\"value\":{\"tapped\":{\"type\":\"Tapped\"},\"attacking\":true}} "
   -- Decode-only, because it is the other spelling of the value above rather
   -- than a value of its own: Pawl.JsonCodec.Arm.optionalPayload accepts a
   -- stated default and the encoder writes the bare tag back, which is what keeps
@@ -62,7 +71,7 @@ spec s = Spec.describe s "Pawl.Codec.ConjureDestination" $ do
     Common.assertFromJson
       s
       (Codec.decode ConjureDestination.codec)
-      " {\"type\":\"Battlefield\",\"value\":{\"type\":\"Untapped\"}} "
-      (ConjureDestination.Battlefield TapState.Untapped)
+      " {\"type\":\"Battlefield\",\"value\":{\"tapped\":{\"type\":\"Untapped\"}}} "
+      (ConjureDestination.Battlefield ConjureEntry.defaultValue)
   Spec.it s "has a schema" $
     Common.assertHasSchema s ConjureDestination.codec

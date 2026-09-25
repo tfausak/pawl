@@ -53,6 +53,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.ConjureEntry as ConjureEntry
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -137,7 +138,6 @@ import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
@@ -1587,7 +1587,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           (S.combinedFace piker)
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (ConjureCards.Reference (FromReference.MkFromReference buried amount)) Conjure.defaultSelection (ConjureDestination.Battlefield TapState.Untapped)))))) Map.empty))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Conjure (Conjure.MkConjure Conjure.defaultQuantity (ConjureCards.Reference (FromReference.MkFromReference buried amount)) Conjure.defaultSelection (ConjureDestination.Battlefield ConjureEntry.defaultValue) Nothing))))) Map.empty))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom in a reference pick naming no amount is an offence" (manaValueEqualToAmountCounts (conjuring Nothing)) (0, 1)

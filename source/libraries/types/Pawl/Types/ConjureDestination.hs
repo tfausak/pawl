@@ -1,6 +1,6 @@
 module Pawl.Types.ConjureDestination where
 
-import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.ConjureEntry as ConjureEntry
 
 -- | Where an Alchemy conjure puts the card it creates.
 --
@@ -32,12 +32,9 @@ data ConjureDestination
     -- The resolver hands 'Pawl.Types.LibraryPosition.defaultValue' to every
     -- arrival, and that is the BOTTOM -- the opposite end from the one every
     -- printing above names. Nothing is red because none of those printings is in
-    -- @data\/cards\/@: Jewel Mine Overseer\'s rider has to NAME the seven cards it
-    -- conjured, which wants them bound to a slot (#3971), Pampered Loamfrill\'s
-    -- "the duplicate perpetually gets +1\/+1 and gains deathtouch" names its own
-    -- the same way and wants the same slot, and this arm\'s own producer shuffles
-    -- immediately, which makes the end unobservable there. Pampered Loamfrill is
-    -- the one that would OBSERVE it, since it never shuffles (#3972).
+    -- @data\/cards\/@, and this arm\'s own producer shuffles immediately, which
+    -- makes the end unobservable there. Pampered Loamfrill is the one that would
+    -- OBSERVE it, since it never shuffles (#3972).
     Library
   | -- | Shellfish Scholar\'s "conjure a card named Think Twice into your
     -- graveyard" (CR 404.1).
@@ -50,37 +47,22 @@ data ConjureDestination
     -- trigger scan, so Pawl.Engine.Event.conjureOntoBattlefield is a road of its
     -- own rather than another argument to Pawl.Engine.Event.conjure.
     --
-    -- The 'Pawl.Types.TapState.TapState' is CR 110.5b's status, STATED by the
-    -- effect rather than carried by the arriving card -- Foundry
-    -- Groundbreaker\'s "conjure two cards named Mishra\'s Foundry onto the
-    -- battlefield tapped" and Thendar, the Overminer\'s "onto the battlefield
-    -- tapped". CR 110.5b\'s untapped is the default, which Lam prints and the
-    -- codec elides.
+    -- The 'Pawl.Types.ConjureEntry.ConjureEntry' is what the sentence states
+    -- about the arrival: CR 110.5b's status (Foundry Groundbreaker\'s "onto the
+    -- battlefield tapped") and CR 508.4's combat state (Kari Zev, Crew of
+    -- Two\'s "tapped and attacking").
     --
     -- On the ARM rather than beside 'Pawl.Types.Conjure.destination', which is
     -- what makes a conjure into a hand, a library, a graveyard or exile unable to
     -- state one: CR 110.5d gives a card outside the battlefield no status at all,
     -- so a field there would be a key four of the five destinations could write and
-    -- nothing could read. 'Pawl.Types.EntryRiders.EntryRiders', what the other
-    -- three entry doors carry, is not what this arm holds: beyond the status and
-    -- the combat state below, its riders are counters, two kinds of
-    -- face-downness, transformation, attachment, blocking and CR 110.2a\'s
-    -- controller, and no printed conjure states one.
-    --
-    -- Not implemented: CR 508.4\'s combat state, which two printings state
-    -- beside the status -- Stormforged Armor\'s equipped creature "conjure a card
-    -- named Ball Lightning onto the battlefield tapped and attacking", and Kari
-    -- Zev, Crew of Two\'s same sentence, whose rider then names the conjured card
-    -- and so wants the binding see #3971 as well (#3973).
-    Battlefield TapState.TapState
+    -- nothing could read.
+    Battlefield ConjureEntry.ConjureEntry
   | -- | Smog Smasher\'s "conjure a duplicate of target nontoken creature into
     -- exile" (CR 406.1).
     --
-    -- Not implemented: Dazzling Flameweaver\'s "you may play that card until
-    -- the end of your next turn", Darigaaz, Shivan Champion\'s "face down with
-    -- three egg counters on it", Gyox, Brutal Carnivora\'s "those duplicates
-    -- perpetually get +X\/+X" and Limitless Rekindling\'s "you may cast that
-    -- card" each name the card this arm exiled in a later clause, which wants the
-    -- slot the conjure does not bind (#3971).
+    -- A later clause names the card this arm exiled through
+    -- 'Pawl.Types.Conjure.slot' -- Dazzling Flameweaver\'s "you may play that
+    -- card until the end of your next turn".
     Exile
   deriving (Eq, Ord, Show)

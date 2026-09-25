@@ -254,6 +254,34 @@ offersCast pid oid printing gs =
 librarySize :: PlayerId.PlayerId -> GameState.GameState -> Int
 librarySize pid gs = length (Map.findWithDefault mempty pid (GameState.library gs))
 
+-- Sphinx's Decree {1}{W} Sorcery: "Each opponent can't cast instant or sorcery
+-- spells during that player's next turn." (Oracle checked against Scryfall
+-- 2026-09-25.) CR 611.2a's window, one per opponent: each opponent's next turn
+-- is a different turn from three seats on, so each is barred on their own turn
+-- and not on the other's. Turn order is alice, bob, carol; bob and carol each
+-- hold a Lightning Bolt and two Mountains, so a cast is offered whenever nothing
+-- bars it.
+sphinxsDecreeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+sphinxsDecreeSpec s registry =
+  Spec.describe s "Sphinx's Decree" $ do
+    Spec.it s "CR 611.2a each opponent is barred during their own next turn and no other" $ do
+      plains <- S.printingOf s registry "Plains"
+      decree <- S.printingOf s registry "Sphinx's Decree"
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (decreeId, bobsBolt, carolsBolt, before) = threeSeatSilenceBoard plains decree mountain bolt
+          resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer before (S.cast S.alice decreeId)) Engine.priorityLoop
+          handoff gs = (S.runPure S.identityAnswer (Expiry.dropAtCleanup gs) Engine.handoffTurn) {GameState.phase = Phase.PrecombatMain}
+          bobsTurn = handoff resolved
+          carolsTurn = handoff bobsTurn
+          offered pid oid gs = elem (Action.Type.Cast oid (S.printingName bolt) Facing.FaceUp) (Action.legalActions pid (gs {GameState.priority = Just pid}))
+      Spec.assertBool s (offered S.bob bobsBolt resolved) "the window has not begun on alice's turn, so bob may still cast his Bolt"
+      Spec.assertEqWith s "on bob's turn bob is barred and carol is not" (offered S.bob bobsBolt bobsTurn, offered S.carol carolsBolt bobsTurn) (False, True)
+      Spec.assertEqWith s "on carol's turn carol is barred and bob is not" (offered S.carol carolsBolt carolsTurn, offered S.bob bobsBolt carolsTurn) (False, True)
+      -- Preconditions, ordered behind the gameplay assertions.
+      Spec.assertEqWith s "the Decree resolved on alice's turn 1, into a turn each for bob and carol" (fmap GameState.activePlayer [resolved, bobsTurn, carolsTurn], GameState.turnNumber carolsTurn) ([S.alice, S.bob, S.carol], 3)
+      Spec.assertEqWith s "one row per opponent, each over that opponent alone" (List.sort (fmap ActivePlayerEffect.scope (GameState.playerEffects resolved))) [AffectedPlayers.Named S.bob, AffectedPlayers.Named S.carol]
+
 -- Cease-Fire {2}{W} Instant: "Target player can't cast creature spells this
 -- turn. Draw a card." The first card in the pool to store a player effect on a
 -- TARGETED seat.
@@ -2310,6 +2338,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   conjurersBanSpec s registry
   cityInABottleSpec s registry
   silenceSpec s registry
+  sphinxsDecreeSpec s registry
   ceaseFireSpec s registry
   blossomingCalmSpec s registry
   conditionalSilenceSpec s registry

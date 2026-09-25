@@ -44,6 +44,7 @@ module Pawl.ConjureSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -73,20 +74,29 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Conjure as Conjure
+import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -98,6 +108,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
@@ -145,6 +156,29 @@ namesIn zone gs = fmap (\oid -> S.soleFaceName oid gs) (Game.zoneMembers zone S.
 
 namedIn :: CardName.CardName -> Zone.Zone -> GameState.GameState -> [ObjectId.ObjectId]
 namedIn name zone gs = filter (\oid -> S.soleFaceName oid gs == name) (Game.zoneMembers zone S.alice gs)
+
+ragavanName :: CardName.CardName
+ragavanName = CardName.MkCardName (Text.pack "Ragavan, Nimble Pilferer")
+
+-- The cards a printing's triggered abilities conjure, written out in its file.
+conjuredBy :: Printing.Printing -> [Card.Card]
+conjuredBy printing =
+  [ card
+  | face <- NonEmpty.toList (Card.faces (Printing.card printing)),
+    ability <- Face.triggeredAbilities face,
+    mode <- Foldable.toList (Modal.modes (TriggeredAbility.modal ability)),
+    clause <- Foldable.toList (Mode.clauses mode),
+    Effect.Conjure conjure <- Foldable.toList (Clause.effects clause),
+    card <- ConjureCards.written (Conjure.cards conjure)
+  ]
+
+-- Whole steps until `phase` is current, bounded like Pawl.Support's combatGame.
+runStepsUntil :: Phase.Phase -> Game.Type.Game ()
+runStepsUntil phase =
+  let go n = do
+        gs <- State.get
+        Monad.unless (n <= (0 :: Int) || GameState.phase gs == phase || Maybe.isJust (GameState.result gs)) (Engine.runStep >> go (n - 1))
+   in go 24
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Conjure" $ do
@@ -444,9 +478,9 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- printed SPELLBOOK: ten candidates in the card file and one pick over them.
   --
   -- Not implemented: the rider, "It perpetually gains 'You may spend mana as
-  -- though it were mana of any color to cast this spell.'" A conjure binds its
-  -- card to no slot, so no later clause can name it; pawl's Tome is stricter
-  -- than the printing, never weaker (#3971).
+  -- though it were mana of any color to cast this spell.'" A perpetual effect
+  -- over a card in a hand, granting it an ability about paying for itself; pawl's
+  -- Tome is stricter than the printing, never weaker (#3291).
   --
   --
   -- The answerer pins the pick to the LAST candidate, which the offered list's
@@ -496,6 +530,42 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- head is not: Pawl.Engine.Replay.defaultAnswer takes the head, so an engine
   -- that picked for alice -- or asked for randomness here, whose default answer
   -- is also the head -- lands on Gate of the Black Dragon instead.
+  -- Kari Zev, Crew of Two ({2}{R}{R} 3/3, menace, haste): "Whenever Kari Zev
+  -- attacks while you don't control a legendary Monkey, conjure a card named
+  -- Ragavan, Nimble Pilferer onto the battlefield tapped and attacking. At the
+  -- beginning of the next end step, if that card is on the battlefield, return
+  -- it to its owner's hand."
+  --
+  -- bob's Marchesa's Decree ("whenever a creature attacks you ..., that
+  -- creature's controller loses 1 life") is the CR 508.3a witness: Kari was
+  -- declared and costs alice 1, while a Ragavan put onto the battlefield
+  -- attacking (CR 508.4) was never declared and costs her nothing. The paired
+  -- board differs only in a Ragavan alice already controls, which is the
+  -- "while" failing, so no second Ragavan arrives and bob takes Kari's 3 alone.
+  --
+  -- Not implemented: the conjured Ragavan's "Until end of turn, you may cast
+  -- that card"; pawl's Ragavan is stricter than the printing (#4103).
+  Spec.it s "Kari Zev's Ragavan attacks without being declared and goes home at the next end step" $ do
+    kari <- S.printingOf s registry "Kari Zev, Crew of Two"
+    let ragavans = conjuredBy kari
+        setup = S.duel S.beginningOfCombat [S.settled "kari" "Kari Zev, Crew of Two"] [S.permanent "Marchesa's Decree"]
+        script = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "kari"])]
+        throughEndStep = runStepsUntil (Phase.Ending EndingStep.Cleanup)
+    built <- S.buildBoardOrFail s registry setup
+    (_, after) <- S.runScriptOrFail s script built throughEndStep
+    (_, withMonkey) <- case ragavans of
+      [ragavan] -> S.runScriptOrFail s script built {S.builtState = snd (S.addPermanent (Printing.MkPrinting ragavan) S.alice (S.builtState built))} throughEndStep
+      _ -> pure ((), after)
+    Spec.assertEqWith
+      s
+      "CR 508.4 the conjured Ragavan dealt 2 beside Kari's 3 without costing alice a declared attacker's life, and none came while she controlled a legendary Monkey"
+      (S.lifeOf S.bob after, S.lifeOf S.alice after, S.lifeOf S.bob withMonkey)
+      (Just 15, Just 19, Just 17)
+    Spec.assertEqWith
+      s
+      "CR 603.7c the end step returned the bound card to alice's hand"
+      (length (namedIn ragavanName Zone.Hand after), length (namedIn ragavanName Zone.Battlefield after))
+      (1, 0)
   Spec.it s "a printed spellbook picked by choice is offered whole, and the card its controller named is the one conjured" $ do
     forest <- S.printingOf s registry "Forest"
     tracks <- S.printingOf s registry "Follow the Tracks"
