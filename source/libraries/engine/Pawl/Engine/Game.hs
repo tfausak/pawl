@@ -2991,8 +2991,11 @@ bendingsThisTurn gs pid =
 -- The ATTACKING PLAYER is resolved through CR 506.2 rather than off the event,
 -- which records the attacker and the defender but not the declarer: the active
 -- player is the attacking player, and one turn's log can only hold one active
--- player's declarations. CR 805.10a's several attacking players would break that
--- (#4002).
+-- player's declarations.
+--
+-- Not implemented: CR 805.10a's several attacking players -- under the shared
+-- team turns option the whole team's declarations count for the active player
+-- and none for a teammate (#4125).
 --
 -- CR 508.4's creature put onto the battlefield attacking stays out, only
 -- Pawl.Engine.Combat.declareAttackers appending the event -- the same scope
