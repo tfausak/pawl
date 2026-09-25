@@ -37,10 +37,9 @@ data Duration
     -- Pawl.Engine.Expiry.arm samples the reference ONCE, as the duration begins,
     -- so the stored Pawl.Types.AfterTurn holds a seat and not a reference.
     --
-    -- Not implemented: any arm of the reference beyond InSlot and
-    -- ControllerOfBound, which are what Pawl.Engine.Expiry.arm can answer without
-    -- a resolution's whole evaluation context; a card writing another arm arms
-    -- nothing and its effect does not happen (#3950).
+    -- A reference naming several seats, or Candidate outside the fold
+    -- Pawl.Engine.Expiry.perSeat serves, names no one turn and arms nothing
+    -- (Pawl.Engine.Expiry.seatOf).
     UntilEndOfNextTurnOf PlayerRef.PlayerRef
   | -- | CR 611.2a: "during that player's next turn" (Wall of Dust) -- a WINDOW,
     -- where every arm above states only an end. The effect applies during that
@@ -48,22 +47,17 @@ data Duration
     -- what tells this arm from UntilEndOfNextTurnOf above.
     --
     -- The seat is a reference, as that arm's is, and is sampled the same way and
-    -- at the same moment (Pawl.Engine.Expiry.arm, Pawl.Engine.Expiry.seatOf), so
-    -- it inherits that arm's limit: a reference beyond InSlot and
-    -- ControllerOfBound arms nothing (#3950).
-    --
-    -- Not implemented: one seat per member of a FOLD, which "each opponent
-    -- can't cast instant or sorcery spells during that player's next turn"
-    -- (Sphinx's Decree) wants -- one reference is sampled once, so a single
-    -- stored row names a single turn (#3982).
+    -- at the same moment (Pawl.Engine.Expiry.arm, Pawl.Engine.Expiry.seatOf).
+    -- Candidate is "that player" of a fold -- Sphinx's Decree's "each opponent
+    -- can't cast instant or sorcery spells during that player's next turn" --
+    -- and arms one window per member (Pawl.Engine.Expiry.perSeat).
     DuringNextTurnOf PlayerRef.PlayerRef
   | -- | CR 611.2a: "during your next turn" (Galvanic Relay) -- the arm above's
     -- window with the seat taken from CR 109.5's "you" instead of sampled from a
     -- reference, as UntilYourNextTurn stands to UntilEndOfNextTurnOf.
     --
-    -- Nullary and not DuringNextTurnOf (PlayerRef.Relative You), because that
-    -- reference arms nothing: Pawl.Engine.Expiry.seatOf answers only InSlot and
-    -- ControllerOfBound (#3950), and a printed card does not know a PlayerId.
+    -- Nullary, as UntilYourNextTurn is: CR 109.5's "you" is the effect's
+    -- controller, which Pawl.Engine.Expiry.arm already holds.
     DuringYourNextTurn
   | -- | CR 611.2b: "for as long as ...". The duration has a BEGINNING as well as
     -- an end -- "if the 'for as long as' duration never starts, the effect does
