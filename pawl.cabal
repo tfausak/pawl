@@ -566,6 +566,8 @@ library codec
     Pawl.Codec.HybridSpec
     Pawl.Codec.IgnoredAbility
     Pawl.Codec.IgnoredAbilitySpec
+    Pawl.Codec.Impending
+    Pawl.Codec.ImpendingSpec
     Pawl.Codec.IncreaseActivationCost
     Pawl.Codec.IncreaseActivationCostSpec
     Pawl.Codec.IncreaseSpellCost
@@ -1897,6 +1899,7 @@ library types
     Pawl.Types.HybridPayment
     Pawl.Types.HybridPhyrexian
     Pawl.Types.IgnoredAbility
+    Pawl.Types.Impending
     Pawl.Types.IncreaseActivationCost
     Pawl.Types.IncreaseSpellCost
     Pawl.Types.InherentTriggerSource

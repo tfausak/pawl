@@ -259,6 +259,7 @@ import qualified Pawl.Codec.HalvedSpec
 import qualified Pawl.Codec.HandActionSpec
 import qualified Pawl.Codec.HybridSpec
 import qualified Pawl.Codec.IgnoredAbilitySpec
+import qualified Pawl.Codec.ImpendingSpec
 import qualified Pawl.Codec.InZoneSpec
 import qualified Pawl.Codec.IncreaseActivationCostSpec
 import qualified Pawl.Codec.IncreaseSpellCostSpec
@@ -914,6 +915,7 @@ spec s registry = do
   Pawl.Codec.ExcessDestinationSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
   Pawl.Codec.CraftSpec.spec s
+  Pawl.Codec.ImpendingSpec.spec s
   Pawl.Codec.SpliceSpec.spec s
   Pawl.Codec.ExileCardsFromGraveyardSpec.spec s
   Pawl.Codec.ExileMaterialsSpec.spec s
@@ -1320,6 +1322,7 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.ashiokLoyaltySpec s registry
+  Pawl.PlaneswalkerSpec.tamiyoNotebookSpec s registry
   Pawl.PlayerDesignationSpec.spec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.CastProhibitionSpec.spec s registry

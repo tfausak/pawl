@@ -95,6 +95,7 @@ import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
@@ -491,6 +492,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
   Keyword.Freerunning _ -> []
+  -- CR 702.176a's FOURTH ability; the second is castForReplacementsOf's and the
+  -- third mintedStaticAbilitiesOf's.
+  Keyword.Impending _ -> List.genericReplicate count impendingEndStep
   Keyword.Unleash -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -754,6 +758,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
   Keyword.Freerunning _ -> []
+  Keyword.Impending _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Sunburst -> []
@@ -1325,6 +1330,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
   Keyword.Freerunning _ -> []
+  Keyword.Impending _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Sunburst -> []
@@ -1977,6 +1983,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
   Keyword.Freerunning _ -> []
+  Keyword.Impending _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Sunburst -> []
@@ -2740,6 +2747,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
   Keyword.Freerunning _ -> []
+  Keyword.Impending _ -> []
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Sunburst -> []
@@ -3060,10 +3068,11 @@ castOverloaded castUsing = case castUsing of
   Just (Keyword.Overload _) -> True
   _ -> False
 
--- CR 702.74a, 702.96a, 702.109a, 702.113a, 702.148a, 702.152a, 702.188a and
--- 702.190a: every evoke, overload, dash, blitz, cleave, awaken, web-slinging
--- and sneak cost this card may be cast for, each beside the keyword that offers
--- it -- the tag CR 601.2b records as Object.castUsing -- in ascending Set order.
+-- CR 702.74a, 702.96a, 702.109a, 702.113a, 702.148a, 702.152a, 702.176a,
+-- 702.188a and 702.190a: every evoke, overload, dash, blitz, cleave, awaken,
+-- impending, web-slinging and sneak cost this card may be cast for, each beside
+-- the keyword that offers it -- the tag CR 601.2b records as Object.castUsing --
+-- in ascending Set order.
 -- Read by Pawl.Engine.Cost.candidateCostsFor wherever the printed cost is
 -- offered, bestowCosts' reading: evoke's static ability functions "in any zone
 -- from which the card with evoke can be cast", dash and blitz name no zone, and
@@ -3080,8 +3089,8 @@ castOverloaded castUsing = case castUsing of
 -- Pawl.Engine.Cast.candidateTimingOk reads rule 702.190a's window off.
 --
 -- UNGATED, where surgeCosts' and spectacleCosts' callers gate: rules 702.113a,
--- 702.148a and 702.188a state no clause of their own. Rule 702.190a's clause is
--- a WINDOW rather than a condition on the board, so it
+-- 702.148a, 702.176a and 702.188a state no clause of their own. Rule 702.190a's
+-- clause is a WINDOW rather than a condition on the board, so it
 -- gates in Pawl.Engine.Cast beside the card's own timing and not here -- an offer
 -- withheld here would still leave the printed cost castable in that window, which
 -- is the opposite of what that rule says. A list and a wildcard for
@@ -3097,6 +3106,7 @@ plainAlternativeCosts keywords =
         Keyword.Cleave cost -> Just (keyword, cost)
         Keyword.Overload cost -> Just (keyword, cost)
         Keyword.Awaken cost -> Just (keyword, cost)
+        Keyword.Impending impending -> Just (keyword, Impending.cost impending)
         -- CR 702.188a's "a tapped creature you control", three conjuncts and CR
         -- 400.3 for the destination -- ninjutsu's component one rule over, whose
         -- haddock has the argument for asking the creature conjunct at all.
@@ -3976,7 +3986,7 @@ madnessDiscardExile =
 
 -- The static continuous abilities rule 702 states as a keyword's meaning, for the
 -- object those keywords are on: CR 702.161a's living metal, and the battlefield
--- halves of CR 702.109a's dash and CR 702.152a's blitz.
+-- halves of CR 702.109a's dash, CR 702.152a's blitz and CR 702.176a's impending.
 --
 -- MEMBERSHIP and not a count, unlike mintedReplacementsOf below: rule 702.161a
 -- adds card types the object already has once the first instance has applied, so
@@ -3994,6 +4004,7 @@ mintedStaticAbilitiesOf =
         Keyword.Dash _ -> [whilePaid KeywordFamily.Dash (NonEmpty.singleton (Modification.GainKeyword Keyword.Haste))]
         Keyword.Blitz _ -> [whilePaid KeywordFamily.Blitz (Modification.GainKeyword Keyword.Haste NonEmpty.:| [Modification.GainAbility (GrantedAbility.Triggered blitzDraw)])]
         Keyword.Reconfigure _ -> [reconfigured]
+        Keyword.Impending _ -> [impendingNotCreature]
         _ -> []
    in foldMap staticsOf . Set.toAscList
 
@@ -4098,6 +4109,31 @@ reconfigured =
       StaticAbility.modifications = NonEmpty.singleton (Modification.LoseCardType CardType.Creature)
     }
 
+-- CR 702.176a's THIRD ability: "as long as this permanent's impending cost was
+-- paid and it has a time counter on it, it's not a creature" -- a CR 613.1d
+-- layer 4 removal, reconfigured's modification. The paid half is whilePaid's
+-- Quantity.CastUsing, so a copy of an impending permanent (CR 707.2) is a
+-- creature even with a time counter on it; Pawl.CastSpec's "Impending" group
+-- proves both halves.
+impendingNotCreature :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card)
+impendingNotCreature =
+  StaticAbility.MkStaticAbility
+    { StaticAbility.affected = Affected.Matching Filter.IsSource,
+      StaticAbility.condition = Just impendingHolds,
+      StaticAbility.functionsFrom = Set.empty,
+      StaticAbility.lingers = Nothing,
+      StaticAbility.modifications = NonEmpty.singleton (Modification.LoseCardType CardType.Creature)
+    }
+
+-- CR 702.176a's "this permanent's impending cost was paid and it has a time
+-- counter on it", shared by the third and fourth abilities.
+impendingHolds :: Condition.Condition
+impendingHolds =
+  Condition.All
+    [ Condition.Compares (Compares.MkCompares (Quantity.CastUsing KeywordFamily.Impending) Comparison.AtLeast (Quantity.Literal 1)),
+      Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1))
+    ]
+
 -- CR 702.136a: the AS-ENTERS REPLACEMENT rule 702 gives a permanent for holding
 -- riot. Gathered by the PROJECTION off POST-LAYER keyword COUNTS, since rule
 -- 702.136a functions on the battlefield -- so Humility takes it away and a static
@@ -4114,6 +4150,23 @@ reconfigured =
 -- classes; the CR 616.1 loop matches each against the event it is offered.
 mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
 mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toAscList counts)
+
+-- CR 702.176a's SECOND ability: "if you chose to pay this permanent's impending
+-- cost, it enters with N time counters on it", a CR 614.1c row minted only when
+-- the entering object's CR 601.2b tag (Object.castUsing) names impending and the
+-- permanent still has the keyword, Projection.intrinsicReplacementsOf's
+-- compleated shape. The tag is not copiable (CR 707.2), so a copy of an
+-- impending permanent enters with none.
+--
+-- The keyword half is CR 614.12's look-ahead, and nothing in the suite
+-- observes it: dropping it leaves every case green, so it is a regression
+-- fence resting on that rule rather than a proved behaviour.
+castForReplacementsOf :: Maybe Keyword -> Map Keyword Natural -> [ReplacementEffect Card (GrantedAbility.GrantedAbility Card) (Effect.Effect Card (GrantedAbility.GrantedAbility Card))]
+castForReplacementsOf castUsing counts = case castUsing of
+  Just keyword@(Keyword.Impending impending)
+    | Map.member keyword counts ->
+        [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.Time (Quantity.Literal (toInteger (Impending.counters impending))))))]
+  _ -> []
 
 -- Exhaustive for abilitiesFor's reason: the next keyword that rewrites an entry
 -- must break this build rather than silently produce nothing.
@@ -4143,6 +4196,10 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
   Keyword.Freerunning _ -> []
+  -- CR 702.176a's SECOND ability is conditioned on the impending cost having
+  -- been paid, which the keyword alone cannot answer; castForReplacementsOf
+  -- mints it off the entering object's CR 601.2b tag instead.
+  Keyword.Impending _ -> []
   -- CR 702.98a's FIRST static ability, riot's row with the declining half deleted.
   -- Filter.IsSource and one row per instance for riot's reasons.
   Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Unleash))
@@ -4561,8 +4618,12 @@ mintedReplacementsFor keyword count = case keyword of
 -- effect, and a minted row is not printed in a face's list, so the gate has to
 -- be told which keywords mint one. Membership rather than a count, the gate asking whether
 -- there is any.
+--
+-- Impending is the one keyword whose row castForReplacementsOf mints instead.
 mintsReplacement :: Keyword -> Bool
-mintsReplacement keyword = not (null (mintedReplacementsFor keyword 1))
+mintsReplacement keyword = case keyword of
+  Keyword.Impending _ -> True
+  _ -> not (null (mintedReplacementsFor keyword 1))
 
 -- CR 508.1c / CR 509.1b: every combat restriction rule 702 gives an object for
 -- holding a keyword. CombatRestriction.inForce adds these to the ones a face
@@ -4615,6 +4676,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
   Keyword.Freerunning _ -> []
+  Keyword.Impending _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -4898,6 +4960,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Spectacle _ -> []
   Keyword.Prowl _ -> []
   Keyword.Freerunning _ -> []
+  Keyword.Impending _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
   Keyword.Frenzy _ -> []
@@ -5381,6 +5444,7 @@ familyOf keyword = case keyword of
   Keyword.Spectacle _ -> Just KeywordFamily.Spectacle
   Keyword.Prowl _ -> Just KeywordFamily.Prowl
   Keyword.Freerunning _ -> Just KeywordFamily.Freerunning
+  Keyword.Impending _ -> Just KeywordFamily.Impending
   Keyword.Unleash -> Nothing
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing
@@ -9031,6 +9095,23 @@ vanishingLastCounter =
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.176a's FOURTH ability: "at the beginning of your end step, if this
+-- permanent's impending cost was paid and it has a time counter on it, remove a
+-- time counter from it". vanishingUpkeep's shape on the end step, with the
+-- intervening "if" (CR 603.4) widened to impendingHolds.
+impendingEndStep :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+impendingEndStep =
+  let effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource Nothing)
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) Nothing TurnScope.ControllersTurn),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Just impendingHolds,
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 

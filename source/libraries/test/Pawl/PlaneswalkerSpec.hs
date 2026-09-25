@@ -91,6 +91,8 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -114,6 +116,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -1466,3 +1469,37 @@ ashiokLoyaltySpec s registry = Spec.describe s "AshiokLoyalty" $ do
     Spec.assertEqWith s "bob's exiled card, which the count did not read, is still his" (namesIn Zone.Exile S.bob after) [named "Goblin Piker"]
     Spec.assertEqWith s "carol's exile was empty before the ability resolved" (namesIn Zone.Exile S.carol board) []
     Spec.assertEqWith s "CR 606.4: seven loyalty counters came off" (S.counterOf CounterKind.Loyalty ashiokId after) 2
+
+-- Tamiyo, Compleated Sage's -7: "Create Tamiyo's Notebook, a legendary colorless
+-- Book artifact token with 'Spells you cast cost {2} less to cast' and '{T}: Draw
+-- a card.'" Alice holds her at EIGHT loyalty, so the cost leaves a survivor, with
+-- one Island, Divination ({2}{U}) in hand and two cards in her library, in her
+-- precombat main phase with priority.
+tamiyoNotebookSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+tamiyoNotebookSpec s registry = Spec.describe s "TamiyoNotebook" $ do
+  Spec.it s "CR 606.4 / 111.3 the -7 creates a Notebook that discounts spells and draws" $ do
+    tamiyo <- S.printingOf s registry "Tamiyo, Compleated Sage"
+    island <- S.printingOf s registry "Island"
+    divination <- S.printingOf s registry "Divination"
+    ornithopter <- S.printingOf s registry "Ornithopter"
+    let stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) (S.landsInPlay island 1) [ornithopter, ornithopter]
+        (divinationId, held) = S.addHandCard divination S.alice stocked
+        (tamiyoId, placed) = S.addPermanent tamiyo S.alice held
+        board =
+          (S.addCounter CounterKind.Loyalty 8 tamiyoId placed)
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        ultimate = filter (elem (CostComponent.RemoveLoyaltyFromThis 7) . Cost.Type.components . ActivatedAbility.cost) (Face.activatedAbilities (S.combinedFace tamiyo))
+        created = S.runPure S.identityAnswer board (do mapM_ (Activate.activateAbility S.alice tamiyoId) ultimate; Stack.resolveTop)
+        notebooks = Set.toList (Set.difference (GameState.battlefield created) (GameState.battlefield board))
+        drawn = S.runPure S.identityAnswer created (do Monad.forM_ notebooks (\oid -> mapM_ (Activate.activateAbility S.alice oid) (Projection.abilitiesOf oid created)); Stack.resolveTop)
+        shape oid = (Game.isToken oid created, Projection.supertypesOf oid created, Projection.cardTypesOf oid created, Projection.subtypesOf oid created, Projection.colorsOf oid created)
+    Spec.assertEqWith
+      s
+      "CR 111.3: one legendary colorless Book artifact token"
+      (fmap shape notebooks)
+      [(True, Set.singleton Supertype.Legendary, Set.singleton CardType.Artifact, Set.singleton Subtype.Book, Set.empty)]
+    Spec.assertBool s (S.castable S.alice divinationId created) "CR 601.2f: {2}{U} Divination costs {U}, so the one Island casts it"
+    Spec.assertEqWith s "{T}: Draw a card -- Divination plus the drawn card" (S.handSize S.alice drawn) 2
