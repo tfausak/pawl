@@ -174,6 +174,7 @@ viewOfCard face =
           Filter.attackingBattleProtector = Nothing,
           Filter.blocking = False,
           Filter.blocked = False,
+          Filter.blockers = Set.empty,
           Filter.attackedThisTurn = False,
           -- CR 508.1a / 509.1a: a printed face is in no combat, for the reason
           -- `attacking` above is False.
@@ -626,6 +627,7 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 509.1h: the key lookup the line above is careful not to be. Stays True
       -- once every creature blocking it has left combat.
       Filter.blocked = Map.member oid (Combat.blockers (GameState.combat gs)),
+      Filter.blockers = Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs)),
       -- CR 608.2i: from the turn's event log, which CR 511.3 does not clear.
       Filter.attackedThisTurn = any (declaredIt oid . LoggedEvent.event) (GameState.events gs),
       -- CR 508.1a / 509.1a: from the COMBAT record, which CR 511.3 does clear --

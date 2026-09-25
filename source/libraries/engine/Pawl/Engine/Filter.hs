@@ -263,6 +263,9 @@ data View = MkView
     -- reads -- but from its KEYS, which is Pawl.Engine.Combat.isBlocked's
     -- question and never `blocking`'s.
     blocked :: Bool,
+    -- CR 509.1g: the creatures blocking this candidate right now, the member set
+    -- Combat.blockers keeps under its key. Empty wherever `blocked` is False.
+    blockers :: Set.Set ObjectId.ObjectId,
     -- CR 608.2i: was this candidate declared as an attacker earlier this turn?
     -- Unlike `attacking` not even a present state: it is a look-back read of the
     -- turn-scoped GameEvent log.
@@ -810,6 +813,7 @@ playerView pid =
       -- CR 509.1h: blocked-ness is a status of an ATTACKING creature, and by CR
       -- 506.3 a player never is one.
       blocked = False,
+      blockers = Set.empty,
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
       -- CR 506.3 once more, for the two combat-phase-scoped questions: only a
@@ -2180,6 +2184,9 @@ matches context view predicate = case predicate of
   Filter.IsPairedWithSource -> case (paired view, source context) of
     (Just pairing, Just src) -> Pairing.partner pairing == src
     _ -> False
+  -- CR 509.1g: the source is among the candidate's blockers. Vacuously False
+  -- where no source frames the match.
+  Filter.IsBlockedBySource -> maybe False (`Set.member` blockers view) (source context)
   -- The designation, asked of the CANDIDATE. A live read of Object.designations,
   -- never a stamp on the candidate: every rule here ends its designation when the
   -- permanent leaves the battlefield, and CR 400.7's new incarnation simply arrives
@@ -2373,6 +2380,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsRingBearer -> predicate
   Filter.IsPaired -> predicate
   Filter.IsPairedWithSource -> predicate
+  Filter.IsBlockedBySource -> predicate
   Filter.HasDesignation _ -> predicate
   -- Untouched: CR 612.1 swaps a subtype, a colour or a card type word, and this
   -- atom names none -- "an activated ability that isn't a mana ability" has no
@@ -3097,6 +3105,7 @@ bakeBound players predicate = case predicate of
   Filter.IsRingBearer -> predicate
   Filter.IsPaired -> predicate
   Filter.IsPairedWithSource -> predicate
+  Filter.IsBlockedBySource -> predicate
   Filter.HasDesignation _ -> predicate
   Filter.HasCounters _ -> predicate
   Filter.HasCountersOfAnyKind -> predicate
@@ -3261,6 +3270,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsRingBearer -> []
   Filter.IsPaired -> []
   Filter.IsPairedWithSource -> []
+  Filter.IsBlockedBySource -> []
   Filter.HasDesignation _ -> []
   Filter.HasCounters _ -> []
   Filter.HasCountersOfAnyKind -> []
@@ -3438,6 +3448,7 @@ statesAQuality predicate = case predicate of
   Filter.IsRingBearer -> True
   Filter.IsPaired -> True
   Filter.IsPairedWithSource -> True
+  Filter.IsBlockedBySource -> True
   Filter.HasDesignation _ -> True
   Filter.HasCounters _ -> True
   Filter.HasCountersOfAnyKind -> True

@@ -631,7 +631,7 @@ effectObjectRefs effect = case effect of
   Effect.LoseLife {} -> []
   Effect.GainLife {} -> []
   Effect.ExchangeLifeTotals {} -> []
-  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) -> foldMap exchangedObjectRefs [one, other]
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other _) -> foldMap exchangedObjectRefs [one, other]
   Effect.SetLifeTotal {} -> []
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -833,7 +833,7 @@ effectPlayerRefs effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss ref _ _ _) -> [ref]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.ExchangeLifeTotals {} -> []
-  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) -> foldMap exchangedPlayerRefs [one, other]
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> foldMap exchangedPlayerRefs [one, other] <> durationPlayerRefs duration
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.LoseGame ref -> [ref]
   Effect.RedistributeLifeTotals -> []
@@ -1107,7 +1107,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
   -- Both sides' references are effectObjectRefs' and effectPlayerRefs' halves.
-  Effect.ExchangeValues {} -> Map.empty
+  Effect.ExchangeValues x -> durationSlots (ExchangeValues.duration x)
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.LoseGame {} -> Map.empty
   Effect.RedistributeLifeTotals -> Map.empty
@@ -1752,7 +1752,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
-  Effect.ExchangeValues _ -> True
+  Effect.ExchangeValues x -> durationSlotsAreExhaustive (ExchangeValues.duration x)
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.LoseGame {} -> True
   Effect.RedistributeLifeTotals -> True

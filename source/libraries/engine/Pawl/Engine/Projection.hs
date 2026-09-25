@@ -3086,6 +3086,7 @@ filterReads f = case f of
   Filter.Type.IsRingBearer -> Set.empty
   Filter.Type.IsPaired -> Set.empty
   Filter.Type.IsPairedWithSource -> Set.empty
+  Filter.Type.IsBlockedBySource -> Set.empty
   -- Reads nothing, for that atom's reason. What CR 701.60c hangs off `Suspected`
   -- IS in layer 6, but that is what the designation WRITES, not what this reads.
   Filter.Type.HasDesignation _ -> Set.empty
@@ -3260,6 +3261,7 @@ filterReadsPeers f = case f of
   Filter.Type.IsRingBearer -> False
   Filter.Type.IsPaired -> False
   Filter.Type.IsPairedWithSource -> False
+  Filter.Type.IsBlockedBySource -> False
   Filter.Type.HasDesignation _ -> False
   Filter.Type.HasCounters _ -> False
   Filter.Type.HasCountersOfAnyKind -> False

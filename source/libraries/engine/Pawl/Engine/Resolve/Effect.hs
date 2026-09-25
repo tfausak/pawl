@@ -5855,12 +5855,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- either is written, so each reaches the other's PREVIOUS value. A life total
   -- moves through changeLifeByDelta, the ExchangeLifeTotals arm's road; a power
   -- or toughness is set by a layer-7b effect (CR 613.4b) holding the other value
-  -- as a literal, for no stated duration (CR 611.2a).
+  -- as a literal, for the card's stated duration (CR 611.2a).
   --
   -- CR 701.12a's all-or-nothing: a side naming no single player, or no creature
   -- on the battlefield, or a life total CR 119.7-8 forbids reaching, cancels the
   -- whole exchange. Pawl.ZoneChangeSpec's ExchangeValues group is the proof.
-  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) -> do
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> do
     gs <- State.get
     let single xs = case xs of
           [x] -> Just x
@@ -5885,7 +5885,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           previous <- characteristic oid gs
           pure (previous, Just . setBase oid . setting . Quantity.Type.Literal)
         -- CR 611.2c: the one creature is frozen into the stored effect.
-        setBase oid setting = State.modify' $ \g -> case Expiry.arm legal controller source Duration.Indefinite g of
+        setBase oid setting = State.modify' $ \g -> case Expiry.arm legal controller source duration g of
           Nothing -> g
           Just expiry ->
             let (ts, g1) = Game.freshTimestamp g

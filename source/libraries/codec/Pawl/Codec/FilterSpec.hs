@@ -614,6 +614,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       Filter.IsPairedWithSource
       " {\"type\":\"IsPairedWithSource\"} "
     Spec.assertBool s (Codec.encode codec Filter.IsPairedWithSource /= Codec.encode codec Filter.IsPaired) "IsPairedWithSource and IsPaired encode differently"
+  Spec.it s "IsBlockedBySource" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsBlockedBySource
+      " {\"type\":\"IsBlockedBySource\"} "
   Spec.it s "HasNonManaActivatedAbility" $
     Common.assertCodec
       s
