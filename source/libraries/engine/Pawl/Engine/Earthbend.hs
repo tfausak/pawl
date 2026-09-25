@@ -87,7 +87,7 @@ instructions earthbend =
   let ref = Earthbend.ref earthbend
       animate modification = Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.Indefinite modification ref)
    in [ animate (Modification.AddCardType CardType.Creature),
-        animate (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 0) (Quantity.Literal 0))),
+        animate (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Literal 0)) (Just (Quantity.Literal 0)))),
         animate (Modification.GainKeyword Keyword.Haste),
         Effect.PutCounters
           PutCounters.MkPutCounters

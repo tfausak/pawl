@@ -489,8 +489,12 @@ library codec
     Pawl.Codec.EventShapeSpec
     Pawl.Codec.ExcessDestination
     Pawl.Codec.ExcessDestinationSpec
+    Pawl.Codec.ExchangedValue
+    Pawl.Codec.ExchangedValueSpec
     Pawl.Codec.ExchangeSides
     Pawl.Codec.ExchangeSidesSpec
+    Pawl.Codec.ExchangeValues
+    Pawl.Codec.ExchangeValuesSpec
     Pawl.Codec.ExileCardsFromGraveyard
     Pawl.Codec.ExileCardsFromGraveyardSpec
     Pawl.Codec.ExileHaunting
@@ -1856,7 +1860,9 @@ library types
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
     Pawl.Types.ExcessDestination
+    Pawl.Types.ExchangedValue
     Pawl.Types.ExchangeSides
+    Pawl.Types.ExchangeValues
     Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
     Pawl.Types.ExileLooker

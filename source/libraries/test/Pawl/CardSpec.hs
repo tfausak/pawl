@@ -158,6 +158,8 @@ import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
+import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Face as Face
@@ -628,7 +630,8 @@ objectRefPositions =
         ("make-foretold", Effect.MakeForetold (MakeForetold.MkMakeForetold (plantedRef "mf") Nothing), [plantedRef "mf"]),
         ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") LoopMembers.Every (SlotName.MkSlotName (Text.pack "each")) Seq.empty False), [plantedRef "fe"]),
-        ("heal", Effect.Heal (plantedRef "he"), [plantedRef "he"])
+        ("heal", Effect.Heal (plantedRef "he"), [plantedRef "he"]),
+        ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.Power (plantedRef "xv-power")) (ExchangedValue.Toughness (plantedRef "xv-toughness"))), [plantedRef "xv-power", plantedRef "xv-toughness"])
       ]
 
 -- The ref plantedRef at one position, named for it so a position answering with
@@ -658,6 +661,7 @@ playerRefPositions =
         ("lose-life", Effect.LoseLife (LifeLoss.MkLifeLoss (plantedPlayer "ll") one LifeLossCause.ByEffect Nothing), [plantedPlayer "ll"]),
         ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
         ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
+        ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (plantedPlayer "xv-one")) (ExchangedValue.LifeTotal (plantedPlayer "xv-other"))), [plantedPlayer "xv-one", plantedPlayer "xv-other"]),
         ("lose-game", Effect.LoseGame (plantedPlayer "lg"), [plantedPlayer "lg"]),
         ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
         ("decrease-speed", Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease (plantedPlayer "ds") one 0), [plantedPlayer "ds"]),
@@ -844,7 +848,7 @@ modificationCounts modification = case modification of
   Modification.LoseKeyword _ -> []
   -- Carries a payload-free family, which nests neither a Count nor a Filter.
   Modification.LoseKeywordFamily _ -> []
-  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityCounts p <> quantityCounts t
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityCounts p <> foldMap quantityCounts t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
@@ -1188,6 +1192,7 @@ ownCounts effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
+  Effect.ExchangeValues _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -1619,6 +1624,7 @@ effectNestedEffects effect = case effect of
   Effect.LoseLife {} -> []
   Effect.GainLife {} -> []
   Effect.ExchangeLifeTotals {} -> []
+  Effect.ExchangeValues {} -> []
   Effect.SetLifeTotal {} -> []
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -2104,6 +2110,7 @@ effectReplacements effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause _) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
+  Effect.ExchangeValues _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -2565,6 +2572,7 @@ effectMintedFaces effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _cause _) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
+  Effect.ExchangeValues _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
@@ -3790,7 +3798,7 @@ modificationFilters modification = case modification of
   Modification.GainAbility _ -> []
   -- Payload-free, so no Filter of its own -- see modificationCounts.
   Modification.GainAbilitiesOfSource -> []
-  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityFilters p <> quantityFilters t
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityFilters p <> foldMap quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []
   Modification.LoseNamedAbility _ -> []
@@ -5428,6 +5436,7 @@ effectFilters effect = case effect of
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> frame Unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) -> frame SourceHostFramed (foldMap objectRefFilters (foldMap Resolve.exchangedObjectRefs [one, other]))
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.LoseGame {} -> []
   Effect.RedistributeLifeTotals -> []
