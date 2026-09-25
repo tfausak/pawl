@@ -1232,6 +1232,7 @@ spec s registry = do
   Pawl.CopySpec.flamerushRiderSpec s registry
   Pawl.CopySpec.castCopySpec s registry
   Pawl.CopySpec.garthSpec s registry
+  Pawl.CopySpec.cipherSpec s registry
   Pawl.CopySpec.magarSpec s registry
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry

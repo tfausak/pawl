@@ -194,6 +194,8 @@ noCombat =
 --     the battlefield brings it back plus the zone it came from.
 --   * GameState.haunting (CR 702.55b), keyed by the haunting card in exile, its
 --     value the object that card haunts.
+--   * GameState.encoded (CR 702.99b), keyed by the card with cipher in exile,
+--     its value the creature it is encoded on.
 --   * GameState.exiledWith (CR 607.2), keyed by the exiled card, its value the
 --     object CR 607.2a's or CR 607.2b's link names.
 --   * GameState.exilePiles (CR 406.4), keyed by the card in exile face down, its
@@ -217,7 +219,7 @@ noCombat =
 -- value moved.
 --
 -- The KEY side is a regression fence rather than a proof, and so is exiledWith's
--- value side and exilePiles' whole arm. Every one of these relations keys on an
+-- value side, encoded's whole arm and exilePiles' whole arm. Every one of these relations keys on an
 -- object that is not on the battlefield -- an exiled incarnation, or a permanent
 -- GameState.battlefield excludes (CR 702.26b) -- so no key can ever be a
 -- mana-source candidate, and neutering `key == oid` below leaves the whole suite
@@ -230,6 +232,7 @@ namedByRelation oid gs =
         || relates monarchWatchNames (GameState.exiledUntilMonarch gs)
         || relates returnWatchNames (GameState.movedUntilSourceLeaves gs)
         || relates Set.singleton (GameState.haunting gs)
+        || relates Set.singleton (GameState.encoded gs)
         || relates Set.singleton (GameState.exiledWith gs)
         || relates pileNames (GameState.exilePiles gs)
 

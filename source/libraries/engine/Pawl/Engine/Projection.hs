@@ -1931,7 +1931,8 @@ gatherGiven stripped functioning seed gs =
       designations = designationGathered gs
       bestows = bestowGathered gs
       castGrants = castGrantGathered gs
-   in stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants
+      encodings = encodedGathered gs
+   in stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants <> encodings
 
 -- CR 113.6b's stated set, without the empty-set default that
 -- functionsFromZone folds in: does this ability SAY it functions from `zone`?
@@ -2716,6 +2717,37 @@ castGrantGathered gs =
               }
           ]
    in concatMap fromObject (GameState.stack gs)
+
+-- CR 702.99a's static ability: "for as long as this card is encoded on that
+-- creature, that creature has" the trigger Keyword.cipherTrigger builds, emitted
+-- as a layer-6 grant from the card in exile with the card's timestamp (CR
+-- 613.7a). Read off GameState.encoded on every projection, which IS "for as long
+-- as": CR 702.99c's two conditions are the card still in exile under the id the
+-- encode filed, and the creature still on the battlefield.
+--
+-- The keyword is read off the card's PRINTED face, not its projection, which
+-- this gather is part of. The two differ only under an effect that changes the
+-- abilities of a card in exile, and nothing in pawl does.
+encodedGathered :: GameState -> [Gathered]
+encodedGathered gs =
+  let fromRow (card, creature) = case Game.lookupObject card gs of
+        Just cardObj
+          | Set.member card (GameState.exile gs),
+            Set.member creature (GameState.battlefield gs),
+            not (Object.exiledFaceDown cardObj),
+            maybe False (Map.member Keyword.Type.Cipher . Face.keywords) (Game.faceOfObject gs cardObj) ->
+              [ MkGathered
+                  { gEffect = Nothing,
+                    gSource = card,
+                    gAffected = Affected.TheseObjects (Set.singleton creature),
+                    gLayer = Layer.Ability,
+                    gLowest = Layer.Ability,
+                    gTimestamp = Object.timestamp cardObj,
+                    gModification = Modification.GainAbility (GrantedAbility.Triggered (Keyword.cipherTrigger card))
+                  }
+              ]
+        _ -> []
+   in concatMap fromRow (Map.toList (GameState.encoded gs))
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
 -- question needs: applying one effect can only change what another applies to if

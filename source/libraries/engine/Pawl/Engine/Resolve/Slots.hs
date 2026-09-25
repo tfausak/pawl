@@ -391,6 +391,7 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- seat is CR 109.5's "you", so no slot names it.
   ObjectRef.EachCardInYourLibrary _ -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
+  ObjectRef.EachCardEncodedOnSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachAbility _ -> Map.empty
   ObjectRef.EachOnStack _ -> Map.empty
@@ -469,6 +470,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
   ObjectRef.EachCardInYourLibrary _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
+  ObjectRef.EachCardEncodedOnSource _ -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachAbility _ -> []
   ObjectRef.EachOnStack _ -> []
@@ -518,6 +520,7 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
   ObjectRef.EachCardInYourLibrary _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
+  ObjectRef.EachCardEncodedOnSource _ -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachAbility _ -> []
   ObjectRef.EachOnStack _ -> []
@@ -2586,6 +2589,18 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           Just filter_ -> Filter.matches context (viewOf oid) filter_
      in filter
           (\oid -> Map.lookup oid (GameState.exiledWith gs) == Just source && stated oid)
+          (Set.toList (GameState.exile gs))
+  -- CR 702.99b's relation, the arm above's shape over GameState.encoded. Keyed
+  -- on the source's id alone, so a trigger whose creature has since left still
+  -- finds the card; no Gatherer ruling on cipher covers that case.
+  ObjectRef.EachCardEncodedOnSource mFilter ->
+    let context = effectContext gs controller source legal (slotBindings resolving gs)
+        viewOf = Projection.viewsOf gs
+        stated oid = case mFilter of
+          Nothing -> True
+          Just filter_ -> Filter.matches context (viewOf oid) filter_
+     in filter
+          (\oid -> Map.lookup oid (GameState.encoded gs) == Just source && stated oid)
           (Set.toList (GameState.exile gs))
   -- CR 109.2b's reading of a description carrying the word "spell" -- the stack,
   -- not the battlefield. Game.isSpell keeps the abilities sharing the zone out
