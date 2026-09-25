@@ -308,6 +308,7 @@ looksBack condition = case condition of
   -- battlefield, so the ordinary CR 603.10 reading -- the board as it is now --
   -- is the right one.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  TriggerCondition.PermanentsBecomeTapped _ -> False
   -- Nor is becoming untapped: CR 701.26b leaves the permanent standing on
   -- the battlefield too, so the same live read is the right one.
   TriggerCondition.SelfBecomesUntapped -> False
@@ -405,6 +406,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfDiscarded -> False
   TriggerCondition.SelfExiledForMadness -> False
   TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.PlayerDiscardsCards _ -> False
   TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
   TriggerCondition.SelfAttacks _ -> False
@@ -566,9 +568,14 @@ batchScoped condition = case condition of
   -- once put ONE counter on the Mascot".
   TriggerCondition.CardsLeaveZone {} -> True
   TriggerCondition.AttachedCreatureDies -> False
-  -- CR 603.2e names the MOMENT a permanent becomes tapped, and a moment holds one
-  -- occurrence; no printing of that event says "one or more".
+  -- CR 603.2e names the MOMENT the one enchanted permanent becomes tapped, so a
+  -- batch holds at most one occurrence of it.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
+  -- A True, PlayerDiscardsCards' reason for taps: "one or more nontoken Merfolk
+  -- you control become tapped" (Deeproot Pilgrimage) is one trigger event per
+  -- tapping, however many it tapped -- a cost's taps, CR 508.1f's attackers, or
+  -- one Effect.Tap -- so long as each of those sites brackets its loop.
+  TriggerCondition.PermanentsBecomeTapped _ -> True
   -- The untap direction the same way, CR 502.3's simultaneous batch
   -- included: the condition is about the BEARER, so a batch that untaps a
   -- whole board still holds one occurrence of it.
@@ -637,6 +644,13 @@ batchScoped condition = case condition of
   TriggerCondition.SelfDiscarded -> False
   TriggerCondition.SelfExiledForMadness -> False
   TriggerCondition.PlayerDiscards _ -> False
+  -- A True beside PermanentsDie: "whenever you discard one or more cards"
+  -- (Magmakin Artillerist) names a whole CR 608.2f / 601.2h discard as one
+  -- trigger event, where the arm above is CR 603.2c's second sentence. Only as
+  -- good as the brackets around the discard funnel's callers -- Pawl.Engine.Cost's
+  -- DiscardCards arm and Pawl.Engine.Resolve's Discard arms -- since an unbracketed
+  -- loop gives each card a group of its own.
+  TriggerCondition.PlayerDiscardsCards _ -> True
   TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
   TriggerCondition.SelfAttacks _ -> False
@@ -2250,6 +2264,7 @@ zonesTriggeredFrom cond =
         -- permanent is itself a permanent on the battlefield, and CR 113.6k's exception
         -- is for a condition that cannot trigger from there at all.
         TriggerCondition.AttachedCreatureBecomesTapped -> battlefield
+        TriggerCondition.PermanentsBecomeTapped _ -> battlefield
         -- CR 110.5 makes tapped a permanent's status, so only a permanent can
         -- become untapped and only the battlefield can hold one.
         TriggerCondition.SelfBecomesUntapped -> battlefield
@@ -2366,6 +2381,7 @@ zonesTriggeredFrom cond =
         -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
         -- graveyard does not see an opponent discard.
         TriggerCondition.PlayerDiscards _ -> battlefield
+        TriggerCondition.PlayerDiscardsCards _ -> battlefield
         -- CR 113.6's default too, and NOT the graveyard SelfCycled answers above: the
         -- bearer here is a permanent, not the card that was cycled, so the zone the
         -- cycled card winds up in (rule 702.29c's second sentence) is nothing to do
@@ -2657,6 +2673,7 @@ stateTriggers gs
               TriggerCondition.SelfDiscarded -> False
               TriggerCondition.SelfExiledForMadness -> False
               TriggerCondition.PlayerDiscards _ -> False
+              TriggerCondition.PlayerDiscardsCards _ -> False
               TriggerCondition.PlayerCycles _ -> False
               TriggerCondition.PlayerDrawsNthCard {} -> False
               TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
@@ -2747,6 +2764,7 @@ stateTriggers gs
               -- False: CR 603.2e says a "becomes" condition does not retrigger
               -- while the state persists, and a state trigger would do nothing but.
               TriggerCondition.AttachedCreatureBecomesTapped -> False
+              TriggerCondition.PermanentsBecomeTapped _ -> False
               -- CR 701.26b's untap is an EVENT for the identical reason,
               -- read off the bearer instead of its host.
               TriggerCondition.SelfBecomesUntapped -> False

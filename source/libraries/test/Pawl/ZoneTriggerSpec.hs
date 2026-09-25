@@ -2211,6 +2211,8 @@ representativeEvents cond =
         -- the flag is not, so a False event would pin nothing.
         TriggerCondition.SelfExiledForMadness -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary True))
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary False))
+        -- The same event, which binds this batch reading's one card as its amount.
+        TriggerCondition.PlayerDiscardsCards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary False))
         -- The CYCLING cause, which is the only one this condition admits -- an
         -- Ordinary discard is an event it rejects, and eventBindings is consulted
         -- only for a match, so it would pin nothing.
@@ -2537,6 +2539,7 @@ representativeEvents cond =
         -- eventBindings claims nothing either way, and the floor is what this
         -- pins.
         TriggerCondition.AttachedCreatureBecomesTapped -> one (GameEvent.BecameTapped departed)
+        TriggerCondition.PermanentsBecomeTapped _ -> one (GameEvent.BecameTapped departed)
         -- CR 701.26b's own event, and the only one this condition admits, on
         -- `departed` for SelfEvolves' reason: the pair does not match, which
         -- pins the floor for a matching pair too, this arm binding nothing
@@ -2722,6 +2725,7 @@ everyTriggerCondition =
     TriggerCondition.SelfDiscarded,
     TriggerCondition.SelfExiledForMadness,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
+    TriggerCondition.PlayerDiscardsCards PlayerRelation.You,
     TriggerCondition.PlayerCycles PlayerRelation.You,
     TriggerCondition.PlayerCycles PlayerRelation.Opponent,
     TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You 2),
@@ -2840,6 +2844,7 @@ everyTriggerCondition =
     TriggerCondition.AttachedCreatureMentors,
     TriggerCondition.AttachedCreatureDies,
     TriggerCondition.AttachedCreatureBecomesTapped,
+    TriggerCondition.PermanentsBecomeTapped (Filter.Type.And []),
     TriggerCondition.SelfBecomesUntapped,
     TriggerCondition.AttachedPermanentTappedForMana,
     -- ALL THREE relations, on the PermanentSacrificed rows' reasoning below:

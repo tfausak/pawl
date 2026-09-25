@@ -1532,6 +1532,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Waterbent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
+  -- CR 603.2c's batch reading of the arm above, delegated for CardsLeaveZone's
+  -- reason: firing once per discard event is `batchScoped`, never this arm.
+  TriggerCondition.PlayerDiscardsCards relation -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.PlayerDiscards relation) event
   -- The discard arm above narrowed by the CAUSE, which is the whole of the
   -- difference: CR 702.29a makes cycling a discard, so an ordinary discard
   -- reaches the same log through the same funnel and must fire nothing here.
@@ -4690,6 +4693,81 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     -- CR 106.12a's event is a DIFFERENT one, and stated rather than folded
     -- into the arm above: a mana activation writes both, and matching this
     -- one here would fire Betrayal twice off one tap.
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 701.26a by a bystander: a permanent the filter admits became tapped,
+  -- judged off CR 603.10's board just after the event. Firing once for a
+  -- batch is `batchScoped` plus eventTriggers' dedup, never this arm.
+  TriggerCondition.PermanentsBecomeTapped f -> case event of
+    GameEvent.BecameTapped tapped -> case Map.lookup tapped board of
+      Nothing -> False
+      Just candidate -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) (Projection.sampledView tapped candidate gs) f
+    GameEvent.BecameUntapped _ -> False
     GameEvent.TappedForMana _ -> False
     GameEvent.ManaAdded _ -> False
     GameEvent.ManaAbilityResolved _ -> False

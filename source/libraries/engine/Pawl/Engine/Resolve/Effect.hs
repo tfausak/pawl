@@ -5539,9 +5539,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       _ -> State.gets (\gs -> objectRefObjects legal resolving controller source gs ref)
     gs <- State.get
     let owned oid = fmap ((,) oid . Object.owner) (Game.lookupObject oid gs)
-    Monad.mapM_
-      (\(oid, owner) -> Event.discard DiscardCause.Ordinary owner oid)
-      (Maybe.mapMaybe owned named)
+    -- One event group, CR 608.2f.
+    Event.simultaneously $
+      Monad.mapM_
+        (\(oid, owner) -> Event.discard DiscardCause.Ordinary owner oid)
+        (Maybe.mapMaybe owned named)
   Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity mDiscarded)) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -5594,8 +5596,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 701.9a's move, through the shared discard funnel, so the discard is
     -- recorded for a trigger to read. The funnel's own answers come back for the
     -- binding below; a move that did not complete answers Nothing and is dropped.
+    -- One event group across the seats, CR 101.4's "simultaneously".
     moved <-
-      fmap concat . Monad.forM doomed $ \(victim, oids) ->
+      Event.simultaneously . fmap concat . Monad.forM doomed $ \(victim, oids) ->
         fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
     -- The cards "discarded this way", for a later effect of the same resolution
     -- to look back at -- Psychic Miasma's "if a land card is discarded this way".
@@ -8647,7 +8650,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- on the write: the assignment was idempotent and the event is not.
   Effect.Tap ref -> do
     gs <- State.get
-    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) Event.tap
+    -- One event group, CR 608.2f.
+    Event.simultaneously (Monad.forM_ (objectRefObjects legal resolving controller source gs ref) Event.tap)
   -- CR 701.26b: rotate each named permanent back upright. The victims are
   -- enumerated ONCE (CR 608.2f) and off the board as it stands before any of them
   -- is untapped, so an illegal slot (CR 608.2b), a player recipient and a set
@@ -9938,7 +9942,8 @@ conniveOne n oid = Monad.when (n > 0) $ do
           let valid = ListUtils.nubOrd (filter (\c -> List.elem c held) answer)
               filler = filter (\c -> List.notElem c valid) held
           pure (List.genericTake n (valid <> filler))
-    moved <- fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary pid) chosen)
+    -- One event group: CR 701.50d discards the N cards as one action.
+    moved <- Event.simultaneously (fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary pid) chosen))
     after <- State.get
     let nonland c = not (Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject c after)))
         grown = Natural.length (filter nonland moved)
