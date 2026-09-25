@@ -1304,8 +1304,9 @@ offerCastOnce context named caster optionality verb retake offer = do
               fmap (Maybe.mapMaybe (proposal oid)) (faces oid card)
           )
           named
-      -- One entry per land face (CR 712.12), beside the spells above: a land is
-      -- never castable (CR 305.1), so no pair is offered both ways.
+      -- One entry per land face (CR 712.12), beside the spells above, which
+      -- hold no land face (CR 305.9, Cast.printedRestrictionsOk), so no pair is
+      -- offered both ways.
       landOffers
         | verb == PermissionVerb.Play && Cast.landDropOpen caster gs =
             [ (oid, mName, Face.name face)
