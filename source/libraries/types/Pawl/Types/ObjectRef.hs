@@ -51,6 +51,9 @@ data ObjectRef
     -- instruction in an ability of this effect's source put there, narrowed by the
     -- optional Filter.
     EachCardExiledWithSource (Maybe (Filter.Filter Keyword.Keyword))
+  | -- | CR 702.99a / Last Thoughts: every card in exile encoded on this effect's
+    -- source, narrowed by the optional Filter.
+    EachCardEncodedOnSource (Maybe (Filter.Filter Keyword.Keyword))
   | -- | CR 109.2b / Swift Silence: every spell on the stack matching the Filter,
     -- abilities excluded (CR 113.9).
     EachSpell (Filter.Filter Keyword.Keyword)

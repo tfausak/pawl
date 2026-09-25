@@ -2701,6 +2701,7 @@ promptDecider prompt = case prompt of
   Prompt.ChoosePayLifeOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseRevealOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEnlist decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseEncode decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseColor decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseManaType decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCardName decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2850,6 +2851,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChoosePayLifeOnEntry {} -> "ChoosePayLifeOnEntry"
   Prompt.ChooseRevealOnEntry {} -> "ChooseRevealOnEntry"
   Prompt.ChooseEnlist {} -> "ChooseEnlist"
+  Prompt.ChooseEncode {} -> "ChooseEncode"
   Prompt.ChooseColor {} -> "ChooseColor"
   Prompt.ChooseManaType {} -> "ChooseManaType"
   Prompt.ChooseCardName {} -> "ChooseCardName"
@@ -3431,6 +3433,7 @@ oneMountainState mountain ph =
           GameState.exiledUntilMonarch = Map.empty,
           GameState.movedUntilSourceLeaves = Map.empty,
           GameState.haunting = Map.empty,
+          GameState.encoded = Map.empty,
           GameState.exiledWith = Map.empty,
           GameState.exilePiles = Map.empty,
           GameState.extraTurns = [],

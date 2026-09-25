@@ -177,6 +177,12 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.EachCardExiledWithSource Nothing)
       " {\"type\":\"EachCardExiledWithSource\"} "
+  Spec.it s "EachCardEncodedOnSource" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachCardEncodedOnSource Nothing)
+      " {\"type\":\"EachCardEncodedOnSource\"} "
   -- And the narrowed set, Karn Liberated's "non-Aura permanent cards": an absent
   -- key and a stated filter are different refs, so the optional payload has to
   -- survive the trip rather than being dropped to the bare tag.

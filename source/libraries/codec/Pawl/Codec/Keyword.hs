@@ -230,6 +230,7 @@ codec =
       Arm.payload "Mutate" (Cost.codec codec) Keyword.Mutate (\x -> case x of Keyword.Mutate y -> Just y; _ -> Nothing),
       Arm.nullary "UmbraArmor" Keyword.UmbraArmor,
       Arm.nullary "Epic" Keyword.Epic,
+      Arm.nullary "Cipher" Keyword.Cipher,
       Arm.nullary "Convoke" Keyword.Convoke,
       Arm.nullary "Delve" Keyword.Delve,
       Arm.nullary "Undaunted" Keyword.Undaunted,
@@ -425,6 +426,7 @@ tagOf x = case x of
   Keyword.Mutate {} -> "Mutate"
   Keyword.UmbraArmor {} -> "UmbraArmor"
   Keyword.Epic {} -> "Epic"
+  Keyword.Cipher {} -> "Cipher"
   Keyword.Convoke {} -> "Convoke"
   Keyword.Delve {} -> "Delve"
   Keyword.Undaunted {} -> "Undaunted"
