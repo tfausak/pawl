@@ -2763,6 +2763,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.142a, exhaust's reason one rule over: what boast adds is a rider on
   -- the ability printed after it, so CR 612.2 has nothing here to swap.
   Keyword.Type.Boast -> keyword
+  Keyword.Type.Forecast -> keyword
   Keyword.Type.StartYourEngines -> keyword
   -- CR 701.43d names no quality and carries no cost, so CR 612.2 has nothing here
   -- to swap.

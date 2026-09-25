@@ -76,6 +76,7 @@ import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.EachCardFromAmong as EachCardFromAmong
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Emerge as Emerge
@@ -133,6 +134,7 @@ import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
@@ -533,6 +535,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
+  Keyword.Forecast -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
@@ -784,6 +787,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
+  Keyword.Forecast -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -1351,6 +1355,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
+  Keyword.Forecast -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -2004,6 +2009,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
+  Keyword.Forecast -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
   -- rather than the stack.
   Keyword.Exert -> []
@@ -2779,6 +2785,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
+  Keyword.Forecast -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -4495,6 +4502,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
+  Keyword.Forecast -> []
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
   -- writes Object.exertedBy directly.
   Keyword.Exert -> []
@@ -4778,6 +4786,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
+  Keyword.Forecast -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
   -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
@@ -5079,6 +5088,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Assist -> []
   Keyword.Exhaust -> []
   Keyword.Boast -> []
+  Keyword.Forecast -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -5123,7 +5133,34 @@ addsRulesToPrintedAbility :: Keyword -> Bool
 addsRulesToPrintedAbility keyword = case keyword of
   Keyword.Exhaust -> True
   Keyword.Boast -> True
+  Keyword.Forecast -> True
   _ -> False
+
+-- CR 602.5b: the riders rule 702 adds to the printed ability a keyword is
+-- written on. Forecast's are CR 702.57b's "only during the upkeep step of the
+-- card's owner and only once each turn"; ControllersTurn reads the activator, who
+-- for a card in a hand is its owner (CR 602.2, CR 108.4a).
+--
+-- Not implemented: exhaust's and boast's riders, which their cards state
+-- themselves (#3044).
+printedRiders :: Keyword -> [ActivationRestriction.ActivationRestriction]
+printedRiders keyword = case keyword of
+  Keyword.Forecast ->
+    [ ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase (PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep)) TurnScope.ControllersTurn),
+      ActivationRestriction.OnlyOnceEachTurn
+    ]
+  _ -> []
+
+-- Every rider the ability is bound by: the ones it prints plus printedRiders.
+restrictionsOf :: ActivatedAbility Card (GrantedAbility.GrantedAbility Card) -> [ActivationRestriction.ActivationRestriction]
+restrictionsOf ability = ActivatedAbility.restrictions ability <> foldMap printedRiders (ActivatedAbility.keyword ability)
+
+-- CR 113.6b: the zone rule 702 says the printed ability a keyword is written on
+-- functions from. CR 702.57a puts a forecast ability in a hand.
+printedZone :: Keyword -> Maybe Zone.Zone
+printedZone keyword = case keyword of
+  Keyword.Forecast -> Just Zone.Hand
+  _ -> Nothing
 
 -- CR 702: does a card's designator name the keyword whose rules this ability is
 -- under? The comparison Pawl.Types.ReduceActivationCost.grantedBy is put through,
@@ -5351,6 +5388,7 @@ familyOf keyword = case keyword of
   -- is what Pawl.Types.KeywordDesignator.OfNullary names.
   Keyword.Exhaust -> Nothing
   Keyword.Boast -> Nothing
+  Keyword.Forecast -> Nothing
   Keyword.Exert -> Nothing
   Keyword.Enlist -> Nothing
   Keyword.Persist -> Nothing
