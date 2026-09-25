@@ -251,8 +251,9 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Pawl.ManaSpec's "CR 613.1f Humility strips Dryad Arbor's CR 305.6 mana
     -- ability" is what proves it reaches the mana routes.
     lostAllAbilities :: Bool,
-    -- | CR 612.1 layer 3: the subtype word swaps applied to this object, in the
-    -- order they were applied. A RECORD of what layer 3 did, where every field
+    -- | CR 612.1 layer 3: the subtype word swaps applied to the text box this
+    -- object carries, in the order they were applied -- CR 612.5's exchange
+    -- moves them with the text. A RECORD of what layer 3 did, where every field
     -- above is the RESULT of it -- kept because rule 702's abilities are minted
     -- from the finished keyword counts, after the fold, so the mint has no other
     -- way to learn that the words it is about to write were changed (CR 612.2a,

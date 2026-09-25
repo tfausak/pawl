@@ -47,6 +47,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -3067,6 +3068,37 @@ championSpec s registry =
           Spec.assertEqWith s "CR 702.72a nothing was exiled" (namesIn Zone.Exile S.bob after) []
           Spec.assertEqWith s "the Russet Wolves alice would have exiled stayed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Russet Wolves")) S.bob after) 1
           Spec.assertEqWith s "and so did the Goblin Piker" (S.countOnBattlefieldByName pikerName S.alice after) 1
+        -- CR 612.1 / 613.7 through the MINT: two Artificial Evolutions ({U}
+        -- Instant, "Change the text of target spell or permanent by replacing
+        -- all instances of one creature type with another. The new creature
+        -- type can't be Wall." -- checked against Scryfall 2026-09-24) on the
+        -- Prophet, Merfolk -> Elf and then Elf -> Merfolk. The keyword ends
+        -- Champion a Merfolk, and the entry ability rule 702.72a mints from it
+        -- has to say Merfolk too, not the Elf a first-match lookup of the raw
+        -- swaps gives.
+        Spec.it s "CR 613.7 two Evolutions on Wanderwine Prophets champion a Merfolk" $ do
+          island <- S.printingOf s registry "Island"
+          prophets <- S.printingOf s registry "Wanderwine Prophets"
+          evolution <- S.printingOf s registry "Artificial Evolution"
+          let (prophetId, b0) = S.addPermanent prophets S.alice (S.landsInPlay island 2)
+              (b1, firstId) = S.handOne evolution b0
+              (b2, secondId) = S.handOne evolution b1
+              evolving :: (Subtype.Subtype, Subtype.Subtype) -> Prompt.Prompt r -> r
+              evolving swap p = case p of
+                Prompt.ChooseTargets _ _ _ offers -> S.preferring ((== Just prophetId) . Recipient.objectOf) offers
+                Prompt.ChooseCreatureTypeSwap {} -> swap
+                _ -> S.identityAnswer p
+              toElf = (Subtype.Merfolk, Subtype.Elf)
+              toMerfolk = (Subtype.Elf, Subtype.Merfolk)
+              first = S.runPure (evolving toElf) b2 (S.cast S.alice firstId >> Stack.resolveTop)
+              both = S.runPure (evolving toMerfolk) first (S.cast S.alice secondId >> Stack.resolveTop)
+              championOf quality = Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Champion (Filter.Type.HasSubtype quality)) 1)
+              mintedOn gs = Projection.mintedTriggeredAbilitiesOf (Projection.project prophetId gs)
+          Spec.assertBool s (mintedOn both == championOf Subtype.Merfolk) "CR 613.7 the minted entry ability exiles another Merfolk"
+          -- The anti-vacuity check, after the behaviour: the first Evolution
+          -- alone really moved the ability onto Elves.
+          Spec.assertBool s (mintedOn first == championOf Subtype.Elf) "after the first Evolution alone it exiles another Elf"
+
         -- Rule 702.72a's SECOND ability, off the first's board: the Prophet dies
         -- and the linked pile empties back onto the battlefield -- under BOB's
         -- control, he owning the card alice championed.

@@ -1052,11 +1052,10 @@ stampedSnapshotOf oid gs = do
 -- which keeps this PROJECTION-FREE for staticAbilitiesOf's reason: a static
 -- ability's affected set is never a TheseObjects pair, so none can exchange.
 --
--- Not implemented: CR 613.8's dependency order between an exchange and a CR
--- 612 word change on one of the pair. The word changes a moved static ability
--- is rewritten by are its NEW host's (Pawl.Engine.Projection.textChangesAffecting),
--- so a Magical Hack that resolved on the old host before the exchange stays
--- behind (#4038).
+-- The word changes a moved ability is rewritten by are the ones its text box
+-- took, wherever it was when each applied: Pawl.Engine.Projection.textChangesAffecting
+-- reads them off layer 3, which orders them against the exchange by CR 613.7
+-- and 613.8.
 textBoxHolderOf :: ObjectId -> GameState -> ObjectId
 textBoxHolderOf oid gs =
   let swapOf eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
