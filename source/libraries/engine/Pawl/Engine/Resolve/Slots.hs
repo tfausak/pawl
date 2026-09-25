@@ -2368,7 +2368,9 @@ legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
 -- imposes it.
 playerRefPlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
 playerRefPlayers legal controller gs ref =
-  let everyone = Game.stillPlaying gs
+  let -- CR 801.10: the table the controller's spell or ability reaches. The arms
+      -- reading a slot are cut already, CR 801.4 having kept a target in range.
+      everyone = Game.reachableBy controller gs
    in case ref of
         PlayerRef.InSlot slot -> case legalOne slot legal of
           Just (Recipient.ToPlayer pid) -> [pid]
@@ -2491,9 +2493,12 @@ battlefieldMatching legal resolving controller source gs filter_ =
       -- controls" is the phrase, and Pawl.CardTriggerSpec's Total War group is
       -- what proves it.
       baked = Filter.bakeBound (Binding.playerSlots (slotBindings resolving gs)) filter_
+      grants = Projection.controlGrants gs
+      -- CR 801.10 / 801.5a: only permanents in the controller's range, so the
+      -- sweep, the AnyNumberMatching offer and the ChosenPermanent offer agree.
       matching =
         filter
-          (\oid -> Filter.matches context (viewOf oid) baked)
+          (\oid -> Filter.matches context (viewOf oid) baked && Projection.objectInRangeGiven grants controller oid gs)
           (Set.toList (GameState.battlefield gs))
       order = Game.apnapOrder gs
       last_ = length order
@@ -2788,7 +2793,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
 zoneScopePlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> ZoneScope.ZoneScope -> [PlayerId]
 zoneScopePlayers bindings controller gs scope =
   let named = Target.zoneScopePlayers (Just controller) bindings scope gs
-   in filter (`elem` named) (Game.apnapOrder gs)
+   in -- CR 801.10: only the zones of players in the controller's range.
+      filter (\pid -> elem pid named && Game.inRangeOf controller pid gs) (Game.apnapOrder gs)
 
 -- The cards in ONE player's graveyard matching the filter, in ascending
 -- ObjectId. The filter is matched in THIS EFFECT's context -- the caller's, so

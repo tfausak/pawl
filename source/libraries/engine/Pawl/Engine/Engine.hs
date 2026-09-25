@@ -1629,7 +1629,7 @@ turnAnchorOf gs = Maybe.fromMaybe (GameState.activePlayer gs) (GameState.turnAnc
 -- turn, which beginTurnOf's CR 805.4 answer gives it with no arm here.
 --
 -- Not implemented: CR 805.8's one turn for a team two of whose members one
--- effect gives the same turn (#4003), and CR 807.4i/j's Grand Melee turn
+-- effect gives the same turn (#4139), and CR 807.4i/j's Grand Melee turn
 -- markers (#3003).
 takeNextTurn :: GameState -> GameState
 takeNextTurn gs = case GameState.extraTurns gs of
@@ -1781,7 +1781,7 @@ beginTurnOf pid gs =
             -- row under CR 805.4.
             --
             -- Not implemented: CR 805.8's last sentence, a player controlling a
-            -- teammate controlling the whole team (#4003).
+            -- teammate controlling the whole team (#4140).
             GameState.control =
               Map.fromList
                 [ ( taker,
@@ -1849,8 +1849,8 @@ runStep = do
   -- question (CR 505.2). Both are asked even when the phase says yes -- Stasis
   -- skipping an untap step must still take it in an unskipped phase.
   --
-  -- Not implemented: CR 805.8's skip by a teammate of the active player, which
-  -- is asked of `active` alone (#4003).
+  -- Asked of `active` alone even under the shared team turns option: CR 805.8
+  -- makes a teammate's skip the team's, which Replacement.applies answers.
   phaseBegins <- case Turn.phaseBeginningAt phase of
     Nothing -> pure True
     Just selector -> Event.beginsPhase selector active
