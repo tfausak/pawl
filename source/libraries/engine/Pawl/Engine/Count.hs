@@ -17,6 +17,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Deploy as Deploy
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -32,6 +33,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
@@ -574,6 +576,8 @@ playersFor viewOf context gs ref =
             -- PlayerRelation.holds is the predicate, so the two arms and every
             -- reader elsewhere agree on what the relation means.
             PlayerRelation.Opponent -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
+            -- CR 102.3's other players on your team, the same predicate.
+            PlayerRelation.Teammate -> Just (filter (PlayerRelation.holds (Game.teams gs) relation you) everyone)
             -- CR 102.1's whole table, the perspective included -- which is
             -- EachPlayer above, arrived at from the other side. Answered off
             -- `everyone` rather than by consing `you` onto the Opponent set, so a
@@ -773,7 +777,7 @@ snapshotView viewOf gs shape event = case event of
     -- CR 108.3's owner comes from castOwner below, and is NOT `caster` again:
     -- Dire Fleet Daredevil casts a card its owner never touched
     -- (Pawl.CountSpec).
-    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) (castOwner gs spell) False Map.empty snapshot)
+    EventShape.SpellCast -> Just (viewOfSnapshot False (Just caster) (castOwner gs spell) False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
     -- CR 601.2a moves a card to the STACK, so a cast IS a card arriving there --
     -- but the Moved event the same cast emits is what says so, and answering here
@@ -916,14 +920,15 @@ arrivedView :: ViewOf -> GameState -> ObjectId -> Maybe Filter.View
 arrivedView viewOf gs arrived =
   if Maybe.isJust (Game.lookupObject arrived gs)
     then viewOf arrived
-    else fmap recordedView (Map.lookup arrived (GameState.lastKnown gs))
+    else fmap (recordedView gs) (Map.lookup arrived (GameState.lastKnown gs))
 
 -- CR 608.2h's record read as a view, the way departedView reads the one filed
 -- under the departing id -- the same four non-characteristic fields off the same
 -- record, over the characteristics the record itself carries.
-recordedView :: LastKnown.LastKnown -> Filter.View
-recordedView lastKnown =
+recordedView :: GameState -> LastKnown.LastKnown -> Filter.View
+recordedView gs lastKnown =
   viewOfSnapshot
+    (deployIn gs (LastKnown.zone lastKnown))
     (Just (LastKnown.controller lastKnown))
     (Just (LastKnown.owner lastKnown))
     (Game.sourceIsToken (LastKnown.source lastKnown))
@@ -971,6 +976,7 @@ departedView :: GameState -> ZoneChange.ZoneChange -> PC.ProjectedCharacteristic
 departedView gs zc snapshot =
   let lastKnown = Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs)
    in viewOfSnapshot
+        (deployIn gs (ZoneChange.from zc))
         (fmap LastKnown.controller lastKnown)
         (fmap LastKnown.owner lastKnown)
         (maybe (Game.isToken (ZoneChange.object zc) gs) (Game.sourceIsToken . LastKnown.source) lastKnown)
@@ -1002,8 +1008,11 @@ castOwner gs spell = case Game.lookupObject spell gs of
 -- are the arm's to supply, since they are the four fields no
 -- ProjectedCharacteristics carries (CR 109.3 / CR 108.3 / CR 111.6 / CR 122.1)
 -- and the events differ on where each is recoverable from.
-viewOfSnapshot :: Maybe PlayerId -> Maybe PlayerId -> Bool -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural -> PC.ProjectedCharacteristics -> Filter.View
-viewOfSnapshot mController mOwner isToken counters snapshot =
+--
+-- `deploy` says whether CR 804.2 reaches the snapshot: the game uses the option
+-- and the snapshot is of a permanent (CR 109.2).
+viewOfSnapshot :: Bool -> Maybe PlayerId -> Maybe PlayerId -> Bool -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural -> PC.ProjectedCharacteristics -> Filter.View
+viewOfSnapshot deploy mController mOwner isToken counters snapshot =
   Filter.MkView
     { -- CR 201.1 off the snapshot, which carries the set: this reads what the
       -- object's names were AT THE EVENT, which is the whole point of a snapshot.
@@ -1182,7 +1191,7 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
       -- CR 602.1 / 605.1a off the snapshot, which is what it reads for `keywords`
       -- and `power` too -- so this answers what the object HAD at the event.
       --
-      -- Rule 702's own abilities are minted on top, exactly as
+      -- Rule 702's own abilities, and CR 804.2's, are minted on top, exactly as
       -- Pawl.Engine.Projection.View.abilitiesFromCharacteristics mints them: a
       -- ProjectedCharacteristics stores the printed and granted list only, so
       -- reading the field bare would answer differently here than live for a
@@ -1197,6 +1206,7 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
                   <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
                   <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+                  <> [Deploy.ability | Deploy.grants deploy snapshot]
               )
           ),
       -- CR 602.1 off the same four lists, without CR 605.1a's exclusion, plus CR
@@ -1212,6 +1222,7 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
                   <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
                   <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
                   <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+                  <> [Deploy.ability | Deploy.grants deploy snapshot]
               )
           )
           || Subtype.intrinsicManaAbilityOf snapshot,
@@ -1240,9 +1251,9 @@ viewOfSnapshot mController mOwner isToken counters snapshot =
 -- hand-kept copy of which of them the snapshot answers. A field added to
 -- viewOfSnapshot's PC-derived set and not to this record update is silently read
 -- LIVE here, and neither -Werror nor any test says so. Keep the two in step.
-overlaySnapshot :: PC.ProjectedCharacteristics -> Filter.View -> Filter.View
-overlaySnapshot snapshot live =
-  let sampled = viewOfSnapshot (Filter.controller live) (Filter.owner live) (Filter.token live) (Filter.counters live) snapshot
+overlaySnapshot :: Bool -> PC.ProjectedCharacteristics -> Filter.View -> Filter.View
+overlaySnapshot deploy snapshot live =
+  let sampled = viewOfSnapshot deploy (Filter.controller live) (Filter.owner live) (Filter.token live) (Filter.counters live) snapshot
    in live
         { Filter.names = Filter.names sampled,
           Filter.cardTypes = Filter.cardTypes sampled,
@@ -1258,3 +1269,8 @@ overlaySnapshot snapshot live =
           Filter.hasActivatedAbility = Filter.hasActivatedAbility sampled,
           Filter.grantsStationToughness = Filter.grantsStationToughness sampled
         }
+
+-- Does CR 804.2 reach an object snapshotted as it left, or while it was in,
+-- this zone? Only a permanent's (CR 109.2), and only in a game using the option.
+deployIn :: GameState -> Zone.Zone -> Bool
+deployIn gs zone = zone == Zone.Battlefield && GameSettings.deployCreatures (GameState.settings gs)

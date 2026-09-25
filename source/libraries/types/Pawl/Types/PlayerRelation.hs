@@ -34,6 +34,10 @@ data PlayerRelation
     -- answer off Game.stillPlaying, which CR 102.1 has already narrowed to the
     -- players still in the game -- the roster Opponent is filtered from there.
     AnyPlayer
+  | -- | CR 102.3's teammates: the OTHER players on the perspective's team, so
+    -- never the perspective itself and nobody in CR 102.4's game without teams.
+    -- CR 804.2's "target teammate" (Pawl.Engine.Deploy).
+    Teammate
   deriving (Bounded, Enum, Eq, Ord, Show)
 
 -- | Does @candidate@ stand in this relation to @you@, the perspective? The one
@@ -50,3 +54,4 @@ holds teams relation you candidate = case relation of
   You -> candidate == you
   Opponent -> Teams.areOpponents teams you candidate
   AnyPlayer -> True
+  Teammate -> Teams.sameTeam teams you candidate

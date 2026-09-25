@@ -396,6 +396,7 @@ manaProduced effect = case effect of
   Effect.EndTurn -> Nothing
   Effect.EndCombatPhase -> Nothing
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
+  Effect.GiveControl _ -> Nothing
   Effect.ExchangeControl _ -> Nothing
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
@@ -637,6 +638,7 @@ movesLibraryCard effect = case effect of
   Effect.EndCombatPhase -> False
   Effect.TakeExtraTurn {} -> False
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
+  Effect.GiveControl _ -> False
   Effect.ExchangeControl _ -> False
   -- The armed ability is a SEPARATE ability (CR 603.7a), so what it later does
   -- is not this effect's doing. The monarch's draw below is a separate triggered

@@ -105,6 +105,7 @@ import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
+import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -766,6 +767,8 @@ rewriteEffect pairs effect = case effect of
   Effect.EndTurn -> effect
   Effect.EndCombatPhase -> effect
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef (rewriteDuration pairs duration) (rewriteObjectRef pairs ref))
+  -- The player is a PlayerRef, which names its seat structurally.
+  Effect.GiveControl (GiveControl.MkGiveControl player ref) -> Effect.GiveControl (GiveControl.MkGiveControl player (rewriteObjectRef pairs ref))
   -- A slot NAME is not a word rule 612 can swap, ExchangeLifeTotals' reason.
   Effect.ExchangeControl _ -> effect
   -- CR 612.1 through the only half that holds printed words: CR 603.7b's stated

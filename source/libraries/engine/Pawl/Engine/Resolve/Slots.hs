@@ -106,6 +106,7 @@ import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -688,6 +689,7 @@ effectObjectRefs effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl (DurationRef.MkDurationRef _ ref) -> [ref]
+  Effect.GiveControl (GiveControl.MkGiveControl _ ref) -> [ref]
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
@@ -867,6 +869,7 @@ effectPlayerRefs effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl {} -> []
+  Effect.GiveControl (GiveControl.MkGiveControl player _) -> [player]
   Effect.ExchangeControl {} -> []
   Effect.ArmDelayedTrigger {} -> []
   -- CR 400.1's zone reference, which lives inside the permission payloads rather
@@ -1199,6 +1202,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.EndTurn -> Map.empty
   Effect.EndCombatPhase -> Map.empty
   Effect.GainControl {} -> Map.empty
+  -- Both refs are the generic folds' half, joined at the head.
+  Effect.GiveControl {} -> Map.empty
   Effect.ExchangeControl sides -> controlSidesSlots sides
   Effect.ArmDelayedTrigger {} -> Map.empty
   -- Two reads, on the two halves of one opcode: the seat AffectedPlayers.Named
@@ -1795,6 +1800,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
   Effect.GainControl (DurationRef.MkDurationRef duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  Effect.GiveControl _ -> True
   Effect.ExchangeControl _ -> True
   -- CR 603.7c: the armed ability inherits this object's whole environment.
   Effect.ArmDelayedTrigger {} -> False
@@ -2016,6 +2022,7 @@ readsX =
         Effect.EndTurn -> False
         Effect.EndCombatPhase -> False
         Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
+        Effect.GiveControl _ -> False
         Effect.ExchangeControl _ -> False
         Effect.ArmDelayedTrigger {} -> False
         Effect.AffectPlayers {} -> False
@@ -2247,6 +2254,7 @@ boundSlots effect = case effect of
   Effect.EndTurn -> Set.empty
   Effect.EndCombatPhase -> Set.empty
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
+  Effect.GiveControl _ -> Set.empty
   Effect.ExchangeControl _ -> Set.empty
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
@@ -2326,6 +2334,7 @@ playerRefPlayers legal controller gs ref =
         PlayerRef.EachInSlot slot -> Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
         PlayerRef.Relative PlayerRelation.You -> [controller]
         PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller) everyone
+        PlayerRef.Relative PlayerRelation.Teammate -> filter (PlayerRelation.holds (Game.teams gs) PlayerRelation.Teammate controller) everyone
         -- CR 102.1's whole table, off the roster rather than by consing the controller
         -- onto the Opponent set, so a departed seat stays out.
         PlayerRef.Relative PlayerRelation.AnyPlayer -> everyone

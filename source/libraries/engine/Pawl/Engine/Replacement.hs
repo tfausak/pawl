@@ -704,7 +704,7 @@ applies gs event candidate =
         -- would exist (CR 614.12) since none is minted yet.
         (ReplacementEffect.TokenR (TokenR.MkTokenR pat _ _), ProposedEvent.WouldCreateTokens pid lots) ->
           matchesPlayer gs src (TokenPattern.whose pat) pid
-            && any (matchesTokenLot (candidateContext gs candidate) (TokenPattern.whatToken pat) pid) lots
+            && any (matchesTokenLot (Count.deployIn gs Zone.Battlefield) (candidateContext gs candidate) (TokenPattern.whatToken pat) pid) lots
         -- CR 614.1b / 500.11: a skip intercepts a step or phase BEGINNING, and
         -- names exactly which one -- and, for a player-scoped skip, whose.
         --
@@ -1569,13 +1569,13 @@ candidateContext gs candidate =
 -- for CR 707.1's copy token the copiable values it takes (CR 707.2). The
 -- controller is the event's player (CR 111.2), which is what lets a lot say
 -- "under your control" on the Filter axis too.
-matchesTokenLot :: Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerId -> TokenLot.TokenLot -> Bool
-matchesTokenLot context filter_ pid lot =
+matchesTokenLot :: Bool -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerId -> TokenLot.TokenLot -> Bool
+matchesTokenLot deploy context filter_ pid lot =
   let view = case TokenLot.copy lot of
         -- No OWNER, matching the viewOfCard branch below, which has no object to
         -- read CR 108.3 off either: a lot that named one would answer two ways
         -- for the same token depending on whether it was a copy.
-        Just snapshot -> Count.viewOfSnapshot (Just pid) Nothing True Map.empty snapshot
+        Just snapshot -> Count.viewOfSnapshot deploy (Just pid) Nothing True Map.empty snapshot
         -- CR 111.1: what the lot describes is a TOKEN whichever way its
         -- characteristics were given, so `token` is True here as it is in the
         -- copy branch above. Projection.viewOfCard answers False, describing a

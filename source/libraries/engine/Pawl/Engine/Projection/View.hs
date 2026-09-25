@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Defender as Defender
+import qualified Pawl.Engine.Deploy as Deploy
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -838,9 +839,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- neighbour's reason.
       --
       -- CR 305.6's intrinsic ability is a disjunct here and not a member of that
-      -- list, because abilitiesFromCharacteristics mints rule 702's abilities and
-      -- not rule 305's: what it folds is PC.activatedAbilities plus the keyword
-      -- map, and no layer writes "{T}: Add {R}" onto a Mountain. Read off the
+      -- list, because abilitiesFromCharacteristics mints rule 702's abilities (and
+      -- CR 804.2's) and not rule 305's: what it folds is PC.activatedAbilities
+      -- plus the keyword map, and no layer writes "{T}: Add {R}" onto a Mountain. Read off the
       -- PROJECTION, so a land that lost its basic land type in layer 4 has lost
       -- the ability with it (CR 305.7) and one that lost all its abilities in
       -- layer 6 has too (CR 613.1f).
@@ -1665,6 +1666,13 @@ abilitiesFromCharacteristics peers pc oid gs =
             <> Keyword.battlefieldAbilitiesOf (PC.keywords pc)
             <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords pc))
             <> Keyword.graveyardAbilitiesOf (Map.keysSet (PC.keywords pc))
+            -- CR 804.2's, minted off the POST-LAYER types for the same reason, and
+            -- for a creature on the battlefield only (CR 109.2) -- or, for an id
+            -- that has ceased, one whose CR 608.2h record was filed there.
+            <> [ Deploy.ability
+               | Deploy.grants (GameSettings.deployCreatures (GameState.settings gs)) pc,
+                 lastZoneOf oid gs == Just Zone.Battlefield
+               ]
         )
 
 -- CR 115.1: what a stack object TARGETS -- the recipients under its declared
@@ -2015,3 +2023,10 @@ leanViewOf grants visited gs oid =
 -- controller, leaving CR 108.4a's owner.
 defaultControllerOf :: Object.Object -> PlayerId.PlayerId
 defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnder obj)
+
+-- CR 400.1 / 608.2h: the zone an object is in, or for an id that has ceased the
+-- zone its last-known record was filed from.
+lastZoneOf :: ObjectId -> GameState -> Maybe Zone.Zone
+lastZoneOf oid gs = case Game.lookupObject oid gs of
+  Just obj -> Just (Object.zone obj)
+  Nothing -> fmap LastKnown.zone (Map.lookup oid (GameState.lastKnown gs))
