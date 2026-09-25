@@ -4022,6 +4022,42 @@ blitzSpec s registry = Spec.describe s "Blitz" $ do
     Spec.assertEqWith s "CR 702.152a and drew a card as it died" (drew blitzed) 1
     Spec.assertEqWith s "cast for {1}{R} and bolted, it died and made its Treasure without drawing" (drew bolted, dead bolted) (0, (0, 1))
 
+-- CR 702.176a on Overlord of the Mistmoors {5}{W}{W} 6/6 Enchantment Creature --
+-- Avatar Horror, "Impending 4--{2}{W}{W}" and "Whenever this permanent enters or
+-- attacks, create two 2/1 white Insect creature tokens with flying" (Oracle text
+-- checked on Scryfall, 2026-09-25).
+--
+-- One board: four Plains and four Islands pay either cost, so the printed-cost
+-- control had the impending cost available and declined it. Both libraries are
+-- stocked for the four turns the counters take to run out.
+impendingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+impendingSpec s registry = Spec.describe s "Impending" $ do
+  Spec.it s "CR 702.176a cast for impending, the Overlord is not a creature until alice's fourth end step removes its last time counter" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    overlord <- S.printingOf s registry "Overlord of the Mistmoors"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let (overlordId, gs1) = S.addHandCard overlord S.alice (S.landsFor island S.alice 4 (S.landsInPlay plains 4))
+        (copyId, gs2) = S.addHandCard copyEnchantment S.alice gs1
+        stock pid g = List.foldl' (\h _ -> snd (S.addLibraryCard plains pid h)) g [1 :: Int .. 10]
+        board = scheduled (stock S.bob (stock S.alice gs2))
+        impended = castResolved (payingFor impendingCost) overlordId board
+        hardCast = castResolved (payingFor overlordCost) overlordId board
+        reading oid gs = (Set.member CardType.Creature (Projection.cardTypesOf oid gs), S.counterOf CounterKind.Time oid gs)
+        overlordOf gs = case namedOnBattlefield "Overlord of the Mistmoors" gs of
+          [oid] -> reading oid gs
+          _ -> (True, 99)
+    case namedOnBattlefield "Overlord of the Mistmoors" impended of
+      [original] -> do
+        let afterOne = throughEndStepOf S.alice impended
+            afterFour = iterate (throughEndStepOf S.alice) impended !! 4
+            copied = castResolved (aimedAt original) copyId impended
+            copies = filter (/= original) (namedOnBattlefield "Overlord of the Mistmoors" copied)
+        Spec.assertEqWith s "CR 702.176a impended, it entered with four time counters as a non-creature and still made its two Insects; hard-cast, a creature with none" ((reading original impended, length (S.tokensOf impended)), (overlordOf hardCast, length (S.tokensOf hardCast))) (((False, 4), 2), ((True, 0), 2))
+        Spec.assertEqWith s "CR 702.176a alice's first end step removes one counter, and her fourth the last, making it a creature" (reading original afterOne, reading original afterFour) ((False, 3), (True, 0))
+        Spec.assertEqWith s "CR 707.2 a Copy Enchantment copying it was not cast for impending, so it is a creature with no time counters" (fmap (`reading` copied) copies) [(True, 0)]
+      other -> Spec.assertFailure s ("expected one Overlord, got " <> show (length other))
+
 -- CR 702.113a on Part the Waterveil {4}{U}{U} Sorcery, "Take an extra turn after
 -- this one. Exile Part the Waterveil. / Awaken 6--{6}{U}{U}{U}" (Oracle text
 -- checked on Scryfall, 2026-09-17).
@@ -5077,6 +5113,11 @@ dashCost = [ManaSymbol.Generic 1, theRed]
 requisitionerCost = [ManaSymbol.Generic 1, theRed]
 blitzCost = [ManaSymbol.Generic 2, theRed]
 
+-- Overlord of the Mistmoors' printed {5}{W}{W} and its impending {2}{W}{W}.
+overlordCost, impendingCost :: [ManaSymbol.ManaSymbol]
+overlordCost = [ManaSymbol.Generic 5, theWhite, theWhite]
+impendingCost = [ManaSymbol.Generic 2, theWhite, theWhite]
+
 -- alice with `n` Mountains and Mardu Scout in hand, on turn with the rest of the
 -- turn scheduled.
 scoutBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (GameState.GameState, ObjectId.ObjectId)
@@ -5923,6 +5964,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   harmonizeSpec s registry
   dashSpec s registry
   blitzSpec s registry
+  impendingSpec s registry
   awakenSpec s registry
   cleaveSpec s registry
   overloadSpec s registry

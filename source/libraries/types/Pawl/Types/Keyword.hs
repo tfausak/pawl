@@ -10,6 +10,7 @@ import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Gift as Gift
+import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Protection as Protection
@@ -816,6 +817,10 @@ data Keyword
     -- creature that was then an Assassin or a commander under your control,
     -- which CR 601.2b and CR 601.2f-h price as an alternative cost.
     Freerunning (Cost.Cost Keyword)
+  | -- | 702.176a: impending N--[cost] -- an alternative cost; paid, the permanent
+    -- enters with N time counters, isn't a creature while it has one, and loses
+    -- one at the beginning of its controller's end step.
+    Impending (Impending.Impending Keyword)
   | -- | 702.177a: exhaust adds rules to the activated ability printed AFTER it --
     -- "Exhaust -- [Cost]: [Effect]" means "[Cost]: [Effect]. Activate only once".
     -- PRINTED rather than minted, so a card writes this on the ability itself

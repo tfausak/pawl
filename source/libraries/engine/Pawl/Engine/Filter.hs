@@ -25,6 +25,7 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Morph as Morph
@@ -2725,6 +2726,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Spectacle cost -> Keyword.Type.Spectacle (rewriteCost pairs cost)
   Keyword.Type.Prowl cost -> Keyword.Type.Prowl (rewriteCost pairs cost)
   Keyword.Type.Freerunning cost -> Keyword.Type.Freerunning (rewriteCost pairs cost)
+  Keyword.Type.Impending (Impending.MkImpending n cost) -> Keyword.Type.Impending (Impending.MkImpending n (rewriteCost pairs cost))
   Keyword.Type.Unleash -> keyword
   -- CR 702.150a names no word CR 612.2 can swap: it is written about loyalty
   -- counters and Phyrexian mana symbols, both the rules' own vocabulary.
