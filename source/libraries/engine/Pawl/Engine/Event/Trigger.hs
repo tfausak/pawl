@@ -571,7 +571,7 @@ batchScoped condition = case condition of
   -- CR 603.2e names the MOMENT the one enchanted permanent becomes tapped, so a
   -- batch holds at most one occurrence of it.
   TriggerCondition.AttachedCreatureBecomesTapped -> False
-  -- A True, PlayerDiscardsCards' reason for taps: "one or more nontoken Merfolk
+  -- A True beside PermanentsDie: "one or more nontoken Merfolk
   -- you control become tapped" (Deeproot Pilgrimage) is one trigger event per
   -- tapping, however many it tapped -- a cost's taps, CR 508.1f's attackers, or
   -- one Effect.Tap -- so long as each of those sites brackets its loop.
@@ -647,9 +647,9 @@ batchScoped condition = case condition of
   -- A True beside PermanentsDie: "whenever you discard one or more cards"
   -- (Magmakin Artillerist) names a whole CR 608.2f / 601.2h discard as one
   -- trigger event, where the arm above is CR 603.2c's second sentence. Only as
-  -- good as the brackets around the discard funnel's callers -- Pawl.Engine.Cost's
-  -- DiscardCards arm and Pawl.Engine.Resolve's Discard arms -- since an unbracketed
-  -- loop gives each card a group of its own.
+  -- good as the brackets around every caller discarding several cards at once
+  -- -- a cost, Effect.Discard, connive, the cleanup discard -- since an
+  -- unbracketed loop gives each card a group of its own.
   TriggerCondition.PlayerDiscardsCards _ -> True
   TriggerCondition.PlayerCycles _ -> False
   TriggerCondition.PlayerDrawsNthCard {} -> False
