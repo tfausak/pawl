@@ -335,7 +335,7 @@ candidateCostsGiven permitted pid name oid gs =
           let -- CR 707.2: the costs are copiable values, so a card carrying a
               -- copy stamp or a conjured duplicate's values is priced off those
               -- (Game.castingFaceOf).
-              face = Game.castingFaceOf obj (Game.resolveFace (Just name) card)
+              face = Game.castingFaceOf obj card (Game.resolveFace (Just name) card)
               printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
               -- CR 118.9d: an alternative replaces only the MANA cost; every
               -- additional cost still applies. CR 702.34a's last sentence sends
@@ -926,9 +926,9 @@ selfReductions pid oid gs =
             -- A negative saturates to 0, the floor the header states.
             times n = concat (replicate (max 0 (Integer.toIntSaturating n)) (ManaCost.unwrap (CostReduction.amount reduction)))
          in fmap (ManaCost.MkManaCost . times) copies
-   in case (Game.lookupObject oid gs, Game.faceOf oid gs) of
-        (Just obj, Just printedFace) ->
-          let face = Game.castingFaceOf obj printedFace
+   in case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
+        (Just obj, Just card, Just printedFace) ->
+          let face = Game.castingFaceOf obj card printedFace
            in Maybe.mapMaybe scaled (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face))
         _ -> []
 
