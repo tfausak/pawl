@@ -99,6 +99,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromReference as FromReference
+import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -329,6 +330,7 @@ ownQuantities effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationQuantities duration
+  Effect.GiveControl _ -> []
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationQuantities duration
@@ -1369,6 +1371,7 @@ effectObjectRefs effect =
         Effect.EndTurn -> []
         Effect.EndCombatPhase -> []
         Effect.GainControl (DurationRef.MkDurationRef _ ref) -> read_ [ref]
+        Effect.GiveControl (GiveControl.MkGiveControl _ ref) -> read_ [ref]
         Effect.ExchangeControl _ -> []
         Effect.ArmDelayedTrigger {} -> []
         Effect.AffectPlayers {} -> []
@@ -1835,6 +1838,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           PlayerRef.Relative PlayerRelation.Opponent -> False
           -- The whole table -- EachPlayer's answer, which this relation is.
           PlayerRef.Relative PlayerRelation.AnyPlayer -> False
+          -- CR 102.3's teammates, of whom a team of three has two.
+          PlayerRef.Relative PlayerRelation.Teammate -> False
           PlayerRef.InSlot _ -> True
           -- A SET -- the arm above's plural, and the whole of what parts them.
           PlayerRef.EachInSlot _ -> False

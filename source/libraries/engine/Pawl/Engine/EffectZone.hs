@@ -232,6 +232,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.EndTurn -> Nothing
   Effect.EndCombatPhase -> Nothing
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
+  Effect.GiveControl _ -> Nothing
   Effect.ExchangeControl _ -> Nothing
   -- CR 113.6m's final sentence: "the same is true if the effect of that ability
   -- creates a delayed triggered ability whose effect moves the object out of a

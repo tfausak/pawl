@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 
--- Covers: CR 102.3's teammates and CR 808's Team vs. Team variant --
+-- Covers: CR 102.3's teammates, CR 804's deploy creatures option
+-- (Pawl.Engine.Deploy) and CR 808's Team vs. Team variant --
 -- Pawl.Types.Teams, the Pawl.Types.GameSettings field that carries them, and the
 -- readers that answer "who are my opponents", one case each: Pawl.Engine.Combat's
 -- attackableOpponents (CR 506.2a), Pawl.Engine.Resolve's playerRefPlayers
@@ -31,16 +32,21 @@
 module Pawl.TeamSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
@@ -251,6 +257,36 @@ spec s registry = Spec.describe s "Teams" $ do
         after = S.runPure S.identityAnswer cast Engine.priorityLoop
     Spec.assertEqWith s "one token per opponent, and bob is not one" (length (S.tokensOf after)) 2
     Spec.assertEqWith s "the spell resolved" (GameState.stack after) []
+  -- CR 804.2 through a PAIR of boards differing only in the option. alice,
+  -- bob and carol against dave, so alice has two teammates to choose between
+  -- and the offer separates CR 102.3's teammates from every other seat; carol is
+  -- chosen rather than the first offered, so the control change reads the
+  -- target rather than a default. The Piker prints no activated ability, so
+  -- whatever alice can activate on it is the one CR 804.2 gives it.
+  Spec.it s "CR 804.2 a creature taps to hand itself to a teammate" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (mine, staged) = S.addPermanent piker S.alice (S.inTeams [[S.alice, S.bob, S.carol], [S.dave]] S.fourPlayerGame)
+        board deploy =
+          staged
+            { GameState.settings = (GameState.settings staged) {GameSettings.deployCreatures = deploy},
+              GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        offers gs = [ability | Action.Activate oid ability <- Action.legalActions S.alice gs, oid == mine]
+        recording :: Prompt.Prompt r -> State.State [[Recipient.Recipient]] r
+        recording p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> do
+            State.modify' (<> fmap (Set.toAscList . snd) (Map.elems sets))
+            pure (S.preferring (== Recipient.ToPlayer S.carol) sets)
+          _ -> pure (S.identityAnswer p)
+        step gs ability = do
+          (_, activated) <- Engine.runGame recording gs (Activate.activateAbility S.alice mine ability)
+          snd <$> Engine.runGame recording activated Stack.resolveTop
+        (after, offered) = State.runState (Foldable.foldlM step (board True) (offers (board True))) []
+    Spec.assertEqWith s "CR 804.2 carol controls alice's Piker" (Projection.controllerOf mine after) (Just S.carol)
+    Spec.assertEqWith s "CR 102.3 only alice's teammates are offered" offered [[Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol]]
+    Spec.assertEqWith s "CR 804.1 without the option the Piker has nothing to activate" (length (offers (board False))) 0
   sharedTurnsSpec s registry
 
 -- CR 805.1: twoTeams with the shared team turns option on.

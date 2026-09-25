@@ -200,6 +200,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -2752,6 +2753,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.EndTurn {} -> False
   Effect.EndCombatPhase {} -> False
   Effect.GainControl {} -> False
+  Effect.GiveControl {} -> False
   Effect.ExchangeControl {} -> False
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
@@ -8928,47 +8930,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         State.modify' (\gs -> gs {GameState.endTurnSignal = EndTurnSignal.Ended})
       _ -> pure ()
   Effect.GainControl (DurationRef.MkDurationRef duration ref) ->
-    State.modify' $ \gs ->
-      -- Enumerated ONCE by the shared sweep; a player recipient, an illegal slot
-      -- (CR 608.2b) and a set that matched nothing all change nothing.
-      case objectRefObjects legal resolving controller source gs ref of
-        [] -> gs
-        targets
-          -- CR 800.4b: an object doesn't change to the control of a player who
-          -- has left the game. `controller` is baked at trigger time (CR 113.8),
-          -- and CR 800.4a's exile clause is not a state-based action, so it has
-          -- already run and does not run again; without this guard the permanent
-          -- would sit on the battlefield controlled by a player not in the game.
-          | List.notElem controller (Game.stillPlaying gs) -> gs
-          -- CR 611.2b's condition is baked against `legal` rather than `chosen`,
-          -- so a slot CR 608.2b has emptied never starts the duration.
-          | otherwise -> case Expiry.arm legal controller source duration gs of
-              -- CR 611.2b: the duration never started, so nothing is stored and
-              -- control never changed.
-              Nothing -> gs
-              Just expiry ->
-                -- CR 613.1b / 611.2c: the new controller is `controller`, baked
-                -- in now -- derived, never chosen. CR 302.6 re-Sicks it, unless
-                -- control does not actually move, which is why the
-                -- question is asked PER OBJECT and against the PROJECTED
-                -- controller rather than against Object.owner.
-                --
-                -- CR 611.2c: one stored effect over the frozen id set.
-                let (ts, gs1) = Game.freshTimestamp gs
-                    eff =
-                      ContinuousEffect.MkContinuousEffect
-                        { ContinuousEffect.source = source,
-                          ContinuousEffect.timestamp = ts,
-                          ContinuousEffect.expiry = expiry,
-                          ContinuousEffect.modification = Modification.SetController controller,
-                          ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
-                        }
-                    sicken o = o {Object.sickness = Sickness.Sick}
-                    moved = filter (\oid -> Projection.controllerOf oid gs /= Just controller) targets
-                 in gs1
-                      { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
-                        GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
-                      }
+    State.modify' (installControl legal resolving controller source controller duration ref)
+  -- GainControl's arm with the new controller read off the PlayerRef rather than
+  -- being `controller`. Exactly one player or nothing: a slot CR 608.2b emptied
+  -- names nobody to give the object to.
+  Effect.GiveControl (GiveControl.MkGiveControl player ref) ->
+    State.modify' $ \gs -> case playerRefPlayers legal controller gs player of
+      [recipient] -> installControl legal resolving controller source recipient Duration.Indefinite ref gs
+      _ -> gs
   -- CR 701.12b: each of the two permanents goes to the other's controller,
   -- simultaneously. TWO stored effects, because Modification.SetController names
   -- one controller, and both read the PROJECTED controller off the same pre-swap
@@ -9957,3 +9926,49 @@ conniveOne n oid = Monad.when (n > 0) $ do
     -- nobody ever controlled connives nothing; CR 701.50e's zero never reaches
     -- here, the guard above having returned.
     State.modify' (Event.recordEvent (GameEvent.Connived oid))
+
+-- CR 613.1b / 611.2c: install a layer-2 control effect giving `recipient` the
+-- objects `ref` names, for `duration` -- GainControl's arm and GiveControl's,
+-- which differ only in who the recipient is.
+installControl :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> PlayerId -> Duration.Duration -> ObjectRef.ObjectRef -> GameState -> GameState
+installControl legal resolving controller source recipient duration ref gs =
+  -- Enumerated ONCE by the shared sweep; a player recipient, an illegal slot
+  -- (CR 608.2b) and a set that matched nothing all change nothing.
+  case objectRefObjects legal resolving controller source gs ref of
+    [] -> gs
+    targets
+      -- CR 800.4b: an object doesn't change to the control of a player who has
+      -- left the game. GainControl's recipient is `controller`, baked at trigger
+      -- time (CR 113.8), and CR 800.4a's exile clause is not a state-based
+      -- action, so it has already run and does not run again; without this guard
+      -- the permanent would sit on the battlefield controlled by a player not in
+      -- the game.
+      | List.notElem recipient (Game.stillPlaying gs) -> gs
+      -- CR 611.2b's condition is baked against `legal` rather than `chosen`, so a
+      -- slot CR 608.2b has emptied never starts the duration.
+      | otherwise -> case Expiry.arm legal controller source duration gs of
+          -- CR 611.2b: the duration never started, so nothing is stored and
+          -- control never changed.
+          Nothing -> gs
+          Just expiry ->
+            -- CR 613.1b / 611.2c: the new controller is baked in now. CR 302.6
+            -- re-Sicks it, unless control does not actually move, which is why
+            -- the question is asked PER OBJECT and against the PROJECTED
+            -- controller rather than against Object.owner.
+            --
+            -- CR 611.2c: one stored effect over the frozen id set.
+            let (ts, gs1) = Game.freshTimestamp gs
+                eff =
+                  ContinuousEffect.MkContinuousEffect
+                    { ContinuousEffect.source = source,
+                      ContinuousEffect.timestamp = ts,
+                      ContinuousEffect.expiry = expiry,
+                      ContinuousEffect.modification = Modification.SetController recipient,
+                      ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
+                    }
+                sicken o = o {Object.sickness = Sickness.Sick}
+                moved = filter (\oid -> Projection.controllerOf oid gs /= Just recipient) targets
+             in gs1
+                  { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
+                    GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
+                  }

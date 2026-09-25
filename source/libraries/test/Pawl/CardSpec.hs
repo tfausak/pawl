@@ -173,6 +173,7 @@ import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -610,6 +611,7 @@ objectRefPositions =
         ("turn-face-down", Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (plantedRef "tf") FaceDownCharacteristics.defaultValue), [plantedRef "tf"]),
         ("remove-from-combat", Effect.RemoveFromCombat (plantedRef "rc"), [plantedRef "rc"]),
         ("gain-control", Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (plantedRef "gc")), [plantedRef "gc"]),
+        ("give-control", Effect.GiveControl (GiveControl.MkGiveControl (PlayerRef.Relative PlayerRelation.You) (plantedRef "gv")), [plantedRef "gv"]),
         ("require-block", Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfTurn (plantedRef "rb-blocker") (plantedRef "rb-attacker")), [plantedRef "rb-blocker", plantedRef "rb-attacker"]),
         ("cant-be-regenerated", Effect.CantBeRegenerated (CantBeRegenerated.MkCantBeRegenerated Duration.UntilEndOfTurn (plantedRef "cb")), [plantedRef "cb"]),
         ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (PlayerRef.Relative PlayerRelation.You)), [plantedRef "ra"]),
@@ -662,6 +664,7 @@ playerRefPositions =
         ("gain-player-counters", Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "gp") PlayerCounterKind.Rad one), [plantedPlayer "gp"]),
         ("remove-player-counters", Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (plantedPlayer "rp") PlayerCounterKind.Rad one), [plantedPlayer "rp"]),
         ("require-attack", Effect.RequireAttack (RequireAttack.MkRequireAttack Duration.UntilEndOfTurn (plantedRef "ra") (plantedPlayer "ra-defender")), [plantedPlayer "ra-defender"]),
+        ("give-control", Effect.GiveControl (GiveControl.MkGiveControl (plantedPlayer "gv") (plantedRef "gv")), [plantedPlayer "gv"]),
         ("blight", Effect.Blight (Blight.MkBlight (plantedPlayer "bl") one Nothing), [plantedPlayer "bl"]),
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
@@ -1254,6 +1257,7 @@ ownCounts effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
+  Effect.GiveControl _ -> []
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
@@ -1635,6 +1639,7 @@ effectNestedEffects effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl {} -> []
+  Effect.GiveControl {} -> []
   Effect.ExchangeControl _ -> []
   Effect.Unsuspect {} -> []
   Effect.SetHalfLocked {} -> []
@@ -2126,6 +2131,7 @@ effectReplacements effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
+  Effect.GiveControl _ -> []
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
@@ -2586,6 +2592,7 @@ effectMintedFaces effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
+  Effect.GiveControl _ -> []
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
@@ -5483,6 +5490,7 @@ effectFilters effect = case effect of
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (objectRefFilters ref)
+  Effect.GiveControl (GiveControl.MkGiveControl _ ref) -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ExchangeControl _ -> []
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration) -> frame Unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> frame Unframed (durationFilters duration) <> unframed (playerEffectFilters playerEffect)

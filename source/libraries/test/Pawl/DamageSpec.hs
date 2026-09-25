@@ -888,7 +888,8 @@ lastKnownRiderSpec s registry =
                     LastKnown.protector = Nothing,
                     LastKnown.paidCosts = Map.empty,
                     -- CR 702.30a: nothing here asks about an echo window.
-                    LastKnown.controlClock = Map.empty
+                    LastKnown.controlClock = Map.empty,
+                    LastKnown.zone = Zone.Battlefield
                   }
               humbled = S.withHumility humility equipped
               planted =

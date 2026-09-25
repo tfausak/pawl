@@ -547,6 +547,8 @@ library codec
     Pawl.Codec.GameState
     Pawl.Codec.Gift
     Pawl.Codec.GiftSpec
+    Pawl.Codec.GiveControl
+    Pawl.Codec.GiveControlSpec
     Pawl.Codec.GrantedAbility
     Pawl.Codec.GrantedAbilitySpec
     Pawl.Codec.GrantLookAtExiled
@@ -1136,6 +1138,7 @@ library engine
     Pawl.Engine.Decide
     Pawl.Engine.Defender
     Pawl.Engine.Departure
+    Pawl.Engine.Deploy
     Pawl.Engine.Detain
     Pawl.Engine.Dice
     Pawl.Engine.Dungeon
@@ -1880,6 +1883,7 @@ library types
     Pawl.Types.GameSettings
     Pawl.Types.GameState
     Pawl.Types.Gift
+    Pawl.Types.GiveControl
     Pawl.Types.GrantedAbility
     Pawl.Types.GrantLookAtExiled
     Pawl.Types.GrantPlayFromExile

@@ -12,12 +12,13 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Source as Source
+import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.LastKnown as LastKnown
 
--- | All fourteen axes, none derivable from another: the type's own haddock says why
+-- | All fifteen axes, none derivable from another: the type's own haddock says why
 -- CR 608.2h needs each of them beside the projection.
 codec :: Codec.Codec LastKnown.LastKnown
 codec = Fields.object $ do
@@ -35,6 +36,7 @@ codec = Fields.object $ do
   protector <- Fields.required "protector" (Common.maybe PlayerId.codec) LastKnown.protector
   paidCosts <- Fields.defaulted "paidCosts" Map.empty (Common.multiset Keyword.codec) LastKnown.paidCosts
   controlClock <- Fields.defaulted "controlClock" Map.empty (Common.keyedList ControlClock.entry) LastKnown.controlClock
+  zone <- Fields.required "zone" Zone.codec LastKnown.zone
   pure
     LastKnown.MkLastKnown
       { LastKnown.characteristics = characteristics,
@@ -50,5 +52,6 @@ codec = Fields.object $ do
         LastKnown.blocking = blocking,
         LastKnown.protector = protector,
         LastKnown.paidCosts = paidCosts,
-        LastKnown.controlClock = controlClock
+        LastKnown.controlClock = controlClock,
+        LastKnown.zone = zone
       }

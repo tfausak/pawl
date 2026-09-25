@@ -20,6 +20,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Zone as Zone
 
 -- | The bare projection an all-default value writes, reused as the `copiable`
 -- half below.
@@ -28,7 +29,7 @@ minimalJson = "{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
-  -- CR 608.2h, all fourteen axes. `characteristics` and `copiable` are the same type
+  -- CR 608.2h, all fifteen axes. `characteristics` and `copiable` are the same type
   -- and hold DIFFERENT values here, because CR 707.2's layer-1-only reading is
   -- exactly what the whole fold loses -- an encoder writing one where the other
   -- belongs would round trip against equal values.
@@ -50,7 +51,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.blocking = True,
           LastKnown.protector = Just (PlayerId.MkPlayerId 7),
           LastKnown.paidCosts = Map.singleton (Keyword.Offspring (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])) 1,
-          LastKnown.controlClock = Map.singleton (PlayerId.MkPlayerId 1) ControlClock.SinceLastUpkeep
+          LastKnown.controlClock = Map.singleton (PlayerId.MkPlayerId 1) ControlClock.SinceLastUpkeep,
+          LastKnown.zone = Zone.Battlefield
         }
       ( " {\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
@@ -61,7 +63,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"attached\":[9]"
           <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]"
-          <> ",\"controlClock\":[{\"player\":1,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]} "
+          <> ",\"controlClock\":[{\"player\":1,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]"
+          <> ",\"zone\":{\"type\":\"Battlefield\"}} "
       )
   -- CR 109.3: neither an attachment nor a chosen name is a characteristic, and
   -- most objects have neither, so the absent case is written out rather than left
@@ -84,7 +87,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.blocking = False,
           LastKnown.protector = Nothing,
           LastKnown.paidCosts = Map.empty,
-          LastKnown.controlClock = Map.empty
+          LastKnown.controlClock = Map.empty,
+          LastKnown.zone = Zone.Stack
         }
       ( " {\"characteristics\":"
           <> minimalJson
@@ -93,7 +97,8 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"copiable\":"
           <> minimalJson
           <> ",\"attached\":[]"
-          <> ",\"chosenNames\":[],\"attacking\":true,\"attackTarget\":{\"type\":\"OfPlaneswalker\",\"value\":8},\"blocking\":false,\"protector\":null} "
+          <> ",\"chosenNames\":[],\"attacking\":true,\"attackTarget\":{\"type\":\"OfPlaneswalker\",\"value\":8},\"blocking\":false,\"protector\":null"
+          <> ",\"zone\":{\"type\":\"Stack\"}} "
       )
   Spec.it s "has a schema" $
     Common.assertHasSchema s LastKnown.codec
