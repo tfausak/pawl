@@ -3266,6 +3266,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Delve -> []
   Keyword.Improvise -> []
@@ -3508,6 +3509,7 @@ objectRefFilters ref = case ref of
   -- Karn Liberated's "all non-Aura permanent cards exiled with Karn" is the one
   -- printing that also states characteristics, and states them here.
   ObjectRef.EachCardExiledWithSource f -> unframed (Foldable.toList f)
+  ObjectRef.EachCardEncodedOnSource f -> unframed (Foldable.toList f)
   -- Swift Silence's "all other spells" states its own -- CR 109.2b's set is
   -- named by characteristics exactly as CR 109.2's battlefield sweep is.
   ObjectRef.EachSpell f -> unframed [f]

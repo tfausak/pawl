@@ -125,6 +125,7 @@ import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.MoveCounters as MoveCounters
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MovedKinds as MovedKinds
+import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
@@ -550,6 +551,7 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.89a states a REPLACEMENT and nothing else; see mintedReplacementsFor.
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -798,6 +800,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -1364,6 +1367,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -2022,6 +2026,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Station -> List.genericReplicate count station
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -2799,6 +2804,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- which is CR 601.2h and not CR 601.3. Pawl.Engine.Cost.manaSubstitutions is
   -- where the offer lives, Bestow's arm above and for its reason.
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -4523,6 +4529,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- Replacement.collect assigns.
   Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR DestructionRewrite.UmbraArmor)
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -4803,6 +4810,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -5103,6 +5111,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- states its own "enchant creature".
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
   Keyword.Delve -> []
@@ -5398,6 +5407,7 @@ familyOf keyword = case keyword of
   -- CR 702.89a carries no parameter, so there is no family to name it by.
   Keyword.UmbraArmor -> Nothing
   Keyword.Epic -> Nothing
+  Keyword.Cipher -> Nothing
   Keyword.Convoke -> Nothing
   Keyword.Improvise -> Nothing
   Keyword.Delve -> Nothing
@@ -8699,6 +8709,41 @@ hasRebound = Set.member Keyword.Rebound
 -- gets neither (CR 613.1f).
 hasEpic :: Set Keyword -> Bool
 hasEpic = Set.member Keyword.Epic
+
+-- CR 702.99a's granted trigger: "Whenever this creature deals combat damage to a
+-- player, you may copy the encoded card and you may cast the copy without paying
+-- its mana cost." Pawl.Engine.Projection.encodedGathered grants it, baking in
+-- the one card it names so two cards encoded on one creature are two triggers
+-- (CR 603.2) each offering its own.
+--
+-- ONE MANDATORY clause and one prompt for the two printed "may"s: a copy that is
+-- not cast ceases to exist (CR 704.5e) with nothing having seen it, so copying
+-- without casting is indistinguishable from declining. Prompt.OfferedCast asks.
+--
+-- "You" is the trigger's controller, which is the creature's (CR 603.3a).
+cipherTrigger :: ObjectId -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+cipherTrigger card =
+  let effect =
+        Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.ref = ObjectRef.EachCardEncodedOnSource (Just (Filter.IsObject card)),
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = CastObligation.Optional,
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing},
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = True,
+              OfferCast.verb = PermissionVerb.Cast,
+              OfferCast.controlWhileResolving = False
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
 
 -- CR 702.50a's "except for its epic ability", written into the copiable snapshot
 -- that Pawl.Engine.Resolve.finishSpell archives: the copy rule 702.50a's delayed

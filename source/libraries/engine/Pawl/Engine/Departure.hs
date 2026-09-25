@@ -189,6 +189,11 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     the haunting card itself -- belongs to the departing player is dropped,
 --     because that card is leaving the game.
 --
+--   * a GameState.encoded entry, on haunting's terms: CR 702.99c ends the link
+--     once the creature leaves the battlefield, which the reader checks, so only
+--     an entry whose KEY -- the encoded card -- belongs to the departing player
+--     is dropped.
+--
 --   * a GameState.exiledWith entry whose VALUE is the departing player's
 --     permanent, for haunting's reason a third time: CR 607.2a's link keeps
 --     naming the object whose ability exiled the card after that object is gone,
@@ -216,6 +221,7 @@ objectsLeaveWith pid gs =
                 GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
                 GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g1),
                 GameState.haunting = Map.delete oid (GameState.haunting g1),
+                GameState.encoded = Map.delete oid (GameState.encoded g1),
                 GameState.exiledWith = Map.delete oid (GameState.exiledWith g1),
                 GameState.exilePiles = Map.delete oid (GameState.exilePiles g1)
               }

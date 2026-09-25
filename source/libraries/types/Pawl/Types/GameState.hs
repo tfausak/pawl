@@ -377,6 +377,9 @@ data GameState = MkGameState
     -- incarnation; the value is never cleaned up, the haunted creature dying
     -- being the point.
     haunting :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
+    -- | CR 702.99b: the creature each card with cipher is encoded on, keyed by
+    -- the exiled incarnation; CR 702.99c's persistence is read, not swept.
+    encoded :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
     -- | CR 607.2's linked set as a relation: the object each exiled card is
     -- linked to, keyed by the exiled incarnation and written by
     -- Pawl.Engine.Resolve.Effect.applyEffectWith (rule 607.2a) and Pawl.Engine.Event's

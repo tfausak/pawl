@@ -144,6 +144,7 @@ encode p answer = case p of
   Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
   Prompt.ChooseRevealOnEntry {} -> Response.ChoseRevealOnEntry answer
   Prompt.ChooseEnlist {} -> Response.ChoseEnlist answer
+  Prompt.ChooseEncode {} -> Response.ChoseEncode answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
   Prompt.ChooseManaType {} -> Response.ChoseManaType answer
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
@@ -443,6 +444,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseEnlist {} -> case response of
     Response.ChoseEnlist m -> Just m
+    _ -> Nothing
+  Prompt.ChooseEncode {} -> case response of
+    Response.ChoseEncode m -> Just m
     _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
@@ -954,6 +958,9 @@ defaultAnswer p = case p of
   -- CR 508.1g: declining, which rule 702.154a's "up to one" always permits and
   -- which taps nobody.
   Prompt.ChooseEnlist {} -> Nothing
+  -- CR 702.99a: declining, which the printed "may" permits; the card goes to
+  -- its owner's graveyard as usual (CR 608.2n).
+  Prompt.ChooseEncode {} -> Nothing
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
   -- CR 105.4: every candidate is a type Mana.producedTypes offered, so the head
