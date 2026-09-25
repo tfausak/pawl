@@ -282,6 +282,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.MilledThisTurn -> 0
   Filter.Type.CantCrewVehicles -> 0
   Filter.Type.DealtDamageThisTurn -> 0
+  Filter.Type.EnteredThisTurn -> 0
   Filter.Type.CrewedSourceThisTurn -> 0
   Filter.Type.ConvokedSourceThisTurn -> 0
   Filter.Type.ControlledSinceTurnBegan -> 0
