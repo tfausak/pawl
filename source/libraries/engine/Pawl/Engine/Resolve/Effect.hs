@@ -6869,8 +6869,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- never fires and the skip waits however many turns it must (CR 614.10a). The
     -- PhaseSelector goes in untouched: step or whole phase (CR 500.1) is card
     -- data.
+    --
+    -- CR 805.8: under the shared team turns option one effect naming several
+    -- players on a team skips that team's step once, so the team's first named
+    -- player takes the one row. Replacement.applies matches it for the team.
     gs <- State.get
-    let named = playerRefPlayers legal controller gs ref
+    let named = List.foldl' (\kept pid -> if any (Turn.sharesTurn gs pid) kept then kept else kept <> [pid]) [] (playerRefPlayers legal controller gs ref)
         install pid g =
           let (ts, g1) = Game.freshTimestamp g
               active =
