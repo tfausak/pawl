@@ -10109,9 +10109,8 @@ exploreOne oid = do
 -- putCounters places none.
 --
 -- CR 701.50e: connive 0 is not a connive. No draw, no discard, no counter, and
--- none of CR 701.50f's event below. No printing in the pool counts something
--- that can be zero when its connive resolves, so the guard is a regression
--- fence rather than a proven behaviour (gap #3677).
+-- none of CR 701.50f's event below. Pawl.CardTriggerSpec's Spymaster's Vault
+-- group proves it.
 --
 -- "Nonland" is asked of each card the discard funnel MINTED, through its CR 613
 -- projection, exploreOne's reading: the hand incarnation is gone by then, and a
