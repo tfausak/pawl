@@ -42,6 +42,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
@@ -487,6 +488,8 @@ data Effect card ability
     -- effect's source, and each object whose controller changed is re-Sicked (CR
     -- 302.6).
     GainControl DurationRef.DurationRef
+  | -- | CR 613.1b / 804.2: GainControl indefinitely to a NAMED player.
+    GiveControl GiveControl.GiveControl
   | -- | CR 701.12b: the two permanents the ControlSides names swap controllers
     -- indefinitely (Switcheroo, Avarice Totem); one controller means the
     -- exchange does nothing.

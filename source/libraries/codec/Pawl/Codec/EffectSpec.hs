@@ -87,6 +87,7 @@ import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InZone as InZone
@@ -1583,6 +1584,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment))))
       " {\"type\":\"GainControl\",\"value\":{\"duration\":{\"type\":\"Indefinite\"},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Enchantment\"}}}}} "
+  Spec.it s "GiveControl" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.GiveControl (GiveControl.MkGiveControl (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "teammate"))) (ObjectRef.EachMatching Filter.IsSource)))
+      " {\"type\":\"GiveControl\",\"value\":{\"player\":{\"type\":\"InSlot\",\"value\":\"teammate\"},\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}}} "
   Spec.it s "ExchangeControl round-trips both ControlSides arms" $ do
     Common.assertJsonCodec
       s
