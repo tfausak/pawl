@@ -903,7 +903,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     -- CR 613.1f puts the NAMED removal in the same layer as the wipe: what
     -- differs between the two arms is scope, never when they apply.
     Spec.assertEqWith s "lose-named is layer 6 too" (Projection.layer (Modification.LoseNamedAbility (AbilityName.MkAbilityName (Text.pack "animate")))) Layer.Ability
-    Spec.assertEqWith s "set base is 7b" (Projection.layer (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))) Layer.SetPT
+    Spec.assertEqWith s "set base is 7b" (Projection.layer (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Literal 1)) (Just (Quantity.Literal 1))))) Layer.SetPT
     Spec.assertEqWith s "modify is 7c" (Projection.layer (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)))) Layer.ModifyPT
 
   -- CR 613.1b: layer 2 is where control-changing effects apply, whether the new
@@ -1024,7 +1024,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
-        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) gs0
+        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Literal 1)) (Just (Quantity.Literal 1)))) gs0
     Spec.assertEqWith s "power" (Projection.powerOf oid gs) (Just 1)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) (Just 1)
 
@@ -1035,7 +1035,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         -- Deliberately give 7c the EARLIER timestamp to prove layer beats
         -- timestamp: 7b still applies first.
         gs1 = S.withEffectAt oid (Timestamp.MkTimestamp 50) (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs0
-        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) gs1
+        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Literal 1)) (Just (Quantity.Literal 1)))) gs1
     Spec.assertEqWith s "power 1 then +3" (Projection.powerOf oid gs) (Just 4)
     Spec.assertEqWith s "toughness 1 then +3" (Projection.toughnessOf oid gs) (Just 4)
 
@@ -1810,7 +1810,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (oid, gs0) = S.addPermanent piker S.bob (S.landsInPlay mountain 1)
-        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness Quantity.ManaValue Quantity.ManaValue)) gs0
+        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just Quantity.ManaValue) (Just Quantity.ManaValue))) gs0
     Spec.assertEqWith s "power = mana value" (Projection.powerOf oid gs) (Just 2)
     Spec.assertEqWith s "toughness = mana value" (Projection.toughnessOf oid gs) (Just 2)
 

@@ -54,7 +54,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Nothing
           Set.empty
           Nothing
-          (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))])
+          (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Just (Quantity.Literal 1)) (Just (Quantity.Literal 1)))])
       )
       " {\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"},{\"type\":\"SetBasePowerToughness\",\"value\":{\"power\":{\"type\":\"Literal\",\"value\":1},\"toughness\":{\"type\":\"Literal\",\"value\":1}}}]} "
   -- CR 604.2's "as long as" gate, Kird Ape's shape: the same ability plus a

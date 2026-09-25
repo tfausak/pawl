@@ -1,0 +1,92 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ExchangeValues",
+                        "value": {
+                          "one": {
+                            "type": "LifeTotal",
+                            "value": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
+                          },
+                          "other": {
+                            "type": "Toughness",
+                            "value": {
+                              "type": "InSlot",
+                              "value": "self"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Defender"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Tree of Redemption",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 13
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Plant"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

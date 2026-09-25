@@ -95,6 +95,8 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRestriction as EntryRestriction
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownState as FaceDownState
@@ -295,8 +297,8 @@ rewriteModification pairs m =
         Modification.SetBasePowerToughness pt ->
           Modification.SetBasePowerToughness
             pt
-              { SetBasePowerToughness.power = rewriteQuantity [(from, to)] (SetBasePowerToughness.power pt),
-                SetBasePowerToughness.toughness = rewriteQuantity [(from, to)] (SetBasePowerToughness.toughness pt)
+              { SetBasePowerToughness.power = fmap (rewriteQuantity [(from, to)]) (SetBasePowerToughness.power pt),
+                SetBasePowerToughness.toughness = fmap (rewriteQuantity [(from, to)]) (SetBasePowerToughness.toughness pt)
               }
         Modification.ModifyPowerToughness pt ->
           Modification.ModifyPowerToughness
@@ -598,6 +600,13 @@ rewriteEffect pairs effect = case effect of
   Effect.LoseLife x -> Effect.LoseLife x {LifeLoss.quantity = rewriteQuantity pairs (LifeLoss.quantity x)}
   Effect.GainLife x -> Effect.GainLife (rewritePlayerQuantity pairs x)
   Effect.ExchangeLifeTotals _ -> effect
+  -- A creature side's ObjectRef may carry a Filter rule 612 reaches.
+  Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other) ->
+    let side value = case value of
+          ExchangedValue.LifeTotal _ -> value
+          ExchangedValue.Power ref -> ExchangedValue.Power (rewriteObjectRef pairs ref)
+          ExchangedValue.Toughness ref -> ExchangedValue.Toughness (rewriteObjectRef pairs ref)
+     in Effect.ExchangeValues (ExchangeValues.MkExchangeValues (side one) (side other))
   Effect.SetLifeTotal x -> Effect.SetLifeTotal (rewritePlayerQuantity pairs x)
   Effect.LoseGame {} -> effect
   Effect.RedistributeLifeTotals -> effect

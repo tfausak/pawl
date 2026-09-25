@@ -76,6 +76,8 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
+import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
@@ -701,6 +703,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ExchangeLifeTotals (ExchangeSides.BetweenTargets (SlotName.MkSlotName (Text.pack "players"))))
       " {\"type\":\"ExchangeLifeTotals\",\"value\":{\"type\":\"BetweenTargets\",\"value\":\"players\"}} "
+  Spec.it s "ExchangeValues" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (PlayerRef.Relative PlayerRelation.You)) (ExchangedValue.Power (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))))
+      " {\"type\":\"ExchangeValues\",\"value\":{\"one\":{\"type\":\"LifeTotal\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"other\":{\"type\":\"Power\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}}}} "
   Spec.it s "SetLifeTotal" $
     Common.assertJsonCodec
       s
