@@ -502,7 +502,7 @@ attackerAssignment gs contested (attacker, target) = case Projection.combatDamag
 -- pool prints it.
 --
 -- Not implemented: CR 805.9's choice of which active player that is under the
--- shared team turns option (#4003).
+-- shared team turns option (#4141).
 blockerChooser :: GameState -> [ObjectId] -> PlayerId -> PlayerId
 blockerChooser gs attackers controller =
   if any (\attacker -> Projection.hasKeyword Keyword.Banding attacker gs) attackers

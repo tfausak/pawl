@@ -21,6 +21,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -2929,6 +2930,45 @@ ironMongerSpec s registry =
           Spec.assertBool s (elem (GameEvent.Connived informantId) (S.eventsOf after)) "bob's Informant really did connive"
           Spec.assertEqWith s "and bob's Informant grew off its own nonland discard" (S.powerToughnessOf informantId after) (Just (3, 2))
 
+-- CR 701.50e over a whole card. Spymaster's Vault, Land, "{B}, {T}: Target
+-- creature you control connives X, where X is the number of creatures that died
+-- this turn." (Oracle text checked against api.scryfall.com, 2026-09-25.)
+--
+-- alice's Iron Monger is both the target and the watcher: a connive would draw
+-- the Hill Giant on top of her library, discard it, grow the Monger once for the
+-- nonland discard and once more off its own CR 701.50f trigger. Two boards
+-- differing in ONE thing: whether a Goblin Piker died this turn, which is X.
+spymastersVaultSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spymastersVaultSpec s registry =
+  let board killFirst = do
+        vault <- S.printingOf s registry "Spymaster's Vault"
+        swamp <- S.printingOf s registry "Swamp"
+        monger <- S.printingOf s registry "Iron Monger, Sadistic Tycoon"
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Hill Giant"
+        let (vaultId, g1) = S.addPermanent vault S.alice (Setup.emptyGame S.bothPlayers)
+            (swampId, g2) = S.addPermanent swamp S.alice g1
+            (mongerId, g3) = S.addPermanent monger S.alice g2
+            (pikerId, g4) = S.addPermanent piker S.alice g3
+            (_, g5) = S.addLibraryCard giant S.alice g4
+            g6 = if killFirst then S.runPure S.identityAnswer g5 (Event.destroy Regenerability.Regenerable [pikerId]) else g5
+            floated = S.runPure S.identityAnswer g6 (Cost.tapForMana S.manaPerformer swampId)
+            ability = case Face.activatedAbilities (S.combinedFace vault) of
+              _ : connive : _ -> connive
+              _ -> error "Pawl.CardTriggerSpec: Spymaster's Vault has two activated abilities"
+            activated = snd (Engine.runGamePure (aimAtOffered mongerId) floated (Activate.activateAbility S.alice vaultId ability))
+        pure (mongerId, S.runPure S.identityAnswer activated Engine.priorityLoop)
+   in Spec.describe s "Spymaster's Vault" $ do
+        Spec.it s "CR 701.50e with nothing dead, conniving 0 draws, discards, grows and triggers nothing" $ do
+          (mongerId, after) <- board False
+          Spec.assertEqWith s "no card was drawn" (length (Game.zoneMembers Zone.Hand S.alice after), length (Game.zoneMembers Zone.Library S.alice after)) (0, 1)
+          Spec.assertEqWith s "the Monger neither grew nor triggered" (S.powerToughnessOf mongerId after) (Just (2, 2))
+          Spec.assertBool s (notElem (GameEvent.Connived mongerId) (S.eventsOf after)) "and no connive event was recorded"
+        Spec.it s "CR 701.50d with a creature dead, the Monger connives 1" $ do
+          (mongerId, after) <- board True
+          Spec.assertEqWith s "the Giant was drawn and discarded" (length (Game.zoneMembers Zone.Hand S.alice after), length (Game.zoneMembers Zone.Library S.alice after)) (0, 0)
+          Spec.assertEqWith s "one counter for the nonland discard and one off its own trigger" (S.powerToughnessOf mongerId after) (Just (4, 4))
+
 -- CR 701.3a's attachment event, read from the HOST's side by
 -- TriggerCondition.SelfBecomesAttachedBy.
 --
@@ -3916,6 +3956,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   raffinesInformantSpec s registry
   raffineSchemingSeerSpec s registry
   ironMongerSpec s registry
+  spymastersVaultSpec s registry
   rayOfCommandSpec s registry
   brambleElementalSpec s registry
   enormousEnergyBladeSpec s registry

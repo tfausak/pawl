@@ -31,6 +31,7 @@
 -- which is why the combat case can read the whole defending group.
 module Pawl.TeamSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -41,9 +42,11 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
@@ -51,6 +54,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.PreventionSpec as PreventionSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.SpeedSpec as SpeedSpec
@@ -63,6 +67,8 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
@@ -83,6 +89,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -818,6 +825,55 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in S.handSize S.bob (S.runCombat (S.attackTo S.carol) board)
     Spec.assertEqWith s "one Piker of bob's beside alice's draws nothing" (run (1 :: Int)) 0
     Spec.assertEqWith s "two of bob's draw a card" (run 2) 1
+  -- CR 805.8: a skip naming bob is his team's, so Fatigue aimed at him takes
+  -- the draw step of alice's team's next turn from both of them. The control
+  -- casts nothing.
+  --
+  -- Fatigue, {1}{U} Sorcery: "Target player skips their next draw step."
+  Spec.it s "CR 805.8 a teammate's skip is the team's" $ do
+    island <- S.printingOf s registry "Island"
+    fatigue <- S.printingOf s registry "Fatigue"
+    let run casting =
+          let (held, staged) = S.addHandCard fatigue S.alice (S.landsFor island S.alice 2 (stockedWith island sharedTurns))
+              board = staged {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+              cast = if casting then PreventionSpec.castEach (PreventionSpec.aimPlayer S.bob) board [held] else board
+              -- The rest of alice's turn and carol's, then the untap, upkeep and
+              -- draw steps of alice's team's next.
+              next = fst (TurnSpec.runTurn S.identityAnswer (fst (TurnSpec.runTurn S.identityAnswer cast)))
+              drawn = S.runPure S.identityAnswer next (Monad.replicateM_ 3 Engine.runStep)
+           in fmap (\pid -> S.handSize pid drawn - S.handSize pid next) [S.alice, S.bob]
+    Spec.assertEqWith s "neither alice nor bob drew" (run True) [0, 0]
+    Spec.assertEqWith s "without Fatigue both drew" (run False) [1, 1]
+  -- CR 805.8: ONE effect skipping two players on a team skips that team's step
+  -- once. Carol turns Brine Elemental face up, so alice and bob each skip their
+  -- next untap step: their team's next untap step is skipped and the one after
+  -- is not.
+  --
+  -- Brine Elemental, {4}{U}{U} 5/4 Creature -- Elemental: "Morph {5}{U}{U}.
+  -- When this creature is turned face up, each opponent skips their next untap
+  -- step."
+  Spec.it s "CR 805.8 one effect skips a team's step once" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    brine <- S.printingOf s registry "Brine Elemental"
+    let (alices, g1) = S.addPermanent piker S.alice (stockedWith island sharedTurns)
+        (bobs, g2) = S.addPermanent piker S.bob g1
+        withLands = List.foldl' (\g _ -> snd (S.addPermanent island S.carol g)) g2 [1 .. (10 :: Int)]
+        (brineId, g3) = S.addHandCard brine S.carol withLands
+        board = (S.tapObject bobs (S.tapObject alices g3)) {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        down = S.runPure S.identityAnswer board (Cast.castSpell S.manaPerformer S.carol brineId (S.printingName brine) (Facing.faceDown FaceDownReason.Morphed) >> Stack.resolveTop)
+        tapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
+        -- The rest of the current turn and carol's, then the untap step of
+        -- alice's team's next turn.
+        nextUntap gs = S.runPure S.identityAnswer (fst (TurnSpec.runTurn S.identityAnswer (fst (TurnSpec.runTurn S.identityAnswer gs)))) Engine.runStep
+    case Set.toList (Set.difference (GameState.battlefield down) (GameState.battlefield board)) of
+      [permanent] -> do
+        let armed = S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.manaPerformer S.carol TurnUpProcedure.Morph permanent >> Engine.priorityLoop)
+            first_ = nextUntap armed
+            second = nextUntap first_
+        Spec.assertEqWith s "the team's next untap step was skipped" (fmap (`tapped` first_) [alices, bobs]) [True, True]
+        Spec.assertEqWith s "and the one after untapped both" (fmap (`tapped` second) [alices, bobs]) [False, False]
+      _ -> Spec.assertFailure s "the face-down cast did not reach the battlefield"
 
 -- alice's beginning of combat step, the rest of her turn to come.
 atCombat :: GameState.GameState -> GameState.GameState

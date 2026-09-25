@@ -6889,8 +6889,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- never fires and the skip waits however many turns it must (CR 614.10a). The
     -- PhaseSelector goes in untouched: step or whole phase (CR 500.1) is card
     -- data.
+    --
+    -- CR 805.8: under the shared team turns option one effect naming several
+    -- players on a team skips that team's step once, so the team's first named
+    -- player takes the one row. Replacement.applies matches it for the team.
     gs <- State.get
-    let named = playerRefPlayers legal controller gs ref
+    let named = List.foldl' (\kept pid -> if any (Turn.sharesTurn gs pid) kept then kept else kept <> [pid]) [] (playerRefPlayers legal controller gs ref)
         install pid g =
           let (ts, g1) = Game.freshTimestamp g
               active =
@@ -10125,9 +10129,8 @@ exploreOne oid = do
 -- putCounters places none.
 --
 -- CR 701.50e: connive 0 is not a connive. No draw, no discard, no counter, and
--- none of CR 701.50f's event below. No printing in the pool counts something
--- that can be zero when its connive resolves, so the guard is a regression
--- fence rather than a proven behaviour (gap #3677).
+-- none of CR 701.50f's event below. Pawl.CardTriggerSpec's Spymaster's Vault
+-- group proves it.
 --
 -- "Nonland" is asked of each card the discard funnel MINTED, through its CR 613
 -- projection, exploreOne's reading: the hand incarnation is gone by then, and a
