@@ -5,8 +5,9 @@
 -- Harnessed arm, written by Effect.Designate (CR 701.64a's "if this permanent
 -- isn't harnessed" is its transition guard), and an ∞ ability is the static
 -- grant CR 702.186b says it means, gated on Quantity.HasDesignation -- the
--- shape a Class level or a Case's "Solved --" already takes. The Mind Stone
--- carries both.
+-- shape a Class level or a Case's "Solved --" already takes. No
+-- Pawl.Types.Keyword arm, as for CR 702.178a's max speed: nothing asks whether
+-- a permanent has ∞. The Mind Stone carries both.
 module Pawl.HarnessSpec where
 
 import qualified Data.Set as Set
