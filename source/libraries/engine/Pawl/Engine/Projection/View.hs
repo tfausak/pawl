@@ -488,7 +488,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- naming nothing and for everything off the stack.
       Filter.targets = maybe Set.empty (targetsOfStackObject gs) (Game.lookupObject oid gs),
       -- CR 115.1's targets one indirection along, filled beside them and lazily:
-      -- nothing forces this map but Filter.TargetsOnlyOne's nest.
+      -- nothing forces this map but Filter.TargetsOnlyOne's and TargetsMatching's
+      -- nests.
       Filter.targetViews = maybe Map.empty (targetViewsOfStackObject peers gs) (Game.lookupObject oid gs),
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
@@ -1761,8 +1762,9 @@ targetsOfStackObject gs obj
        in Set.unions (Map.elems (Map.restrictKeys (Binding.targetsOf bindings) declared))
 
 -- CR 115.1 one indirection along: a VIEW of each thing the stack object above
--- targets, which is what Filter.TargetsOnlyOne's nest is matched against. What
--- Pawl.Engine.Filter.View's `targetViews` is filled from.
+-- targets, which is what Filter.TargetsOnlyOne's and TargetsMatching's nests
+-- are matched against. What Pawl.Engine.Filter.View's `targetViews` is filled
+-- from.
 --
 -- Through `peers` for an object target, exactly as `attachedToView` is: the
 -- reader is bounded, and taking a full projection here would re-enter the fold

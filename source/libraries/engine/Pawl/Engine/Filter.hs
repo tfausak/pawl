@@ -176,8 +176,8 @@ data View = MkView
     -- has chosen anything: Pawl.Engine.Cast.castProposed says what that costs.
     targets :: Set.Set Recipient.Recipient,
     -- CR 115.1 asked of the TARGETS rather than of the candidate: the view of
-    -- each recipient above, so that TargetsOnlyOne's nest has something to match
-    -- against. Filled beside `targets` by
+    -- each recipient above, so that TargetsOnlyOne's and TargetsMatching's nests
+    -- have something to match against. Filled beside `targets` by
     -- Pawl.Engine.Projection.View.targetViewsOfStackObject, through the same
     -- bounded `peers` reader `attachedToView` below takes -- an object target
     -- answers that reader and a player target answers
@@ -1813,6 +1813,11 @@ matches context view predicate = case predicate of
   Filter.TargetsOnlyOne f -> case Set.toList (targets view) of
     [r] -> maybe False (\target -> matches context target f) (Map.lookup r (targetViews view))
     _ -> False
+  -- The atom above without "only": ANY target's view the nest matches, in the
+  -- same context, so "a permanent YOU control" (Rebuff the Wicked) reads the
+  -- evaluating source's controller and never the candidate's. CR 115.9b ignores
+  -- a target that left its zone, which targetViews' dropped key is.
+  Filter.TargetsMatching f -> any (\target -> matches context target f) (targetViews view)
   -- CR 115.1's player target, judged against the perspective the way ControlledBy
   -- judges a controller. ONLY a ToPlayer counts: CR 115.10a says an object is a
   -- target only where the word names it, and a spell aimed at a creature names
@@ -2287,6 +2292,7 @@ rewrite pairs predicate = case predicate of
   -- so may name a subtype -- Precursor Golem's "targets only a single Golem" is
   -- the shape a CR 612.1 swap would find there.
   Filter.TargetsOnlyOne f -> Filter.TargetsOnlyOne (rewrite pairs f)
+  Filter.TargetsMatching f -> Filter.TargetsMatching (rewrite pairs f)
   Filter.TargetsPlayer _ -> predicate
   Filter.IsBound _ -> predicate
   Filter.SameNameAsBound _ -> predicate
@@ -3002,6 +3008,7 @@ bakeBound players predicate = case predicate of
   -- of another object and may name a bound slot, which this function's pairing
   -- with overBoundSlots requires be baked here and reported there.
   Filter.TargetsOnlyOne f -> Filter.TargetsOnlyOne (bakeBound players f)
+  Filter.TargetsMatching f -> Filter.TargetsMatching (bakeBound players f)
   Filter.TargetsPlayer _ -> predicate
   -- Untouched for the reason IsControllerOfBound below is, and one step shorter:
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
@@ -3175,6 +3182,7 @@ manaValueThresholds predicate = case predicate of
   -- Descended into for AttachedTo's reason: the nest is a description of another
   -- object and may carry a mana-value bound of its own.
   Filter.TargetsOnlyOne f -> manaValueThresholds f
+  Filter.TargetsMatching f -> manaValueThresholds f
   Filter.TargetsPlayer _ -> []
   Filter.IsBound _ -> []
   Filter.SameNameAsBound _ -> []
@@ -3336,6 +3344,7 @@ statesAQuality predicate = case predicate of
   Filter.TargetsSource -> True
   Filter.TargetsOnlySource -> True
   Filter.TargetsOnlyOne _ -> True
+  Filter.TargetsMatching _ -> True
   Filter.TargetsPlayer _ -> True
   Filter.IsBound _ -> True
   Filter.SameNameAsBound _ -> True
@@ -3508,6 +3517,7 @@ overBoundSlots f predicate = case predicate of
   -- one: `bakeBound` descends into the target's description, so the catch-all
   -- below would silently bake a slot this function never reported.
   Filter.TargetsOnlyOne g -> fmap Filter.TargetsOnlyOne (overBoundSlots f g)
+  Filter.TargetsMatching g -> fmap Filter.TargetsMatching (overBoundSlots f g)
   -- Descended into for the atom above's reason and named explicitly for the same
   -- one: `bakeBound` descends into the represented card's description, so the
   -- catch-all below would silently bake a slot this function never reported.
