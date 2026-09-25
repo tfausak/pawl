@@ -61,8 +61,20 @@ import qualified Pawl.Types.Zone as Zone
 -- the control its resolution held (CR 723.2).
 resolveTopWith :: Game Result -> Game ()
 resolveTopWith runSubgame = do
+  top <- State.gets GameState.stack
+  Foldable.for_ (take 1 top) (State.modify' . beginResolutionControl)
   resolveOneWith runSubgame
   State.modify' endResolutionControl
+
+-- CR 723.2: "you control the player while that spell is resolving" -- the rows
+-- waiting on `oid` take hold as it begins to resolve, in place, so CR 723.1a's
+-- creation order is kept, and lapse with the rest of its resolution's rows.
+beginResolutionControl :: ObjectId -> GameState.GameState -> GameState.GameState
+beginResolutionControl oid gs =
+  let wake row
+        | PlayerControl.duration row == ControlDuration.WhileResolving oid = row {PlayerControl.duration = ControlDuration.UntilResolutionEnds}
+        | otherwise = row
+   in gs {GameState.control = fmap (fmap wake) (GameState.control gs)}
 
 -- CR 723.2's lapse -- "until Word of Command finishes resolving". Applied after
 -- resolveOneWith rather than inside its spell branch, since either kind of
@@ -81,16 +93,20 @@ resolveTopWith runSubgame = do
 -- 723.1's own expiry stays Pawl.Engine.Engine.beginTurnOf's, and
 -- Pawl.GameSpec's "CR 723.1a gameplay: Word of Command over a Mindslaver hands
 -- bob back to alice, not to himself" is what proves the hand-back.
+--
+-- A WhileResolving row outlives the resolution only while its spell is still on
+-- the stack: one countered or otherwise gone (CR 400.7) will never resolve.
 endResolutionControl :: GameState.GameState -> GameState.GameState
-endResolutionControl gs = gs {GameState.control = Map.mapMaybe outlivesResolution (GameState.control gs)}
+endResolutionControl gs = gs {GameState.control = Map.mapMaybe (outlivesResolution (GameState.stack gs)) (GameState.control gs)}
 
 -- The rows of one player's control stack that a resolution ending leaves in
 -- place, or Nothing where none is left -- a player under no control has no key.
-outlivesResolution :: NonEmpty.NonEmpty PlayerControl.PlayerControl -> Maybe (NonEmpty.NonEmpty PlayerControl.PlayerControl)
-outlivesResolution =
+outlivesResolution :: [ObjectId] -> NonEmpty.NonEmpty PlayerControl.PlayerControl -> Maybe (NonEmpty.NonEmpty PlayerControl.PlayerControl)
+outlivesResolution stack =
   let survives row = case PlayerControl.duration row of
         ControlDuration.UntilTurnEnds -> True
         ControlDuration.UntilResolutionEnds -> False
+        ControlDuration.WhileResolving oid -> elem oid stack
    in NonEmpty.nonEmpty . NonEmpty.filter survives
 
 -- One object resolves. CR 729.1a's "the spell or ability that created the

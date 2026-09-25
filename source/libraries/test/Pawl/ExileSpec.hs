@@ -581,12 +581,8 @@ castExtractPower s registry = do
 --
 -- The ability printed under it is Effect.OfferCast over
 -- ObjectRef.EachCardExiledWithSource -- CR 607.2a's linked set -- under a
--- Clause.condition comparing Quantity.AttackersDeclaredThisTurn against 3.
---
--- Not implemented: CR 116.2a's land drop, which CR 305.2a reaches during a
--- resolution where Effect.OfferCast reaches only CR 601's cast, so a hidden LAND
--- cannot be played and pawl's Windbrisk Heights is stricter than printed there
--- (#3347).
+-- Clause.condition comparing Quantity.AttackersDeclaredThisTurn against 3,
+-- under PermissionVerb.Play so a hidden land is offered as CR 305.2a's land play.
 --
 -- Where Extract Power above tells the look apart from OWNERSHIP, this group
 -- tells it apart from CONTROL OF THE SPELL: the looker is named by a keyword

@@ -16,6 +16,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
@@ -3729,6 +3730,42 @@ backupSpec s registry =
               Spec.assertEqWith s "the Frog really resolved first, leaving a 1/1 with the counter" (Projection.powerOf pikerId frogFirst) (Just 2)
               Spec.assertEqWith s "and last" (Projection.powerOf pikerId frogLast) (Just 2)
             _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Evangel"
+        -- CR 613.1f's NAMED removal, later than the grant: Glittering Lion
+        -- ({2}{W} 2/2, "{3}: Until end of turn, this creature loses 'Prevent
+        -- all damage that would be dealt to this creature.'") loses its shield
+        -- and nothing else, so the restriction backup granted it stays. The
+        -- pair is the same activation on a Lion no Kavu backed up, which the
+        -- 2/2 may block.
+        Spec.it s "CR 613.1f Glittering Lion losing its shield keeps the restriction backup granted it" $ do
+          lion <- S.printingOf s registry "Glittering Lion"
+          evangel <- S.printingOf s registry "Cabal Evangel"
+          kavu <- S.printingOf s registry "Chomping Kavu"
+          plains <- S.printingOf s registry "Plains"
+          case (S.combatBoardOf [lion] [evangel], Face.activatedAbilities (S.combinedFace lion)) of
+            ((gs0, [lionId], [evangelId]), shieldOff : _) -> do
+              let (card, staged) = S.addHandCard kavu S.alice (S.landsFor plains S.alice 3 gs0)
+                  unshield g = S.runPure S.identityAnswer g {GameState.priority = Just S.alice} (Activate.activateAbility S.alice lionId shieldOff >> Stack.resolveTop)
+                  backed = unshield (entersTargeting lionId card staged)
+                  bare = unshield staged
+              Spec.assertBool s (not (mayBlock evangelId lionId backed)) "CR 613.1f the unshielded Lion still can't be blocked by the 2/2"
+              Spec.assertBool s (mayBlock evangelId lionId bare) "where an unbacked unshielded Lion can be"
+              Spec.assertBool s (null (PC.replacementEffects (Projection.project lionId backed))) "and the Lion really lost its shield"
+            _ -> Spec.assertFailure s "fixture should give alice a Lion and bob an Evangel"
+        -- The same named removal over a granted STATIC ability, the gate
+        -- Pawl.Engine.Projection.gather applies: Streetwise Negotiator's backup
+        -- survives the Lion losing its shield.
+        Spec.it s "CR 613.1f Glittering Lion losing its shield keeps the static ability backup granted it" $ do
+          lion <- S.printingOf s registry "Glittering Lion"
+          negotiator <- S.printingOf s registry "Streetwise Negotiator"
+          plains <- S.printingOf s registry "Plains"
+          case (S.combatBoardOf [lion] [], Face.activatedAbilities (S.combinedFace lion)) of
+            ((gs0, [lionId], _), shieldOff : _) -> do
+              let (card, staged) = S.addHandCard negotiator S.alice (S.landsFor plains S.alice 3 gs0)
+                  backed = entersTargeting lionId card staged
+                  unshielded = S.runPure S.identityAnswer backed {GameState.priority = Just S.alice} (Activate.activateAbility S.alice lionId shieldOff >> Stack.resolveTop)
+              Spec.assertBool s (PC.assignsCombatDamageWithToughness (Projection.project lionId unshielded)) "CR 613.1f the unshielded Lion still assigns damage by toughness"
+              Spec.assertBool s (null (PC.replacementEffects (Projection.project lionId unshielded))) "and the Lion really lost its shield"
+            _ -> Spec.assertFailure s "fixture should give alice a Lion"
         -- CR 305.7's last clause over a rule ability: Blood Moon strips the
         -- Dryad Arbor's rules text but not the restriction backup granted it.
         Spec.it s "CR 305.7 a Blood Moon'd Dryad Arbor keeps the restriction backup granted it" $ do

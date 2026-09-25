@@ -69,12 +69,16 @@
                         "type": "InSlot",
                         "value": "opponent"
                       },
+                      "controlWhileResolving": true,
                       "optionality": {
                         "type": "Mandatory"
                       },
                       "ref": {
                         "type": "InSlot",
                         "value": "chosen"
+                      },
+                      "verb": {
+                        "type": "Play"
                       }
                     }
                   }

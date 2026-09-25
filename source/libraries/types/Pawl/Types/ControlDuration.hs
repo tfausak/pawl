@@ -1,5 +1,7 @@
 module Pawl.Types.ControlDuration where
 
+import Pawl.Types.ObjectId (ObjectId)
+
 -- | How long one player's control of another lasts, which is the axis CR 723
 -- splits on: rule 723.1's effects run for a whole turn, and rule 723.2's two
 -- named cards for a limited duration inside one.
@@ -14,4 +16,7 @@ data ControlDuration
   | -- | CR 723.2: until the object that installed it finishes resolving (Word of
     -- Command).
     UntilResolutionEnds
-  deriving (Bounded, Enum, Eq, Ord, Show)
+  | -- | CR 723.2: only while the object resolves, and dormant until then (Word
+    -- of Command's forced spell).
+    WhileResolving ObjectId
+  deriving (Eq, Ord, Show)

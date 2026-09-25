@@ -2063,7 +2063,7 @@ abilityRemoval gs =
   let gated = gatedGather gs
    in -- Almost every board has no ability-removing effect, and then no projection
       -- is spent on the question.
-      if any (removesAbilities . gModification) gated
+      if any (wipesAbilities . gModification) gated
         then abilitiesRemoved gated gs
         else const False
 
@@ -2099,7 +2099,7 @@ gatedGather gs =
 abilityRemovalAfter :: GameState -> Timestamp -> ObjectId -> Bool
 abilityRemovalAfter gs =
   let gated = gatedGather gs
-   in if any (removesAbilities . gModification) gated
+   in if any (wipesAbilities . gModification) gated
         then \ts -> abilitiesRemovedBy ((> ts) . gTimestamp) gated gs
         else \_ _ -> False
 
@@ -2201,6 +2201,16 @@ removesAbilities m = case m of
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
 
+-- CR 613.1f: does this modification remove the abilities the gates below ask
+-- about? A named removal does not: applyModification's LoseNamedAbility arm
+-- reaches an activated ability or a printed replacement alone, never a static,
+-- player or rule ability, whatever the removal names. Not implemented: a named
+-- removal of a static ability (gap #2212).
+wipesAbilities :: Modification -> Bool
+wipesAbilities m = case m of
+  Modification.LoseNamedAbility _ -> False
+  _ -> removesAbilities m
+
 -- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6
 -- finished, by any remover on the board?
 abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
@@ -2226,9 +2236,14 @@ abilitiesRemoved = abilitiesRemovedBy (const True)
 -- Not asked of the remover's own source: order WITHIN layer 6 is CR 613.7
 -- timestamp, settled by the fold. CR 305.7's gate asks a related question one
 -- level up and settles it by CR 613.8 -- see appliedSetEffects.
+--
+-- Only a WIPE counts (wipesAbilities): every ability this gates -- a static,
+-- player or rule ability -- is one CR 613.1f's named removal leaves in place.
+-- Pawl.KeywordTriggerSpec's "CR 613.1f Glittering Lion losing its shield keeps
+-- the restriction backup granted it" proves it.
 abilitiesRemovedBy :: (Gathered -> Bool) -> [Gathered] -> GameState -> ObjectId -> Bool
 abilitiesRemovedBy keep cands gs oid =
-  let byLowest = Map.fromListWith (<>) (fmap (\c -> (gLowest c, [c])) (filter (\c -> removesAbilities (gModification c) && keep c) cands))
+  let byLowest = Map.fromListWith (<>) (fmap (\c -> (gLowest c, [c])) (filter (\c -> wipesAbilities (gModification c) && keep c) cands))
       grants = controlGrants gs
       removesAt (lyr, cs) =
         let partial = projectUpTo lyr cands oid gs
