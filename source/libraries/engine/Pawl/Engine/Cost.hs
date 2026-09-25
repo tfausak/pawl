@@ -335,7 +335,7 @@ candidateCostsGiven permitted pid name oid gs =
           let -- CR 707.2: the costs are copiable values, so a card carrying a
               -- copy stamp or a conjured duplicate's values is priced off those
               -- (Game.castingFaceOf).
-              face = Game.castingFaceOf obj card (Game.resolveFace (Just name) card)
+              face = Game.castingFaceNamed obj card name
               printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
               -- CR 118.9d: an alternative replaces only the MANA cost; every
               -- additional cost still applies. CR 702.34a's last sentence sends

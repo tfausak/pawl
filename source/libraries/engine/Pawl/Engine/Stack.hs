@@ -386,8 +386,9 @@ resolveCardBacked runSubgame oid rest printingId = do
           -- a Room's into an unlocked designation. Read off `obj` rather than
           -- off `face`, because what the rules carry is the object's own
           -- record of which half is up and not the face a fallback resolved
-          -- to.
-          entering = Card.enteringFace card (Object.face obj)
+          -- to. Asked of the halves the spell's copiable values give it (CR
+          -- 709.5b), so a card carrying a Room's opens the door it was cast as.
+          entering = Card.enteringFace (Maybe.fromMaybe card (Game.halvesCardOf obj card)) (Object.face obj)
           -- CR 110.2b: "the permanent's controller by default is the player
           -- who put that spell onto the stack" -- CR 405.4's caster, which is
           -- what Object.enteredUnder holds for a spell and what

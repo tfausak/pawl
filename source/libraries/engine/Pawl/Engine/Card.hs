@@ -401,6 +401,23 @@ prepareFace card = case Card.layout card of
   Layout.ModalDoubleFaced -> Nothing
   Layout.Meld -> Nothing
 
+-- CR 715.2 / 720.2: the Adventure or Omen half -- the alternative
+-- characteristics "the object may have while it's a spell" -- and Nothing for
+-- every other layout. prepareFace's shape, one rule over: CR 715.2b and CR
+-- 720.2b make it a copiable value, which Game.alternativeSpellOf reads.
+alternativeSpellFace :: Card.Card -> Maybe (Face.Face Card.Card)
+alternativeSpellFace card = case Card.layout card of
+  Layout.Normal -> Nothing
+  Layout.Split -> Nothing
+  Layout.Room -> Nothing
+  Layout.Flip -> Nothing
+  Layout.Adventure -> Maybe.listToMaybe (NonEmpty.tail (Card.faces card))
+  Layout.Omen -> Maybe.listToMaybe (NonEmpty.tail (Card.faces card))
+  Layout.Preparation -> Nothing
+  Layout.Transforming -> Nothing
+  Layout.ModalDoubleFaced -> Nothing
+  Layout.Meld -> Nothing
+
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
 --
