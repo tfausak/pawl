@@ -3,6 +3,7 @@ module Pawl.Types.GrantPlayFromExile where
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
 -- | The payload of Pawl.Types.Effect's GrantPlayFromExile arm: which objects the
@@ -44,6 +45,10 @@ data GrantPlayFromExile = MkGrantPlayFromExile
     player :: PlayerRef.PlayerRef,
     ref :: ObjectRef.ObjectRef,
     spending :: ManaSpending.ManaSpending,
-    withoutPayingManaCost :: Bool
+    withoutPayingManaCost :: Bool,
+    -- | CR 601.3 / 305.9: Ragavan, Nimble Pilferer\'s "you may CAST that card"
+    -- is Cast, which never lets an exiled land be played; Galvanic Relay\'s
+    -- "you may PLAY that card" is Play.
+    verb :: PermissionVerb.PermissionVerb
   }
   deriving (Eq, Ord, Show)

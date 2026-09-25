@@ -50,6 +50,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.OutsideObject as OutsideObject
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
@@ -328,7 +329,7 @@ dirtied pid object =
       Object.worldSince = Just (Timestamp.MkTimestamp 2),
       -- The origin is inert here: newIncarnation clears playableFromExile
       -- outright, so no value of it makes this fixture more or less honest.
-      Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never ManaSpending.AnyType Nothing PlayPermissionOrigin.Granted),
+      Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never ManaSpending.AnyType Nothing PlayPermissionOrigin.Granted PermissionVerb.Play),
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
       Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna")),

@@ -66,6 +66,9 @@
                           },
                           "spending": {
                             "type": "AnyType"
+                          },
+                          "verb": {
+                            "type": "Cast"
                           }
                         }
                       },

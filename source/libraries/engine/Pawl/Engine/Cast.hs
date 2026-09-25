@@ -81,6 +81,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
+import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
@@ -1126,9 +1127,9 @@ grantedByAdventureRule oid gs =
 -- with none of permitsCastFromExile's other disjuncts and without its Adventure
 -- conjunct: does the exiled object's stored permission name THIS player?
 --
--- The rule says PLAY, so this is the conjunct the land side shares --
--- Pawl.Engine.Action.playableLands asks it of an exiled land, where playing is
--- CR 305.1's special action rather than a cast. None of the other disjuncts may
+-- This is the conjunct the land side shares, through permitsLandPlayFromExile
+-- below, which Pawl.Engine.Action.playableLands asks of an exiled land (CR
+-- 305.1's special action rather than a cast). None of the other disjuncts may
 -- be shared: CR 702.170d ("a plotted card's owner may cast it"), CR 702.143a
 -- ("they may cast that card") and CR 702.185a ("its owner may cast this card")
 -- each permit a CAST and nothing else, so a land carrying any of those keywords
@@ -1153,6 +1154,15 @@ permitsPlayFromExile pid oid gs = case Game.lookupObject oid gs >>= Object.playa
   Just permission ->
     ExilePlayPermission.player permission == pid
       && Expiry.begun gs (ExilePlayPermission.expiry permission)
+
+-- The land side of permitsPlayFromExile: CR 305.9 / 601.3, a permission whose
+-- verb is Cast lets a spell be cast and never lets a land be played (Ragavan,
+-- Nimble Pilferer's "you may cast that card"). Pawl.ConjureSpec's Kari Zev case
+-- proves it.
+permitsLandPlayFromExile :: PlayerId -> ObjectId -> GameState -> Bool
+permitsLandPlayFromExile pid oid gs =
+  permitsPlayFromExile pid oid gs
+    && fmap ExilePlayPermission.verb (Game.lookupObject oid gs >>= Object.playableFromExile) == Just PermissionVerb.Play
 
 -- CR 118.14: how may this player spend mana toward casting THIS object, as the
 -- object lies right now? Dire Fleet Daredevil's "and mana of any type can be
