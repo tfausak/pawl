@@ -4671,17 +4671,13 @@ selfSpec s registry = Spec.describe s "CR 201.5 a resolving spell naming itself"
 -- fight could not reach and the three readings of "that player" are distinct.
 --
 -- "Glory of Battle" is transcribed as TriggerCondition.SelfDealsDamageToCreature
--- and proved in Pawl.CardTriggerSpec's Strax group; it does not fire here,
--- because the fight below never happens.
+-- and proved in Pawl.CardTriggerSpec's Strax group.
 --
--- Not implemented: the "when you do" half never arms, because
--- Pawl.Engine.Resolve.Effect.applyClauseEffects reads CR 603.12's "happened" off
--- the event log and a slot bind records no event (#3165). So the fight does not
--- happen here and the bind is unobservable on the board; the offer below is what
--- this card proves. Strax is that issue's first producer in the pool -- with the
--- gate lifted by hand the whole chain runs, alice's own creature dying to Strax's
--- five and Strax taking its one.
-straxSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+-- The random choice records no game event; it only binds the "chosen" slot. So
+-- the "when you do" arming at all is CR 603.12's "happened" read off the state
+-- rather than the event log (Pawl.Engine.Resolve.Effect.happenedBetween), and
+-- the fight reaching exactly that player's creature is the bind being read.
+straxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 straxSpec s registry =
   let build strax thumb mountain maiden piker giant =
         let g0 = Setup.emptyGame S.threePlayers
@@ -4731,6 +4727,28 @@ straxSpec s registry =
               -- equality is not passing on a board where the prompt was never
               -- raised.
               Spec.assertEqWith s "CR 602.2b Strax paid its own {T}" (fmap Object.tapped (Game.lookupObject straxId after)) (Just TapState.Tapped)
+        -- THE GAMEPLAY ASSERTIONS, the chain run to an empty stack. Bob named:
+        -- Strax's five kill Goblin Piker, and Glory of Battle (the damage Strax
+        -- dealt) adds one counter. Alice named: "another" leaves Bird Maiden as
+        -- the only victim, so she dies beside the sacrificed Thumb and Strax does
+        -- not fight itself.
+        Spec.it s "CR 603.12 a choice that records no event still arms its when you do" $ do
+          (abilities, (straxId, gs)) <- staged
+          case abilities of
+            [] -> Spec.assertFailure s "Strax should print an activated ability"
+            ability : _ -> do
+              let run who = S.runPure (straxAnswer straxId ability who) gs Engine.priorityLoop
+                  graveyardNames pid g = Set.fromList (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid g)) (Game.zoneMembers Zone.Graveyard pid g))
+                  named = Set.fromList . fmap (CardName.MkCardName . Text.pack)
+                  bobNamed = run S.bob
+                  aliceNamed = run S.alice
+              Spec.assertEqWith s "bob named: Goblin Piker died fighting Strax" (graveyardNames S.bob bobNamed) (named ["Goblin Piker"])
+              Spec.assertEqWith s "alice named: Bird Maiden died, not Strax" (graveyardNames S.alice aliceNamed) (named ["Bird Maiden", "Krark's Thumb"])
+              Spec.assertEqWith
+                s
+                "CR 701.14a Glory of Battle saw the fight's damage"
+                (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject straxId bobNamed))
+                (Just 1)
 
 -- Activates Strax's "Grenades!" whenever it is offered, pinning WHICH seat
 -- randomness names. STATELESS, unlike Pawl.CombatEffectSpec's mazeAnswer: this

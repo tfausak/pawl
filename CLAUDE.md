@@ -265,7 +265,10 @@ to agents as written. What it doesn't say:
     descent that rebuilds a record silently drops it. The recurring site is
     `Pawl.Engine.Projection.Rewrite`'s `rewriteEffect`, CR 612.1's text-change
     walk. Grep `{ SomeRecord.field = ` over the tree beside the construction
-    sites, and say in the PR which you checked.
+    sites, and say in the PR which you checked. The one update that keeps a
+    new field ON PURPOSE is `Pawl.Engine.Resolve.Effect.happenedBetween`, CR
+    603.12's "did it happen": a new `GameState` field an instruction that did
+    not happen can still write owes a copy-across there.
 
     A NEW READ OF A PERMANENT'S CARD goes through the projection
     (`Pawl.Engine.Projection.View`) or the copiable record it stamps
