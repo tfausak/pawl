@@ -1414,10 +1414,16 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- Casing on the arms is a classification, not an effect's identity:
 -- Pawl.Engine.Cast is the sole reader of Pawl.Types.CastingRestriction exactly as
 -- it is of CastingPermission.
+--
+-- CR 305.9's "it can't be cast as a spell" rides here too, since it is the one
+-- prohibition every face states by its type line: without it only CR 118.6's
+-- absent mana cost stops a land cast, and a CR 118.9 waiver prices that at zero.
+-- Pawl.ExileSpec's "CR 305.9 a hidden Forest is played as the turn's land and
+-- never cast for free" proves it.
 printedRestrictionsOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 printedRestrictionsOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
-  Just face -> all (restrictionMet pid gs) (Face.castingRestrictions face)
+  Just face -> not (Card.isLand face) && all (restrictionMet pid gs) (Face.castingRestrictions face)
 
 -- Does the game state satisfy this one printed clause?
 restrictionMet :: PlayerId -> GameState -> CastingRestriction.CastingRestriction -> Bool
