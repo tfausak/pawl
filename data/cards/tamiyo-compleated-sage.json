@@ -69,6 +69,123 @@
               }
             ]
           }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveLoyaltyFromThis",
+                "value": 7
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
+                                        {
+                                          "type": "TapThis"
+                                        }
+                                      ],
+                                      "mana": []
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "Draw",
+                                                  "value": {
+                                                    "player": {
+                                                      "type": "Relative",
+                                                      "value": {
+                                                        "type": "You"
+                                                      }
+                                                    },
+                                                    "quantity": {
+                                                      "type": "Literal",
+                                                      "value": 1
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ],
+                                "name": "Tamiyo's Notebook",
+                                "playerAbilities": [
+                                  {
+                                    "effect": {
+                                      "type": "ReduceSpellCost",
+                                      "value": {
+                                        "reduction": [
+                                          {
+                                            "type": "Generic",
+                                            "value": 2
+                                          }
+                                        ],
+                                        "whichSpells": {
+                                          "type": "And",
+                                          "value": []
+                                        }
+                                      }
+                                    },
+                                    "scope": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ],
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Book"
+                                    }
+                                  ],
+                                  "supertypes": [
+                                    {
+                                      "type": "Legendary"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Artifact"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
       ],
       "keywords": [
