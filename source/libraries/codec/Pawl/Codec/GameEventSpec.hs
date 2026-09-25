@@ -538,6 +538,20 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.RolledToVisit DieResult.MkDieResult {DieResult.roller = PlayerId.MkPlayerId 2, DieResult.result = 5})
       " {\"type\":\"RolledToVisit\",\"value\":{\"roller\":2,\"result\":5}} "
+  -- CR 701.51c.
+  Spec.it s "AttractionOpened" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.AttractionOpened (PlayerId.MkPlayerId 4))
+      " {\"type\":\"AttractionOpened\",\"value\":4} "
+  -- CR 702.159b.
+  Spec.it s "PrizeClaimed" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.PrizeClaimed (PlayerId.MkPlayerId 6))
+      " {\"type\":\"PrizeClaimed\",\"value\":6} "
   -- CR 716.2a. The object then the level BEFORE then the level AFTER, and the two
   -- levels deliberately differ by more than one: a level bar can only step N-1 to
   -- N, so a fixture crossing one threshold would round-trip a codec that dropped

@@ -1160,6 +1160,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.Visit
       " {\"type\":\"Visit\"} "
+  -- CR 701.51c and CR 702.159b, PlayerForages' shape.
+  Spec.it s "PlayerOpensAttraction round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerOpensAttraction PlayerRelation.You)
+      " {\"type\":\"PlayerOpensAttraction\",\"value\":{\"type\":\"You\"}} "
+  Spec.it s "PlayerClaimsPrize round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerClaimsPrize PlayerRelation.Opponent)
+      " {\"type\":\"PlayerClaimsPrize\",\"value\":{\"type\":\"Opponent\"}} "
   -- CR 705.2. Both relations, PlayerRollsDice's shape: Tavern Scoundrel is the
   -- You form.
   Spec.it s "PlayerWinsCoinFlip round-trips both relations" $ do

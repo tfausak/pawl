@@ -548,6 +548,12 @@ data TriggerCondition
   | -- | CR 702.159a: Visit -- its controller rolled to visit their Attractions
     -- and the result is lit up on this one.
     Visit
+  | -- | CR 701.51c: "whenever you open an Attraction" (The Most Dangerous
+    -- Gamer), against GameEvent.AttractionOpened.
+    PlayerOpensAttraction PlayerRelation.PlayerRelation
+  | -- | CR 702.159b: "whenever you claim the prize of an Attraction" (The Most
+    -- Dangerous Gamer), against GameEvent.PrizeClaimed.
+    PlayerClaimsPrize PlayerRelation.PlayerRelation
   | -- | CR 705.2: "whenever you win a coin flip" (Tavern Scoundrel), reading the
     -- event's win where PlayerRollsDice ignores what the die showed.
     --

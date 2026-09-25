@@ -1130,6 +1130,8 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerRollsDice _ -> Set.empty
   TriggerCondition.PlayerRollsResult _ -> Set.empty
   TriggerCondition.Visit -> Set.empty
+  TriggerCondition.PlayerOpensAttraction _ -> Set.empty
+  TriggerCondition.PlayerClaimsPrize _ -> Set.empty
   TriggerCondition.PlayerWinsCoinFlip _ -> Set.empty
   TriggerCondition.PlayerLosesCoinFlip _ -> Set.empty
   -- Empty for the same reason, and CR 701.43d is what settles it: the linked

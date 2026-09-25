@@ -161,6 +161,8 @@ codec =
           Arm.payload "PlayerRollsDice" PlayerRelation.codec TriggerCondition.PlayerRollsDice (\x -> case x of TriggerCondition.PlayerRollsDice y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsResult" (DieResult.codec PlayerRelation.codec) TriggerCondition.PlayerRollsResult (\x -> case x of TriggerCondition.PlayerRollsResult y -> Just y; _ -> Nothing),
           Arm.nullary "Visit" TriggerCondition.Visit,
+          Arm.payload "PlayerOpensAttraction" PlayerRelation.codec TriggerCondition.PlayerOpensAttraction (\x -> case x of TriggerCondition.PlayerOpensAttraction y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerClaimsPrize" PlayerRelation.codec TriggerCondition.PlayerClaimsPrize (\x -> case x of TriggerCondition.PlayerClaimsPrize y -> Just y; _ -> Nothing),
           Arm.payload "PlayerWinsCoinFlip" PlayerRelation.codec TriggerCondition.PlayerWinsCoinFlip (\x -> case x of TriggerCondition.PlayerWinsCoinFlip y -> Just y; _ -> Nothing),
           Arm.payload "PlayerLosesCoinFlip" PlayerRelation.codec TriggerCondition.PlayerLosesCoinFlip (\x -> case x of TriggerCondition.PlayerLosesCoinFlip y -> Just y; _ -> Nothing),
           Arm.nullary "SelfBecomesPlotted" TriggerCondition.SelfBecomesPlotted,
@@ -305,6 +307,8 @@ tagOf x = case x of
   TriggerCondition.PlayerRollsDice {} -> "PlayerRollsDice"
   TriggerCondition.PlayerRollsResult {} -> "PlayerRollsResult"
   TriggerCondition.Visit {} -> "Visit"
+  TriggerCondition.PlayerOpensAttraction {} -> "PlayerOpensAttraction"
+  TriggerCondition.PlayerClaimsPrize {} -> "PlayerClaimsPrize"
   TriggerCondition.PlayerWinsCoinFlip {} -> "PlayerWinsCoinFlip"
   TriggerCondition.PlayerLosesCoinFlip {} -> "PlayerLosesCoinFlip"
   TriggerCondition.SelfBecomesPlotted {} -> "SelfBecomesPlotted"
