@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -217,7 +218,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
 -- ids are not reused, so it can name nothing else before the turn ends.
 recordActivation :: ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> GameState
 recordActivation srcId ability gs =
-  let prints restriction = elem restriction (ActivatedAbility.restrictions ability)
+  let prints restriction = elem restriction (Keyword.restrictionsOf ability)
       perGame g =
         g {GameState.objects = Map.adjust (\o -> o {Object.activatedOnce = Set.insert ability (Object.activatedOnce o)}) srcId (GameState.objects g)}
       perTurn g =

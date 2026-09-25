@@ -1470,6 +1470,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Boast
       " {\"type\":\"Boast\"} "
+  -- CR 702.57a. Nullary for boast's reason.
+  Spec.it s "Forecast" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Forecast
+      " {\"type\":\"Forecast\"} "
   -- CR 702.179a. Nullary, and the tag is the whole encoding.
   Spec.it s "StartYourEngines" $
     Common.assertCodec

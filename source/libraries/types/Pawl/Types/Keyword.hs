@@ -840,6 +840,10 @@ data Keyword
     -- ActivationRestriction.OnlyOnceEachTurn rather than having the keyword add
     -- them (#3044).
     Boast
+  | -- | 702.57a: a forecast ability is the activated ability printed after it,
+    -- activatable only from a hand, during its owner's upkeep, once each turn
+    -- (CR 702.57b); written on Pawl.Types.ActivatedAbility.keyword.
+    Forecast
   | -- | 702.179a: a static ability whose whole content is CR 704.5aa's
     -- state-based action, read off the projection by Pawl.Engine.Sba rather than
     -- minted.

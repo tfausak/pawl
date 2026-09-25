@@ -76,6 +76,8 @@ import qualified Pawl.Types.Zone as Zone
 -- authored one does (CR 113.6j), leaving it in a public graveyard a moment later.
 -- NOT vacuous for ninjutsu, whose card stays in its owner's hand for the whole
 -- window; Ninja of the Deep Hours is the first card in `data/cards/` this bites.
+-- Nor CR 702.57b's longer duration for a forecast card, revealed in its hand
+-- until it leaves or a step or phase other than an upkeep begins (#1408).
 revealIfHidden :: PlayerId -> ObjectId -> Game ()
 revealIfHidden pid srcId = do
   gs <- State.get
