@@ -149,9 +149,15 @@ arm targets controller source duration gs = case duration of
   -- CR 500.5a / 511.2: "until end of combat" is the end of the combat PHASE, so
   -- the stored window is PhaseSelector.CombatPhase and never the end of combat
   -- step. Naming the phase is the whole of the arming: unlike UntilYourNextTurn
-  -- there is nothing about the game to bake in, because the sweep ends the
-  -- effect at the first combat phase whose end it sees (#525).
+  -- there is nothing about the game to bake in, because every producer arms it
+  -- during combat and the sweep ends the effect at the first combat phase whose
+  -- end it sees.
   Duration.UntilEndOfCombat -> Just (Expiry.AtEndOf PhaseSelector.CombatPhase)
+  -- CR 500.5a / 611.2a: UntilEndOfYourNextTurn's two samples, so the combat
+  -- phase that ends it is one of the controller's LATER turns and never the
+  -- current one's.
+  Duration.UntilEndOfCombatOnYourNextTurn ->
+    Just (Expiry.AtEndOfCombatOn (AfterTurn.MkAfterTurn controller (GameState.turnNumber gs)))
   -- CR 116.2c: nothing about the game's clock is baked in, because no window of
   -- the turn ends this -- the PRICE is carried through unchanged so the offer
   -- below can quote it and the payment charge it. The SEAT is baked, as
@@ -239,6 +245,7 @@ perSeat duration = case duration of
   Duration.DuringYourNextTurn -> Nothing
   Duration.ForAsLongAs _ -> Nothing
   Duration.UntilEndOfCombat -> Nothing
+  Duration.UntilEndOfCombatOnYourNextTurn -> Nothing
   Duration.UntilPaid _ -> Nothing
   Duration.UntilUsed -> Nothing
 
@@ -261,6 +268,7 @@ follows expiry = case expiry of
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
   Expiry.AtEndOf _ -> False
+  Expiry.AtEndOfCombatOn _ -> False
   Expiry.WhenPaid _ -> False
   Expiry.WhenUsed -> False
 
@@ -293,6 +301,7 @@ begun gs expiry = case expiry of
   Expiry.AtTurnOf _ -> True
   Expiry.AtEndOfTurnOf _ -> True
   Expiry.AtEndOf _ -> True
+  Expiry.AtEndOfCombatOn _ -> True
   Expiry.WhenPaid _ -> True
   Expiry.WhenUsed -> True
 
@@ -332,6 +341,12 @@ dropAtCleanup gs =
           not (Turn.isActive gs (AfterTurn.player afterTurn))
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
         Expiry.AtEndOf _ -> True
+        -- The named turn is over, so a turn that had no combat phase takes the
+        -- effect with it rather than handing it to a later turn of theirs, which
+        -- is not "your next turn".
+        Expiry.AtEndOfCombatOn afterTurn ->
+          not (Turn.isActive gs (AfterTurn.player afterTurn))
+            || GameState.turnNumber gs <= AfterTurn.turn afterTurn
         -- CR 116.2c: only a payment ends this, and the cleanup step is not one.
         Expiry.WhenPaid _ -> True
         -- CR 611.2a: every printed producer also says "this turn", so cleanup
@@ -399,6 +414,7 @@ sweepConditional = do
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
         Expiry.AtEndOf _ -> True
+        Expiry.AtEndOfCombatOn _ -> True
         -- CR 116.2c states a price, not a condition, so no board change ends it.
         Expiry.WhenPaid _ -> True
         -- Consumed only by Pawl.Engine.PlayerEffect.spentByCast/spentByLandPlay,
@@ -565,6 +581,8 @@ dropAtTurnOf pid gs =
         -- still in the game keeps it, and this is the very moment `begun` starts
         -- answering True for the turn it names.
         Expiry.DuringTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
+        -- CR 800.4m's "a specific point in that turn", for the two arms above' reason.
+        Expiry.AtEndOfCombatOn afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
         Expiry.AtEndOf _ -> True
         -- CR 116.2c: no turn of anyone's ends it, and CR 800.4m does not reach it
         -- either -- the offer goes away with the departed player's objects rather
@@ -617,6 +635,12 @@ dropAtEndOf :: PhaseSelector -> GameState -> GameState
 dropAtEndOf ending gs =
   let survives expiry = case expiry of
         Expiry.AtEndOf window -> window /= ending
+        -- CR 500.8: the FIRST combat phase of that turn to end ends it, so an
+        -- added combat phase after it finds nothing left.
+        Expiry.AtEndOfCombatOn afterTurn ->
+          ending /= PhaseSelector.CombatPhase
+            || not (Turn.isActive gs (AfterTurn.player afterTurn))
+            || GameState.turnNumber gs <= AfterTurn.turn afterTurn
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.
@@ -680,6 +704,7 @@ paidExpiries gs =
         Expiry.AtEndOfTurnOf _ -> []
         Expiry.DuringTurnOf _ -> []
         Expiry.AtEndOf _ -> []
+        Expiry.AtEndOfCombatOn _ -> []
         Expiry.WhenUsed -> []
    in concatMap paid (sourcedExpiries gs)
 
@@ -725,6 +750,7 @@ dropWhenPaidBy oid gs =
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
         Expiry.AtEndOf _ -> True
+        Expiry.AtEndOfCombatOn _ -> True
         Expiry.WhenUsed -> True
       keepEffect x = survives (ContinuousEffect.source x) (ContinuousEffect.expiry x)
       keepCopy x = survives (ActiveCopy.source x) (ActiveCopy.expiry x)
@@ -772,4 +798,5 @@ expiresWhenUsed expiry = case expiry of
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
   Expiry.AtEndOf _ -> False
+  Expiry.AtEndOfCombatOn _ -> False
   Expiry.WhenPaid _ -> False

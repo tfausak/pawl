@@ -72,9 +72,13 @@ data Duration
     --
     -- WHICH combat phase is not carried. CR 500.8 permits more than one in a
     -- turn, and the sweep ends this effect at the first whose end it sees; every
-    -- producer can only be activated during combat, so that is the phase the
-    -- effect was created in. One armed OUTSIDE combat is unspecified here (#525).
+    -- producer arms it during combat, so that is the phase the effect was
+    -- created in. The one printed duration armed outside combat names its turn,
+    -- and is the arm below.
     UntilEndOfCombat
+  | -- | CR 500.5a / 611.2a: "until end of combat on your next turn" (Brazen
+    -- Cannonade), stored as Expiry.AtEndOfCombatOn.
+    UntilEndOfCombatOnYourNextTurn
   | -- | CR 611.2a: "You may pay {U} to end this effect", the clause every Licid
     -- prints. The duration a spell or ability states need not be a window of the
     -- turn at all -- this one ends when a player takes CR 116.2c's special

@@ -179,8 +179,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1) (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 5)) 4))
-      " {\"type\":\"AttackerDeclared\",\"value\":{\"attacker\":3,\"defender\":1,\"target\":{\"type\":\"OfPlaneswalker\",\"value\":5},\"count\":4}} "
+      (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1) (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 5)) 4 (PlayerId.MkPlayerId 0)))
+      " {\"type\":\"AttackerDeclared\",\"value\":{\"attacker\":3,\"defender\":1,\"target\":{\"type\":\"OfPlaneswalker\",\"value\":5},\"count\":4,\"attackingPlayer\":0}} "
   -- AttackerDeclared's grouping sibling: the target and the player who declared,
   -- with no creature and no count -- CR 508.3b's subject beside CR 508.3e's.
   Spec.it s "BecameAttacked" $

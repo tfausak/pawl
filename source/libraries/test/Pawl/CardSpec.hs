@@ -805,6 +805,7 @@ durationConditions duration = case duration of
   Duration.DuringYourNextTurn -> []
   Duration.ForAsLongAs condition -> [condition]
   Duration.UntilEndOfCombat -> []
+  Duration.UntilEndOfCombatOnYourNextTurn -> []
   -- CR 116.2c's price is a Cost, whose Filters are swept by durationFilters
   -- below and never through a Condition -- an activated ability's own cost takes
   -- exactly that split (activatedAbilityCounts against activatedAbilityFilters).
@@ -3783,6 +3784,7 @@ durationFilters duration =
           Duration.DuringYourNextTurn -> []
           Duration.ForAsLongAs _ -> []
           Duration.UntilEndOfCombat -> []
+          Duration.UntilEndOfCombatOnYourNextTurn -> []
           Duration.UntilUsed -> []
       )
 

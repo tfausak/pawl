@@ -421,8 +421,8 @@ data Filter keyword
     -- The printed wording says "since the beginning of the turn" and this atom
     -- answers "since their most recent turn began". The two coincide for the
     -- ACTIVE player, which is the only seat either printing asks about: CR 508.1
-    -- lets only the active player declare attackers, and Nettling Imp names the
-    -- active player outright.
+    -- lets only an active player declare attackers (CR 805.10a), and Nettling
+    -- Imp names the active player outright.
     ControlledSinceTurnBegan
   | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to something the nested
     -- Filter admits -- Crown of the Ages' "target Aura attached to a creature".

@@ -74,6 +74,7 @@ emptyCombat =
       Combat.attackedControlledBy = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
+      Combat.declaredAttackedBy = Map.empty,
       Combat.declaredAttackedThisStep = Set.empty,
       Combat.declaredAttackers = Set.empty,
       Combat.declaredBlockers = Set.empty,
@@ -1891,6 +1892,12 @@ attemptAttackDeclaration perform pid rejected = do
                         -- battlefield attacking.
                         Combat.declaredAttacked =
                           Set.union (Set.fromList (Map.elems recorded)) (Combat.declaredAttacked (GameState.combat g)),
+                        -- The same record split by attacking player (CR 805.10a).
+                        Combat.declaredAttackedBy =
+                          Map.unionWith
+                            Set.union
+                            (Map.fromListWith Set.union (fmap (Bifunctor.bimap attackerOf Set.singleton) (Map.toList recorded)))
+                            (Combat.declaredAttackedBy (GameState.combat g)),
                         -- CR 508.6's same record on CR 500.1's narrower span,
                         -- written here for the reason above and emptied as the
                         -- step ends (Pawl.Engine.Engine.runStepThatBegan).
@@ -2065,7 +2072,7 @@ attemptAttackDeclaration perform pid rejected = do
                         record h oid = Maybe.fromMaybe h $ do
                           t <- Map.lookup oid recorded
                           d <- Defender.playerOf Projection.controllerWithLastKnown t g
-                          pure (Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid d t declared)) h)
+                          pure (Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid d t declared (attackerOf oid))) h)
                      in List.foldl' record g attacking
                 )
               -- CR 508.3b's arity, which is the declaration's rather than the

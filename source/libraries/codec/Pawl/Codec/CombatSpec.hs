@@ -24,6 +24,7 @@ empty =
       Combat.attackedControlledBy = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
+      Combat.declaredAttackedBy = Map.empty,
       Combat.declaredAttackedThisStep = Set.empty,
       Combat.declaredAttackers = Set.empty,
       Combat.declaredBlockers = Set.empty,
@@ -66,6 +67,9 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           Combat.attackedControlledBy = Map.singleton (ObjectId.MkObjectId 16) (PlayerId.MkPlayerId 17),
           Combat.attacked = Set.singleton (AttackTarget.OfPlayer (PlayerId.MkPlayerId 2)),
           Combat.declaredAttacked = Set.singleton (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
+          -- CR 805.10a: keyed by the attacking PLAYER, a seat no other field
+          -- keys by.
+          Combat.declaredAttackedBy = Map.singleton (PlayerId.MkPlayerId 18) (Set.singleton (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8))),
           Combat.declaredAttackedThisStep = Set.singleton (AttackTarget.OfBattle (ObjectId.MkObjectId 9)),
           -- CR 508.1a / 509.1a: keyed by the CREATURE, where the three sets
           -- above are keyed by what was attacked, and distinct ids again so
@@ -86,6 +90,7 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           <> ",\"attackedControlledBy\":{\"16\":17}"
           <> ",\"attacked\":[{\"type\":\"OfPlayer\",\"value\":2}]"
           <> ",\"declaredAttacked\":[{\"type\":\"OfPlaneswalker\",\"value\":8}]"
+          <> ",\"declaredAttackedBy\":{\"18\":[{\"type\":\"OfPlaneswalker\",\"value\":8}]}"
           <> ",\"declaredAttackedThisStep\":[{\"type\":\"OfBattle\",\"value\":9}]"
           <> ",\"declaredAttackers\":[11],\"declaredBlockers\":[12]"
           <> ",\"blockersDeclared\":true,\"attackingNothing\":[13]"
