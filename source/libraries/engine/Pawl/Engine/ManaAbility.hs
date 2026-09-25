@@ -354,6 +354,8 @@ manaProduced effect = case effect of
   Effect.ExchangeValues _ -> Nothing
   Effect.SetLifeTotal {} -> Nothing
   Effect.LoseGame {} -> Nothing
+  Effect.WinGame {} -> Nothing
+  Effect.DrawGame {} -> Nothing
   Effect.RedistributeLifeTotals -> Nothing
   Effect.IncreaseSpeed {} -> Nothing
   Effect.DecreaseSpeed {} -> Nothing
@@ -575,6 +577,8 @@ movesLibraryCard effect = case effect of
   Effect.ExchangeValues _ -> False
   Effect.SetLifeTotal {} -> False
   Effect.LoseGame {} -> False
+  Effect.WinGame {} -> False
+  Effect.DrawGame {} -> False
   Effect.RedistributeLifeTotals -> False
   Effect.IncreaseSpeed {} -> False
   Effect.DecreaseSpeed {} -> False

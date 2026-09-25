@@ -2771,6 +2771,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- Game.stillPlaying answered, and a target who has already left the game is an
   -- illegal target CR 608.2b drops before this is asked.
   Effect.LoseGame {} -> False
+  Effect.WinGame {} -> False
+  Effect.DrawGame {} -> False
   Effect.RedistributeLifeTotals {} -> False
   Effect.IncreaseSpeed {} -> False
   Effect.DecreaseSpeed {} -> False
@@ -5705,6 +5707,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let named = Set.fromList (playerRefPlayers legal controller gs ref)
         alive = Set.fromList (Game.stillPlaying gs)
     Departure.leaveGameTogether Departure.Type.Lost (filter (\pid -> Set.member pid named && Set.member pid alive) (Game.apnapOrder gs))
+  -- CR 104.2b with CR 801.14: a player the reference names wins the game, which
+  -- is each of their opponents within their range losing it. Under an unlimited
+  -- range that is every opponent, and CR 104.2a then settles the win itself
+  -- (Departure.outcomeAfterLeaving). One departure set over every winner, the
+  -- LoseGame arm's reason.
+  Effect.WinGame ref -> do
+    gs <- State.get
+    let winners = filter (`elem` Game.stillPlaying gs) (playerRefPlayers legal controller gs ref)
+        losers = Set.fromList [pid | winner <- winners, pid <- Game.opponentsInReach winner gs]
+    Departure.leaveGameTogether Departure.Type.Lost (filter (`Set.member` losers) (Game.apnapOrder gs))
+  -- CR 104.4c with CR 801.15: the game is a draw for the controller and each
+  -- player within their range, who leave it; everyone else plays on. Under an
+  -- unlimited range that is the whole table, which CR 104.2a's settle then
+  -- records as the draw.
+  Effect.DrawGame -> do
+    gs <- State.get
+    let drawn = Game.reachableBy controller gs
+    Departure.leaveGameTogether Departure.Type.Drew (filter (`elem` drawn) (Game.apnapOrder gs))
   -- CR 119.7 / 119.8: redistribute life totals, each new total being CR 119.5's
   -- gain or loss of the necessary amount. The roster is CR 102.1's players IN the
   -- game, not the keys of GameState.players, which keep a departed seat's row.
