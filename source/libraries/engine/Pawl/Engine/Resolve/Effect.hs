@@ -512,19 +512,31 @@ applyClauseEffects source applyOne =
 -- deliberately unforced), the allocators, interning and Oracle-reference memos
 -- an instruction advances before finding nothing to do, CR 104.4b's lastChoice
 -- (an offer answered with nothing), CR 121.4's drewFromEmpty (an attempted
--- draw), and every bound AMOUNT, since a tally binds zero for an instruction
--- that did nothing. Everything else is compared, so a new GameState field
+-- draw), CR 607.2a's exiledWith and CR 406.4's exilePiles (applyEffectWith
+-- prunes both after EVERY instruction, and a card can leave exile off that
+-- road -- CR 704.5d ceasing a token -- so the prune of a stale key is no act;
+-- a real exile already shows in `exile` and `objects`), and every bound
+-- AMOUNT, since a tally binds zero for an instruction that did nothing -- a
+-- slot that holds nothing else is dropped, so a FIRST zero bind is not a
+-- difference either. Everything else is compared, so a new GameState field
 -- counts as state by default.
 --
--- The copied-across fields are a REGRESSION FENCE rather than a proved line:
--- no pool card puts an offering, drawing or tallying instruction directly
--- before a reflexive arm, so un-copying lastChoice leaves the suite green.
--- Miasma Demon ("you may discard any number of cards. When you do, ...",
--- answered with zero) is the card that would observe it.
+-- A deny-list and not an allow-list: an allow-list fails as the event-log
+-- reading did, on every state-only instruction writing a field it does not
+-- name, which grows with the open half; this one fails only on a closed-half write made whether
+-- or not anything happened, a finite set.
+--
+-- Pawl.ResolveSpec's "CR 603.12 an empty mill after a token ceased in exile
+-- arms no reflexive" proves the exiledWith copy. The rest is a REGRESSION
+-- FENCE rather than a proved line: no pool card puts an offering, drawing or
+-- tallying instruction directly before a reflexive arm, so un-copying
+-- lastChoice leaves the suite green. Miasma Demon ("you may discard any number
+-- of cards. When you do, ...", answered with zero) is the card that would
+-- observe it.
 happenedBetween :: GameState -> GameState -> Bool
 happenedBetween before after =
   let tallyless :: Map.Map SlotName Binding.Type.Binding -> Map.Map SlotName Binding.Type.Binding
-      tallyless = Map.map (\binding -> binding {Binding.Type.amount = Nothing})
+      tallyless = Map.filter (/= Binding.Type.empty) . Map.map (\binding -> binding {Binding.Type.amount = Nothing})
       objectTallyless :: Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
       objectTallyless = Map.map (\obj -> obj {Object.bindings = tallyless (Object.bindings obj)})
       comparable gs =
@@ -542,10 +554,12 @@ happenedBetween before after =
             GameState.referenceNames = GameState.referenceNames before,
             GameState.lastChoice = GameState.lastChoice before,
             GameState.drewFromEmpty = GameState.drewFromEmpty before,
+            GameState.exiledWith = GameState.exiledWith before,
+            GameState.exilePiles = GameState.exilePiles before,
             GameState.ambientAmounts = GameState.ambientAmounts before,
             GameState.objects = objectTallyless (GameState.objects gs),
             GameState.stackArchive = objectTallyless (GameState.stackArchive gs),
-            GameState.detachedBindings = fmap tallyless (GameState.detachedBindings gs)
+            GameState.detachedBindings = Map.filter (not . Map.null) (fmap tallyless (GameState.detachedBindings gs))
           }
    in Seq.length (GameState.events after) > Seq.length (GameState.events before)
         || comparable before /= comparable after

@@ -1222,6 +1222,33 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "bob's library, which had a card, is empty: his mill happened" (Game.zoneMembers Zone.Library S.bob after) []
     Spec.assertEqWith s "carol's library was already empty and stays that way" (Game.zoneMembers Zone.Library S.carol after) []
     Spec.assertEqWith s "CR 608.2f / 603.12 the reflexive armed once, off bob's mill alone: alice gained exactly 1 life" (S.lifeOf S.alice after) (fmap (+ 1) (S.lifeOf S.alice entered))
+  -- CR 603.12 / 704.5d: the same Toll with BOTH opponents' libraries empty, so
+  -- nothing is milled and "toll" must never arm. Before it enters, Flicker of
+  -- Fate exiles alice's own token, which CR 111.8 keeps from returning and CR
+  -- 704.5d then ceases to exist -- leaving behind the bookkeeping that recorded
+  -- the exile. Pruning that leftover is not the mill happening
+  -- (Pawl.Engine.Resolve.Effect.happenedBetween).
+  Spec.it s "CR 603.12 an empty mill after a token ceased in exile arms no reflexive" $ do
+    toll <- S.printingOf s registry "Synthetic Communal Toll"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    flicker <- S.printingOf s registry "Flicker of Fate"
+    let (tokenId, withToken) = S.addToken (Printing.card piker) S.alice (S.landsFor plains S.alice 2 S.threePlayerGame)
+        (flickerId, withFlicker) = S.addHandCard flicker S.alice withToken
+        aimed :: Prompt.Prompt r -> r
+        aimed p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just tokenId) . Recipient.objectOf) sets
+          _ -> S.identityAnswer p
+        resolveEverything gs =
+          let settled = S.runPure S.identityAnswer gs Engine.settleForPriority
+           in if null (GameState.stack settled)
+                then settled
+                else resolveEverything (S.runPure S.identityAnswer settled Stack.resolveTop)
+        flickered = resolveEverything (S.runPure aimed withFlicker (S.cast S.alice flickerId))
+        (_, entered) = S.entersWithTrigger toll S.alice flickered
+        after = resolveEverything entered
+    Spec.assertEqWith s "CR 603.12 nobody milled, so the reflexive never armed: alice's life is unchanged" (S.lifeOf S.alice after) (S.lifeOf S.alice entered)
+    Spec.assertEqWith s "CR 111.8 / 704.5d the flickered token is in no zone" (Game.zoneMembers Zone.Exile S.alice flickered, S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice flickered) ([], 0)
   -- CR 608.2d's either-or, on the three boards that tell its four readings
   -- apart: Twiddle -- "You may tap or untap target artifact, creature, or land"
   -- -- aimed at bob's Goblin Piker. One mode, two clauses naming each other

@@ -267,8 +267,10 @@ to agents as written. What it doesn't say:
     walk. Grep `{ SomeRecord.field = ` over the tree beside the construction
     sites, and say in the PR which you checked. The one update that keeps a
     new field ON PURPOSE is `Pawl.Engine.Resolve.Effect.happenedBetween`, CR
-    603.12's "did it happen": a new `GameState` field an instruction that did
-    not happen can still write owes a copy-across there.
+    603.12's "did it happen": any write an instruction makes whether or not it
+    happened --- a prune, a cache, a stamp, a zero tally, in a new field OR an
+    existing one --- owes a copy-across there, or an ignored instruction arms
+    its "when you do".
 
     A NEW READ OF A PERMANENT'S CARD goes through the projection
     (`Pawl.Engine.Projection.View`) or the copiable record it stamps
