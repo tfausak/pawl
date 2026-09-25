@@ -1339,11 +1339,12 @@ offerCastOnce context named caster optionality verb retake offer = do
             -- costs are why: the face's additional costs ride the applied cost,
             -- and one of them may offer the caster a choice of payments, which
             -- Cost.choiceVariants expands here exactly as it does for a cast the
-            -- board itself offers.
+            -- board itself offers. CR 702.48a's offering is the other optional
+            -- additional cost, and Cost.withOffering adds it the same way.
             appliedOne
               | CastOffer.withoutPayingManaCost offer = Just (CandidateCost.plain (CastOffer.offeredBy offer) (Cost.withoutPayingManaCost face))
               | otherwise = fmap (\c -> CandidateCost.plain (CastOffer.offeredBy offer) (c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face})) (CastOffer.payingInstead offer)
-            applied = concatMap (Cost.choiceVariants face) (Maybe.maybeToList appliedOne)
+            applied = concatMap (Cost.withOffering caster oid proposed) (concatMap (Cost.choiceVariants face) (Maybe.maybeToList appliedOne))
             -- Face up: CR 708.4's face-down cast is a morph permission (CR
             -- 702.37d), and an OfferCast opcode carries no such rider.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
