@@ -5775,7 +5775,7 @@ annihilator n =
   let effect =
         Effect.PlayerSacrifices
           ( PlayerSacrifices.MkPlayerSacrifices
-              Binding.triggerPlayer
+              (PlayerRef.EachInSlot Binding.triggerPlayer)
               (Filter.And [])
               (Quantity.Literal (toInteger n))
           )
@@ -8298,7 +8298,9 @@ demonstrateOpponent = SlotName.MkSlotName (Text.pack "demonstrated")
 --
 -- Filter.ManaValueLessThanSource and not a literal, because CR 613.2a moves the
 -- spell's mana cost under layer 1: a cascade spell that is a copy of something
--- else measures the copied cost, which no minter could have baked.
+-- else measures the copied cost, which no minter could have baked. So does an
+-- {X} spell granted cascade, whose mana value counts its announced X (CR
+-- 202.3e).
 --
 -- Not implemented: CR 702.85b's "as you cascade" window, the action another
 -- effect takes over the exiled batch between the walk and the cast decision

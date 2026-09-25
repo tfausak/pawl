@@ -925,7 +925,7 @@ effectPlayerRefs effect = case effect of
   -- CR 701.58a's own reference: whose library the top card comes off.
   Effect.Cloak ref -> [ref]
   Effect.Venture {} -> []
-  Effect.PlayerSacrifices {} -> []
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players _ _) -> [players]
   -- CR 701.38a's specified player, the seat the vote starts with.
   Effect.Vote (Vote.MkVote starter _) -> [starter]
   Effect.TakeExtraTurn takeExtraTurn -> [TakeExtraTurn.player takeExtraTurn]
@@ -1034,9 +1034,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Cloak {} -> Map.empty
   Effect.Venture {} -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
-  -- CR 101.4's "each player sacrifices": the arm takes every player recipient
-  -- the slot holds, so the read is Many.
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot _ quantity) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
+  -- The players are effectPlayerRefs' half, joined at the head above.
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantitySlots quantity
   -- The object vote's listed choices are a Filter and nothing else: the starter
   -- is effectPlayerRefs' half, joined at the head above, and the slot this
   -- WRITES is boundSlots' half. A word vote reads no slot at all -- its words
@@ -1078,9 +1077,8 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Connive (Connive.MkConnive quantity _) -> quantitySlots quantity
   Effect.Discard subject -> case subject of
     -- The bound slot is a DEFINITION, not a read, so it is not joined in here.
-    -- Many, PlayerSacrifices' arity and for its reason: CR 101.4's worked
-    -- example is a table-wide edict, and the resolution arm below folds over
-    -- every player the slot names.
+    -- Many: CR 101.4's worked example is a table-wide instruction, and the
+    -- resolution arm below folds over every player the slot names.
     Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
     Discard.These {} -> Map.empty
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> quantitySlots quantity

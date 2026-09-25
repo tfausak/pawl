@@ -22,7 +22,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -4186,7 +4186,7 @@ projectDecidingFrom seedOf admits cands =
                           ordered = effectUnits (List.sortOn gTimestamp (filter applies here))
                        in (List.foldl' (applyUnit bounded (const Nothing) oid) seeded ordered, decided2)
             (folded, decisions) = List.foldl' applyLayer (seedOf oid gs, Map.empty) layers
-         in (noncreaturePT oid gs folded, decisions)
+         in (withAnnouncedX oid gs (noncreaturePT oid gs folded), decisions)
    in forObject
 
 -- CR 208.3: a noncreature permanent has no power or toughness, and only on the

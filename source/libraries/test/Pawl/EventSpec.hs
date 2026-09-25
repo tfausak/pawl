@@ -189,6 +189,33 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "and both sacrifices are in exile" (Set.size (GameState.exile after)) 2
     Spec.assertEqWith s "neither opponent kept their permanent" (length (Game.zoneMembers Zone.Battlefield S.bob after) + length (Game.zoneMembers Zone.Battlefield S.carol after)) 0
 
+  -- CR 101.4 / 701.21a: Tithing Blade's "each opponent sacrifices a creature of
+  -- their choice", with no slot to name the opponents. Three seats, so "each
+  -- opponent" is two players, and each opponent holds two creatures, so each is
+  -- asked (CR 609.3 elides nothing). Each answer is the creature the elision's
+  -- ascending-order filler would NOT take, so an ignored answer is visible.
+  Spec.it s "CR 101.4 Tithing Blade makes each opponent sacrifice the creature they chose" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    blade <- S.printingOf s registry "Tithing Blade"
+    let (alicePiker, g0) = S.addPermanent piker S.alice (S.landsFor swamp S.alice 2 (Setup.emptyGame S.threePlayers))
+        (bobPiker, g1) = S.addPermanent piker S.bob g0
+        (bobGiant, g2) = S.addPermanent giant S.bob g1
+        (carolGiant, g3) = S.addPermanent giant S.carol g2
+        (carolPiker, g4) = S.addPermanent piker S.carol g3
+        (g5, bladeId) = S.handOne blade g4
+        chosen = Set.fromList [bobGiant, carolPiker]
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseSacrifices _ _ _ candidates _ -> Set.fromList (filter (`Set.member` chosen) candidates)
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer g5 (S.cast S.alice bladeId))
+        after = snd (Engine.runGamePure answer cast Engine.priorityLoop)
+    Spec.assertEqWith s "bob sacrificed the Hill Giant he chose and kept his Piker" (Game.zoneMembers Zone.Battlefield S.bob after) [bobPiker]
+    Spec.assertEqWith s "carol sacrificed the Piker she chose and kept her Hill Giant" (Game.zoneMembers Zone.Battlefield S.carol after) [carolGiant]
+    Spec.assertBool s (elem alicePiker (Game.zoneMembers Zone.Battlefield S.alice after)) "alice, no opponent of her own, kept her creature"
+
   Spec.it s "without Rest in Peace, a creature goes to the graveyard" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (theCreature, g1) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)

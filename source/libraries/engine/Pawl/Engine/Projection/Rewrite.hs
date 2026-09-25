@@ -541,7 +541,7 @@ rewriteEffect pairs effect = case effect of
   -- this function can be given names it.
   Effect.Venture {} -> effect
   Effect.ExileHandThenDraw -> effect
-  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) (rewriteQuantity pairs quantity))
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices players (Filter.rewrite pairs filter_) (rewriteQuantity pairs quantity))
   Effect.Vote (Vote.MkVote starter choices) ->
     Effect.Vote . Vote.MkVote starter $ case choices of
       VoteChoices.Objects objects -> VoteChoices.Objects objects {VoteObjects.filter = Filter.rewrite pairs (VoteObjects.filter objects)}

@@ -15,6 +15,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import Pawl.CastProhibitionSpec (equipBoard, flashBoard, flashOnOwnTurn, isActivateOf, isPlay, landDropBoard, nextTurnFor, orreryScopeBoard, playEveryLand)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
@@ -1720,6 +1721,28 @@ voidWinnowerSpec s registry =
       Spec.assertEqWith s "and only the printed cost: the grant's even route is withheld, so the Disaster is cast at X = 3 and alice takes 3" (S.lifeOf S.alice resolvedFunded) (Just 17)
       Spec.assertEqWith s "and so does bob" (S.lifeOf S.bob resolvedFunded) (Just 17)
 
+    -- CR 601.2e with CR 202.3e's second half: CR 601.3a let bob BEGIN, and the X
+    -- he announces is then judged. X = 2 leaves {X}{R}{R} at mana value 4, even,
+    -- so the cast is taken back; X = 3 makes it 5 on the stack. The Winnower gone
+    -- is the pair for the X = 2 announcement.
+    Spec.it s "CR 601.2e an announced X that leaves the spell even takes the cast back" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      disaster <- S.printingOf s registry "Molten Disaster"
+      winnower <- S.printingOf s registry "Void Winnower"
+      let (_, _, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster [winnower]
+          (_, _, _, bareDisaster, bare) = voidWinnowerBoard mountain piker bolt disaster []
+          announcing :: Natural -> Prompt.Prompt r -> r
+          announcing x p = case p of
+            Prompt.ChooseX {} -> x
+            _ -> S.identityAnswer p
+          castAt x gs oid = S.runPure (announcing x) (gs {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}) (S.cast S.bob oid)
+          odd' = castAt 3 board bobsDisaster
+      Spec.assertEqWith s "X = 3: the spell on the stack has mana value 5" (fmap (\sid -> Filter.manaValue (Projection.viewOfObject sid odd')) (GameState.stack odd')) [Just 5]
+      Spec.assertEqWith s "X = 2: mana value 4 is even, so the cast is taken back" (GameState.stack (castAt 2 board bobsDisaster)) []
+      Spec.assertEqWith s "the pair: with the Winnower gone X = 2 is cast" (length (GameState.stack (castAt 2 bare bareDisaster))) 1
+
 -- CR 601.2f / 602.2b: the MANA half of a cost increase, at the activation
 -- moment. Oppressive Rays -- "{W} Enchantment -- Aura. Enchant creature.
 -- Enchanted creature can't attack or block unless its controller pays {3}.
@@ -2144,6 +2167,23 @@ serraParagonSpec s registry =
           Spec.assertBool s (notElem (pbGraveForest b, Nothing) (Action.playableLands S.alice after)) "the graveyard Forest is not playable once the Elves are cast"
           Spec.assertBool s (elem (pbHandForest b, Nothing) (Action.playableLands S.alice after)) "while the Forest in her hand is"
           Spec.assertBool s (elem (pbGraveForest b, Nothing) (Action.playableLands S.alice gs)) "and the graveyard Forest was, before the cast"
+
+        -- CR 601.2e with CR 202.3e: Protean Hydra ({X}{G}) is mana value 1 in
+        -- the graveyard, so the Paragon admits it, and the X alice announces is
+        -- then judged against "mana value 3 or less". Two more Forests make
+        -- five, so X = 3's {3}{G} is payable and mana is never why a cast fails.
+        Spec.it s "CR 601.2e Serra Paragon admits Protean Hydra at X = 2 and not at X = 3" $ do
+          b <- board "Protean Hydra" "Forest" True
+          forest <- S.printingOf s registry "Forest"
+          let gs = S.landsFor forest S.alice 2 (pbState b)
+              announcing :: Natural -> Prompt.Prompt r -> r
+              announcing x p = case p of
+                Prompt.ChooseX {} -> x
+                _ -> S.identityAnswer p
+              castAt x = S.runPure (announcing x) gs (S.cast S.alice (pbBuried b))
+          Spec.assertEqWith s "X = 3: mana value 4, so the cast is taken back and the Hydra stays in the graveyard" (elem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice (castAt 3))) True
+          Spec.assertEqWith s "and the stack is empty" (GameState.stack (castAt 3)) []
+          Spec.assertEqWith s "X = 2: mana value 3, so the Hydra is cast" (length (GameState.stack (castAt 2))) 1
 
         -- The budget comes back at the turn handoff, CR 601.3's "each of your
         -- turns".

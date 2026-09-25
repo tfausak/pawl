@@ -1533,12 +1533,14 @@ symbolValue symbol = case symbol of
   -- one mana from a snow source, so Icehide Golem's mana value is 1.
   ManaSymbol.Snow -> 1
   -- CR 202.3e's first half: off the stack a variable's contribution to mana value
-  -- is 0.
-  --
-  -- Not implemented: rule 202.3e's second half, X treated as the number chosen
-  -- for it while the object is ON THE STACK, so an {X} spell on the stack
-  -- projects its mana value with X at 0 here (#3582).
+  -- is 0. The second half needs the object's announcement:
+  -- Pawl.Engine.Projection.View.withAnnouncedX.
   ManaSymbol.Variable -> 0
+
+-- CR 107.3: how many {X} a mana cost prints. A count, since each moves the mana
+-- value by the announced X (CR 202.3e).
+variablesOf :: ManaCost.ManaCost -> Integer
+variablesOf = toInteger . length . filter (== ManaSymbol.Variable) . ManaCost.unwrap
 
 -- CR 202.2b: only a coloured mana symbol carries a colour; colourless is not a
 -- colour (CR 105.2c). A list, since a hybrid is all of its colours (CR 107.4e).

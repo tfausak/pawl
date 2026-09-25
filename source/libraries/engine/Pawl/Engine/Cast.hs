@@ -2201,7 +2201,13 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
-          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) before
+          -- CR 601.2e's re-asking, at the announced mana value, of a prohibition
+          -- and of the permission the cast is made under, judged on the same
+          -- proposal board candidateAllowed judged them on.
+          let refusedAt castFor permission manaValue =
+                let board = proposedFor oid castFor proposed
+                 in PlayerEffect.prohibitsAtManaValue pid oid manaValue board || not (PlayerEffect.admitsAtManaValue permission oid manaValue board)
+          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) refusedAt before
 
 -- CR 305.2a / 305.3: whether `pid` may play a land at all now -- it is their
 -- turn, and the lands they have played this turn fall short of the lands they
@@ -2548,8 +2554,8 @@ trimModalForCandidate castFor modal = modal {Modal.Type.modes = fmap (trimModeTa
 -- of the pre-move state for `spent`'s reason; the one chosen spends its budget
 -- beside `spent`, and `riders` is what it gives the spell (CR 611.3d), asked
 -- there too and stored beside it.
-castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> (Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card]) -> GameState -> Game ()
-castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permissions riders before = do
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> (Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card]) -> (Maybe Keyword -> Maybe (ObjectId, CastFromZone.CastFromZone) -> Integer -> Bool) -> GameState -> Game ()
+castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permissions riders refusedAt before = do
   gs <- State.get
   let candidates = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate)) candidateCosts
       decider = Decide.deciderFor pid gs
@@ -2955,7 +2961,19 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- one predicate over one cost instead of two spellings of when the
               -- gate applies.
               let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
-              if overCeiling || not (payableCost chosenReductions spending pid sid bestowedGs announcedAtX)
+                  -- CR 601.2e / 202.3e: the spell's mana value with X announced,
+                  -- read off the stack incarnation as CR 601.2i will stamp it.
+                  -- PlayerEffect.choiceCouldEscape let the cast BEGIN; this is
+                  -- where the chosen X is judged, against Void Winnower's
+                  -- prohibition and Serra Paragon's permission alike.
+                  --
+                  -- The payability gate and the announcement below read the same
+                  -- board, so a cost modifier naming a mana value sees the X the
+                  -- CR 601.2f total will.
+                  withX o = o {Object.bindings = Map.union (Binding.fromChoices Map.empty mAmount Seq.empty) (Object.bindings o)}
+                  announcedBoard = bestowedGs {GameState.objects = Map.adjust withX sid (GameState.objects bestowedGs)}
+                  refused = Maybe.isJust mAmount && maybe False (refusedAt castFor permissionUsed) (Filter.manaValue (Projection.viewOfObject sid announcedBoard))
+              if overCeiling || refused || not (payableCost chosenReductions spending pid sid announcedBoard announcedAtX)
                 then reject
                 else do
                   -- CR 601.2b's own order puts the hybrid and Phyrexian
@@ -2966,7 +2984,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- Cost.totalManas is handed in so that the routes offered are the
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
                   -- payableCost gated this cast on, read from the same
-                  -- `bestowedGs` the total below is. Under CR 702.51b's, CR
+                  -- `announcedBoard` the total below is. Under CR 702.51b's, CR
                   -- 702.66b's and CR 702.126b's substitutes as well, for the reason
                   -- Cost.substitutedManas gives: the gate counts them, so an
                   -- announcement that did not would find no payable half on a
@@ -2983,10 +3001,10 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                   -- proof: no printing states assist beside a hybrid or
                   -- Phyrexian symbol (Scryfall keyword:assist, 2026-09-23), so
                   -- no announcement here has a choice it could change.
-                  let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments pid sid bestowedGs)
+                  let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments pid sid announcedBoard)
                   let totalledCost = Cost.plusComponents gathered announcedAtX
-                      assistedTotal = Cost.assistable (Game.castingKeywordsOf sid bestowedGs) (PaymentSubject.Casting sid) pid sid bestowedGs
-                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid bestowedGs) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
+                      assistedTotal = Cost.assistable (Game.castingKeywordsOf sid announcedBoard) (PaymentSubject.Casting sid) pid sid announcedBoard
+                  (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid announcedBoard) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
                   -- CR 400.7d's cost record, stamped on the SPELL and carried
                   -- onto the permanent it becomes by
                   -- Pawl.Engine.Event.changeZoneAttaching, `Object.paidCosts`'s

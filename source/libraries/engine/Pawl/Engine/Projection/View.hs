@@ -1311,6 +1311,25 @@ noCharacteristics =
       PC.flipped = Nothing
     }
 
+-- CR 202.3e's second half: on the stack each {X} in the mana cost counts the
+-- announced X (CR 107.3a), where baseCharacteristics counted 0. Applied to the
+-- FINISHED fold rather than the seed, so a layer-1 copiable snapshot holds no X:
+-- a spell copy counts the X it copied into its own bindings (CR 707.10), and a
+-- permanent counts none. A spell cast paying neither its mana cost nor an
+-- alternative cost with {X} announced none, so 0 (CR 107.3b).
+--
+-- The zone gate is a regression fence: CR 400.7's new incarnation clears the
+-- bindings off the stack, so dropping it leaves the suite green.
+-- Pawl.CastPermissionSpec's "CR 601.2e an announced X that leaves the spell even
+-- takes the cast back" proves the stack reading.
+withAnnouncedX :: ObjectId -> GameState -> ProjectedCharacteristics -> ProjectedCharacteristics
+withAnnouncedX oid gs pc = case Game.lookupObject oid gs of
+  Just object
+    | Game.zoneOf oid gs == Just Zone.Stack,
+      Just x <- Binding.amountOf Binding.variableX (Object.bindings object) ->
+        pc {PC.manaValue = fmap (+ toInteger x * maybe 0 Quantity.variablesOf (PC.manaCost pc)) (PC.manaValue pc)}
+  _ -> pc
+
 -- Printed characteristics before any effect: CR 613.1's starting point.
 baseCharacteristics :: ObjectId -> GameState -> ProjectedCharacteristics
 baseCharacteristics oid gs = case Game.faceOf oid gs of
