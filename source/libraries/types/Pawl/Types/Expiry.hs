@@ -74,6 +74,8 @@ data Expiry
     -- Only the CombatPhase arm has a printed producer today
     -- (Duration.UntilEndOfCombat, Jade Statue); the others cost nothing.
     AtEndOf PhaseSelector.PhaseSelector
+  | -- | CR 500.5a / 611.2a: Duration.UntilEndOfCombatOnYourNextTurn, stored.
+    AtEndOfCombatOn AfterTurn.AfterTurn
   | -- | CR 611.2a / 116.2c: ends when a player pays this cost, which they may do
     -- "any time they have priority ... for as long as the effect allows it". The
     -- stored counterpart of Duration.UntilPaid.
