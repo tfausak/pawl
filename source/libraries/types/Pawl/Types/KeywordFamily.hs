@@ -338,6 +338,9 @@ data KeywordFamily
   | -- | CR 702.180a: harmonize [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Harmonize
+  | -- | CR 702.176a: impending N--[cost]; the family Quantity.CastUsing names
+    -- for rule 702.176a's "this permanent's impending cost was paid".
+    Impending
   | -- | CR 702.151a: reconfigure [cost]. No card in the pool asks yet, and it is
     -- owed at the keyword rather than at the first asker.
     Reconfigure

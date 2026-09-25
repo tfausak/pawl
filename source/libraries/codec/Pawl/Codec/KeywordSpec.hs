@@ -18,6 +18,7 @@ import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Gift as Gift
+import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -364,6 +365,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
     Common.assertCodec s Keyword.codec (Keyword.Dash cost) " {\"type\":\"Dash\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
     Common.assertCodec s Keyword.codec (Keyword.Blitz cost) " {\"type\":\"Blitz\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+  -- CR 702.176a carries its N beside its cost, Reinforce's shape.
+  Spec.it s "Impending carries its N and its cost" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Impending (Impending.MkImpending 4 (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [])))
+      " {\"type\":\"Impending\",\"value\":{\"counters\":4,\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}}} "
   -- CR 702.185a's payload is a whole Cost too, Bygone Colossus's {3}, under a tag
   -- of its own: rule 702.185a's cost is offered from the HAND alone where dash's
   -- and blitz's name no zone, so a warp arriving under either tag would be

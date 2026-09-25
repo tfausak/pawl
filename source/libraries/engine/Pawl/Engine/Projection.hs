@@ -4373,7 +4373,7 @@ replacementsOfGiven pcs zone oid gs =
       -- card's own rules text and every segment after it is a rule minting a row
       -- onto the permanent. See Pawl.Types.ReplacementProvenance.
       fmap ((,) ReplacementProvenance.Printed . PrintedReplacement.effect) (filter lives (PC.replacementEffects pc))
-        <> fmap ((,) ReplacementProvenance.Minted) (intrinsicReplacementsOf (announcedXOf oid gs) (phyrexianLifePaidOf oid gs) pc)
+        <> fmap ((,) ReplacementProvenance.Minted) (intrinsicReplacementsOf (announcedXOf oid gs) (phyrexianLifePaidOf oid gs) (Game.lookupObject oid gs >>= Object.castUsing) pc)
         <> fmap ((,) ReplacementProvenance.Minted) (shieldOf oid gs)
         <> fmap ((,) ReplacementProvenance.Minted) (finalityOf oid gs)
         <> fmap ((,) ReplacementProvenance.Minted) (stunOf oid gs)
@@ -4615,8 +4615,8 @@ stunCounters oid gs = case Game.lookupObject oid gs of
 -- where the two orders disagree. Read off the same finished projection, so a
 -- compleated ability the CR 613 fold removed is gone -- which is what a keyword
 -- needs, where CR 306.5b's loyalty itself is a rule and stays.
-intrinsicReplacementsOf :: Natural -> Natural -> ProjectedCharacteristics -> [ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
-intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
+intrinsicReplacementsOf :: Natural -> Natural -> Maybe Keyword.Type.Keyword -> ProjectedCharacteristics -> [ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
+intrinsicReplacementsOf announcedX phyrexianLifePaid castUsing pc =
   ( -- CR 614.1c: the entering object is the ability's own source, so the pattern
     -- is Filter.IsSource.
     if Set.member CardType.Planeswalker (PC.cardTypes pc)
@@ -4654,6 +4654,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid pc =
     -- No CR 612.2a rewrite here either, for abilitiesFromCharacteristics' reason
     -- (gap #2495).
     <> Keyword.mintedReplacementsOf (PC.keywords pc)
+    <> Keyword.castForReplacementsOf castUsing (PC.keywords pc)
     -- CR 714.3a's intrinsic lore counter -- or CR 714.3b's chosen number, which
     -- rule 714.3b substitutes for it on a Saga with read ahead -- minted off the
     -- same projection for CR 306.5b's reason: a subtype is not an ability.
