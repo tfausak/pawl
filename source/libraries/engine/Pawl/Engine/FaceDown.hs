@@ -136,7 +136,7 @@ disguiseCostOf oid gs = do
 creatureCardCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 creatureCardCostOf oid gs = do
   face <- Game.faceUpCastingFaceOf oid gs
-  -- CR 707.2: the card's types are copiable too, so a stamp's answer them.
+  -- CR 707.2: card types are copiable too, so a copy stamp's types decide.
   let types = maybe (TypeLine.types (Face.typeLine face)) PC.cardTypes (Game.copyStampOf =<< Game.lookupObject oid gs)
   Monad.guard (Set.member CardType.Creature types)
   manaCost <- Face.manaCost face

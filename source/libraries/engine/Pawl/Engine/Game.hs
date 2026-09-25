@@ -968,7 +968,7 @@ landFacesOf obj card = case copyStampOf obj of
     | Set.member CardType.Land (PC.cardTypes stamp) -> [(Nothing, castingFaceOf obj card (Card.frontFace card))]
     | otherwise -> []
 
--- CR 201.2 / 707.2: the names a card shows off the battlefield -- its copy
+-- CR 201.1 / 707.2: the names a card shows off the battlefield -- its copy
 -- stamp's when it has one, CR 709.4's combined names otherwise. What CR 305.1's
 -- land-play prohibitions are asked of.
 copiableNamesOf :: Object.Object -> Card -> Set.Set CardName.CardName
