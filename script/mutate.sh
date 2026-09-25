@@ -26,6 +26,13 @@
 #   rather than exit, which no retry can reach. They are not passed
 #   unconditionally: the semaphore is what keeps concurrent worktrees off each
 #   other's cores.
+# - The build is -O0 in its own `dist-mutate/`, never `dist-newstyle/`. At -O1 a
+#   module's interface carries its function bodies, so a body-only mutation
+#   recompiles every module downstream, and restoring the file does it again:
+#   653s plus 657s for one mutation of Pawl.Engine.Event, against 11s at -O0
+#   (#4122). The separate directory keeps the two optimization levels from
+#   invalidating each other's builds. Unoptimized tests are slower, which a
+#   narrow PATTERN keeps invisible.
 # - Nothing is killed and nothing runs in the background. `pkill` reaches other
 #   agents' worktrees.
 # - `sed -i` is spelled differently by GNU and BSD sed, and both are reachable
@@ -68,8 +75,10 @@ Exit status is the outcome, not the test run's:
   3  the mutated source did not build, or the run produced no tasty summary
   4  PATTERN matched no tests at all
 
-Run it from the repository root; it builds the `pawl-test-suite` target, so it
-needs cabal.project.local in place for +pedantic like any other build.
+Run it from the repository root; it builds the `pawl-test-suite` target at -O0
+in `dist-mutate/`, so it needs cabal.project.local in place for +pedantic like
+any other build. The first run in a checkout without a warm `dist-mutate/` is a
+cold build; `script/warm-worktree.sh seed` copies one in.
 EOF
 }
 
@@ -131,6 +140,8 @@ log=$work/output
 # rejects the second one.
 run() {
   cabal test pawl-test-suite \
+    --builddir=dist-mutate \
+    --ghc-options=-O0 \
     --test-show-details=direct \
     --test-option=-p \
     --test-option="$pattern" \

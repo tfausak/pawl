@@ -249,12 +249,15 @@ sides compile.
 `script/warm-worktree.sh refresh` resets `.claude/worktrees/warm` to
 `origin/main` and builds it through the lock; run it after every merge, in the
 background, since the build is incremental and the lane does not wait on it.
-`script/warm-worktree.sh seed DIR` clones its `dist-newstyle` into a fresh
-worktree, which `implementing.md` tells the agent to do before its first
-build. Measured 2026-09-04 on a loaded machine: a cold `cabal build all` in a
-fresh worktree took 463s; seeded from a build 80 files behind, 414s with 843
-of 1528 modules recompiled; seeded from a build at the same commit, 24s with
-none. A donor that has fallen behind still pays off, so a missed refresh is a
+`script/warm-worktree.sh seed DIR` clones its `dist-newstyle`, and the `-O0`
+`dist-mutate` that `script/mutate.sh` builds in, into a fresh worktree, which
+`implementing.md` tells the agent to do before its first build. Measured
+2026-09-04 on a loaded machine: a cold `cabal build all` in a fresh worktree
+took 463s; seeded from a build 80 files behind, 414s with 843 of 1528 modules
+recompiled; seeded from a build at the same commit, 24s with none. Measured
+2026-09-25: a seeded `dist-mutate` at the same commit rebuilt in 26s where a
+cold one took 284s. Renaming the directory is a new configuration and rebuilds
+from scratch, so it keeps its name. A donor that has fallen behind still pays off, so a missed refresh is a
 slower dispatch, not a broken one. The warm worktree is never reaped and
 never dispatched into.
 
