@@ -365,7 +365,7 @@ returnExiledForMonarch = do
 -- monarch.
 --
 -- Not implemented: which active player "the active player" is under the shared
--- team turns option (#4003).
+-- team turns option (#4142).
 reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
 reassignOnDeparture leaving playing gs =
   if GameState.monarch gs /= Just leaving

@@ -221,7 +221,7 @@ takeInitiative pid gs = Event.recordEvent (GameEvent.TookInitiative pid) gs {Gam
 -- by a player who has left the game is a state no rule describes.
 --
 -- Not implemented: which active player "the active player" is under the shared
--- team turns option (#4003).
+-- team turns option (#4142).
 reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
 reassignOnDeparture leaving playing gs =
   if GameState.initiative gs /= Just leaving
