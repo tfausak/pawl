@@ -1782,10 +1782,8 @@ beginTurnOf pid gs =
             -- than inserting is also what retires a CR 723.2 row a resolution
             -- somehow left behind; no resolution spans a turn boundary, so that
             -- is a belt on top of Pawl.Engine.Stack's braces. Each taker's own
-            -- row under CR 805.4.
-            --
-            -- Not implemented: CR 805.8's last sentence, a player controlling a
-            -- teammate controlling the whole team (#4140).
+            -- row under CR 805.4, which CR 805.8's control of a whole team
+            -- scheduled for every teammate (Resolve.Effect.controlledTeam).
             GameState.control =
               Map.fromList
                 [ ( taker,

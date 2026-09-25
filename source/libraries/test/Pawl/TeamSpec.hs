@@ -40,6 +40,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.ActivateSpec as ActivateSpec
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
@@ -65,6 +66,7 @@ import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
@@ -874,6 +876,38 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
         Spec.assertEqWith s "the team's next untap step was skipped" (fmap (`tapped` first_) [alices, bobs]) [True, True]
         Spec.assertEqWith s "and the one after untapped both" (fmap (`tapped` second) [alices, bobs]) [False, False]
       _ -> Spec.assertFailure s "the face-down cast did not reach the battlefield"
+  -- CR 805.8: controlling a player controls their team. Carol activates
+  -- Mindslaver at bob on her own turn, so on alice's team's next turn carol makes
+  -- alice's decisions too -- and, deciding alice's attack, declares nothing.
+  -- The control board activates nothing, and alice's Piker attacks carol.
+  --
+  -- Mindslaver, {6} Legendary Artifact: "{4}, {T}, Sacrifice Mindslaver: You
+  -- control target player during that player's next turn."
+  Spec.it s "CR 805.8 controlling a player controls their team" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mindslaver <- S.printingOf s registry "Mindslaver"
+    let run activating =
+          let (_, withPiker) = S.addPermanent piker S.alice (stockedWith island sharedTurns)
+              (slaver, placed) = S.addPermanent mindslaver S.carol withPiker
+              lands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.carol g)) placed [1 .. (4 :: Int)]
+              board = lands {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.carol, GameState.priority = Just S.carol}
+              armed =
+                if activating
+                  then S.runPure (PreventionSpec.aimPlayer S.bob) board (Activate.activateAbility S.carol slaver (ActivateSpec.theAbility mindslaver) >> Stack.resolveTop)
+                  else board
+              -- Carol declines to attack with anything she decides for; alice
+              -- attacks with everything.
+              deciding :: Prompt.Prompt r -> r
+              deciding p = case p of
+                Prompt.DeclareAttackers decider _ ids -> if decider == Decider.MkDecider S.carol then [] else ids
+                _ -> S.attackTo S.carol p
+              -- The rest of carol's turn, then alice's team's whole turn.
+              after = fst (TurnSpec.runTurn deciding (fst (TurnSpec.runTurn deciding armed)))
+           in (fmap (\pid -> Map.member pid (GameState.pendingControl armed)) [S.alice, S.bob], S.lifeOf S.carol after)
+    Spec.assertEqWith s "carol controlled alice's attack, so no Piker hit her" (run True) ([True, True], Just 20)
+    Spec.assertEqWith s "without Mindslaver alice's Piker dealt carol 2" (run False) ([False, False], Just 18)
 
 -- alice's beginning of combat step, the rest of her turn to come.
 atCombat :: GameState.GameState -> GameState.GameState
