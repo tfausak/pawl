@@ -25,6 +25,7 @@
 -- behaviour.
 module Pawl.Engine.Replacement where
 
+import qualified Control.Applicative as Applicative
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
@@ -658,6 +659,7 @@ applies gs event candidate =
             && unspent rewrite
             && admitsRecipient src rewrite de
             && (not (redirects rewrite) || redirectable gs de)
+            && (not (prevents rewrite) || preventsInRange gs (ReplacementCandidate.controller candidate) pat rewrite de)
         -- DestructionR carries no pattern: each rewrite names its subject by
         -- identity or by attachment, which `scopes` reads off the board.
         (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid regenerability cause) ->
@@ -2700,7 +2702,7 @@ partialCoverage :: GameState -> Map.Map CandidateId Natural -> ReplacementCandid
 partialCoverage gs allowances candidate event = case (ReplacementCandidate.effect candidate, event) of
   (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de) -> case rewrite of
     DamageRewrite.RedirectNext remaining dest
-      | Maybe.isJust (redirectDestination gs dest) && covered < DamageEvent.amount de -> Just covered
+      | Maybe.isJust (redirectDestination gs (ReplacementCandidate.controller candidate) dest) && covered < DamageEvent.amount de -> Just covered
       | otherwise -> Nothing
       where
         covered = min remaining (Map.findWithDefault (DamageEvent.amount de) (ReplacementCandidate.identity candidate) allowances)
@@ -2875,6 +2877,43 @@ spentInertly rewrite = case rewrite of
   DamageRewrite.RedirectMatching _ -> False
   DamageRewrite.RunEffects _ -> False
 
+-- CR 801.13b: does this prevention reach this damage from its controller's
+-- range? One naming the source reaches only an in-range source, one naming the
+-- recipient only an in-range recipient, and one naming neither (Fog) only
+-- damage whose source and recipient are both in range. Always under an
+-- unlimited range, and for a row with no controller.
+--
+-- A pattern names the source by `whichSource` or a `whatSource` narrower than
+-- every source; the recipient by any of its recipient halves, or by CR
+-- 122.1c's shield, whose recipient is its own permanent (`admitsRecipient`).
+-- A source with no controller cuts nothing.
+preventsInRange :: GameState -> Maybe PlayerId -> DamagePattern.DamagePattern -> Rewrite -> DamageEvent.DamageEvent -> Bool
+preventsInRange gs controller pat rewrite de = case controller of
+  Nothing -> True
+  Just you ->
+    let namesSource = Maybe.isJust (DamagePattern.whichSource pat) || DamagePattern.whatSource pat /= Filter.Type.And []
+        namesRecipient =
+          Maybe.isJust (DamagePattern.whatRecipient pat)
+            || Maybe.isJust (DamagePattern.whoRecipient pat)
+            || Maybe.isJust (DamagePattern.whichRecipient pat)
+            || Maybe.isJust (DamagePattern.boundRecipient pat)
+            || rewrite == DamageRewrite.PreventRemovingShieldCounter
+        sourceWithin = case DamageEvent.dealtByController de Applicative.<|> Projection.controllerOf (DamageEvent.source de) gs of
+          Nothing -> True
+          Just pid -> Game.inRangeOf you pid gs
+        recipientWithin = recipientInRange gs you (DamageEvent.target de)
+     in (sourceWithin || (namesRecipient && not namesSource))
+          && (recipientWithin || (namesSource && not namesRecipient))
+
+-- CR 801.2d: is this damage recipient within @you@'s range -- a player in
+-- range, or an object controlled (a battle, or protected) by one? A pile of
+-- face-down cards names no one, so it is.
+recipientInRange :: GameState -> PlayerId -> Recipient.Recipient -> Bool
+recipientInRange gs you recipient = case (Recipient.objectOf recipient, Recipient.playerOf recipient) of
+  (Just oid, _) -> Projection.objectInRangeGiven (Projection.controlGrants gs) you oid gs
+  (Nothing, Just pid) -> Game.inRangeOf you pid gs
+  (Nothing, Nothing) -> True
+
 -- CR 614.9: the destination a redirection effect may still use, re-derived
 -- against the CURRENT state at redirect time. Nothing is the rule's guard --
 -- "if one of those permanents is no longer on the battlefield ... or is no
@@ -2900,10 +2939,18 @@ spentInertly rewrite = case rewrite of
 -- Not implemented, and unreachable: the rule's last sentence, damage redirected
 -- to or from a player who has left the game. Pawl has no leave-the-game path, so
 -- a ToPlayer destination is always live.
-redirectDestination :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
-redirectDestination gs dest = case Recipient.objectOf dest of
+--
+-- CR 801.13a: a destination outside the redirecting effect's controller's
+-- range is no destination either, so that portion does nothing.
+redirectDestination :: GameState -> Maybe PlayerId -> Recipient.Recipient -> Maybe Recipient.Recipient
+redirectDestination gs controller dest = Monad.mfilter (withinRangeOf gs controller) $ case Recipient.objectOf dest of
   Nothing -> Just dest
   Just oid -> liveDestination gs oid
+
+-- CR 801.13a: may a redirection controlled by this player send damage here?
+-- Always for a row with no controller.
+withinRangeOf :: GameState -> Maybe PlayerId -> Recipient.Recipient -> Bool
+withinRangeOf gs controller dest = maybe True (\you -> recipientInRange gs you dest) controller
 
 -- CR 614.9's two conditions asked of ONE object id, and the CR 613.1d re-tag
 -- beside them. Split out of redirectDestination above so the PRINTED
@@ -2938,10 +2985,12 @@ liveDestination gs oid
 --
 -- The battlefield rather than every object, because that is where CR 614.9's
 -- own guard puts a destination; liveDestination then answers the rest.
+--
+-- CR 801.13a as redirectDestination asks it, of the Context's perspective.
 printedDestination :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe Recipient.Recipient
 printedDestination gs context filter_ =
   let viewOf = Projection.viewsOf gs
-   in case filter (\oid -> Filter.matches context (viewOf oid) filter_) (Set.toList (GameState.battlefield gs)) of
+   in Monad.mfilter (withinRangeOf gs (Filter.perspective context)) $ case filter (\oid -> Filter.matches context (viewOf oid) filter_) (Set.toList (GameState.battlefield gs)) of
         [oid] -> liveDestination gs oid
         _ -> Nothing
 

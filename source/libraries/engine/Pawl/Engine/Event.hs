@@ -3300,7 +3300,7 @@ apply batch candidate event =
       DamageRewrite.Redirect dest -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
-        pure . Just $ case Replacement.redirectDestination gs dest of
+        pure . Just $ case Replacement.redirectDestination gs (ReplacementCandidate.controller candidate) dest of
           Nothing -> event
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
       -- The arm above with a countdown: Harm's Way moves as much of THIS event
@@ -3320,7 +3320,7 @@ apply batch candidate event =
       -- rather than per application, and `setShield` drops it at 0.
       DamageRewrite.RedirectNext remaining dest -> do
         gs <- State.get
-        case Replacement.redirectDestination gs dest of
+        case Replacement.redirectDestination gs (ReplacementCandidate.controller candidate) dest of
           Nothing -> pure (Just event)
           Just live -> do
             let moved = min remaining (DamageEvent.amount de)
