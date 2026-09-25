@@ -510,16 +510,17 @@ applyClauseEffects source applyOne =
 -- instruction that did NOT happen can still write it: the event log and its
 -- CR 603.10 samples (read by the first disjunct, and the samples are
 -- deliberately unforced), the allocators, interning and Oracle-reference memos
--- an instruction advances before finding nothing to do, CR 104.4b's lastChoice (a declined "you may"),
--- CR 121.4's drewFromEmpty (an attempted draw), and every bound AMOUNT, since a
--- tally binds zero for an instruction that did nothing. Everything else is
--- compared, so a new GameState field counts as state by default.
+-- an instruction advances before finding nothing to do, CR 104.4b's lastChoice
+-- (an offer answered with nothing), CR 121.4's drewFromEmpty (an attempted
+-- draw), and every bound AMOUNT, since a tally binds zero for an instruction
+-- that did nothing. Everything else is compared, so a new GameState field
+-- counts as state by default.
 --
 -- The copied-across fields are a REGRESSION FENCE rather than a proved line:
--- no pool card puts a declinable, drawing or tallying instruction directly
+-- no pool card puts an offering, drawing or tallying instruction directly
 -- before a reflexive arm, so un-copying lastChoice leaves the suite green.
--- Miasma Demon ("you may discard any number of cards. When you do, ...") is
--- the card that would observe it.
+-- Miasma Demon ("you may discard any number of cards. When you do, ...",
+-- answered with zero) is the card that would observe it.
 happenedBetween :: GameState -> GameState -> Bool
 happenedBetween before after =
   let tallyless :: Map.Map SlotName Binding.Type.Binding -> Map.Map SlotName Binding.Type.Binding
