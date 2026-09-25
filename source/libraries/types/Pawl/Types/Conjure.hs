@@ -4,6 +4,7 @@ import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ConjureSelection as ConjureSelection
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | Alchemy\'s conjure keyword action: create a card that was in nobody\'s deck
 -- and put it into a zone.
@@ -38,10 +39,6 @@ import qualified Pawl.Types.Quantity as Quantity
 -- conjures a card named Wastes onto the battlefield tapped") are both printed --
 -- so a 'Pawl.Types.PlayerRef.PlayerRef' is what this would carry, the field
 -- 'Pawl.Types.Create.Create' already has (#3970).
---
--- Not implemented: a slot binding the conjured card for a later clause to name
--- (Kari Zev, Crew of Two\'s "if that card is on the battlefield, return it to
--- its owner\'s hand") (#3971).
 data Conjure card = MkConjure
   { -- | How many copies of the card. Toralf\'s Disciple\'s "conjure four cards
     -- named Lightning Bolt"; a printed "a card" is one.
@@ -54,7 +51,11 @@ data Conjure card = MkConjure
     -- and on a duplicate, where neither question is asked.
     selection :: ConjureSelection.ConjureSelection,
     -- | The zone it arrives in.
-    destination :: ConjureDestination.ConjureDestination
+    destination :: ConjureDestination.ConjureDestination,
+    -- | The slot the conjured cards are bound to, for a later clause to name --
+    -- Kari Zev, Crew of Two\'s "if that card is on the battlefield, return it
+    -- to its owner\'s hand" (CR 603.7c). 'Pawl.Types.Create.slot''s shape.
+    slot :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)
 

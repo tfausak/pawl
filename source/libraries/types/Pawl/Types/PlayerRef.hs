@@ -108,11 +108,13 @@ data PlayerRef
     -- never at that count's per-member quantity, which the fold below still
     -- supplies its own candidate for.
     --
-    -- Pawl.Types.Search.owner is that second reading one type over, and the one
-    -- position outside a quantity that answers it: Jungle Wayfinder's "each
-    -- player may search THEIR library" is one instruction per player, so the
-    -- library read is the searcher this pass reached, and
-    -- Pawl.Engine.Resolve's Effect.Search arm substitutes it there.
+    -- Pawl.Types.Search.owner is that second reading one type over: Jungle
+    -- Wayfinder's "each player may search THEIR library" is one instruction per
+    -- player, so the library read is the searcher this pass reached, and
+    -- Pawl.Engine.Resolve's Effect.Search arm substitutes it there. A duration's
+    -- seat is the other position outside a quantity: Sphinx's Decree's "each
+    -- opponent can't cast ... during THAT PLAYER's next turn", substituted per
+    -- affected player by Pawl.Engine.Expiry.perSeat.
     --
     -- Undeterminable ANYWHERE ELSE, deliberately: an evaluation aimed at an object
     -- or at nothing has no candidate player, so a card writing this outside a

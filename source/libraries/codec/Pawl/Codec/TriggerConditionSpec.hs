@@ -369,6 +369,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfAttacksPlayerWithMostLife
       " {\"type\":\"SelfAttacksPlayerWithMostLife\"} "
+  Spec.it s "SelfAttacksWhile" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfAttacksWhile (Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))))
+      " {\"type\":\"SelfAttacksWhile\",\"value\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":0},\"comparison\":{\"type\":\"Exactly\"},\"threshold\":{\"type\":\"Literal\",\"value\":0}}}} "
   Spec.it s "SelfAttacksWhileSaddled" $
     Common.assertCodec
       s

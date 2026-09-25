@@ -31,7 +31,8 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
           { Conjure.quantity = Conjure.defaultQuantity,
             Conjure.cards = ConjureCards.Written (Text.pack "Ornithopter" NonEmpty.:| []),
             Conjure.selection = Conjure.defaultSelection,
-            Conjure.destination = ConjureDestination.Hand
+            Conjure.destination = ConjureDestination.Hand,
+            Conjure.slot = Nothing
           }
       )
       " {\"cards\":{\"type\":\"Written\",\"value\":[\"Ornithopter\"]},\"destination\":{\"type\":\"Hand\"}} "
@@ -45,7 +46,8 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
           { Conjure.quantity = Quantity.Literal 4,
             Conjure.cards = ConjureCards.Written (Text.pack "Lightning Bolt" NonEmpty.:| []),
             Conjure.selection = Conjure.defaultSelection,
-            Conjure.destination = ConjureDestination.Library
+            Conjure.destination = ConjureDestination.Library,
+            Conjure.slot = Nothing
           }
       )
       " {\"quantity\":{\"type\":\"Literal\",\"value\":4},\"cards\":{\"type\":\"Written\",\"value\":[\"Lightning Bolt\"]},\"destination\":{\"type\":\"Library\"}} "
@@ -59,7 +61,8 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
           { Conjure.quantity = Conjure.defaultQuantity,
             Conjure.cards = ConjureCards.Written (Text.pack "Ponder" NonEmpty.:| [Text.pack "Dark Ritual"]),
             Conjure.selection = Conjure.defaultSelection,
-            Conjure.destination = ConjureDestination.Hand
+            Conjure.destination = ConjureDestination.Hand,
+            Conjure.slot = Nothing
           }
       )
       " {\"cards\":{\"type\":\"Written\",\"value\":[\"Ponder\",\"Dark Ritual\"]},\"destination\":{\"type\":\"Hand\"}} "
@@ -73,7 +76,8 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
           { Conjure.quantity = Conjure.defaultQuantity,
             Conjure.cards = ConjureCards.Written (Text.pack "Ponder" NonEmpty.:| [Text.pack "Dark Ritual"]),
             Conjure.selection = ConjureSelection.ByChoice,
-            Conjure.destination = ConjureDestination.Hand
+            Conjure.destination = ConjureDestination.Hand,
+            Conjure.slot = Nothing
           }
       )
       " {\"cards\":{\"type\":\"Written\",\"value\":[\"Ponder\",\"Dark Ritual\"]},\"selection\":{\"type\":\"ByChoice\"},\"destination\":{\"type\":\"Hand\"}} "
@@ -87,8 +91,23 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
           { Conjure.quantity = Conjure.defaultQuantity,
             Conjure.cards = ConjureCards.Duplicate (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
             Conjure.selection = Conjure.defaultSelection,
-            Conjure.destination = ConjureDestination.Hand
+            Conjure.destination = ConjureDestination.Hand,
+            Conjure.slot = Nothing
           }
       )
       " {\"cards\":{\"type\":\"Duplicate\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}},\"destination\":{\"type\":\"Hand\"}} "
+  -- Kari Zev, Crew of Two's "that card": the slot a later clause names.
+  Spec.it s "MkConjure bound to a slot" $
+    Common.assertCodec
+      s
+      codec
+      ( Conjure.MkConjure
+          { Conjure.quantity = Conjure.defaultQuantity,
+            Conjure.cards = ConjureCards.Written (Text.pack "Ragavan" NonEmpty.:| []),
+            Conjure.selection = Conjure.defaultSelection,
+            Conjure.destination = ConjureDestination.Hand,
+            Conjure.slot = Just (SlotName.MkSlotName (Text.pack "conjured"))
+          }
+      )
+      " {\"cards\":{\"type\":\"Written\",\"value\":[\"Ragavan\"]},\"destination\":{\"type\":\"Hand\"},\"slot\":\"conjured\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

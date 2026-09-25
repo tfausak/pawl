@@ -135,6 +135,7 @@ import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
+import qualified Pawl.Types.ConjureEntry as ConjureEntry
 import qualified Pawl.Types.ConjureSelection as ConjureSelection
 import qualified Pawl.Types.Connive as Connive.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -6194,7 +6195,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- The conjurer is the resolving CONTROLLER (CR 109.5's "you"). Not implemented:
   -- a printing that states one instead, which is a shape rather than one card --
   -- Pawl.Types.Conjure lists the two forms (#3970).
-  Effect.Conjure (Conjure.MkConjure quantity cards selection destination) -> do
+  Effect.Conjure (Conjure.MkConjure quantity cards selection destination mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
@@ -6303,8 +6304,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           ConjureCards.Written written -> pure (replicate (Integer.toIntSaturating n) (fmap Just (pickWritten written)))
           ConjureCards.Duplicate ref -> pure (fmap (pure . Just) (duplicatesOf ref))
           ConjureCards.Reference from -> referencePickers from (Integer.toIntSaturating n)
-        intoZone zone n = pickers n >>= Monad.mapM_ (\p -> p >>= Monad.mapM_ (\(card, copied) -> Monad.void (Event.conjure controller card copied zone LibraryPosition.defaultValue)))
-    case evaluateForRecipient viewOf context gs resolving source controller quantity of
+        intoZone zone n = fmap (concatMap Maybe.catMaybes) (pickers n >>= Monad.mapM (\p -> p >>= Monad.mapM (\(card, copied) -> Event.conjure controller card copied zone LibraryPosition.defaultValue) . Maybe.maybeToList))
+        onto entry n (card, copied) = do
+          made <- Foldable.toList <$> Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) (ConjureEntry.tapped entry)
+          -- CR 508.4, Create's arm's posture and in the same place: after the
+          -- entry loops, with the controller choosing what it attacks, and CR
+          -- 508.3a's attack triggers seeing nothing.
+          Monad.when (ConjureEntry.attacking entry) (Monad.mapM_ (Combat.putOntoBattlefieldAttacking Combat.Any) made)
+          pure made
+    -- The cards conjured, bound for a later clause to name (CR 603.7c's "that
+    -- card"), Create's bindMinted.
+    conjured <- case evaluateForRecipient viewOf context gs resolving source controller quantity of
       Just n
         | n > 0 -> case destination of
             ConjureDestination.Hand -> intoZone Zone.Hand n
@@ -6327,11 +6337,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- One batch per pick, which on the written road is the one pick the
             -- whole count is minted from and on the duplicate road is one batch
             -- of `n` per named object.
-            ConjureDestination.Battlefield tapped -> case cards of
-              ConjureCards.Written written -> pickWritten written >>= \(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped)
-              ConjureCards.Duplicate ref -> Monad.forM_ (duplicatesOf ref) (\(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped))
-              ConjureCards.Reference from -> referencePickers from 1 >>= Monad.mapM_ (>>= Monad.mapM_ (\(card, copied) -> Monad.void (Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) tapped)))
-      _ -> pure ()
+            ConjureDestination.Battlefield entry -> case cards of
+              ConjureCards.Written written -> pickWritten written >>= onto entry n
+              ConjureCards.Duplicate ref -> concat <$> Monad.mapM (onto entry n) (duplicatesOf ref)
+              ConjureCards.Reference from -> referencePickers from 1 >>= fmap concat . Monad.mapM (\p -> p >>= fmap concat . Monad.mapM (onto entry n) . Maybe.maybeToList)
+      _ -> pure []
+    bindMinted resolving mSlot conjured
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref entry mSlot exceptions) -> do
     gs <- State.get
     -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the
@@ -7069,50 +7080,60 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- re-resolved on every read. A NAMED set is baked, the bindings that answer a
     -- target slot (CR 601.2c) being gone once this resolution is over; an
     -- unfilled or illegal slot stores nothing (CR 608.2b).
-    State.modify' $ \gs -> case Expiry.arm legal controller source duration gs of
-      -- CR 611.2b: the duration never started, so nothing is stored.
-      Nothing -> gs
-      Just expiry ->
-        let baked = case affected of
-              AffectedPlayers.Scoped scope -> [AffectedPlayers.Scoped scope]
-              -- Through playerRefPlayers so the slot is read exactly as every
-              -- other opcode reads one, CR 608.2b's empty answer included.
-              AffectedPlayers.Named slot ->
-                fmap AffectedPlayers.Named (playerRefPlayers legal controller gs (PlayerRef.InSlot slot))
-            -- CR 601.2c / 608.2b: a zone reference inside the payload is a read of
-            -- this resolution's bindings, so it is baked here for the reason the
-            -- Named set above is -- Sen Triplets' "that player's hand" is the
-            -- targeted opponent, and the slot is gone once this resolution is.
-            -- Pawl.Engine.Condition.bakeBound is the precedent, and its posture
-            -- for a slot naming nobody: the reference is left standing and reads
-            -- as naming nobody, rather than falling back to some other seat.
-            withPlayers = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
-            -- CR 601.2c / 608.2b again, one payload over: a DamagePattern's
-            -- `boundRecipient` names the slot this resolution filled, and the
-            -- recipient it named is written into `whichRecipient` here --
-            -- Whippoorwill's "damage that would be dealt to THAT CREATURE this
-            -- turn can't be prevented". The slot dies with the resolution, so
-            -- nothing later could read it; installDamageRow bakes a shield's
-            -- recipient at the same moment and for the same reason.
-            --
-            -- Through the LIST applicative, so a slot naming several recipients
-            -- stores one effect apiece and a slot naming none stores nothing at
-            -- all, which is rule 608.2b's answer for an illegal target. A
-            -- pattern naming no slot yields exactly one effect, unchanged.
-            bakedEffects = PlayerEffect.overDamagePatterns (bakeDamagePatternRecipient legal resolving controller source gs) withPlayers
-            install g (scope, bakedEffect) =
-              let (ts, g1) = Game.freshTimestamp g
-                  active =
-                    ActivePlayerEffect.MkActivePlayerEffect
-                      { ActivePlayerEffect.source = source,
-                        ActivePlayerEffect.controller = controller,
-                        ActivePlayerEffect.timestamp = ts,
-                        ActivePlayerEffect.expiry = expiry,
-                        ActivePlayerEffect.scope = scope,
-                        ActivePlayerEffect.effect = bakedEffect
-                      }
-               in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
-         in List.foldl' install gs ((,) <$> baked <*> bakedEffects)
+    State.modify' $ \gs ->
+      let baked = case affected of
+            AffectedPlayers.Scoped scope -> [AffectedPlayers.Scoped scope]
+            -- Through playerRefPlayers so the slot is read exactly as every
+            -- other opcode reads one, CR 608.2b's empty answer included.
+            AffectedPlayers.Named slot ->
+              fmap AffectedPlayers.Named (playerRefPlayers legal controller gs (PlayerRef.InSlot slot))
+          -- CR 601.2c / 608.2b: a zone reference inside the payload is a read of
+          -- this resolution's bindings, so it is baked here for the reason the
+          -- Named set above is -- Sen Triplets' "that player's hand" is the
+          -- targeted opponent, and the slot is gone once this resolution is.
+          -- Pawl.Engine.Condition.bakeBound is the precedent, and its posture
+          -- for a slot naming nobody: the reference is left standing and reads
+          -- as naming nobody, rather than falling back to some other seat.
+          withPlayers = PlayerEffect.mapPlayerRefs (Quantity.bakePlayerRef (Binding.playersIn legal)) playerEffect
+          -- CR 601.2c / 608.2b again, one payload over: a DamagePattern's
+          -- `boundRecipient` names the slot this resolution filled, and the
+          -- recipient it named is written into `whichRecipient` here --
+          -- Whippoorwill's "damage that would be dealt to THAT CREATURE this
+          -- turn can't be prevented". The slot dies with the resolution, so
+          -- nothing later could read it; installDamageRow bakes a shield's
+          -- recipient at the same moment and for the same reason.
+          --
+          -- Through the LIST applicative, so a slot naming several recipients
+          -- stores one effect apiece and a slot naming none stores nothing at
+          -- all, which is rule 608.2b's answer for an illegal target. A
+          -- pattern naming no slot yields exactly one effect, unchanged.
+          bakedEffects = PlayerEffect.overDamagePatterns (bakeDamagePatternRecipient legal resolving controller source gs) withPlayers
+          -- CR 611.2b: a duration that never started stores nothing. A window
+          -- naming "that player" (Expiry.perSeat) is one window per affected
+          -- player, each its own row over that one seat: Sphinx's Decree's
+          -- opponents each have a different next turn, so the set is fixed as
+          -- the effect begins.
+          armed = case Expiry.perSeat duration of
+            Nothing -> [(scope, expiry) | expiry <- Maybe.maybeToList (Expiry.arm legal controller source duration gs), scope <- baked]
+            Just seated ->
+              [ (AffectedPlayers.Named pid, expiry)
+              | pid <- Game.stillPlaying gs,
+                any (PlayerEffect.applies pid controller gs) baked,
+                expiry <- Maybe.maybeToList (Expiry.arm legal controller source (seated pid) gs)
+              ]
+          install g ((scope, expiry), bakedEffect) =
+            let (ts, g1) = Game.freshTimestamp g
+                active =
+                  ActivePlayerEffect.MkActivePlayerEffect
+                    { ActivePlayerEffect.source = source,
+                      ActivePlayerEffect.controller = controller,
+                      ActivePlayerEffect.timestamp = ts,
+                      ActivePlayerEffect.expiry = expiry,
+                      ActivePlayerEffect.scope = scope,
+                      ActivePlayerEffect.effect = bakedEffect
+                    }
+             in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
+       in List.foldl' install gs ((,) <$> armed <*> bakedEffects)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blockerRef attackerRef) ->
     -- CR 509.1c / 613.11: store one requirement per (blocker, attacker) pair the
     -- two refs name, rule 509.1c counting requirements PER CREATURE. Both sets are
