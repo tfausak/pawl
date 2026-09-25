@@ -2201,7 +2201,10 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
-          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) before
+          -- CR 601.2e's re-asking of a prohibition at the announced mana value,
+          -- judged on the same proposal board candidateAllowed judged it on.
+          let prohibitedAt castFor manaValue = PlayerEffect.prohibitsAtManaValue pid oid manaValue (proposedFor oid castFor proposed)
+          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) prohibitedAt before
 
 -- CR 305.2a / 305.3: whether `pid` may play a land at all now -- it is their
 -- turn, and the lands they have played this turn fall short of the lands they
@@ -2548,8 +2551,8 @@ trimModalForCandidate castFor modal = modal {Modal.Type.modes = fmap (trimModeTa
 -- of the pre-move state for `spent`'s reason; the one chosen spends its budget
 -- beside `spent`, and `riders` is what it gives the spell (CR 611.3d), asked
 -- there too and stored beside it.
-castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> (Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card]) -> GameState -> Game ()
-castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permissions riders before = do
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> (Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card]) -> (Maybe Keyword -> Integer -> Bool) -> GameState -> Game ()
+castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permissions riders prohibitedAt before = do
   gs <- State.get
   let candidates = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate)) candidateCosts
       decider = Decide.deciderFor pid gs
@@ -2955,7 +2958,14 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
               -- one predicate over one cost instead of two spellings of when the
               -- gate applies.
               let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
-              if overCeiling || not (payableCost chosenReductions spending pid sid bestowedGs announcedAtX)
+                  -- CR 601.2e / 202.3e: the spell's mana value with X announced,
+                  -- read off the stack incarnation as CR 601.2i will stamp it.
+                  -- PlayerEffect.choiceCouldEscape let the cast BEGIN; this is
+                  -- where the chosen X is judged.
+                  withX o = o {Object.bindings = Map.union (Binding.fromChoices Map.empty mAmount Seq.empty) (Object.bindings o)}
+                  announcedBoard = bestowedGs {GameState.objects = Map.adjust withX sid (GameState.objects bestowedGs)}
+                  prohibited = Maybe.isJust mAmount && maybe False (prohibitedAt castFor) (Filter.manaValue (Projection.viewOfObject sid announcedBoard))
+              if overCeiling || prohibited || not (payableCost chosenReductions spending pid sid bestowedGs announcedAtX)
                 then reject
                 else do
                   -- CR 601.2b's own order puts the hybrid and Phyrexian

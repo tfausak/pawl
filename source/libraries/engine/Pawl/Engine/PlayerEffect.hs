@@ -45,6 +45,7 @@ import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Types.AbilityKind as AbilityKind
@@ -72,8 +73,6 @@ import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
-import qualified Pawl.Types.ManaCost as ManaCost
-import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.Object as Object
@@ -1138,9 +1137,8 @@ contextFor you src gs =
 -- so `climb + 2` samples have seen every verdict the criterion can give. A cost
 -- with no variable never gets here at all.
 --
--- Asked ONCE, and nothing re-asks it: CR 601.3a lets the player begin "ignoring
--- the effect", so a player who then announces an X that leaves the spell in the
--- prohibited class still casts it.
+-- Lenience to BEGIN only: CR 601.2e judges the announced X, which
+-- prohibitsAtManaValue below asks.
 choiceCouldEscape :: PlayerId -> Maybe ObjectId -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
 choiceCouldEscape you src criterion oid variable gs =
   let variables = case variable of
@@ -1168,10 +1166,22 @@ choiceCouldEscape you src criterion oid variable gs =
 -- all of them, since CR 202.3c reads a melded permanent's cost off two cards and
 -- an {X} on either would move the sum.
 variablesIn :: ObjectId -> GameState -> Integer
-variablesIn oid gs =
-  let symbolsOf face = foldMap ManaCost.unwrap (Face.manaCost face)
-      variable symbol = symbol == ManaSymbol.Variable
-   in toInteger (length (filter variable (foldMap symbolsOf (Game.manaCostFacesOf oid gs))))
+variablesIn oid gs = sum (fmap (maybe 0 Quantity.variablesOf . Face.manaCost) (Game.manaCostFacesOf oid gs))
+
+-- CR 601.2e: the legality check choiceCouldEscape's lenience defers to. Once X
+-- is announced the spell's mana value is fixed (CR 202.3e), so a quality-bearing
+-- prohibition is asked again at `manaValue`, against the proposal's view of
+-- `oid` otherwise. Only CantCastMatching, the one prohibition reading a quality X
+-- moves; prohibitsCasting judged the rest at the proposal. Pawl.CastPermissionSpec's
+-- "CR 601.2e an announced X that leaves the spell even takes the cast back" is
+-- the proof, off Void Winnower.
+prohibitsAtManaValue :: PlayerId -> ObjectId -> Integer -> GameState -> Bool
+prohibitsAtManaValue pid oid manaValue gs =
+  let view = (Projection.viewOfObject oid gs) {Filter.manaValue = Just manaValue}
+      prohibits (source, effect) = case effect of
+        PlayerEffect.CantCastMatching criterion -> Filter.matches (contextFor (Just pid) source gs) view criterion
+        _ -> False
+   in any prohibits (applying pid gs)
 
 -- CR 613.11 / 601.2f: the cost increases, the cost reductions and the additional
 -- non-mana components that apply to `pid` CASTING `oid`.
