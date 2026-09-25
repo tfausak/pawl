@@ -117,6 +117,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
     ObjectRef.EachCardFromAmong {} -> Nothing
     ObjectRef.RandomCardInHand _ -> Nothing
     ObjectRef.RandomCardInGraveyard _ -> Nothing
+    ObjectRef.RandomCardInLibrary _ -> Nothing
     ObjectRef.AnyNumberMatching _ -> Nothing
     ObjectRef.ChosenPermanent _ -> Nothing
     ObjectRef.SourceAndChosenPermanent _ -> Nothing

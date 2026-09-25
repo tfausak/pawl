@@ -12,6 +12,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Codec.RandomCardInHand as RandomCardInHand
+import qualified Pawl.Codec.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Codec.TopOfLibraryUntil as TopOfLibraryUntil
@@ -31,7 +32,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- tags, emitted identically -- and what it adds is the schema.
 --
 -- 'EachCardInGraveyard', 'EachCardInHand', 'TopOfLibrary', 'TopOfLibraryUntil', 'ChosenCardInGraveyard',
--- 'ChosenCardInHand', 'ChosenCardFromAmong', 'EachCardFromAmong', 'RandomCardInHand', 'RandomCardInGraveyard' and
+-- 'ChosenCardInHand', 'ChosenCardFromAmong', 'EachCardFromAmong', 'RandomCardInHand', 'RandomCardInGraveyard', 'RandomCardInLibrary' and
 -- 'ChosenPermanent' each carry a payload record of their own (#1464), so no arm here writes a
 -- positional array.
 --
@@ -77,6 +78,7 @@ codec =
           Arm.payload "EachCardFromAmong" EachCardFromAmong.codec ObjectRef.EachCardFromAmong (\x -> case x of ObjectRef.EachCardFromAmong y -> Just y; _ -> Nothing),
           Arm.payload "RandomCardInHand" RandomCardInHand.codec ObjectRef.RandomCardInHand (\x -> case x of ObjectRef.RandomCardInHand y -> Just y; _ -> Nothing),
           Arm.payload "RandomCardInGraveyard" RandomCardInGraveyard.codec ObjectRef.RandomCardInGraveyard (\x -> case x of ObjectRef.RandomCardInGraveyard y -> Just y; _ -> Nothing),
+          Arm.payload "RandomCardInLibrary" RandomCardInLibrary.codec ObjectRef.RandomCardInLibrary (\x -> case x of ObjectRef.RandomCardInLibrary y -> Just y; _ -> Nothing),
           Arm.payload "AnyNumberMatching" filterCodec ObjectRef.AnyNumberMatching (\x -> case x of ObjectRef.AnyNumberMatching y -> Just y; _ -> Nothing),
           Arm.payload "ChosenPermanent" ChosenPermanent.codec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
           Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing)
@@ -108,6 +110,7 @@ tagOf x = case x of
   ObjectRef.EachCardFromAmong {} -> "EachCardFromAmong"
   ObjectRef.RandomCardInHand {} -> "RandomCardInHand"
   ObjectRef.RandomCardInGraveyard {} -> "RandomCardInGraveyard"
+  ObjectRef.RandomCardInLibrary {} -> "RandomCardInLibrary"
   ObjectRef.AnyNumberMatching {} -> "AnyNumberMatching"
   ObjectRef.ChosenPermanent {} -> "ChosenPermanent"
   ObjectRef.SourceAndChosenPermanent {} -> "SourceAndChosenPermanent"

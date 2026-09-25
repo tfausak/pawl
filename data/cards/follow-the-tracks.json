@@ -32,6 +32,77 @@
                           {
                             "faces": [
                               {
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
+                                        {
+                                          "type": "TapThis"
+                                        }
+                                      ],
+                                      "mana": [
+                                        {
+                                          "type": "Generic",
+                                          "value": 3
+                                        },
+                                        {
+                                          "type": "OfType",
+                                          "value": {
+                                            "type": "Colored",
+                                            "value": {
+                                              "type": "Black"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "MoveToZone",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "RandomCardInLibrary",
+                                                      "value": {
+                                                        "filter": {
+                                                          "type": "Not",
+                                                          "value": {
+                                                            "type": "HasCardType",
+                                                            "value": {
+                                                              "type": "Land"
+                                                            }
+                                                          }
+                                                        },
+                                                        "player": {
+                                                          "type": "Relative",
+                                                          "value": {
+                                                            "type": "You"
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "zone": {
+                                                      "type": "Hand"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "restrictions": [
+                                      {
+                                        "type": "OnlyOnce"
+                                      }
+                                    ]
+                                  }
+                                ],
                                 "name": "Gate of the Black Dragon",
                                 "replacementEffects": [
                                   {
@@ -69,6 +140,77 @@
                           {
                             "faces": [
                               {
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
+                                        {
+                                          "type": "TapThis"
+                                        }
+                                      ],
+                                      "mana": [
+                                        {
+                                          "type": "Generic",
+                                          "value": 3
+                                        },
+                                        {
+                                          "type": "OfType",
+                                          "value": {
+                                            "type": "Colored",
+                                            "value": {
+                                              "type": "Green"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "MoveToZone",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "RandomCardInLibrary",
+                                                      "value": {
+                                                        "filter": {
+                                                          "type": "Not",
+                                                          "value": {
+                                                            "type": "HasCardType",
+                                                            "value": {
+                                                              "type": "Land"
+                                                            }
+                                                          }
+                                                        },
+                                                        "player": {
+                                                          "type": "Relative",
+                                                          "value": {
+                                                            "type": "You"
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "zone": {
+                                                      "type": "Hand"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "restrictions": [
+                                      {
+                                        "type": "OnlyOnce"
+                                      }
+                                    ]
+                                  }
+                                ],
                                 "name": "Gate to Manorborn",
                                 "replacementEffects": [
                                   {
@@ -106,6 +248,77 @@
                           {
                             "faces": [
                               {
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
+                                        {
+                                          "type": "TapThis"
+                                        }
+                                      ],
+                                      "mana": [
+                                        {
+                                          "type": "Generic",
+                                          "value": 3
+                                        },
+                                        {
+                                          "type": "OfType",
+                                          "value": {
+                                            "type": "Colored",
+                                            "value": {
+                                              "type": "Blue"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "MoveToZone",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "RandomCardInLibrary",
+                                                      "value": {
+                                                        "filter": {
+                                                          "type": "Not",
+                                                          "value": {
+                                                            "type": "HasCardType",
+                                                            "value": {
+                                                              "type": "Land"
+                                                            }
+                                                          }
+                                                        },
+                                                        "player": {
+                                                          "type": "Relative",
+                                                          "value": {
+                                                            "type": "You"
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "zone": {
+                                                      "type": "Hand"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "restrictions": [
+                                      {
+                                        "type": "OnlyOnce"
+                                      }
+                                    ]
+                                  }
+                                ],
                                 "name": "Gate to Seatower",
                                 "replacementEffects": [
                                   {
@@ -143,6 +356,77 @@
                           {
                             "faces": [
                               {
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
+                                        {
+                                          "type": "TapThis"
+                                        }
+                                      ],
+                                      "mana": [
+                                        {
+                                          "type": "Generic",
+                                          "value": 3
+                                        },
+                                        {
+                                          "type": "OfType",
+                                          "value": {
+                                            "type": "Colored",
+                                            "value": {
+                                              "type": "White"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "MoveToZone",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "RandomCardInLibrary",
+                                                      "value": {
+                                                        "filter": {
+                                                          "type": "Not",
+                                                          "value": {
+                                                            "type": "HasCardType",
+                                                            "value": {
+                                                              "type": "Land"
+                                                            }
+                                                          }
+                                                        },
+                                                        "player": {
+                                                          "type": "Relative",
+                                                          "value": {
+                                                            "type": "You"
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "zone": {
+                                                      "type": "Hand"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "restrictions": [
+                                      {
+                                        "type": "OnlyOnce"
+                                      }
+                                    ]
+                                  }
+                                ],
                                 "name": "Gate to the Citadel",
                                 "replacementEffects": [
                                   {
@@ -180,6 +464,77 @@
                           {
                             "faces": [
                               {
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
+                                        {
+                                          "type": "TapThis"
+                                        }
+                                      ],
+                                      "mana": [
+                                        {
+                                          "type": "Generic",
+                                          "value": 3
+                                        },
+                                        {
+                                          "type": "OfType",
+                                          "value": {
+                                            "type": "Colored",
+                                            "value": {
+                                              "type": "Red"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "MoveToZone",
+                                                  "value": {
+                                                    "ref": {
+                                                      "type": "RandomCardInLibrary",
+                                                      "value": {
+                                                        "filter": {
+                                                          "type": "Not",
+                                                          "value": {
+                                                            "type": "HasCardType",
+                                                            "value": {
+                                                              "type": "Land"
+                                                            }
+                                                          }
+                                                        },
+                                                        "player": {
+                                                          "type": "Relative",
+                                                          "value": {
+                                                            "type": "You"
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "zone": {
+                                                      "type": "Hand"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "restrictions": [
+                                      {
+                                        "type": "OnlyOnce"
+                                      }
+                                    ]
+                                  }
+                                ],
                                 "name": "Gate to Tumbledown",
                                 "replacementEffects": [
                                   {
