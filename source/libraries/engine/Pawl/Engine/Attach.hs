@@ -52,6 +52,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 701.3a/701.3b: may `src` legally be attached to `destination` right now?
 --
@@ -280,7 +281,21 @@ attachableWithLastKnown src host gs = case Projection.lastKnownOf host gs of
 -- and bindings through here for the two callers that have neither is what the
 -- shared signature would otherwise force.
 hostsFor :: Filter.Context -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-hostsFor context subject filter_ gs =
+hostsFor context subject filter_ gs = hostsAmong (Set.toList (GameState.battlefield gs)) context subject filter_ gs
+
+-- CR 303.4f: what an Aura entering by any means but resolving may enchant. The
+-- battlefield hostsFor offers and every graveyard card besides, since CR 702.5a
+-- names no zone -- Animate Dead's "enchant creature card in a graveyard", put
+-- onto the battlefield by Replenish. Filter.CanHostSubject is the whole filter,
+-- so the Aura's own enchant ability decides which of them it may enchant.
+entryHostsFor :: Filter.Context -> ObjectId -> GameState -> [ObjectId]
+entryHostsFor context subject gs =
+  let graveyards = concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) (Game.stillPlaying gs)
+   in hostsAmong (Set.toList (GameState.battlefield gs) <> graveyards) context subject Filter.Type.CanHostSubject gs
+
+-- hostsFor over the candidates the caller names.
+hostsAmong :: [ObjectId] -> Filter.Context -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+hostsAmong candidates context subject filter_ gs =
   let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
       viewOf oid =
         (Projection.viewOfObject oid gs)
@@ -296,7 +311,7 @@ hostsFor context subject filter_ gs =
    in List.sort
         ( filter
             (\oid -> Just oid /= host && Filter.matches subjectContext (viewOf oid) filter_)
-            (Set.toList (GameState.battlefield gs))
+            candidates
         )
 
 -- CR 303.4k: the destinations an Aura that is BEING TURNED FACE UP may become

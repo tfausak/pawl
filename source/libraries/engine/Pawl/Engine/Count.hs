@@ -406,6 +406,7 @@ bakePerspective viewOf context gs candidate predicate =
           truth (any (\view -> Filter.matches context view f) (Maybe.mapMaybe viewOf (attachersOfPlayer gs candidate)))
         Filter.Type.IsAttachedToSource -> predicate
         Filter.Type.IsHostOfSource -> predicate
+        Filter.Type.EnteredWithSource -> predicate
         Filter.Type.CanHostSubject -> predicate
         Filter.Type.CanAttachToSubject -> predicate
         Filter.Type.HostOfSubjectHasCardType _ -> predicate

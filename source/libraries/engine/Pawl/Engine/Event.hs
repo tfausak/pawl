@@ -5677,7 +5677,8 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
           -- prompt.
           --
           -- Asked of `gs`, the PRE-MOVE board, which is where the Aura still is and
-          -- where the hosts already are. Attach.hostsFor sweeps the battlefield and
+          -- where the hosts already are. Attach.entryHostsFor sweeps the battlefield
+          -- and the graveyards, and
           -- Attach.attachmentFor reads Projection.subtypesOf and Game.faceOf, both
           -- of which answer for an object in any zone.
           --
@@ -5739,7 +5740,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                     -- Aura's own enchant ability, so there is no resolution
                     -- whose slots the filter could name -- and CanHostSubject,
                     -- the whole filter here, names none.
-                    hosts = filter (\h -> not (Set.member h batch)) (Attach.hostsFor (Filter.contextFor (Game.teams gs) (Just chooser) (Just oid)) oid Filter.Type.CanHostSubject gs)
+                    hosts = filter (\h -> not (Set.member h batch)) (Attach.entryHostsFor (Filter.contextFor (Game.teams gs) (Just chooser) (Just oid)) oid gs)
                 chosen <- Attach.chooseHost chooser oid hosts
                 -- THE TAG the Aura's own enchant slot produced, never a hand-built
                 -- ToObject: Sba.stillLegalEnchant compares the (pool, tag) pair, so
@@ -5748,7 +5749,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 --
                 -- attachmentFor answering Nothing collapses into CR 303.4g's
                 -- "remains in its current zone" too, and is unreachable rather than
-                -- a second reading: hostsFor's Filter.CanHostSubject conjunct is
+                -- a second reading: entryHostsFor's Filter.CanHostSubject conjunct is
                 -- that same function, so every candidate it offered admits.
                 pure (fmap Just (chosen >>= \h -> Attach.attachmentFor oid (Recipient.ToObject h) gs))
               else pure (Just seed)

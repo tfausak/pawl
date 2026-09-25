@@ -190,6 +190,7 @@ codec resolve = Fields.object $ do
   haunting <- Fields.defaulted "haunting" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.haunting
   encoded <- Fields.defaulted "encoded" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.encoded
   exiledWith <- Fields.defaulted "exiledWith" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.exiledWith
+  enteredWith <- Fields.defaulted "enteredWith" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.enteredWith
   exilePiles <- Fields.defaulted "exilePiles" Map.empty (Common.naturalMap ObjectId.codec Timestamp.codec) GameState.exilePiles
   extraTurns <- Fields.defaulted "extraTurns" [] (Common.list ExtraTurn.codec) GameState.extraTurns
   subgamesThisMatch <- Fields.defaulted "subgamesThisMatch" 0 Common.natural GameState.subgamesThisMatch
@@ -282,6 +283,7 @@ codec resolve = Fields.object $ do
         GameState.haunting = haunting,
         GameState.encoded = encoded,
         GameState.exiledWith = exiledWith,
+        GameState.enteredWith = enteredWith,
         GameState.exilePiles = exilePiles,
         GameState.extraTurns = extraTurns,
         GameState.subgamesThisMatch = subgamesThisMatch,

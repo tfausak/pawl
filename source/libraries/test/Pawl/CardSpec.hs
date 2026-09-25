@@ -824,6 +824,7 @@ modificationCounts modification = case modification of
   -- and countFilters, never through this sweep, which is the answer GainKeyword
   -- gives above for the Filter inside its keyword.
   Modification.GainEnchant _ -> []
+  Modification.LoseEnchant _ -> []
   -- CR 613.1f's other grant carries a whole ability, so the sweep descends into
   -- it exactly as it does into a printed one, whichever of CR 113.3's kinds it is.
   Modification.GainAbility granted -> case granted of
@@ -3774,11 +3775,12 @@ modificationFilters modification = case modification of
   -- Payload-free, so there is no Filter to sweep -- see modificationCounts.
   Modification.GainFlashbackAtManaCost -> []
   -- CR 702.5a again: the granted slot's own Filter, which is card text like any
-  -- other and has to be swept. NOT [] -- this, GainKeyword above, LoseKeyword
-  -- and AddNamesMatching below are the arms that answer with something, and every
-  -- other one carries no Filter at all, LoseKeywordFamily's payload-free family
-  -- included.
+  -- other and has to be swept. NOT [] -- this, LoseEnchant beside it,
+  -- GainKeyword above, LoseKeyword and AddNamesMatching below are the arms that
+  -- answer with something, and every other one carries no Filter at all,
+  -- LoseKeywordFamily's payload-free family included.
   Modification.GainEnchant slot -> targetSlotFilters slot
+  Modification.LoseEnchant slot -> targetSlotFilters slot
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities, grantedTriggeredAbilities and
   -- grantedStaticAbilities below, at the outer level, so they keep the Framing that a printed ability's do. Answering
@@ -4414,6 +4416,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.HasAttached f -> filterSlotsReadSingly f
   Filter.Type.IsAttachedToSource -> []
   Filter.Type.IsHostOfSource -> []
+  Filter.Type.EnteredWithSource -> []
   Filter.Type.CanHostSubject -> []
   Filter.Type.CanAttachToSubject -> []
   Filter.Type.HostOfSubjectHasCardType _ -> []

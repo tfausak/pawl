@@ -454,6 +454,10 @@ data Filter keyword
     -- player; Pawl.CardSpec's position lint keeps a card to the positions that
     -- fill the field.
     IsHostOfSource
+  | -- | CR 400.7: the candidate, as this object, was put onto the battlefield by
+    -- an effect of the evaluation's SOURCE -- Animate Dead's "creature put onto
+    -- the battlefield with this Aura". Read off GameState.enteredWith.
+    EnteredWithSource
   | -- | CR 701.3a's last sentence: the candidate is one the SUBJECT of the
     -- surrounding attach could legally be attached to -- Aura Graft's "another
     -- permanent IT CAN ENCHANT". Answered by Pawl.Engine.Attach.attachmentFor, so

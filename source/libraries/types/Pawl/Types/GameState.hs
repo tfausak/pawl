@@ -396,6 +396,11 @@ data GameState = MkGameState
     -- on at all -- Pawl.Types.Source embeds the ability value, not an index. No
     -- printing in the pool is in that shape (#1535).
     exiledWith :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
+    -- | CR 400.7: the object whose effect put each permanent onto the
+    -- battlefield, keyed by the entered incarnation and written by
+    -- Pawl.Engine.Resolve.Effect's Effect.MoveToZone arm. Read by
+    -- Filter.EnteredWithSource. Cleaned up by key only.
+    enteredWith :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
     -- | CR 406.4: which pile each face-down exiled card is in, a name drawn from
     -- nextTimestamp and shared by every card one execution of one instruction
     -- exiled (Pawl.Engine.Resolve.Effect.recordExilePile). Cleaned up by key only.

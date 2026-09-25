@@ -2423,8 +2423,7 @@ playerRefPlayers legal controller gs ref =
 -- CANDIDATES ObjectRef.AnyNumberMatching offers -- shared so a card cannot find
 -- the sweep and the offer disagreeing about what matches.
 --
--- CR 303.4b's host is supplied here and nowhere else in this module: this sweep
--- is the one effect-borne Filter position naming what the SOURCE enchants. Read
+-- CR 303.4b's host is supplied here and for EachCardInGraveyard below. Read
 -- live, so an Aura moved between the trigger and its resolution acts on the host
 -- it has now.
 --
@@ -2521,7 +2520,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- reading of CR 109.5 or the players another slot of this announcement targets
   -- -- and what matches within each is graveyardCardsOf.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) ->
-    concatMap (\pid -> graveyardCardsOf (effectContext gs controller source legal (slotBindings resolving gs)) gs pid filter_) (zoneScopePlayers legal controller gs scope)
+    -- With CR 303.4b's host filled for Animate Dead's "return enchanted
+    -- creature card".
+    let context = (effectContext gs controller source legal (slotBindings resolving gs)) {Filter.sourceAttachedTo = Projection.hostOf source gs}
+     in concatMap (\pid -> graveyardCardsOf context gs pid filter_) (zoneScopePlayers legal controller gs scope)
   -- CR 400.1's per-player zone again, but only the RESOLVING CONTROLLER's, so no
   -- scope to fold over and no APNAP order to impose. In the zone's own order,
   -- which no rule reads: CR 402.3 leaves a hand's arrangement to its owner.
@@ -2539,8 +2541,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- so swapping in a bare Filter.contextFor exiles nothing. The sibling sweeps
   -- are written the same way for the reason spelled out at EachMatching above.
   --
-  -- No sourceAttachedTo override, unlike EachMatching: no card in a hand names
-  -- what its Aura's host is.
+  -- No sourceAttachedTo override, unlike EachMatching and EachCardInGraveyard:
+  -- no card in a hand names what its Aura's host is.
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand scope mFilter) ->
     let context = effectContext gs controller source legal (slotBindings resolving gs)
         held pid = case mFilter of

@@ -567,6 +567,7 @@ import qualified Pawl.FlipSpec
 import qualified Pawl.ForageSpec
 import qualified Pawl.GameSpec
 import qualified Pawl.GoadSpec
+import qualified Pawl.HarnessSpec
 import qualified Pawl.HealSpec
 import qualified Pawl.InitiativeSpec
 import qualified Pawl.InvestigateSpec
@@ -1276,6 +1277,7 @@ spec s registry = do
   Pawl.LearnSpec.spec s registry
   Pawl.GameSpec.spec s registry
   Pawl.GoadSpec.spec s registry
+  Pawl.HarnessSpec.spec s registry
   Pawl.HealSpec.spec s registry
   Pawl.Json.ArraySpec.spec s
   Pawl.Json.BooleanSpec.spec s

@@ -297,6 +297,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasAttached f -> canHostSubjects f
   Filter.Type.IsAttachedToSource -> 0
   Filter.Type.IsHostOfSource -> 0
+  Filter.Type.EnteredWithSource -> 0
   -- Zero: the MIRROR atom is not this one, and its own lint counts it through the
   -- codec (canAttachToSubjectCounts) rather than through this recursion.
   Filter.Type.CanAttachToSubject -> 0
@@ -1630,11 +1631,18 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Pariah's redirect destination is framed too"
       (hostOfSourceCounts (S.combinedFace pariah))
       (1, 0)
+    -- One more ObjectRef leg: Animate Dead's return of the card it enchants.
+    animate <- S.printingOf s registry "Animate Dead"
+    Spec.assertEqWith
+      s
+      "Animate Dead's return is framed too"
+      (hostOfSourceCounts (S.combinedFace animate))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . hostOfSourceCounts . S.combinedFace) ps))
-      5
+      6
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the same atom planted in a target slot -- the position a card
     -- author would most plausibly reach for -- IS counted as elsewhere.
