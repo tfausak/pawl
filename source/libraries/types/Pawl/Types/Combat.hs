@@ -151,6 +151,15 @@ data Combat = MkCombat
     -- Same lifetime and same never-cleared posture as `attacked`, for that
     -- field's reasons. A reader wanting one STEP wants the field below.
     declaredAttacked :: Set.Set AttackTarget.AttackTarget,
+    -- | CR 508.1b / 805.10a: `declaredAttacked` split by the attacking player
+    -- whose creatures were declared at each target -- "you attacked", which
+    -- Pawl.Engine.Quantity's OpponentsAttacked arm asks. Under the shared team
+    -- turns option each player on the active team is an attacking player, so the
+    -- whole record cannot answer for one of them (CR 805.10c).
+    --
+    -- Written beside `declaredAttacked`, with its lifetime; the union of its
+    -- values is that field.
+    declaredAttackedBy :: Map.Map PlayerId.PlayerId (Set.Set AttackTarget.AttackTarget),
     -- | CR 508.6: the targets a creature was declared attacking THIS STEP --
     -- "you've been attacked this step" (Rally the Troops on the casting side,
     -- Kongming's Contraptions on the activation side), read by

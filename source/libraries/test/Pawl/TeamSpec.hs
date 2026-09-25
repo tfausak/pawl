@@ -36,6 +36,7 @@ import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
@@ -749,6 +750,74 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
            in S.lifeOf S.carol (S.runCombat (S.attackTo S.carol) board)
     Spec.assertEqWith s "the Garrison and both Humans dealt carol 4" (run sharedTurns) (Just 16)
     Spec.assertEqWith s "without the option the Garrison was not offered" (run id) (Just 20)
+  -- CR 805.10c / 207.2c: raid asks whether YOU attacked, and a teammate's attack
+  -- is not yours. Bob casts the Skullhunter after combat; the legs differ only
+  -- in whose Piker attacked.
+  --
+  -- Mardu Skullhunter, {1}{B} 2/1 Creature -- Human Warrior: "This creature
+  -- enters tapped. Raid -- When this creature enters, if you attacked this turn,
+  -- target opponent discards a card."
+  Spec.it s "CR 805.10c raid reads the teammate's own attack" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    skullhunter <- S.printingOf s registry "Mardu Skullhunter"
+    let run attacker =
+          let (alices, staged) = S.addPermanent piker S.alice (atCombat (twoTeams S.fourPlayerGame))
+              (bobs, placed) = S.addPermanent piker S.bob staged
+              lands = List.foldl' (\g _ -> snd (S.addPermanent swamp S.bob g)) placed [1 :: Int, 2]
+              (_, held) = S.addHandCard skullhunter S.bob lands
+              board = sharedTurns (List.foldl' (\g pid -> snd (S.addHandCard island pid g)) held [S.carol, S.dave])
+              chosen = if attacker == S.alice then alices else bobs
+              raiding :: Prompt.Prompt r -> r
+              raiding p = case p of
+                Prompt.DeclareAttackers _ _ ids -> filter (== chosen) ids
+                Prompt.ChooseAction {} -> S.castAnswer p
+                _ -> S.attackTo S.carol p
+              after = S.runPure raiding (S.runCombat raiding board) Engine.runStep
+           in (S.handSize S.carol after + S.handSize S.dave after, S.countOnBattlefieldByName (S.printingName skullhunter) S.bob after)
+    Spec.assertEqWith s "bob attacked, so his raid made an opponent discard" (run S.bob) (1, 1)
+    Spec.assertEqWith s "only alice attacked, so bob's Skullhunter entered and nobody discarded" (run S.alice) (2, 1)
+  -- CR 805.10c / 702.121a: melee counts the opponents YOU attacked. Bob's Wings
+  -- attack carol; alice's Piker attacks dave in one leg and carol in the other,
+  -- and the Wings are 2/2 in both.
+  --
+  -- Wings of the Guard, {1}{W} 1/1 Creature -- Bird: "Flying. Melee (Whenever
+  -- this creature attacks, it gets +1/+1 until end of turn for each opponent you
+  -- attacked this combat.)"
+  Spec.it s "CR 805.10c melee counts the teammate's own opponents" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    wings <- S.printingOf s registry "Wings of the Guard"
+    let run pikerAt =
+          let (alices, staged) = S.addPermanent piker S.alice (atCombat (sharedTurns (twoTeams S.fourPlayerGame)))
+              (_, board) = S.addPermanent wings S.bob staged
+              aiming :: Prompt.Prompt r -> r
+              aiming p = case p of
+                Prompt.ChooseAttackTarget _ _ oid options ->
+                  let who = if oid == alices then pikerAt else S.carol
+                   in Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer who) (NonEmpty.toList options))
+                _ -> S.attackTo S.carol p
+              after = S.runCombat aiming board
+           in (S.lifeOf S.carol after, S.lifeOf S.dave after)
+    Spec.assertEqWith s "the Wings dealt carol 2 while alice's Piker dealt dave 2" (run S.dave) (Just 18, Just 18)
+    Spec.assertEqWith s "with both at carol she took 4" (run S.carol) (Just 16, Just 20)
+  -- CR 805.10c / 508.3c: "you attack with two or more creatures" counts only
+  -- the creatures you control. Bob attacks beside alice with one Piker in one
+  -- leg and with two in the other.
+  --
+  -- Military Intelligence, {1}{U} Enchantment: "Whenever you attack with two or
+  -- more creatures, draw a card."
+  Spec.it s "CR 508.3c a teammate's attack-with-two counts only his creatures" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    intelligence <- S.printingOf s registry "Military Intelligence"
+    let run bobs =
+          let (_, staged) = S.addPermanent intelligence S.bob (atCombat (stockedWith island sharedTurns))
+              withAlice = snd (S.addPermanent piker S.alice staged)
+              board = List.foldl' (\g _ -> snd (S.addPermanent piker S.bob g)) withAlice [1 .. bobs]
+           in S.handSize S.bob (S.runCombat (S.attackTo S.carol) board)
+    Spec.assertEqWith s "one Piker of bob's beside alice's draws nothing" (run (1 :: Int)) 0
+    Spec.assertEqWith s "two of bob's draw a card" (run 2) 1
 
 -- alice's beginning of combat step, the rest of her turn to come.
 atCombat :: GameState.GameState -> GameState.GameState

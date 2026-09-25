@@ -1362,8 +1362,9 @@ keeningStoneSpec s registry =
 --
 -- THE VACUITY GUARD is two attacking CREATURES from ONE attacking player: the
 -- count is 1 and not 2, which is what separates folding players from folding the
--- combat record's rows. CR 508.1 lets only the active player declare, so one is
--- as many attacking players as a legal board holds.
+-- combat record's rows. Without the shared team turns option (CR 805.10a) CR
+-- 508.1 lets only the active player declare, so one is as many attacking players
+-- as such a board holds.
 --
 -- THREE SEATS, all three doing different work: alice attacks, carol casts, bob is
 -- targeted -- so "you", the attacked player and the attacking player are three

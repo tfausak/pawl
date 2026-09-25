@@ -186,11 +186,8 @@ data Quantity
   | -- | CR 508.3b: how many of that player's opponents were declared attacked
     -- this combat (Combat.declaredAttacked) -- rule 702.121a's melee.
     --
-    -- WHO attacked is not recorded: CR 506.2 makes the attacking player the
-    -- active player, so one combat phase's record is that player's attacks.
-    --
-    -- Not implemented: CR 805.10a's several attacking players -- under the
-    -- shared team turns option the record is the whole team's (#4125).
+    -- That player's own attacks: under the shared team turns option each player
+    -- on the active team is an attacking player (CR 805.10a).
     OpponentsAttacked PlayerRef.PlayerRef
   | -- | CR 508.1a / 608.2i: how many creatures that player declared as attackers
     -- this turn, folded from the turn-scoped GameEvent.AttackerDeclared log.
@@ -203,11 +200,9 @@ data Quantity
     -- neither: it asks whether the DECLARATION happened, which only the log
     -- records.
     --
-    -- WHO declared is not on the event, OpponentsAttacked's reason: CR 506.2
-    -- makes the attacking player the active player, and the log's extent is one
-    -- turn, so every declaration in it is the active player's.
-    --
-    -- Not implemented: CR 805.10a's several attacking players (#4125).
+    -- Only that player's declarations, read off the event: under the shared team
+    -- turns option each player on the active team is an attacking player (CR
+    -- 805.10a).
     AttackersDeclaredThisTurn PlayerRef.PlayerRef
   | -- | CR 701.9a / 608.2i: how many cards that player discarded this turn,
     -- folded from the turn-scoped GameEvent.Discarded log.

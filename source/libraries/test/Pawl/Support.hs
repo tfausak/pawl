@@ -3067,7 +3067,7 @@ tokensOf gs =
 attackerDeclarationsOf :: GameState.GameState -> [ObjectId.ObjectId]
 attackerDeclarationsOf gs =
   let declared event = case event of
-        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _) -> Just oid
+        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _) -> Just oid
         _ -> Nothing
    in Maybe.mapMaybe declared (eventsOf gs)
 

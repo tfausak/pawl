@@ -638,15 +638,18 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- wither and infect are three boards where the damage that was dealt is no
         -- longer marked on the creature that took it.
         Quantity.DamageDealtToThisTurn -> fmap (toInteger . Game.damageDealtToThisTurn gs) mOid
-        -- CR 508.3b: how many of that player's opponents were declared attacked this
+        -- CR 508.3b: how many of that player's opponents they declared attacked this
         -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
         -- through the same playersOf, and Nothing for a reference naming
         -- anything but exactly one player, since "whose opponents?" has no sum.
         --
-        -- Read off Combat.declaredAttacked and NOT Combat.attacked, which is that
-        -- field's whole reason for existing: CR 508.4 says a creature put onto the
-        -- battlefield attacking never "attacked", for trigger events AND effects, and
-        -- rule 702.121a's is an effect.
+        -- Read off Combat.declaredAttackedBy, that player's share of
+        -- Combat.declaredAttacked -- under the shared team turns option a
+        -- teammate's attack is not "you attacked" (CR 805.10c) -- and NOT
+        -- Combat.attacked, which is the reason Combat.declaredAttacked exists: CR
+        -- 508.4 says a creature put onto the battlefield attacking never
+        -- "attacked", for trigger events AND effects, and rule 702.121a's is an
+        -- effect.
         --
         -- Nor Combat.declaredAttackedThisStep, its step-scoped twin: melee's words are
         -- "this combat", which CR 511.3's span matches and CR 500.1's does not. The two
@@ -665,7 +668,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- answered question, and outside a combat phase the cleared record (CR 511.3)
         -- says the same thing. What is unanswered is only the reference.
         Quantity.OpponentsAttacked ref -> case playersOf ref of
-          Just [pid] -> Just (toInteger (length (filter (attackedOpponent (Game.teams gs) pid) (Set.toList (Combat.declaredAttacked (GameState.combat gs))))))
+          Just [pid] -> Just (toInteger (length (filter (attackedOpponent (Game.teams gs) pid) (Set.toList (Map.findWithDefault Set.empty pid (Combat.declaredAttackedBy (GameState.combat gs)))))))
           _ -> Nothing
         -- CR 508.1a / 608.2i: how many creatures that player has declared as attackers
         -- this turn -- rule 207.2c's raid, compared against 1. OpponentsAttacked's arm

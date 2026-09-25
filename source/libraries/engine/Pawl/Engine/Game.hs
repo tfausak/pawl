@@ -23,6 +23,7 @@ import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -2999,22 +3000,15 @@ bendingsThisTurn gs pid =
 -- turn. lifeGainedThisTurn's footing -- a fold over GameState.events, whose
 -- extent Pawl.Engine.Engine.beginTurnOf's clearing makes "this turn".
 --
--- The ATTACKING PLAYER is resolved through CR 506.2 rather than off the event,
--- which records the attacker and the defender but not the declarer: the active
--- player is the attacking player, and one turn's log can only hold one active
--- player's declarations.
---
--- Not implemented: CR 805.10a's several attacking players -- under the shared
--- team turns option the whole team's declarations count for the active player
--- and none for a teammate (#4125).
+-- The ATTACKING PLAYER is read off the event rather than resolved through CR
+-- 506.2, because under the shared team turns option each player on the active
+-- team is one (CR 805.10a), and "you attacked" names one of them (CR 805.10c).
 --
 -- CR 508.4's creature put onto the battlefield attacking stays out, only
 -- Pawl.Engine.Combat.declareAttackers appending the event -- the same scope
 -- Pawl.Engine.Projection.View.declaredIt reads.
 attackersDeclaredThisTurn :: GameState -> PlayerId -> Natural
-attackersDeclaredThisTurn gs pid
-  | GameState.activePlayer gs /= pid = 0
-  | otherwise = Natural.length (filter (isAttackerDeclaration . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
+attackersDeclaredThisTurn gs pid = Natural.length (filter (declaredBy pid . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
 
 -- CR 509.1h / 608.2i: did this OBJECT become a blocked creature this turn?
 -- attackersDeclaredThisTurn's footing over the other combat log, and its extent
@@ -3046,8 +3040,9 @@ blockedAttacker event = case event of
   GameEvent.AttackerBlocked x -> Just (AttackerBlocked.attacker x)
   _ -> Nothing
 
--- Does this event record an attacker declaration (CR 508.1k)?
-isAttackerDeclaration :: GameEvent -> Bool
-isAttackerDeclaration event = case event of
-  GameEvent.AttackerDeclared _ -> True
+-- Does this event record an attacker declaration (CR 508.1k) by this attacking
+-- player?
+declaredBy :: PlayerId -> GameEvent -> Bool
+declaredBy pid event = case event of
+  GameEvent.AttackerDeclared x -> AttackerDeclared.attackingPlayer x == pid
   _ -> False
