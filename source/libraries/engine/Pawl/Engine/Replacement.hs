@@ -49,6 +49,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbilitySource as ActivatedAbilitySource
@@ -718,13 +719,17 @@ applies gs event candidate =
         --
         -- The event's PlayerId is the ACTIVE player, which is also whose step
         -- this is: every step and phase in a turn belongs to the player whose
-        -- turn it is. So Fatigue is `whosePhase == Just that player`, and
+        -- turn it is, or to their team (CR 805.4). So Fatigue is `whosePhase ==
+        -- Just that player`, widened to the team by the paragraph below, and
         -- Nothing is Eon Hub's symmetric skip, which reads no PlayerId at all.
         -- The SOURCE's controller is not consulted: unlike matchesController's
         -- CR 109.5 "you", the player here was named by the effect, not derived.
+        --
+        -- CR 805.8: under the shared team turns option a skip naming any player
+        -- on the active team is that team's, so a teammate's row matches too.
         (ReplacementEffect.PhaseR pat, ProposedEvent.WouldBeginPhase selector pid) ->
           PhasePattern.whichPhase pat == selector
-            && maybe True (== pid) (PhasePattern.whosePhase pat)
+            && maybe True (Turn.sharesTurn gs pid) (PhasePattern.whosePhase pat)
         -- CR 614.1c-d: which entering permanents this replacement watches, as a
         -- Filter over the entering object (see Pawl.Types.ReplacementEffect).
         -- 614.1c's self-scope is Filter.IsSource; 614.1d's is a characteristic

@@ -1849,8 +1849,8 @@ runStep = do
   -- question (CR 505.2). Both are asked even when the phase says yes -- Stasis
   -- skipping an untap step must still take it in an unskipped phase.
   --
-  -- Not implemented: CR 805.8's skip by a teammate of the active player, which
-  -- is asked of `active` alone (#4003).
+  -- Asked of `active` alone even under the shared team turns option: CR 805.8
+  -- makes a teammate's skip the team's, which Replacement.applies answers.
   phaseBegins <- case Turn.phaseBeginningAt phase of
     Nothing -> pure True
     Just selector -> Event.beginsPhase selector active
