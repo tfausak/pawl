@@ -46,6 +46,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Combat (Combat)
 import qualified Pawl.Types.Combat as Combat
+import Pawl.Types.Cost (Cost)
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -341,6 +342,8 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- CR 508.1a: an attacking creature must be untapped, controlled by the active
 -- player, and not summoning sick (CR 302.6), plus the PER-CREATURE half of CR
 -- 508.1c: a creature failing one of those is in no legal declaration at all.
+-- Under the shared team turns option each active player is an attacking player
+-- (CR 805.10a).
 --
 -- CR 508.1c's SET-SHAPED half (Bonded Construct's "can't attack alone") is
 -- attackDeclarationAllowed's, since such a creature is still a candidate -- taking
@@ -366,7 +369,7 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
   Nothing -> False
   Just obj ->
     Projection.controllerOfGiven grants Set.empty oid gs == Just pid
-      && GameState.activePlayer gs == pid
+      && Turn.isActive gs pid
       -- CR 506.3 wants a permanent, so the test is battlefield MEMBERSHIP and not
       -- Object.zone: a phased-out permanent is one the game treats as not
       -- existing (CR 702.26b) whose zone still reads Zone.Battlefield (CR 702.26d).
@@ -390,6 +393,13 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
       -- (Pacifism), CR 701.35a's detain, or stored by the resolution that said it
       -- (Netter en-Dal).
       && not (Set.member oid restricted)
+
+-- CR 805.10b / 805.10d: the players who declare as one alongside `pid` --
+-- `pid`, then each still-playing teammate under the shared team turns option, in
+-- seat order. Just `pid` otherwise, which is CR 508.1's and CR 509.1's one
+-- declaring player.
+sideOf :: PlayerId -> GameState -> [PlayerId]
+sideOf pid gs = pid : filter (\p -> p /= pid && Turn.sharesTurn gs pid p) (Game.stillPlaying gs)
 
 legalAttackers :: PlayerId -> GameState -> [ObjectId]
 legalAttackers pid gs =
@@ -1298,14 +1308,8 @@ blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projectio
 
 blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Requirement.Instances (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
 blockCeilingGiven grants pcs pid gs =
-  -- CR 802.4b: judged ignoring any creature attacking anyone else.
-  let attackers = attackersOn pid gs
-      candidates = legalBlockersGiven grants pcs pid gs
-      -- One walk for the whole search: CR 509.1b's pairwise restrictions are
-      -- decided once here and read by every pair `able` judges.
-      barred = CombatRestriction.cantBeBlockedBy (Just pid) candidates attackers gs
+  let (candidates, attackers, barred, limit) = blockScopeGiven grants pcs pid gs
       able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
-      limit = CombatRestriction.blockLimit (Just pid) gs
       arity = blockArityGiven candidates gs
       requirements = BlockRequirement.instances able candidates attackers gs
       -- CR 509.1c's cost clause is a filter on the CREATURE, never on its
@@ -1330,20 +1334,36 @@ legalBlockDeclaration :: PlayerId -> Map ObjectId (Set ObjectId) -> GameState ->
 legalBlockDeclaration pid declaration gs =
   let grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
-      -- CR 802.4b: judged ignoring any creature attacking anyone else, which is
-      -- also CR 802.4a's restriction -- pairAllowedGiven refuses a pair whose
-      -- attacker is not on this list.
-      attackers = attackersOn pid gs
-      candidates = legalBlockersGiven grants pcs pid gs
-      -- One walk for the whole search: CR 509.1b's pairwise restrictions are
-      -- decided once here and read by every pair `able` judges.
-      barred = CombatRestriction.cantBeBlockedBy (Just pid) candidates attackers gs
+      -- pairAllowedGiven refuses a pair whose attacker is not on `attackers`,
+      -- which is CR 802.4a's restriction.
+      (candidates, attackers, barred, limit) = blockScopeGiven grants pcs pid gs
       able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
-      limit = CombatRestriction.blockLimit (Just pid) gs
       arity = blockArityGiven candidates gs
       (requirements, best) = blockCeilingGiven grants pcs pid gs
    in blockDeclarationAllowed limit arity pcs able declaration gs
         && requirementsMet requirements declaration >= requirementsMet requirements best
+
+-- CR 509.1 / 805.10d: what a block declaration by `pid`'s side is judged over --
+-- its candidate blockers, the attackers they may block, CR 509.1b's barred pairs
+-- and its bound. One defending player's own under CR 802.4a / 802.4b, judged
+-- ignoring any creature attacking anyone else; under the shared team turns
+-- option the defending team's one combined block, whose creatures may block a
+-- creature attacking any of its players.
+--
+-- Each player's restrictions are read at their own seat, the defending player
+-- CR 509.1a names, and the tightest bound among them binds the whole block.
+-- One walk for the whole search: CR 509.1b's pairwise restrictions are decided
+-- once here and read by every pair the caller judges.
+blockScopeGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> ([ObjectId], [ObjectId], Set (ObjectId, ObjectId), Maybe Natural)
+blockScopeGiven grants pcs pid gs =
+  let side = sideOf pid gs
+      attackers = concatMap (`attackersOn` gs) side
+      seats = fmap (\p -> (p, legalBlockersGiven grants pcs p gs)) side
+      barred = Set.unions (fmap (\(p, mine) -> CombatRestriction.cantBeBlockedBy (Just p) mine attackers gs) seats)
+      limit = case Maybe.mapMaybe (\p -> CombatRestriction.blockLimit (Just p) gs) side of
+        [] -> Nothing
+        bounds -> Just (minimum bounds)
+   in (concatMap snd seats, attackers, barred, limit)
 
 -- CR 509.1a: how many attacking creatures each of `candidates` may be declared
 -- blocking -- the rule's one, plus whatever Pawl.Engine.BlockPermission adds, and
@@ -1641,8 +1661,11 @@ designateDefenders = do
     case NonEmpty.nonEmpty (attackableOpponents gs) of
       Nothing -> pure ()
       Just candidates -> do
+        let settings = GameState.settings gs
         chosen <-
-          if GameSettings.attackOption (GameState.settings gs) == Just AttackOption.MultiplePlayers
+          -- CR 805.10a: under the shared team turns option the nonactive team
+          -- is the defending team, every one of its players defending.
+          if GameSettings.attackOption settings == Just AttackOption.MultiplePlayers || GameSettings.sharedTeamTurns settings
             then -- CR 802.2: the action is taken and asks nothing. The whole
             -- candidate list is the answer, already in CR 802.4's APNAP order.
               pure (NonEmpty.toList candidates)
@@ -1732,7 +1755,14 @@ declareAttackers perform pid = do
 attemptAttackDeclaration :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> Set (Map ObjectId AttackTarget.AttackTarget) -> Game ()
 attemptAttackDeclaration perform pid rejected = do
   gs <- State.get
-  let legal = legalAttackers pid gs
+  -- CR 805.10b: the active team has one combined attack, so the candidates are
+  -- every attacking player's. `pid` is who declares it, the team's primary
+  -- player (CR 805.2) on the engine's path.
+  let side = sideOf pid gs
+      legal = concatMap (`legalAttackers` gs) side
+      -- CR 805.10a / 805.10c: the attacking player a creature is declared by is
+      -- the one controlling it, which legalAttackers made one of `side`.
+      attackerOf oid = Maybe.fromMaybe pid (Projection.controllerOf oid gs)
       -- CR 508.1c's aimed-at restriction, gathered ONCE for the whole pass and
       -- over the WIDER list, so the narrowing below and the ceiling read one set.
       barred = barredAnnouncements legal gs
@@ -1821,9 +1851,8 @@ attemptAttackDeclaration perform pid rejected = do
             tapIt oid = do
               g <- State.get
               Monad.unless (Projection.hasKeyword Keyword.Vigilance oid g) (Event.tap oid)
-            -- CR 506.4's comparand, taken where the creature joins combat. `pid`
-            -- and not a fresh controllerOf: canAttack already required it.
-            joined = Map.fromList (fmap (\oid -> (oid, pid)) attacking)
+            -- CR 506.4's comparand, taken where the creature joins combat.
+            joined = Map.fromList (fmap (\oid -> (oid, attackerOf oid)) attacking)
         -- UNIONED into the record, not written over it: "the record is mine alone"
         -- is exactly the assumption CR 508.8's second clause breaks, and replacing
         -- the map would silently remove such a creature from combat.
@@ -1910,12 +1939,13 @@ attemptAttackDeclaration perform pid rejected = do
         Monad.forM_ attacking $ \oid -> do
           gsExert <- State.get
           Monad.when (Projection.hasKeyword Keyword.Exert oid gsExert) $ do
-            let exertDecider = Decide.deciderFor pid gsExert
+            let you = attackerOf oid
+                exertDecider = Decide.deciderFor you gsExert
                 exert g =
                   Event.recordEvent
                     (GameEvent.Exerted oid)
-                    g {GameState.objects = Map.adjust (\o -> o {Object.exertedBy = Set.insert pid (Object.exertedBy o)}) oid (GameState.objects g)}
-            answer <- Game.choose (Prompt.ChooseExert exertDecider pid oid)
+                    g {GameState.objects = Map.adjust (\o -> o {Object.exertedBy = Set.insert you (Object.exertedBy o)}) oid (GameState.objects g)}
+            answer <- Game.choose (Prompt.ChooseExert exertDecider you oid)
             Monad.when (answer == OptionalDecision.Exercises) (State.modify' exert)
         -- CR 702.154a's optional cost to attack, rule 508.1g's other one, asked
         -- after exert's and of `attacking` for the same reason. Rule 702.154d:
@@ -1954,27 +1984,29 @@ attemptAttackDeclaration perform pid rejected = do
           let instances = Map.findWithDefault 0 Keyword.Enlist (Projection.keywordsOf oid gsEnlist)
           Monad.forM_ (List.genericReplicate instances ()) $ \() -> do
             g <- State.get
-            let grants = Projection.controlGrants g
+            let you = attackerOf oid
+                grants = Projection.controlGrants g
                 pcs = Projection.projectAll g
                 enlistable cid =
                   notElem cid attacking
                     && Set.member cid (GameState.battlefield g)
                     && fmap Object.tapped (Game.lookupObject cid g) == Just TapState.Untapped
-                    && Summoning.settledOrHastyGiven pcs pid cid g
+                    && Summoning.settledOrHastyGiven pcs you cid g
                     && isCreatureObjectGiven pcs cid g
-                enlistCandidates = filter enlistable (Projection.controlsGiven grants pid g)
+                enlistCandidates = filter enlistable (Projection.controlsGiven grants you g)
             Monad.forM_ (NonEmpty.nonEmpty enlistCandidates) $ \enlistOffer -> do
-              answer <- Game.choose (Prompt.ChooseEnlist (Decide.deciderFor pid g) pid oid enlistOffer)
+              answer <- Game.choose (Prompt.ChooseEnlist (Decide.deciderFor you g) you oid enlistOffer)
               -- Reject-not-repair, Pawl.Engine.Cost's posture: an answer outside
               -- the offer taps nobody and arms nothing.
               Monad.forM_ (filter enlistable (Maybe.maybeToList answer)) $ \enlisted -> do
                 Event.tap enlisted
-                State.modify' (Event.armDelayed Keyword.Engine.enlistReflexive oid pid (Map.singleton Binding.tappedPermanent (Binding.toObject enlisted)) Onset.Immediately Nothing)
+                State.modify' (Event.armDelayed Keyword.Engine.enlistReflexive oid you (Map.singleton Binding.tappedPermanent (Binding.toObject enlisted)) Onset.Immediately Nothing)
         gs1 <- State.get
         -- CR 508.1h: the total cost to attack is determined once and then LOCKED
         -- IN -- this `let`. Asking AttackCost.totalCost a second time is what the
         -- rule forbids, which is why that function leaves locking to its caller.
-        let owed = AttackCost.totalCost recorded gs1
+        -- One total per attacking player, over the creatures they control.
+        let owed = fmap (\p -> (p, AttackCost.totalCost (Map.filterWithKey (\oid _ -> attackerOf oid == p) recorded) gs1)) side
         -- CR 508.1i's mana-ability window and CR 508.1j's all-costs-or-nothing
         -- payment are both Cost.payToll, which reverses the declaration back to
         -- `before` rather than spending half of it. Skipped outright when nothing
@@ -1984,10 +2016,7 @@ attemptAttackDeclaration perform pid rejected = do
         -- elision: CR 508.1j is unconditional once the creatures are chosen, and CR
         -- 508.1d's excuse from paying is exercised one step earlier, by NOT
         -- DECLARING the creature.
-        paid <-
-          if null owed
-            then pure True
-            else Cost.payToll perform before pid owed
+        paid <- payTolls perform before owed
         if not paid
           then do
             -- CR 508.1's preamble: the declaration is illegal and CR 733.1
@@ -2044,27 +2073,29 @@ attemptAttackDeclaration perform pid rejected = do
               -- creatures were sent at was attacked once. A Set is what makes that
               -- structural, and it orders the batch deterministically besides.
               --
-              -- `pid` rides every one of them, which is CR 508.3e's first
-              -- subject: rule 508.1 gives a declaration ONE declaring player, so
-              -- the pair (attacker, target) is already this batch's key and no
-              -- second grouping is needed.
+              -- The attacking player rides every one of them, which is CR 508.3e's
+              -- first subject, and is the creature's controller: CR 805.10a makes
+              -- each player on the active team an attacking player, so the pair
+              -- (attacking player, target) is this batch's key.
               --
               -- After the per-creature batch above, since CR 508.2b puts every
               -- trigger from this declaration on the stack together and the order
               -- they triggered in does not matter.
               State.modify'
                 ( \g ->
-                    let attacked = Set.fromList (Maybe.mapMaybe (\oid -> Map.lookup oid recorded) attacking)
-                     in List.foldl' (\h t -> Event.recordEvent (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked pid t)) h) g (Set.toList attacked)
+                    let attacked = Set.fromList (Maybe.mapMaybe (\oid -> fmap ((,) (attackerOf oid)) (Map.lookup oid recorded)) attacking)
+                     in List.foldl' (\h (p, t) -> Event.recordEvent (GameEvent.BecameAttacked (BecameAttacked.MkBecameAttacked p t)) h) g (Set.toList attacked)
                 )
               -- CR 508.3d's arity, which is neither of the two above: the
               -- DECLARATION's, so one event however many creatures were named and
-              -- however many things they were sent at. `pid` is rule 508.1's
-              -- declaring player, whom rule 508.3d's "[a player]" names.
+              -- however many things they were sent at -- per attacking player,
+              -- whom rule 508.3d's "[a player]" names, and CR 805.10a makes each
+              -- player on the active team one.
               --
-              -- Only for a non-empty declaration, which is rule 508.3d's "one or
-              -- more creatures": a player who declined has not attacked, and this
-              -- block is reached with `attacking` empty whenever they did. Proved
+              -- Only for a player who declared one or more creatures, which is
+              -- rule 508.3d's "one or more creatures": a player who declined has
+              -- not attacked, and this block is reached with `attacking` empty
+              -- whenever the whole side did. Proved
               -- by Pawl.EventTriggerSpec's Avatar Roku, Firebender group, whose
               -- trigger targets nothing: dropping the guard adds six {R} on an
               -- empty declaration and shows as the wrong power. Boggart
@@ -2074,7 +2105,22 @@ attemptAttackDeclaration perform pid rejected = do
               --
               -- Last of the three, the batch above's reason: CR 508.2b puts every
               -- trigger from this declaration on the stack together.
-              Monad.unless (null attacking) (State.modify' (Event.recordEvent (GameEvent.AttackersDeclared pid)))
+              Monad.forM_ side $ \p ->
+                Monad.when (any ((== p) . attackerOf) attacking) (State.modify' (Event.recordEvent (GameEvent.AttackersDeclared p)))
+
+-- CR 508.1j / 509.1f: pay each player's locked-in toll, in `owed`'s order,
+-- all or nothing -- a failed payment rewinds to `before` (Cost.payToll), which
+-- also undoes the payments ahead of it. Each player pays for the creatures they
+-- control, which only a shared team's declaration can split (CR 805.10b /
+-- 805.10d). A player owing nothing is not asked.
+payTolls :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [(PlayerId, [(ObjectId, Cost Keyword.Keyword)])] -> Game Bool
+payTolls perform before owed = case owed of
+  [] -> pure True
+  (payer, charges) : rest
+    | null charges -> payTolls perform before rest
+    | otherwise -> do
+        paid <- Cost.payToll perform before payer charges
+        if paid then payTolls perform before rest else pure False
 
 -- What an effect leaves open about CR 508.4's choice, which is a question about
 -- the EFFECT rather than about the board, so it is settled by
@@ -2157,8 +2203,10 @@ putOntoBattlefieldAttacking choice oid = do
         isCreatureObject oid gs,
         -- CR 506.3f
         not (Projection.isBattleOf oid gs),
-        -- CR 506.3b / CR 506.2: the attacking player is the active player
-        controller == GameState.activePlayer gs -> do
+        -- CR 506.3b / CR 506.2: the attacking player is the active player,
+        -- and under the shared team turns option each active player (CR
+        -- 805.10a)
+        Turn.isActive gs controller -> do
           -- CR 508.4's chooser is the creature's controller, whom the guard above
           -- makes the attacking player -- which is what lets CR 508.1b's
           -- announcement and this one share a prompt.
@@ -2339,7 +2387,9 @@ putOntoBattlefieldBlocking oid attacker = do
 
 -- CR 509.1 / CR 802.4: each defending player declares blockers, in APNAP order
 -- (CR 101.4) -- the order Defender.defendingPlayers already comes back in. One
--- player is the ordinary game and needs no special case.
+-- player is the ordinary game and needs no special case. Under the shared team
+-- turns option the defending team declares one combined block (CR 805.10d),
+-- which its primary player makes (CR 805.2).
 --
 -- CR 310.9c needs no clause of its own: this asks each defending player about
 -- their own attackers and nobody else's, and attackableBattles admits a battle
@@ -2363,11 +2413,13 @@ declareBlockers perform = do
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
   Monad.unless (null attacking) $ do
-    Monad.forM_ (Defender.defendingPlayers start) $ \pid ->
+    let declarers = ListUtils.nubOrd (fmap (Game.primaryOf start) (Defender.defendingPlayers start))
+    Monad.forM_ declarers $ \pid ->
       -- CR 802.4a: those creatures can block only creatures attacking that
       -- player, a planeswalker that player controls, or a battle that player
       -- protects -- which is attackersOn's list, and is the whole of `attacking`
-      -- wherever one player defends.
+      -- wherever one player defends. CR 805.10d widens it to the whole
+      -- defending team's (blockScopeGiven).
       --
       -- A defending player with none of them is SKIPPED rather than asked. CR
       -- 509.1a's choice is "one creature for it to block that's attacking that
@@ -2376,7 +2428,7 @@ declareBlockers perform = do
       -- nothing to ask. CR 802.2 makes this ordinary at three or more seats:
       -- every opponent defends, and only the ones a creature was aimed at have
       -- an attacker on them.
-      case attackersOn pid start of
+      case concatMap (`attackersOn` start) (sideOf pid start) of
         [] -> pure ()
         theirs -> attemptBlockDeclaration perform pid theirs Set.empty
     -- CR 509.1h's other half, performed once CR 509.1g has assigned the blockers:
@@ -2427,7 +2479,10 @@ recordDeclaredBlockers oids g =
 attemptBlockDeclaration :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> [ObjectId] -> Set (Map ObjectId (Set ObjectId)) -> Game ()
 attemptBlockDeclaration perform pid attacking rejected = do
   gs <- State.get
-  let candidates = legalBlockers pid gs
+  let (candidates, _, _, _) = blockScopeGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+      -- CR 805.10d: the defending player a blocker is declared by is the one
+      -- controlling it, which blockScopeGiven made one of `pid`'s side.
+      blockerOf oid = Maybe.fromMaybe pid (Projection.controllerOf oid gs)
   Monad.unless (null candidates) $ do
     let decider = Decide.deciderFor pid gs
     chosen <- Game.choose (Prompt.DeclareBlockers decider pid candidates attacking)
@@ -2456,7 +2511,8 @@ attemptBlockDeclaration perform pid attacking rejected = do
         -- CR 509.1d: the total cost to block is determined once and then LOCKED IN
         -- -- this `let`. Asking BlockCost.totalCost a second time is what the rule
         -- forbids, which is why that function leaves locking to its caller.
-        let owed = BlockCost.totalCost legal gs1
+        -- One total per defending player, over the creatures they control.
+        let owed = fmap (\p -> (p, BlockCost.totalCost (Map.filterWithKey (\oid _ -> blockerOf oid == p) legal) gs1)) (sideOf pid gs1)
         -- CR 509.1's preamble, captured here for the one thing this function does
         -- write ahead of the payment. Everything else it writes is below.
         before <- State.get
@@ -2486,10 +2542,7 @@ attemptBlockDeclaration perform pid attacking rejected = do
         -- blocking only after CR 509.1f's payment. Combat.declaredBlockers above
         -- is the one thing written earlier, and CR 509.1a rather than CR 509.1g is
         -- why it may be.
-        paid <-
-          if null owed
-            then pure True
-            else Cost.payToll perform before pid owed
+        paid <- payTolls perform before owed
         -- CR 509.1's preamble: a declaration the defending player cannot pay for
         -- is illegal and CR 733.1 reverses it, which Cost.payToll has done back
         -- to `before`. The blocks themselves are recorded below, so the only
@@ -2515,10 +2568,8 @@ attemptBlockDeclaration perform pid attacking rejected = do
               let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
                   merged = List.foldl' add (Combat.blockers (GameState.combat gs2)) pairs
                   -- CR 506.4's comparand for the blockers, alongside the attackers'.
-                  -- `pid` for the same reason it is there: every blocker here is one
-                  -- legalBlockers offered, which is controllerOf == Just pid (CR
-                  -- 509.1a). Unioned, the attackers' entries being already in this map.
-                  joined = Map.union (Map.fromList (fmap (\(b, _) -> (b, pid)) pairs)) (Combat.joinedUnder (GameState.combat gs2))
+                  -- Unioned, the attackers' entries being already in this map.
+                  joined = Map.union (Map.fromList (fmap (\(b, _) -> (b, blockerOf b)) pairs)) (Combat.joinedUnder (GameState.combat gs2))
               State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}
               -- CR 509.1a again, for the declaration that actually stands. A
               -- second write and not a duplicate of the one above: on the

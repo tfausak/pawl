@@ -484,7 +484,7 @@ runTurnBasedActions phase = do
   --
   -- Not implemented: CR 805.6's order -- the team does not choose the order its
   -- members untap, draw (CR 805.6a) and discard in (#4014).
-  hasActive <- State.gets (List.elem active . Game.stillPlaying)
+  primary <- State.gets (`Game.primaryOf` active)
   live <- State.gets (\gs -> filter (\pid -> List.elem pid (Game.stillPlaying gs)) (Turn.activePlayers gs))
   case phase of
     Phase.Beginning BeginningStep.Untap -> do
@@ -513,9 +513,9 @@ runTurnBasedActions phase = do
     -- than dropping, so it is NOT guarded here -- designateDefenders asks
     -- Game.ruleChooser who makes the choice.
     Phase.Combat CombatStep.BeginningOfCombat -> Combat.designateDefenders
-    -- Not implemented: CR 805.10b's combined attack -- only the active player
-    -- declares attackers, not the active team as one (#4002).
-    Phase.Combat CombatStep.DeclareAttackers -> Monad.when hasActive (Combat.declareAttackers Resolve.performManaAbility active)
+    -- CR 805.10b: the active team declares one combined attack, which its
+    -- primary player makes (CR 805.2).
+    Phase.Combat CombatStep.DeclareAttackers -> Monad.unless (null live) (Combat.declareAttackers Resolve.performManaAbility primary)
     Phase.Combat CombatStep.DeclareBlockers -> Combat.declareBlockers Resolve.performManaAbility
     Phase.Combat CombatStep.CombatDamage -> do
       -- CR 510.4: deal this step's damage; if it was the first-strike step,
@@ -2074,7 +2074,7 @@ runStepThatBegan phase = do
         -- attacked. Asked as the declare attackers step ENDS, not when its
         -- turn-based action finishes, because the rule's second clause -- put onto
         -- the battlefield attacking -- can only happen in the priority round this
-        -- line sits after (Hanweir Garrison). NOT guarded by hasActive: a turn
+        -- line sits after (Hanweir Garrison). NOT guarded by `live`: a turn
         -- with no active player declares no attackers, CR 508.8's own condition.
         Monad.when (phase == Phase.Combat CombatStep.DeclareAttackers) (State.modify' Combat.skipEmptyCombat)
         checkSba
