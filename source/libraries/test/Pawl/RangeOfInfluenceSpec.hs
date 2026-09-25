@@ -16,7 +16,8 @@
 -- redirectDestination (CR 801.13), Pawl.Engine.Resolve.Slots'
 -- playerRefPlayers, zoneScopePlayers and battlefieldMatching, Pawl.Engine.Count's
 -- playersFor and the choice offers Game.reachableBy feeds (CR 801.5a, 801.10,
--- 801.11); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
+-- 801.11), and Pawl.Engine.Resolve.Effect's WinGame and DrawGame (CR 801.14,
+-- 801.15); and CR 801.2c's turn-start seating, Pawl.Types.GameState's
 -- departedThisTurn.
 --
 -- FOUR SEATS, at range 1 unless a case says otherwise, turn order [alice, bob,
@@ -37,6 +38,7 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
@@ -48,6 +50,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Departure as Departure.Type
@@ -66,6 +69,8 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -606,6 +611,36 @@ spec s registry = Spec.describe s "Range of influence" $ do
         offered gs = State.execState (Engine.runGame recording (S.runPure S.identityAnswer (onMain gs) (S.cast S.alice spellId)) Engine.priorityLoop) []
     Spec.assertEqWith s "CR 801.10 at range 1 only bob is offered" (offered (S.withRange 1 board)) [[S.bob]]
     Spec.assertEqWith s "at an unlimited range carol is too" (offered board) [[S.bob, S.carol]]
+
+  -- CR 104.2b / 801.14: alice's Felidar Sovereign ("At the beginning of your
+  -- upkeep, if you have 40 or more life, you win the game.") at 40 life. At range
+  -- 1 only bob and dave, her opponents in range, lose; carol plays on.
+  Spec.it s "CR 801.14 a player who wins makes only their opponents within range lose" $ do
+    sovereign <- S.printingOf s registry "Felidar Sovereign"
+    let (_, g0) = S.addPermanent sovereign S.alice S.fourPlayerGame
+        atLife n = g0 {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.alice (GameState.players g0)}
+        limited = upkeepOf S.alice (S.withRange 1 (atLife 40))
+    Spec.assertEqWith s "CR 801.14 at range 1 alice and carol are still playing" (Game.stillPlaying limited) [S.alice, S.carol]
+    Spec.assertEqWith s "and the game goes on" (GameState.result limited) Nothing
+    Spec.assertEqWith s "CR 104.2b at an unlimited range alice wins" (GameState.result (upkeepOf S.alice (atLife 40))) (Just (Result.Won S.alice))
+    Spec.assertEqWith s "CR 603.4 at 39 life nothing happens" (Game.stillPlaying (upkeepOf S.alice (atLife 39))) [S.alice, S.bob, S.carol, S.dave]
+
+  -- CR 104.4c / 801.15: alice casts Divine Intervention ("This enchantment enters
+  -- with two intervention counters on it. At the beginning of your upkeep, remove
+  -- an intervention counter from this enchantment. When you remove the last
+  -- intervention counter from this enchantment, the game is a draw.") and two of
+  -- her upkeeps pass. At range 1 the draw takes alice, bob and dave out; carol,
+  -- the last one playing, wins by CR 104.2a.
+  Spec.it s "CR 801.15 a draw is a draw for its controller and the players within their range" $ do
+    plains <- S.printingOf s registry "Plains"
+    intervention <- S.printingOf s registry "Divine Intervention"
+    let (spellId, g0) = S.addHandCard intervention S.alice (S.landsFor plains S.alice 8 S.fourPlayerGame)
+        played ranged = castResolved S.identityAnswer S.alice spellId (ranged (onMain g0))
+        twice gs = upkeepOf S.alice (upkeepOf S.alice gs)
+        limited = twice (played (S.withRange 1))
+    Spec.assertEqWith s "one upkeep leaves the game running" (GameState.result (upkeepOf S.alice (played id))) Nothing
+    Spec.assertEqWith s "CR 801.15 at range 1 only carol is still playing" (Game.stillPlaying limited) [S.carol]
+    Spec.assertEqWith s "CR 104.4c at an unlimited range the game is a draw" (GameState.result (twice (played id))) (Just Result.Drawn)
   where
     resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
     -- Pawl.LifeTriggerSpec's entry staging: the permanent is placed, its Moved
@@ -629,3 +664,8 @@ spec s registry = Spec.describe s "Range of influence" $ do
             GameState.combat = Combat.emptyCombat {Combat.Type.defenders = [defender], Combat.Type.attackers = Map.fromList (fmap (\oid -> (oid, AttackTarget.OfPlayer defender)) attackers)}
           }
         (Monad.void Damage.dealCombatDamage)
+    -- CR 503.1: `pid`'s upkeep begins and its triggers resolve.
+    upkeepOf pid gs =
+      let upkeep = Phase.Beginning BeginningStep.Upkeep
+          began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+       in resolveAll (S.runPure S.identityAnswer began Engine.settleForPriority)

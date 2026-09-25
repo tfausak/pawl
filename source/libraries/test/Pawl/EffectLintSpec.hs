@@ -282,6 +282,8 @@ ownQuantities effect = case effect of
   Effect.ExchangeValues x -> durationQuantities (ExchangeValues.duration x)
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.LoseGame {} -> []
+  Effect.WinGame {} -> []
+  Effect.DrawGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.DecreaseSpeed d -> [SpeedDecrease.quantity d]
@@ -1311,6 +1313,8 @@ effectObjectRefs effect =
         Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other _) -> read_ (foldMap Resolve.exchangedObjectRefs [one, other])
         Effect.SetLifeTotal {} -> []
         Effect.LoseGame {} -> []
+        Effect.WinGame {} -> []
+        Effect.DrawGame {} -> []
         Effect.RedistributeLifeTotals -> []
         Effect.IncreaseSpeed {} -> []
         Effect.DecreaseSpeed {} -> []

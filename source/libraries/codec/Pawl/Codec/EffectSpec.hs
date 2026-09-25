@@ -1103,6 +1103,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.LoseGame (PlayerRef.Relative PlayerRelation.You))
       " {\"type\":\"LoseGame\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+  Spec.it s "WinGame" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.WinGame (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"WinGame\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+  Spec.it s "DrawGame" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.DrawGame
+      " {\"type\":\"DrawGame\"} "
   -- CR 608.2g, in the shape rule 310.12b's battles and rule 702's keywords mint
   -- in the engine (Pawl.Engine.Battle, Pawl.Engine.Keyword): both defaulted keys
   -- elided. Wild Evocation is the one card that writes them, and

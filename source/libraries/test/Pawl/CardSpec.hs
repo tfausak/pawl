@@ -663,6 +663,7 @@ playerRefPositions =
         ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
         ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (plantedPlayer "xv-one")) (ExchangedValue.LifeTotal (plantedPlayer "xv-other")) Duration.Indefinite), [plantedPlayer "xv-one", plantedPlayer "xv-other"]),
         ("lose-game", Effect.LoseGame (plantedPlayer "lg"), [plantedPlayer "lg"]),
+        ("win-game", Effect.WinGame (plantedPlayer "wg"), [plantedPlayer "wg"]),
         ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
         ("decrease-speed", Effect.DecreaseSpeed (SpeedDecrease.MkSpeedDecrease (plantedPlayer "ds") one 0), [plantedPlayer "ds"]),
         ("create", Effect.Create (Create.MkCreate one () EntryRiders.defaultValue Nothing (plantedPlayer "cr")), [plantedPlayer "cr"]),
@@ -1201,6 +1202,8 @@ ownCounts effect = case effect of
   Effect.ExchangeValues x -> durationCounts (ExchangeValues.duration x)
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.LoseGame {} -> []
+  Effect.WinGame {} -> []
+  Effect.DrawGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   -- The floor beside it is a printed literal and holds no Count.
@@ -1635,6 +1638,8 @@ effectNestedEffects effect = case effect of
   Effect.ExchangeValues {} -> []
   Effect.SetLifeTotal {} -> []
   Effect.LoseGame {} -> []
+  Effect.WinGame {} -> []
+  Effect.DrawGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed {} -> []
   Effect.DecreaseSpeed {} -> []
@@ -2123,6 +2128,8 @@ effectReplacements effect = case effect of
   Effect.ExchangeValues _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.LoseGame {} -> []
+  Effect.WinGame {} -> []
+  Effect.DrawGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.DecreaseSpeed _ -> []
@@ -2587,6 +2594,8 @@ effectMintedFaces effect = case effect of
   Effect.ExchangeValues _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.LoseGame {} -> []
+  Effect.WinGame {} -> []
+  Effect.DrawGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.DecreaseSpeed _ -> []
@@ -5461,6 +5470,8 @@ effectFilters effect = case effect of
   Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (foldMap objectRefFilters (foldMap Resolve.exchangedObjectRefs [one, other]))
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.LoseGame {} -> []
+  Effect.WinGame {} -> []
+  Effect.DrawGame {} -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.DecreaseSpeed d -> frame Unframed (quantityFilters (SpeedDecrease.quantity d))

@@ -617,6 +617,8 @@ rewriteEffect pairs effect = case effect of
      in Effect.ExchangeValues (ExchangeValues.MkExchangeValues (side one) (side other) (rewriteDuration pairs duration))
   Effect.SetLifeTotal x -> Effect.SetLifeTotal (rewritePlayerQuantity pairs x)
   Effect.LoseGame {} -> effect
+  Effect.WinGame {} -> effect
+  Effect.DrawGame {} -> effect
   Effect.RedistributeLifeTotals -> effect
   Effect.IncreaseSpeed x -> Effect.IncreaseSpeed (rewritePlayerQuantity pairs x)
   Effect.DecreaseSpeed x -> Effect.DecreaseSpeed x {SpeedDecrease.quantity = rewriteQuantity pairs (SpeedDecrease.quantity x)}

@@ -1,0 +1,133 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 6
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Divine Intervention",
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "WithCounters",
+                "value": [
+                  {
+                    "count": {
+                      "type": "Literal",
+                      "value": 2
+                    },
+                    "kind": {
+                      "type": "Named",
+                      "value": "intervention"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              "scope": {
+                "type": "ControllersTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "RemoveCounters",
+                        "value": {
+                          "kind": {
+                            "type": "Named",
+                            "value": "intervention"
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "slot": "self"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "condition": {
+            "type": "SelfLastCounterRemoved",
+            "value": {
+              "type": "Named",
+              "value": "intervention"
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "DrawGame"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
