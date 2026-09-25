@@ -3278,7 +3278,7 @@ greenSlimeSpec s registry = Spec.describe s "Green Slime" $ do
     Spec.assertEqWith s "both triggers went on the stack" (length (GameState.stack placed)) 2
     Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
 
--- Rebuff the Wicked (TSP 38) {W} Instant, Oracle text checked against Scryfall
+-- Rebuff the Wicked (PLC 12) {W} Instant, Oracle text checked against Scryfall
 -- 2026-09-25: "Counter target spell that targets a permanent you control."
 --
 -- One board, two runs differing only in which Goblin Piker bob's Lightning Bolt
