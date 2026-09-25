@@ -595,6 +595,7 @@ effectObjectRefs effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> [ref]
   Effect.ChangeText {} -> []
   Effect.AddMana {} -> []
+  Effect.Firebend {} -> []
   Effect.ActivateManaAbilities {} -> []
   Effect.MoveMana {} -> []
   Effect.Search {} -> []
@@ -799,6 +800,7 @@ effectPlayerRefs effect = case effect of
   Effect.ModifyTarget x -> durationPlayerRefs (ModifyTarget.duration x)
   Effect.ChangeText {} -> []
   Effect.AddMana (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
+  Effect.Firebend (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref _) -> [ref]
   Effect.MoveMana (MoveMana.MkMoveMana from to) -> [from, to]
   Effect.Search (Search.MkSearch searcher owner _ _ _ _ _ _) -> [searcher, owner]
@@ -1007,6 +1009,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
     joinTwo (joinSlots (fmap quantitySlots (Projection.quantitiesOf modification))) (durationSlots duration)
   Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
   Effect.AddMana {} -> Map.empty
+  Effect.Firebend {} -> Map.empty
   -- The actor is effectPlayerRefs' half, joined at the head; the FILTER is a
   -- read like Search's, a card naming a slot in it being read here.
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities _ filter_) -> filterSlotsOf filter_
@@ -1689,6 +1692,7 @@ ownSlotsAreExhaustive effect = case effect of
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
   Effect.AddMana _ -> True
+  Effect.Firebend _ -> True
   Effect.ActivateManaAbilities _ -> True
   Effect.MoveMana _ -> True
   -- The COUNT's own nested reads. The filter's are exhaustive by construction:
@@ -1938,6 +1942,7 @@ readsX =
         Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
         Effect.ChangeText {} -> False
         Effect.AddMana _ -> False
+        Effect.Firebend _ -> False
         Effect.ActivateManaAbilities _ -> False
         Effect.MoveMana _ -> False
         Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> any Quantity.readsX quantity
@@ -2155,6 +2160,7 @@ boundSlots effect = case effect of
   Effect.ModifyTarget {} -> Set.empty
   Effect.ChangeText {} -> Set.empty
   Effect.AddMana _ -> Set.empty
+  Effect.Firebend _ -> Set.empty
   Effect.ActivateManaAbilities _ -> Set.empty
   Effect.MoveMana _ -> Set.empty
   Effect.Search {} -> Set.empty

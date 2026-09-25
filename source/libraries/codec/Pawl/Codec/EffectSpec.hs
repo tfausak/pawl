@@ -1972,6 +1972,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Train (SlotName.MkSlotName (Text.pack "self")))
       " {\"type\":\"Train\",\"value\":\"self\"} "
+  -- CR 702.189a's mana and CR 702.189b's marker, AddMana's payload: firebending
+  -- 2's two retained {R}.
+  Spec.it s "Firebend" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Firebend (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Red)) (Quantity.Literal 2) ManaRetention.UntilEndOfCombat Nothing Nothing))
+      " {\"type\":\"Firebend\",\"value\":{\"count\":{\"type\":\"Literal\",\"value\":2},\"production\":{\"type\":\"OfType\",\"value\":{\"type\":\"Colored\",\"value\":{\"type\":\"Red\"}}},\"retention\":{\"type\":\"UntilEndOfCombat\"}}} "
   Spec.it s "ItBecomes" $
     Common.assertJsonCodec
       s

@@ -234,6 +234,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Mentor" SlotName.codec Effect.Mentor (\x -> case x of Effect.Mentor y -> Just y; _ -> Nothing),
           Arm.nullary "Exploit" Effect.Exploit,
           Arm.payload "Train" SlotName.codec Effect.Train (\x -> case x of Effect.Train y -> Just y; _ -> Nothing),
+          Arm.payload "Firebend" ManaAddition.codec Effect.Firebend (\x -> case x of Effect.Firebend y -> Just y; _ -> Nothing),
           Arm.payload "ItBecomes" Daytime.codec Effect.ItBecomes (\x -> case x of Effect.ItBecomes y -> Just y; _ -> Nothing),
           Arm.payload "ExileUntilMonarch" SlotName.codec Effect.ExileUntilMonarch (\x -> case x of Effect.ExileUntilMonarch y -> Just y; _ -> Nothing),
           Arm.payload "ExileHaunting" ExileHaunting.codec Effect.ExileHaunting (\x -> case x of Effect.ExileHaunting y -> Just y; _ -> Nothing),
@@ -381,6 +382,7 @@ tagOf x = case x of
   Effect.Mentor {} -> "Mentor"
   Effect.Exploit {} -> "Exploit"
   Effect.Train {} -> "Train"
+  Effect.Firebend {} -> "Firebend"
   Effect.ItBecomes {} -> "ItBecomes"
   Effect.ExileUntilMonarch {} -> "ExileUntilMonarch"
   Effect.ExileHaunting {} -> "ExileHaunting"
