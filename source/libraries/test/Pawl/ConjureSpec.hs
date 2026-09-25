@@ -57,6 +57,7 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -78,6 +79,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -96,6 +98,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.Zone as Zone
 
 -- Pawl.CounterspellSpec's bitterblossomChain, which is the shape both cases
@@ -885,6 +888,53 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           (castOffered duplicate welcomeHome paid, S.tappedCount S.alice cast - S.tappedCount S.alice paid, fmap (\oid -> Projection.namesOf oid cast) (GameState.stack cast), length bears, length (Game.zoneMembers Zone.Exile S.alice played))
           (True, 7, [Set.singleton welcomeHome], 3, 1)
       Nothing -> Spec.assertFailure s "expected one Clone and one duplicate"
+  -- CR 305.1 / 707.2: card types are copiable, so a duplicate of a Clone copying
+  -- Dryad Arbor -- printed Clone beneath -- is a land card its owner may play,
+  -- and enters as Dryad Arbor. With no mana cost it has no cast to fall back on
+  -- (CR 118.6), so the land play is the only way it leaves the hand.
+  Spec.it s "CR 707.2/305.1 a duplicate of a Clone of Dryad Arbor is played as a land" $ do
+    island <- S.printingOf s registry "Island"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    arbor <- S.printingOf s registry "Dryad Arbor"
+    let (arborId, board0) = S.addPermanent arbor S.alice (S.landsInPlay island 2) {GameState.phase = Phase.PrecombatMain}
+    case duplicateOfCopy clone reflections arborId board0 of
+      Just (duplicate, conjured) -> do
+        let played = S.settleSba (S.runPure S.identityAnswer conjured (Cast.playLand False S.alice duplicate Nothing))
+            arrived = Set.toList (Set.difference (GameState.battlefield played) (GameState.battlefield conjured))
+        Spec.assertEqWith
+          s
+          "CR 305.1 (the land play offered, the names it enters with)"
+          (elem (Action.Play duplicate Nothing) (Action.legalActions S.alice conjured {GameState.priority = Just S.alice}), fmap (\oid -> Projection.namesOf oid played) arrived)
+          (True, [Set.singleton dryadArbor])
+      Nothing -> Spec.assertFailure s "expected one Clone and one duplicate"
+  -- CR 707.2 / 702.37c / 702.37e: morph is copiable, so a duplicate of a Clone
+  -- copying Ainok Tracker ({5}{R}, "Morph {4}{R}") -- printed Clone beneath --
+  -- is offered face down for {3} and turned face up for {4}{R}, becoming the
+  -- Tracker. The Mountains arrive after Sinister Reflections, so every land the
+  -- two steps tap is counted.
+  Spec.it s "CR 707.2/702.37e a duplicate of a Clone of Ainok Tracker is cast face down and turned up for its morph cost" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    clone <- S.printingOf s registry "Clone"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    tracker <- S.printingOf s registry "Ainok Tracker"
+    let (trackerId, board0) = S.addPermanent tracker S.alice (S.landsInPlay island 2) {GameState.phase = Phase.PrecombatMain}
+        morphed = Facing.faceDown FaceDownReason.Morphed
+    case duplicateOfCopy clone reflections trackerId board0 of
+      Just (duplicate, conjured) -> do
+        let paid = S.landsFor mountain S.alice 8 conjured
+            offeredDown = elem (Action.Cast duplicate cloneName morphed) (Action.legalActions S.alice paid {GameState.priority = Just S.alice})
+            cast = S.settleSba (S.runPure S.identityAnswer paid (Cast.castSpell S.manaPerformer S.alice duplicate cloneName morphed >> Stack.resolveTop))
+            arrived = Set.toList (Set.difference (GameState.battlefield cast) (GameState.battlefield paid))
+            turnable = FaceDown.turnableFaceUp S.alice cast
+            up = S.settleSba (S.runPure S.identityAnswer cast (Monad.mapM_ (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph) arrived))
+        Spec.assertEqWith
+          s
+          "CR 702.37c/702.37e (face-down cast offered, lands it taps, turn-up offered, lands that taps, names face up)"
+          (offeredDown, S.tappedCount S.alice cast - S.tappedCount S.alice paid, turnable, S.tappedCount S.alice up - S.tappedCount S.alice cast, fmap (\oid -> Projection.namesOf oid up) arrived)
+          (True, 3, fmap (\oid -> (oid, TurnUpProcedure.Morph)) arrived, 5, [Set.singleton ainokTracker])
+      Nothing -> Spec.assertFailure s "expected one Clone and one duplicate"
   -- CR 709.5b / 707.2: a Room's halves are copiable values, so a Copy
   -- Enchantment copying Spiked Corridor // Torture Pit, made a creature by
   -- Opalescence and duplicated by Sinister Reflections, is a card in hand printed
@@ -1505,6 +1555,12 @@ duplicateOf reflections target board0 = do
 -- priority hers? The offer, which Cast.castable asked of a name does not check.
 castOffered :: ObjectId.ObjectId -> CardName.CardName -> GameState.GameState -> Bool
 castOffered oid name gs = elem (Action.Cast oid name Facing.FaceUp) (Action.legalActions S.alice gs {GameState.priority = Just S.alice})
+
+dryadArbor :: CardName.CardName
+dryadArbor = CardName.MkCardName (Text.pack "Dryad Arbor")
+
+ainokTracker :: CardName.CardName
+ainokTracker = CardName.MkCardName (Text.pack "Ainok Tracker")
 
 welcomeHome :: CardName.CardName
 welcomeHome = CardName.MkCardName (Text.pack "Welcome Home")
