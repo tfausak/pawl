@@ -1284,6 +1284,11 @@ noCharacteristics =
       -- CR 702.184c: an ability on the stack grants nothing to its
       -- controller's station abilities of its own.
       PC.grantsStationToughness = False,
+      -- CR 601.2b / 601.2f: no card, so no printed costs either.
+      PC.additionalCosts = [],
+      PC.additionalCostChoices = [],
+      PC.alternativeCosts = [],
+      PC.costReductions = [],
       -- CR 709.5: no characteristics, so no halves either.
       PC.halves = Nothing,
       -- CR 722.2b, for the same reason one line up.
@@ -1408,6 +1413,13 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- CR 613.1's starting point, before layer 6 has run:
               -- applyModification's GrantsStationToughness arm is the only writer.
               PC.grantsStationToughness = False,
+              -- CR 707.2: the cast-time costs printed in the rules text, copiable
+              -- with it, so a card carrying a copy stamp or a conjured
+              -- duplicate's values is cast with them (Game.castingFaceOf).
+              PC.additionalCosts = Face.additionalCosts face,
+              PC.additionalCostChoices = Face.additionalCostChoices face,
+              PC.alternativeCosts = Face.alternativeCosts face,
+              PC.costReductions = Face.costReductions face,
               -- CR 709.5 / 709.5b: the halves this object has, which -- like the
               -- names above -- `face` cannot carry, a Face being one half's worth
               -- of characteristics. Game.halvesOf decides, and it reads the copy

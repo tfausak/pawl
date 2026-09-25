@@ -901,6 +901,28 @@ halvesCardOf obj card = case copyStampOf obj of
 copyStampOf :: Object.Object -> Maybe PC.ProjectedCharacteristics
 copyStampOf obj = Binding.copyOf (Object.bindings obj) Applicative.<|> Object.duplicate obj
 
+-- CR 707.2 / 601.2b-f: `face` with the cast-time costs its copy stamp carries
+-- laid over it -- mana cost, additional and alternative costs, and its own cost
+-- reductions -- so a card carrying copiable values other than its printing's is
+-- cast at the copied card's price. Pawl.ConjureSpec's "a duplicate of a Clone
+-- costs / owes / offers / takes" cases prove every field but the cost choices.
+--
+-- Not implemented: a stamp with halves, whose half is still chosen off the
+-- printed card (#4078), and the cast-time keywords (affinity, convoke, assist),
+-- still read off the printed face (#4079).
+castingFaceOf :: Object.Object -> Face Card -> Face Card
+castingFaceOf obj face = case copyStampOf obj of
+  Just stamp
+    | Maybe.isNothing (PC.halves stamp) ->
+        face
+          { Face.manaCost = PC.manaCost stamp,
+            Face.additionalCosts = PC.additionalCosts stamp,
+            Face.additionalCostChoices = PC.additionalCostChoices stamp,
+            Face.alternativeCosts = PC.alternativeCosts stamp,
+            Face.costReductions = PC.costReductions stamp
+          }
+  _ -> face
+
 -- CR 722.2a / 722.2b: the PREPARE SPELL this object has -- the copy snapshot's
 -- when the object is copying something, and its own printed card's otherwise.
 -- halvesCardOf above's shape, and the rule states the same thing rule 709.5b

@@ -5,12 +5,16 @@ module Pawl.Codec.ProjectedCharacteristics where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Codec.AlternativeCost as AlternativeCost
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Codec.Color as Color
+import qualified Pawl.Codec.CostChoice as CostChoice
+import qualified Pawl.Codec.CostComponent as CostComponent
+import qualified Pawl.Codec.CostReduction as CostReduction
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Face as Face
@@ -64,6 +68,10 @@ codec = Fields.object $ do
   textChangedKeywords <- Fields.defaulted "textChangedKeywords" Map.empty (Common.multiset Keyword.codec) PC.textChangedKeywords
   assignsCombatDamageWithToughness <- Fields.defaulted "assignsCombatDamageWithToughness" False Common.boolean PC.assignsCombatDamageWithToughness
   grantsStationToughness <- Fields.defaulted "grantsStationToughness" False Common.boolean PC.grantsStationToughness
+  additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) PC.additionalCosts
+  additionalCostChoices <- Fields.defaulted "additionalCostChoices" [] (Common.list CostChoice.codec) PC.additionalCostChoices
+  alternativeCosts <- Fields.defaulted "alternativeCosts" [] (Common.list AlternativeCost.codec) PC.alternativeCosts
+  costReductions <- Fields.defaulted "costReductions" [] (Common.list CostReduction.codec) PC.costReductions
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   prepare <- Fields.defaulted "prepare" Nothing (Common.maybe (Face.codec Card.codec)) PC.prepare
   flipped <- Fields.defaulted "flipped" Nothing (Common.maybe codec) PC.flipped
@@ -95,6 +103,10 @@ codec = Fields.object $ do
         PC.textChangedKeywords = textChangedKeywords,
         PC.assignsCombatDamageWithToughness = assignsCombatDamageWithToughness,
         PC.grantsStationToughness = grantsStationToughness,
+        PC.additionalCosts = additionalCosts,
+        PC.additionalCostChoices = additionalCostChoices,
+        PC.alternativeCosts = alternativeCosts,
+        PC.costReductions = costReductions,
         PC.halves = halves,
         PC.prepare = prepare,
         PC.flipped = flipped

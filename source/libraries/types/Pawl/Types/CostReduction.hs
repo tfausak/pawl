@@ -21,7 +21,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- spells to match against, because the only spell it reduces is the one it is
 -- printed on, and it carries a Quantity where that one carries a literal amount.
 --
--- Read straight off the card by Pawl.Engine.Cost.selfReductions and NOT
+-- Read straight off the card, or its copy stamp (Pawl.Engine.Game.castingFaceOf),
+-- by Pawl.Engine.Cost.selfReductions and NOT
 -- through the projection -- Pawl.Types.Face.castingPermissions' precedent, for
 -- its reason: the ability is consulted while the object is in a hand or on the
 -- stack, where this reader takes the printed card (#1859). CR

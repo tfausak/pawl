@@ -4,12 +4,16 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CostChoice as CostChoice
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
@@ -291,6 +295,18 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- permanent the ability's controller controls, so the fact is per-object
     -- here and folded to a per-player question at the one site that asks it.
     grantsStationToughness :: Bool,
+    -- | CR 707.2 / 601.2b: the printed additional costs the copiable face
+    -- carries (Face.additionalCosts), read by Game.castingFaceOf.
+    additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
+    -- | CR 707.2 / 601.2b: the additional costs offering a choice
+    -- (Face.additionalCostChoices), read by Game.castingFaceOf.
+    additionalCostChoices :: [CostChoice.CostChoice],
+    -- | CR 707.2 / 118.9: the printed alternative costs (Face.alternativeCosts),
+    -- read by Game.castingFaceOf.
+    alternativeCosts :: [AlternativeCost.AlternativeCost],
+    -- | CR 707.2 / 601.2f: the printed reductions of its own cost
+    -- (Face.costReductions), read by Game.castingFaceOf.
+    costReductions :: [CostReduction.CostReduction],
     -- | CR 709.5: the card whose HALVES this object has, and Nothing for an
     -- object with no shared type line. The one field here that is not a
     -- characteristic: rule 709.5's last sentence makes the shared type line's
