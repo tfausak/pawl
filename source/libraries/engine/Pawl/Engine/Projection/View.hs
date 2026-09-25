@@ -1543,7 +1543,15 @@ withMergedAbilities donor base =
       -- CR 613.11's twelve families, whose Semigroup is the same concatenation
       -- the eight fields above are written out with; Pawl.Types.RuleAbilities
       -- carries it so a thirteenth family cannot be added and left out here.
-      PC.ruleAbilities = PC.ruleAbilities base <> PC.ruleAbilities donor
+      PC.ruleAbilities = PC.ruleAbilities base <> PC.ruleAbilities donor,
+      -- CR 702.140e / 118.8 / 118.9: a cost line in a component's rules text is
+      -- one of its abilities too, so a duplicate of the merged permanent owes
+      -- every component's. Pawl.ConjureSpec's "CR 702.140e a duplicate of a
+      -- mutated Headless Skaab" proves it.
+      PC.additionalCosts = PC.additionalCosts base <> PC.additionalCosts donor,
+      PC.additionalCostChoices = PC.additionalCostChoices base <> PC.additionalCostChoices donor,
+      PC.alternativeCosts = PC.alternativeCosts base <> PC.alternativeCosts donor,
+      PC.costReductions = PC.costReductions base <> PC.costReductions donor
     }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's

@@ -53,6 +53,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -75,6 +76,7 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -755,6 +757,53 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
           "CR 601.2f castable at {7}{G}{G}: (eight Forests, nine Forests)"
           (S.castable S.alice duplicate (S.landsFor forest S.alice 8 conjured), S.castable S.alice duplicate (S.landsFor forest S.alice 9 conjured))
           (False, True)
+  -- CR 702.140e: a mutated permanent has every component's abilities, and the
+  -- Skaab's additional cost is one. Cubwarden mutates over alice's Headless
+  -- Skaab and Sinister Reflections duplicates the merged creature, so the
+  -- duplicate costs the Cubwarden's {3}{W} and still owes the Skaab's exile. The
+  -- pair differs only in a Goblin Piker in the graveyard.
+  Spec.it s "CR 702.140e a duplicate of a mutated Headless Skaab owes the Skaab's additional cost" $ do
+    (island, _, plains, piker, _, reflections, cubwarden) <- duplicatePrintings s registry
+    skaab <- S.printingOf s registry "Headless Skaab"
+    let (skaabId, board0) = S.addPermanent skaab S.alice (S.landsInPlay plains 4)
+        (withCubwarden, cubwardenSpell) = S.handOne cubwarden board0
+        merged = mergingOnto skaabId withCubwarden cubwardenSpell
+        (spell, board1) = S.addHandCard reflections S.alice (S.landsFor island S.alice 2 merged)
+        before = Game.zoneMembers Zone.Hand S.alice board1
+        resolved = S.settleSba (S.runPure (aimingAtAll [skaabId]) board1 {GameState.phase = Phase.PrecombatMain} (S.cast S.alice spell >> Stack.resolveTop))
+    case filter (`notElem` before) (Game.zoneMembers Zone.Hand S.alice resolved) of
+      [duplicate] -> do
+        let bare = S.landsFor plains S.alice 4 resolved
+            (_, stocked) = S.addGraveyardCard piker S.alice bare
+        Spec.assertEqWith
+          s
+          "CR 702.140e castable only with a creature card to exile: (empty graveyard, a Piker in it)"
+          (S.castable S.alice duplicate bare, S.castable S.alice duplicate stocked)
+          (False, True)
+        Spec.assertEqWith s "setup: the merged permanent held the Cubwarden and the Skaab" (fmap (Seq.length . Game.componentsOf . Object.source) (Game.lookupObject skaabId merged)) (Just 2)
+      other -> Spec.assertFailure s ("expected one duplicate in hand, got " <> show (length other))
+  -- CR 715.3a: an Adventure is cast with its own characteristics alone, so a
+  -- duplicate of Flaxen Intruder ({G}) cast as Welcome Home still costs
+  -- {5}{G}{G}. One Forest pays the creature half and not the Adventure.
+  Spec.it s "CR 715.3a a duplicate of Flaxen Intruder cast as Welcome Home costs Welcome Home's cost" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    reflections <- S.printingOf s registry "Sinister Reflections"
+    intruder <- S.printingOf s registry "Flaxen Intruder"
+    let (intruderId, board0) = S.addPermanent intruder S.alice (S.landsInPlay island 2)
+        (spell, board1) = S.addHandCard reflections S.alice board0
+        before = Game.zoneMembers Zone.Hand S.alice board1
+        resolved = S.settleSba (S.runPure (aimingAtAll [intruderId]) board1 {GameState.phase = Phase.PrecombatMain} (S.cast S.alice spell >> Stack.resolveTop))
+        paid = S.landsFor forest S.alice 1 resolved
+        castableAs name oid = Cast.castable S.alice oid (CardName.MkCardName (Text.pack name)) Facing.FaceUp paid
+    case filter (`notElem` before) (Game.zoneMembers Zone.Hand S.alice resolved) of
+      [duplicate] ->
+        Spec.assertEqWith
+          s
+          "CR 715.3a off one Forest: (as Flaxen Intruder, as Welcome Home)"
+          (castableAs "Flaxen Intruder" duplicate, castableAs "Welcome Home" duplicate)
+          (True, False)
+      other -> Spec.assertFailure s ("expected one duplicate in hand, got " <> show (length other))
   -- CR 730.3 / 400.7: the duplicate, cast and resolved as the Piker, is the
   -- permanent Cubwarden ({3}{W} 3/5 Cat, "Mutate {2}{W}{W}", lifelink) mutates
   -- OVER, and the merged permanent is then destroyed. Its two components are put

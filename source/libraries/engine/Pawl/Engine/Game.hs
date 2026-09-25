@@ -907,13 +907,19 @@ copyStampOf obj = Binding.copyOf (Object.bindings obj) Applicative.<|> Object.du
 -- cast at the copied card's price. Pawl.ConjureSpec's "a duplicate of a Clone
 -- costs / owes / offers / takes" cases prove every field but the cost choices.
 --
+-- The stamp describes the card's NORMAL characteristics alone, so it is laid
+-- over the front face and nothing else: CR 715.3a casts an Adventure with only
+-- its alternative characteristics, and CR 708.4 a face-down spell with only
+-- those. Pawl.ConjureSpec's "CR 715.3a a duplicate of Flaxen Intruder" proves
+-- the first.
+--
 -- Not implemented: a stamp with halves, whose half is still chosen off the
 -- printed card (#4078), and the cast-time keywords (affinity, convoke, assist),
 -- still read off the printed face (#4079).
-castingFaceOf :: Object.Object -> Face Card -> Face Card
-castingFaceOf obj face = case copyStampOf obj of
+castingFaceOf :: Object.Object -> Card -> Face Card -> Face Card
+castingFaceOf obj card face = case copyStampOf obj of
   Just stamp
-    | Maybe.isNothing (PC.halves stamp) ->
+    | Maybe.isNothing (PC.halves stamp) && Face.name face == Face.name (Card.frontFace card) ->
         face
           { Face.manaCost = PC.manaCost stamp,
             Face.additionalCosts = PC.additionalCosts stamp,
