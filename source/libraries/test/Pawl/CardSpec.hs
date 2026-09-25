@@ -4361,6 +4361,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.MilledThisTurn -> []
   Filter.Type.CantCrewVehicles -> []
   Filter.Type.DealtDamageThisTurn -> []
+  Filter.Type.EnteredThisTurn -> []
   Filter.Type.CrewedSourceThisTurn -> []
   Filter.Type.ConvokedSourceThisTurn -> []
   Filter.Type.ControlledSinceTurnBegan -> []

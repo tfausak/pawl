@@ -190,6 +190,9 @@ viewOfCard face =
           -- a permanent. viewOfCharacteristics is the view that holds an id and
           -- answers.
           Filter.dealtDamageThisTurn = False,
+          -- CR 400.7 enters an OBJECT; this builder describes a printed FACE --
+          -- `milledThisTurn` above's reason.
+          Filter.enteredThisTurn = False,
           -- CR 702.122c relates a creature to a Vehicle it crewed, and this
           -- builder describes a printed FACE rather than either --
           -- `milledThisTurn` above's reason.
@@ -645,6 +648,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- 701.69a heals them away and CR 120.3d/120.3e mark none at all for wither
       -- or infect, and any such creature was still dealt damage this turn.
       Filter.dealtDamageThisTurn = any ((== Just oid) . Game.damagedObject . LoggedEvent.event) (GameState.events gs),
+      -- CR 400.7 / 608.2i: the same log again, read for the entries, keyed on
+      -- the ARRIVAL's id as Pawl.Engine.Quantity's EnteredThisTurn arm is.
+      Filter.enteredThisTurn = any ((== Just oid) . Game.enteredBattlefield . LoggedEvent.event) (GameState.events gs),
       -- CR 702.122c / 608.2i: the same log once more, read for the crewings this
       -- candidate paid for. The VEHICLES, which is the half of the relation a
       -- candidate can answer; Pawl.Engine.Filter's CrewedSourceThisTurn compares
