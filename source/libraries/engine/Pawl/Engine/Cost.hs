@@ -332,18 +332,11 @@ candidateCostsGiven permitted pid name oid gs =
         -- Unreachable: a PrintingId is minted only by Game.intern, which inserts.
         Nothing -> []
         Just card ->
-          let face = Game.resolveFace (Just name) card
-              -- CR 707.2: mana cost is a copiable value, so a card carrying a
-              -- copy stamp or a conjured duplicate's values (Game.copyStampOf)
-              -- is priced off those. Pawl.ConjureSpec's "CR 707.2 a duplicate of
-              -- a Clone costs what the Clone copies" proves it. Not implemented:
-              -- the other cast-time reads of the copiable face -- additional and
-              -- alternative costs, self-reductions, the half a stamp with halves
-              -- names -- which still take the printed card (#4044).
-              stampedCost = case Game.copyStampOf obj of
-                Just stamp | Maybe.isNothing (PC.halves stamp) -> Just (PC.manaCost stamp)
-                _ -> Nothing
-              printed = Cost.MkCost {Cost.mana = Maybe.fromMaybe (Face.manaCost face) stampedCost, Cost.components = Face.additionalCosts face}
+          let -- CR 707.2: the costs are copiable values, so a card carrying a
+              -- copy stamp or a conjured duplicate's values is priced off those
+              -- (Game.castingFaceOf).
+              face = Game.castingFaceOf obj (Game.resolveFace (Just name) card)
+              printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
               -- CR 118.9d: an alternative replaces only the MANA cost; every
               -- additional cost still applies. CR 702.34a's last sentence sends
               -- flashback through the same rules, so its cost is wrapped the same.
@@ -919,7 +912,8 @@ spellAdjustments pid oid gs =
 --
 -- The face comes straight off the object rather than through a projection, for
 -- Pawl.Types.CostReduction's reason (#1859): it is the half Cast.asProposed
--- already stamped (CR 709.3b).
+-- already stamped (CR 709.3b), with its copy stamp's costs laid over it
+-- (Game.castingFaceOf, CR 707.2).
 selfReductions :: PlayerId -> ObjectId -> GameState -> [ManaCost.ManaCost]
 selfReductions pid oid gs =
   let -- CR 109.5: the perspective is the would-be controller, `pid` -- not
@@ -932,9 +926,11 @@ selfReductions pid oid gs =
             -- A negative saturates to 0, the floor the header states.
             times n = concat (replicate (max 0 (Integer.toIntSaturating n)) (ManaCost.unwrap (CostReduction.amount reduction)))
          in fmap (ManaCost.MkManaCost . times) copies
-   in case Game.faceOf oid gs of
-        Nothing -> []
-        Just face -> Maybe.mapMaybe scaled (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face))
+   in case (Game.lookupObject oid gs, Game.faceOf oid gs) of
+        (Just obj, Just printedFace) ->
+          let face = Game.castingFaceOf obj printedFace
+           in Maybe.mapMaybe scaled (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face))
+        _ -> []
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes
 -- through rule 601.2b-i like a spell's. No commander tax: CR 903.8 taxes
