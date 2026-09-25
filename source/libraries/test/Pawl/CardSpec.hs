@@ -259,6 +259,7 @@ import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
+import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
@@ -709,7 +710,8 @@ objectRefPlayerRefPositions =
     ("top-of-library-until", ObjectRef.TopOfLibraryUntil (TopOfLibraryUntil.MkTopOfLibraryUntil (plantedPlayer "tu") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "tu"]),
     ("top-of-graveyard", ObjectRef.TopOfGraveyard (plantedPlayer "tg"), [plantedPlayer "tg"]),
     ("chosen-card-in-hand", ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (plantedPlayer "ch") (Filter.Type.And [])), [plantedPlayer "ch"]),
-    ("random-card-in-hand", ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (plantedPlayer "rh") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "rh"])
+    ("random-card-in-hand", ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (plantedPlayer "rh") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "rh"]),
+    ("random-card-in-library", ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (plantedPlayer "rl") (Filter.Type.And []) (Quantity.Type.Literal 1)), [plantedPlayer "rl"])
   ]
 
 -- plantedRef's player half, named for its position for that function's reason.
@@ -3625,6 +3627,9 @@ objectRefFilters ref = case ref of
   -- the whole of what there is to lint -- the arm above's answer, for its
   -- reason -- and Make a Wish's count goes through refFilters beside it.
   ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard _ f _) -> unframed [f] <> refFilters ref
+  -- The Gates' "seek a nonland card": RandomCardInHand's answer one hidden zone
+  -- over, for its reason.
+  ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary _ f _) -> unframed [f] <> refFilters ref
   -- Tovolar's "any number of Human Werewolves you control": EachMatching's
   -- Filter position exactly -- same zone, same sweep, the chooser standing
   -- between the matches and the set -- so it is framed the same way.

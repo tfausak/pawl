@@ -757,6 +757,10 @@ refReachesLibrary ref = case ref of
   -- FALSE for the arm above's reason and for ChosenCardInGraveyard's: the
   -- position is in a GRAVEYARD, so the ref itself reaches no library.
   ObjectRef.RandomCardInGraveyard _ -> False
+  -- TRUE, TopOfLibrary's answer: seek names cards IN a library. A regression
+  -- fence: no seek in the pool could add mana, so CR 605.1a's second clause
+  -- already answers for it.
+  ObjectRef.RandomCardInLibrary _ -> True
   -- The battlefield, the arm this one offers a subset of: EachMatching's
   -- answer, unchanged by a chooser standing between the sweep and the set.
   ObjectRef.AnyNumberMatching _ -> False

@@ -156,6 +156,7 @@ import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RandomCardInGraveyard as RandomCardInGraveyard
 import qualified Pawl.Types.RandomCardInHand as RandomCardInHand
+import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
@@ -957,8 +958,8 @@ rewriteConjureCards pairs cards = case cards of
 -- and the player-naming arms hold no subtype word; only the Filters and the
 -- Quantities can carry one -- the Filter that says what ends a walk of a library
 -- included, and ChosenCardInGraveyard's, ChosenCardFromAmong's,
--- RandomCardInHand's and RandomCardInGraveyard's counts beside the two library
--- walks'.
+-- RandomCardInHand's, RandomCardInGraveyard's and RandomCardInLibrary's counts
+-- beside the two library walks'.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
@@ -996,6 +997,9 @@ rewriteObjectRef pairs ref = case ref of
   -- The arm above's regression fence, for its reason: Ghoulraiser's Zombie is a
   -- creature type and no printing changes this trigger's text.
   ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard s f c) -> ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard s (Filter.rewrite pairs f) (rewriteQuantity pairs c))
+  -- The arm above's regression fence, for its reason: the Gates' "nonland" is a
+  -- card type and no printing changes their text.
+  ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p f c) -> ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p (Filter.rewrite pairs f) (rewriteQuantity pairs c))
   ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
   ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f w) -> ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.rewrite pairs f) w)
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)
