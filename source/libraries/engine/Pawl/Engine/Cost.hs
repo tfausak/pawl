@@ -485,6 +485,7 @@ candidateCostsGiven permitted pid name oid gs =
                         (Just (Keyword.Type.Emerge emerge))
                         (withAdditional (Emerge.cost emerge) {Cost.components = Cost.components (Emerge.cost emerge) <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.IsObject vid))]})
                         [ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]]
+                        False
                  in concatMap
                       (\emerge -> fmap (offer emerge) (victims (Maybe.fromMaybe (Filter.Type.HasCardType CardType.Creature) (Emerge.quality emerge))))
                       (Keyword.emergeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
@@ -625,13 +626,29 @@ candidateCostsGiven permitted pid name oid gs =
               -- 702.170d a Mulldrifter Aven Interrupter plotted is offered no evoke
               -- cost" proves it.
               ordinary = fmap untagged (printed : alternatives) <> bestowed <> prototyped <> mutated <> evoked <> emerged <> surged <> spectacled <> prowled <> freerun
+              -- CR 702.48a: offering, an optional ADDITIONAL cost, so every
+              -- candidate is offered as it stands and once more per sacrificeable
+              -- [quality] permanent, which carries the widened window. The
+              -- victim is named outright for `emerged`'s reason (CR 702.48b), and
+              -- its mana cost is read off the projection, so a Clone reduces by
+              -- what it copied; CR 702.48c sends that through CR 118.7.
+              offered candidate =
+                candidate
+                  : [ candidate
+                        { CandidateCost.cost = (CandidateCost.cost candidate) {Cost.components = Cost.components (CandidateCost.cost candidate) <> [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.IsObject vid))]},
+                          CandidateCost.reductions = CandidateCost.reductions candidate <> [Maybe.fromMaybe (ManaCost.MkManaCost []) (Filter.manaCost (Projection.viewOfObject vid gs))],
+                          CandidateCost.instantSpeed = True
+                        }
+                    | quality <- Keyword.offeringQualities (Map.keysSet (Projection.keywordsOf oid gs)),
+                      vid <- Replacement.sacrificeCandidates Map.empty pid (Just oid) quality gs
+                    ]
            in -- CR 118.8 / 601.2b: every candidate below owes this face's choice
               -- costs, whichever of them the caster announces, so the expansion
               -- wraps the whole list rather than any one arm of it. The zone is
               -- Game.zoneOf's, so a CR 707.13 copy outside the game (CR 400.11)
               -- takes the `_` arm. A regression fence: none of Garth One-Eye's
               -- six cards prints a cost the graveyard arm offers.
-              concatMap (choiceVariants face) . orConverted $ case Game.zoneOf oid gs of
+              concatMap offered . concatMap (choiceVariants face) . orConverted $ case Game.zoneOf oid gs of
                 -- Three shapes, differing in what they do to the printed cost, plus
                 -- an effect's permission. Flashback (CR 702.34a) REPLACES the mana
                 -- cost, so it is wrapped by `withAdditional`, and escape (CR
@@ -730,6 +747,7 @@ candidateCostsGiven permitted pid name oid gs =
                                 (Just (Keyword.Type.Harmonize cost))
                                 (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (criterion vid))]})
                                 [ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]]
+                                False
                             tappingNone cost = CandidateCost.plain (Just (Keyword.Type.Harmonize cost)) (withAdditional cost)
                          in concatMap
                               (\cost -> tappingNone cost : fmap (tappingOne cost) tappable)
@@ -867,7 +885,7 @@ total pid oid cost gs = totalWith (spellAdjustments pid oid gs) cost
 
 -- CR 601.2f: the reductions a CANDIDATE COST brings with it
 -- (Pawl.Types.CandidateCost's @reductions@) folded into the adjustments the board
--- states -- rule 702.119a's, the only ones in the pool.
+-- states -- rule 702.119a's, rule 702.180a's and rule 702.48a's.
 --
 -- Unfloored and unconfined, `spellAdjustments`' reading of Thrasta's sentence:
 -- rule 702.119a states neither restriction, so CR 601.2f's own {0} and CR

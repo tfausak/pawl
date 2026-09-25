@@ -109,6 +109,7 @@ codec =
       Arm.optionalPayload "Vanishing" Common.natural Keyword.Vanishing (\x -> case x of Keyword.Vanishing y -> Just y; _ -> Nothing),
       Arm.payload "Fortify" (Cost.codec codec) Keyword.Fortify (\x -> case x of Keyword.Fortify y -> Just y; _ -> Nothing),
       Arm.payload "Splice" (Splice.codec codec) Keyword.Splice (\x -> case x of Keyword.Splice y -> Just y; _ -> Nothing),
+      Arm.payload "Offering" (Filter.codec codec) Keyword.Offering (\x -> case x of Keyword.Offering y -> Just y; _ -> Nothing),
       Arm.payload "Ninjutsu" (Cost.codec codec) Keyword.Ninjutsu (\x -> case x of Keyword.Ninjutsu y -> Just y; _ -> Nothing),
       Arm.payload "Frenzy" Common.natural Keyword.Frenzy (\x -> case x of Keyword.Frenzy y -> Just y; _ -> Nothing),
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous (\x -> case x of Keyword.Poisonous y -> Just y; _ -> Nothing),
@@ -305,6 +306,7 @@ tagOf x = case x of
   Keyword.Vanishing {} -> "Vanishing"
   Keyword.Fortify {} -> "Fortify"
   Keyword.Splice {} -> "Splice"
+  Keyword.Offering {} -> "Offering"
   Keyword.Ninjutsu {} -> "Ninjutsu"
   Keyword.Frenzy {} -> "Frenzy"
   Keyword.Poisonous {} -> "Poisonous"

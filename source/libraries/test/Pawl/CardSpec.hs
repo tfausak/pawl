@@ -3105,6 +3105,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Intimidate -> []
   Keyword.Poisonous _ -> []
   Keyword.Champion quality -> [quality]
+  Keyword.Offering quality -> [quality]
   -- CR 702.45a names no quality either: the "+N/+N" and the two combat events
   -- are written into the abilities Pawl.Engine.Keyword mints, not into the
   -- keyword.

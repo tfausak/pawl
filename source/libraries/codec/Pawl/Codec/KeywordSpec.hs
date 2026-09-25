@@ -855,6 +855,12 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Champion (Filter.HasSubtype Subtype.Merfolk)) /= Codec.encode Keyword.codec (Keyword.Champion (Filter.HasSubtype Subtype.Island)))
       "champion a Merfolk and champion an Island encode differently"
+  Spec.it s "Offering carries its quality" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Offering (Filter.HasSubtype Subtype.Goblin))
+      " {\"type\":\"Offering\",\"value\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Goblin\"}}} "
   -- CR 702.112a's N is written like every other keyword's, so the TAG is what
   -- keeps them apart: `Renown 2` and `Poisonous 2` differ only by it on the wire.
   Spec.it s "Renown carries its N" $ do

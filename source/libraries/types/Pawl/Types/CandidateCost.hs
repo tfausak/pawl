@@ -41,12 +41,15 @@ data CandidateCost = MkCandidateCost
     -- hand them to Pawl.Engine.Cost.plusReductions, so the gate that offers the
     -- cast and the total that prices it cannot disagree.
     --
-    -- Empty for every other candidate: no other rule 702 alternative cost states
-    -- an amount that depends on a choice made at CR 601.2b.
-    reductions :: [ManaCost.ManaCost]
+    -- Empty wherever the rule that offered it states no reduction. CR 702.48a's is the
+    -- sacrificed permanent's whole mana cost, colored symbols included.
+    reductions :: [ManaCost.ManaCost],
+    -- | CR 702.48a: this candidate may be announced any time its caster could
+    -- cast an instant, whatever the card's own window.
+    instantSpeed :: Bool
   }
   deriving (Eq, Ord, Show)
 
--- | A candidate bringing no reduction of its own -- every offer but CR 702.119a's.
+-- | A candidate bringing no reduction and no window of its own.
 plain :: Maybe Keyword.Keyword -> Cost.Cost Keyword.Keyword -> CandidateCost
-plain k c = MkCandidateCost k c []
+plain k c = MkCandidateCost k c [] False
