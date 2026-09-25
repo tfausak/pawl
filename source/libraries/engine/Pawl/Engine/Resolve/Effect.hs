@@ -1825,7 +1825,7 @@ sourceObjectOf src = case src of
 -- refers to both of them, and CR 609.7a asks for every object referred to.
 -- Player recipients drop out, the rule's classes all being objects.
 --
--- ONE SLOT IS DROPPED, and by NAME rather than by comparing ids: Binding.thisAbility
+-- TWO SLOTS ARE DROPPED, by NAME rather than by comparing ids. Binding.thisAbility
 -- holds the activated ability's OWN id (CR 602.2a), which pawl stamps so a card can
 -- read the activation's own record -- the mana that paid for it, and how many times
 -- it has resolved this turn -- not because any printed text names the ability as
@@ -1839,9 +1839,16 @@ sourceObjectOf src = case src of
 -- ActiveReplacement.slots, already narrowed to the row's own slot names, so it
 -- never sees this one unless a card writes it -- and then the card really does name
 -- it. Pawl.ReplacementSpec proves both binding carriers, one case each.
+--
+-- Binding.collectedEvidence is the SECOND slot dropped, for the same kind of
+-- reason: it records whether evidence was collected, which is all CR 701.59c's
+-- linked text asks, and no text names the exiled cards through it.
+-- Pawl.CostSpec's "CR 609.7a the evidence the Inspector collected is not a
+-- source it refers to" proves it. The other paid-cost slots stay: a card reads
+-- each by name (Fling's "the sacrificed creature's power").
 referentsOfBindings :: Map.Map SlotName Binding.Type.Binding -> [ObjectId]
 referentsOfBindings bindings =
-  let named = Map.delete Binding.thisAbility bindings
+  let named = Map.withoutKeys bindings (Set.fromList [Binding.thisAbility, Binding.collectedEvidence])
    in foldMap (Maybe.mapMaybe Recipient.objectOf . Set.toList) (Binding.targetsOf named)
         <> foldMap Foldable.toList (Binding.groupsOf named)
 

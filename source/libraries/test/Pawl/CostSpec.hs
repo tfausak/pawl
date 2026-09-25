@@ -2622,6 +2622,19 @@ evidenceSpec s registry =
               declined = S.runPure (collectingEvidence False S.noSource) gs (play held)
           Spec.assertEqWith s "CR 118.12 collecting evidence made two Spiders, declining made none" (spiders collected, spiders declined) (2, 0)
           Spec.assertEqWith s "CR 701.59a and the collection exiled both Soils" (length (Game.zoneMembers Zone.Exile S.alice collected), length (Game.zoneMembers Zone.Exile S.alice declined)) (2, 0)
+        -- CR 609.7a's third class, over the Inspector SPELL: the record its cost
+        -- bound says only whether evidence was collected (CR 701.59c), so the
+        -- exiled Soils are no object it refers to. bob answers the Inspector with
+        -- Healing Grace, and is offered sources on the stack and battlefield.
+        Spec.it s "CR 609.7a the evidence the Inspector collected is not a source it refers to" $ do
+          (gs, held, piker) <- evidenceBoard s registry "Vitu-Ghazi Inspector" 2
+          plains <- S.printingOf s registry "Plains"
+          grace <- S.printingOf s registry "Healing Grace"
+          let (graceId, withGrace) = S.addHandCard grace S.bob (S.landsFor plains S.bob 1 gs)
+              soils = Game.zoneMembers Zone.Graveyard S.alice gs
+              offered = snd (State.runState (Engine.runGame (recordingSources True piker) withGrace (S.cast S.alice held >> S.cast S.bob graceId >> Stack.resolveTop)) [])
+          Spec.assertEqWith s "CR 609.7a no collected Soil is offered to bob as a source" (concatMap (filter (`elem` soils)) offered) []
+          Spec.assertBool s (List.elem piker (concat offered)) "and he was asked, over the Piker among others"
 
 -- `card` in alice's hand over `lands` Forests and a Swamp, two Acidic Soils in
 -- her graveyard, and bob's Goblin Piker, in her precombat main phase with
@@ -2653,6 +2666,14 @@ collectingEvidence collects victim p = case p of
   Prompt.ChooseToPay {} -> if collects then PaymentDecision.Pays else PaymentDecision.Declines
   Prompt.ChooseCollectEvidence _ _ _ candidates _ -> Set.fromList candidates
   _ -> announcing collects victim p
+
+-- collectingEvidence, recording every CR 609.7a source-choice offer in order.
+recordingSources :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+recordingSources collects victim p = case p of
+  Prompt.ChooseDamageSource _ _ _ offered -> do
+    State.modify' (<> [NonEmpty.toList offered])
+    pure (NonEmpty.head offered)
+  _ -> pure (collectingEvidence collects victim p)
 
 -- CR 115.4's "any target" pointed at a PLAYER, FILTERED out of the offered
 -- recipients for `targeting`'s reason: a hand-built Recipient.ToPlayer is a
