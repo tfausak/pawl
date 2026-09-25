@@ -193,8 +193,9 @@ curseOfVitalitySpec s registry =
         -- attacks bob with her own creatures, so the one player attacking the
         -- enchanted player is not an opponent of the Curse's controller and the
         -- second sentence names nobody. carol gains 2 for the first sentence and
-        -- no more. Reachable because CR 508.1 lets only the active player declare,
-        -- so this needs carol's turn rather than a second attacker.
+        -- no more. Reachable because, without the shared team turns option, CR
+        -- 508.1 lets only the active player declare, so this needs carol's turn
+        -- rather than a second attacker.
         Spec.it s "CR 508.6 the Curse's own controller attacking pays only the first sentence" $ do
           built <- ownTurnBoard
           case built of
@@ -892,9 +893,10 @@ anafenzaAttackSpec s registry =
 --     field could not tell the two disjuncts apart.
 --
 -- PlayerRelation.Opponent is BORNE by this card and still not discriminated from
--- AnyPlayer: CR 506.2/508.1 let only the active player declare, and no player
--- attacks themselves, so alice declaring leaves the "if" false whichever relation
--- is read. What the boards do falsify is You -- bob declares on all three, and a
+-- AnyPlayer: on these boards CR 506.2/508.1 let only the active player declare
+-- (CR 805.10a's shared team turns widen that), and no player attacks
+-- themselves, so alice declaring leaves the "if" false whichever relation is
+-- read. What the boards do falsify is You -- bob declares on all three, and a
 -- You reading fires nothing at all.
 everWatchingThresholdSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 everWatchingThresholdSpec s registry =
@@ -1224,9 +1226,10 @@ luluSpec s registry =
 -- three readings a wrong arm could take -- the declarer, CR 109.5's "you", and
 -- CR 508.1b's announced player -- are three different life totals.
 --
--- The ACTIVE player is not discriminated from the declarer and cannot be: CR
--- 506.2 lets only the active player declare attackers, so the two are the same
--- seat on every board the rules admit.
+-- The ACTIVE player is not discriminated from the declarer: without the shared
+-- team turns option CR 506.2 lets only the active player declare attackers, so
+-- the two are the same seat on these boards. CR 805.10a's teammate is the board
+-- that parts them.
 marauderTollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 marauderTollSpec s registry =
   let -- Answers CR 506.2a's turn-based choice with `defender` and sends every

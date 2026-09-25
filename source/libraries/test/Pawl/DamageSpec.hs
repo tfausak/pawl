@@ -2246,6 +2246,7 @@ departedAttackerSpec s registry =
                       Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      Combat.Type.declaredAttackedBy = Map.singleton S.alice (Set.singleton (AttackTarget.OfPlayer S.bob)),
                       -- Empty, because this board stands after the declare attackers
                       -- step ended: CR 500.1 scopes this half to the step, and
                       -- Combat.clearAttackedThisStep empties it as one ends.
@@ -2324,6 +2325,7 @@ departedDefenderSpec s registry =
                       Combat.Type.joinedUnder = Map.singleton attacker S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      Combat.Type.declaredAttackedBy = Map.singleton S.alice (Set.singleton (AttackTarget.OfPlayer S.bob)),
                       -- Empty, because this board stands after the declare attackers
                       -- step ended: CR 500.1 scopes this half to the step, and
                       -- Combat.clearAttackedThisStep empties it as one ends.
@@ -2380,6 +2382,7 @@ departedDefenderSpec s registry =
                       Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.carol),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.carol),
+                      Combat.Type.declaredAttackedBy = Map.singleton S.alice (Set.singleton (AttackTarget.OfPlayer S.carol)),
                       -- Empty, because this board stands after the declare attackers
                       -- step ended: CR 500.1 scopes this half to the step, and
                       -- Combat.clearAttackedThisStep empties it as one ends.

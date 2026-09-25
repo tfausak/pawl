@@ -8428,9 +8428,9 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.AttachedPlayerIsAttacked -> False
   TriggerCondition.SelfIsAttacked -> False
   -- The only arm around here that can answer True, and only on one relation: CR
-  -- 508.1 lets only the active player declare attackers, so the declarer named
-  -- by the event is always the active player. You therefore pins the event to CR
-  -- 109.5's "you"'s own turn; Opponent pins it to somebody else's; AnyPlayer
+  -- 508.1 lets only an active player declare attackers (CR 805.10a), so the
+  -- declarer named by the event is always an active player. You therefore pins
+  -- the event to CR 109.5's "you"'s own turn; Opponent pins it to somebody else's; AnyPlayer
   -- pins nothing. SelfAttacks answers False because it pins the CREATURE and not
   -- the declarer -- a stolen creature attacks on its thief's turn -- which is
   -- the comparison this arm does make.

@@ -169,6 +169,7 @@ noCombat =
       Combat.attackedControlledBy = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
+      Combat.declaredAttackedBy = Map.empty,
       Combat.declaredAttackedThisStep = Set.empty,
       Combat.declaredAttackers = Set.empty,
       Combat.declaredBlockers = Set.empty,
