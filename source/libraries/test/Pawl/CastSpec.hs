@@ -4939,11 +4939,6 @@ giftSpec s registry = Spec.describe s "Gift" $ do
   -- checked on Scryfall, 2026-09-18). The only printing whose gift promises an
   -- Octopus.
   --
-  -- pawl's card omits the end-step ability entirely: no Pawl.Types.Filter arm
-  -- asks whether a permanent entered the battlefield this turn (#3878). The
-  -- omission is stricter than printed -- alice copies nothing -- and never weaker
-  -- in the controller's favour.
-  --
   -- The 8/8 is what tells this arm from rule 702.174f's 1/1 on the same board
   -- shape, so the assertion reads the token's power and toughness rather than its
   -- name.
@@ -4954,6 +4949,24 @@ giftSpec s registry = Spec.describe s "Gift" $ do
     Spec.assertEqWith s "CR 702.174i and CR 111.2 one 8/8 Octopus token, under carol" (fmap (\o -> (View.controllerOf o after, S.powerToughnessOf o after)) octopus) [(Just S.carol, Just (8, 8))]
     Spec.assertEqWith s "CR 702.174i and it entered untapped" (fmap (\o -> fmap Object.tapped (Game.lookupObject o after)) octopus) [Just TapState.Untapped]
     Spec.assertEqWith s "and the 3/3 entered with the stack empty" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Octomancer" after), length (GameState.stack after)) ([Just (3, 3)], 0)
+
+  -- Octomancer's other ability, Filter.EnteredThisTurn's producer. ONE GAME, TWO
+  -- END STEPS: carol's gifted Octopus enters on alice's turn, so alice's end step
+  -- copies it; by bob's end step neither Octopus entered this turn, so the
+  -- trigger has no target (CR 603.3d). The turn is the only difference. A
+  -- test-local answerer, since Pawl.Support's Board harness cannot answer a
+  -- trigger's target prompt.
+  Spec.it s "CR 608.2i Octomancer copies a token that entered this turn, and not one that entered last turn" $ do
+    (frogId, board) <- octomancerBoard s registry
+    forest <- S.printingOf s registry "Forest"
+    let stock gs = snd (S.addLibraryCard forest S.bob (snd (S.addLibraryCard forest S.bob gs)))
+        cast = castResolved (promising S.carol) frogId (stock (scheduled board))
+        aliceEnd = throughEndStepOf S.alice cast
+        bobEnd = throughEndStepOf S.bob aliceEnd
+        octopi gs = List.sort (fmap (\o -> (View.controllerOf o gs, S.powerToughnessOf o gs)) (namedOnBattlefield "Octopus Token" gs))
+    Spec.assertEqWith s "CR 707.2 at alice's end step she copied carol's 8/8 Octopus, which entered this turn" (octopi aliceEnd) (List.sort [(Just S.alice, Just (8, 8)), (Just S.carol, Just (8, 8))])
+    Spec.assertEqWith s "at bob's end step both Octopi entered last turn, so it copied neither" (octopi bobEnd) (octopi aliceEnd)
+    Spec.assertEqWith s "and that end step was bob's" (GameState.activePlayer bobEnd, GameState.phase bobEnd == Phase.Ending EndingStep.Cleanup) (S.bob, True)
 
   -- CR 702.174b's OTHER half on Longstalk Brawl {G} Sorcery, "Gift a tapped Fish
   -- / Choose target creature you control and target creature you don't control.
@@ -5102,6 +5115,18 @@ castResolved answer oid gs =
 -- everything.
 throughEndStep :: GameState.GameState -> GameState.GameState
 throughEndStep gs = List.foldl' (\g _ -> S.runPure (payingAttacking []) g Engine.runStep) gs [1 .. (8 :: Int)]
+
+-- Step the game until `pid`'s end step has run, so a CR 603.2b "at the
+-- beginning of each end step" ability triggers and resolves. Bounded, so a
+-- schedule that never reaches it stops rather than looping.
+throughEndStepOf :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+throughEndStepOf pid = go (40 :: Int)
+  where
+    step gs = S.runPure (payingAttacking []) gs Engine.runStep
+    go n gs
+      | n <= 0 = gs
+      | GameState.activePlayer gs == pid && GameState.phase gs == Phase.Ending EndingStep.EndStep = step gs
+      | otherwise = go (n - 1) (step gs)
 
 -- Mulldrifter's printed {4}{U} and its evoke {2}{U}.
 mulldrifterCost, evokeCost :: [ManaSymbol.ManaSymbol]

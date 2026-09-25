@@ -402,6 +402,11 @@ data Filter keyword
     -- (GameEvent.DamageDealt), and not Object.damage being positive: a wither or
     -- infect source marks nothing at all (CR 120.3d).
     DealtDamageThisTurn
+  | -- | CR 400.7 / 608.2i: the candidate ENTERED THE BATTLEFIELD earlier this
+    -- turn, as the object it is now -- Octomancer's "target creature token that
+    -- entered the battlefield this turn". Read off the log's zone changes, so
+    -- phasing in (CR 702.26d) and turning face up (CR 708.8) never count.
+    EnteredThisTurn
   | -- | CR 302.6: the candidate's CONTROLLER has controlled it continuously since
     -- their most recent turn began -- Total War's "creatures the player hasn't
     -- controlled continuously since the beginning of the turn", negated. Reads
