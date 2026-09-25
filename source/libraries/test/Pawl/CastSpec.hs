@@ -3753,16 +3753,8 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
   -- CR 702.119b on Crabomination {4}{B}{B} 5/5 Creature -- Crab Demon, "Emerge
   -- from artifact {5}{B}{B}" (Oracle text checked on Scryfall, 2026-09-18). The
   -- only printing whose emerge names a quality, so it is the whole of rule
-  -- 702.119b's demand.
-  --
-  -- pawl's card omits the printed triggered ability -- "When this creature
-  -- enters, target opponent exiles the top card of their library, a card at
-  -- random from their graveyard, and a card at random from their hand. You may
-  -- cast a spell from among cards exiled this way without paying its mana cost."
-  -- Not implemented: that ability, which the DSL can now spell out -- the three
-  -- exiles and the free cast from among them are still to be written (#3929).
-  -- The omission is stricter than printed -- alice exiles nothing and gains no
-  -- cast -- and nothing about it touches the emerge cost this group is about.
+  -- 702.119b's demand. Its enters trigger is the next case's; here it goes on
+  -- the stack and nothing resolves it.
   --
   -- TWO BOARDS DIFFERING IN ONE PERMANENT'S CARD TYPE, which is the whole of
   -- rule 702.119b. Both are alice holding Crabomination over FOUR Swamps with a
@@ -3788,6 +3780,77 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
         creatureBoard = aliceOnTurn creature2
     Spec.assertEqWith s "CR 702.119b four Swamps paid {5}{B}{B} less the Crawlspace's three, so Crabomination resolved, and CR 702.119c sacrificed that artifact" (length (namedOnBattlefield "Crabomination" after), length (namedInGraveyard "Crawlspace" after)) (1, 1)
     Spec.assertBool s (not (S.castable S.alice creatureSpell creatureBoard)) "CR 702.119b a creature of the same mana value is not a [quality] permanent, so the same four Swamps cannot pay the emerge cost at all"
+
+  -- Crabomination's enters trigger (Oracle text checked on Scryfall,
+  -- 2026-09-25): "target opponent exiles the top card of their library, a card
+  -- at random from their graveyard, and a card at random from their hand. You
+  -- may cast a spell from among cards exiled this way without paying its mana
+  -- cost."
+  --
+  -- "This way" is the three cards this resolution moved (CR 400.7j), not every
+  -- card linked to Crabomination by CR 607.2a, so the card narrows the link by
+  -- Filter.IsBound on the three slots. Lithoform Engine's copy of the trigger
+  -- keeps its source (CR 707.10b) and resolves first, which is what files a
+  -- second pile against the same Crabomination: its library card, Ancestral
+  -- Recall, is declined and stays linked in exile, where the original's offer
+  -- must not reach it.
+  --
+  -- bob's graveyard holds a Forest and a Sign in Blood, his hand a Plains and a
+  -- Lightning Bolt. Randomness names the lands for the copy, so the original
+  -- takes a spell from each of the three zones and its offer is a choice among
+  -- three, while every land stays off both offers (CR 305.1: a land is never a
+  -- spell). alice holds eight Swamps: six for the creature, two for the Engine,
+  -- none for Divination, so its cast is the free one (CR 118.9).
+  Spec.it s "CR 400.7j Crabomination offers a spell from its own three exiled cards alone" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    engine <- S.printingOf s registry "Lithoform Engine"
+    crab <- S.printingOf s registry "Crabomination"
+    recall <- S.printingOf s registry "Ancestral Recall"
+    divination <- S.printingOf s registry "Divination"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    let stock printing pid add gs = snd (add printing pid gs)
+        (engineId, gs1) = S.addPermanent engine S.alice (S.landsInPlay swamp 8)
+        -- bob's library, the last added on top: the copy takes the Recall, the
+        -- original the Divination beneath it.
+        gs2 = foldr (\p -> stock p S.bob S.addLibraryCard) gs1 [recall, divination, island]
+        (forestId, gs3) = S.addGraveyardCard forest S.bob (stock signInBlood S.bob S.addGraveyardCard gs2)
+        (plainsId, gs4) = S.addHandCard plains S.bob (stock bolt S.bob S.addHandCard gs3)
+        -- alice's library feeds the Divination's two draws.
+        gs5 = foldr (\p -> stock p S.alice S.addLibraryCard) gs4 [island, island, island]
+        (crabId, gs6) = S.addHandCard crab S.alice gs5
+        entered = S.runPure S.identityAnswer (S.runPure S.identityAnswer (aliceOnTurn gs6) (S.cast S.alice crabId)) (Stack.resolveTop >> Engine.settleForPriority)
+        trigger = Maybe.listToMaybe (GameState.stack entered)
+        -- Each offer the engine made, in order: Left for CR 601.3's choice among
+        -- several, Right for the "may" over one. The Recall is declined and the
+        -- Divination taken, both answered by the name the engine offered.
+        answering :: Prompt.Prompt r -> State.State [Either [CardName.CardName] CardName.CardName] r
+        answering p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((== trigger) . Recipient.objectOf) sets)
+          Prompt.RandomObject offered -> pure (Maybe.fromMaybe (NonEmpty.head offered) (List.find (`elem` [forestId, plainsId]) offered))
+          Prompt.ChooseOfferedCastSpell _ _ options -> do
+            State.modify' (<> [Left (fmap snd (NonEmpty.toList options))])
+            pure (Maybe.fromMaybe (NonEmpty.head options) (List.find ((== S.printingName divination) . snd) options))
+          Prompt.OfferedCast _ _ _ name -> do
+            State.modify' (<> [Right name])
+            pure (if name == S.printingName divination then OptionalDecision.Exercises else OptionalDecision.Declines)
+          _ -> pure (S.identityAnswer p)
+        driven = case Activatable.abilitiesFor engineId entered of
+          copier : _ -> Activate.activateAbility S.alice engineId copier >> Engine.priorityLoop
+          [] -> pure ()
+        (after, offers) = State.runState (fmap snd (Engine.runGame answering entered driven)) []
+        namesOf zone pid = fmap (\o -> fmap S.nameOf (Game.cardOf o after)) (Game.zoneMembers zone pid after)
+        named = S.printingName
+    Spec.assertEqWith
+      s
+      "CR 400.7j each offer reached its own resolution's spells: the Recall the copy exiled, then the original's three, the linked Recall and every land left off"
+      offers
+      [Right (named recall), Left (fmap named [divination, signInBlood, bolt]), Right (named divination)]
+    Spec.assertEqWith s "CR 608.2g the Divination was cast free and resolved: alice drew two, and it is in bob's graveyard" (length (Game.zoneMembers Zone.Hand S.alice after), namesOf Zone.Graveyard S.bob) (2, [Just (named divination)])
+    Spec.assertEqWith s "and bob's exile holds the other five cards the two resolutions took" (List.sort (namesOf Zone.Exile S.bob)) (List.sort (fmap (Just . named) [recall, signInBlood, bolt, forest, plains]))
 
 -- CR 702.180a on Unending Whisper {U} Sorcery, "Draw a card." with "Harmonize
 -- {5}{U}" (Oracle text checked on Scryfall, 2026-09-13). Chosen over Nature's
