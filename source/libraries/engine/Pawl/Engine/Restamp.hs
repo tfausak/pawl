@@ -87,9 +87,9 @@ order oids = do
 -- refute that.
 --
 -- Proved by Pawl.RestampSpec's Replenish boards (Humility and Opalescence), on
--- Pawl.Engine.Resolve's MoveToZone road. Event.createTokens and
--- Pawl.Engine.MoveDuration.returnMoved reach it too, and no board observes
--- either (gap #4214).
+-- Pawl.Engine.Resolve's MoveToZone road, and its Rite of Replication board on
+-- Event.createTokens'. Pawl.Engine.MoveDuration.returnMoved reaches it too, and
+-- no board observes that (gap #4214).
 settle :: Timestamp -> [ObjectId] -> Game ()
 settle start arrivals = do
   gs <- State.get
