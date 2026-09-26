@@ -5308,6 +5308,43 @@ giftSpec s registry = Spec.describe s "Gift" $ do
     Spec.assertEqWith s "CR 702.174k no gift was promised, so no Treasure token exists" (namedOnBattlefield "Treasure Token" after) []
     Spec.assertEqWith s "and bob's 3/3 took 2 while bob took nothing" (S.lifeOf S.bob after, fmap (fmap Object.damage . (`Game.lookupObject` after)) (namedOnBattlefield "Hill Giant" after)) (Just 20, [Just 2])
 
+  -- CR 702.174c on Jolly Gerbils {1}{W} 2/3 Creature -- Hamster Citizen,
+  -- "Whenever you give a gift, draw a card." (Oracle text checked on Scryfall,
+  -- 2026-09-26.) alice and bob each control one, so "you" is told from "a
+  -- player"; each pair of boards differs only in the answer to rule 702.174a's
+  -- "you may", which is what makes the gift's own "if" observable.
+  Spec.it s "CR 702.174c a promised gift sorcery resolving has alice's Jolly Gerbils draw" $ do
+    (brawlId, board) <- longstalkBoard s registry
+    gerbilled <- withGerbils s registry board
+    let promised = throughGift (promising S.carol) brawlId gerbilled
+        unpromised = throughGift declining brawlId gerbilled
+    Spec.assertEqWith s "CR 702.174c alice drew only when her promised Brawl resolved" (S.handSize S.alice promised, S.handSize S.alice unpromised) (1, 0)
+    Spec.assertEqWith s "CR 109.5 bob's Gerbils drew for neither" (S.handSize S.bob promised, S.handSize S.bob unpromised) (0, 0)
+    Spec.assertEqWith s "and both runs ended with the stack empty" (length (GameState.stack promised), length (GameState.stack unpromised)) (0, 0)
+  Spec.it s "CR 702.174c a promised gift permanent's trigger resolving has alice's Jolly Gerbils draw" $ do
+    (shooterId, board) <- scrapshooterBoard s registry
+    gerbilled <- withGerbils s registry board
+    let promised = throughGift (promising S.carol) shooterId gerbilled
+        unpromised = throughGift declining shooterId gerbilled
+    Spec.assertEqWith s "CR 702.174c alice drew only when Scrapshooter's promised gift trigger resolved" (S.handSize S.alice promised, S.handSize S.alice unpromised) (1, 0)
+    Spec.assertEqWith s "CR 109.5 bob's Gerbils drew for neither" (S.handSize S.bob promised, S.handSize S.bob unpromised) (0, 0)
+    Spec.assertEqWith s "and both runs ended with the stack empty" (length (GameState.stack promised), length (GameState.stack unpromised)) (0, 0)
+
+-- A Jolly Gerbils each for alice and bob, and two cards in each of their
+-- libraries so a Gerbils draw is a draw rather than CR 104.3c.
+withGerbils :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> GameState.GameState -> m GameState.GameState
+withGerbils s registry gs = do
+  forest <- S.printingOf s registry "Forest"
+  gerbils <- S.printingOf s registry "Jolly Gerbils"
+  let stock pid g = snd (S.addLibraryCard forest pid (snd (S.addLibraryCard forest pid g)))
+      mine pid g = snd (S.addPermanent gerbils pid g)
+  pure (stock S.alice (stock S.bob (mine S.alice (mine S.bob gs))))
+
+-- castResolved, resolving far enough for a Gerbils trigger behind the card's own.
+throughGift :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+throughGift answer oid gs =
+  S.runPure answer (S.runPure answer gs (S.cast S.alice oid)) (Monad.replicateM_ (5 :: Int) (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority))
+
 -- carol's Bolt aimed at bob and paid with red from whichever mana source is
 -- offered first -- on blastBoard her Treasure is the only one -- where
 -- S.identityAnswer aims at nothing and taps nothing.

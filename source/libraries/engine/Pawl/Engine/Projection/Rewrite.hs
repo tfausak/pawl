@@ -860,6 +860,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Evolve _ -> effect
   Effect.Mentor _ -> effect
   Effect.Exploit -> effect
+  Effect.GiveGift -> effect
   Effect.Train _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
@@ -1804,6 +1805,8 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerBlights _ -> condition
   TriggerCondition.PlayerForages _ -> condition
   TriggerCondition.PlayerForetells _ -> condition
+  TriggerCondition.PlayerCollectsEvidence _ -> condition
+  TriggerCondition.PlayerGivesGift _ -> condition
   TriggerCondition.PlayerEarthbends _ -> condition
   TriggerCondition.PlayerWaterbends _ -> condition
   TriggerCondition.PlayerAirbends _ -> condition

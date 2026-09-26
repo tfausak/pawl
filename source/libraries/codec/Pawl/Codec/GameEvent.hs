@@ -138,6 +138,8 @@ codec =
       -- write their own Moved events, so the forager is all this carries.
       Arm.payload "Foraged" PlayerId.codec GameEvent.Foraged (\x -> case x of GameEvent.Foraged y -> Just y; _ -> Nothing),
       Arm.payload "Foretold" PlayerId.codec GameEvent.Foretold (\x -> case x of GameEvent.Foretold y -> Just y; _ -> Nothing),
+      Arm.payload "CollectedEvidence" PlayerId.codec GameEvent.CollectedEvidence (\x -> case x of GameEvent.CollectedEvidence y -> Just y; _ -> Nothing),
+      Arm.payload "GaveGift" PlayerId.codec GameEvent.GaveGift (\x -> case x of GameEvent.GaveGift y -> Just y; _ -> Nothing),
       Arm.payload "Earthbent" PlayerId.codec GameEvent.Earthbent (\x -> case x of GameEvent.Earthbent y -> Just y; _ -> Nothing),
       Arm.payload "Waterbent" PlayerId.codec GameEvent.Waterbent (\x -> case x of GameEvent.Waterbent y -> Just y; _ -> Nothing),
       Arm.payload "Airbent" PlayerId.codec GameEvent.Airbent (\x -> case x of GameEvent.Airbent y -> Just y; _ -> Nothing),
@@ -221,6 +223,8 @@ tagOf x = case x of
   GameEvent.Blighted {} -> "Blighted"
   GameEvent.Foraged {} -> "Foraged"
   GameEvent.Foretold {} -> "Foretold"
+  GameEvent.CollectedEvidence {} -> "CollectedEvidence"
+  GameEvent.GaveGift {} -> "GaveGift"
   GameEvent.Earthbent {} -> "Earthbent"
   GameEvent.Waterbent {} -> "Waterbent"
   GameEvent.Airbent {} -> "Airbent"

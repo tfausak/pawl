@@ -632,6 +632,12 @@ data TriggerCondition
   | -- | CR 702.143c: "whenever you foretell a card" (Dream Devourer), against
     -- GameEvent.Foretold.
     PlayerForetells PlayerRelation.PlayerRelation
+  | -- | CR 701.59a: "whenever you collect evidence" (Surveillance Monitor),
+    -- against GameEvent.CollectedEvidence.
+    PlayerCollectsEvidence PlayerRelation.PlayerRelation
+  | -- | CR 702.174c: "whenever you give a gift" (Jolly Gerbils), against
+    -- GameEvent.GaveGift.
+    PlayerGivesGift PlayerRelation.PlayerRelation
   | -- | CR 701.66b: "whenever a player earthbends"
     -- (data\/cards\/synthetic-stonelistener-adept.json), against
     -- GameEvent.Earthbent. Rule 701.66b puts the moment at the CREATION of rule

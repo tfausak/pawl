@@ -1138,6 +1138,8 @@ eventBindingSlots cond = case cond of
   -- no binding of this condition: nothing printed names it.
   TriggerCondition.PlayerForages _ -> Set.empty
   TriggerCondition.PlayerForetells _ -> Set.empty
+  TriggerCondition.PlayerCollectsEvidence _ -> Set.empty
+  TriggerCondition.PlayerGivesGift _ -> Set.empty
   TriggerCondition.PlayerEarthbends _ -> Set.empty
   TriggerCondition.PlayerWaterbends _ -> Set.empty
   TriggerCondition.PlayerAirbends _ -> Set.empty
