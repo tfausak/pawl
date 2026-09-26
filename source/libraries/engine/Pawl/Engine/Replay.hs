@@ -56,6 +56,7 @@ encode p answer = case p of
   Prompt.ChooseConjuredCard {} -> Response.ChoseConjuredCard answer
   Prompt.RandomPlayer _ -> Response.SelectedPlayerAtRandom answer
   Prompt.RollDie _ -> Response.RolledDie answer
+  Prompt.RandomDepth _ -> Response.PlacedAtRandomDepth answer
   Prompt.LookUpCard _ -> Response.LookedUpCard answer
   Prompt.ReferenceCards {} -> Response.ReferenceCardNames answer
   Prompt.ReferenceNames _ -> Response.ReferenceCardNames answer
@@ -225,6 +226,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.RollDie _ -> case response of
     Response.RolledDie n -> Just n
+    _ -> Nothing
+  Prompt.RandomDepth _ -> case response of
+    Response.PlacedAtRandomDepth n -> Just n
     _ -> Nothing
   Prompt.LookUpCard _ -> case response of
     Response.LookedUpCard card -> Just card
@@ -674,6 +678,9 @@ defaultAnswer p = case p of
   -- answer that is in range for any N -- including the degenerate N of a
   -- malformed card. FIXED for the reason RandomObject gives above.
   Prompt.RollDie _ -> 1
+  -- The top, which is in range for any N. FIXED for the reason RandomObject
+  -- gives above.
+  Prompt.RandomDepth _ -> 1
   -- A reference holding no such card: the engine then treats the name as it
   -- did before it could ask, known only through the cards the game holds.
   Prompt.LookUpCard _ -> Nothing

@@ -311,7 +311,7 @@ permute xs order =
 --     decision. Engine.priorityLoop makes that call, being the only caller that
 --     knows the menu.
 --   * Prompt.Shuffle, Prompt.RandomFirstPlayer, Prompt.RandomObject,
---     Prompt.RandomPlayer, Prompt.RandomCard, Prompt.RollDie and
+--     Prompt.RandomPlayer, Prompt.RandomCard, Prompt.RandomDepth, Prompt.RollDie and
 --     Prompt.FlipCoin, which ask for RANDOMNESS rather than for a choice (CR
 --     701.24, CR 729.2, CR 706.1a, CR 705.1, and CR 701.9b's acknowledgment
 --     that "at random" is not "the player chooses"). A loop that reshuffles a
@@ -589,6 +589,13 @@ insertIntoZone zone position pid oid gs = case zone of
   Zone.Exile -> gs {GameState.exile = Set.insert oid (GameState.exile gs)}
   Zone.Command -> gs {GameState.command = Set.insert oid (GameState.command gs)}
   Zone.Stack -> gs {GameState.stack = oid : GameState.stack gs}
+
+-- Move a card already in a library to this many cards down from its top, 0
+-- being the top; a depth past the bottom lands on the bottom (Seq.insertAt's
+-- clamp). The one placement insertIntoZone's two ends cannot say:
+-- Pawl.Types.LibraryDepth's.
+sinkInLibrary :: Int -> PlayerId -> ObjectId -> GameState -> GameState
+sinkInLibrary depth pid oid gs = gs {GameState.library = Map.adjust (Seq.insertAt depth oid . Seq.filter (/= oid)) pid (GameState.library gs)}
 
 -- CR 608.2n: an ability leaves the stack and CEASES TO EXIST. No graveyard --
 -- an ability is not a card -- so the removal is NOT a zone change and never

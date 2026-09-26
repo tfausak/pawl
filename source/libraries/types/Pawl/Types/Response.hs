@@ -106,6 +106,11 @@ data Response
     -- point -- a transcript of a player ANNOUNCING a number must not satisfy a
     -- prompt that asked randomness, which is CR 701.9b's distinction.
     RolledDie Natural.Natural
+  | -- | The place randomness put a conjured card at, for Pawl.Types.Prompt's
+    -- RandomDepth. Its own constructor rather than RolledDie reused, for that
+    -- constructor's reason: no die was rolled, and a transcript of one must not
+    -- satisfy this prompt.
+    PlacedAtRandomDepth Natural.Natural
   | -- | CR 108.1: the card the Oracle card reference answered a name with,
     -- for Pawl.Types.Prompt's LookUpCard.
     LookedUpCard (Maybe Card.Card)

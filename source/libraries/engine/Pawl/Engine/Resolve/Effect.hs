@@ -213,6 +213,7 @@ import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.LibraryDepth as LibraryDepth
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
@@ -6101,11 +6102,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- rather than a zone change, CR 111.2's token being the CR's own object
         -- that enters having left no zone.
         --
-        -- Not implemented: a stated library position. Every arrival takes
-        -- LibraryPosition.defaultValue, which is the BOTTOM, and the printings
-        -- that state an end all say the TOP -- Pawl.Types.ConjureDestination's
-        -- Library arm names them and says why none of them is in data/cards/
-        -- (#3972).
+        -- A stated library DEPTH is settled per card, as each lands, so a later
+        -- card of the same conjure is placed in a library already holding the
+        -- earlier ones; unproven, since no card in data/cards/ conjures more
+        -- than one card to a depth. A random depth is ASKED (Prompt.RandomDepth), over the places the
+        -- library has -- a library of k other cards has k + 1 -- and never
+        -- raised for one place. Pawl.ConjureSpec's Calim and Mine Security cases
+        -- prove the two. The clamp of an answer outside the places is a
+        -- regression fence: no case there answers outside them.
         --
         -- The CANDIDATES of a WRITTEN conjure are picked over once per card
         -- conjured, and the pick is
@@ -6190,7 +6194,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           ConjureCards.Written written -> pure (replicate (Integer.toIntSaturating n) (fmap Just (pickWritten written)))
           ConjureCards.Duplicate ref -> pure (fmap (pure . Just) (duplicatesOf ref))
           ConjureCards.Reference from -> referencePickers from (Integer.toIntSaturating n)
-        intoZone zone n = fmap (concatMap Maybe.catMaybes) (pickers n >>= Monad.mapM (\p -> p >>= Monad.mapM (\(card, copied) -> Event.conjure controller card copied zone LibraryPosition.defaultValue) . Maybe.maybeToList))
+        intoZone zone settle n = fmap (concatMap Maybe.catMaybes) (pickers n >>= Monad.mapM (\p -> p >>= Monad.mapM (\(card, copied) -> Event.conjure controller card copied zone LibraryPosition.defaultValue >>= \made -> made <$ Monad.mapM_ settle made) . Maybe.maybeToList))
+        sink depth oid = do
+          g <- State.get
+          let places = Natural.length (Map.findWithDefault Seq.empty controller (GameState.library g))
+          ordinal <- case depth of
+            LibraryDepth.FromTop k -> pure k
+            LibraryDepth.AtRandomInTop k -> case min k places of
+              reach
+                | reach < 2 -> pure 1
+                | otherwise -> fmap (max 1 . min reach) (Game.ask (Prompt.RandomDepth reach))
+          State.modify' (Game.sinkInLibrary (Natural.toIntSaturating ordinal - 1) controller oid)
         onto entry n (card, copied) = do
           made <- Foldable.toList <$> Event.conjureOntoBattlefield controller card copied (Integer.toNaturalSaturating n) (ConjureEntry.tapped entry)
           -- CR 508.4, Create's arm's posture and in the same place: after the
@@ -6203,10 +6217,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     conjured <- case evaluateForRecipient viewOf context gs resolving source controller quantity of
       Just n
         | n > 0 -> case destination of
-            ConjureDestination.Hand -> intoZone Zone.Hand n
-            ConjureDestination.Library -> intoZone Zone.Library n
-            ConjureDestination.Graveyard -> intoZone Zone.Graveyard n
-            ConjureDestination.Exile -> intoZone Zone.Exile n
+            ConjureDestination.Hand -> intoZone Zone.Hand (const (pure ())) n
+            ConjureDestination.Library depth -> intoZone Zone.Library (\oid -> Monad.mapM_ (`sink` oid) depth) n
+            ConjureDestination.Graveyard -> intoZone Zone.Graveyard (const (pure ())) n
+            ConjureDestination.Exile -> intoZone Zone.Exile (const (pure ())) n
             -- CR 110.2a: the resolving controller is who the permanent enters
             -- under, which conjureOntoBattlefield stamps.
             -- One pick for the whole BATCH rather than one per card, which is
