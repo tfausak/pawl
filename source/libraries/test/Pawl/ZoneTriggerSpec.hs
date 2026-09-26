@@ -111,6 +111,7 @@ import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -2806,16 +2807,18 @@ everyTriggerCondition =
     -- eventBindings stamps for every event -- so an arm that had cased on the
     -- scope and stamped nothing under one of them would go unseen if only one
     -- were listed.
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing Nothing),
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.OpponentsTurn Nothing Nothing),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing Nothing Nothing),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.OpponentsTurn Nothing Nothing Nothing),
     -- And the zone axis, listed for the TurnScope pair's reason one field over:
     -- an arm that cased on the zone and stamped nothing when one was named would
     -- go unseen if every entry here left it Nothing.
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn (Just Zone.Hand) Nothing),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn (Just Zone.Hand) Nothing Nothing),
     -- And the ordinal axis, for the same reason again: Clarion Spirit's "your
     -- second spell each turn" narrows which cast fires the ability and stamps
     -- nothing of its own, which an entry leaving it Nothing could not show.
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing (Just 2)),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing (Just 2) Nothing),
+    -- And the phase axis, Zuko, Firebending Master's "during combat".
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing Nothing (Just PhaseSelector.CombatPhase)),
     TriggerCondition.SelfCast,
     -- BOTH relations, for the SpellCast pair's reason just above: the arm cases
     -- on the relation, and one that stamped nothing under the other half would go

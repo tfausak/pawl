@@ -1,0 +1,126 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "FirstStrike"
+        },
+        {
+          "type": "Firebending",
+          "value": {
+            "type": "PlayerCounters",
+            "value": {
+              "kind": {
+                "type": "Experience"
+              },
+              "player": {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Zuko, Firebending Master",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SpellCast",
+            "value": {
+              "filter": {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              },
+              "phase": {
+                "type": "CombatPhase"
+              },
+              "scope": {
+                "type": "EachTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "GainPlayerCounters",
+                        "value": {
+                          "kind": {
+                            "type": "Experience"
+                          },
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Ally"
+          },
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Noble"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

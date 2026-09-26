@@ -1685,7 +1685,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind f) -> TriggerCondition.PermanentGetsCounters (CounterPlacement.MkCounterPlacement kind (Filter.rewrite pairs f))
   -- The TurnScope is carried through untouched, not dropped: a rebuild that
   -- forgot the field would reset a text-changed trigger to firing every turn.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope fromZone ordinal)
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal window) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope fromZone ordinal window)
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins {} -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> condition

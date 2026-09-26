@@ -7110,11 +7110,14 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- cast happened in -- so the active player standing now is the one the cast
   -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
   -- 603.3a), exactly as the StepBegins arm above reads its own.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal) -> case event of
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal window) -> case event of
     GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom _) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
         turnScopeAdmits gs scope (GameState.activePlayer gs) you
+          -- "During combat" off the GAME STATE, the TurnScope's reason: the cast
+          -- happened in this same settle, so the phase standing now is its phase.
+          && maybe True (`Turn.inWindow` GameState.phase gs) window
           -- CR 601.2a's zone, read off the EVENT and not off the spell: rule
           -- 400.7 left the stack incarnation with no memory of it. A condition
           -- that names no zone admits every cast, which is what almost every

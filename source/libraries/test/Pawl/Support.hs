@@ -2708,6 +2708,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseOpponent decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseProtector decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePlayer decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseActivePlayer decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderTriggers decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderDamage decider _ _ -> Just (Decider.unwrap decider)
   Prompt.AllocateDamage decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2858,6 +2859,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseOpponent {} -> "ChooseOpponent"
   Prompt.ChooseProtector {} -> "ChooseProtector"
   Prompt.ChoosePlayer {} -> "ChoosePlayer"
+  Prompt.ChooseActivePlayer {} -> "ChooseActivePlayer"
   Prompt.OrderTriggers {} -> "OrderTriggers"
   Prompt.OrderDamage {} -> "OrderDamage"
   Prompt.AllocateDamage {} -> "AllocateDamage"
