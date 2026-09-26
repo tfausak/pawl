@@ -386,6 +386,7 @@ bakePerspective viewOf context gs candidate predicate =
         Filter.Type.EnteredThisTurn -> predicate
         Filter.Type.CrewedSourceThisTurn -> predicate
         Filter.Type.ConvokedSourceThisTurn -> predicate
+        Filter.Type.SaddledSourceThisTurn -> predicate
         Filter.Type.ControlledSinceTurnBegan -> predicate
         -- NOT descended into, unlike And/Or/Not above, and that is the load-bearing
         -- call rather than an omission: `candidate` here is a PLAYER (the sole caller
@@ -835,6 +836,7 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -1134,6 +1136,7 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- rather than one -- `milledThisTurn` above's reason again.
       Filter.crewedThisTurn = Set.empty,
       Filter.convokedThisTurn = Set.empty,
+      Filter.saddledThisTurn = Set.empty,
       -- CR 302.6 asks about an OBJECT under a player's control; this view
       -- describes a snapshot rather than one -- `milledThisTurn` above's reason.
       Filter.controlledSinceTurnBegan = False,

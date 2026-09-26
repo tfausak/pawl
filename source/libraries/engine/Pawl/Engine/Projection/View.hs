@@ -75,6 +75,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
+import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
@@ -202,6 +203,9 @@ viewOfCard face =
           -- builder describes a printed FACE rather than either -- the field
           -- above's reason.
           Filter.convokedThisTurn = Set.empty,
+          -- CR 702.171c relates a creature to a Mount it saddled; the field
+          -- above's reason.
+          Filter.saddledThisTurn = Set.empty,
           -- CR 302.6 asks about an OBJECT a player controls; this builder
           -- describes a printed FACE, which is none -- `milledThisTurn` above's
           -- reason.
@@ -376,6 +380,14 @@ crewedByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
 crewedByIt oid event = case event of
   GameEvent.Crewed crewed
     | Set.member oid (Crewing.crewedBy crewed) -> Just (Crewing.vehicle crewed)
+  _ -> Nothing
+
+-- CR 702.171c: crewedByIt one keyword over -- if this event records a saddling
+-- THIS object paid for, which Mount it saddled.
+saddledByIt :: ObjectId -> GameEvent.GameEvent -> Maybe ObjectId
+saddledByIt oid event = case event of
+  GameEvent.Saddled saddled
+    | Set.member oid (Saddling.saddledBy saddled) -> Just (Saddling.mount saddled)
   _ -> Nothing
 
 -- CR 702.51c: which spells did this object convoke, and which permanents did
@@ -668,6 +680,9 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- ConvokedSourceThisTurn compares the set against the source it is
       -- evaluating for.
       Filter.convokedThisTurn = convokedThisTurnOf oid gs,
+      -- CR 702.171c / 608.2i: `crewedThisTurn` above's read, for the Mounts
+      -- this candidate saddled.
+      Filter.saddledThisTurn = Set.fromList (Maybe.mapMaybe (saddledByIt oid . LoggedEvent.event) (Foldable.toList (GameState.events gs))),
       -- CR 302.6: Object.sickness, compared against the PROJECTED controller
       -- rather than read as a bare flag -- rule 302.6's subject is a player, so
       -- `Settled` names one, and Pawl.Engine.Engine.checkControlContinuity drops a

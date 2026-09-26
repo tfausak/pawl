@@ -41,6 +41,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
@@ -461,23 +462,19 @@ activateAbility pid srcId ability = do
                   -- loyalty record above and for its reason: every rejecting path
                   -- restores `before`, so no refused activation leaves one behind.
                   State.modify' (ActivationRestriction.recordActivation srcId ability)
-                  -- CR 702.122b: the creatures this crew cost tapped crewed the
-                  -- Vehicle as they were tapped, so the relation is recorded at
-                  -- the payment and a crew ability that never resolves still
-                  -- leaves it (CrewSpec's "a countered crew ability"). A case on
-                  -- the rule-702 keyword stamp, never on an effect.
-                  Monad.when
-                    ((Keyword.familyOf =<< stamp) == Just KeywordFamily.Crew)
-                    ( State.modify'
-                        ( Event.recordEvent
-                            ( GameEvent.Crewed
-                                Crewing.MkCrewing
-                                  { Crewing.vehicle = srcId,
-                                    Crewing.crewedBy = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedForTotalPower bound)))
-                                  }
-                            )
-                        )
-                    )
+                  -- CR 702.122b / 702.171c: the creatures this crew or saddle
+                  -- cost tapped crewed the Vehicle or saddled the Mount as they
+                  -- were tapped, so the relation is recorded at the payment and
+                  -- an ability that never resolves still leaves it (CrewSpec's
+                  -- "a countered crew ability"). A case on the rule-702 keyword
+                  -- stamp, never on an effect.
+                  let tappers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedForTotalPower bound)))
+                  case Keyword.familyOf =<< stamp of
+                    Just KeywordFamily.Crew ->
+                      State.modify' (Event.recordEvent (GameEvent.Crewed Crewing.MkCrewing {Crewing.vehicle = srcId, Crewing.crewedBy = tappers}))
+                    Just KeywordFamily.Saddle ->
+                      State.modify' (Event.recordEvent (GameEvent.Saddled Saddling.MkSaddling {Saddling.mount = srcId, Saddling.saddledBy = tappers}))
+                    _ -> pure ()
                   -- CR 601.2c through CR 602.2b: each chosen object became a
                   -- target of this ability, which is what CR 702.21a's ward
                   -- watches -- and an activated ability is the half
