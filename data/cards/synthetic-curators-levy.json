@@ -1,0 +1,59 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Curator's Levy",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "AddSpellCost",
+            "value": {
+              "components": [
+                {
+                  "type": "DiscardCards",
+                  "value": {
+                    "count": 1,
+                    "whichCards": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    }
+                  }
+                }
+              ],
+              "whichSpells": {
+                "type": "And",
+                "value": []
+              }
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
