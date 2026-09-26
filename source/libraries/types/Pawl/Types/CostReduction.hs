@@ -52,8 +52,7 @@ data CostReduction = MkCostReduction
     -- totalled has filed no GameEvent.SpellCast of its own for the count to pick
     -- up.
     perEach :: Quantity.Quantity,
-    -- | CR 601.2f: when the reduction applies at all -- Ertai's Scorn's "if an
-    -- opponent cast two or more spells this turn". Nothing is unconditional.
+    -- | CR 601.2f: when the reduction applies at all; Nothing is unconditional.
     condition :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)

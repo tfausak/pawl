@@ -229,9 +229,7 @@ data Quantity
   | -- | CR 601.2i / 608.2i: how many spells that player cast last turn, read off
     -- GameState.castsLastTurn (not CR 502.2's active-player scalar).
     SpellsCastLastTurn PlayerRef.PlayerRef
-  | -- | CR 601.2i / 608.2i: how many spells that player cast this turn -- one
-    -- seat's tally, so Aggregation.Greatest over opponents asks Ertai's Scorn's
-    -- "an opponent cast two or more".
+  | -- | CR 601.2i / 608.2i: how many spells that player cast this turn.
     SpellsCastThisTurn PlayerRef.PlayerRef
   | -- | CR 608.2n \/ 608.2i: how many times the ACTIVATED ABILITY this quantity is
     -- evaluated against has resolved this turn, folded from the turn-scoped
