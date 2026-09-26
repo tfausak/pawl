@@ -215,7 +215,8 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     enchant :: [TargetSlot.TargetSlot],
     -- | CR 601.3 / 613.1f: the permissions this object has to be cast from where
     -- the rules would refuse. Seeded from Face.castingPermissions, added to by
-    -- Modification.GainCastingPermission, emptied by LoseAllAbilities.
+    -- Modification.GainCastingPermission, emptied by LoseAllAbilities and by CR
+    -- 305.7's strip.
     castingPermissions :: [CastingPermission.CastingPermission],
     -- | CR 613.11: the ability families that affect game rules rather than
     -- objects -- combat, attack, block, untap, entry, sacrifice, counter,

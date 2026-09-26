@@ -5,9 +5,9 @@ module Pawl.Types.CastingPermission where
 -- Wurm's "while you're searching your library, you may cast this from your
 -- library". The general "cast from the top of your library" (Garruk's Horde) is
 -- a player permission rather than an object one and lives on
--- Pawl.Types.PlayerEffect.CastFrom instead. Only
--- Pawl.Engine.Cast reads this type, as a membership test per
--- arm. Three producers: Face.castingPermissions (printed),
+-- Pawl.Types.PlayerEffect.CastFrom instead. Pawl.Engine.Cast reads this type,
+-- as a membership test per arm, and Pawl.Engine.Projection folds the grants
+-- into ProjectedCharacteristics.castingPermissions. Three producers: Face.castingPermissions (printed),
 -- Modification.GainCastingPermission (a layer-6 grant) and
 -- Pawl.Engine.Keyword.castingPermissionsOf (what rule 702 gives for a keyword).
 --

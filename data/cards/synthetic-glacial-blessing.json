@@ -25,12 +25,6 @@
               "type": "And",
               "value": [
                 {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Creature"
-                  }
-                },
-                {
                   "type": "OwnedBy",
                   "value": {
                     "type": "You"
