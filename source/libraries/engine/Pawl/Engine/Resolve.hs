@@ -1343,10 +1343,12 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
           -- exactly as permissive as `Cost.canPay` above, which enumerates the
           -- same CR 601.2b nonhybrid equivalents through Mana.resolutions --
           -- so no route Mana.announce offers is one the gate refused, and its
-          -- no-payable-route fallback stays unreachable from here.
+          -- no-payable-route fallback stays unreachable from here. CR 701.67a's
+          -- taps are folded into the totalling for the same reason, Activate's
+          -- `substitutedManas` posture: the gate weighs them too.
           -- Discarded, Activate's reason: rule 702.150a asks about a spell's own
           -- cost, not about a cost paid during a resolution (CR 118.13b).
-          (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer source pure cost
+          (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer source (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components cost) slots payer source gs) pure) cost
           -- DuringResolution: rule 118.12's cost is paid as the spell or ability
           -- resolves, which is CR 609.1's effect, so a blight paid here is CR
           -- 614.16's subject where Soul Immolation's additional cost is not.
