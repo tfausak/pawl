@@ -91,7 +91,7 @@ testCharacteristics =
       PC.additionalCosts = [CostComponent.TapThis],
       PC.additionalCostChoices = [CostChoice.MkCostChoice (Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.TapThis] NonEmpty.:| [Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []])],
       PC.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
-      PC.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)],
+      PC.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing],
       -- Synthetic like the rest of this value: a Mountain has no halves, and
       -- what the case is about is that the field carries a whole card through
       -- the wire (CR 709.5).
