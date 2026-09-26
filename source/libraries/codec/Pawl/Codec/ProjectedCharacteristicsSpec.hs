@@ -22,10 +22,13 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
+import qualified Pawl.Types.Face as Face.Type
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -104,6 +107,8 @@ testCharacteristics =
       PC.prepare = Just (NonEmpty.head (Card.Type.faces CardSpec.mountainCard)),
       -- Synthetic for prepare's reason (CR 715.2b).
       PC.alternativeSpell = Just (NonEmpty.head (Card.Type.faces CardSpec.mountainCard)),
+      -- Two empty modes, off the default of one (CR 707.2).
+      PC.spell = Face.Type.defaultSpell {Modal.modes = Modal.modes (Face.Type.defaultSpell :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) <> Modal.modes Face.Type.defaultSpell},
       -- The recursive field, carrying the all-default record so the nested
       -- object's own defaults are exercised too (CR 707.3).
       PC.flipped = Just minimalCharacteristics
@@ -138,6 +143,7 @@ testCharacteristicsJson =
     <> "\"halves\":{\"faces\":[{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}}]},"
     <> "\"prepare\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
     <> "\"alternativeSpell\":{\"name\":\"Mountain\",\"typeLine\":{\"supertypes\":[{\"type\":\"Basic\"}],\"types\":[{\"type\":\"Land\"}],\"subtypes\":[{\"type\":\"Mountain\"}]}},"
+    <> "\"spell\":{\"modes\":[{},{}]},"
     <> "\"flipped\":{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}}"
 
 -- | Every field but the two required ones at its default.
@@ -178,6 +184,7 @@ minimalCharacteristics =
       PC.halves = Nothing,
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
+      PC.spell = Face.Type.defaultSpell,
       PC.flipped = Nothing
     }
 

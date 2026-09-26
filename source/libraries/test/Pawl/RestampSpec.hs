@@ -235,6 +235,25 @@ entryOrderSpec s registry =
       (board, humility) <- replenishBoard s registry
       let after = castAndResolve S.castAnswer board
       Spec.assertEqWith s "CR 613.7m Opalescence was stamped last, so Humility is 4/4" (fmap (`S.powerToughnessOf` after) (onField humility after)) [Just (4, 4)]
+    -- CR 603.10 reads the board after the WHOLE event, so the enters trigger is
+    -- judged under the stamps alice chose, not the arrival order: Pawl.Engine.Event.Match
+    -- reads the entrant off the board at the CR 117.5 scan, after the settle. Kiora is a
+    -- planeswalker, so Humility leaves her ability alone; Humility entering as a
+    -- 4/4 is what she draws for.
+    Spec.it s "CR 613.7m / 603.10 an enters trigger reads the chosen stamps" $ do
+      (board, _) <- replenishBoard s registry
+      kiora <- S.printingOf s registry "Kiora, Behemoth Beckoner"
+      plains <- S.printingOf s registry "Plains"
+      let (_, k1) = S.addPermanent kiora S.alice board
+          (_, stocked) = S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice k1))
+      Spec.assertEqWith s "CR 603.10 Humility entered as a 1/1 under alice's order, so Kiora draws nothing" (libraryAfter reversingAnswer stocked) 2
+      Spec.assertEqWith s "while the arrival order makes it a 4/4 she draws for" (libraryAfter S.castAnswer stocked) 1
+
+-- How many cards alice's library holds after she casts her one spell, it
+-- resolves, and every trigger it raised resolves too. The library rather than the
+-- hand, since castAnswer plays a drawn land.
+libraryAfter :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Int
+libraryAfter answer gs = length (Game.zoneMembers Zone.Library S.alice (S.runPure answer (castAndResolve answer gs) Engine.priorityLoop))
 
 -- alice holds Replenish and eight Plains, with Humility and then Opalescence in
 -- her graveyard.

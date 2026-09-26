@@ -207,12 +207,13 @@ putBindings holder bindings gs =
 -- effect list because CR 603.5's "may" belongs to a clause within a mode.
 --
 -- The mode's TARGET SLOTS are rewritten by targetSlotsOf instead: CR 608.2b
--- re-reads them off the printed face, which unions in CR 303.4a's enchant slot
--- and, for CR 702.96b's overloaded spell, drops them all.
+-- re-reads them off the spell's face (Projection.spellFaceOf), which unions in
+-- CR 303.4a's enchant slot and, for CR 702.96b's overloaded spell, drops them
+-- all.
 modesOf :: ObjectId -> GameState -> [(ModeInstance, Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card))]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
-  Just obj -> case Game.faceOf oid gs of
+  Just obj -> case Projection.spellFaceOf oid gs of
     Nothing -> []
     Just face ->
       let chosen = Binding.modesOf (Object.bindings obj)
@@ -243,7 +244,7 @@ spellController obj oid gs = Maybe.fromMaybe (Projection.defaultControllerOf obj
 targetsAllIllegal :: ObjectId -> GameState -> Bool
 targetsAllIllegal oid gs = case Game.lookupObject oid gs of
   Nothing -> False
-  Just obj -> case Game.faceOf oid gs of
+  Just obj -> case Projection.spellFaceOf oid gs of
     Nothing -> False
     Just face ->
       let slots = targetSlotsOf obj oid gs face
@@ -271,7 +272,7 @@ resolveSpellWith runSubgame oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
-    Just obj -> case Game.faceOf oid gs of
+    Just obj -> case Projection.spellFaceOf oid gs of
       Nothing -> pure ()
       Just face ->
         -- CR 608.2b/700.2c: re-validate only the CHOSEN modes' slots.
@@ -587,7 +588,9 @@ applyCipher oid controller = do
 --
 -- The Adventure and Omen riders are keyed on the CHOSEN FACE's spell type (CR
 -- 205.3k) rather than on the card's layout, because the question is which set of
--- characteristics is resolving rather than which card printed them -- a
+-- characteristics is resolving rather than which card printed them -- read off
+-- Projection.spellFaceOf, so a spell that became a copy asks of the copy (CR
+-- 707.2, 715.3c, 720.3c) -- a
 -- classification either way, never an effect's identity. Buyback's is keyed on the
 -- record CR 601.2b's announcement wrote (Pawl.Engine.Cast.stampBoughtBack), which
 -- is rule 702.27a's own "if the buyback cost was paid", and rebound's on rule

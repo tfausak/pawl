@@ -25,10 +25,11 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- `bindings` on the move, and Pawl.Engine.Cast stamps the stack incarnation a
 -- fresh binding map besides.
 --
--- Not implemented: a SPELL on the stack becoming a copy, the third noun in CR
--- 707.1's list -- the one place CR 707.2's copiable rules text would have to
--- reach Pawl.Engine.Resolve.resolveSpellWith, which reads the printed face
--- (#3154).
+-- A SPELL on the stack is the third noun in CR 707.1's list: it resolves the
+-- copied text (Pawl.Engine.Projection.View.spellFaceOf) with the original's
+-- choices (CR 707.2, Pawl.Engine.Resolve.Effect.acquireChoices), which Synthetic
+-- Mimicry and Pawl.CopySpec's "CR 707.2 a spell that becomes a copy of a Bolt"
+-- prove.
 --
 -- TWO ObjectRefs, named rather than positional for Pawl.Types.RequireBlock's
 -- reason: the sides are not interchangeable, and a card file that swapped them
