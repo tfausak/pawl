@@ -1474,6 +1474,9 @@ eventBindingSlots cond = case cond of
   -- admits every destination, and CR 400.2 makes a hand and a library hidden, so
   -- CR 400.7e withholds `became` for some of the moves it matches.
   TriggerCondition.CardLeavesZone {} -> Set.empty
+  -- The self form, empty for the same floor: the destination may be hidden. The
+  -- bearer is the card that left, which the source slot already names.
+  TriggerCondition.SelfLeavesGraveyard -> Set.empty
   -- CR 603.2c's "that many" (Rakshasa Vizier): how many cards the whole batch
   -- moved that the filter admits, each event's share stamped by eventBindings'
   -- arm and summed by batchBindings. Guaranteed given a match, the one event
