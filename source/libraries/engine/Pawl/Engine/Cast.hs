@@ -1446,9 +1446,9 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- Troops' "only during the declare attackers step and only if you've been
 -- attacked this step".
 --
--- The exact counterweight to permissionsWith below, and read the way its LIBRARY
--- caller reads keywords: off the card, never through the projection (CR 113.6e;
--- an effect granting or removing a printed restriction there is missed, #1859).
+-- The exact counterweight to permissionsOf below, but read off the card rather
+-- than through the projection (CR 113.6e; an effect granting or removing a
+-- printed restriction there is missed, #1859).
 -- ALL of them must hold, which is what CR 601.3's "no ... prohibits"
 -- means; one permission, by contrast, suffices.
 --
@@ -1776,9 +1776,9 @@ castableSpells pid gs =
 -- CR 601.3 (Panglacial): may this card be cast from the library while its
 -- controller searches their own library? A membership test on the card's casting
 -- permissions -- a classification, never card identity.
-permitsCastWhileSearching :: Face.Face Card.Type.Card -> Bool
-permitsCastWhileSearching face =
-  elem CastingPermission.CastFromLibraryWhileSearching (permissionsWith (Face.keywordSet face) face)
+permitsCastWhileSearching :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+permitsCastWhileSearching oid face gs =
+  elem CastingPermission.CastFromLibraryWhileSearching (permissionsOf oid face gs)
 
 -- CR 601.3 / 702.34a: may this player cast this card from the graveyard it lies
 -- in?
@@ -1797,7 +1797,7 @@ permitsCastWhileSearching face =
 -- to say "for this player".
 permitsCastFromGraveyard :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromGraveyard pid oid face gs =
-  (ownedBy pid oid gs && (elem CastingPermission.CastFromGraveyard (permissionsWith (graveyardKeywords oid gs) face) || permitsDisturb oid face gs))
+  (ownedBy pid oid gs && (elem CastingPermission.CastFromGraveyard (permissionsOf oid face gs) || permitsDisturb oid face gs))
     || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs
 
 -- CR 702.146a's permission, which is the one rule 702 permission no keyword set
@@ -1838,7 +1838,7 @@ permitsDisturb oid face gs = case Game.cardOf oid gs of
 ownedBy :: PlayerId -> ObjectId -> GameState -> Bool
 ownedBy pid oid gs = fmap Object.owner (Game.lookupObject oid gs) == Just pid
 
--- CR 613.1: the keywords a card in a GRAVEYARD has, projected rather than
+-- CR 613.1: the keywords a card has where it lies, projected rather than
 -- printed. Rule 702.34a's permission is stated by the ABILITY, and an ability
 -- granted to a card lying in a graveyard (Viral Spawning's own, CR 113.6f, which
 -- Projection.gather reaches there) states it as much as a printed one does
@@ -1847,17 +1847,15 @@ ownedBy pid oid gs = fmap Object.owner (Game.lookupObject oid gs) == Just pid
 -- Read off the OBJECT, so the CR 709.3a half the caller stamped through
 -- asProposed is the one projected -- the same posture Pawl.Engine.Cost.costsFor
 -- takes for the cost half of the same sentence.
-graveyardKeywords :: ObjectId -> GameState -> Set Keyword
-graveyardKeywords oid gs = Map.keysSet (Projection.keywordsOf oid gs)
+projectedKeywords :: ObjectId -> GameState -> Set Keyword
+projectedKeywords oid gs = Map.keysSet (Projection.keywordsOf oid gs)
 
--- Every casting permission a card has: the ones it PRINTS (Panglacial Wurm) plus
--- the ones rule 702 gives it for a keyword set the CALLER supplies.
---
--- The keywords arrive as an argument rather than being read off the face because
--- the two callers read them from different places, and each is right for its
--- zone: a card in a GRAVEYARD is read through the projection, since an ability
--- granted to it there grants rule 702.34a's permission as much as a printed
--- keyword does; a card in a LIBRARY is read as printed instead (#1859).
+-- Every casting permission a card has where it lies (CR 113.6, 613.1f): the ones
+-- its projection carries -- printed (Panglacial Wurm) or granted
+-- (Modification.GainCastingPermission) -- plus the ones rule 702 gives it for
+-- its projected keywords. Both are read off the OBJECT for projectedKeywords'
+-- reason. Pawl.CastSpec's "CR 601.3 a granted permission lets a creature card
+-- be cast while searching" proves the grant reaches a library.
 --
 -- The face's own type line is what answers rule 702.34a's "if the resulting
 -- spell is an instant or sorcery spell", and it is the PROPOSED face's because
@@ -1865,10 +1863,10 @@ graveyardKeywords oid gs = Map.keysSet (Projection.keywordsOf oid gs)
 -- example is that same reading one zone over: under "you may cast instant and
 -- sorcery spells from the top of your library", an adventurer card offers its
 -- instant Adventure half and not its creature half.
-permissionsWith :: Set Keyword -> Face.Face Card.Type.Card -> [CastingPermission.CastingPermission]
-permissionsWith keywords face =
-  Face.castingPermissions face
-    <> Keyword.castingPermissionsOf (TypeLine.types (Face.typeLine face)) keywords
+permissionsOf :: ObjectId -> Face.Face Card.Type.Card -> GameState -> [CastingPermission.CastingPermission]
+permissionsOf oid face gs =
+  PC.castingPermissions (Projection.project oid gs)
+    <> Keyword.castingPermissionsOf (TypeLine.types (Face.typeLine face)) (projectedKeywords oid gs)
 
 -- The library cards this player may cast while searching their own library:
 -- permitted, not prohibited, affordable, and with a fillable target set.
@@ -1911,7 +1909,7 @@ castableWhileSearching pid gs =
             -- Panglacial permission is printed text the face-down object does
             -- not have (CR 708.2a). Unreachable either way -- no card holds both.
             proposed = asProposed oid name Facing.FaceUp gs
-         in permitsCastWhileSearching face
+         in permitsCastWhileSearching oid face proposed
               && castableWhenOffered ManaSpending.AsProduced pid oid name (Cost.candidateCostsFor pid name oid proposed) proposed
       proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (Game.castableFacesOfId oid gs))
    in concatMap proposals (Game.zoneMembers Zone.Library pid gs)
@@ -2175,7 +2173,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- continue to apply to the new object that card became": the value
           -- crosses the move that the grant cannot. armCastFromGraveyard is where
           -- the carried answer is spent.
-          keywordsBefore = graveyardKeywords oid proposed
+          keywordsBefore = projectedKeywords oid proposed
           -- CR 118.14, read one step ahead of the move for `keywordsBefore`'s
           -- reason and a stronger one: the permission carrying the clause lives
           -- on the exiled card, and CR 400.7's new incarnation on the stack has

@@ -253,6 +253,8 @@ rewriteModification pairs m =
         -- rewriteTargetSlot is the same descent a mode's target slots take.
         Modification.GainEnchant slot -> Modification.GainEnchant (rewriteTargetSlot [(from, to)] slot)
         Modification.LoseEnchant slot -> Modification.LoseEnchant (rewriteTargetSlot [(from, to)] slot)
+        -- Carries no word: CastingPermission is a closed enumeration.
+        Modification.GainCastingPermission _ -> acc
         -- CR 612.1 through the names' own Filter, printed on the granter (CR
         -- 612.3) as the enchant's is.
         Modification.AddNamesMatching f -> Modification.AddNamesMatching (Filter.rewrite [(from, to)] f)
