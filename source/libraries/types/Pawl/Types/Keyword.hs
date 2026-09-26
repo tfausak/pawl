@@ -11,6 +11,7 @@ import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Impending as Impending
+import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Protection as Protection
@@ -962,18 +963,11 @@ data Keyword
   | -- | 702.181a: mobilize N -- whenever this creature attacks, create N tapped
     -- and attacking 1\/1 red Warrior tokens, sacrificed at the beginning of the
     -- next end step.
-    --
-    -- Not implemented: a Natural, so a characteristic-defined N -- Avenger of
-    -- the Fallen's "mobilize X, where X is the number of creature cards in your
-    -- graveyard" -- has no transcription (gap #3697).
-    Mobilize Natural.Natural
+    Mobilize (KeywordCount.KeywordCount Keyword)
   | -- | 702.189a: firebending N -- whenever this creature attacks, add N {R}
     -- that its controller does not lose as steps and phases end until end of
     -- combat.
-    --
-    -- Not implemented: a Natural, so Firebending Student's "firebending X, where
-    -- X is this creature's power" has no transcription (gap #3697).
-    Firebending Natural.Natural
+    Firebending (KeywordCount.KeywordCount Keyword)
   | -- | 702.53a: transmute [cost] -- an ability functioning only in a hand,
     -- discarding this card to search your library for a card with the same mana
     -- value, at sorcery speed.
