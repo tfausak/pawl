@@ -3552,8 +3552,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- says so. CR 701.23i supplies the order: apnapOrder supplies the ORDER
           -- and the ref the MEMBERSHIP, for searchers and owners alike.
           --
-          -- Not implemented: CR 701.23i's SIMULTANEOUS look, each searcher seeing
-          -- the zones before any of them decides (#1319).
+          -- CR 701.23i and CR 101.4: every searcher looks at the same cards and
+          -- decides in APNAP order, and only then does anything move. So the
+          -- first pass below only decides; the finds are put and the libraries
+          -- shuffled after the last decision, and a later searcher of the same
+          -- library is offered what an earlier one found.
           let inApnapOrder r =
                 let named = playerRefPlayers legal controller gs0 r
                  in filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
@@ -3583,7 +3586,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               evaluateCap q = case Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext gs0 controller source legal (slotBindings resolving gs0)) gs0 resolving source q of
                 Just n | n > 0 -> Integer.toNaturalSaturating n
                 _ -> 0
-          arrivals <- fmap (concat . concat) . Monad.forM searchers $ \searcher -> Monad.forM (ownersFor searcher) $ \owner -> do
+          decisions <- fmap concat . Monad.forM searchers $ \searcher -> Monad.forM (ownersFor searcher) $ \owner -> do
             -- CR 101.2: a player who can't search libraries does not, and finds
             -- nothing there. Asked BEFORE CR 601.3's offer below, which is made
             -- WHILE SEARCHING. The rest of the instruction still happens -- CR
@@ -3613,9 +3616,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Offered over the card's own zones rather than over the
             -- prohibition-filtered set just below, since CR 101.2 stops the
             -- looking and not the card's other instructions -- the shuffle among
-            -- them. Read LIVE rather than off gs0: CR 601.3's cast and the finds
-            -- both happen during an earlier searcher's pass, so a later pass asks
-            -- over a board this resolution has already moved.
+            -- them. Read LIVE rather than off gs0: CR 601.3's cast happens
+            -- during an earlier searcher's pass, so a later pass asks over a
+            -- board this resolution has already moved.
             chosenZones <-
               if Set.size zones < 2
                 then pure zones
@@ -3696,31 +3699,48 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
                       filler = filter (\oid -> List.notElem oid picked) forced
                   pure (List.genericTake capHere (picked <> filler))
-            -- Where the cards go is the CARD's instruction, not rule 701.23's;
-            -- CR 701.23e says the same of the reveal. The searcher is the
-            -- revealer (CR 701.20a), and the cards go in the order the searcher
-            -- named them.
+            pure (searcher, owner, chosenZones, found)
+          -- Where the cards go is the CARD's instruction, not rule 701.23's;
+          -- CR 701.23e says the same of the reveal. The searcher is the
+          -- revealer (CR 701.20a), and the cards go in the order the searcher
+          -- named them.
+          --
+          -- A card an earlier find has already moved is no longer in the zones
+          -- this searcher looked through, and is skipped: two searchers of one
+          -- library may find the same card (CR 701.23i), and it moves once, as
+          -- the first of them in APNAP order sends it. Pawl.ResolveSpec's
+          -- Synthetic Shared Excavation case proves the card moves once; the
+          -- skip itself is a REGRESSION FENCE, since that card exiles and the
+          -- move of a ceased object (CR 400.7) already does nothing, so
+          -- removing it reddens nothing.
+          arrivals <- fmap concat . Monad.forM decisions $ \(searcher, owner, chosenZones, found) -> do
             -- Read HERE rather than when the arm was entered, the reason the
             -- context above is a function of the board: CR 608.2c carries the
             -- clauses out in order, so the slot an earlier clause bound is read
             -- as it stands now.
             host <- State.gets subjectOf
-            arrived <- concat <$> traverse (putFound searcher host destination) found
-            -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
-            -- The library shuffled is the one that was READ, so this seat is the
-            -- owner -- and only where a LIBRARY is among the zones the searcher
-            -- CHOSE. Delivery Moogle's "if you search your library this way,
-            -- shuffle" is that condition printed: a searcher who took the
-            -- graveyard half alone shuffles nothing.
-            --
-            -- Read off chosenZones rather than searchedZones, since CR 101.2's
-            -- prohibition stops the looking and not the card's other
-            -- instructions.
-            Monad.when (Set.member Zone.Library chosenZones) $ do
-              lib <- State.gets (Game.zoneMembers Zone.Library owner)
-              shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
-              State.modify' (reorderLibrary owner (Game.honourShuffle lib shuffleAnswer))
-            pure arrived
+            let stillThere gs oid = any (\zone -> List.elem oid (Game.zoneMembers zone owner gs)) (Set.toList chosenZones)
+            fmap concat . Monad.forM found $ \oid -> do
+              present <- State.gets (`stillThere` oid)
+              if present then putFound searcher host destination oid else pure []
+          -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
+          -- The library shuffled is the one that was READ, so the seat is the
+          -- owner -- and only where a LIBRARY is among the zones a searcher
+          -- CHOSE. Delivery Moogle's "if you search your library this way,
+          -- shuffle" is that condition printed: a searcher who took the
+          -- graveyard half alone shuffles nothing.
+          --
+          -- Read off chosenZones rather than searchedZones, since CR 101.2's
+          -- prohibition stops the looking and not the card's other
+          -- instructions.
+          --
+          -- ONCE per library, however many searchers read it: the card prints
+          -- one "then shuffle" of that library, not one per searcher.
+          let shuffled = ListUtils.nubOrd [owner | (_, owner, chosenZones, _) <- decisions, Set.member Zone.Library chosenZones]
+          Monad.forM_ shuffled $ \owner -> do
+            lib <- State.gets (Game.zoneMembers Zone.Library owner)
+            shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
+            State.modify' (reorderLibrary owner (Game.honourShuffle lib shuffleAnswer))
           -- CR 608.2c: "that card" in a later clause, or in a delayed ability
           -- this resolution arms (CR 603.7c), is what arrived.
           Monad.forM_ foundSlot $ \slot -> case arrivals of
@@ -4804,7 +4824,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   now <- State.get
                   let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
                   fmap (reverse . snd) (Event.simultaneously (moveOne mAttack mBlocked riders now (Set.empty, []) arrival))
-                else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
+                else do
+                  batch <- fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
+                  -- CR 613.7m: the members that entered the battlefield together
+                  -- take their stamps in APNAP order, each seat choosing its own.
+                  -- Not on the one-at-a-time road above, whose cards enter at
+                  -- separate moments.
+                  Restamp.settle (GameState.nextTimestamp before) (concatMap Foldable.toList batch)
+                  pure batch
             Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
   -- CR 701.12d / 701.12f: every named player's two zones swap their cards, an
   -- empty zone included. Both zones are the player's own (CR 400.3), so every
@@ -7663,7 +7690,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case legalOne destination legal of
       Just recipient -> do
         gs <- State.get
-        Foldable.for_ (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)) $ \mover ->
+        -- CR 613.7m: movers becoming attached together take CR 701.3c's stamps
+        -- in APNAP order, each seat choosing its own, asked before the fold that
+        -- mints them, as turnPermanentsOver asks -- and only of the movers the
+        -- move will restamp, since Event.attach refuses the rest (CR 701.3b).
+        -- No board observes the order (gap #4214).
+        let movers = objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)
+            restamped mover = case Attach.attachmentFor mover recipient gs of
+              Just attachment -> fmap Object.attachedTo (Game.lookupObject mover gs) /= Just (Just attachment)
+              Nothing -> False
+        ordered <- Restamp.order (filter restamped movers)
+        Foldable.for_ (ordered <> filter (not . restamped) movers) $ \mover ->
           Event.attach mover recipient
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
       Nothing -> pure ()

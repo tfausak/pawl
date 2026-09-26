@@ -2021,8 +2021,20 @@ objectInRangeGiven grants you oid gs = objectInRangeUnder (\o -> controllerOfGiv
 -- objectInRangeGiven with the controllers supplied: layer 2's running table
 -- inside the fold, the finished fold outside it.
 objectInRangeUnder :: (ObjectId -> Maybe PlayerId.PlayerId) -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
-objectInRangeUnder ctrl you oid gs =
-  let reaches = maybe False (\pid -> Game.inRangeOf you pid gs)
+objectInRangeUnder = objectInRangeBy Game.inRangeOf
+
+-- CR 801.2c: objectInRangeGiven with the seats fixed as this turn began
+-- (Game.wasInRangeOf), so an object whose controller left the game this turn
+-- is judged by the seat they held. Such an object exists only inside CR
+-- 800.4a's fourth clause and CR 800.4c's exile, which is where
+-- Pawl.Engine.Replacement.reaches asks it.
+objectWasInRangeGiven :: [ControlGrant] -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
+objectWasInRangeGiven grants you oid gs = objectInRangeBy Game.wasInRangeOf (\o -> controllerOfGiven grants o gs) you oid gs
+
+-- The two readings above, differing only in which seat check a player gets.
+objectInRangeBy :: (PlayerId.PlayerId -> PlayerId.PlayerId -> GameState -> Bool) -> (ObjectId -> Maybe PlayerId.PlayerId) -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
+objectInRangeBy seated ctrl you oid gs =
+  let reaches = maybe False (\pid -> seated you pid gs)
    in case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
         Nothing -> True
         Just _ -> reaches (ctrl oid) || reaches (Object.protector =<< Game.lookupObject oid gs)
