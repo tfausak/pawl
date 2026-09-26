@@ -1,5 +1,6 @@
 module Pawl.Types.ObjectRef where
 
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -52,6 +53,9 @@ data ObjectRef
     -- instruction in an ability of this effect's source put there, narrowed by the
     -- optional Filter.
     EachCardExiledWithSource (Maybe (Filter.Filter Keyword.Keyword))
+  | -- | CR 607.2a / Synthetic Split Reliquary: every card in exile that the named
+    -- activated ability of this effect's source put there.
+    EachCardExiledWithAbility AbilityName.AbilityName
   | -- | CR 702.99a / Last Thoughts: every card in exile encoded on this effect's
     -- source, narrowed by the optional Filter.
     EachCardEncodedOnSource (Maybe (Filter.Filter Keyword.Keyword))
