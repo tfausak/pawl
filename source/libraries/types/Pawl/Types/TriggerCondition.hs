@@ -306,6 +306,9 @@ data TriggerCondition
   | -- | CR 603.2c's batch reading of the arm above: "whenever one or more cards
     -- leave your graveyard" (Spirit Mascot), once however many left.
     CardsLeaveZone CardLeavesZone.CardLeavesZone
+  | -- | CR 603.10a / 113.6k: "when this card leaves your graveyard" (Oglor,
+    -- Devoted Assistant's grant). Self-scoped, and a look-back.
+    SelfLeavesGraveyard
   | -- | CR 700.4's "dies" read off the permanent the bearer is attached to
     -- (Screams from Within); the one condition CR 113.6m's Aura clause names.
     AttachedCreatureDies

@@ -455,6 +455,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfAttacksUnblocked
       " {\"type\":\"SelfAttacksUnblocked\"} "
+  Spec.it s "SelfLeavesGraveyard" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfLeavesGraveyard
+      " {\"type\":\"SelfLeavesGraveyard\"} "
   -- CR 113.6k's condition, which names a zone pair rather than the battlefield.
   Spec.it s "SelfPutIntoGraveyardFromLibrary" $
     Common.assertCodec

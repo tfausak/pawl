@@ -25,6 +25,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForageMode as ForageMode
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -409,9 +410,9 @@ data Prompt r where
   -- Pawl.Engine.Resolve completes a short answer from a public zone.
   Search :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 608.2g: the re-entrant cast during a library search (Panglacial Wurm),
-  -- offered in a loop before the find; one entry per castable half with the
-  -- name CR 709.3 needs.
-  CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, CardName.CardName)] -> Prompt (Maybe (ObjectId.ObjectId, CardName.CardName))
+  -- offered in a loop before the find; one entry per castable half and facing
+  -- (CR 709.3, 708.4).
+  CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, CardName.CardName, Facing.Facing)] -> Prompt (Maybe (ObjectId.ObjectId, CardName.CardName, Facing.Facing))
   -- | CR 601.2b / 602.2b: the value of X, before targets. The Naturals are the
   -- least value the card permits (CR 101.1's "X can't be 0") and the greatest
   -- legally announceable now (Cast.affordableX, Activatable.affordableX;
