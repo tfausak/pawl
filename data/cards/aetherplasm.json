@@ -91,7 +91,10 @@
                             }
                           },
                           "riders": {
-                            "blocking": "thatAttacker"
+                            "blocking": {
+                              "type": "Specified",
+                              "value": "thatAttacker"
+                            }
                           },
                           "zone": {
                             "type": "Battlefield"
