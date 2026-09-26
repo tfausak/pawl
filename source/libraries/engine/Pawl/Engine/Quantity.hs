@@ -27,6 +27,7 @@ import qualified Pawl.Types.CompletedDungeon as CompletedDungeon
 import qualified Pawl.Types.ControlClock as ControlClock
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Devotion as Devotion
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -325,16 +326,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- OBJECT and the object this quantity is aimed at need not be the ability's
         -- source. Nothing when the context names no source at all.
         --
-        -- Not implemented: rule 607.2a scopes the link to the exiling ABILITY, and
-        -- GameState.exiledWith keys it by the source object, so an object with two
-        -- exiling abilities would hand this arm the union of both piles (#1535).
+        -- Every exiling ability of the source counts, whatever its name: this
+        -- reference names none, so CR 607.4 links it to each of them.
         --
         -- Terminating: the payload is a strictly smaller subterm.
         Quantity.AgainstCardsExiledWith inner ->
           case Filter.source context of
             Nothing -> Nothing
             Just src ->
-              let linked = filter (\o -> Map.lookup o (GameState.exiledWith gs) == Just src) (Set.toList (GameState.exile gs))
+              let linked = filter (\o -> fmap ExileLink.source (Map.lookup o (GameState.exiledWith gs)) == Just src) (Set.toList (GameState.exile gs))
                in fmap sum (traverse (\o -> evaluateAgainst viewOf context gs announcedOn (Just o) (viewOf o) inner) linked)
         Quantity.Plus (Plus.MkPlus a b) -> case (recur a, recur b) of
           (Just x, Just y) -> Just (x + y)

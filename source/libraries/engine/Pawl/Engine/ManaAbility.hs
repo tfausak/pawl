@@ -738,6 +738,7 @@ refReachesLibrary ref = case ref of
   ObjectRef.EachCardInYourHand -> False
   ObjectRef.EachCardInHand {} -> False
   ObjectRef.EachCardExiledWithSource {} -> False
+  ObjectRef.EachCardExiledWithAbility _ -> False
   ObjectRef.EachCardEncodedOnSource {} -> False
   ObjectRef.EachSpell _ -> False
   ObjectRef.EachAbility _ -> False

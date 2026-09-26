@@ -565,9 +565,16 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- Per FACE, because the name is written on one face's ability and read by that
   -- same face's text -- so two faces may reuse a name without colliding.
-  Spec.it s "CR 613.1f every named removal names an ability its face declares, and every named ability is removed" $ do
+  --
+  -- CR 607.2a's ObjectRef.EachCardExiledWithAbility is the name's third reader,
+  -- and joins the same namespace: a reference naming no exiling ability of its
+  -- face would read an empty pile. It must name an ACTIVATED ability, the one
+  -- carrier Pawl.Engine.Resolve.Effect.exilingAbility files a name for.
+  Spec.it s "CR 613.1f/607.2a every named removal or exile reference names an ability its face declares, and every named ability is read" $ do
     ps <- S.allPrintings s
-    let faceOffends face = namedRemovals face /= declaredAbilityNames face
+    let faceOffends face =
+          Set.union (namedRemovals face) (namedExileReferences face) /= declaredAbilityNames face
+            || not (Set.isSubsetOf (namedExileReferences face) (Set.fromList (Maybe.mapMaybe ActivatedAbility.name (Face.activatedAbilities face))))
         offenders = filter (anyFace faceOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused ability names" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 116.2d's join, the same shape one rule over: an ignore naming an ability
@@ -1360,8 +1367,17 @@ namedRemovals face =
             <> concatMap removals (concatMap stored (cardAuthoredEffects face))
         )
 
--- Every AbilityName a face declares FOR A LAYER-6 REMOVAL to name -- the other
--- side of the join above. Both carriers of one: an activated ability (Gliding
+-- Every AbilityName a face's CR 607.2a references name: the exiling ability
+-- each EachCardExiledWithAbility reads the pile of.
+namedExileReferences :: Face.Face Card.Type.Card -> Set.Set AbilityName.AbilityName
+namedExileReferences face =
+  let named ref = case ref of
+        ObjectRef.EachCardExiledWithAbility name -> [name]
+        _ -> []
+   in Set.fromList (concatMap named (concatMap Resolve.effectObjectRefs (cardAuthoredEffects face)))
+
+-- Every AbilityName a face declares FOR A LAYER-6 REMOVAL OR AN EXILE REFERENCE
+-- to name -- the other side of the join above. Both carriers of one: an activated ability (Gliding
 -- Licid) and a printed replacement (Glittering Lion). A HAND-KEPT union, so a
 -- third carrier added to Pawl.Types.AbilityName's readers must be added here
 -- too, or its cards' names read as dangling.

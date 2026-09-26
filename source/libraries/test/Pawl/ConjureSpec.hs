@@ -89,6 +89,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.Facing as Facing
@@ -1370,7 +1371,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     Spec.assertEqWith
       s
       "CR 607.2a it is exiled with Smog Smasher"
-      (fmap (`Map.lookup` GameState.exiledWith final) duplicates)
+      (fmap (fmap ExileLink.source . (`Map.lookup` GameState.exiledWith final)) duplicates)
       [Just smasher]
   -- The card the exile arm is for, the rest of its text: at max speed (CR
   -- 702.178a) the beginning of alice's combat returns what the Smasher exiled,

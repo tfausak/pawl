@@ -29,6 +29,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -396,7 +397,8 @@ data GameState = MkGameState
     -- the exiled incarnation; CR 702.99c's persistence is read, not swept.
     encoded :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
     -- | CR 607.2's linked set as a relation: the object each exiled card is
-    -- linked to, keyed by the exiled incarnation and written by
+    -- linked to, and the name of the ability that exiled it (CR 607.2a), keyed
+    -- by the exiled incarnation and written by
     -- Pawl.Engine.Resolve.Effect.applyEffectWith (rule 607.2a) and Pawl.Engine.Event's
     -- zone change funnel (rule 607.2b) as a difference over GameState.exile,
     -- never a case over the opcode. Rule 614.14's link has a third writer,
@@ -404,13 +406,7 @@ data GameState = MkGameState
     -- entering permanent outright: no diff can find it, an entry replacement
     -- being neither an opcode's window nor a redirected move. Cleaned up by key
     -- only.
-    --
-    -- Scoped to the OBJECT and not to the printed ABILITY, where rule 607.2a
-    -- scopes it to the ability. The two differ only for a card with two exiling
-    -- abilities and two referring ones, since pawl has no ability identity to key
-    -- on at all -- Pawl.Types.Source embeds the ability value, not an index. No
-    -- printing in the pool is in that shape (#1535).
-    exiledWith :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
+    exiledWith :: Map.Map ObjectId.ObjectId ExileLink.ExileLink,
     -- | CR 400.7: the object whose effect put each permanent onto the
     -- battlefield, keyed by the entered incarnation and written by
     -- Pawl.Engine.Resolve.Effect's Effect.MoveToZone arm. Read by
