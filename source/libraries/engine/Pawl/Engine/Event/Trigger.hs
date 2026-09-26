@@ -1413,7 +1413,7 @@ eventTriggers events gs =
       -- The ids a graveyard arrival in this block minted, keyed by the ARRIVING
       -- incarnation -- ZoneChange.object, the key `inGraveyards` would hold them
       -- under, and the key `leftGraveyard` files the same card's later departure
-      -- under (`graveyardDeparted` argues that the two ids coincide).
+      -- under (`leftGraveyard` argues that the two ids coincide).
       arrivalsIn block = Set.fromList (Maybe.mapMaybe (arrivedInGraveyardAt . LoggedEvent.event) (Foldable.toList block))
       arrivedInGraveyardAt event = case movedOf event of
         Just zc | ZoneChange.to zc == Zone.Graveyard -> Just (ZoneChange.object zc)
@@ -1439,15 +1439,18 @@ eventTriggers events gs =
       -- information. It was in the graveyard immediately after group i's events,
       -- so what CR 113.6k and 113.6m let function there is checked against them --
       -- Bloodghast's landfall seeing a land that entered before the same
-      -- resolution exiled it.
-      -- Strictly later because a card removed by this group's own event did not
-      -- exist immediately after it; CR 603.10a's look-back list names no
-      -- graveyard-functioning condition that would ask otherwise.
+      -- resolution returned it to hand. Strictly later because a card removed by
+      -- this group's own event did not exist immediately after it.
+      --
+      -- Not implemented: CR 603.10a's look-back for a card's own "when this card
+      -- leaves your graveyard", which CR 113.6k makes function from the graveyard
+      -- and which would need the departing card offered to its own group; no
+      -- TriggerCondition spells that self form (#4208).
       --
       -- A card that was there before the batch and one the batch put there are
       -- served alike; the second is narrowed by `arrivedLater` in `graveyardAt`
       -- below, so it reaches no event before its own arrival. Pawl.ZoneTriggerSpec's
-      -- Synthetic Sunder the Loam case is the proving board. Both boundaries --
+      -- Travel Through Caradhras case is the proving board. Both boundaries --
       -- strictly later, and that narrowing -- are regression fences: loosening
       -- either leaves the suite green, since no graveyard-functioning condition in
       -- data/cards/ matches the event that removes its card, and no board there
