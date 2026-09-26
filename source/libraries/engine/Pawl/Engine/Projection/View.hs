@@ -275,6 +275,9 @@ viewOfCard face =
           -- sentence.
           Filter.tributePaid = False,
           Filter.castUsing = Nothing,
+          -- CR 702.143c asks about a card in exile or a spell, and this builder
+          -- describes a printed face.
+          Filter.foretold = False,
           -- CR 601.2h pays the cost of a SPELL, and this builder describes a
           -- printed face.
           Filter.manaSpentTagColors = Map.empty,
@@ -820,6 +823,8 @@ viewOfCharacteristics peers oid pc controller counters gs =
       Filter.tributePaid = any Object.tributePaid (Game.lookupObject oid gs),
       -- CR 400.7d: read live off the object, with no last-known override.
       Filter.castUsing = Object.castUsing =<< Game.lookupObject oid gs,
+      -- CR 702.143c: read live off the object, `castUsing`'s posture.
+      Filter.foretold = any (Maybe.isJust . Object.foretold) (Game.lookupObject oid gs),
       -- CR 400.7d / CR 107.4h: read live off the object like `castUsing`, and
       -- keyed by tag with CR 202.2's colours beside it, which is the whole of what
       -- the vocabulary asks (see the field's own comment in Pawl.Engine.Filter).
