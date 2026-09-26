@@ -363,7 +363,7 @@ activateAbility pid srcId ability = do
           -- (Cost.substitutedManas): a half this offer makes payable is a half
           -- CR 601.2b leaves to the payer rather than to the fallback.
           let totalledCost = Cost.plusComponents gathered announcedAtX
-          (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.substitutedManas (Cost.activationManaSubstitutions (Cost.Type.components totalledCost) Map.empty pid srcId gs) (Cost.totalManas gathered)) totalledCost
+          (announcedCost, _) <- Cost.announce (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components totalledCost) Map.empty pid srcId gs) (Cost.totalManas gathered)) totalledCost
           chosen <- Target.chooseTargets pid abilId srcId (Maybe.fromMaybe 0 mAmount) slots sets
           if not (Target.selectionLegal (Just pid) seed srcId (Maybe.fromMaybe 0 mAmount) slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
@@ -436,7 +436,7 @@ activateAbility pid srcId ability = do
               -- (Cost.paySubstituting). The bindings the substitution makes are
               -- dropped -- no printing reads back which permanents a waterbend
               -- cost tapped, where CR 702.51c's convoke does.
-              (payment, _) <- Cost.paySubstituting Resolve.performManaAbility before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.activationManaSubstitutions pid srcId) paidCost
+              (payment, _) <- Cost.paySubstituting Resolve.performManaAbility before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating srcId) (Just abilId) ManaSpending.AsProduced pid srcId (Cost.announceSubstitutions Cost.waterbendSubstitutions pid srcId) paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

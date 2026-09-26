@@ -223,10 +223,12 @@ data CostComponent keyword
     -- and no more.
     --
     -- A SPELL's mandatory additional waterbend cost rides the same way, its mana
-    -- and this licence one Face.additionalCostChoices option (Water Whip).
+    -- and this licence one Face.additionalCostChoices option (Water Whip). So do
+    -- a ward cost and an unless cost, paid at CR 118.12 (The Unagi of Kyoshi
+    -- Island, Waterbending Lesson).
     --
-    -- Not implemented: a spell's OPTIONAL waterbend cost, a ward cost, an unless
-    -- cost, an alternative cost (#3901).
+    -- Not implemented: a spell's OPTIONAL waterbend cost, an alternative cost
+    -- (#3901).
     Waterbend Natural.Natural
   | -- | CR 107.3a / 601.2b / Katara, Water Tribe's Hope: X as a waterbend
     -- amount, announced by the activator and rewritten to a Waterbend by
