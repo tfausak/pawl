@@ -5806,12 +5806,14 @@ mobilize n =
 
 -- The quantity mobilize's and firebending's N reads as the ability resolves
 -- (CR 608.2h). Power reads the triggered ability's source, the object carrying
--- the keyword (CR 113.7); a tally's "you" is the ability's controller (CR 109.5).
+-- the keyword (CR 113.7); a tally's or a counter count's "you" is the ability's
+-- controller (CR 109.5).
 keywordCount :: KeywordCount.KeywordCount Keyword -> Quantity.Quantity
 keywordCount n = case n of
   KeywordCount.Fixed k -> Quantity.Literal (toInteger k)
   KeywordCount.Power -> Quantity.Power
   KeywordCount.Tally tally -> Quantity.Count Count.MkCount {Count.scope = KeywordTally.scope tally, Count.filter = KeywordTally.filter tally, Count.aggregation = Aggregation.Members}
+  KeywordCount.PlayerCounters tally -> Quantity.PlayerCounters tally
 
 -- | CR 702.181a's token: 1\/1 red Warrior creature. Rule 702.181a names no name,
 -- so CR 111.4 supplies one -- rebelToken's shape one rule over.
@@ -6166,7 +6168,8 @@ prowess =
                   SpellCast.zone = Nothing,
                   -- And no ordinal either: every noncreature spell cast fires it,
                   -- not one chosen occurrence of the turn.
-                  SpellCast.ordinal = Nothing
+                  SpellCast.ordinal = Nothing,
+                  SpellCast.phase = Nothing
                 },
           TriggeredAbility.modal =
             Modal.MkModal
@@ -6213,7 +6216,8 @@ extort =
                 { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
                   SpellCast.scope = TurnScope.EachTurn,
                   SpellCast.zone = Nothing,
-                  SpellCast.ordinal = Nothing
+                  SpellCast.ordinal = Nothing,
+                  SpellCast.phase = Nothing
                 },
           TriggeredAbility.modal =
             Modal.MkModal
@@ -6272,7 +6276,8 @@ increment =
                 { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
                   SpellCast.scope = TurnScope.EachTurn,
                   SpellCast.zone = Nothing,
-                  SpellCast.ordinal = Nothing
+                  SpellCast.ordinal = Nothing,
+                  SpellCast.phase = Nothing
                 },
           TriggeredAbility.modal =
             Modal.MkModal
