@@ -982,6 +982,25 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
     Spec.assertEqWith s "the Aura entered attached to the one creature that matched both" (length (attachedTo mineTapped after)) 1
     Spec.assertEqWith s "the enchanted creature is a 2/1 plus +2/+2" (S.powerToughnessOf mineTapped settled) (Just (4, 3))
     Spec.assertEqWith s "and a state-based pass leaves it alone, since both instances still hold" (length (attachedTo mineTapped settled)) 1
+  -- CR 702.5c's last sentence over the POOLS: enchant permanent then enchant
+  -- creature admits only creatures, whichever instance is printed first. The
+  -- wider pool first is the order a first-instance fold gets wrong, offering
+  -- the land (and the creature as a bare object, ToCreature being the
+  -- narrower pool's).
+  Spec.it s "CR 702.5c enchant permanent then enchant creature offers no land" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warden <- S.printingOf s registry "Synthetic Warden of Two Charges"
+    let base0 = S.landsInPlay plains 2
+        (land, base1) = S.addPermanent plains S.alice base0
+        (creature, base2) = S.addPermanent piker S.alice base1
+        (gs, spellId) = S.handOne warden base2
+        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) spellId theSlot gs) (Card.enchantTargetSlot (S.combinedFace warden))
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (S.cast S.alice spellId))
+        after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+    Spec.assertEqWith s "the land matches enchant permanent but not enchant creature" (fmap (Set.member (Recipient.ToObject land)) offered) (Just False)
+    Spec.assertEqWith s "the creature matches both, as a creature" (fmap (Set.member (Recipient.ToCreature creature)) offered) (Just True)
+    Spec.assertEqWith s "and the Aura enchants it: a 2/1 plus +1/+1" (S.powerToughnessOf creature after) (Just (3, 2))
   -- CR 704.5m / 303.4c with the SECOND instance broken and the first untouched:
   -- alice still controls the creature, but CR 502.3's untap step untaps it, so
   -- "enchant tapped creature" no longer admits it. An engine that read only the

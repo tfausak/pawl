@@ -39,6 +39,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
@@ -1819,18 +1820,13 @@ enchantSlotMapGiven enchants = case foldEnchant enchants of
 -- one -- which keeps a lone bare "enchant creature" folding to ITSELF, and that
 -- matters: Sba.stillLegalEnchant's fast arm matches on exactly that shape.
 --
--- The POOL is taken from the first instance. CR 702.5c's last sentence conjoins
--- the pools too -- "The Aura can enchant only objects or players that match all
--- of its enchant abilities" -- and what that asks for is their INTERSECTION,
--- which Pool is not closed under: only a NESTED pair has a Pool naming it
--- (Creatures against Permanents is Creatures), Creatures against Players is
--- empty, and AnyTarget against Permanents is creatures-and-planeswalkers. So
--- taking the first instance is not merely inexact, it is ORDER-DEPENDENT even
--- where the answer could be written down. No card can reach it: the CardSpec lint
--- rejects a face whose enchant abilities disagree about their pool, and states
--- the rule (#797). A record update over the first instance's slot, so its pool
--- and its CR 115.6 requirement ride along; CR 702.5a's "Enchant [object or
--- player]" has no "up to" in it, so an enchant slot is always required.
+-- The POOL is their INTERSECTION, CR 702.5c's last sentence conjoining the
+-- pools as well as the Filters, and poolMeet below is how the fold writes it.
+-- A record update over the first instance's slot, so its CR 115.6 requirement
+-- rides along; CR 702.5a's "Enchant [object or player]" has no "up to" in it, so
+-- an enchant slot is always required. Pawl.AuraSpec's "CR 702.5c enchant
+-- permanent then enchant creature offers no land" proves the pool is not the
+-- first instance's.
 enchantTargetSlot :: Face.Face card -> Maybe TargetSlot
 enchantTargetSlot = foldEnchant . Face.enchant
 
@@ -1851,9 +1847,50 @@ foldEnchant slots = case slots of
   [] -> Nothing
   first : rest ->
     Just
-      first
-        { TargetSlot.filter = case Maybe.mapMaybe TargetSlot.filter (first : rest) of
-            [] -> Nothing
-            [one] -> Just one
-            many -> Just (Filter.And many)
-        }
+      ( case poolMeet (fmap TargetSlot.pool (first : rest)) of
+          Just meet ->
+            first
+              { TargetSlot.pool = meet,
+                TargetSlot.filter = case Maybe.mapMaybe TargetSlot.filter (first : rest) of
+                  [] -> Nothing
+                  [one] -> Just one
+                  many -> Just (Filter.And many)
+              }
+          -- The empty disjunction, which matches nothing: no candidate for CR
+          -- 601.2c to choose, so CR 303.4a leaves the spell uncastable, CR 303.4g
+          -- keeps an entering one where it is and CR 704.5m bins one attached.
+          -- A fence rather than a proven arm: the lint poolMeet names keeps
+          -- every card off it, so no test observes it.
+          Nothing -> first {TargetSlot.filter = Just (Filter.Or [])}
+      )
+
+-- The pool among these that every other one CONTAINS, if one does: the
+-- intersection CR 702.5c asks for whenever the pools are nested (enchant
+-- permanent against enchant creature is the creatures). Nothing when no pool
+-- sits inside all the rest, and foldEnchant then admits nothing. That is exact
+-- for a DISJOINT pair (enchant creature against enchant player, CR 702.5d), and
+-- stricter than the rule for an OVERLAPPING one, whose intersection Pool has no
+-- constructor for (AnyTarget against Permanents is creatures, planeswalkers and
+-- battles); Pawl.EffectLintSpec's "every card's enchant pools nest" keeps a card
+-- from reaching the latter.
+poolMeet :: [Pool.Pool] -> Maybe Pool.Pool
+poolMeet pools = List.find (\inner -> all (poolWithin inner) pools) pools
+
+-- CR 115: is every candidate the first pool admits also one the second admits?
+-- Read off each pool's own note. A graveyard pool nests only under the SAME
+-- ZoneScope, a wider scope's subset being left unanswered, and anything unlisted
+-- answers False -- both stricter, never looser, than the sets themselves.
+poolWithin :: Pool.Pool -> Pool.Pool -> Bool
+poolWithin inner outer =
+  inner == outer || case (inner, outer) of
+    (Pool.Creatures, Pool.AnyTarget) -> True
+    (Pool.Creatures, Pool.Permanents) -> True
+    (Pool.Creatures, Pool.SpellsAndPermanents) -> True
+    (Pool.Creatures, Pool.CreaturesAndCardsInGraveyard _) -> True
+    (Pool.Players, Pool.AnyTarget) -> True
+    (Pool.Players, Pool.PlayersAndPlaneswalkers) -> True
+    (Pool.PlayersAndPlaneswalkers, Pool.AnyTarget) -> True
+    (Pool.Permanents, Pool.SpellsAndPermanents) -> True
+    (Pool.Spells, Pool.SpellsAndPermanents) -> True
+    (Pool.CardsInGraveyard scope, Pool.CreaturesAndCardsInGraveyard scope') -> scope == scope'
+    _ -> False
