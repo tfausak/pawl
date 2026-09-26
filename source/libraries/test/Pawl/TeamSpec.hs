@@ -45,6 +45,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -55,6 +56,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.InitiativeSpec as InitiativeSpec
 import qualified Pawl.PreventionSpec as PreventionSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -947,6 +949,63 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
     Spec.assertEqWith s "bob named alice, so alice divided" (run sharedTurns S.bob (piker, S.bob) S.alice) [(False, S.bob), (True, S.alice)]
     Spec.assertEqWith s "without the option alice divided unasked" (run id S.alice (piker, S.alice) S.bob) [(True, S.alice)]
     Spec.assertEqWith s "a Hero each, so alice named bob" (run sharedTurns S.bob (hero, S.alice) S.bob) [(False, S.alice), (True, S.bob)]
+  -- CR 725.4 / 805.2: carol, the monarch, concedes before alice's team's turn.
+  -- No rule names which active player takes the crown, so the team decides and
+  -- dave, its primary player, names himself over alice, the turn's seat. He then
+  -- draws at the team's end step (CR 725.2). Without the option alice is the one
+  -- active player and takes it unasked.
+  Spec.it s "CR 725.4 the active team's primary player names the new monarch" $ do
+    island <- S.printingOf s registry "Island"
+    let run option =
+          let teamed = option (daveAliceTeams S.fourPlayerGame)
+              stockOne gs pid = List.foldl' (\g _ -> snd (S.addLibraryCard island pid g)) gs [1 :: Int .. 4]
+              board = S.withMonarch S.carol (List.foldl' stockOne teamed [S.alice, S.bob, S.carol, S.dave])
+              (chosen, gone) = departNaming S.dave S.carol board
+              after = fst (TurnSpec.runTurn S.identityAnswer gone)
+           in (fmap (`S.handSize` after) [S.alice, S.dave], GameState.monarch gone, chosen)
+        (hands, monarch, asked) = run sharedTurns
+        (handsAlone, monarchAlone, askedAlone) = run id
+    Spec.assertEqWith s "dave drew his draw-step card and the monarch's, alice one" hands [1, 2]
+    Spec.assertEqWith s "dave is the monarch" monarch (Just S.dave)
+    Spec.assertEqWith s "dave, the primary player, chose between alice and him" asked [(S.dave, [S.alice, S.dave])]
+    Spec.assertEqWith s "without the option alice drew both, dave none" handsAlone [2, 0]
+    Spec.assertEqWith s "and alice is the monarch" monarchAlone (Just S.alice)
+    Spec.assertEqWith s "and nobody was asked" askedAlone []
+  -- CR 726.4 / 805.2: the same choice for the initiative, and the taker ventures
+  -- into Undercity (CR 726.2).
+  Spec.it s "CR 726.4 the active team's primary player names who takes the initiative" $ do
+    undercity <- S.printingOf s registry "Undercity"
+    let run option =
+          let board = S.withInitiative S.carol (InitiativeSpec.owningUndercity undercity [S.alice, S.bob, S.carol, S.dave] (option (daveAliceTeams S.fourPlayerGame)))
+              (chosen, gone) = departNaming S.dave S.carol board
+              settled = InitiativeSpec.resolveAll InitiativeSpec.answering gone
+           in (fmap (`InitiativeSpec.dungeonNamesOf` settled) [S.alice, S.dave], GameState.initiative gone, chosen)
+        (dungeons, holder, asked) = run sharedTurns
+        (dungeonsAlone, holderAlone, askedAlone) = run id
+    Spec.assertEqWith s "dave ventured into Undercity, alice did not" dungeons [[], ["\"Undercity\""]]
+    Spec.assertEqWith s "dave has the initiative" holder (Just S.dave)
+    Spec.assertEqWith s "dave, the primary player, chose between alice and him" asked [(S.dave, [S.alice, S.dave])]
+    Spec.assertEqWith s "without the option alice ventured, dave did not" dungeonsAlone [["\"Undercity\""], []]
+    Spec.assertEqWith s "and alice has the initiative" holderAlone (Just S.alice)
+    Spec.assertEqWith s "and nobody was asked" askedAlone []
+
+-- Dave and alice against bob and carol, alice's turn. Their team wraps the turn
+-- order, so dave is its primary player (CR 805.2) while alice is the turn's seat.
+daveAliceTeams :: GameState.GameState -> GameState.GameState
+daveAliceTeams = S.inTeams [[S.dave, S.alice], [S.bob, S.carol]]
+
+-- `leaving` concedes, every CR 725.4 / 726.4 active-player choice naming `named`
+-- where offered; the answer is each choice's (chooser, candidates).
+departNaming :: PlayerId.PlayerId -> PlayerId.PlayerId -> GameState.GameState -> ([(PlayerId.PlayerId, [PlayerId.PlayerId])], GameState.GameState)
+departNaming named leaving board =
+  let record :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [PlayerId.PlayerId])] r
+      record p = case p of
+        Prompt.ChooseActivePlayer _ pid offer -> do
+          State.modify' (<> [(pid, NonEmpty.toList offer)])
+          pure (Maybe.fromMaybe (NonEmpty.head offer) (List.find (== named) (NonEmpty.toList offer)))
+        _ -> pure (S.identityAnswer p)
+      ((_, gone), asked) = State.runState (Engine.runGame record board (Departure.depart Departure.Conceded leaving)) []
+   in (asked, gone)
 
 -- alice's beginning of combat step, the rest of her turn to come.
 atCombat :: GameState.GameState -> GameState.GameState

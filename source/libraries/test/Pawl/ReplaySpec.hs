@@ -993,6 +993,14 @@ combatReplaySpec s =
           -- constructor. Both carry a PlayerId, so the types would not object.
           let p = Prompt.ChooseDefender decider S.alice (S.bob NonEmpty.:| [S.carol])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.DeterminedFirstPlayer S.bob)) Nothing
+        -- CR 725.4 / 726.4 with CR 805.2: which active player takes a departing
+        -- holder's designation. Its answer has ChoosePlayer's shape, so each
+        -- rejects the other's response.
+        Spec.it s "ChooseActivePlayer round-trips, and rejects a chosen player" $ do
+          let p = Prompt.ChooseActivePlayer decider S.alice (S.alice NonEmpty.:| [S.bob])
+          Spec.assertEqWith s "bob round trips" (Replay.decode p (Replay.encode p S.bob)) (Just S.bob)
+          Spec.assertEqWith s "alice round trips" (Replay.decode p (Replay.encode p S.alice)) (Just S.alice)
+          Spec.assertEqWith s "a chosen player is not an answer to it" (Replay.decode p (Response.ChosePlayer S.bob)) Nothing
         -- CR 601.2g: the mana-source choice round-trips like every other prompt.
         Spec.it s "ChooseManaSource round-trips through the transcript" $ do
           let a = ObjectId.MkObjectId 7
