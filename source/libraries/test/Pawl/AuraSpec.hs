@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.EndEffect as EndEffect
@@ -3568,6 +3569,37 @@ bestowSpec s registry = Spec.describe s "Bestow" $ do
     -- escapes -- which is what keeps the cast above from being offered and then
     -- rejected.
     Spec.assertBool s (S.castable S.alice spellId stormed) "CR 702.103d: the bestow card is still offered under Aether Storm"
+  -- CR 702.103d through CR 601.3's search exception: the bestow candidate is
+  -- judged as an Aura where the card lies, in the LIBRARY. Synthetic Glacial
+  -- Blessing grants the Rollicker the permission; the pair differs only in
+  -- Aether Storm, under one answerer naming the printed cost. Were the library's
+  -- stamp invisible, the Storm would take both candidates and nothing would cast.
+  Spec.it s "CR 702.103d a bestow card cast while searching is judged as an Aura" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+    blessing <- S.printingOf s registry "Synthetic Glacial Blessing"
+    storm <- S.printingOf s registry "Aether Storm"
+    let (host, gs1) = S.addPermanent mammoth S.alice (S.landsInPlay mountain 4)
+        (_, gs2) = S.addPermanent blessing S.alice gs1
+        (_, board) = S.addLibraryCard rollicker S.alice gs2
+        stormed = snd (S.addPermanent storm S.alice board)
+        searchCasting :: Prompt.Prompt r -> r
+        searchCasting p = case p of
+          Prompt.CastWhileSearching _ _ options -> Maybe.listToMaybe options
+          _ -> payingPrinted host p
+        castThere gs = S.runPure searchCasting gs (Cast.castWhileSearching S.manaPerformer S.alice)
+        typesOnStack gs = fmap (`Projection.cardTypesOf` gs) (topOfStack gs)
+    Spec.assertEqWith
+      s
+      "CR 702.103d: under Aether Storm the Rollicker is cast from the library as an Aura spell"
+      (typesOnStack (castThere stormed))
+      (Just (Set.singleton CardType.Enchantment))
+    Spec.assertEqWith
+      s
+      "and without it the same answerer casts the creature spell"
+      (typesOnStack (castThere board))
+      (Just (Set.fromList [CardType.Creature, CardType.Enchantment]))
   -- CR 702.103d's TARGET half, through CR 601.2c: the bestow candidate is the
   -- one that has to find a creature to enchant, and the printed one is not. Two
   -- boards differing in exactly one permanent, and ONE answerer across both --
