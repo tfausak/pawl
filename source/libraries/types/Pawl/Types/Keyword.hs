@@ -1,6 +1,7 @@
 module Pawl.Types.Keyword where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Craft as Craft
@@ -749,13 +750,7 @@ data Keyword
     -- on target creature. If that's another creature, it also gains the
     -- non-backup abilities of this creature printed below this one until end of
     -- turn." Minted by Pawl.Engine.Keyword.backup.
-    --
-    -- Not implemented: CR 702.165a's "printed below this one", which needs the
-    -- printed ORDER of a face's keywords and abilities against one another --
-    -- Pawl.Types.Face keeps the keywords in a Set beside the ability lists, so
-    -- every non-backup printed ability is granted whether it was printed above
-    -- or below (gap #3938). Cragsmasher Yeti is the card that needs it.
-    Backup Natural.Natural
+    Backup (Backup.Backup Keyword)
   | -- | 702.166a: bargain -- an optional additional cost of sacrificing an
     -- artifact, enchantment or token, minted by Pawl.Engine.Keyword.bargainCost.
     -- CR 702.166c's "if it was bargained" clauses are the card's own, gated on

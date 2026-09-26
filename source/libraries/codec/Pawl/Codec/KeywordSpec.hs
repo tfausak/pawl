@@ -1,10 +1,12 @@
 module Pawl.Codec.KeywordSpec where
 
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -989,17 +991,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Annihilator 3) /= Codec.encode Keyword.codec (Keyword.Poisonous 3))
       "annihilator 3 is not poisonous 3"
-  -- CR 702.165a's N rides the constructor the same way.
-  Spec.it s "Backup carries its N" $ do
+  -- CR 702.165a's N rides a record, beside what the card prints above it.
+  Spec.it s "Backup carries its N" $
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Backup 1)
-      " {\"type\":\"Backup\",\"value\":1} "
-    Spec.assertBool
-      s
-      (Codec.encode Keyword.codec (Keyword.Backup 3) /= Codec.encode Keyword.codec (Keyword.Annihilator 3))
-      "backup 3 is not annihilator 3"
+      (Keyword.Backup (Backup.MkBackup 1 Set.empty))
+      " {\"type\":\"Backup\",\"value\":{\"count\":1}} "
   -- CR 702.60a's N rides the constructor the same way, and must not share a tag
   -- with the other Ns either.
   Spec.it s "Ripple carries its N" $ do

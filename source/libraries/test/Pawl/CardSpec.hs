@@ -74,6 +74,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.BlockCost as BlockCost
@@ -846,9 +847,9 @@ modificationCounts modification = case modification of
     GrantedAbility.Static ability -> staticAbilityCounts ability
     GrantedAbility.Rules rules -> ruleAbilitiesCounts rules
     GrantedAbility.Replacement ability -> concatMap conditionCounts (Maybe.maybeToList (PrintedReplacement.condition ability))
-  -- Payload-free: rule 702.165a's grant names the source and carries no text of
-  -- its own, so there is nothing here to sweep.
-  Modification.GainAbilitiesOfSource -> []
+  -- Rule 702.165a's grant names the source, and the keywords it carries are
+  -- minted from the card's Backup keyword, swept there.
+  Modification.GainAbilitiesOfSource _ -> []
   Modification.LoseAllAbilities -> []
   -- Carries a name, which reaches no Count.
   Modification.LoseNamedAbility _ -> []
@@ -3336,7 +3337,8 @@ keywordPayloadFilters keyword = case keyword of
   -- Filter, and rule 702.160a's ability names no quality.
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
-  Keyword.Backup _ -> []
+  -- The keywords printed above the backup line are card text like any other.
+  Keyword.Backup b -> concatMap keywordPayloadFilters (Set.toList (Backup.printedAbove b))
   -- CR 702.184a is payload-free: the "another untapped creature you control" the
   -- cost taps is written into the ability Pawl.Engine.Keyword.station mints, not
   -- into the keyword.
@@ -3848,8 +3850,8 @@ modificationFilters modification = case modification of
   -- here would flatten them to unframed and lose CR 701.3a's attach-destination
   -- distinction.
   Modification.GainAbility _ -> []
-  -- Payload-free, so no Filter of its own -- see modificationCounts.
-  Modification.GainAbilitiesOfSource -> []
+  -- Minted, and swept as the Backup keyword -- see modificationCounts.
+  Modification.GainAbilitiesOfSource _ -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityFilters p <> foldMap quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []

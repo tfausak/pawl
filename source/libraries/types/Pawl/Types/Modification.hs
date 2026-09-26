@@ -137,9 +137,11 @@ data Modification ability
     -- abilities of THIS effect's SOURCE, the grant backup's minted trigger makes
     -- ("it also gains the non-backup abilities of this creature").
     --
-    -- NULLARY, and the source is read rather than named, for
-    -- SetControllerToSource's reason: a keyword's mint is card-independent data
-    -- and cannot name the abilities of a card it has not met.
+    -- The source is read rather than named, for SetControllerToSource's
+    -- reason: a keyword's mint is card-independent data and cannot name the
+    -- abilities of a card it has not met. What it carries is the keywords the
+    -- card prints ABOVE the backup line (Pawl.Types.Backup's printedAbove),
+    -- which rule 702.165a's "printed below this one" keeps out.
     --
     -- EXPANDED AS THE ABILITY RESOLVES, by Pawl.Engine.Resolve.Effect's
     -- ModifyTarget arm, into one ordinary GainKeyword or GainAbility per ability
@@ -156,7 +158,7 @@ data Modification ability
     -- backup grants what it copied, and an ability a layer-6 effect afterwards
     -- gave the creature with backup is not granted. Pawl.KeywordTriggerSpec's Backup group
     -- proves the first half.
-    GainAbilitiesOfSource
+    GainAbilitiesOfSource (Set.Set Keyword.Keyword)
   | LoseAllAbilities -- layer 6 (Humility)
   | -- | layer 6, CR 613.1f: this object loses the abilities carrying this name
     -- -- "this creature loses this ability", the clause every Licid prints ahead
