@@ -341,6 +341,44 @@ stackSpec s registry = Spec.describe s "Stack" $ do
         Spec.assertEqWith s "the granted permission cast Llanowar Elves onto the battlefield" (S.countOnBattlefieldByName elvesName S.alice withGrant) 1
         Spec.assertEqWith s "without the grant Llanowar Elves stays in the library" (S.countOnBattlefieldByName elvesName S.alice without, S.countByName elvesName S.alice without) (0, 1)
       _ -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
+  -- CR 702.37c / 708.4: the granted permission's affected set (a card you own
+  -- in your library) still matches the 2/2 face-down creature card, so CR 601.3
+  -- allows the morph cast too, and the player picks between the two casts.
+  Spec.it s "CR 702.37c a granted permission offers Skirk Marauder face down while searching" $ do
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    marauder <- S.printingOf s registry "Skirk Marauder"
+    blessing <- S.printingOf s registry "Synthetic Glacial Blessing"
+    nullChamber <- S.printingOf s registry "Null Chamber"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (ewId, g1) = S.addPermanent evolvingWilds S.alice g0
+        g2 = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) g1 [1 .. (3 :: Int)]
+        (_, g3) = S.addPermanent mountain S.alice g2
+        (_, g4) = S.addLibraryCard marauder S.alice g3
+        gs = (snd (S.addPermanent blessing S.alice g4)) {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        -- Pinned to the face-down option, so the engine's order cannot pick it.
+        castFaceDown :: Prompt.Prompt r -> r
+        castFaceDown p = case p of
+          Prompt.CastWhileSearching _ _ options -> List.find (\(_, _, facing) -> Facing.isFaceDown facing) options
+          _ -> S.identityAnswer p
+        -- CR 400.7: a new object on the battlefield, found by its printed card.
+        faceDownMarauder after =
+          filter
+            (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just (S.printingName marauder) && maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid after))
+            (Game.zoneMembers Zone.Battlefield S.alice after)
+    case Projection.abilitiesOf ewId gs of
+      ewAbility : _ -> do
+        let after = snd (Engine.runGamePure castFaceDown gs (do Activate.activateAbility S.alice ewId ewAbility; Stack.resolveTop; Stack.resolveTop))
+        Spec.assertEqWith s "CR 708.4 Skirk Marauder resolved onto the battlefield face down" (length (faceDownMarauder after)) 1
+        Spec.assertEqWith s "both casts offered, face up and face down" (fmap (\(_, _, facing) -> Facing.isFaceDown facing) (Cast.castableWhileSearching S.alice gs)) [False, True]
+        -- CR 708.4: the face-down cast has no name, so a Null Chamber naming the
+        -- card prohibits only the face-up one. The name is written straight
+        -- onto the Chamber, as Pawl.FaceDownSpec's hand-cast twin does.
+        let (chamber, chambered) = S.addPermanent nullChamber S.bob gs
+            named = chambered {GameState.objects = Map.adjust (\o -> o {Object.chosenNames = Set.singleton (S.printingName marauder)}) chamber (GameState.objects chambered)}
+        Spec.assertEqWith s "CR 708.4 Null Chamber naming it leaves only the face-down cast" (fmap (\(_, _, facing) -> Facing.isFaceDown facing) (Cast.castableWhileSearching S.alice named)) [True]
+      [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do
@@ -586,7 +624,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     split <- S.printingOf s registry "Synthetic Glacial Half"
     let (_, withMountain) = S.addPermanent mountain S.alice (S.landsInPlay forest 1)
         (_, gs) = S.addLibraryCard split S.alice withMountain
-    Spec.assertEqWith s "both halves offered, by name" (fmap snd (Cast.castableWhileSearching S.alice gs)) [glacialHalf, volcanicHalf]
+    Spec.assertEqWith s "both halves offered, by name" (fmap (\(_, name, _) -> name) (Cast.castableWhileSearching S.alice gs)) [glacialHalf, volcanicHalf]
   -- The control, one Mountain apart from the pair above: CR 709.3a's "Only the
   -- chosen half is evaluated to see if it can be cast" gates each half on its
   -- OWN cost, so a lone Forest reaches {G} and not {R}. Without this, "both
@@ -596,7 +634,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     forest <- S.printingOf s registry "Forest"
     split <- S.printingOf s registry "Synthetic Glacial Half"
     let (_, gs) = S.addLibraryCard split S.alice (S.landsInPlay forest 1)
-    Spec.assertEqWith s "only the affordable half" (fmap snd (Cast.castableWhileSearching S.alice gs)) [glacialHalf]
+    Spec.assertEqWith s "only the affordable half" (fmap (\(_, name, _) -> name) (Cast.castableWhileSearching S.alice gs)) [glacialHalf]
   -- WHICH half the player picked is what reaches the stack, not the first one
   -- the engine happened to enumerate: the answerer takes the LAST option, and
   -- the Volcanic half is what lands there. CR 709.3b -- "While on the stack,
