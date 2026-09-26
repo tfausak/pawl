@@ -88,6 +88,7 @@ import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.ForetellCost as ForetellCost
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -219,12 +220,22 @@ faceDownCost =
 grantedForetellCost :: Face.Face card -> Object.Object -> Maybe (Cost Keyword.Type.Keyword)
 grantedForetellCost face obj = do
   amount <- Object.foretellCostReduction obj
-  manaCost <- Face.manaCost face
-  pure
-    Cost.MkCost
-      { Cost.mana = Just (reducedManaCost amount manaCost),
-        Cost.components = []
-      }
+  foretellCostFor face (ForetellCost.ManaCostReducedBy amount)
+
+-- CR 702.143a: a foretell keyword's payload settled against the face being cast
+-- -- the stated cost as printed, or that face's mana cost reduced (CR 118.7),
+-- grantedForetellCost's reading and for its reasons. Nothing for a reduction off
+-- a face with no mana cost (CR 202.1b).
+foretellCostFor :: Face.Face card -> ForetellCost.ForetellCost Keyword.Type.Keyword -> Maybe (Cost Keyword.Type.Keyword)
+foretellCostFor face payload = case payload of
+  ForetellCost.Stated cost -> Just cost
+  ForetellCost.ManaCostReducedBy amount -> do
+    manaCost <- Face.manaCost face
+    pure
+      Cost.MkCost
+        { Cost.mana = Just (reducedManaCost amount manaCost),
+          Cost.components = []
+        }
 
 -- CR 118.7: one object's mana cost with an amount taken off it, which is the
 -- whole of what "its mana cost reduced by {2}" names. Rule 118.7a-g's spill is
@@ -816,7 +827,7 @@ candidateCostsGiven permitted pid name oid gs =
                   | Maybe.isJust (Object.foretold obj) ->
                       fmap
                         (untagged . withAdditional)
-                        (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (Keyword.foretellCost (Face.keywordSet face)))
+                        (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (foretellCostFor face =<< Keyword.foretellCost (Face.keywordSet face)))
                 -- CR 118.9a: a CR 601.3 permission that states an alternative
                 -- cost -- "without paying its mana cost" (Extract Power), or rule
                 -- 701.65a's {2} -- REPLACES the printed cost for the plotted arm's

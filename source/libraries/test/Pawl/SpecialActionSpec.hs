@@ -1697,10 +1697,6 @@ foretoldSpell s registry = Spec.describe s "CR 702.143c Poison the Cup" $ do
 -- its mana cost reduced by {2}. / Whenever you foretell a card, this creature
 -- gets +2/+0 until end of turn." -- checked against Scryfall, 2026-09-25.
 --
--- Not implemented: the first ability, a grant of foretell whose cost each card
--- derives from its own mana cost (#4158). pawl's Devourer is stricter than the
--- printing, never weaker: it foretells nothing the printing could not.
---
 -- ONE DEVOURER EACH, alice's and bob's, so "you" is not collapsed onto "a
 -- player": alice foretells, and only hers may grow.
 devourerBoard ::
@@ -1754,6 +1750,56 @@ foretellTrigger s registry = Spec.describe s "CR 702.143c Dream Devourer" $ do
       (soleExile after >>= \oid -> fmap (Maybe.isJust . Object.foretold) (Game.lookupObject oid after))
       (Just True)
 
+-- Dream Devourer's first ability over Hill Giant, {3}{R} Creature -- Giant
+-- 3/3, whose granted foretell cost is {1}{R}. FOUR MOUNTAINS: {2} for the
+-- action leaves exactly the {1}{R}, a mana short of the printed {3}{R}.
+grantBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+grantBoard mountain giant devourer controller =
+  let (giantId, g1) = S.addHandCard giant S.alice (S.landsInPlay mountain 4)
+      (devourerId, g2) = S.addPermanent devourer controller g1
+   in ( giantId,
+        devourerId,
+        g2
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+foretellGrant :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foretellGrant s registry = Spec.describe s "CR 702.143a Dream Devourer's grant" $ do
+  -- CR 613.1f: a layer-6 grant to a card in a hand, where CR 702.143a's ability
+  -- functions. The pair differs only in who controls the Devourer: "your hand"
+  -- is its controller's.
+  Spec.it s "CR 613.1f a card in its controller's hand may be foretold, and one in an opponent's may not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    giant <- S.printingOf s registry "Hill Giant"
+    devourer <- S.printingOf s registry "Dream Devourer"
+    let (giantId, _, mine) = grantBoard mountain giant devourer S.alice
+        (theirGiantId, _, theirs) = grantBoard mountain giant devourer S.bob
+    Spec.assertBool s (List.elem (Action.Type.Foretell giantId) (Action.legalActions S.alice mine)) "CR 613.1f alice's Devourer lets her foretell the Giant"
+    Spec.assertBool s (List.notElem (Action.Type.Foretell theirGiantId) (Action.legalActions S.alice theirs)) "bob's does not"
+  -- The ruling: the grant stops once the card leaves the hand, yet the card keeps
+  -- the cost it was given -- so the Devourer is gone before the cast.
+  Spec.it s "CR 702.143a the foretold card is cast for its own mana cost reduced by {2}, the Devourer gone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    giant <- S.printingOf s registry "Hill Giant"
+    devourer <- S.printingOf s registry "Dream Devourer"
+    let (giantId, devourerId, gs) = grantBoard mountain giant devourer S.alice
+        foretold = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell giantId)) gs Engine.priorityLoop) [])
+        gone = S.runPure S.identityAnswer foretold (Event.changeZone devourerId Zone.Graveyard)
+        later = gone {GameState.turnNumber = GameState.turnNumber gone + 1}
+    Spec.assertBool s (Maybe.isJust (soleExile foretold)) "the Giant was foretold into exile, so the case below runs at all"
+    Monad.forM_ (soleExile later) $ \exiledId -> do
+      Spec.assertBool s (S.castable S.alice exiledId later) "CR 702.143a the two Mountains the {2} left pay {1}{R}"
+      Spec.assertBool s (not (S.castable S.alice exiledId (tapOne later))) "one Mountain does not, so the cast is not free"
+    Spec.assertEqWith s "the control: the Devourer is off the battlefield" (S.creaturesInPlay S.alice later) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
@@ -1768,6 +1814,7 @@ spec s registry = do
   makeForetoldPerFace s registry
   foretoldSpell s registry
   foretellTrigger s registry
+  foretellGrant s registry
   suspending s registry
   suspendHaste s registry
   suspendingForX s registry

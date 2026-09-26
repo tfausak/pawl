@@ -8,17 +8,20 @@
         {
           "type": "Foretell",
           "value": {
-            "mana": [
-              {
-                "type": "OfType",
-                "value": {
-                  "type": "Colored",
+            "type": "Stated",
+            "value": {
+              "mana": [
+                {
+                  "type": "OfType",
                   "value": {
-                    "type": "Green"
+                    "type": "Colored",
+                    "value": {
+                      "type": "Green"
+                    }
                   }
                 }
-              }
-            ]
+              ]
+            }
           }
         }
       ],
