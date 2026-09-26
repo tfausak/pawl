@@ -77,6 +77,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -612,8 +613,9 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let slot = SlotName.MkSlotName (Text.pack "thatAttacker")
         moved = SlotName.MkSlotName (Text.pack "self")
         move riders = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot moved) Zone.Battlefield riders Nothing Nothing LibraryPlacement.defaultValue Nothing)
-    Spec.assertEqWith s "the rider is a read, beside the ref's own" (Resolve.slotsOf (move EntryRiders.defaultValue {EntryRiders.blocking = Just slot})) (Map.fromList [(moved, SlotArity.Many), (slot, SlotArity.One)])
+    Spec.assertEqWith s "the rider is a read, beside the ref's own" (Resolve.slotsOf (move EntryRiders.defaultValue {EntryRiders.blocking = Just (EntryBlock.Specified slot)})) (Map.fromList [(moved, SlotArity.Many), (slot, SlotArity.One)])
     Spec.assertEqWith s "and a move stating no attacker names only what it moves" (Resolve.slotsOf (move EntryRiders.defaultValue)) (Map.singleton moved SlotArity.Many)
+    Spec.assertEqWith s "as does one whose controller chooses the attacker" (Resolve.slotsOf (move EntryRiders.defaultValue {EntryRiders.blocking = Just EntryBlock.Chosen})) (Map.singleton moved SlotArity.Many)
   Spec.it s "CR 605 manaProduced reads AddMana whole, and nothing else" $ do
     let plain = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)) (Quantity.Literal 1) ManaRetention.Ordinary Nothing Nothing
         anyColor = ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor (Quantity.Literal 1) ManaRetention.Ordinary Nothing Nothing

@@ -216,6 +216,7 @@ import qualified Pawl.Codec.EndTurnSignalSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntersWithSpec
 import qualified Pawl.Codec.EntryAttackSpec
+import qualified Pawl.Codec.EntryBlockSpec
 import qualified Pawl.Codec.EntryFlipSpec
 import qualified Pawl.Codec.EntryOptionSpec
 import qualified Pawl.Codec.EntryRSpec
@@ -920,6 +921,7 @@ spec s registry = do
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntersWithSpec.spec s
   Pawl.Codec.EntryAttackSpec.spec s
+  Pawl.Codec.EntryBlockSpec.spec s
   Pawl.Codec.EntryFlipSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
   Pawl.Codec.EntryRSpec.spec s

@@ -179,6 +179,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryAttack as EntryAttack
+import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
@@ -4384,7 +4385,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- place whichever opcode put the creature there. The attacker was
             -- read ONCE ahead of this fold (see mBlocked below), so CR 608.2f's
             -- single event cannot see it move between members.
-            Monad.forM_ mBlocked (Combat.putOntoBattlefieldBlocking newId)
+            Monad.forM_ mBlocked (\blocked -> Combat.putOntoBattlefieldBlocking blocked newId)
             -- CR 610.3: a move with a duration is only half of a pair, so the
             -- incarnation that arrived is registered against the source whose
             -- leaving the battlefield ends it, and against the zone it came from
@@ -4751,10 +4752,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- case anyway.
             mBlocked <- case EntryRiders.blocking entry of
               Nothing -> pure Nothing
-              Just slot -> do
+              -- CR 509.4's main clause: Combat asks the controller.
+              Just EntryBlock.Chosen -> pure (Just Combat.AnyAttacker)
+              Just (EntryBlock.Specified slot) -> do
                 named <- fromAmongMembers legal resolving chosen slot
                 pure $ case named of
-                  [attacker] -> Just attacker
+                  [attacker] -> Just (Combat.SpecifiedAttacker attacker)
                   _ -> Nothing
             -- CR 508.4's rider, read ONCE off the same pre-move board for
             -- mBlocked's reason.
@@ -6088,10 +6091,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- no printing names several. Nothing here is Combat's own no-op case anyway.
     mBlocked <- case EntryRiders.blocking entry of
       Nothing -> pure Nothing
-      Just slot -> do
+      -- CR 509.4's main clause: Combat asks the controller.
+      Just EntryBlock.Chosen -> pure (Just Combat.AnyAttacker)
+      Just (EntryBlock.Specified slot) -> do
         named <- fromAmongMembers legal resolving chosen slot
         pure $ case named of
-          [attacker] -> Just attacker
+          [attacker] -> Just (Combat.SpecifiedAttacker attacker)
           _ -> Nothing
     -- CR 303.4i's "attached to", read ONCE ahead of the minting loop for
     -- mBlocked's reason and through the same reader. THREE-VALUED for
@@ -6135,7 +6140,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- for the same reason: CR 614.16's replacement settles the COUNT
               -- first, and CR 506.3e / CR 509.4a's no-op conditions live in
               -- Pawl.Engine.Combat rather than here.
-              Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\made2 -> Combat.putOntoBattlefieldBlocking made2 attacker) made)
+              Monad.forM_ mBlocked (\blocked -> Monad.mapM_ (Combat.putOntoBattlefieldBlocking blocked) made)
               pure made
         _ -> pure []
     bindMinted resolving mSlot minted
@@ -6341,10 +6346,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- reads and the slot this reads are one name.
     mBlocked <- case EntryRiders.blocking entry of
       Nothing -> pure Nothing
-      Just blockedSlot -> do
+      -- CR 509.4's main clause: Combat asks the controller.
+      Just EntryBlock.Chosen -> pure (Just Combat.AnyAttacker)
+      Just (EntryBlock.Specified blockedSlot) -> do
         named <- fromAmongMembers legal resolving chosen blockedSlot
         pure $ case named of
-          [attacker] -> Just attacker
+          [attacker] -> Just (Combat.SpecifiedAttacker attacker)
           _ -> Nothing
     -- The count is Create's, read the same way and off the same `gs` (CR 707.1).
     minted <- case Quantity.evaluateFor viewOf context gs resolving source quantity of
@@ -6381,7 +6388,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 Monad.forM_ mAttack (\specified -> Monad.mapM_ (Combat.putOntoBattlefieldAttacking specified) made)
                 -- CR 509.4, the blocking twin one rule over, in the same place
                 -- and for the same reason Create's arm puts it there.
-                Monad.forM_ mBlocked (\attacker -> Monad.mapM_ (\token -> Combat.putOntoBattlefieldBlocking token attacker) made)
+                Monad.forM_ mBlocked (\blocked -> Monad.mapM_ (Combat.putOntoBattlefieldBlocking blocked) made)
                 pure made
       _ -> pure []
     bindMinted resolving mSlot minted

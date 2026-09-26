@@ -3,6 +3,7 @@ module Pawl.Types.EntryRiders where
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryAttack as EntryAttack
+import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SlotName as SlotName
@@ -42,20 +43,12 @@ import qualified Pawl.Types.TapState as TapState
 -- attacking, and CR 702.116a's narrows that choice to the player a slot names.
 -- Pawl.Engine.Combat.putOntoBattlefieldAttacking applies each.
 --
--- `blocking` is CR 509.4's rider, and that it has no counterpart to
--- `attacking`'s Chosen is the design call rather than an oversight. CR 509.4's parenthetical --
--- "unless the effect that put it onto the battlefield specifies what it's
--- blocking" -- is the case every printing of this shape is in: Flash Foliage
--- names a target and Aetherplasm names a trigger's binding, both in the pool;
--- Mirror Match names the attacker it copied, over a CreateCopy, and Brimaz,
--- King of Oreskos names a trigger's binding too and is not pooled. So the
--- field names the SLOT the effect specified, and the engine never asks. A Bool plus a prompt
--- would put a question to the player that the effect has already answered.
---
--- Not implemented: CR 509.4's unspecified form, where the creature's controller
--- chooses which attacking creature it's blocking as it enters (#2089).
--- Nothing distinguishes that from "no rider" here, and nothing needs to while no
--- printing writes it.
+-- `blocking` is CR 509.4's rider, an EntryBlock for `attacking`'s reason: the
+-- rule's main clause has the controller choose as the creature enters
+-- (EntryBlock.Chosen, Synthetic Sudden Interposition), and its
+-- parenthetical is an effect that names the attacker by slot
+-- (EntryBlock.Specified -- Flash Foliage's target, Aetherplasm's trigger
+-- binding, Mirror Match's copied attacker).
 --
 -- Applied by Pawl.Engine.Combat.putOntoBattlefieldBlocking, which is where CR
 -- 506.3e and CR 509.4a's two no-op conditions live and where CR 509.4b's
@@ -203,8 +196,8 @@ import qualified Pawl.Types.TapState as TapState
 -- producer, and its "up to one" is why the rule's undefined case is reachable at
 -- all: a seat that announces zero targets leaves the slot naming nothing.
 --
--- A SLOT NAME, `blocking`'s shape and for its reason: every printing of this
--- sentence names its host with the word "target", and CR 608.2b has already
+-- A SLOT NAME, EntryBlock.Specified's shape and for its reason: every printing
+-- of this sentence names its host with the word "target", and CR 608.2b has already
 -- judged that slot by the time the effect is applied. So the effect has answered
 -- the question and the engine never asks -- which is the difference from CR
 -- 303.4f, whose whole content is that the effect did NOT name one.
@@ -223,7 +216,7 @@ import qualified Pawl.Types.TapState as TapState
 data EntryRiders count ability = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Maybe EntryAttack.EntryAttack,
-    blocking :: Maybe SlotName.SlotName,
+    blocking :: Maybe EntryBlock.EntryBlock,
     transformed :: Bool,
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) count,
     underOwner :: Bool,

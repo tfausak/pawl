@@ -477,6 +477,8 @@ library codec
     Pawl.Codec.EntersWithSpec
     Pawl.Codec.EntryAttack
     Pawl.Codec.EntryAttackSpec
+    Pawl.Codec.EntryBlock
+    Pawl.Codec.EntryBlockSpec
     Pawl.Codec.EntryFlip
     Pawl.Codec.EntryFlipSpec
     Pawl.Codec.EntryOption
@@ -1879,6 +1881,7 @@ library types
     Pawl.Types.EndTurnSignal
     Pawl.Types.EntersWith
     Pawl.Types.EntryAttack
+    Pawl.Types.EntryBlock
     Pawl.Types.EntryFlip
     Pawl.Types.EntryOption
     Pawl.Types.EntryR
