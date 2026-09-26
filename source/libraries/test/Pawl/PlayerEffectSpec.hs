@@ -92,6 +92,10 @@
 -- pool's only Expiry.WhenUsed grant -- CR 611.2a's "or until you play a
 -- matching card, whichever comes first" -- so Mountain beside it is the
 -- Filter's own negative and Goblin Piker proves the same grant widens a CAST.
+--
+-- Angelic Arbiter is the condition asked PER AFFECTED PLAYER: "each opponent
+-- who" names the players by what each of them did this turn, so it is a
+-- three-seat fixture for Cease-Fire's reason.
 module Pawl.PlayerEffectSpec where
 
 import qualified Data.List as List
@@ -102,6 +106,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -119,6 +124,8 @@ import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -2957,6 +2964,53 @@ greedSpec s registry =
       Spec.assertEqWith s "and is still at 20" (S.lifeOf S.alice after) (Just 20)
       Spec.assertEqWith s "her Swamp was never tapped for the {B}" (S.tappedCount S.alice after) 0
 
+-- Angelic Arbiter {5}{W}{W}: "Each opponent who cast a spell this turn can't
+-- attack with creatures. Each opponent who attacked with a creature this turn
+-- can't cast spells." Three seats with bob active, so "each opponent who" has
+-- one opponent who did and one who didn't: alice controls the Arbiter, bob a
+-- Settled Goblin Piker, and bob and carol each a Mountain and a Lightning Bolt
+-- in hand. `acted` is the turn's event log, given bob's Piker; each pair of
+-- boards below differs in it alone.
+angelicArbiterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+angelicArbiterSpec s registry =
+  Spec.describe s "AngelicArbiter" $ do
+    let board acted step = do
+          arbiter <- S.printingOf s registry "Angelic Arbiter"
+          mountain <- S.printingOf s registry "Mountain"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, gs1) = S.addPermanent arbiter S.alice S.threePlayerGame
+              gs2 = S.landsFor mountain S.carol 1 (S.landsFor mountain S.bob 1 gs1)
+              (bobBolt, gs3) = S.addHandCard bolt S.bob gs2
+              (carolBolt, gs4) = S.addHandCard bolt S.carol gs3
+              (bobPiker, gs5) = S.addPermanent piker S.bob gs4
+              positioned =
+                gs5
+                  { GameState.phase = step,
+                    GameState.activePlayer = S.bob,
+                    GameState.priority = Just S.bob
+                  }
+          pure (bobBolt, carolBolt, bobPiker, S.withEvents (acted bobPiker) positioned)
+        attacked piker = [GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared piker S.alice (AttackTarget.OfPlayer S.alice) 1 S.bob)]
+        castOne _ = [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.bob S.noSource S.emptyCharacteristics (Just Zone.Hand) Nothing)]
+
+    -- The condition is asked of EACH opponent with that opponent as
+    -- PlayerRef.Candidate: bob attacked and carol didn't, so a reading asked
+    -- once for the whole ability -- of the controller, or of the active player
+    -- -- stops both of them or neither.
+    Spec.it s "CR 601.3 only the opponent who attacked with a creature this turn can't cast spells" $ do
+      (bobBolt, carolBolt, _, afterAttack) <- board attacked Phase.PostcombatMain
+      (quietBolt, _, _, quiet) <- board (const []) Phase.PostcombatMain
+      Spec.assertBool s (not (S.castable S.bob bobBolt afterAttack)) "bob, who attacked with his Piker, can't cast Lightning Bolt"
+      Spec.assertBool s (S.castable S.carol carolBolt afterAttack {GameState.priority = Just S.carol}) "carol, who attacked with nothing, still can"
+      Spec.assertBool s (S.castable S.bob quietBolt quiet) "and bob can on the same board had he not attacked"
+
+    Spec.it s "CR 508.1c an opponent who cast a spell this turn can't attack with creatures" $ do
+      (_, _, bobPiker, afterCast) <- board castOne S.beginningOfCombat
+      (_, _, quietPiker, quiet) <- board (const []) S.beginningOfCombat
+      Spec.assertBool s (bobPiker `notElem` Combat.legalAttackers S.bob afterCast) "bob, who cast a spell, can't attack with his Piker"
+      Spec.assertBool s (quietPiker `elem` Combat.legalAttackers S.bob quiet) "and can on the same board had he cast nothing"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -2981,3 +3035,4 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   cindermawSpec s registry
   emperionSpec s registry
   greedSpec s registry
+  angelicArbiterSpec s registry

@@ -59,6 +59,7 @@ codec =
           Arm.nullary "HasProtectionFromChosenName" PlayerEffect.HasProtectionFromChosenName,
           Arm.payload "HasProtectionFrom" filterCodec PlayerEffect.HasProtectionFrom (\x -> case x of PlayerEffect.HasProtectionFrom y -> Just y; _ -> Nothing),
           Arm.nullary "CantBecomeMonarch" PlayerEffect.CantBecomeMonarch,
+          Arm.nullary "CantAttackWithCreatures" PlayerEffect.CantAttackWithCreatures,
           Arm.payload "CantCastMatching" filterCodec PlayerEffect.CantCastMatching (\x -> case x of PlayerEffect.CantCastMatching y -> Just y; _ -> Nothing),
           Arm.nullary "CastOnlyAtSorcerySpeed" PlayerEffect.CastOnlyAtSorcerySpeed,
           Arm.payload "CantPlayLands" filterCodec PlayerEffect.CantPlayLands (\x -> case x of PlayerEffect.CantPlayLands y -> Just y; _ -> Nothing),
@@ -104,6 +105,7 @@ tagOf x = case x of
   PlayerEffect.HasProtectionFromChosenName {} -> "HasProtectionFromChosenName"
   PlayerEffect.HasProtectionFrom {} -> "HasProtectionFrom"
   PlayerEffect.CantBecomeMonarch {} -> "CantBecomeMonarch"
+  PlayerEffect.CantAttackWithCreatures {} -> "CantAttackWithCreatures"
   PlayerEffect.CantCastMatching {} -> "CantCastMatching"
   PlayerEffect.CastOnlyAtSorcerySpeed {} -> "CastOnlyAtSorcerySpeed"
   PlayerEffect.CantPlayLands {} -> "CantPlayLands"

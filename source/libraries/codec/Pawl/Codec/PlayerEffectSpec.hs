@@ -377,6 +377,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.CantBecomeMonarch
       " {\"type\":\"CantBecomeMonarch\"} "
+  -- CR 508.1c / Angelic Arbiter.
+  Spec.it s "CantAttackWithCreatures" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      PlayerEffect.CantAttackWithCreatures
+      " {\"type\":\"CantAttackWithCreatures\"} "
   -- CR 601.3a / Damping Engine's cast half.
   Spec.it s "CantCastMatching" $
     Common.assertCodec

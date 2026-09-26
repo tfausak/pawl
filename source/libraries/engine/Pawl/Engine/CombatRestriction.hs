@@ -108,7 +108,10 @@ cantAttack candidates gs =
             [] -> Set.empty
             first : rest -> List.foldl' Set.intersection first rest,
           detained candidates gs,
-          attackProhibited candidates gs
+          attackProhibited candidates gs,
+          -- CR 508.1c: a player who can't attack with creatures (Angelic
+          -- Arbiter) attacks with none of those they control, at every seat.
+          Set.fromList (filter (\oid -> any (`PlayerEffect.prohibitsAttackingWithCreatures` gs) (Projection.controllerOf oid gs)) candidates)
         ]
 
 -- CR 802.3a: which (creature, defending player) pairs a CR 508.1c restriction

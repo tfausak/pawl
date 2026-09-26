@@ -120,3 +120,18 @@ bakeBound players condition = case condition of
         }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (bakeBound players) conditions)
   Condition.Type.All conditions -> Condition.Type.All (fmap (bakeBound players) conditions)
+
+-- The condition read for ONE affected player: every PlayerRef.Candidate inside
+-- it substituted by that seat (Quantity.forCandidate). Angelic Arbiter's "each
+-- opponent who cast a spell this turn" is a player static ability's condition
+-- asked once per player it would affect (Pawl.Engine.PlayerEffect.printedRows).
+forCandidate :: PlayerId -> Condition.Type.Condition -> Condition.Type.Condition
+forCandidate pid condition = case condition of
+  Condition.Type.Compares c ->
+    Condition.Type.Compares
+      c
+        { Compares.measured = Quantity.forCandidate pid (Compares.measured c),
+          Compares.threshold = Quantity.forCandidate pid (Compares.threshold c)
+        }
+  Condition.Type.Any conditions -> Condition.Type.Any (fmap (forCandidate pid) conditions)
+  Condition.Type.All conditions -> Condition.Type.All (fmap (forCandidate pid) conditions)
