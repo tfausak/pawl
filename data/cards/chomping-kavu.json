@@ -21,7 +21,9 @@
       "keywords": [
         {
           "type": "Backup",
-          "value": 1
+          "value": {
+            "count": 1
+          }
         }
       ],
       "manaCost": [

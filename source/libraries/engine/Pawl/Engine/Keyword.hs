@@ -24,6 +24,7 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
+import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import Pawl.Types.Card (Card)
@@ -7405,8 +7406,10 @@ fabricate n =
 --
 -- THE GRANT is Modification.GainAbilitiesOfSource, whose header carries the rest
 -- of the rule: what it reads off the source, when, and what it cannot reach.
-backup :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-backup n =
+-- It carries this instance's printedAbove, the keywords rule 702.165a's
+-- "printed below this one" keeps out.
+backup :: Backup.Backup Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+backup (Backup.MkBackup n above) =
   let slot = TargetSlot.required Pool.Creatures Nothing
       counters =
         Effect.PutCounters
@@ -7419,7 +7422,7 @@ backup n =
         Effect.ModifyTarget
           ModifyTarget.MkModifyTarget
             { ModifyTarget.duration = Duration.UntilEndOfTurn,
-              ModifyTarget.modification = Modification.GainAbilitiesOfSource,
+              ModifyTarget.modification = Modification.GainAbilitiesOfSource above,
               ModifyTarget.ref = ObjectRef.InSlot backupTarget
             }
       another =
