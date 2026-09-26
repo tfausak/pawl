@@ -790,21 +790,21 @@ affectsWith grants peers source oid a partial gs = case a of
   Affected.Matching f ->
     let -- CR 109.5: "you" is the SOURCE's controller. Safe to force: controlGrants
         -- consults no liveness gate and so cannot re-enter this function.
-        perspective = controllerOfGiven grants Set.empty source gs
+        perspective = controllerOfGiven grants source gs
      in Set.member oid (GameState.battlefield gs)
           && inReach
-          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct.
   Affected.MatchingAnywhere f ->
-    let perspective = controllerOfGiven grants Set.empty source gs
+    let perspective = controllerOfGiven grants source gs
      in inReach
-          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants oid gs) (countersOf oid gs) gs) f
   -- Matching's body with that conjunct NEGATED rather than dropped.
   Affected.MatchingOffBattlefield f ->
-    let perspective = controllerOfGiven grants Set.empty source gs
+    let perspective = controllerOfGiven grants source gs
      in not (Set.member oid (GameState.battlefield gs))
           && inReach
-          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (affectedContext source perspective gs) (viewOfCharacteristics peers oid partial (controllerOfGiven grants oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. The Filter's perspective stays the source's controller (CR 109.5), not
   -- the enchanted player's. The candidate's controller is bound once and used
@@ -815,15 +815,15 @@ affectsWith grants peers source oid a partial gs = case a of
   -- answers for the layers AFTER 2 (CR 613.8a confines a dependency to one
   -- layer), where the controller a candidate has is the one layer 2 left it; a
   -- control grant reading its own output is what CR 613.8b's ordering is for,
-  -- and controlNames does that ordering there. So the two arms differ exactly on
+  -- and Projection.View.layerTwo does that ordering there. So the two arms differ exactly on
   -- a candidate this source itself takes, and neither is the other's bug.
   Affected.AttachedPlayerControls f -> case enchantedPlayerOf source gs of
     Just pid ->
-      let controller = controllerOfGiven grants Set.empty oid gs
+      let controller = controllerOfGiven grants oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
             && inReach
-            && Filter.matches (affectedContext source (controllerOfGiven grants Set.empty source gs) gs) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
+            && Filter.matches (affectedContext source (controllerOfGiven grants source gs) gs) (viewOfCharacteristics peers oid partial controller (countersOf oid gs) gs) f
     Nothing -> False
   -- CR 611.3d: a rider, applied by storing it (Event.permissionRiders) and never
   -- derived, so a projection's own read of the template names nothing.
@@ -870,7 +870,7 @@ viewsOf :: GameState -> ObjectId -> Filter.View
 viewsOf gs =
   let cands = gather gs
       grants = controlGrants gs
-      viewOf oid = viewOfCharacteristics (Just . viewOf) oid (projectFrom cands oid gs) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs
+      viewOf oid = viewOfCharacteristics (Just . viewOf) oid (projectFrom cands oid gs) (controllerOfGiven grants oid gs) (countersOf oid gs) gs
    in viewOf
 
 -- viewOfObject against a pre-projected board and a precomputed grant list. See
@@ -881,7 +881,7 @@ viewOfObjectGiven pcs grants oid gs =
   -- safe for the reason viewOfCharacteristics gives: both attachment views are
   -- lazy, so the recursion is driven by a filter's own AttachedTo / HasAttached
   -- nesting, which is finite.
-  viewOfCharacteristics (\host -> Just (viewOfObjectGiven pcs grants host gs)) oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs
+  viewOfCharacteristics (\host -> Just (viewOfObjectGiven pcs grants host gs)) oid (projectGiven pcs oid gs) (controllerOfGiven grants oid gs) (countersOf oid gs) gs
 
 -- CR 112.2 / 601.2a: the view of a SPELL on the stack, whose controller is the
 -- player who cast it. The caster is passed in rather than rediscovered, so a
@@ -1071,7 +1071,7 @@ viewUpTo bound cands gs = viewUpToGiven (controlGrants gs) bound cands gs
 viewUpToGiven :: [ControlGrant] -> Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpToGiven grants bound cands gs oid =
   if Map.member oid (GameState.objects gs)
-    then Just (viewOfCharacteristics (viewUpToGiven grants bound cands gs) oid (noValueAt bound (projectUpTo bound cands oid gs)) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs)
+    then Just (viewOfCharacteristics (viewUpToGiven grants bound cands gs) oid (noValueAt bound (projectUpTo bound cands oid gs)) (controllerOfGiven grants oid gs) (countersOf oid gs) gs)
     else Nothing
 
 -- CR 707.2a: the replacement effects this object's copiable rules text gives it,
@@ -5349,7 +5349,7 @@ controls pid gs = controlsGiven (controlGrants gs) pid gs
 -- controllerOfGiven about the permanents keeps from rebuilding it per candidate.
 controlsGiven :: [ControlGrant] -> PlayerId.PlayerId -> GameState -> [ObjectId]
 controlsGiven grants pid gs =
-  filter (\oid -> controllerOfGiven grants Set.empty oid gs == Just pid) (Set.toList (GameState.battlefield gs))
+  filter (\oid -> controllerOfGiven grants oid gs == Just pid) (Set.toList (GameState.battlefield gs))
 
 -- CR 800.4a: does this stored effect give `pid` control of an object?
 -- SetController's payload IS the player who gains control.

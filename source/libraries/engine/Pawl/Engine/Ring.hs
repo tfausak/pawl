@@ -672,7 +672,7 @@ endOnControlChange = do
   Monad.unless (null marked) $ do
     let grants = Projection.controlGrants gs
         lapsed (oid, p) objs =
-          if Projection.controllerOfGiven grants Set.empty oid gs == Just p
+          if Projection.controllerOfGiven grants oid gs == Just p
             then objs
             else Map.adjust (\o -> o {Object.ringBearerFor = Nothing}) oid objs
     State.put gs {GameState.objects = foldr lapsed (GameState.objects gs) marked}

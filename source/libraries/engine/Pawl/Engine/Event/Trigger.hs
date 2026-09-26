@@ -139,7 +139,7 @@ battlefieldCandidates gs =
                 -- Unreachable: projectAll is keyed on the same battlefield set this
                 -- list walks, so every oid drawn from it has an entry.
                 Nothing -> Nothing
-                Just pc -> fmap (\ctrl -> (oid, BattlefieldCandidate.MkBattlefieldCandidate {BattlefieldCandidate.controller = ctrl, BattlefieldCandidate.characteristics = pc})) (Projection.controllerOfGiven grants Set.empty oid gs)
+                Just pc -> fmap (\ctrl -> (oid, BattlefieldCandidate.MkBattlefieldCandidate {BattlefieldCandidate.controller = ctrl, BattlefieldCandidate.characteristics = pc})) (Projection.controllerOfGiven grants oid gs)
             )
             (Set.toAscList (GameState.battlefield gs))
         )
@@ -2835,7 +2835,7 @@ stateTriggers gs
             Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == srcId && TriggeredAbilitySource.ability triggered == ab
             _ -> False
        in length (filter isInstance (GameState.stack gs))
-    forOne oid = case Projection.controllerOfGiven grants Set.empty oid gs of
+    forOne oid = case Projection.controllerOfGiven grants oid gs of
       Nothing -> []
       -- CR 603.3a / 109.5: the ability's controller is its source's, and that is
       -- what "you" in the condition means. Outside the layer fold, so the ViewOf
