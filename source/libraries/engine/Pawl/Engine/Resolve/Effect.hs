@@ -933,9 +933,10 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- CR 120.3a, one seat wide: the player the SOURCE chose as it entered (CR
   -- 614.12a). Read off `source` (CR 113.7a), not `resolving`, which for a
   -- triggered ability is the ability object and never carries the choice.
-  -- Nothing where the source has left or never chose, which CR 101.3 ignores.
+  -- A source that has left answers through CR 608.2h's last known
+  -- information; one that never chose names nobody, which CR 101.3 ignores.
   ObjectRef.ChosenPlayer ->
-    Maybe.maybeToList (fmap Recipient.ToPlayer (Game.lookupObject source gs >>= Object.chosenPlayer))
+    Maybe.maybeToList (fmap Recipient.ToPlayer (Game.chosenPlayerWithLastKnown source gs))
   -- CR 120.3a, at whatever width the reference has: the seats a PlayerRef names,
   -- which for Deflecting Palm's ControllerOfBound is CR 108.4's controller of the
   -- object a slot holds, read through CR 608.2h's last known information.

@@ -653,11 +653,13 @@ playersFor viewOf context gs ref =
         -- off Object.chosenPlayer rather than off the view -- a choice is a
         -- record, not a characteristic (CR 707.2), so no projection answers it.
         --
-        -- Unanswered where the slot names no object, names several, or names one
-        -- that has left, ControllerOfBound's posture above without its CR 608.2h
-        -- look-back (Pawl.Types.PlayerRef says why).
+        -- Unanswered where the slot names no object or names several,
+        -- ControllerOfBound's posture above; one that has left answers through
+        -- CR 608.2h's last known information. That look-back is a regression
+        -- fence: no card in data/cards/ counts over this reference, so reverting
+        -- it to the live read leaves the suite green.
         PlayerRef.ChosenPlayerOfBound slot ->
-          fmap pure (Filter.slotOneObject slot context >>= \oid -> Game.lookupObject oid gs >>= Object.chosenPlayer)
+          fmap pure (Filter.slotOneObject slot context >>= (`Game.chosenPlayerWithLastKnown` gs))
         -- CR 508.6's set: the players controlling a creature attacking the player
         -- a slot names, narrowed by the relation the card printed. The SAME fold
         -- Pawl.Engine.Resolve.Slots.playerRefPlayers makes for the reference in an
@@ -743,8 +745,10 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot _ _ _) -> case shape of
     EventShape.MovedBetween (MovedBetween.MkMovedBetween from to) ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to then Just (departedView gs zc snapshot) else Nothing
+    -- CR 603.6c: to another zone, so Event.recordMintedEntry's Battlefield to
+    -- Battlefield entry of a token or conjured card is not a departure.
     EventShape.MovedFrom from ->
-      if ZoneChange.from zc == from then Just (departedView gs zc snapshot) else Nothing
+      if ZoneChange.from zc == from && ZoneChange.to zc /= from then Just (departedView gs zc snapshot) else Nothing
     -- CR 712.21e's second half, whose unit is the CARD: this event announces the
     -- move's LEADING arrival (Pawl.Engine.Event.changeZoneAttaching), so it is
     -- worth one card here and each arrival after it is worth another through the

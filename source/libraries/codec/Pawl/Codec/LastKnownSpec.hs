@@ -29,7 +29,7 @@ minimalJson = "{\"names\":[\"Mountain\"],\"cardTypes\":[{\"type\":\"Land\"}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
-  -- CR 608.2h, all fifteen axes. `characteristics` and `copiable` are the same type
+  -- CR 608.2h, every axis. `characteristics` and `copiable` are the same type
   -- and hold DIFFERENT values here, because CR 707.2's layer-1-only reading is
   -- exactly what the whole fold loses -- an encoder writing one where the other
   -- belongs would round trip against equal values.
@@ -46,6 +46,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.attached = Set.singleton (ObjectId.MkObjectId 9),
           LastKnown.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")),
+          LastKnown.chosenPlayer = Just (PlayerId.MkPlayerId 3),
           LastKnown.attacking = False,
           LastKnown.attackTarget = Nothing,
           LastKnown.blocking = True,
@@ -61,7 +62,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           <> ",\"copiable\":"
           <> minimalJson
           <> ",\"attached\":[9]"
-          <> ",\"chosenNames\":[\"Goblin Piker\"],\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
+          <> ",\"chosenNames\":[\"Goblin Piker\"],\"chosenPlayer\":3,\"attacking\":false,\"attackTarget\":null,\"blocking\":true,\"protector\":7"
           <> ",\"paidCosts\":[{\"key\":{\"type\":\"Offspring\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}},\"value\":1}]"
           <> ",\"controlClock\":[{\"player\":1,\"clock\":{\"type\":\"SinceLastUpkeep\"}}]"
           <> ",\"zone\":{\"type\":\"Battlefield\"}} "
@@ -82,6 +83,7 @@ spec s = Spec.describe s "Pawl.Codec.LastKnown" $ do
           LastKnown.copiable = ProjectedCharacteristicsSpec.minimalCharacteristics,
           LastKnown.attached = Set.empty,
           LastKnown.chosenNames = Set.empty,
+          LastKnown.chosenPlayer = Nothing,
           LastKnown.attacking = True,
           LastKnown.attackTarget = Just (AttackTarget.OfPlaneswalker (ObjectId.MkObjectId 8)),
           LastKnown.blocking = False,

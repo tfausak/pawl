@@ -266,6 +266,7 @@ objectsLeaveWith pid gs =
                 -- while the answer still exists (CR 603.10a).
                 (Game.attachments oid gs)
                 (Object.chosenNames obj)
+                (Object.chosenPlayer obj)
                 -- CR 508.1k, the sibling read of the same record.
                 (Game.isAttacking oid gs)
                 (Game.attackTargetOf oid gs)
