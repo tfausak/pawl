@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ChooseBetween as ChooseBetween
+import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -38,7 +39,7 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
 -- inner list per mode, kept apart. The shape a caller wants when the MODE is
 -- the unit of choice but resolution is not in play, where flattening would fuse
--- two alternatives into one. selectionEffects just below is what CR 700.2's
+-- two alternatives into one. selectionClauses just below is what CR 700.2's
 -- selection makes of it, and is what Pawl.Engine.Mana reads.
 modeEffects :: Modal.Modal card ability -> [[Effect card ability]]
 modeEffects m = fmap (Foldable.toList . Mode.allEffects) (Foldable.toList (Modal.modes m))
@@ -55,8 +56,12 @@ allEffects m = concat (modeEffects m)
 -- enumerate the ways one mana ability could be activated, where a choose-two
 -- ability's option is a PAIR of modes adding both modes' mana.
 --
--- Reduces to modeEffects when the selection is "choose exactly one", which is
--- what every printed mana ability asks. Targeting is not consulted, so CR
+-- CLAUSES rather than effects, because CR 608.2c's gate rides the clause
+-- (Clause.condition) and this module holds no board to read it against; the
+-- caller does.
+--
+-- Reduces to one selection per mode when the selection is "choose exactly
+-- one", which is what every printed mana ability asks. Targeting is not consulted, so CR
 -- 700.2a's "if one of the modes would be illegal ... that mode can't be chosen"
 -- does not narrow the list here; the one caller is Pawl.Engine.Mana, and CR
 -- 605.1a already keeps a targeting ability from being a mana ability at all.
@@ -64,10 +69,11 @@ allEffects m = concat (modeEffects m)
 -- Every size the instruction allows, so a RANGE ("Choose one or both")
 -- contributes the selections of each size -- one mode alone adds less mana than
 -- both together, and both are ways the one activation could go.
-selectionEffects :: Modal.Modal card ability -> [[Effect card ability]]
-selectionEffects m =
+selectionClauses :: Modal.Modal card ability -> [[Clause.Clause card ability]]
+selectionClauses m =
   let enumerate = if allowsRepeats m then combinationsWithRepeats else combinations
-   in fmap concat (concatMap (\n -> enumerate n (modeEffects m)) (selectionSizes (Modal.selection m)))
+      modeClauses = fmap (Foldable.toList . Mode.clauses) (Foldable.toList (Modal.modes m))
+   in fmap concat (concatMap (\n -> enumerate n modeClauses) (selectionSizes (Modal.selection m)))
 
 -- CR 700.2d: "If a player is allowed to choose more than one mode for a modal
 -- spell or ability, that player normally can't choose the same mode more than
