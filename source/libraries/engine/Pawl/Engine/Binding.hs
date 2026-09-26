@@ -505,14 +505,14 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- cost carrying both components (data/cards/synthetic-crewed-battery.json) would
 -- otherwise answer Binding.onlyOne Nothing for either question.
 --
--- CR 702.122b is what reads it: a creature "crews a Vehicle" when it is tapped to
--- pay a crew ability's cost, and Pawl.Engine.Activate puts this set on
--- GameEvent.Crewed as the payment completes so that Gearshift Ace's "whenever
--- this creature crews a Vehicle" can find itself in it. The component is not
--- crew's alone, so the slot is named for the component; on a non-crew cost
--- nothing reads it. CR 702.122c's look-back reads that same event rather than
--- this slot (Pawl.Engine.Projection.View's crewedByIt), the relation outliving
--- the payment.
+-- CR 702.122b and CR 702.171c are what read it: a creature "crews a Vehicle" or
+-- "saddles" a Mount when it is tapped to pay that ability's cost, and
+-- Pawl.Engine.Activate puts this set on GameEvent.Crewed or GameEvent.Saddled as
+-- the payment completes so that Gearshift Ace's "whenever this creature crews a
+-- Vehicle" can find itself in it. The component is not those two keywords' alone,
+-- so the slot is named for the component; on any other cost nothing reads it.
+-- CR 702.122c's look-back reads that same event rather than this slot
+-- (Pawl.Engine.Projection.View's crewedByIt), the relation outliving the payment.
 --
 -- SET-VALUED and read as a set: CR 702.122a's "any number" is a set by
 -- construction, so a reader taking Binding.onlyOne of it would go quiet on every
@@ -894,6 +894,20 @@ blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 attackingCreature :: SlotName
 attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 
+-- CR 508.3c: the reserved slot under which the attackers a batch attack trigger
+-- counted are bound -- Tyvar the Bellicose's "whenever one or more Elves you
+-- control attack, THEY gain deathtouch". Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings off GameEvent.AttackersDeclared: the
+-- declared attackers that player controls which the condition's Filter admits,
+-- so "they" names exactly what made the trigger fire.
+--
+-- A GROUP (Binding.objects), crewers' reason: named, never targeted (CR
+-- 115.10a), and a set CR 611.2c freezes when a resolution's effect begins, so a
+-- creature that joins the attack later is not among them. Unordered; nothing may
+-- read it positionally.
+attackingCreatures :: SlotName
+attackingCreatures = SlotName.MkSlotName (Text.pack "thoseAttackingCreatures")
+
 -- CR 508.3d / 508.3e: the reserved slot under which the player who DECLARED the
 -- attackers is bound. Stamped by Pawl.Engine.Event.Binding.eventBindings off
 -- GameEvent.AttackersDeclared and GameEvent.BecameAttacked as the trigger is
@@ -1133,6 +1147,10 @@ setBlockedCreature oid = Map.insert blockedCreature (toObject oid)
 -- Bind an object under the reserved attackingCreature slot (CR 506.5).
 setAttackingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setAttackingCreature oid = Map.insert attackingCreature (toObject oid)
+
+-- Bind the counted attackers under the reserved attackingCreatures slot (CR 508.3c).
+setAttackingCreatures :: Seq ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setAttackingCreatures oids = Map.insert attackingCreatures (toObjects oids)
 
 -- Bind a player under the reserved attackingPlayer slot (CR 508.3d / 508.3e).
 setAttackingPlayer :: PlayerId -> Map SlotName Binding -> Map SlotName Binding

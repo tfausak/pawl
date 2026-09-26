@@ -57,6 +57,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -632,6 +633,70 @@ hermesSpec s registry =
               Spec.assertEqWith s "no scry: alice's library is exactly as it was stocked" (libraryOf after) ids
               Spec.assertEqWith s "CR 508.1b and bob's Bird really was declared attacking alice" (sentAt after) (Map.fromList [(theirBirdId, AttackTarget.OfPlayer S.alice)])
             Nothing -> Spec.assertFailure s "fixture should give alice a Hermes and two Birds"
+
+-- CR 508.3c's "they": Tyvar the Bellicose's "whenever one or more Elves you
+-- control attack, they gain deathtouch until end of turn", read through
+-- Binding.attackingCreatures.
+--
+-- alice declares a Llanowar Elves and a Goblin Piker and keeps Tyvar and a
+-- second Llanowar Elves home. Each creature parts one wrong reading: the Piker
+-- attacked but is no Elf (every declared attacker), and the two held back are
+-- Elves alice controls that did not attack (the Filter alone).
+tyvarAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+tyvarAttackSpec s registry =
+  let answering :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering plan p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> List.elem oid plan) ids
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      sentAt gs = Combat.Type.attackers (GameState.combat gs)
+      deathtouch = Projection.hasKeyword Keyword.Deathtouch
+   in Spec.describe s "Tyvar the Bellicose, attacking"
+        . Spec.it s "CR 508.3c the Elves that attacked gain deathtouch, and nothing else does"
+        $ do
+          tyvar <- S.printingOf s registry "Tyvar the Bellicose"
+          elves <- S.printingOf s registry "Llanowar Elves"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case S.combatBoardOf [tyvar, elves, elves, piker] [] of
+            (gs, [tyvarId, attackingElf, homeElf, pikerId], []) -> do
+              let after = atBlockers (answering [attackingElf, pikerId]) gs
+              Spec.assertBool s (deathtouch attackingElf after) "CR 508.3c the Elf that attacked gained deathtouch"
+              Spec.assertBool s (not (deathtouch pikerId after)) "the Piker attacked but is no Elf, so it gained nothing"
+              Spec.assertBool s (not (deathtouch homeElf after)) "an Elf alice controls that did not attack gained nothing"
+              Spec.assertBool s (not (deathtouch tyvarId after)) "and neither did Tyvar, an Elf that stayed home"
+              Spec.assertBool s (not (deathtouch attackingElf gs)) "the fixture: the Elf had no deathtouch before combat"
+              Spec.assertEqWith s "CR 508.1b the Elf and the Piker really were declared attacking bob" (sentAt after) (Map.fromList [(attackingElf, AttackTarget.OfPlayer S.bob), (pikerId, AttackTarget.OfPlayer S.bob)])
+            _ -> Spec.assertFailure s "fixture should give alice Tyvar, two Llanowar Elves and a Goblin Piker"
+
+-- The same slot under a DealDamage: Lightmine Field's "whenever one or more
+-- creatures attack, this enchantment deals damage to each of those creatures
+-- equal to the number of attacking creatures".
+--
+-- alice declares a Hill Giant and a Goblin Piker and keeps a Llanowar Elves
+-- home: two attackers, so two damage to each. The Giant survives it with the
+-- damage marked, the Piker does not, and the Elf is no attacker and is spared.
+lightmineFieldSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+lightmineFieldSpec s registry =
+  let answering :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering plan p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> List.elem oid plan) ids
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      damageOn oid gs = fmap Object.damage (Game.lookupObject oid gs)
+   in Spec.describe s "Lightmine Field"
+        . Spec.it s "CR 508.3c each of those creatures is dealt damage equal to the number attacking"
+        $ do
+          field <- S.printingOf s registry "Lightmine Field"
+          giant <- S.printingOf s registry "Hill Giant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          elves <- S.printingOf s registry "Llanowar Elves"
+          case S.combatBoardOf [field, giant, piker, elves] [] of
+            (gs, [_, giantId, pikerId, elfId], []) -> do
+              let after = atBlockers (answering [giantId, pikerId]) gs
+              Spec.assertEqWith s "CR 508.3c the Giant, one of those creatures, has two damage marked" (damageOn giantId after) (Just 2)
+              Spec.assertBool s (not (S.onBattlefield pikerId after)) "the Piker, the other, took two and died"
+              Spec.assertEqWith s "the Elf did not attack, so it was dealt nothing" (damageOn elfId after) (Just 0)
+            _ -> Spec.assertFailure s "fixture should give alice a Lightmine Field, a Hill Giant, a Goblin Piker and a Llanowar Elves"
 
 -- CR 508.3c at a floor ABOVE one, which is the whole difference between this
 -- group and hermesSpec above: the same condition counts the creatures the Filter
@@ -3936,6 +4001,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   avatarRokuSpec s registry
   everWatchingThresholdSpec s registry
   hermesSpec s registry
+  tyvarAttackSpec s registry
+  lightmineFieldSpec s registry
   militaryIntelligenceSpec s registry
   totalWarSpec s registry
   seiferSpec s registry
