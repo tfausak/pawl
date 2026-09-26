@@ -215,6 +215,7 @@ overSlots f quantity =
         -- having nothing beside it: the OBJECT it asks about is the one the
         -- evaluation is aimed at, as ObjectCounters' is.
         Quantity.ControlGainedSinceLastUpkeep _ -> pure quantity
+        Quantity.PlayedThisTurnBy _ -> pure quantity
         -- The one arm that names a TARGET slot and is visited here anyway. Every other
         -- nested target slot is a PlayerRef this function leaves to nestedRefs below;
         -- reporting this one here is what keeps Soul's Majesty's declared target on the
@@ -315,6 +316,7 @@ nestedRefs quantity = case quantity of
   Quantity.IsStartingPlayer ref -> Set.singleton (Left ref)
   Quantity.IsActivePlayer ref -> Set.singleton (Left ref)
   Quantity.ControlGainedSinceLastUpkeep ref -> Set.singleton (Left ref)
+  Quantity.PlayedThisTurnBy ref -> Set.singleton (Left ref)
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> Set.singleton (Left ref)
   Quantity.Devotion d -> Set.singleton (Left (Devotion.player d))
   Quantity.ObjectCounters _ -> Set.empty
@@ -423,6 +425,7 @@ nestedCounts quantity = case quantity of
   Quantity.IsStartingPlayer _ -> []
   Quantity.IsActivePlayer _ -> []
   Quantity.ControlGainedSinceLastUpkeep _ -> []
+  Quantity.PlayedThisTurnBy _ -> []
   Quantity.HasDesignation _ -> []
   Quantity.DesignationValue _ -> []
   Quantity.ClassLevel -> []
@@ -589,6 +592,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.IsStartingPlayer ref -> Quantity.IsStartingPlayer (f ref)
         Quantity.IsActivePlayer ref -> Quantity.IsActivePlayer (f ref)
         Quantity.ControlGainedSinceLastUpkeep ref -> Quantity.ControlGainedSinceLastUpkeep (f ref)
+        Quantity.PlayedThisTurnBy ref -> Quantity.PlayedThisTurnBy (f ref)
         Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (f ref) kind)
         Quantity.Devotion d -> Quantity.Devotion d {Devotion.player = f (Devotion.player d)}
         Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)

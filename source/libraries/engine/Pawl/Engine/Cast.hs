@@ -2233,7 +2233,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
           let refusedAt castFor permission manaValue =
                 let board = proposedFor oid castFor proposed
                  in PlayerEffect.prohibitsAtManaValue pid oid manaValue board || not (PlayerEffect.admitsAtManaValue permission oid manaValue board)
-          castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) refusedAt before
+          castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) refusedAt before
 
 -- CR 305.2a / 305.3: whether `pid` may play a land at all now -- it is their
 -- turn, and the lands they have played this turn fall short of the lands they
@@ -2300,6 +2300,9 @@ playLand offered pid oid mName = do
     State.modify' (PlayerEffect.consume spent)
     State.modify' (PlayerEffect.spendCastPermission (PlayerEffect.permissionSpent permission))
     State.modify' (\g -> g {GameState.continuousEffects = concatMap riders (filter (`Set.member` GameState.battlefield g) (Foldable.toList moved)) <> GameState.continuousEffects g})
+    -- CR 305.1 / 400.7i: the card was played, under its pre-move id and the
+    -- permanent's.
+    State.modify' (\g -> g {GameState.playedThisTurn = foldr (`Map.insert` pid) (GameState.playedThisTurn g) (oid Seq.<| moved)})
   -- CR 305.2a counts the lands played this turn, so this TALLIES rather than
   -- flagging. CR 305.4: the only tally, an effect that PUTS a land onto the
   -- battlefield not being one.
@@ -2335,9 +2338,10 @@ choosePlayPermission pid oid options = case options of
 -- to have named anything.
 --
 -- The floating replacement store is the only captured environment rewritten. A
--- delayed triggered ability captures one too (Pawl.Types.DelayedTrigger), and no
--- card in data/cards/ arms one from the same effect that grants a cast; not
--- implemented there (#1961).
+-- delayed triggered ability captures one too (Pawl.Types.DelayedTrigger); not
+-- implemented there (#1961). Elkin Lair arms one beside its grant, and cannot
+-- observe the gap: its one read of a played card is Quantity.PlayedThisTurnBy,
+-- which GameState.playedThisTurn answers for either incarnation.
 followIntoSpell :: Maybe ExilePlayPermission.ExilePlayPermission -> ObjectId -> ObjectId -> GameState -> GameState
 followIntoSpell permission old new gs = case permission of
   Nothing -> gs
@@ -2559,7 +2563,8 @@ trimModalForCandidate :: Maybe Keyword -> Modal.Type.Modal Card.Type.Card (Grant
 trimModalForCandidate castFor modal = modal {Modal.Type.modes = fmap (trimModeTargetSlotsForCandidate castFor) (Modal.Type.modes modal)}
 
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
--- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object
+-- 601.2a move has happened. `oid` is the card before that move, named only to
+-- record the play. `sid` is the stack incarnation (CR 400.7), the object
 -- every step below announces for, targets relative to, is projected from and
 -- stamps its choices onto; `before` is the state to return to. Split out so the
 -- whole announcement reads one state and one id.
@@ -2580,8 +2585,8 @@ trimModalForCandidate castFor modal = modal {Modal.Type.modes = fmap (trimModeTa
 -- of the pre-move state for `spent`'s reason; the one chosen spends its budget
 -- beside `spent`, and `riders` is what it gives the spell (CR 611.3d), asked
 -- there too and stored beside it.
-castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> (Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card]) -> (Maybe Keyword -> Maybe (ObjectId, CastFromZone.CastFromZone) -> Integer -> Bool) -> GameState -> Game ()
-castProposed perform spending pid sid face castFrom preparedFor keywordsBefore candidateCosts spent permissions riders refusedAt before = do
+castProposed :: ManaAbilityPerformer.ManaAbilityPerformer -> ManaSpending -> PlayerId -> ObjectId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Maybe ObjectId -> Set Keyword -> [CandidateCost.CandidateCost] -> [ActivePlayerEffect.ActivePlayerEffect] -> [Maybe (ObjectId, CastFromZone.CastFromZone)] -> (Maybe (ObjectId, CastFromZone.CastFromZone) -> [ContinuousEffect.ContinuousEffect Card.Type.Card]) -> (Maybe Keyword -> Maybe (ObjectId, CastFromZone.CastFromZone) -> Integer -> Bool) -> GameState -> Game ()
+castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefore candidateCosts spent permissions riders refusedAt before = do
   gs <- State.get
   let candidates = fmap (\candidate -> (CandidateCost.reductions candidate, CandidateCost.cost candidate)) candidateCosts
       decider = Decide.deciderFor pid gs
@@ -3299,6 +3304,9 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- your hand" trigger reads it off the event, since CR
                           -- 400.7 left `sid` no memory of it.
                           State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g) castFrom (Object.castUsing =<< Game.lookupObject sid g))) g)
+                          -- CR 601.2a / 400.7h: the card was played, under the
+                          -- id it had before the move and the spell's.
+                          State.modify' (\g -> g {GameState.playedThisTurn = Map.insert sid pid (Map.insert oid pid (GameState.playedThisTurn g))})
                           -- CR 722.3c's last sentence: "that permanent loses the
                           -- prepared designation AT THE TIME THE SPELL BECOMES
                           -- CAST (see rule 601.2i)". So it is here, beside rule
