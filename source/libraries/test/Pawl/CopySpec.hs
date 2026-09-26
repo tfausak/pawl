@@ -109,6 +109,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
@@ -2370,6 +2371,55 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "bob took the Bolt's 3 and the copied Think Twice's 3" (S.lifeOf S.bob after) (Just 14)
         Spec.assertEqWith s "and alice drew nothing: the printed text never resolved" (S.handSize S.alice after) 0
         Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+      _ -> Spec.assertFailure s "the spells never reached the stack"
+  -- CR 707.2 / 715.3d: the case above with Battle Display, cast as an Adventure
+  -- at the Bonesplitter, as the subject. Once it is a copy of the Bolt it is no
+  -- longer an Adventure, so it resolves into the graveyard rather than into
+  -- exile. CR 720.3d's Omen rider reads the same face.
+  Spec.it s "CR 707.2 an Adventure that becomes a copy of a Bolt goes to the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    mimicry <- S.printingOf s registry "Synthetic Mimicry"
+    let lands = S.landsFor island S.alice 2 (S.landsFor mountain S.alice 2 S.threePlayerGame)
+        withArtifact = snd (S.addPermanent bonesplitter S.alice lands)
+        (withBolt, boltId) = S.handOne bolt withArtifact
+        (displayId, withDisplay) = S.addHandCard shieldbreaker S.alice withBolt
+        (mimicryId, board) = S.addHandCard mimicry S.alice withDisplay
+        cast1 = snd (Engine.runGamePure S.identityAnswer board (Cast.castSpell S.manaPerformer S.alice displayId (CardName.MkCardName (Text.pack "Battle Display")) Facing.FaceUp))
+        cast2 = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) cast1 (S.cast S.alice boltId))
+        graveyardNames gs = Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Graveyard S.alice gs)
+    case (topOfStack cast1, topOfStack cast2) of
+      (Just displaySpell, Just boltSpell) | displaySpell /= boltSpell -> do
+        let cast3 = snd (Engine.runGamePure (aimMimicry displaySpell boltSpell) cast2 (S.cast S.alice mimicryId))
+            -- Mimicry, then the Bolt, then the copied Battle Display.
+            after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne S.identityAnswer cast3))
+        Spec.assertBool s (CardName.MkCardName (Text.pack "Embereth Shieldbreaker") `elem` graveyardNames after) "the card went to alice's graveyard, not into exile"
+        Spec.assertEqWith s "bob took the Bolt's 3 and the copy's 3" (S.lifeOf S.bob after) (Just 14)
+      _ -> Spec.assertFailure s "the spells never reached the stack"
+  -- CR 707.2 / 702.34a: a Think Twice cast with flashback that becomes a copy of
+  -- the Bolt no longer has flashback, and acquires the Bolt's cast record, which
+  -- paid no flashback cost -- so it goes to the graveyard rather than into exile.
+  Spec.it s "CR 707.2 a flashed-back spell that becomes a copy of a Bolt goes to the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    mimicry <- S.printingOf s registry "Synthetic Mimicry"
+    let lands = S.landsFor island S.alice 5 (S.landsFor mountain S.alice 1 S.threePlayerGame)
+        (withBolt, boltId) = S.handOne bolt lands
+        (thinkId, withThink) = S.addGraveyardCard thinkTwice S.alice withBolt
+        (mimicryId, board) = S.addHandCard mimicry S.alice withThink
+        cast1 = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) board (S.cast S.alice boltId))
+        cast2 = snd (Engine.runGamePure S.identityAnswer cast1 (S.cast S.alice thinkId))
+    case (topOfStack cast1, topOfStack cast2) of
+      (Just boltSpell, Just thinkSpell) | boltSpell /= thinkSpell -> do
+        let cast3 = snd (Engine.runGamePure (aimMimicry thinkSpell boltSpell) cast2 (S.cast S.alice mimicryId))
+            after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne S.identityAnswer cast3))
+        Spec.assertEqWith s "nothing of alice's was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+        Spec.assertEqWith s "bob took the Bolt's 3 and the copy's 3" (S.lifeOf S.bob after) (Just 14)
       _ -> Spec.assertFailure s "the spells never reached the stack"
   -- CR 707.10 end to end: the copy exists, carries the original's decisions (CR
   -- 707.10's "all decisions made for it" -- here the Bolt's target), resolves as
