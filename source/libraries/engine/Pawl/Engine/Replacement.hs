@@ -653,6 +653,12 @@ applies gs event candidate = matchesPrinted gs event candidate && reaches gs eve
 -- (`preventsInRange`) and the destination (`redirectDestination`). Every other
 -- damage rewrite -- Furnace of Rath's doubling, Kill-Suit Cultist's
 -- "destroy it instead" -- affects the recipient, as `affected` names it.
+--
+-- An object is judged by CR 801.2c's seats as this turn began
+-- (Projection.objectWasInRangeGiven), so CR 800.4a's and CR 800.4c's exile of a
+-- permanent whose controller left this turn is still in range of the rows
+-- that were in range of that seat. Pawl.DepartureSpec's "CR 801.2c a survivor's
+-- exile replacement still reaches a departing neighbour's permanent" proves it.
 reaches :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
 reaches gs event candidate = case (ReplacementCandidate.controller candidate, ReplacementCandidate.effect candidate) of
   (Nothing, _) -> True
@@ -660,7 +666,7 @@ reaches gs event candidate = case (ReplacementCandidate.controller candidate, Re
     | prevents rewrite || redirects rewrite -> True
   (Just you, _) ->
     let (objects, players) = affected event
-     in all (\oid -> Projection.objectInRangeGiven (Projection.controlGrants gs) you oid gs) objects
+     in all (\oid -> Projection.objectWasInRangeGiven (Projection.controlGrants gs) you oid gs) objects
           && all (\pid -> Game.inRangeOf you pid gs) players
 
 -- CR 801.13a: the objects and players a replaced event would affect. A moving
@@ -2252,7 +2258,8 @@ at xs i fallback = case List.genericDrop i xs of
 -- so one falling to a player who has left goes to the next player in turn order
 -- instead (Game.ruleChooser), and Nothing when no seat is left to take it.
 -- Pawl.DepartureSpec's "a replacement choice inside the departure's exile goes
--- to the next player" proves it, on the one race a departed player can face.
+-- to the next player" proves it for CR 800.4a's exile; CR 800.4c's
+-- (Departure.exileOrphanedByEndedControl) reaches the same wrapper.
 chooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
 chooserOf gs event = affectedChooserOf gs event >>= Game.ruleChooser gs
 

@@ -1442,16 +1442,67 @@ setLandSubtypeEffectsGiven functioning gs =
 -- outside the fold use liveAfterLayers. The layer-2 control fold asks NEITHER
 -- gate -- see controlGrants.
 --
--- Not implemented: a layer-4 ability whose OWN effect would take its source out
--- of the setter's affected set makes the setter depend on it (CR 613.8a), so it
--- applies first and keeps its text; base cannot see that, and it is stripped
--- (#1489).
-liveGiven :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
-liveGiven setEffs oid gs =
+-- The one exception is a layer-4 effect that takes the permanent OUT of the
+-- setter's set: CR 613.8a makes the setter depend on it (escapes). Pawl.ProjectionSpec's
+-- Rootpath Purifier and Synthetic Primeval Claim cases prove both limbs.
+liveGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
+liveGiven functioning setEffs oid gs =
   not
     ( hasLandType (baseCharacteristics oid gs)
-        && any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs)
+        && any (\(src, aff) -> affectsBase src oid aff gs && not (escapes src aff)) (appliedSetEffects setEffs gs)
     )
+  where
+    -- CR 613.8a/613.8b: the other layer-4 effects that apply before this setter.
+    -- One the setter would strip (a rules-text ability of a land it reaches)
+    -- depends on it too, and that loop falls back to timestamps; any other the
+    -- setter merely waits for. Applied to `oid`, do they move it out of reach?
+    escapes src aff =
+      let stamp = fmap Object.timestamp (Game.lookupObject src gs)
+          strippedBy c = affectsBase src (gSource c) aff gs && hasLandType (baseCharacteristics (gSource c) gs)
+          before (c, printed) = not (printed && strippedBy c) || maybe True (gTimestamp c <) stamp
+       in case fmap fst (filter before (typeChangersGiven functioning gs)) of
+            [] -> False
+            first -> not (affectsGiven (baseView gs) src oid aff (projectWith (<= Layer.Type) first oid gs) gs)
+
+-- Every layer-4 part of an effect that sets no land's subtype, for liveGiven's CR
+-- 613.8a question. Walked as setLandSubtypeEffectsGiven walks the setters: stored
+-- effects, then each permanent's printed and granted static abilities, under the
+-- same CR 604.2 and CR 612 reads. The flag marks a PRINTED ability, the one kind
+-- CR 305.7 can strip.
+typeChangersGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [(Gathered, Bool)]
+typeChangersGiven functioning gs =
+  let part src ts aff m =
+        MkGathered
+          { gEffect = Nothing,
+            gSource = src,
+            gAffected = aff,
+            gLayer = Layer.Type,
+            gLowest = Layer.Type,
+            gTimestamp = ts,
+            gModification = m
+          }
+      typeParts = filter ((== Layer.Type) . layer) . NonEmpty.toList
+      keeps sa = not (any setsLandSubtype (StaticAbility.modifications sa)) && functionsFromZone Zone.Battlefield sa
+      fromStored eff =
+        let m = ContinuousEffect.modification eff
+         in [(part (ContinuousEffect.source eff) (ContinuousEffect.timestamp eff) (ContinuousEffect.affected eff) m, False) | layer m == Layer.Type, not (setsLandSubtype m)]
+      fromPerm permId = case Game.lookupObject permId gs of
+        Nothing -> []
+        Just obj ->
+          let changes = textChangesAffecting permId gs
+              ts = staticTimestampOf permId obj gs
+              printedOf sa =
+                let parts = staticParts changes sa
+                 in if keeps sa && staticLives (functioning permId) changes (minimum (fmap layer parts)) sa
+                      then [(part permId ts (rewriteAffected changes (StaticAbility.affected sa)) m, True) | m <- typeParts parts]
+                      else []
+              grantedOf (grantTs, sa) =
+                let parts = staticParts [] sa
+                 in if keeps sa && staticLives (functioning permId) [] (minimum (fmap layer parts)) sa
+                      then [(part permId (max (Object.timestamp obj) grantTs) (StaticAbility.affected sa) m, False) | m <- typeParts parts]
+                      else []
+           in concatMap printedOf (staticAbilitiesOf permId gs) <> concatMap grantedOf (grantedStaticAbilitiesOf permId gs)
+   in concatMap fromStored (GameState.continuousEffects gs) <> concatMap fromPerm (abilitySources gs)
 
 -- CR 305.7's subject: only a LAND loses its rules text to a subtype set. CR 205.3d
 -- is what makes that a precondition rather than a description of every board a
@@ -2060,7 +2111,7 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
      in printedParts printed permObj <> grantedParts
   where
     printedParts printed permObj =
-      if null setEffs || liveGiven setEffs permId gs
+      if null setEffs || liveGiven functioning setEffs permId gs
         then
           -- CR 612: rewrite each static ability's subtype words by the text
           -- changes the text box THIS source carries has taken, before its

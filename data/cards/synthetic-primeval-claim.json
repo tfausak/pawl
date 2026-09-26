@@ -1,0 +1,32 @@
+{
+  "faces": [
+    {
+      "name": "Synthetic Primeval Claim",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "IsSource"
+            }
+          },
+          "modifications": [
+            {
+              "type": "AddSupertype",
+              "value": {
+                "type": "Basic"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}
