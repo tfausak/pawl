@@ -2,6 +2,7 @@
 
 module Pawl.Codec.SpellWasCast where
 
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
@@ -20,10 +21,12 @@ codec = Fields.object $ do
   spell <- Fields.required "spell" ObjectId.codec SpellWasCast.spell
   characteristics <- Fields.required "characteristics" ProjectedCharacteristics.codec SpellWasCast.characteristics
   zone <- Fields.defaulted "zone" Nothing (Common.maybe Zone.codec) SpellWasCast.zone
+  castUsing <- Fields.defaulted "castUsing" Nothing (Common.maybe Keyword.codec) SpellWasCast.castUsing
   pure
     SpellWasCast.MkSpellWasCast
       { SpellWasCast.player = player,
         SpellWasCast.spell = spell,
         SpellWasCast.characteristics = characteristics,
-        SpellWasCast.zone = zone
+        SpellWasCast.zone = zone,
+        SpellWasCast.castUsing = castUsing
       }
