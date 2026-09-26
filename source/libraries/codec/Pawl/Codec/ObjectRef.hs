@@ -1,5 +1,6 @@
 module Pawl.Codec.ObjectRef where
 
+import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Codec.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
@@ -55,6 +56,7 @@ codec =
           Arm.payload "EachCardInHand" EachCardInHand.codec ObjectRef.EachCardInHand (\x -> case x of ObjectRef.EachCardInHand y -> Just y; _ -> Nothing),
           Arm.optionalPayload "EachCardInYourLibrary" filterCodec ObjectRef.EachCardInYourLibrary (\x -> case x of ObjectRef.EachCardInYourLibrary y -> Just y; _ -> Nothing),
           Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
+          Arm.payload "EachCardExiledWithAbility" AbilityName.codec ObjectRef.EachCardExiledWithAbility (\x -> case x of ObjectRef.EachCardExiledWithAbility y -> Just y; _ -> Nothing),
           Arm.optionalPayload "EachCardEncodedOnSource" filterCodec ObjectRef.EachCardEncodedOnSource (\x -> case x of ObjectRef.EachCardEncodedOnSource y -> Just y; _ -> Nothing),
           Arm.payload "EachSpell" filterCodec ObjectRef.EachSpell (\x -> case x of ObjectRef.EachSpell y -> Just y; _ -> Nothing),
           Arm.payload "EachAbility" filterCodec ObjectRef.EachAbility (\x -> case x of ObjectRef.EachAbility y -> Just y; _ -> Nothing),
@@ -93,6 +95,7 @@ tagOf x = case x of
   ObjectRef.EachCardInHand {} -> "EachCardInHand"
   ObjectRef.EachCardInYourLibrary {} -> "EachCardInYourLibrary"
   ObjectRef.EachCardExiledWithSource {} -> "EachCardExiledWithSource"
+  ObjectRef.EachCardExiledWithAbility {} -> "EachCardExiledWithAbility"
   ObjectRef.EachCardEncodedOnSource {} -> "EachCardEncodedOnSource"
   ObjectRef.EachSpell {} -> "EachSpell"
   ObjectRef.EachAbility {} -> "EachAbility"

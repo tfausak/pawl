@@ -185,6 +185,7 @@ import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.ExileLooker as ExileLooker
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
@@ -920,6 +921,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInHand {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardInYourLibrary _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachCardExiledWithAbility _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.EachCardEncodedOnSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   ObjectRef.TopOfLibraryUntil {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -2208,13 +2210,35 @@ pickAtRandom remaining candidates =
 applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 applyEffectWith runSubgame resolving source controller legal chosen effect = do
   before <- State.gets GameState.exile
+  -- Read BEFORE the effect runs, while the resolving ability is surely still an
+  -- object to read.
+  ability <- State.gets (exilingAbility resolving)
   applyOneEffect runSubgame resolving source controller legal chosen effect
-  State.modify' (recordExiledWith source before)
+  State.modify' (recordExiledWith ExileLink.MkExileLink {ExileLink.source = source, ExileLink.ability = ability} before)
   State.modify' (recordExilePile before)
+
+-- CR 607.2a's name for the ability resolving as `resolving`: an activated
+-- ability's ActivatedAbility.name, which is how a linked reference names one of
+-- two exiling abilities of an object. Nothing for every other kind of object,
+-- none of which carries a name a reference could state.
+exilingAbility :: ObjectId -> GameState -> Maybe AbilityName
+exilingAbility resolving gs = case fmap Object.source (Game.lookupObject resolving gs) of
+  Nothing -> Nothing
+  Just src -> case src of
+    Source.OfAbility a -> ActivatedAbility.name (ActivatedAbilitySource.ability a)
+    Source.OfTrigger _ -> Nothing
+    Source.OfInherentTrigger _ -> Nothing
+    Source.OfCard _ -> Nothing
+    Source.OfSpellCopy _ -> Nothing
+    Source.OfCardCopy _ -> Nothing
+    Source.OfMeld _ -> Nothing
+    Source.OfMerge _ -> Nothing
+    Source.OfToken _ -> Nothing
+    Source.OfEmblem _ -> Nothing
 
 -- CR 607.2a's link, filed as the instruction that made it finishes: every card
 -- that ARRIVED in exile while the effect ran is filed against that effect's
--- source.
+-- source and the ability's name.
 --
 -- A DIFFERENCE over GameState.exile rather than a case over the opcode: CR
 -- 607.2a asks whether an ability's instruction exiled the card, never which
@@ -2239,10 +2263,10 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
 -- Filed for a SPELL's effects too, where CR 607.2a scopes the link to an
 -- activated or triggered ability -- unreadable rather than wrong, since CR
 -- 608.2n puts the spell into its graveyard as part of its own resolution.
-recordExiledWith :: ObjectId -> Set ObjectId -> GameState -> GameState
-recordExiledWith source before gs =
+recordExiledWith :: ExileLink.ExileLink -> Set ObjectId -> GameState -> GameState
+recordExiledWith link before gs =
   let arrived = Set.difference (GameState.exile gs) before
-      file oid = Map.insertWith (\_ inner -> inner) oid source
+      file oid = Map.insertWith (\_ inner -> inner) oid link
    in gs {GameState.exiledWith = Map.restrictKeys (foldr file (GameState.exiledWith gs) arrived) (GameState.exile gs)}
 
 -- CR 406.4's separate piles, filed off the same window: "face-down cards in exile
@@ -4475,6 +4499,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- CR 607.2a, swept once from the PRE-MOVE state (CR 608.2c, CR
               -- 608.2f). CR 400.3 files a hand arrival under Object.owner.
               ObjectRef.EachCardExiledWithSource {} -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
+              -- The arm above's, narrowed to one named exiling ability.
+              ObjectRef.EachCardExiledWithAbility _ -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
               -- CR 702.99a, swept once from the PRE-MOVE state, the arm above's

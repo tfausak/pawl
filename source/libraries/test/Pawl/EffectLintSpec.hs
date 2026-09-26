@@ -1167,6 +1167,7 @@ chooserRef ref = case ref of
   ObjectRef.EachCardInHand {} -> False
   ObjectRef.EachCardInYourLibrary {} -> False
   ObjectRef.EachCardExiledWithSource {} -> False
+  ObjectRef.EachCardExiledWithAbility _ -> False
   ObjectRef.EachCardEncodedOnSource {} -> False
   ObjectRef.EachSpell {} -> False
   ObjectRef.EachAbility {} -> False
@@ -1769,6 +1770,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- words are singular: an ability referring to "the exiled card" whose
           -- linked ability exiled several performs its action on each of them.
           ObjectRef.EachCardExiledWithSource {} -> False
+          ObjectRef.EachCardExiledWithAbility _ -> False
           ObjectRef.EachCardEncodedOnSource {} -> False
           ObjectRef.EachSpell _ -> False
           ObjectRef.EachAbility _ -> False

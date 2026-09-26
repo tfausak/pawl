@@ -16,6 +16,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.ExileLink as ExileLink
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
@@ -197,8 +198,8 @@ noCombat =
 --     value the object that card haunts.
 --   * GameState.encoded (CR 702.99b), keyed by the card with cipher in exile,
 --     its value the creature it is encoded on.
---   * GameState.exiledWith (CR 607.2), keyed by the exiled card, its value the
---     object CR 607.2a's or CR 607.2b's link names.
+--   * GameState.exiledWith (CR 607.2), keyed by the exiled card, its value
+--     naming the object CR 607.2a's or CR 607.2b's link names.
 --   * GameState.exilePiles (CR 406.4), keyed by the card in exile face down, its
 --     value the stamp of the pile it is in.
 --
@@ -234,7 +235,7 @@ namedByRelation oid gs =
         || relates returnWatchNames (GameState.movedUntilSourceLeaves gs)
         || relates Set.singleton (GameState.haunting gs)
         || relates Set.singleton (GameState.encoded gs)
-        || relates Set.singleton (GameState.exiledWith gs)
+        || relates (Set.singleton . ExileLink.source) (GameState.exiledWith gs)
         || relates pileNames (GameState.exilePiles gs)
         -- CR 305.1 / 601.2a: keyed by the spell or permanent a play made, too.
         || relates (const Set.empty) (GameState.cardsPlayed gs)

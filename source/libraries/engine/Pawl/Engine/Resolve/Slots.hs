@@ -98,6 +98,7 @@ import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
@@ -396,6 +397,7 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- seat is CR 109.5's "you", so no slot names it.
   ObjectRef.EachCardInYourLibrary _ -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
+  ObjectRef.EachCardExiledWithAbility _ -> Map.empty
   ObjectRef.EachCardEncodedOnSource {} -> Map.empty
   ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachAbility _ -> Map.empty
@@ -478,6 +480,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
   ObjectRef.EachCardInYourLibrary _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
+  ObjectRef.EachCardExiledWithAbility _ -> []
   ObjectRef.EachCardEncodedOnSource _ -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachAbility _ -> []
@@ -531,6 +534,7 @@ objectRefPlayerRefs ref = case ref of
   ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand _ _) -> []
   ObjectRef.EachCardInYourLibrary _ -> []
   ObjectRef.EachCardExiledWithSource _ -> []
+  ObjectRef.EachCardExiledWithAbility _ -> []
   ObjectRef.EachCardEncodedOnSource _ -> []
   ObjectRef.EachSpell _ -> []
   ObjectRef.EachAbility _ -> []
@@ -2679,7 +2683,17 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           Nothing -> True
           Just filter_ -> Filter.matches context (viewOf oid) filter_
      in filter
-          (\oid -> Map.lookup oid (GameState.exiledWith gs) == Just source && stated oid)
+          (\oid -> fmap ExileLink.source (Map.lookup oid (GameState.exiledWith gs)) == Just source && stated oid)
+          (Set.toList (GameState.exile gs))
+  -- The arm above's relation, narrowed to the cards the NAMED ability exiled:
+  -- CR 607.2a links the reference to that one ability, so another exiling
+  -- ability of the same object is not read. Pawl.ResolveSpec's "CR 607.2a
+  -- Synthetic Split Reliquary returns only what its warden ability exiled" is
+  -- what proves it.
+  ObjectRef.EachCardExiledWithAbility name ->
+    let linked = ExileLink.MkExileLink {ExileLink.source = source, ExileLink.ability = Just name}
+     in filter
+          (\oid -> Map.lookup oid (GameState.exiledWith gs) == Just linked)
           (Set.toList (GameState.exile gs))
   -- CR 702.99b's relation, the arm above's shape over GameState.encoded. Keyed
   -- on the source's id alone, so a trigger whose creature has since left still
