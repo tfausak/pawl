@@ -18,7 +18,8 @@ import qualified Pawl.Types.SlotName as SlotName
 -- `from` and `ref` naming the SAME permanent is CR 701.10e's "double the number
 -- of each kind of counter" -- Vorel of the Hull Clade, Gilder Bairn -- the rule
 -- giving each kind "as many of those counters as that ... permanent already
--- has", one placement per kind.
+-- has", one placement per kind. Under an Effect.ForEach over a target slot it
+-- is Deepglow Skate's "on any number of target permanents", each its own tally.
 --
 -- One kind and not a set, though the rule says "kind(s)": no printing names two.
 -- Scryfall @oracle:\/put (its|those)[^.]*counters on\/@ with
