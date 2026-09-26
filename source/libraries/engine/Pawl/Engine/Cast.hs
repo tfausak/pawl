@@ -137,12 +137,14 @@ sorcerySpeed = Turn.sorcerySpeedWindow
 -- card may narrow this further with a printed restriction (CR 601.3), which
 -- `castable` conjoins separately through printedRestrictionsOk.
 timingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
-timingOk pid oid name gs = case proposedFace oid name gs of
+timingOk pid oid name gs = timingWith (PlayerEffect.mayCastAsThoughItHadFlash pid oid gs) pid oid name gs
+
+-- timingOk with the player's flash permission answered by the caller, so
+-- flashRefusedAt and windowedCandidates below can ask the window without it.
+timingWith :: Bool -> PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+timingWith flash pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
-  Just face ->
-    instantSpeed oid face gs
-      || PlayerEffect.mayCastAsThoughItHadFlash pid oid gs
-      || sorcerySpeed pid gs
+  Just face -> instantSpeed oid face gs || flash || sorcerySpeed pid gs
 
 -- CR 117.1a and CR 702.190a: the window a cast of this CARD may begin in, which
 -- is timingOk widened once more. Rule 702.190a's "any time you could cast an
@@ -160,10 +162,14 @@ timingOk pid oid name gs = case proposedFace oid name gs of
 -- half's printed keywords and the object's post-layer ones -- so a granted sneak
 -- widens the window as a printed one does.
 cardTimingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
-cardTimingOk pid oid name gs = case proposedFace oid name gs of
+cardTimingOk pid oid name gs = cardTimingWith (timingOk pid oid name gs) pid oid name gs
+
+-- cardTimingOk over a card window the caller has already answered.
+cardTimingWith :: Bool -> PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
+cardTimingWith window pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
-    timingOk pid oid name gs
+    window
       -- The WINDOW first and the keyword second, which is the cheap conjunct
       -- first: the window is False at all but one step of one player's turn, and
       -- the projection fold behind the second limb then never runs.
@@ -175,6 +181,19 @@ cardTimingOk pid oid name gs = case proposedFace oid name gs of
       || ( not (null (Keyword.offeringQualities (Map.keysSet (Projection.keywordsOf oid gs))))
              && any CandidateCost.instantSpeed (Cost.candidateCostsFor pid name oid gs)
          )
+
+-- CR 601.2e / 601.3b: the timing half of rule 601.2e's check at the announced
+-- X. A cast only a flash permission let begin is illegal once the X announced
+-- leaves the permission not naming the spell at `manaValue` and no other window
+-- is open. windowedCandidates has already judged every other choice. Asked on
+-- the proposal board, so the window reads the stack the spell is not yet on.
+-- Pawl.CastPermissionSpec's "CR 601.2e Untimely Aluren takes back Protean Hydra
+-- at X = 2 and not at X = 3" is the proof.
+flashRefusedAt :: PlayerId -> ObjectId -> CardName.CardName -> Integer -> GameState -> Bool
+flashRefusedAt pid oid name manaValue gs =
+  PlayerEffect.mayCastAsThoughItHadFlash pid oid gs
+    && not (cardTimingWith (timingWith False pid oid name gs) pid oid name gs)
+    && not (PlayerEffect.mayCastAsThoughItHadFlashAt pid oid manaValue gs)
 
 -- CR 601.2b's candidates less the ones their own window shuts out. The ONE
 -- writer both roads to an announcement go through -- `castable`'s gate and the
@@ -191,16 +210,24 @@ cardTimingOk pid oid name gs = case proposedFace oid name gs of
 -- cost in an upkeep). CR 702.48a's offering WIDENS it to any time its caster
 -- could cast an instant.
 --
+-- A window only a CR 601.3b flash permission opens is open to the candidates
+-- whose own choice leaves it naming the spell (PlayerEffect.flashNamesCandidate):
+-- the lookahead lets the cast begin, and CR 601.2e would take back a printed cast
+-- of a bestow card Sigarda's Aid let begin.
+--
 -- `timed` is False for a cast an effect offers mid-resolution (CR 608.2g),
 -- whose timing no window governs, so offering narrows nothing there.
 windowedCandidates :: Bool -> PlayerId -> ObjectId -> CardName.CardName -> GameState -> [CandidateCost.CandidateCost] -> [CandidateCost.CandidateCost]
 windowedCandidates timed pid oid name gs candidates =
-  let cardWindow = timingOk pid oid name gs
+  let ownWindow = timingWith False pid oid name gs
+      cardWindow = ownWindow || PlayerEffect.mayCastAsThoughItHadFlash pid oid gs
       offering = timed && any CandidateCost.instantSpeed candidates
+      flashOnly = timed && cardWindow && not ownWindow
+      flashNames candidate = PlayerEffect.flashNamesCandidate pid oid (Cost.variableChoice (CandidateCost.cost candidate)) (proposedFor oid (CandidateCost.keyword candidate) gs)
       inWindow candidate
         | Keyword.sneakWindowed (CandidateCost.keyword candidate) = Turn.declareBlockersWindow pid gs
-        | otherwise = (timed && CandidateCost.instantSpeed candidate) || cardWindow
-   in if offering || any (Keyword.sneakWindowed . CandidateCost.keyword) candidates
+        | otherwise = (timed && CandidateCost.instantSpeed candidate) || ownWindow || (cardWindow && (not flashOnly || flashNames candidate))
+   in if offering || flashOnly || any (Keyword.sneakWindowed . CandidateCost.keyword) candidates
         then filter inWindow candidates
         else candidates
 
@@ -2245,10 +2272,13 @@ castSpellWith perform offered applied widened pid oid name facing = do
           State.modify' (stampForetold sid (Game.lookupObject oid before >>= Object.foretold))
           -- CR 601.2e's re-asking, at the announced mana value, of a prohibition
           -- and of the permission the cast is made under, judged on the same
-          -- proposal board candidateAllowed judged them on.
+          -- proposal board candidateAllowed judged them on, and of a flash
+          -- window, which no window times for a cast an effect offers.
           let refusedAt castFor permission manaValue =
                 let board = proposedFor oid castFor proposed
-                 in PlayerEffect.prohibitsAtManaValue pid oid manaValue board || not (PlayerEffect.admitsAtManaValue permission oid manaValue board)
+                 in PlayerEffect.prohibitsAtManaValue pid oid manaValue board
+                      || not (PlayerEffect.admitsAtManaValue permission oid manaValue board)
+                      || (not offered && flashRefusedAt pid oid name manaValue board)
           castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) refusedAt before
 
 -- CR 305.2a / 305.3: whether `pid` may play a land at all now -- it is their
@@ -3012,7 +3042,8 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- read off the stack incarnation as CR 601.2i will stamp it.
                   -- PlayerEffect.choiceCouldEscape let the cast BEGIN; this is
                   -- where the chosen X is judged, against Void Winnower's
-                  -- prohibition and Serra Paragon's permission alike.
+                  -- prohibition and Serra Paragon's permission alike, and
+                  -- PlayerEffect.choiceCouldApply's flash window with them.
                   --
                   -- The payability gate and the announcement below read the same
                   -- board, so a cost modifier naming a mana value sees the X the
