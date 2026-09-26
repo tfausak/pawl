@@ -136,6 +136,7 @@ import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Devour as Devour
+import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Draw as Draw
@@ -6205,14 +6206,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- any other count what the roller did not choose is not one number, and
   -- Pawl.Engine.Resolve leaves the slot unbound rather than guessing which of
   -- them the card meant. So a card writing the slot at another count is asking
-  -- for a number nothing will ever bind, which compiles and reads as zero.
+  -- for a number nothing will ever bind, which compiles and reads as zero. A
+  -- total chooses nothing, so it has no other result either.
   Spec.it s "a roll binds the other result only where it rolls two dice" $ do
     ps <- S.allPrintings s
     let binds effect = case effect of
           Effect.RollDie rollDie -> Maybe.isJust (RollDie.other rollDie)
           _ -> False
         offends effect = case effect of
-          Effect.RollDie rollDie -> Maybe.isJust (RollDie.other rollDie) && RollDie.count rollDie /= Quantity.Type.Literal 2
+          Effect.RollDie rollDie -> Maybe.isJust (RollDie.other rollDie) && (RollDie.count rollDie /= Quantity.Type.Literal 2 || RollDie.reading rollDie /= DiceReading.ChooseOne)
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- A guard, since a pool binding no other result at all would pass saying
@@ -6617,6 +6619,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               _ -> []
             q <- Map.elems (WithCounters.counters wc)
             pure (Set.member Binding.variableX (QuantitySlot.slots q))
+        -- The same rule's reader in a CR 614.1c row that RUNS effects rather than
+        -- placing counters: Neverwinter Hydra's "roll X d6", which
+        -- Pawl.Engine.Resolve.runEntryEffect answers with the announcement.
+        entryEffectsReadX rows =
+          or $ do
+            ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects effects)) <- rows
+            pure (Resolve.readsX (Foldable.toList effects))
         -- CR 107.3m's third reader, the enters-the-battlefield TRIGGER beside the
         -- replacement effects above: Lost in the Maze's "tap X target creatures"
         -- names its count at the announcement made for the spell that became the
@@ -6637,6 +6646,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Resolve.readsX (Card.allEffects c)
             || Face.loyalty c == Just Loyalty.Variable
             || entryCountersReadX (fmap PrintedReplacement.effect (Face.replacementEffects c))
+            || entryEffectsReadX (fmap PrintedReplacement.effect (Face.replacementEffects c))
             || mintedCountersReadX c
             || any declaresVariable (payGateCostsOf (Face.spell c))
             || modalReadsAnnouncedX (Face.spell c)
