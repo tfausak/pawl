@@ -2665,15 +2665,10 @@ counterGathered gs =
 -- by the bestow ability are evaluated to determine if it can be cast". That gate
 -- runs one step ahead of rule 601.2a's move, on the card where it lies, so
 -- Pawl.Engine.Cast.proposedFor stamps a candidate-local copy of the board there
--- and this walk is what makes the stamp visible.
---
--- Not implemented: the library, which castZones now names but this walk does not
--- fold. Both roads into it are real -- Panglacial Wurm's CR 601.3 exception
--- (Pawl.Engine.Cast.castableWhileSearching) and the standing top-of-library
--- permission (Pawl.Types.PlayerEffect.CastFromTopOfLibrary) -- so the gap is
--- card-driven rather than rules-enforced: no bestow card in data/cards/ is
--- reachable by either, so a stamp this walk cannot see would skip CR 702.103d
--- with nothing red (#2920).
+-- and this walk is what makes the stamp visible. The LIBRARY is one of them,
+-- for CR 601.3's search exception (Pawl.Engine.Cast.castableWhileSearching):
+-- Pawl.CastSpec's "CR 702.103d a bestow card cast while searching is judged as
+-- an Aura" proves it.
 --
 -- A card in one of those zones takes its OWN timestamp here, where the stack
 -- incarnation takes the new and later one CR 613.7d gives it at the move. The two
@@ -2708,6 +2703,7 @@ bestowGathered gs =
    in concatMap fromObject (Set.toList (GameState.battlefield gs) <> GameState.stack gs <> Set.toList (GameState.exile gs) <> Set.toList (GameState.command gs))
         <> foldZoneCards GameState.hand fromObject gs
         <> foldZoneCards GameState.graveyard fromObject gs
+        <> foldZoneCards GameState.library fromObject gs
 
 -- CR 601.3b / 702.103b: the view this object WOULD have if its controller chose
 -- bestow while proposing it -- an Aura enchantment with enchant creature, off the
