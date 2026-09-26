@@ -96,6 +96,11 @@ data Prompt r where
   -- RandomCard deliberately does not. Asked only for two or more candidates,
   -- and the caller filters the answer back to one.
   ChooseConjuredCard :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty CardName.CardName -> Prompt CardName.CardName
+  -- | Which of the top N places of a library randomness put a conjured card at,
+  -- 1 being the top (Pawl.Types.LibraryDepth.AtRandomInTop). RandomObject's
+  -- reasons for carrying neither Decider nor PlayerId; asked only for two or
+  -- more places, and the caller clamps the answer into range.
+  RandomDepth :: Natural.Natural -> Prompt Natural.Natural
   -- | Which player randomness named out of the offered set
   -- (Pawl.Types.Effect.ChoosePlayerAtRandom); RandomObject's shape, asked only
   -- for two or more.

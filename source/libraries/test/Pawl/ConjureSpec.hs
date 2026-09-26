@@ -22,8 +22,10 @@
 -- the next two begin alice's second main phase under a printed Pearl Collector,
 -- the one conjure in the corpus behind CR 603.4's intervening "if"; the next three
 -- enter a printed Fear of Change, whose conjure picks from the Oracle card
--- reference an interpreter holds; the last three connect with a printed Smog
--- Smasher, whose conjure puts its duplicate into exile.
+-- reference an interpreter holds; the next three connect with a printed Smog
+-- Smasher, whose conjure puts its duplicate into exile; the last three discard a
+-- printed Calim, Djinn Emperor and enter a printed Mine Security, whose conjures
+-- state how deep into a library the card lands.
 --
 -- The first four CAST what the conjure created, which is the point -- conjure
 -- creates a CARD and not CR 111.1's token, and a token in a hand, a library or a
@@ -1396,6 +1398,61 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       (length (namedIn hillGiant Zone.Exile returned), namedIn hillGiant Zone.Battlefield returned)
       (1, [])
 
+  -- Calim, Djinn Emperor ({3}{U}{U}{U} Legendary Creature -- Djinn Noble 5/6,
+  -- flying, ward {2}, "When you discard Calim, conjure a card named Calim,
+  -- Djinn Emperor into your library seventh from the top"). Ten Islands under
+  -- it, so both the seventh place and the bottom are real places, and the two
+  -- readings land the conjured Calim at different indices.
+  --
+  -- Not implemented: Calim's Breath, the activated ability paid by discarding
+  -- Calim, which returns it from the graveyard (#4166).
+  Spec.it s "a conjure seventh from the top puts the card under six cards" $ do
+    calim <- S.printingOf s registry "Calim, Djinn Emperor"
+    island <- S.printingOf s registry "Island"
+    reference <- mapM (S.cardOf s registry) ["Calim, Djinn Emperor", "Goblin Piker"]
+    let (inHand, board) = S.addHandCard calim S.alice (islandsInLibrary island 10 (Setup.emptyGame S.bothPlayers))
+        discarded = S.runPure S.identityAnswer board (Event.discard DiscardCause.Ordinary S.alice inHand)
+        (final, asked) = conjureDepthRun reference 1 discarded
+    Spec.assertEqWith
+      s
+      "the conjured Calim is seventh from the top of alice's library, above four Islands"
+      (libraryIndexOf calimName final, Seq.length (libraryOf final))
+      (Just 6, 11)
+    Spec.assertEqWith s "a stated depth asks randomness nothing" asked []
+
+  -- Mine Security ({1}{R} Creature -- Kavu Soldier 3/1, trample, "When this
+  -- creature enters, conjure a card named Flametongue Kavu into the top eight
+  -- cards of your library at random."). Randomness names the fifth place, which
+  -- neither end nor the top of the eight is.
+  --
+  -- Not implemented: the printed rider "It perpetually gains 'You may pay {0}
+  -- rather than pay this spell's mana cost.'", a perpetual effect over a card in
+  -- a library (#3291).
+  Spec.it s "a conjure into the top eight at random puts the card where randomness named" $ do
+    security <- S.printingOf s registry "Mine Security"
+    island <- S.printingOf s registry "Island"
+    let (_, board) = S.entersWithTrigger security S.alice (islandsInLibrary island 10 (Setup.emptyGame S.bothPlayers))
+        (final, asked) = conjureDepthRun [] 5 board
+    Spec.assertEqWith
+      s
+      "the Flametongue Kavu is fifth from the top of alice's library"
+      (libraryIndexOf flametongueKavu final, Seq.length (libraryOf final))
+      (Just 4, 11)
+    Spec.assertEqWith s "randomness was asked once, over the top eight places" asked [8]
+  -- The pair above on a two-card library: three places, not eight, and the last
+  -- of them is the bottom.
+  Spec.it s "a conjure at random into a short library offers only the places it has" $ do
+    security <- S.printingOf s registry "Mine Security"
+    island <- S.printingOf s registry "Island"
+    let (_, board) = S.entersWithTrigger security S.alice (islandsInLibrary island 2 (Setup.emptyGame S.bothPlayers))
+        (final, asked) = conjureDepthRun [] 3 board
+    Spec.assertEqWith s "randomness was asked over the three places a two-card library has" asked [3]
+    Spec.assertEqWith
+      s
+      "and the third place is under both Islands"
+      (libraryIndexOf flametongueKavu final)
+      (Just 2)
+
 moxPearl :: CardName.CardName
 moxPearl = CardName.MkCardName (Text.pack "Mox Pearl")
 
@@ -1404,6 +1461,45 @@ fearOfChange = CardName.MkCardName (Text.pack "Fear of Change")
 
 llanowarElves :: CardName.CardName
 llanowarElves = CardName.MkCardName (Text.pack "Llanowar Elves")
+
+calimName :: CardName.CardName
+calimName = CardName.MkCardName (Text.pack "Calim, Djinn Emperor")
+
+flametongueKavu :: CardName.CardName
+flametongueKavu = CardName.MkCardName (Text.pack "Flametongue Kavu")
+
+-- This many Islands in alice's library, each put on the bottom.
+islandsInLibrary :: Printing.Printing -> Int -> GameState.GameState -> GameState.GameState
+islandsInLibrary island n gs = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) gs [1 .. n]
+
+libraryOf :: GameState.GameState -> Seq.Seq ObjectId.ObjectId
+libraryOf gs = Map.findWithDefault Seq.empty S.alice (GameState.library gs)
+
+-- Where a card of this name sits in alice's library, 0 being the top.
+libraryIndexOf :: CardName.CardName -> GameState.GameState -> Maybe Int
+libraryIndexOf name gs = Seq.findIndexL (\oid -> S.soleFaceName oid gs == name) (libraryOf gs)
+
+-- Settle the pending trigger and resolve it, looking card names up in
+-- `reference` and answering every Prompt.RandomDepth with `depth`. The reaches
+-- randomness was asked over come back in order.
+conjureDepthRun :: [Card.Card] -> Numeric.Natural.Natural -> GameState.GameState -> (GameState.GameState, [Numeric.Natural.Natural])
+conjureDepthRun reference depth board =
+  let fixture =
+        Registry.MkRegistry
+          { Registry.fetchCard = \name -> pure (List.find (\card -> S.nameOf card == name) reference),
+            Registry.cards = pure reference
+          }
+      answer :: Asked.Asked r -> State.State [Numeric.Natural.Natural] r
+      answer asked = case Asked.prompt asked of
+        Prompt.RandomDepth reach -> do
+          State.modify' (reach :)
+          pure depth
+        p -> pure (S.identityAnswer p)
+      run = do
+        (_, settled) <- Engine.runGameAsked (Interpreter.lookingUpCards fixture answer) board Engine.settleForPriority
+        Engine.runGameAsked (Interpreter.lookingUpCards fixture answer) settled Engine.priorityLoop
+      ((_, final), logged) = State.runState run []
+   in (final, reverse logged)
 
 -- Smog Smasher attacks bob alone, unblocked, beside bob's Hill Giant, and its
 -- combat damage trigger aims at the Giant, FILTERED out of the offered

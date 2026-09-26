@@ -2,12 +2,16 @@ module Pawl.Codec.ConjureDestination where
 
 import qualified Data.Maybe as Maybe
 import qualified Pawl.Codec.ConjureEntry as ConjureEntry
+import qualified Pawl.Codec.LibraryDepth as LibraryDepth
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ConjureEntry as ConjureEntry
 
--- | @Battlefield@ is 'Arm.optionalPayload' rather than 'Arm.payload' for
+-- | @Library@ is 'Arm.optionalPayload' so a conjure naming no place (Toralf\'s
+-- Disciple) writes the bare tag.
+--
+-- @Battlefield@ is 'Arm.optionalPayload' rather than 'Arm.payload' for
 -- Pawl.Codec.Conjure's reason: "onto the battlefield" states nothing about the
 -- arrival, so it writes the bare tag and only "tapped" or "attacking" writes a
 -- value. An explicit default still decodes, and encodes back to the bare tag,
@@ -18,7 +22,7 @@ codec =
   Arm.tagged
     tagOf
     [ Arm.nullary "Hand" ConjureDestination.Hand,
-      Arm.nullary "Library" ConjureDestination.Library,
+      Arm.optionalPayload "Library" LibraryDepth.codec ConjureDestination.Library (\x -> case x of ConjureDestination.Library y -> Just y; _ -> Nothing),
       Arm.nullary "Graveyard" ConjureDestination.Graveyard,
       Arm.nullary "Exile" ConjureDestination.Exile,
       Arm.optionalPayload
@@ -38,7 +42,7 @@ codec =
 tagOf :: ConjureDestination.ConjureDestination -> String
 tagOf x = case x of
   ConjureDestination.Hand -> "Hand"
-  ConjureDestination.Library -> "Library"
+  ConjureDestination.Library _ -> "Library"
   ConjureDestination.Graveyard -> "Graveyard"
   ConjureDestination.Battlefield _ -> "Battlefield"
   ConjureDestination.Exile -> "Exile"

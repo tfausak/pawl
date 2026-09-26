@@ -801,7 +801,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Conjure (Conjure.MkConjure (Quantity.Literal 4) (ConjureCards.Written (Text.pack "Lightning Bolt" NonEmpty.:| [])) Conjure.defaultSelection ConjureDestination.Library Nothing))
+      (Effect.Conjure (Conjure.MkConjure (Quantity.Literal 4) (ConjureCards.Written (Text.pack "Lightning Bolt" NonEmpty.:| [])) Conjure.defaultSelection (ConjureDestination.Library Nothing) Nothing))
       " {\"type\":\"Conjure\",\"value\":{\"quantity\":{\"type\":\"Literal\",\"value\":4},\"cards\":{\"type\":\"Written\",\"value\":[\"Lightning Bolt\"]},\"destination\":{\"type\":\"Library\"}}} "
   -- Both ObjectRef arms have to survive. A count of one is elided, so both of
   -- these write the ref alone.
