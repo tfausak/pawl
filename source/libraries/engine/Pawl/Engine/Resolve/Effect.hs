@@ -182,6 +182,7 @@ import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExileLooker as ExileLooker
@@ -334,6 +335,7 @@ import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZonePair as ZonePair
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
 -- CR 603.7: the text an Effect.ArmDelayedTrigger's name resolves to, off the
@@ -2801,6 +2803,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals {} -> False
   Effect.ExchangeValues {} -> False
+  -- CR 701.12f: an exchange with an empty zone still happens.
+  Effect.ExchangeZones {} -> False
   Effect.SetLifeTotal {} -> False
   -- CR 608.2d: never impossible. Every player the reference can name is one
   -- Game.stillPlaying answered, and a target who has already left the game is an
@@ -4770,6 +4774,30 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   fmap (reverse . snd) (Event.simultaneously (moveOne mAttack mBlocked riders now (Set.empty, []) arrival))
                 else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
             Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
+  -- CR 701.12d / 701.12f: every named player's two zones swap their cards, an
+  -- empty zone included. Both zones are the player's own (CR 400.3), so every
+  -- card is owned by that player, which is CR 701.12d's condition. One CR
+  -- 608.2f event over every card, each direction read off the same pre-move
+  -- board, so a card that just arrived is never sent back; each card is a CR
+  -- 400.7 move with its own CR 616.1 opportunity. There is no CR 701.12e
+  -- hand-off to make: what is attached is an Aura, Equipment or Fortification
+  -- permanent (CR 701.3a), and none of these zones holds a permanent.
+  --
+  -- Cards entering a library go to its default end in the order read, which is
+  -- no player's choice to take: every printing shuffles that library at once
+  -- (Scryfall o:"exchange your" -o:"life total" -o:control, 2026-09-26: Harness
+  -- Infinity, Morality Shift, Mordenkainen). An exchange into a library with no
+  -- shuffle would refute this.
+  Effect.ExchangeZones (ExchangeZones.MkExchangeZones player pair) -> do
+    before <- State.get
+    let (one, other) = ZonePair.zones pair
+        named = playerRefPlayers legal controller before player
+        exchanging = filter (`elem` named) (Game.apnapOrder before)
+        moves =
+          concatMap
+            (\pid -> fmap (\oid -> (oid, other)) (Game.zoneMembers one pid before) <> fmap (\oid -> (oid, one)) (Game.zoneMembers other pid before))
+            exchanging
+    Event.simultaneously (Monad.forM_ moves (uncurry (Event.changeZoneInBatch before)))
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
   -- uses, so a library-entry replacement gets its CR 616.1 opportunity (CR 400.3

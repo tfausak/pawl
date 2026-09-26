@@ -46,6 +46,7 @@ import qualified Pawl.Codec.DurationRef as DurationRef
 import qualified Pawl.Codec.Earthbend as Earthbend
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExchangeValues as ExchangeValues
+import qualified Pawl.Codec.ExchangeZones as ExchangeZones
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Fight as Fight
@@ -175,6 +176,7 @@ codec cardCodec abilityCodec =
           Arm.payload "GainLife" PlayerQuantity.codec Effect.GainLife (\x -> case x of Effect.GainLife y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeLifeTotals" ExchangeSides.codec Effect.ExchangeLifeTotals (\x -> case x of Effect.ExchangeLifeTotals y -> Just y; _ -> Nothing),
           Arm.payload "ExchangeValues" ExchangeValues.codec Effect.ExchangeValues (\x -> case x of Effect.ExchangeValues y -> Just y; _ -> Nothing),
+          Arm.payload "ExchangeZones" ExchangeZones.codec Effect.ExchangeZones (\x -> case x of Effect.ExchangeZones y -> Just y; _ -> Nothing),
           Arm.payload "SetLifeTotal" PlayerQuantity.codec Effect.SetLifeTotal (\x -> case x of Effect.SetLifeTotal y -> Just y; _ -> Nothing),
           Arm.payload "LoseGame" PlayerRef.codec Effect.LoseGame (\x -> case x of Effect.LoseGame y -> Just y; _ -> Nothing),
           Arm.payload "WinGame" PlayerRef.codec Effect.WinGame (\x -> case x of Effect.WinGame y -> Just y; _ -> Nothing),
@@ -328,6 +330,7 @@ tagOf x = case x of
   Effect.GainLife {} -> "GainLife"
   Effect.ExchangeLifeTotals {} -> "ExchangeLifeTotals"
   Effect.ExchangeValues {} -> "ExchangeValues"
+  Effect.ExchangeZones {} -> "ExchangeZones"
   Effect.SetLifeTotal {} -> "SetLifeTotal"
   Effect.LoseGame {} -> "LoseGame"
   Effect.WinGame {} -> "WinGame"

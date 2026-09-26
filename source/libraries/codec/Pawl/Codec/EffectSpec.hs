@@ -79,6 +79,7 @@ import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
@@ -175,6 +176,7 @@ import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZonePair as ZonePair
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout (and at
 -- 'Int' in the parametricity case). 'Effect.codec' reaches it only through the
@@ -713,6 +715,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (PlayerRef.Relative PlayerRelation.You)) (ExchangedValue.Power (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self")))) Duration.Indefinite))
       " {\"type\":\"ExchangeValues\",\"value\":{\"one\":{\"type\":\"LifeTotal\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"other\":{\"type\":\"Power\",\"value\":{\"type\":\"InSlot\",\"value\":\"self\"}}}} "
+  Spec.it s "ExchangeZones" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeZones (ExchangeZones.MkExchangeZones (PlayerRef.Relative PlayerRelation.You) ZonePair.HandAndGraveyard))
+      " {\"type\":\"ExchangeZones\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zones\":{\"type\":\"HandAndGraveyard\"}}} "
   Spec.it s "SetLifeTotal" $
     Common.assertJsonCodec
       s
