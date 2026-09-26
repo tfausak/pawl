@@ -391,8 +391,8 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
       -- still block -- 702.3b says nothing about blocking.
       && not (Projection.hasKeywordGiven pcs Keyword.Defender oid gs)
       -- CR 508.1c: every per-creature attacking restriction in force -- printed
-      -- (Pacifism), CR 701.35a's detain, or stored by the resolution that said it
-      -- (Netter en-Dal).
+      -- (Pacifism), CR 701.35a's detain, stored by the resolution that said it
+      -- (Netter en-Dal), or on the controller (Angelic Arbiter).
       && not (Set.member oid restricted)
 
 -- CR 805.10b / 805.10d: the players who declare as one alongside `pid` --
