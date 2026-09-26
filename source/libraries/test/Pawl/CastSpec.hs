@@ -350,6 +350,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
     mountain <- S.printingOf s registry "Mountain"
     marauder <- S.printingOf s registry "Skirk Marauder"
     blessing <- S.printingOf s registry "Synthetic Glacial Blessing"
+    nullChamber <- S.printingOf s registry "Null Chamber"
     let g0 = Setup.emptyGame S.bothPlayers
         (ewId, g1) = S.addPermanent evolvingWilds S.alice g0
         g2 = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) g1 [1 .. (3 :: Int)]
@@ -371,6 +372,12 @@ stackSpec s registry = Spec.describe s "Stack" $ do
         let after = snd (Engine.runGamePure castFaceDown gs (do Activate.activateAbility S.alice ewId ewAbility; Stack.resolveTop; Stack.resolveTop))
         Spec.assertEqWith s "CR 708.4 Skirk Marauder resolved onto the battlefield face down" (length (faceDownMarauder after)) 1
         Spec.assertEqWith s "both casts offered, face up and face down" (fmap (\(_, _, facing) -> Facing.isFaceDown facing) (Cast.castableWhileSearching S.alice gs)) [False, True]
+        -- CR 708.4: the face-down cast has no name, so a Null Chamber naming the
+        -- card prohibits only the face-up one. The name is written straight
+        -- onto the Chamber, as Pawl.FaceDownSpec's hand-cast twin does.
+        let (chamber, chambered) = S.addPermanent nullChamber S.bob gs
+            named = chambered {GameState.objects = Map.adjust (\o -> o {Object.chosenNames = Set.singleton (S.printingName marauder)}) chamber (GameState.objects chambered)}
+        Spec.assertEqWith s "CR 708.4 Null Chamber naming it leaves only the face-down cast" (fmap (\(_, _, facing) -> Facing.isFaceDown facing) (Cast.castableWhileSearching S.alice named)) [True]
       [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
