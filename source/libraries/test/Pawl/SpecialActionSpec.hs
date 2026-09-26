@@ -1605,6 +1605,155 @@ suspendingForX s registry = Spec.describe s "CR 107.3d Benalish Commander" $ do
     Spec.assertBool s (List.notElem (Action.Type.Suspend tooPoorId) (Action.legalActions S.alice tooPoor)) "two Plains cannot pay {1}{W}{W}, so the action is not offered"
     Spec.assertBool s (List.elem (Action.Type.Suspend enoughId) (Action.legalActions S.alice enough)) "the control: three Plains can, and it is"
 
+-- Poison the Cup (KHM 103) {1}{B}{B} Instant, "Destroy target creature. If this
+-- spell was foretold, scry 2. / Foretell {1}{B}" -- checked against Scryfall,
+-- 2026-09-25.
+--
+-- FOUR SWAMPS AND FOUR ISLANDS, so neither the {2} action, the {1}{B} cast, the
+-- printed {1}{B}{B} nor Twincast's {U}{U} is ever refused for want of mana,
+-- whichever lands the {2} took. bob's Goblin Piker is the lone creature to aim at.
+--
+-- THREE CARDS in alice's library, so a scry 2 that bottoms both is observable on
+-- the board: the card that started third is then on top.
+cupBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+cupBoard swamp island cup piker =
+  let lands = S.landsFor island S.alice 4 (S.landsInPlay swamp 4)
+      (_, g1) = S.addPermanent piker S.bob lands
+      (cupId, g2) = S.addHandCard cup S.alice g1
+      (deepId, g3) = S.addLibraryCard piker S.alice g2
+      (_, g4) = S.addLibraryCard piker S.alice g3
+      (topId, g5) = S.addLibraryCard piker S.alice g4
+   in ( cupId,
+        deepId,
+        topId,
+        g5
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Bottoms every card a scry looks at, so a scry is visible on the board; casts
+-- and otherwise declines, S.castAnswer's answers.
+scriesToBottom :: Prompt.Prompt r -> r
+scriesToBottom prompt = case prompt of
+  Prompt.ChooseScry _ _ looked -> (looked, [])
+  _ -> S.castAnswer prompt
+
+foretoldSpell :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foretoldSpell s registry = Spec.describe s "CR 702.143c Poison the Cup" $ do
+  -- The pair: the same card, the same board, the same answers, cast once from
+  -- the exile its foretelling put it in and once from the hand. Only the first is
+  -- "a spell that was a foretold card before it was cast".
+  Spec.it s "CR 702.143c a spell cast from a foretold card was foretold, and one cast from hand was not" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    cup <- S.printingOf s registry "Poison the Cup"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (cupId, deepId, topId, gs) = cupBoard swamp island cup piker
+        foretold = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell cupId)) gs Engine.priorityLoop) [])
+        later = foretold {GameState.turnNumber = GameState.turnNumber foretold + 1}
+        fromHand = S.runPure scriesToBottom gs (S.cast S.alice cupId >> Stack.resolveTop)
+    Spec.assertEqWith s "setup: bob has the Piker to aim at" (S.creaturesInPlay S.bob gs) 1
+    Spec.assertBool s (Maybe.isJust (soleExile foretold)) "the card was foretold into exile, so the case below runs at all"
+    Monad.forM_ (soleExile foretold) $ \exiledId -> do
+      let fromExile = S.runPure scriesToBottom later (S.cast S.alice exiledId >> Stack.resolveTop)
+      Spec.assertEqWith s "CR 702.143c cast from the foretold card, it scried: the card that was third is on top" (take 1 (Game.zoneMembers Zone.Library S.alice fromExile)) [deepId]
+      Spec.assertEqWith s "and it destroyed the Piker" (S.creaturesInPlay S.bob fromExile) 0
+    Spec.assertEqWith s "the control: cast from hand, it did not scry" (take 1 (Game.zoneMembers Zone.Library S.alice fromHand)) [topId]
+    Spec.assertEqWith s "though it destroyed the Piker all the same" (S.creaturesInPlay S.bob fromHand) 0
+  -- CR 707.10: "a copy of a spell isn't cast", and it has no card. The copy is
+  -- therefore not "a spell that was a foretold card before it was cast", however
+  -- the spell it copies was.
+  --
+  -- The copy keeps the original's target and resolves first, so it destroys the
+  -- Piker and the original is then left with no legal target and does not resolve
+  -- at all (CR 608.2b) -- so the only spell that COULD scry here is the copy.
+  Spec.it s "CR 707.10 a copy of a foretold spell was not foretold" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    cup <- S.printingOf s registry "Poison the Cup"
+    piker <- S.printingOf s registry "Goblin Piker"
+    twincast <- S.printingOf s registry "Twincast"
+    let (cupId, _, topId, gs0) = cupBoard swamp island cup piker
+        (twincastId, gs) = S.addHandCard twincast S.alice gs0
+        foretold = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell cupId)) gs Engine.priorityLoop) [])
+        later = foretold {GameState.turnNumber = GameState.turnNumber foretold + 1}
+    Spec.assertEqWith s "setup: bob has the Piker to aim at" (S.creaturesInPlay S.bob gs) 1
+    Spec.assertBool s (Maybe.isJust (soleExile foretold)) "the card was foretold into exile, so the case below runs at all"
+    Monad.forM_ (soleExile foretold) $ \exiledId -> do
+      let copied = S.runPure scriesToBottom later (S.cast S.alice exiledId >> S.cast S.alice twincastId >> Stack.resolveTop >> Stack.resolveTop >> Stack.resolveTop)
+      Spec.assertEqWith s "CR 707.10 the copy did not scry: the card that was on top still is" (take 1 (Game.zoneMembers Zone.Library S.alice copied)) [topId]
+      Spec.assertEqWith s "the copy destroyed the Piker, so it resolved" (S.creaturesInPlay S.bob copied) 0
+      Spec.assertEqWith s "and the stack is empty" (GameState.stack copied) []
+
+-- Dream Devourer (KHM 90) {1}{B} Creature -- Demon Cleric 0/3, "Each nonland
+-- card in your hand without foretell has foretell. Its foretell cost is equal to
+-- its mana cost reduced by {2}. / Whenever you foretell a card, this creature
+-- gets +2/+0 until end of turn." -- checked against Scryfall, 2026-09-25.
+--
+-- Not implemented: the first ability, a grant of foretell whose cost each card
+-- derives from its own mana cost (#4158). pawl's Devourer is stricter than the
+-- printing, never weaker: it foretells nothing the printing could not.
+--
+-- ONE DEVOURER EACH, alice's and bob's, so "you" is not collapsed onto "a
+-- player": alice foretells, and only hers may grow.
+devourerBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+devourerBoard island raven devourer =
+  let (ravenId, g1) = S.addHandCard raven S.alice (S.landsInPlay island 4)
+      (mineId, g2) = S.addPermanent devourer S.alice g1
+      (theirsId, g3) = S.addPermanent devourer S.bob g2
+   in ( ravenId,
+        mineId,
+        theirsId,
+        g3
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+foretellTrigger :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foretellTrigger s registry = Spec.describe s "CR 702.143c Dream Devourer" $ do
+  Spec.it s "CR 702.143c foretelling a card triggers its controller's Devourer and no one else's" $ do
+    island <- S.printingOf s registry "Island"
+    raven <- S.printingOf s registry "Augury Raven"
+    devourer <- S.printingOf s registry "Dream Devourer"
+    let (ravenId, mineId, theirsId, gs) = devourerBoard island raven devourer
+        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell ravenId)) gs Engine.priorityLoop) [])
+    Spec.assertEqWith s "CR 702.143c alice's Devourer got +2/+0" (Projection.powerOf mineId after) (Just 2)
+    Spec.assertEqWith s "bob's did not: it watches its own controller" (Projection.powerOf theirsId after) (Just 0)
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "and the Raven really was foretold"
+  -- CR 702.143c: "foretelling a card" is the special action, and CR 702.143d's
+  -- effect makes a card foretold without anyone foretelling it -- Ethereal
+  -- Valkyrie's own ruling says the trigger does not fire. The Valkyrie's board
+  -- with alice's Devourer added and nothing else changed.
+  Spec.it s "CR 702.143d a card an effect makes foretold was not foretold by anyone" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    valkyrie <- S.printingOf s registry "Ethereal Valkyrie"
+    lore <- S.printingOf s registry "Lore Weaver"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    devourer <- S.printingOf s registry "Dream Devourer"
+    let (valkyrieId, loreId, gs0) = valkyrieBoard plains island valkyrie lore traveler
+        (mineId, gs) = S.addPermanent devourer S.alice gs0
+        after = S.runPure (valkyrieAnswers loreId) gs (S.cast S.alice valkyrieId >> Engine.priorityLoop)
+    Spec.assertEqWith s "CR 702.143d the Devourer did not grow" (Projection.powerOf mineId after) (Just 0)
+    Spec.assertEqWith
+      s
+      "though the Weaver did become foretold"
+      (soleExile after >>= \oid -> fmap (Maybe.isJust . Object.foretold) (Game.lookupObject oid after))
+      (Just True)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
@@ -1617,6 +1766,8 @@ spec s registry = do
   foretelling s registry
   makeForetold s registry
   makeForetoldPerFace s registry
+  foretoldSpell s registry
+  foretellTrigger s registry
   suspending s registry
   suspendHaste s registry
   suspendingForX s registry

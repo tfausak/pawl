@@ -1137,6 +1137,7 @@ eventBindingSlots cond = case cond of
   -- it puts a counter on itself. Which half of rule 701.61a the forager took is
   -- no binding of this condition: nothing printed names it.
   TriggerCondition.PlayerForages _ -> Set.empty
+  TriggerCondition.PlayerForetells _ -> Set.empty
   TriggerCondition.PlayerEarthbends _ -> Set.empty
   TriggerCondition.PlayerWaterbends _ -> Set.empty
   TriggerCondition.PlayerAirbends _ -> Set.empty

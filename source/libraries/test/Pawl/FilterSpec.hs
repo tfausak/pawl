@@ -111,6 +111,7 @@ blackCreature =
       Filter.paidCosts = Map.empty,
       Filter.tributePaid = False,
       Filter.castUsing = Nothing,
+      Filter.foretold = False,
       Filter.manaSpentTagColors = Map.empty,
       Filter.manaSpentAmount = 0,
       -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
@@ -186,6 +187,7 @@ devoidBigCreature =
       Filter.paidCosts = Map.empty,
       Filter.tributePaid = False,
       Filter.castUsing = Nothing,
+      Filter.foretold = False,
       Filter.manaSpentTagColors = Map.empty,
       Filter.manaSpentAmount = 0,
       Filter.nonManaActivatedAbility = False,

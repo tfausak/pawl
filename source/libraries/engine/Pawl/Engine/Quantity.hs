@@ -555,6 +555,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- reads is the RESOLVING SPELL, which is still on the stack while its own
         -- clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
         Quantity.WasKicked -> fmap (\view -> if any (> 0) (Map.filterWithKey (\keyword _ -> Keyword.familyOf keyword == Just KeywordFamily.Kicker) (Filter.paidCosts view)) then 1 else 0) mView
+        -- CR 702.143c's "if this spell was foretold" as a 0/1, off the view for
+        -- WasKicked's reason: the resolving spell is still on the stack while its
+        -- clause conditions are gated.
+        Quantity.WasForetold -> fmap (\view -> if Filter.foretold view then 1 else 0) mView
         -- CR 702.33f's "kicked with its [A] kicker", CR 702.33c's count and CR
         -- 702.157a's "for each time", which are one read: how many times THIS
         -- ability's cost was declared, zero for one the spell's controller declined
@@ -1209,6 +1213,7 @@ objectSlots quantity = case quantity of
   Quantity.DesignationValue _ -> Set.empty
   Quantity.ClassLevel -> Set.empty
   Quantity.WasKicked -> Set.empty
+  Quantity.WasForetold -> Set.empty
   Quantity.TributeWasPaid -> Set.empty
   -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
   -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against
@@ -1475,6 +1480,7 @@ readsX quantity = case quantity of
   Quantity.DesignationValue _ -> False
   Quantity.ClassLevel -> False
   Quantity.WasKicked -> False
+  Quantity.WasForetold -> False
   Quantity.TributeWasPaid -> False
   -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
   -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against

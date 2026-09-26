@@ -1803,6 +1803,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.RingTemptsPlayer _ -> condition
   TriggerCondition.PlayerBlights _ -> condition
   TriggerCondition.PlayerForages _ -> condition
+  TriggerCondition.PlayerForetells _ -> condition
   TriggerCondition.PlayerEarthbends _ -> condition
   TriggerCondition.PlayerWaterbends _ -> condition
   TriggerCondition.PlayerAirbends _ -> condition
@@ -1941,6 +1942,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.DesignationValue _ -> quantity
   Quantity.Type.ClassLevel -> quantity
   Quantity.Type.WasKicked -> quantity
+  Quantity.Type.WasForetold -> quantity
   Quantity.Type.TributeWasPaid -> quantity
   -- A LEAF like WasKicked above, and the Keyword it names is deliberately NOT
   -- rewritten: Pawl.Engine.Cast keys the record it stamps off the PRINTED face

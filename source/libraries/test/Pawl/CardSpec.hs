@@ -186,6 +186,8 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordCount as KeywordCount
+import qualified Pawl.Types.KeywordTally as KeywordTally
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
@@ -1058,6 +1060,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Count.
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
+  TriggerCondition.PlayerForetells _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
@@ -2947,6 +2950,13 @@ keywordFilters keyword = case keyword of
   Keyword.Equip (Equip.MkEquip cost mQuality) -> keywordFramed (costFilters cost) <> mintedTargetSlot (Maybe.maybeToList mQuality)
   _ -> keywordFramed (keywordPayloadFilters keyword)
 
+-- The Filter a mobilize or firebending N carries: a tally's, and nothing else.
+keywordCountFilters :: KeywordCount.KeywordCount Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
+keywordCountFilters n = case n of
+  KeywordCount.Tally tally -> [KeywordTally.filter tally]
+  KeywordCount.Fixed _ -> []
+  KeywordCount.Power -> []
+
 keywordPayloadFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordPayloadFilters keyword = case keyword of
   Keyword.Cycling (Cycling.MkCycling cost mFilter) -> costFilters cost <> Maybe.maybeToList mFilter
@@ -3180,10 +3190,11 @@ keywordPayloadFilters keyword = case keyword of
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []
-  -- CR 702.181a and CR 702.189a name no quality either: the Warrior token and
-  -- the {R} are written into the abilities Pawl.Engine.Keyword mints.
-  Keyword.Mobilize _ -> []
-  Keyword.Firebending _ -> []
+  -- CR 702.181a's and CR 702.189a's N is a count whose Filter the card may
+  -- write (Avenger of the Fallen's creature cards); the Warrior token and the
+  -- {R} are written into the abilities Pawl.Engine.Keyword mints.
+  Keyword.Mobilize n -> keywordCountFilters n
+  Keyword.Firebending n -> keywordCountFilters n
   -- CR 702.91a: battle cry names no quality either -- the "each other attacking
   -- creature" set is written into the ability Pawl.Engine.Keyword mints, not
   -- into the keyword.
@@ -3702,6 +3713,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.DesignationValue _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
+  Quantity.Type.WasForetold -> []
   Quantity.Type.TributeWasPaid -> []
   Quantity.Type.TimesPaid {} -> []
   Quantity.Type.CastUsing {} -> []
@@ -4082,6 +4094,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Filter.
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
+  TriggerCondition.PlayerForetells _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
@@ -4297,6 +4310,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
+  TriggerCondition.PlayerForetells _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []

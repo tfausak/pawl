@@ -320,6 +320,10 @@ data Object = MkObject
     -- Object.exiledFaceDown stays a separate field: CR 702.143a exiles the card
     -- face down, but CR 702.143d makes a card foretold that was already in exile
     -- face up, so neither field implies the other.
+    --
+    -- Cleared by newIncarnation (CR 400.7) save for one move: Pawl.Engine.Cast
+    -- carries it onto the SPELL a foretold card is cast as, CR 702.143c's "a
+    -- spell that was a foretold card before it was cast" (Quantity.WasForetold).
     foretold :: Maybe Natural.Natural,
     -- | CR 702.143d: the foretell cost an EFFECT gave this foretold card, as the
     -- amount it takes off the card's own mana cost (Ethereal Valkyrie's {2}), or
@@ -340,8 +344,8 @@ data Object = MkObject
     -- the face being offered and ahead of CR 601.2f -- which is what keeps it an
     -- alternative COST rather than a discount the board's increases outrun.
     --
-    -- Per-incarnation: cleared by newIncarnation (CR 400.7), like the stamp it
-    -- belongs to. What rule 702.143e makes its owner track is this amount, "any
+    -- Per-incarnation: cleared by newIncarnation (CR 400.7), and not carried onto
+    -- the spell as `foretold` is. What rule 702.143e makes its owner track is this amount, "any
     -- foretell costs other than their printed foretell costs those cards may
     -- have" being one number per card here.
     foretellCostReduction :: Maybe ManaCost.ManaCost,

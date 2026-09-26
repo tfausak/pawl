@@ -10,6 +10,7 @@ import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Gift as Gift
 import qualified Pawl.Codec.Impending as Impending
+import qualified Pawl.Codec.KeywordCount as KeywordCount
 import qualified Pawl.Codec.Morph as Morph
 import qualified Pawl.Codec.PartnerText as PartnerText
 import qualified Pawl.Codec.Protection as Protection
@@ -216,8 +217,8 @@ codec =
       Arm.nullary "Exhaust" Keyword.Exhaust,
       Arm.nullary "Boast" Keyword.Boast,
       Arm.nullary "Forecast" Keyword.Forecast,
-      Arm.payload "Mobilize" Common.natural Keyword.Mobilize (\x -> case x of Keyword.Mobilize y -> Just y; _ -> Nothing),
-      Arm.payload "Firebending" Common.natural Keyword.Firebending (\x -> case x of Keyword.Firebending y -> Just y; _ -> Nothing),
+      Arm.payload "Mobilize" (KeywordCount.codec codec) Keyword.Mobilize (\x -> case x of Keyword.Mobilize y -> Just y; _ -> Nothing),
+      Arm.payload "Firebending" (KeywordCount.codec codec) Keyword.Firebending (\x -> case x of Keyword.Firebending y -> Just y; _ -> Nothing),
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines,
       Arm.nullary "Bargain" Keyword.Bargain,
       Arm.payload "Craft" (Craft.codec codec) Keyword.Craft (\x -> case x of Keyword.Craft y -> Just y; _ -> Nothing),
