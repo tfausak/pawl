@@ -95,7 +95,8 @@
 --
 -- Angelic Arbiter is the condition asked PER AFFECTED PLAYER: "each opponent
 -- who" names the players by what each of them did this turn, so it is a
--- three-seat fixture for Cease-Fire's reason.
+-- three-seat fixture for Cease-Fire's reason. Ethersworn Canonist asks the
+-- same per-player question of a filtered count of the turn's casts.
 module Pawl.PlayerEffectSpec where
 
 import qualified Data.List as List
@@ -3011,6 +3012,57 @@ angelicArbiterSpec s registry =
       Spec.assertBool s (bobPiker `notElem` Combat.legalAttackers S.bob afterCast) "bob, who cast a spell, can't attack with his Piker"
       Spec.assertBool s (quietPiker `elem` Combat.legalAttackers S.bob quiet) "and can on the same board had he cast nothing"
 
+-- Ethersworn Canonist {1}{W}: "Each player who has cast a nonartifact spell
+-- this turn can't cast additional nonartifact spells." Three seats with bob
+-- active in his main phase: alice controls the Canonist, bob holds a Goblin
+-- Piker, a Lightning Bolt and an Ornithopter beside three Mountains, and carol a
+-- Lightning Bolt beside a Mountain. Bob's casts are real ones, resolved, so the
+-- count reads the turn's own log; neither targets, so nothing touches the
+-- Canonist.
+etherswornCanonistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+etherswornCanonistSpec s registry =
+  Spec.describe s "EtherswornCanonist" $ do
+    let board = do
+          canonist <- S.printingOf s registry "Ethersworn Canonist"
+          mountain <- S.printingOf s registry "Mountain"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          ornithopter <- S.printingOf s registry "Ornithopter"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, gs1) = S.addPermanent canonist S.alice S.threePlayerGame
+              gs2 = S.landsFor mountain S.carol 1 (S.landsFor mountain S.bob 3 gs1)
+              (bobPiker, gs3) = S.addHandCard piker S.bob gs2
+              (bobBolt, gs4) = S.addHandCard bolt S.bob gs3
+              (thopter, gs5) = S.addHandCard ornithopter S.bob gs4
+              (carolBolt, gs6) = S.addHandCard bolt S.carol gs5
+          pure
+            ( bobPiker,
+              bobBolt,
+              thopter,
+              carolBolt,
+              gs6
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.bob,
+                  GameState.priority = Just S.bob
+                }
+            )
+        castAndResolve oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.bob oid)) Engine.priorityLoop
+
+    -- Bob's Piker uses up his one nonartifact spell; carol, who has cast
+    -- nothing, is asked about herself and not about bob.
+    Spec.it s "CR 601.3 a player who has cast a nonartifact spell can't cast another" $ do
+      (bobPiker, bobBolt, thopter, carolBolt, gs) <- board
+      let afterPiker = castAndResolve bobPiker gs
+      Spec.assertBool s (not (S.castable S.bob bobBolt afterPiker)) "bob, who cast a Goblin Piker, can't cast Lightning Bolt"
+      Spec.assertBool s (S.castable S.carol carolBolt afterPiker {GameState.priority = Just S.carol}) "carol, who cast nothing, can still cast hers"
+      Spec.assertBool s (S.castable S.bob thopter afterPiker) "and bob can still cast an artifact spell"
+
+    -- The count is of NONARTIFACT spells: an Ornithopter cast first leaves the
+    -- allowance untouched.
+    Spec.it s "CR 601.3 an artifact spell cast this turn does not use up the one nonartifact spell" $ do
+      (_, bobBolt, thopter, _, gs) <- board
+      let afterThopter = castAndResolve thopter gs
+      Spec.assertBool s (S.castable S.bob bobBolt afterThopter) "bob, who cast only an Ornithopter, can still cast a Bolt"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -3036,3 +3088,4 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   emperionSpec s registry
   greedSpec s registry
   angelicArbiterSpec s registry
+  etherswornCanonistSpec s registry
