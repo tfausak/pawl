@@ -1,5 +1,6 @@
 module Pawl.Codec.Keyword where
 
+import qualified Pawl.Codec.Backup as Backup
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Craft as Craft
@@ -205,7 +206,7 @@ codec =
       Arm.payload "Prototype" Prototype.codec Keyword.Prototype (\x -> case x of Keyword.Prototype y -> Just y; _ -> Nothing),
       Arm.nullary "ForMirrodin" Keyword.ForMirrodin,
       Arm.payload "Toxic" Common.natural Keyword.Toxic (\x -> case x of Keyword.Toxic y -> Just y; _ -> Nothing),
-      Arm.payload "Backup" Common.natural Keyword.Backup (\x -> case x of Keyword.Backup y -> Just y; _ -> Nothing),
+      Arm.payload "Backup" (Backup.codec codec) Keyword.Backup (\x -> case x of Keyword.Backup y -> Just y; _ -> Nothing),
       Arm.payload "Disguise" (Cost.codec codec) Keyword.Disguise (\x -> case x of Keyword.Disguise y -> Just y; _ -> Nothing),
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot (\x -> case x of Keyword.Plot y -> Just y; _ -> Nothing),
       Arm.payload "Foretell" (ForetellCost.codec codec) Keyword.Foretell (\x -> case x of Keyword.Foretell y -> Just y; _ -> Nothing),

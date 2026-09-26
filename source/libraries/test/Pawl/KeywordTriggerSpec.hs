@@ -3462,6 +3462,11 @@ graftSpec s registry =
 -- api.scryfall.com 2026-09-24) grants a RULE ability (CR 613.11). bob's Cabal
 -- Evangel (2/2) is the blocker it bars and his War Mammoth (3/3) the one it
 -- does not.
+--
+-- Saiba Cryptomancer ({1}{U} Creature -- Moonfolk Ninja 0/1, "Flash / Backup 1
+-- / Hexproof", checked against api.scryfall.com 2026-09-26) prints a keyword on
+-- EACH side of its backup line, so rule 702.165a's "printed below this one" is
+-- what decides which one the Piker gains.
 backupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 backupSpec s registry =
   let pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
@@ -3539,6 +3544,19 @@ backupSpec s registry =
               Spec.assertBool s (S.onBattlefield jeditId after) "so the 5/5 blocker survived the three damage"
               Spec.assertEqWith s "and the counters went on the Archpriest itself" (plusOnes selfId backed) 1
             _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Jedit Ojanen"
+        -- "PRINTED BELOW THIS ONE", the pair on one board: the hexproof below
+        -- Saiba Cryptomancer's backup line travels, the flash above it does not.
+        Spec.it s "CR 702.165a the Piker gains the hexproof printed below the backup line and not the flash above it" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          saiba <- S.printingOf s registry "Saiba Cryptomancer"
+          case S.combatBoardOf [piker] [] of
+            (gs0, [pikerId], _) -> do
+              let (card, staged) = S.addHandCard saiba S.alice gs0
+                  backed = entersTargeting pikerId card staged
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Flash pikerId backed)) "CR 702.165a the Piker did not gain the flash printed above the backup line"
+              Spec.assertBool s (Projection.hasKeyword (Keyword.Type.Hexproof Nothing) pikerId backed) "and did gain the hexproof printed below it"
+              Spec.assertEqWith s "with rule 702.165a's one +1/+1 counter on it" (plusOnes pikerId backed) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Piker"
         -- THE ABILITY HALF, at gameplay level, and CR 113.7 with it: the granted
         -- trigger is the PIKER's, so "this creature" is the Piker and "your
         -- graveyard" is the Piker's controller's. The Archpriest never attacks,
