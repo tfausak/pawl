@@ -835,6 +835,48 @@ commandZoneTriggerSpec s registry =
           Spec.assertEqWith s "no trigger gathered" (length (gathered atBobs)) 0
           Spec.assertEqWith s "no Cats" (cats after) 0
 
+-- CR 603.8 on an emblem: a STATE trigger, which Pawl.Engine.Event.Trigger.stateTriggers
+-- gathers rather than eventTriggers, from the command zone CR 114.4 names.
+--
+-- Synthetic Empty Hand Idol {2} Artifact. "{T}: You get an emblem with \"When you
+-- have no cards in hand, each opponent loses 3 life.\"" Synthetic because no
+-- printing reaches it: MTGJSON's 2026-08-23 dump, every emblem text and every
+-- Emblem, Vanguard, Conspiracy, Dungeon, Plane and Scheme card scanned for a line
+-- opening "When " that is not an event, finds only the plane Aretopolis ("When
+-- Aretopolis has ten or more scroll counters on it, planeswalk."), which pawl
+-- cannot put into the command zone (#934).
+--
+-- Three seats, and only alice's hand decides: bob's and carol's are empty on
+-- both boards, so a scan reading "you" as any player would fire on the negative.
+emblemStateTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+emblemStateTriggerSpec s registry =
+  let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      -- alice's Idol activated and resolved, optionally with one card in her hand.
+      emblemBoard holding = do
+        idol <- S.printingOf s registry "Synthetic Empty Hand Idol"
+        swamp <- S.printingOf s registry "Swamp"
+        let (idolId, g0) = S.addPermanent idol S.alice S.threePlayerGame
+            g1 = if holding then snd (S.addHandCard swamp S.alice g0) else g0
+            used = case Face.activatedAbilities (S.combinedFace idol) of
+              ability : _ -> S.runPure S.identityAnswer g1 (do Activate.activateAbility S.alice idolId ability; Stack.resolveTop)
+              [] -> g1
+        pure (Set.toList (GameState.command used), used)
+   in Spec.describe s "CommandZoneStateTrigger" $ do
+        Spec.it s "CR 114.4 / 603.8 whole card: an empty hand makes each opponent lose 3" $ do
+          (emblems, gs) <- emblemBoard False
+          let placed = settle gs
+              after = S.runPure S.identityAnswer placed Stack.resolveTop
+          Spec.assertEqWith s "bob and carol lost 3, alice nothing" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) [Just 20, Just 17, Just 17]
+          Spec.assertEqWith s "one emblem" (length emblems) 1
+        -- CR 603.8: armed again only once THIS instance leaves the stack.
+        Spec.it s "CR 603.8 a second settle pass leaves one instance on the stack" $ do
+          (_, gs) <- emblemBoard False
+          Spec.assertEqWith s "one instance" (length (GameState.stack (settle (settle gs)))) 1
+        -- The negative: the same board, alice holding one card.
+        Spec.it s "CR 109.5 a card in its controller's hand arms nothing" $ do
+          (_, gs) <- emblemBoard True
+          Spec.assertEqWith s "nothing triggered" (length (GameState.stack (settle gs))) 0
+
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), second line: "When
 -- Serra Avatar is put into a graveyard from anywhere, shuffle it into its
 -- owner's library." Oracle text verified against Scryfall. Its first line, the
@@ -3019,6 +3061,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   anyOfEffectZoneTriggerSpec s registry
   droughtUpkeepSpec s registry
   commandZoneTriggerSpec s registry
+  emblemStateTriggerSpec s registry
   serraAvatarSpec s registry
   planarVoidSpec s registry
   diesTriggerSpec s registry
