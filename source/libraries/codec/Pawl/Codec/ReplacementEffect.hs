@@ -4,7 +4,7 @@ import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CoinFlipR as CoinFlipR
 import qualified Pawl.Codec.CounterR as CounterR
 import qualified Pawl.Codec.DamageR as DamageR
-import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Codec.DestructionR as DestructionR
 import qualified Pawl.Codec.DieRollR as DieRollR
 import qualified Pawl.Codec.DrawCountR as DrawCountR
 import qualified Pawl.Codec.DrawR as DrawR
@@ -40,7 +40,7 @@ codec cardCodec abilityCodec effectCodec =
     [ Arm.payload "ZoneChangeR" ZoneChangeR.codec ReplacementEffect.ZoneChangeR (\x -> case x of ReplacementEffect.ZoneChangeR y -> Just y; _ -> Nothing),
       Arm.payload "EntryR" (EntryR.codec abilityCodec effectCodec) ReplacementEffect.EntryR (\x -> case x of ReplacementEffect.EntryR y -> Just y; _ -> Nothing),
       Arm.payload "DamageR" (DamageR.codec effectCodec) ReplacementEffect.DamageR (\x -> case x of ReplacementEffect.DamageR y -> Just y; _ -> Nothing),
-      Arm.payload "DestructionR" DestructionRewrite.codec ReplacementEffect.DestructionR (\x -> case x of ReplacementEffect.DestructionR y -> Just y; _ -> Nothing),
+      Arm.payload "DestructionR" DestructionR.codec ReplacementEffect.DestructionR (\x -> case x of ReplacementEffect.DestructionR y -> Just y; _ -> Nothing),
       Arm.payload "CounterR" CounterR.codec ReplacementEffect.CounterR (\x -> case x of ReplacementEffect.CounterR y -> Just y; _ -> Nothing),
       Arm.payload "TokenR" (TokenR.codec cardCodec) ReplacementEffect.TokenR (\x -> case x of ReplacementEffect.TokenR y -> Just y; _ -> Nothing),
       Arm.payload "TurnUpR" TurnUpR.codec ReplacementEffect.TurnUpR (\x -> case x of ReplacementEffect.TurnUpR y -> Just y; _ -> Nothing),

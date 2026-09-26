@@ -9,6 +9,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Quantity as Quantity
@@ -33,10 +34,10 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
             Replace.uses = Uses.Once,
             Replace.origin = ReplacementOrigin.Other,
             Replace.condition = Nothing,
-            Replace.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
+            Replace.effect = ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate)
           }
       )
-      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"Other\"},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"Other\"},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}}} "
   -- CR 614.15 / 614.1: Galvanic Blast's metalcraft clause, the case that writes
   -- the key.
   Spec.it s "MkReplace, condition written" $
@@ -48,8 +49,8 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
             Replace.uses = Uses.Once,
             Replace.origin = ReplacementOrigin.SelfReplacement,
             Replace.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.Literal 3) Comparison.AtLeast (Quantity.Literal 3))),
-            Replace.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
+            Replace.effect = ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate)
           }
       )
-      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"SelfReplacement\"},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":3},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":3}}},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"SelfReplacement\"},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":3},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":3}}},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

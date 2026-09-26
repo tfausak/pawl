@@ -69,6 +69,7 @@ import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DevourCount as DevourCount
@@ -4602,7 +4603,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- ONE ROW PER INSTANCE, riot's reading: rule 702.89a states one replacement
   -- apiece, and the two rows are equal values told apart by the instance ordinal
   -- Replacement.collect assigns.
-  Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR DestructionRewrite.UmbraArmor)
+  Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.UmbraArmor))
   Keyword.Epic -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
