@@ -895,6 +895,7 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -1223,6 +1224,8 @@ viewOfSnapshot deploy mController mOwner isToken counters snapshot =
       -- sentence -- so a past event reports none.
       Filter.tributePaid = False,
       Filter.castUsing = Nothing,
+      -- CR 702.143c's record is a field of an OBJECT -- `tributePaid` above.
+      Filter.foretold = False,
       -- CR 400.7d's mana record is a field of an OBJECT, which a
       -- ProjectedCharacteristics does not carry -- `designations` above, same
       -- sentence -- so a past event reports none.

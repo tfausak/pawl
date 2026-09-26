@@ -36,6 +36,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
@@ -175,6 +176,8 @@ foretell perform pid oid = do
           -- battlefield (CR 712.21), and this action exiles a card from a hand.
           exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
           Monad.forM_ exiled (State.modify' . becomeForetold Nothing)
+          -- CR 702.143c: "foretelling a card" is this special action.
+          Monad.unless (null exiled) (State.modify' (Event.recordEvent (GameEvent.Foretold pid)))
 
 -- CR 406.3's rider and nothing else: every other rider is battlefield-only, and
 -- this move names exile.
@@ -220,9 +223,9 @@ riders =
 -- is that it never asks which card is being foretold, so the opcode's arm hands
 -- it CR 400.7's exiled incarnation exactly as the special action does.
 --
--- No GameEvent rides along, where Plot.becomePlotted records one. Not
--- implemented: CR 702.143c's "whenever you foretell a card" as a trigger
--- condition, and with it any trigger on a card becoming foretold (#1486).
+-- No GameEvent rides along, where Plot.becomePlotted records one: CR 702.143c's
+-- "foretelling a card" is the special action alone, so `foretell` above records
+-- GameEvent.Foretold and CR 702.143d's route records nothing.
 becomeForetold :: Maybe ManaCost.ManaCost -> ObjectId -> GameState -> GameState
 becomeForetold reduction newId gs =
   gs

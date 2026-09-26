@@ -43,6 +43,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
@@ -1167,6 +1168,31 @@ zhaoSpec s registry =
               Spec.assertEqWith s "CR 702.189a exactly the two the keyword added, retained" (poolOf S.alice blockers) (replicate 2 retainedRed)
               Spec.assertEqWith s "CR 500.5a and none once the combat phase has ended" (poolOf S.alice postcombat) []
             _ -> Spec.assertFailure s "fixture should give alice a Zhao and a Piker"
+
+-- CR 702.189a's N restated as the creature's power: Firebending Student {1}{R}
+-- Creature -- Human Monk 1/2, "Prowess / Firebending X, where X is this
+-- creature's power". Prowess never triggers here, as nothing is cast. Nothing is
+-- omitted, so pawl's Student is neither stricter nor weaker than printed.
+--
+-- TWO +1/+1 COUNTERS make its power three, distinct from the printed one and
+-- from the Piker's two beside it, so X read off the printed card or off the
+-- wrong attacker reddens.
+firebendingStudentSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+firebendingStudentSpec s registry =
+  let passing :: Prompt.Prompt r -> r
+      passing = S.aggressiveAnswer
+   in Spec.describe s "Firebending Student" $ do
+        Spec.it s "CR 702.189a firebending X adds the Student's projected power in retained {R}" $ do
+          student <- S.printingOf s registry "Firebending Student"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case S.combatBoardOf [student, piker] [] of
+            (gs, [studentId, _], _) -> do
+              let pumped = S.addCounter CounterKind.PlusOnePlusOne 2 studentId gs
+                  blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing pumped
+              -- THE gameplay assertion, ahead of the proxy.
+              Spec.assertEqWith s "CR 702.189a three retained {R}, one per point of the Student's power" (poolOf S.alice blockers) (replicate 3 retainedRed)
+              Spec.assertEqWith s "CR 613.4c the counters made the Student a 3/4" (S.powerToughnessOf studentId blockers) (Just (3, 4))
+            _ -> Spec.assertFailure s "fixture should give alice a Student and a Piker"
 
 -- CR 106.6: mana that carries a restriction on what it may be spent on. Geosurge
 -- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast
@@ -2363,6 +2389,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   shizukoSpec s registry
   avatarRokuSpec s registry
   zhaoSpec s registry
+  firebendingStudentSpec s registry
   geosurgeSpec s registry
   workshopSpec s registry
   pillarSpec s registry

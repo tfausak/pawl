@@ -288,6 +288,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -419,6 +420,7 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.RingTempted _ -> False
   GameEvent.Blighted _ -> False
   GameEvent.Foraged _ -> False
+  GameEvent.Foretold _ -> False
   GameEvent.AttractionOpened _ -> False
   GameEvent.PrizeClaimed _ -> False
   GameEvent.Earthbent _ -> False
@@ -510,6 +512,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -613,6 +616,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -694,6 +698,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -787,6 +792,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -876,6 +882,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -966,6 +973,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1054,6 +1062,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1150,6 +1159,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1252,6 +1262,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1351,6 +1362,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1437,6 +1449,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1522,6 +1535,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1616,6 +1630,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1710,6 +1725,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1801,6 +1817,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1891,6 +1908,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -1982,6 +2000,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2085,6 +2104,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2186,6 +2206,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2278,6 +2299,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2369,6 +2391,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2456,6 +2479,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2506,6 +2530,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2620,6 +2645,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2771,6 +2797,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2863,6 +2890,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -2976,6 +3004,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3073,6 +3102,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3181,6 +3211,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3259,6 +3290,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3365,6 +3397,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3450,6 +3483,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3551,6 +3585,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3639,6 +3674,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3738,6 +3774,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3832,6 +3869,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -3987,6 +4025,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
           GameEvent.Foraged _ -> False
+          GameEvent.Foretold _ -> False
           GameEvent.AttractionOpened _ -> False
           GameEvent.PrizeClaimed _ -> False
           GameEvent.Earthbent _ -> False
@@ -4137,6 +4176,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
           GameEvent.Foraged _ -> False
+          GameEvent.Foretold _ -> False
           GameEvent.AttractionOpened _ -> False
           GameEvent.PrizeClaimed _ -> False
           GameEvent.Earthbent _ -> False
@@ -4223,6 +4263,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -4309,6 +4350,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -4401,6 +4443,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -4501,6 +4544,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -4625,6 +4669,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
           GameEvent.Foraged _ -> False
+          GameEvent.Foretold _ -> False
           GameEvent.AttractionOpened _ -> False
           GameEvent.PrizeClaimed _ -> False
           GameEvent.Earthbent _ -> False
@@ -4713,6 +4758,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -4815,6 +4861,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -4954,6 +5001,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5056,6 +5104,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5137,6 +5186,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5205,6 +5255,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5310,6 +5361,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5415,6 +5467,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5500,6 +5553,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5588,6 +5642,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5645,6 +5700,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -5738,6 +5794,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
           GameEvent.Foraged _ -> False
+          GameEvent.Foretold _ -> False
           GameEvent.AttractionOpened _ -> False
           GameEvent.PrizeClaimed _ -> False
           GameEvent.Earthbent _ -> False
@@ -5841,6 +5898,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
           GameEvent.Foraged _ -> False
+          GameEvent.Foretold _ -> False
           GameEvent.AttractionOpened _ -> False
           GameEvent.PrizeClaimed _ -> False
           GameEvent.Earthbent _ -> False
@@ -5975,6 +6033,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6038,6 +6097,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.RingTempted _ -> False
           GameEvent.Blighted _ -> False
           GameEvent.Foraged _ -> False
+          GameEvent.Foretold _ -> False
           GameEvent.AttractionOpened _ -> False
           GameEvent.PrizeClaimed _ -> False
           GameEvent.Earthbent _ -> False
@@ -6177,6 +6237,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6266,6 +6327,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6377,6 +6439,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6482,6 +6545,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6581,6 +6645,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6680,6 +6745,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6747,6 +6813,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6843,6 +6910,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -6969,6 +7037,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7104,6 +7173,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7211,6 +7281,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7261,6 +7332,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7357,6 +7429,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7463,6 +7536,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7570,6 +7644,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7659,6 +7734,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7750,6 +7826,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7875,6 +7952,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -7982,6 +8060,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8063,6 +8142,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8148,6 +8228,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8228,6 +8309,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8319,6 +8401,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8398,6 +8481,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8483,6 +8567,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8577,6 +8662,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8661,6 +8747,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8743,6 +8830,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8839,6 +8927,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -8942,6 +9031,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9070,6 +9160,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9150,6 +9241,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9234,6 +9326,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9357,6 +9450,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9441,6 +9535,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted tempted -> PlayerRelation.holds (Game.teams gs) relation you tempted
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9524,6 +9619,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9603,6 +9699,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9693,6 +9790,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9774,6 +9872,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9857,6 +9956,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -9943,6 +10043,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10028,6 +10129,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10109,6 +10211,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10199,6 +10302,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10285,6 +10389,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10366,6 +10471,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10463,6 +10569,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10559,6 +10666,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10650,6 +10758,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10735,6 +10844,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted blighter -> PlayerRelation.holds (Game.teams gs) relation you blighter
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10819,6 +10929,86 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged forager -> PlayerRelation.holds (Game.teams gs) relation you forager
+    GameEvent.Foretold _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
+  -- CR 702.143c: this player foretold a card, read against CR 109.5's "you",
+  -- PlayerForages' shape above. The event is the special action's alone, so a
+  -- card CR 702.143d's effect made foretold does not reach it.
+  TriggerCondition.PlayerForetells relation -> case event of
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold foreteller -> PlayerRelation.holds (Game.teams gs) relation you foreteller
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10897,6 +11087,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened opener -> PlayerRelation.holds (Game.teams gs) relation you opener
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -10975,6 +11166,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed claimant -> PlayerRelation.holds (Game.teams gs) relation you claimant
     GameEvent.Earthbent _ -> False
@@ -11060,6 +11252,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent bender -> PlayerRelation.holds (Game.teams gs) relation you bender
@@ -11143,6 +11336,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -11220,6 +11414,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False
@@ -11298,6 +11493,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.RingTempted _ -> False
     GameEvent.Blighted _ -> False
     GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
     GameEvent.AttractionOpened _ -> False
     GameEvent.PrizeClaimed _ -> False
     GameEvent.Earthbent _ -> False

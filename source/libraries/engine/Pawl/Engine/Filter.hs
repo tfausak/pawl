@@ -27,6 +27,8 @@ import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.KeywordCount as KeywordCount
+import qualified Pawl.Types.KeywordTally as KeywordTally
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -671,6 +673,11 @@ data View = MkView
     -- object, since Pawl.Types.LastKnown keeps no such record.
     -- Pawl.Engine.Quantity's CastUsing arm is the reader.
     castUsing :: Maybe Keyword.Type.Keyword,
+    -- CR 702.143c: is this candidate a foretold card, or a spell that was one
+    -- before it was cast? Read off Object.foretold, which Pawl.Engine.Cast
+    -- carries onto the stack, and False where there is no live object, as
+    -- `castUsing` above. Pawl.Engine.Quantity's WasForetold arm is the reader.
+    foretold :: Bool,
     -- CR 400.7d / CR 107.4h: the production tags of the mana that was spent to
     -- cast the spell this candidate is, or was, or to activate the CR 602.2a
     -- ability it is -- read off Object.manaSpent, and empty where there is no
@@ -922,6 +929,7 @@ playerView pid =
       -- one -- `designations` above, same sentence.
       tributePaid = False,
       castUsing = Nothing,
+      foretold = False,
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
       manaSpentTagColors = Map.empty,
@@ -2652,13 +2660,13 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Sneak cost -> Keyword.Type.Sneak (rewriteCost pairs cost)
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
-  -- CR 702.181a's N is a number too, and "Warrior" is afterlife's "Spirit": a
-  -- word CR 612.2a reaches in the ability Pawl.Engine.Keyword.mobilize mints
-  -- rather than in this value.
-  Keyword.Type.Mobilize _ -> keyword
-  -- CR 702.189a's N is a number and the {R} is a mana symbol, so CR 612.2 has
-  -- nothing to swap at all.
-  Keyword.Type.Firebending _ -> keyword
+  -- CR 702.181a's and CR 702.189a's N is a number, or a count whose Filter the
+  -- CARD writes (Avenger of the Fallen's creature cards), so CR 612.2 swaps
+  -- whatever word that Filter names. Mobilize's "Warrior" is afterlife's
+  -- "Spirit": a word CR 612.2a reaches in the ability Pawl.Engine.Keyword.mobilize
+  -- mints rather than in this value, and firebending's {R} is a mana symbol.
+  Keyword.Type.Mobilize n -> Keyword.Type.Mobilize (rewriteKeywordCount pairs n)
+  Keyword.Type.Firebending n -> Keyword.Type.Firebending (rewriteKeywordCount pairs n)
   -- CR 702.75a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- the look and the exile are in the ability Pawl.Engine.Keyword.hideaway mints.
   Keyword.Type.Hideaway _ -> keyword
@@ -2872,6 +2880,15 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.47a's [quality] and [cost] are both printed, so both halves descend,
   -- craft's reason.
   Keyword.Type.Splice splicing -> Keyword.Type.Splice (Splice.MkSplice (rewrite pairs (Splice.onto splicing)) (rewriteCost pairs (Splice.cost splicing)))
+
+-- rewriteKeyword's descent into mobilize's and firebending's N: only a tally
+-- carries a Filter, and its scope holds no word, as rewriteQuantity leaves
+-- Count's.
+rewriteKeywordCount :: [(Subtype.Subtype, Subtype.Subtype)] -> KeywordCount.KeywordCount Keyword.Type.Keyword -> KeywordCount.KeywordCount Keyword.Type.Keyword
+rewriteKeywordCount pairs n = case n of
+  KeywordCount.Tally tally -> KeywordCount.Tally tally {KeywordTally.filter = rewrite pairs (KeywordTally.filter tally)}
+  KeywordCount.Fixed _ -> n
+  KeywordCount.Power -> n
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is

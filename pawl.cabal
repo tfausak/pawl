@@ -586,11 +586,14 @@ library codec
     Pawl.Codec.InZone
     Pawl.Codec.InZoneSpec
     Pawl.Codec.Keyword
+    Pawl.Codec.KeywordCount
+    Pawl.Codec.KeywordCountSpec
     Pawl.Codec.KeywordDesignator
     Pawl.Codec.KeywordDesignatorSpec
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
     Pawl.Codec.KeywordSpec
+    Pawl.Codec.KeywordTally
     Pawl.Codec.LastKnown
     Pawl.Codec.LastKnownSpec
     Pawl.Codec.Layout
@@ -1921,8 +1924,10 @@ library types
     Pawl.Types.InstanceOrdinal
     Pawl.Types.InZone
     Pawl.Types.Keyword
+    Pawl.Types.KeywordCount
     Pawl.Types.KeywordDesignator
     Pawl.Types.KeywordFamily
+    Pawl.Types.KeywordTally
     Pawl.Types.KickerDecision
     Pawl.Types.LastKnown
     Pawl.Types.Layer

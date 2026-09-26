@@ -124,6 +124,9 @@ data Quantity
     -- kicked with any of its kicker costs, else 0; a permanent answers for the
     -- spell that became it (CR 400.7d).
     WasKicked
+  | -- | CR 702.143c: 1 if the spell this quantity is evaluated against was a
+    -- foretold card before it was cast, whatever cost it was cast for, else 0.
+    WasForetold
   | -- | CR 702.104b: 1 if tribute was paid for the object this quantity is
     -- evaluated against -- the opponent its controller chose had it enter with
     -- rule 702.104a's +1/+1 counters -- else 0.

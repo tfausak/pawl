@@ -269,6 +269,7 @@ import qualified Pawl.Codec.IncreaseSpellCostSpec
 import qualified Pawl.Codec.InherentTriggerSourceSpec
 import qualified Pawl.Codec.InitiativeTargetSpec
 import qualified Pawl.Codec.InstanceOrdinalSpec
+import qualified Pawl.Codec.KeywordCountSpec
 import qualified Pawl.Codec.KeywordDesignatorSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
@@ -967,6 +968,7 @@ spec s registry = do
   Pawl.Codec.InherentTriggerSourceSpec.spec s
   Pawl.Codec.InstanceOrdinalSpec.spec s
   Pawl.Codec.KeywordDesignatorSpec.spec s
+  Pawl.Codec.KeywordCountSpec.spec s
   Pawl.Codec.KeywordFamilySpec.spec s
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LastKnownSpec.spec s
