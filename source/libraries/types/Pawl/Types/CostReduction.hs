@@ -1,5 +1,6 @@
 module Pawl.Types.CostReduction where
 
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Quantity as Quantity
 
@@ -34,8 +35,7 @@ data CostReduction = MkCostReduction
     -- A ManaCost and not a number, for Pawl.Types.ReduceSpellCost's reason: CR
     -- 118.7 reduces a cost by mana of a stated type, and
     -- Pawl.Engine.Cost.applyAdjustments already reads a reduction's generic and
-    -- typed halves apart. No printing of this sentence names a type, so every
-    -- one written here is generic; the field is where a typed one would go.
+    -- typed halves apart -- Ertai's Scorn's {U} is a typed one.
     amount :: ManaCost.ManaCost,
     -- | How many times 'amount' comes off -- Thrasta's "for each other spell
     -- cast this turn", which is a Count over Scope.InHistory
@@ -51,6 +51,8 @@ data CostReduction = MkCostReduction
     -- makes a spell cast, and it comes after CR 601.2f, so the spell being
     -- totalled has filed no GameEvent.SpellCast of its own for the count to pick
     -- up.
-    perEach :: Quantity.Quantity
+    perEach :: Quantity.Quantity,
+    -- | CR 601.2f: when the reduction applies at all; Nothing is unconditional.
+    condition :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)

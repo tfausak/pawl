@@ -1730,7 +1730,7 @@ beginTurnOf pid gs =
   let -- CR 601.2i / 608.2i: how many spells each player cast during the turn that
       -- is ending, taken here because the log it is folded from is cleared by the
       -- record update below. `gs` still holds the OUTGOING active player.
-      casts = PlayerEffect.castsPerPlayer gs
+      casts = Game.castsPerPlayer gs
       -- CR 800.4b: a player who would be controlled by a departed player isn't, so
       -- a pending Decider naming one is not promoted. CR 800.4a's second clause
       -- clears the entry at the departure itself; this guard answers otherwise.

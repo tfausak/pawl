@@ -88,6 +88,7 @@ import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.ForetellCost as ForetellCost
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -219,12 +220,22 @@ faceDownCost =
 grantedForetellCost :: Face.Face card -> Object.Object -> Maybe (Cost Keyword.Type.Keyword)
 grantedForetellCost face obj = do
   amount <- Object.foretellCostReduction obj
-  manaCost <- Face.manaCost face
-  pure
-    Cost.MkCost
-      { Cost.mana = Just (reducedManaCost amount manaCost),
-        Cost.components = []
-      }
+  foretellCostFor face (ForetellCost.ManaCostReducedBy amount)
+
+-- CR 702.143a: a foretell keyword's payload settled against the face being cast
+-- -- the stated cost as printed, or that face's mana cost reduced (CR 118.7),
+-- grantedForetellCost's reading and for its reasons. Nothing for a reduction off
+-- a face with no mana cost (CR 202.1b).
+foretellCostFor :: Face.Face card -> ForetellCost.ForetellCost Keyword.Type.Keyword -> Maybe (Cost Keyword.Type.Keyword)
+foretellCostFor face payload = case payload of
+  ForetellCost.Stated cost -> Just cost
+  ForetellCost.ManaCostReducedBy amount -> do
+    manaCost <- Face.manaCost face
+    pure
+      Cost.MkCost
+        { Cost.mana = Just (reducedManaCost amount manaCost),
+          Cost.components = []
+        }
 
 -- CR 118.7: one object's mana cost with an amount taken off it, which is the
 -- whole of what "its mana cost reduced by {2}" names. Rule 118.7a-g's spill is
@@ -816,7 +827,7 @@ candidateCostsGiven permitted pid name oid gs =
                   | Maybe.isJust (Object.foretold obj) ->
                       fmap
                         (untagged . withAdditional)
-                        (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (Keyword.foretellCost (Face.keywordSet face)))
+                        (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (foretellCostFor face =<< Keyword.foretellCost (Face.keywordSet face)))
                 -- CR 118.9a: a CR 601.3 permission that states an alternative
                 -- cost -- "without paying its mana cost" (Extract Power), or rule
                 -- 701.65a's {2} -- REPLACES the printed cost for the plotted arm's
@@ -914,8 +925,8 @@ spellAdjustments pid oid gs =
         adjustments
           { CostAdjustments.reductions =
               -- Floored at zero and never confined to coloured mana: Thrasta's
-              -- sentence states neither restriction, so CR 601.2f's own {0} and
-              -- CR 118.7b-d's spill both stand.
+              -- and Ertai's Scorn's sentences state neither restriction, so CR
+              -- 601.2f's own {0} and CR 118.7b-d's spill both stand.
               CostAdjustments.reductions adjustments
                 <> fmap (\amount -> AppliedReduction.MkAppliedReduction amount 0 False) (selfReductions pid oid gs)
           }
@@ -942,6 +953,9 @@ selfReductions pid oid gs =
       -- Projection.controllerOf, which answers Nothing for a card in a hand.
       -- The source is the spell itself, the reduction being printed on it.
       context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
+      -- CR 601.2f: a conditional reduction is asked here, as the total is
+      -- determined, against the same perspective as its count.
+      applies reduction = all (Condition.holds (Projection.fullView gs) context gs oid) (CostReduction.condition reduction)
       scaled reduction =
         let copies = Quantity.evaluate (Projection.fullView gs) context gs oid (CostReduction.perEach reduction)
             -- Saturating rather than partial: an Int cannot hold every Integer.
@@ -951,7 +965,7 @@ selfReductions pid oid gs =
    in case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
         (Just obj, Just card, Just printedFace) ->
           let face = Game.castingFaceOf obj card printedFace
-           in Maybe.mapMaybe scaled (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face))
+           in Maybe.mapMaybe scaled (filter applies (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face)))
         _ -> []
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes
@@ -2576,16 +2590,23 @@ claimsOf slots pid oid components gs = Maybe.mapMaybe (\component -> claimOf slo
 -- (Pawl.Engine.Room.canUnlock) and CR 116.2b's turn-up
 -- (Pawl.Engine.FaceDown.canTurnFaceUp) -- pass their own permanent.
 canPay :: PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPay subject pid oid cost gs = case Cost.mana cost of
+canPay = canPayReading Map.empty
+
+-- `canPay` with a slot map its components' criteria read, which is CR 118.12's
+-- resolution-time payment: the resolving object's slots, so Calim, Djinn
+-- Emperor's "two OTHER cards named Calim" can exclude the card its own discard
+-- cost moved (Binding.discardedCard). `payReading` is the payment it measures.
+canPayReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PaymentSubject.PaymentSubject -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPayReading slots subject pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
     -- CR 118.14's permission is a CAST's, and no caller of this one is casting --
     -- what reaches here is a special action's cost and CR 118.12's
     -- resolution-time payment -- so the mana is spent as it is. Which CR
     -- 106.6-restricted mana is a supply is the subject's question.
-    Mana.canPayCommitting subject (manaActivationsGiven (PlayerEffect.applying pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost gs
-      && all (\component -> canPayComponent Map.empty pid oid component gs) (Cost.components cost)
-      && jointlyPayable Map.empty pid oid (Cost.components cost) gs
+    Mana.canPayCommitting subject (manaActivationsGiven (PlayerEffect.applying pid gs)) ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf slots pid oid (Cost.components cost) gs) manaCost gs
+      && all (\component -> canPayComponent slots pid oid component gs) (Cost.components cost)
+      && jointlyPayable slots pid oid (Cost.components cost) gs
 
 -- How many times may this player activate this mana ability, right now, and what
 -- does one activation spend? CR 605.3b keeps a mana ability off the stack, so
@@ -3841,6 +3862,12 @@ announceSubstitutions substituting pid oid cost = case Cost.mana cost of
 pay :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 pay perform began moment subject announced spending pid oid cost = fmap fst (paySubstituting perform began [] moment subject announced spending pid oid (\c -> pure (c, [])) cost)
 
+-- `pay` with no announcement and the component criteria reading `slots`
+-- instead, `canPayReading`'s payment. No announcement, so CR 400.7d's record of
+-- the mana spent goes nowhere, as it does for every CR 118.12 payment.
+payReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+payReading slots perform began moment subject spending pid oid cost = fmap fst (paySubstitutingReading slots perform began [] moment subject Nothing spending pid oid (\c -> pure (c, [])) cost)
+
 -- `pay` with CR 702.51a's, CR 702.66a's and CR 702.126a's substitution offered
 -- INSIDE the mana window rather than ahead of it, and the components it adds
 -- kept APART from the cost's own.
@@ -3874,6 +3901,12 @@ pay perform began moment subject announced spending pid oid cost = fmap fst (pay
 paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
 paySubstituting perform began earlier moment subject announced spending pid oid substituting cost = do
   slots <- State.gets (announcedSlots announced)
+  paySubstitutingReading slots perform began earlier moment subject announced spending pid oid substituting cost
+
+-- `paySubstituting` with the slot map its component criteria read handed in
+-- rather than read off `announced` (`payReading`).
+paySubstitutingReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
+paySubstitutingReading slots perform began earlier moment subject announced spending pid oid substituting cost =
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action, and
     -- CR 733.1 reverses it with no window to ask about.
@@ -4244,8 +4277,7 @@ mergeBound bound outcome = case outcome of
   Payment.Unpaid -> Payment.Unpaid
   Payment.Paid rest -> Payment.Paid (Map.unionWith Set.union bound rest)
 
--- A component that bound no slot, which is every component but Sacrifice,
--- TapPermanents and TapForTotalPower.
+-- A component that bound no slot.
 bindsNothing :: Payment.Payment
 bindsNothing = Payment.Paid Map.empty
 
@@ -5334,9 +5366,16 @@ payComponent moment slots pid oid component = case component of
   -- 702.29a's discard as ToPayCyclingCost and Keyword.reinforce mints rule
   -- 702.77a's as Ordinary, rule 702.77 never making reinforce a cycling ability.
   -- Pawl.ActivateSpec's "CR 702.77a a reinforce discard is not a cycle" proves it.
+  --
+  -- Binds Binding.discardedCard off what ARRIVED, bindExiled's posture, and only
+  -- where CR 400.7j lets the ability find it: in a PUBLIC zone.
   CostComponent.DiscardThis cause -> do
-    Event.discard cause pid oid
-    pure bindsNothing
+    arrived <- Event.discardReturning cause pid oid
+    gs <- State.get
+    let findable = Seq.filter (\a -> maybe False (not . Game.isHiddenZone . Object.zone) (Game.lookupObject a gs)) arrived
+    pure $ case Foldable.toList findable of
+      [] -> bindsNothing
+      ids -> Payment.Paid (Map.singleton Binding.discardedCard (Set.fromList (fmap Recipient.ToObject ids)))
   -- CR 118.12's hand-to-battlefield cost. The candidates are re-read HERE rather
   -- than carried from `canPayComponent`'s check: CR 118.12 pays as the ability
   -- resolves, and an earlier component of the same cost may have emptied the

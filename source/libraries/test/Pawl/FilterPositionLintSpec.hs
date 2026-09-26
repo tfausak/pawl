@@ -1750,12 +1750,10 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     let destroying = base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing Nothing Nothing)]}
     Spec.assertEqWith s "the same atom over objects is not" (isBoundCounts destroying) (0, 1)
     Spec.assertBool s (not (isBoundOffends destroying)) "and the lint accepts it"
-    -- THE THIRD POSITION, and the one this case gained after #2881: a CR 118.12
-    -- gate's cost is paid through Pawl.Engine.Filter.contextFor, which fills no
-    -- slots, so the same buried atom is as unanswerable there as in a wish's
-    -- filter. The shape is the empty-slot widening -- Not (IsBound "target") reads as
-    -- "each OTHER creature", and against an empty slot map it is vacuously true
-    -- of every creature including the bound one.
+    -- THE THIRD POSITION: a CR 118.12 gate's cost, measured and paid with the
+    -- resolving object's slots (Cost.canPayReading, Cost.payReading), so the
+    -- same buried atom is answerable there and accepted -- Calim, Djinn
+    -- Emperor's "two other cards named Calim" is the printing.
     --
     -- Written as a gate over the SAME `base` face and the SAME `buried` filter as
     -- the two legs above, so the three differ in position and in nothing else.
@@ -1790,8 +1788,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                   )
                   (ModeSelection.ChooseExactly 1)
             }
-    Spec.assertEqWith s "CR 118.12 a planted atom in a gate's cost is an offence" (isBoundCounts gated) (1, 0)
-    Spec.assertBool s (isBoundOffends gated) "and the lint says so"
+    Spec.assertEqWith s "CR 118.12 the same atom in a gate's cost is not an offence" (isBoundCounts gated) (0, 1)
+    Spec.assertBool s (not (isBoundOffends gated)) "and the lint accepts it"
     -- THE OTHER COST POSITIONS, every one paid through the same
     -- Pawl.Engine.Cost.pay, split by whether an announcement is behind them.
     -- Built over the SAME `base` face and the SAME `buried` filter as every leg
@@ -2091,8 +2089,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     lithophage <- S.printingOf s registry "Lithophage"
     Spec.assertBool
       s
-      (elem (SlotlessCostFramed, Filter.Type.HasSubtype Subtype.Mountain) (cardFilters (S.combinedFace lithophage)))
-      "CR 118.12 a gate cost's own filter reaches cardFilters, tagged for the slots it does not get"
+      (elem (Unframed, Filter.Type.HasSubtype Subtype.Mountain) (cardFilters (S.combinedFace lithophage)))
+      "CR 118.12 a gate cost's own filter reaches cardFilters, tagged for the resolution's slots it reads"
   -- The batch-bound slot lint used to answer two ways about one piece of text.
   -- filterSlotsReadSingly deliberately does not descend into Filter.HasKeyword or
   -- Filter.HasCounters -- a keyword's own Filter is read through

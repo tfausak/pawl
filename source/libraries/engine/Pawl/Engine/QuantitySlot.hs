@@ -186,6 +186,7 @@ overSlots f quantity =
         -- And another in that same position, CR 601.2i's cast tally having nothing
         -- beside its PlayerRef either.
         Quantity.SpellsCastLastTurn _ -> pure quantity
+        Quantity.SpellsCastThisTurn _ -> pure quantity
         Quantity.TimesResolvedThisTurn -> pure quantity
         Quantity.SpellsCastBefore -> pure quantity
         Quantity.PermanentsDiedThisTurn -> pure quantity
@@ -348,6 +349,7 @@ nestedRefs quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn ref -> Set.singleton (Left ref)
   Quantity.DamageDealtToPlayersThisTurn ref -> Set.singleton (Left ref)
   Quantity.SpellsCastLastTurn ref -> Set.singleton (Left ref)
+  Quantity.SpellsCastThisTurn ref -> Set.singleton (Left ref)
   Quantity.TimesResolvedThisTurn -> Set.empty
   Quantity.SpellsCastBefore -> Set.empty
   Quantity.PermanentsDiedThisTurn -> Set.empty
@@ -459,6 +461,7 @@ nestedCounts quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> []
   Quantity.DamageDealtToPlayersThisTurn _ -> []
   Quantity.SpellsCastLastTurn _ -> []
+  Quantity.SpellsCastThisTurn _ -> []
   Quantity.TimesResolvedThisTurn -> []
   Quantity.SpellsCastBefore -> []
   Quantity.PermanentsDiedThisTurn -> []
@@ -600,6 +603,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
         Quantity.DamageDealtToPlayersThisTurn ref -> Quantity.DamageDealtToPlayersThisTurn (f ref)
         Quantity.SpellsCastLastTurn ref -> Quantity.SpellsCastLastTurn (f ref)
+        Quantity.SpellsCastThisTurn ref -> Quantity.SpellsCastThisTurn (f ref)
         Quantity.TimesResolvedThisTurn -> quantity
         Quantity.SpellsCastBefore -> quantity
         Quantity.PermanentsDiedThisTurn -> quantity

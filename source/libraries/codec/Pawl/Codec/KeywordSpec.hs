@@ -17,6 +17,7 @@ import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Keyword as Keyword
@@ -479,17 +480,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (plot 3)
       " {\"type\":\"Plot\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
     Spec.assertBool s (Codec.encode Keyword.codec (plot 3) /= Codec.encode Keyword.codec (flashbackOf 3)) "the same cost under two keywords encodes differently"
-  -- CR 702.143a's payload is a Cost too, and must not share Plot's tag: the two
-  -- name costs of opposite halves -- plot's is CR 116.2k's special action and
-  -- foretell's is the later cast, where CR 116.2h fixes the action at {2}.
+  -- CR 702.143a's payload names a cost too, and must not share Plot's tag: the
+  -- two name costs of opposite halves -- plot's is CR 116.2k's special action
+  -- and foretell's is the later cast, where CR 116.2h fixes the action at {2}.
   Spec.it s "Foretell carries its cost, and is not Plot" $ do
-    let foretell n = Keyword.Foretell (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    let foretell n = Keyword.Foretell (ForetellCost.Stated (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []))
         plotOf n = Keyword.Plot (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
     Common.assertCodec
       s
       Keyword.codec
       (foretell 1)
-      " {\"type\":\"Foretell\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}} "
+      " {\"type\":\"Foretell\",\"value\":{\"type\":\"Stated\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}}} "
     Spec.assertBool s (Codec.encode Keyword.codec (foretell 1) /= Codec.encode Keyword.codec (plotOf 1)) "the same cost under two keywords encodes differently"
   -- CR 702.62a's payload is a Cost and rule 702.62a's N beside it, Equip's shape
   -- one field over -- so it is an OBJECT rather than a bare cost, and cannot

@@ -5,21 +5,24 @@
         {
           "type": "Foretell",
           "value": {
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 1
-              },
-              {
-                "type": "OfType",
-                "value": {
-                  "type": "Colored",
+            "type": "Stated",
+            "value": {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 1
+                },
+                {
+                  "type": "OfType",
                   "value": {
-                    "type": "Black"
+                    "type": "Colored",
+                    "value": {
+                      "type": "Black"
+                    }
                   }
                 }
-              }
-            ]
+              ]
+            }
           }
         }
       ],

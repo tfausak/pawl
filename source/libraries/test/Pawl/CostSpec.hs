@@ -2962,6 +2962,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   crossCheckSpec s registry
   longtuskCubSpec s registry
   thrastaSpec s registry
+  ertaisScornSpec s registry
   frogmiteSpec s registry
   exhalationSpec s registry
   omniscienceSpec s registry
@@ -3168,6 +3169,45 @@ omniscienceSpec s registry =
       Spec.assertEqWith s "so the printed cast deals its announced 1" (S.lifeOf S.alice (resolveWith payingPrinted)) (Just 19)
       Spec.assertEqWith s "and the free cast deals 0 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice (resolveWith payingGrant)) (Just 20)
 
+-- Three seats. alice holds Ertai's Scorn ({1}{U}{U}) over an Island and a Swamp;
+-- bob holds one Fog over one Forest, carol two Fogs over two Forests. `bobFirst`
+-- picks who casts the first Fog, which resolves; carol then casts a second, which
+-- stays on the stack as the Scorn's target. Two opponent spells either way, so a
+-- sum across opponents cannot tell the boards apart.
+--
+-- Island and Swamp pay {1}{U} and neither {1}{U}{U} nor a {U}{U} that took the
+-- {U} off generically (CR 118.7c), so castability is the reduction and its type.
+ertaisScornBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
+ertaisScornBoard island swamp forest fog scorn bobFirst =
+  let lands = S.landsFor forest S.carol 2 (S.landsFor forest S.bob 1 (S.landsFor swamp S.alice 1 (S.landsFor island S.alice 1 S.threePlayerGame)))
+      (scornId, gs1) = S.addHandCard scorn S.alice lands
+      (bobFog, gs2) = S.addHandCard fog S.bob gs1
+      (carolFog1, gs3) = S.addHandCard fog S.carol gs2
+      (carolFog2, gs4) = S.addHandCard fog S.carol gs3
+      main = gs4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice}
+      castBy pid oid gs = S.runPure S.identityAnswer (gs {GameState.priority = Just pid}) (S.cast pid oid)
+      (firstCaster, firstFog) = if bobFirst then (S.bob, bobFog) else (S.carol, carolFog1)
+      resolved = S.runPure S.identityAnswer (castBy firstCaster firstFog main) Stack.resolveTop
+      second = castBy S.carol carolFog2 resolved
+   in (scornId, second {GameState.priority = Just S.alice})
+
+-- CR 601.2f: "This spell costs {U} less to cast if an opponent cast two or more
+-- spells this turn" asks each opponent's own tally, not their sum.
+ertaisScornSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+ertaisScornSpec s registry =
+  Spec.describe s "Ertai's Scorn" $ do
+    Spec.it s "CR 601.2f one opponent's two spells take {U} off; two opponents' one each do not" $ do
+      island <- S.printingOf s registry "Island"
+      swamp <- S.printingOf s registry "Swamp"
+      forest <- S.printingOf s registry "Forest"
+      fog <- S.printingOf s registry "Fog"
+      scorn <- S.printingOf s registry "Ertai's Scorn"
+      let board = ertaisScornBoard island swamp forest fog scorn
+          (carolsScorn, carols) = board False
+          (splitScorn, split) = board True
+      Spec.assertBool s (S.castable S.alice carolsScorn carols) "carol cast two, so the Scorn costs {1}{U} and is offered"
+      Spec.assertBool s (not (S.castable S.alice splitScorn split)) "bob and carol cast one each, so the Scorn keeps its {1}{U}{U} and is refused"
+
 -- alice holds Thrasta, Tempest's Roar ({10}{G}{G}) and `elves` copies of
 -- Glistener Elf ({G}), with `forests` untapped Forests and priority in her own
 -- precombat main phase. bob is the second seat every fixture in this file has.
@@ -3230,6 +3270,7 @@ thrastaSpec s registry =
         [ CostReduction.MkCostReduction
             (ManaCost.MkManaCost [ManaSymbol.Generic 3])
             (Quantity.Type.Count (Count.Type.MkCount (Scope.InHistory EventShape.SpellCast) (Filter.Type.And []) Aggregation.Members))
+            Nothing
         ]
     -- Nine Forests. Two Elves tap two of them and leave seven, so an UNREDUCED
     -- Thrasta (twelve) is out of reach and a once-reduced one ({4}{G}{G}, six) is

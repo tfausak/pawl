@@ -21,6 +21,65 @@
         "type": "Literal",
         "value": 0
       },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingOffBattlefield",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Land"
+                    }
+                  }
+                },
+                {
+                  "type": "IsInZone",
+                  "value": {
+                    "type": "Hand"
+                  }
+                },
+                {
+                  "type": "OwnedBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "HasKeywordFamily",
+                    "value": {
+                      "type": "Foretell"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Foretell",
+                "value": {
+                  "type": "ManaCostReducedBy",
+                  "value": [
+                    {
+                      "type": "Generic",
+                      "value": 2
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
       "toughness": {
         "type": "Literal",
         "value": 3

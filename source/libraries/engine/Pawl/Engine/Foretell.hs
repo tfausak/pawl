@@ -25,16 +25,17 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.EntryRiders as EntryRiders
-import qualified Pawl.Types.Face as Face
+import Pawl.Types.ForetellCost (ForetellCost)
+import qualified Pawl.Types.ForetellCost as ForetellCost
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -69,22 +70,21 @@ actionCost =
       Cost.Type.components = []
     }
 
--- Does this object have foretell at all? Nothing for a hand member with no card
--- behind it -- a token, an ability.
+-- Does this object have foretell at all, and with what payload? Nothing for a
+-- hand member with no card behind it -- a token, an ability.
 --
--- Read off the CARD (Card.combined), under any copy stamp's keywords
--- (Game.castingFaceOf, CR 707.2), and never a projection, the reading
--- Pawl.Engine.Plot.plotCostOf gives one rule over: the ability functions in the
--- hand, where this reader takes the printed card (#1859).
+-- Read through the projection (CR 613.1f), since the ability functions in the
+-- hand (CR 702.143a) and an effect may grant it there -- Dream Devourer's "each
+-- nonland card in your hand without foretell has foretell". Pawl.SpecialActionSpec's
+-- Devourer pair proves it.
 --
--- Returns the CAST cost the keyword carries, though this module never spends it:
--- what it answers here is only "is the keyword there", and returning the payload
--- keeps one reader of the keyword rather than two.
-foretellCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
+-- Returns the CAST cost the keyword carries, though this module spends it only
+-- as foretell's stamp: what it answers for canForetell is "is the keyword
+-- there".
+foretellCostOf :: ObjectId -> GameState -> Maybe (ForetellCost Keyword)
 foretellCostOf oid gs = do
-  card <- Game.cardOfHandMember oid gs
-  obj <- Game.lookupObject oid gs
-  Keyword.foretellCost (Face.keywordSet (Game.castingFaceOf obj card (Card.combined card)))
+  _ <- Game.cardOfHandMember oid gs
+  Keyword.foretellCost (Map.keysSet (Projection.keywordsOf oid gs))
 
 -- CR 702.143a / 116.2h: may this player foretell this card right now? Three
 -- conjuncts, each a clause of the rule:
@@ -175,9 +175,23 @@ foretell perform pid oid = do
           -- with more than one only for a melded permanent leaving the
           -- battlefield (CR 712.21), and this action exiles a card from a hand.
           exiled <- Event.changeZoneEntering oid Zone.Exile LibraryPosition.defaultValue riders Nothing
-          Monad.forM_ exiled (State.modify' . becomeForetold Nothing)
+          Monad.forM_ exiled (State.modify' . becomeForetold (reductionOf =<< foretellCostOf oid before))
           -- CR 702.143c: "foretelling a card" is this special action.
           Monad.unless (null exiled) (State.modify' (Event.recordEvent (GameEvent.Foretold pid)))
+
+-- A granted foretell stops applying once the card leaves the hand, yet the card
+-- keeps the cost it was given (Dream Devourer's ruling): so a reduction off the
+-- card's own mana cost is stamped onto the exiled card, where
+-- Pawl.Engine.Cost.grantedForetellCost settles it per face (CR 712.11b).
+--
+-- A STATED cost is not stamped: the exiled card's own face still prints it.
+-- What would refute that is an effect granting a stated foretell cost in a hand;
+-- Scryfall @o:"foretell" -kw:foretell@, 2026-09-26, names none (Dream Devourer
+-- and Bohn, Beguiling Balladeer both grant the reduction).
+reductionOf :: ForetellCost Keyword -> Maybe ManaCost.ManaCost
+reductionOf payload = case payload of
+  ForetellCost.Stated _ -> Nothing
+  ForetellCost.ManaCostReducedBy amount -> Just amount
 
 -- CR 406.3's rider and nothing else: every other rider is battlefield-only, and
 -- this move names exile.
