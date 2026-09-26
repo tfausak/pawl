@@ -1,13 +1,14 @@
 module Pawl.Types.BecomeCopy where
 
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- | The payload of Pawl.Types.Effect's BecomeCopy arm: an effect turning an
 -- object that already exists into a copy of another one (CR 707.1), which for a
 -- permanent is CR 707.4's change. Unstable Shapeshifter's "this creature becomes
--- a copy of that creature" is @original = InSlot became@,
+-- a copy of that creature" is @original = OfObject (InSlot became)@,
 -- @subject = EachMatching IsSource@.
 --
 -- NEITHER SIDE is confined to the battlefield: CR 707.1's object is a "spell,
@@ -29,19 +30,19 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- copied text (Pawl.Engine.Projection.View.spellFaceOf) with the original's
 -- choices (CR 707.2, Pawl.Engine.Resolve.Effect.acquireChoices), which Synthetic
 -- Mimicry and Pawl.CopySpec's "CR 707.2 a spell that becomes a copy of a Bolt"
--- prove.
+-- prove. Transcantation's original is a card NAME (Pawl.Types.CopyOriginal),
+-- and its subject acquires no choices -- "it stops having any targets".
 --
--- TWO ObjectRefs, named rather than positional for Pawl.Types.RequireBlock's
+-- TWO fields, named rather than positional for Pawl.Types.RequireBlock's
 -- reason: the sides are not interchangeable, and a card file that swapped them
 -- would decode into a copy pointing the wrong way -- the entrant becoming a copy
 -- of the Shapeshifter instead.
 --
--- Each is an ObjectRef rather than a bare SlotName, for the reason CreateCopy's
--- comment gives: `original` is a slot on both producers in the pool, while
--- `subject` is Unstable Shapeshifter's "this permanent" and so an EachMatching
--- over IsSource, and the Mirror's targeted card and so a slot. Mirrorweave's
--- "each other creature becomes a copy of target nonlegendary creature" is the
--- swept shape the same field takes.
+-- The subject is an ObjectRef rather than a bare SlotName, for the reason
+-- CreateCopy's comment gives: it is Unstable Shapeshifter's "this permanent" and
+-- so an EachMatching over IsSource, and the Mirror's targeted card and so a
+-- slot. Mirrorweave's "each other creature becomes a copy of target nonlegendary
+-- creature" is the swept shape the same field takes.
 --
 -- The DURATION is Nothing for the printings that state none, and those take a
 -- different road: the copiable values are STAMPED onto the subject's copy
@@ -54,7 +55,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- 707.3 holds on both roads and only the stored one can end. A stamp made while
 -- a row stands takes its subject out of the row (CR 613.7).
 data BecomeCopy ability = MkBecomeCopy
-  { original :: ObjectRef.ObjectRef,
+  { original :: CopyOriginal.CopyOriginal,
     subject :: ObjectRef.ObjectRef,
     -- | CR 611.2a: how long the copy lasts, absent on a card that states no
     -- duration.
@@ -65,6 +66,9 @@ data BecomeCopy ability = MkBecomeCopy
     -- stamps, which is what CR 707.9a asks for: the gained ability "becomes part
     -- of the copiable values for the copy", so a token copy of the Shapeshifter
     -- taken afterwards has it too (CR 707.2).
-    exceptions :: [CopyException.CopyException ability]
+    exceptions :: [CopyException.CopyException ability],
+    -- | CR 707.10c's "its controller may choose new targets for it"
+    -- (Transcantation), asked of each subject on the stack.
+    newTargets :: Bool
   }
   deriving (Eq, Ord, Show)

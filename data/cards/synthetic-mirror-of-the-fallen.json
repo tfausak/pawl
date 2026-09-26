@@ -32,8 +32,11 @@
                     "type": "BecomeCopy",
                     "value": {
                       "original": {
-                        "type": "InSlot",
-                        "value": "archetype"
+                        "type": "OfObject",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "archetype"
+                        }
                       },
                       "subject": {
                         "type": "InSlot",

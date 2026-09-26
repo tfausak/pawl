@@ -107,6 +107,7 @@ import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
@@ -597,7 +598,7 @@ objectRefPositions =
         ("connive", Effect.Connive (Connive.MkConnive (Quantity.Type.Literal 1) (plantedRef "cn")), [plantedRef "cn"]),
         ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
         ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders Nothing []), [plantedRef "cc"]),
-        ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (plantedRef "bc-original") (plantedRef "bc-subject") Nothing []), [plantedRef "bc-original", plantedRef "bc-subject"]),
+        ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (CopyOriginal.OfObject (plantedRef "bc-original")) (plantedRef "bc-subject") Nothing [] False), [plantedRef "bc-original", plantedRef "bc-subject"]),
         ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied CopyStackObject.defaultQuantity CopyStackObject.defaultCopier []), [plantedRef "cs"]),
         -- CR 707.10d names a SECOND ref, the candidates', which the sweep must
         -- reach: a copy effect whose candidate description reads a slot no clause
@@ -1236,7 +1237,7 @@ ownCounts effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ _ _ _) -> quantityCounts quantity
   -- The DURATION's own Counts, ModifyTarget's arm above; the refs' Filters are
   -- effectFilters' business below.
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _) -> foldMap durationCounts duration
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _ _) -> foldMap durationCounts duration
   -- CR 702.40a's "for each" count is card data like CreateCopy's.
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> quantityCounts quantity
   -- The Condition is Galvanic Blast's and Synthetic Voltaic Surge's "if you
@@ -3578,6 +3579,12 @@ conjureCardsAmount cards = case cards of
   ConjureCards.Duplicate {} -> []
   ConjureCards.Reference from -> Maybe.maybeToList (FromReference.amount from)
 
+-- A named original carries no filter.
+copyOriginalFilters :: CopyOriginal.CopyOriginal -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+copyOriginalFilters original = case original of
+  CopyOriginal.OfObject ref -> objectRefFilters ref
+  CopyOriginal.Named _ -> []
+
 -- TAGGED pairs, PR #2739's reader's test: a path from here reaches
 -- keywordFilters, through the CounterKind a depth's Quantity may name.
 objectRefFilters :: ObjectRef.ObjectRef -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
@@ -5559,7 +5566,7 @@ effectFilters effect = case effect of
   -- The exceptions beside them carry Filters through a KEYWORD, and frame them
   -- themselves (copyExceptionFilters) -- EntryRewrite's AsCopy arm takes the same
   -- walk over the same list.
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject duration exceptions) -> frame SourceHostFramed (objectRefFilters original <> objectRefFilters subject) <> frame Unframed (foldMap durationFilters duration) <> concatMap copyExceptionFilters exceptions
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject duration exceptions _) -> frame SourceHostFramed (copyOriginalFilters original <> objectRefFilters subject) <> frame Unframed (foldMap durationFilters duration) <> concatMap copyExceptionFilters exceptions
   -- BOTH refs, CreateCopy's arm above: an EachMatching Filter is card text, and
   -- CR 707.10d's candidates are named by one.
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity _ exceptions) -> frame Unframed (quantityFilters quantity) <> frame SourceHostFramed (objectRefFilters ref <> copyTargetsFilters targets) <> concatMap copyExceptionFilters exceptions
