@@ -5,6 +5,7 @@
 -- consequences of leaving it.
 module Pawl.DepartureSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -26,6 +27,7 @@ import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -53,6 +55,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import Pawl.Types.Printing (Printing)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
@@ -1121,6 +1124,46 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     -- else: a bob who stayed is the one asked, and takes the other land. Without
     -- it the assertion above would pass on a board that never reached the choice.
     Spec.assertEqWith s "a bob who stayed answers for himself, exiling the Island instead" (held "Mountain" staying, held "Island" staying) (1, 0)
+
+  -- CR 800.4h inside CR 800.4a's own exile: the fourth clause happens after the
+  -- player has left, so a CR 616.1 race over a permanent they control goes to
+  -- the next player in turn order.
+  --
+  -- Synthetic Exile Diversion ({1}{B} Enchantment, "If a card or token would be
+  -- put into exile, put it into its owner's graveyard instead") and Synthetic
+  -- Exile Reclamation ({1}{U}, the same with "library") are the producers.
+  -- MTGJSON 2026-08-23, text matching "would be put into exile" or "would be
+  -- exiled": no hit, so no printing replaces an exile with another destination.
+  -- A printing that did would replace one of these.
+  --
+  -- carol owns the Island and alice controls it by CR 110.2a alone, as the
+  -- Towershell case above arranges through the engine, so clause 1 passes it
+  -- over and clause 4 exiles it. Each seat's answer names a different row, so
+  -- the Island's destination says who chose.
+  Spec.it s "CR 800.4a/800.4h a replacement choice inside the departure's exile goes to the next player" $ do
+    island <- S.printingOf s registry "Island"
+    diversion <- S.printingOf s registry "Synthetic Exile Diversion"
+    reclamation <- S.printingOf s registry "Synthetic Exile Reclamation"
+    let (islandId, g1) = S.addPermanent island S.carol S.threePlayerGame
+        (diversionId, g2) = S.addPermanent diversion S.bob g1
+        (reclamationId, g3) = S.addPermanent reclamation S.carol g2
+        board = g3 {GameState.objects = Map.adjust (\o -> o {Object.enteredUnder = Just S.alice}) islandId (GameState.objects g3)}
+        -- bob takes Reclamation's library row, anyone else Diversion's graveyard
+        -- row, pinned by source rather than by index.
+        pick :: PlayerId.PlayerId -> [ReplacementEntry.ReplacementEntry] -> Natural
+        pick pid entries =
+          let wanted = if pid == S.bob then reclamationId else diversionId
+           in maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> ReplacementEntry.source entry == wanted) entries)
+        step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+        step p = case p of
+          Prompt.ChooseReplacement _ pid entries -> do
+            State.modify' (<> [pid])
+            pure (pick pid entries)
+          _ -> pure (S.identityAnswer p)
+        ((_, after), asked) = State.runState (Engine.runGame step board (Departure.leaveGame Departure.Type.Conceded S.alice)) []
+    Spec.assertEqWith s "alice controls carol's Island by CR 110.2a alone" (Projection.controllerOf islandId board) (Just S.alice)
+    Spec.assertEqWith s "CR 800.4h bob, the next seat, chose Reclamation's row: the Island is in carol's library" (fmap (Object.zone . snd) (soleObjectOf island after)) (Just Zone.Library)
+    Spec.assertEqWith s "and bob was the only seat asked" asked [S.bob]
 
 -- alice with Door to Nothingness and one land per colored symbol of its
 -- activation cost, plus whatever other seats the case wants.
