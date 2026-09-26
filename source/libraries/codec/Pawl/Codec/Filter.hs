@@ -114,6 +114,7 @@ codec keywordCodec =
       Arm.nullary "MilledThisTurn" Filter.MilledThisTurn,
       Arm.nullary "CrewedSourceThisTurn" Filter.CrewedSourceThisTurn,
       Arm.nullary "ConvokedSourceThisTurn" Filter.ConvokedSourceThisTurn,
+      Arm.nullary "SaddledSourceThisTurn" Filter.SaddledSourceThisTurn,
       Arm.nullary "CantCrewVehicles" Filter.CantCrewVehicles,
       Arm.nullary "DealtDamageThisTurn" Filter.DealtDamageThisTurn,
       Arm.nullary "EnteredThisTurn" Filter.EnteredThisTurn,
@@ -228,6 +229,7 @@ tagOf x = case x of
   Filter.MilledThisTurn {} -> "MilledThisTurn"
   Filter.CrewedSourceThisTurn {} -> "CrewedSourceThisTurn"
   Filter.ConvokedSourceThisTurn {} -> "ConvokedSourceThisTurn"
+  Filter.SaddledSourceThisTurn {} -> "SaddledSourceThisTurn"
   Filter.CantCrewVehicles {} -> "CantCrewVehicles"
   Filter.DealtDamageThisTurn {} -> "DealtDamageThisTurn"
   Filter.EnteredThisTurn {} -> "EnteredThisTurn"

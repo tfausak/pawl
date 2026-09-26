@@ -85,6 +85,7 @@ blackCreature =
       Filter.enteredThisTurn = False,
       Filter.crewedThisTurn = Set.empty,
       Filter.convokedThisTurn = Set.empty,
+      Filter.saddledThisTurn = Set.empty,
       Filter.controlledSinceTurnBegan = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
@@ -160,6 +161,7 @@ devoidBigCreature =
       Filter.enteredThisTurn = False,
       Filter.crewedThisTurn = Set.empty,
       Filter.convokedThisTurn = Set.empty,
+      Filter.saddledThisTurn = Set.empty,
       Filter.controlledSinceTurnBegan = False,
       Filter.attachedToView = Nothing,
       Filter.attachedViews = [],
@@ -1652,6 +1654,29 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 702.51a taps a CREATURE, and a player is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches (asked 21) aPlayer Filter.Type.ConvokedSourceThisTurn)) "player"
+
+  -- CR 702.171c, the CrewedSourceThisTurn group's shape: Mount 31 is the source
+  -- and Mount 32 the one the candidate saddled instead. The last case is the
+  -- separation from crew, in both directions.
+  Spec.describe s "SaddledSourceThisTurn" $ do
+    let saddledBy ns = blackCreature {Filter.saddledThisTurn = Set.fromList (fmap ObjectId.MkObjectId ns)}
+        asked n = self {Filter.source = Just (ObjectId.MkObjectId n)}
+
+    Spec.it s "matches a creature that saddled the source this turn" $ do
+      Spec.assertBool s (Filter.matches (asked 31) (saddledBy [31]) Filter.Type.SaddledSourceThisTurn) "saddled it"
+
+    Spec.it s "does not match a creature that saddled another Mount" $ do
+      Spec.assertBool s (not (Filter.matches (asked 31) (saddledBy [32]) Filter.Type.SaddledSourceThisTurn)) "saddled something else"
+
+    Spec.it s "is vacuously false where the context has no source" $ do
+      Spec.assertBool s (not (Filter.matches self (saddledBy [31]) Filter.Type.SaddledSourceThisTurn)) "no source"
+
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches (asked 31) aPlayer Filter.Type.SaddledSourceThisTurn)) "player"
+
+    Spec.it s "saddling is not crewing, nor crewing saddling" $ do
+      Spec.assertBool s (not (Filter.matches (asked 31) (saddledBy [31]) Filter.Type.CrewedSourceThisTurn)) "a saddler did not crew it"
+      Spec.assertBool s (not (Filter.matches (asked 31) (blackCreature {Filter.crewedThisTurn = Set.singleton (ObjectId.MkObjectId 31)}) Filter.Type.SaddledSourceThisTurn)) "a crewer did not saddle it"
 
   Spec.describe s "DealtDamageThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do

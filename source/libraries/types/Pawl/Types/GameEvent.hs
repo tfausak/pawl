@@ -35,6 +35,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TappedForMana as TappedForMana
@@ -338,6 +339,10 @@ data GameEvent
     Crewed Crewing.Crewing
   | -- | CR 702.122e: a Vehicle BECAME CREWED, a crew ability of it resolving.
     BecameCrewed Crewing.Crewing
+  | -- | CR 702.171c: creatures SADDLED a Mount, as they were tapped to pay its
+    -- saddle ability's cost. Crewed's relation one keyword over, kept apart so
+    -- that neither reads as the other.
+    Saddled Saddling.Saddling
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice goes through,
     -- and distinct from the Moved event the same sacrifice records: CR 700.4

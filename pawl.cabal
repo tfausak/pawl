@@ -928,6 +928,8 @@ library codec
     Pawl.Codec.SacrificeRestrictionSpec
     Pawl.Codec.SacrificerSpec
     Pawl.Codec.SacrificeSpec
+    Pawl.Codec.Saddling
+    Pawl.Codec.SaddlingSpec
     Pawl.Codec.Scaling
     Pawl.Codec.ScalingSpec
     Pawl.Codec.Scope
@@ -2118,6 +2120,7 @@ library types
     Pawl.Types.SacrificeEffect
     Pawl.Types.Sacrificer
     Pawl.Types.SacrificeRestriction
+    Pawl.Types.Saddling
     Pawl.Types.Scaling
     Pawl.Types.Scope
     Pawl.Types.Search

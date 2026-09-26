@@ -41,6 +41,7 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Revealed as Revealed
+import qualified Pawl.Codec.Saddling as Saddling
 import qualified Pawl.Codec.SpellWasCast as SpellWasCast
 import qualified Pawl.Codec.StepBegan as StepBegan
 import qualified Pawl.Codec.TappedForMana as TappedForMana
@@ -97,6 +98,7 @@ codec =
       Arm.payload "Convoked" Convoking.codec GameEvent.Convoked (\x -> case x of GameEvent.Convoked y -> Just y; _ -> Nothing),
       Arm.payload "Crewed" Crewing.codec GameEvent.Crewed (\x -> case x of GameEvent.Crewed y -> Just y; _ -> Nothing),
       Arm.payload "BecameCrewed" Crewing.codec GameEvent.BecameCrewed (\x -> case x of GameEvent.BecameCrewed y -> Just y; _ -> Nothing),
+      Arm.payload "Saddled" Saddling.codec GameEvent.Saddled (\x -> case x of GameEvent.Saddled y -> Just y; _ -> Nothing),
       Arm.payload "PermanentSacrificed" PermanentWasSacrificed.codec GameEvent.PermanentSacrificed (\x -> case x of GameEvent.PermanentSacrificed y -> Just y; _ -> Nothing),
       Arm.payload "AbilityTriggered" AbilityTriggered.codec GameEvent.AbilityTriggered (\x -> case x of GameEvent.AbilityTriggered y -> Just y; _ -> Nothing),
       Arm.payload "ControlChanged" ControlChanged.codec GameEvent.ControlChanged (\x -> case x of GameEvent.ControlChanged y -> Just y; _ -> Nothing),
@@ -184,6 +186,7 @@ tagOf x = case x of
   GameEvent.Exploited {} -> "Exploited"
   GameEvent.Trained {} -> "Trained"
   GameEvent.Convoked {} -> "Convoked"
+  GameEvent.Saddled {} -> "Saddled"
   GameEvent.Crewed {} -> "Crewed"
   GameEvent.BecameCrewed {} -> "BecameCrewed"
   GameEvent.PermanentSacrificed {} -> "PermanentSacrificed"

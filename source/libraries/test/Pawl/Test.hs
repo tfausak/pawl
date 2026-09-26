@@ -438,6 +438,7 @@ import qualified Pawl.Codec.SacrificeEffectSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.SacrificeSpec
 import qualified Pawl.Codec.SacrificerSpec
+import qualified Pawl.Codec.SaddlingSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
@@ -777,6 +778,7 @@ spec s registry = do
   Pawl.Codec.BecameBlockingSpec.spec s
   Pawl.Codec.ConvokingSpec.spec s
   Pawl.Codec.CrewingSpec.spec s
+  Pawl.Codec.SaddlingSpec.spec s
   Pawl.Codec.BlocksDeclaredSpec.spec s
   Pawl.Codec.CandidateIdSpec.spec s
   Pawl.Codec.CantAttackPlayerSpec.spec s
