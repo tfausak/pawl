@@ -3029,6 +3029,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   merrowSkyswimmerSpec s registry
   geyserLeaperSpec s registry
   kataraSpec s registry
+  waterWhipSpec s registry
   mindGrindSpec s registry
   flashSpec s registry
 
@@ -5918,7 +5919,7 @@ leaperBoard mountain leaper others theirs lands =
 -- discard a card."
 --
 -- CR 701.67a as the WHOLE of an activation cost, which is the position most of
--- rule 701.67's printings put it in and the only one pawl carries (#3901). The
+-- rule 701.67's printings put it in; waterWhipSpec below is a spell's. The
 -- draw and the discard are what a paid cost is read off: a card in alice's
 -- graveyard cannot arrive any other way on these boards.
 --
@@ -6217,6 +6218,78 @@ kataraBoard mountain katara piker others =
             GameState.priority = Just S.alice
           }
       )
+
+-- Water Whip {U}{U} Sorcery -- Lesson (data/cards/water-whip.json): "As an
+-- additional cost to cast this spell, waterbend {5}. / Return up to two target
+-- creatures to their owners' hands. Draw two cards."
+--
+-- CR 701.67a as a SPELL's mandatory additional cost (CR 118.8), carried as a
+-- one-option Face.additionalCostChoices: the {5} and its licence, which
+-- Face.additionalCosts has no mana part to hold. The draw is what a paid cost is
+-- read off -- alice's hand holds two cards only if the spell resolved.
+--
+-- Every board gives alice exactly the two Islands the {U}{U} wants, or a third
+-- for the tax where the case is about CR 701.67b, so the {5} can only have been
+-- paid by tapping; and six tappable permanents for a cost that takes five, so
+-- the ChooseTaps prompt is a real choice.
+waterWhipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+waterWhipSpec s registry = Spec.describe s "Water Whip" $ do
+  Spec.it s "CR 701.67a a spell's additional waterbend {5} is paid by tapping five permanents" $ do
+    (spell, tappable, gs) <- waterWhipBoard s registry 2 False
+    let answer :: Prompt.Prompt r -> r
+        answer = choosingNoTargets (waterbending (ManaCost.MkManaCost [blue, blue]) (take 5 tappable))
+        resolved = S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop
+    Spec.assertEqWith s "CR 701.67a the spell resolved off two Islands and five taps: alice drew two cards" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 2
+    Spec.assertEqWith s "and Water Whip is in her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+    -- The taps, which the assertions above do not see: a {5} paid out of nowhere
+    -- would also have resolved the spell.
+    Spec.assertEqWith s "and seven permanents are tapped -- five for the waterbend cost and both Islands" (S.tappedCount S.alice resolved) 7
+  -- CR 701.67b. bob's Thalia taxes the noncreature spell {1} more (CR 601.2f),
+  -- so the total cost is {U}{U}{6} of which the waterbend cost is {5}: the sixth
+  -- tappable permanent cannot pay the {1}, and a third Island has to. A pair
+  -- varying that Island and nothing else.
+  Spec.it s "CR 701.67b a spell's waterbend taps pay its own {5} and not the tax on top of it" $ do
+    (spell, tappable, taxed) <- waterWhipBoard s registry 3 True
+    (short, _, shortBoard) <- waterWhipBoard s registry 2 True
+    let answer :: Prompt.Prompt r -> r
+        answer = choosingNoTargets (waterbending (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue, blue]) (take 5 tappable))
+        resolved = S.runPure answer (S.runPure answer taxed (S.cast S.alice spell)) Stack.resolveTop
+        greedy :: Prompt.Prompt r -> r
+        greedy = choosingNoTargets waterbendingGreedily
+        unpaid = S.runPure greedy (S.runPure greedy shortBoard (S.cast S.alice short)) Stack.resolveTop
+    Spec.assertEqWith s "CR 701.67b with a third Island for the tax the spell resolved: alice drew two cards" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 2
+    Spec.assertEqWith s "and eight permanents are tapped -- five for the waterbend cost and all three Islands" (S.tappedCount S.alice resolved) 8
+    Spec.assertEqWith s "CR 701.67b with two Islands and six untapped permanents the spell was never paid for: it is still in hand" (Game.zoneMembers Zone.Hand S.alice unpaid) [short]
+    Spec.assertEqWith s "and nothing of hers is tapped" (S.tappedCount S.alice unpaid) 0
+  where
+    blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+
+-- Every waterbending answer above with CR 601.2c's announcement pinned at zero
+-- targets: alice's own creatures are candidates for "up to two target
+-- creatures", and a returned one would carry its tap out of the count.
+choosingNoTargets :: (forall r. Prompt.Prompt r -> r) -> Prompt.Prompt a -> a
+choosingNoTargets answer p = case p of
+  Prompt.AnnounceTargets _ _ _ slots -> fmap (const 0) slots
+  _ -> answer p
+
+-- alice holds Water Whip, controls `islands` Islands, three Goblin Pikers and
+-- three Crawlspaces, and has two Islands in her library for the draw (CR
+-- 104.3c); bob controls Thalia, Guardian of Thraben where `taxed`. She has
+-- priority in her own precombat main phase, when CR 307.1 lets her cast a
+-- sorcery. Returns the spell, the six tappable permanents and that state.
+waterWhipBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> Bool -> m (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+waterWhipBoard s registry islands taxed = do
+  whip <- S.printingOf s registry "Water Whip"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  crawlspace <- S.printingOf s registry "Crawlspace"
+  thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+  let (tappable, gs1) = List.foldl' (\(ids, gs) printing -> let (oid, next) = S.addPermanent printing S.alice gs in (ids <> [oid], next)) ([], S.landsInPlay island islands) [piker, piker, piker, crawlspace, crawlspace, crawlspace]
+      gs2 = if taxed then snd (S.addPermanent thalia S.bob gs1) else gs1
+      (_, gs3) = S.addLibraryCard island S.alice gs2
+      (_, gs4) = S.addLibraryCard island S.alice gs3
+      (spell, gs5) = S.addHandCard whip S.alice gs4
+  pure (spell, tappable, gs5 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
 
 -- alice holds `card`, controls one Forest and `mountains` Mountains, and bob
 -- controls `plainses` Plains; she has priority in her own precombat main phase so
