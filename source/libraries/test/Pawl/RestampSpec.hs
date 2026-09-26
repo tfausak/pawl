@@ -13,10 +13,12 @@
 -- is. The third, Pawl.Engine.Resolve's Effect.TurnFaceDown arm (CR 613.7f),
 -- reaches the same function and no board can observe it -- see the note on
 -- restampOrderSpec. Objects ENTERING together are Restamp.settle's, driven on
--- Replenish's MoveToZone road by entryOrderSpec.
+-- Replenish's MoveToZone road by entryOrderSpec and on the token road by
+-- tokenOrderSpec.
 module Pawl.RestampSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
@@ -28,14 +30,17 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -43,6 +48,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
   restampOrderSpec s registry
   apnapOrderSpec s registry
   entryOrderSpec s registry
+  tokenOrderSpec s registry
 
 -- | The producer is a synthetic pair, and no printing reaches the rule; see
 -- #2571 for the search behind that. Observing which of two simultaneous CR
@@ -246,3 +252,63 @@ replenishBoard s registry = do
 -- The battlefield permanents printed as this card.
 onField :: Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
 onField printing gs = filter (\oid -> Game.cardOf oid gs == Just (Printing.card printing)) (Set.toList (GameState.battlefield gs))
+
+-- | CR 613.7m on the TOKEN road (Event.createTokens' Restamp.settle). Kicked Rite
+-- of Replication makes five token copies of a Clone that copied nothing, so each
+-- token makes its own CR 707.5 copy choice as it enters. The first copies
+-- Harmonious Archon and the other four copy Godhead of Awe, so the tokens write
+-- a Hill Giant's base P/T in layer 7b -- 3/3 or 1/1 -- and the later stamp wins.
+-- The printed Archon and Godhead are older than every token, so their own
+-- writes come first either way.
+tokenOrderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+tokenOrderSpec s registry =
+  Spec.describe s "Tokens" $ do
+    Spec.it s "CR 613.7m the seat's own answer decides which simultaneous token is stamped later" $ do
+      (board, cloneId, archonId, godheadId, giantId) <- replicationBoard s registry
+      let (after, asked) = replicate5 True cloneId archonId godheadId board
+          (canonical, _) = replicate5 False cloneId archonId godheadId board
+      Spec.assertEqWith s "CR 613.7m the Archon copy was stamped last, so the Giant is 3/3" (S.powerToughnessOf giantId after) (Just (3, 3))
+      Spec.assertEqWith s "while the arrival order leaves a Godhead copy last, so the Giant is 1/1" (S.powerToughnessOf giantId canonical) (Just (1, 1))
+      Spec.assertEqWith s "and alice was asked once, over all five tokens" asked [(S.alice, 5)]
+
+-- alice holds Rite of Replication and the nine Islands its kicked cost wants, and
+-- controls a Clone that copied nothing -- kept alive past CR 704.5f by a +1/+1
+-- counter -- a Harmonious Archon, a Godhead of Awe and a Hill Giant.
+replicationBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+replicationBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  clone <- S.printingOf s registry "Clone"
+  archon <- S.printingOf s registry "Harmonious Archon"
+  godhead <- S.printingOf s registry "Godhead of Awe"
+  giant <- S.printingOf s registry "Hill Giant"
+  rite <- S.printingOf s registry "Rite of Replication"
+  let (cloneId, g1) = S.addPermanent clone S.alice (S.landsInPlay island 9)
+      g2 = S.addCounter CounterKind.PlusOnePlusOne 1 cloneId g1
+      (archonId, g3) = S.addPermanent archon S.alice g2
+      (godheadId, g4) = S.addPermanent godhead S.alice g3
+      (giantId, g5) = S.addPermanent giant S.alice g4
+      (g6, _) = S.handOne rite g5
+  pure (g6, cloneId, archonId, godheadId, giantId)
+
+-- Cast the Rite kicked at the Clone and resolve it. The FIRST copy choice asked
+-- takes the Archon and every later one the Godhead, threaded through State so the
+-- five structurally identical prompts can be answered apart. `reversing` answers
+-- CR 613.7m's order with the reverse of the offered indices. Hands back the board
+-- and who was asked the order, over how many.
+replicate5 :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [(PlayerId.PlayerId, Int)])
+replicate5 reversing cloneId archonId godheadId gs =
+  let answer :: Prompt.Prompt r -> State.State (Int, [(PlayerId.PlayerId, Int)]) r
+      answer p = case p of
+        Prompt.ChooseKicker {} -> pure (KickerDecision.MkKickerDecision 1)
+        Prompt.ChooseTargets _ _ _ sets -> pure (Map.map (const (Set.singleton (Recipient.ToCreature cloneId))) sets)
+        Prompt.ChooseCopyTarget {} -> do
+          (n, seen) <- State.get
+          State.put (n + 1, seen)
+          pure (Just (if n == 0 then archonId else godheadId))
+        Prompt.OrderTimestamps _ pid batch -> do
+          State.modify (\(n, seen) -> (n, seen <> [(pid, length batch)]))
+          pure (if reversing then reverse (zipWith const [0 ..] batch) else zipWith const [0 ..] batch)
+        _ -> pure (S.identityAnswer p)
+      spell = lastInHand gs
+      ((_, after), (_, asked)) = State.runState (Engine.runGame answer gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) (0, [])
+   in (after, asked)
