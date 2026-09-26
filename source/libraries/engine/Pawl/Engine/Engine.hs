@@ -683,7 +683,7 @@ placePendingTriggers = do
 -- trigger with no event (a state trigger, a reflexive one, a batch-wide
 -- inherent gather) fired off no ability triggering, so belongs to the first pass.
 reacts :: PendingTrigger.PendingTrigger -> Bool
-reacts = Maybe.isJust . (abilityTriggeredOf Monad.<=< PendingTrigger.firedBy)
+reacts = Maybe.isJust . (Event.abilityTriggeredOf Monad.<=< PendingTrigger.firedBy)
 
 -- CR 603.3b: "if MULTIPLE ABILITIES HAVE TRIGGERED since the last time a player
 -- received priority" -- so an ability that triggers off another ability
