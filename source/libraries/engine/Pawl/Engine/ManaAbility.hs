@@ -38,6 +38,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -53,6 +54,7 @@ import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZonePair as ZonePair
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
 -- doesn't target AND moves no card to or from a library AND is not itself a
@@ -352,6 +354,7 @@ manaProduced effect = case effect of
   Effect.GainLife {} -> Nothing
   Effect.ExchangeLifeTotals _ -> Nothing
   Effect.ExchangeValues _ -> Nothing
+  Effect.ExchangeZones _ -> Nothing
   Effect.SetLifeTotal {} -> Nothing
   Effect.LoseGame {} -> Nothing
   Effect.WinGame {} -> Nothing
@@ -576,6 +579,11 @@ movesLibraryCard effect = case effect of
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals _ -> False
   Effect.ExchangeValues _ -> False
+  -- A library exchange takes every card out of that library and puts the other
+  -- zone's cards into it.
+  Effect.ExchangeZones x ->
+    let (one, other) = ZonePair.zones (ExchangeZones.zones x)
+     in one == Zone.Library || other == Zone.Library
   Effect.SetLifeTotal {} -> False
   Effect.LoseGame {} -> False
   Effect.WinGame {} -> False

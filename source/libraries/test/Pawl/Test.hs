@@ -227,6 +227,7 @@ import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExcessDestinationSpec
 import qualified Pawl.Codec.ExchangeSidesSpec
 import qualified Pawl.Codec.ExchangeValuesSpec
+import qualified Pawl.Codec.ExchangeZonesSpec
 import qualified Pawl.Codec.ExchangedValueSpec
 import qualified Pawl.Codec.ExileCardsFromGraveyardSpec
 import qualified Pawl.Codec.ExileHauntingSpec
@@ -519,6 +520,7 @@ import qualified Pawl.Codec.WithCountersSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeRSpec
 import qualified Pawl.Codec.ZoneChangeSpec
+import qualified Pawl.Codec.ZonePairSpec
 import qualified Pawl.Codec.ZoneScopeSpec
 import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecIntegrationSpec
@@ -930,6 +932,7 @@ spec s registry = do
   Pawl.Codec.ExcessDestinationSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
   Pawl.Codec.ExchangeValuesSpec.spec s
+  Pawl.Codec.ExchangeZonesSpec.spec s
   Pawl.Codec.ExchangedValueSpec.spec s
   Pawl.Codec.CraftSpec.spec s
   Pawl.Codec.ImpendingSpec.spec s
@@ -1226,6 +1229,7 @@ spec s registry = do
   Pawl.Codec.ZoneChangeSpec.spec s
   Pawl.Codec.ZoneScopeSpec.spec s
   Pawl.Codec.ZoneSpec.spec s
+  Pawl.Codec.ZonePairSpec.spec s
   Pawl.CodecIntegrationSpec.spec s registry
   Pawl.CloakSpec.spec s registry
   Pawl.ColorSpec.spec s registry

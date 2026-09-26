@@ -1217,7 +1217,7 @@ damageSpec s registry = Spec.describe s "Damage" $ do
 -- every gameplay-level case here asserts the DESTINATION zone rather than merely
 -- that the battle left. 704.5w's battle-type split has no printing to reach it --
 -- data/cards/synthetic-besiege-the-front.json grants the card type but hands over
--- five defense counters with it -- so the three classifier cases at the end read
+-- five defense counters with it -- so the three classifier cases near the end read
 -- Battle.defeated directly.
 defeatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 defeatSpec s registry = Spec.describe s "Defeat" $ do
@@ -1323,7 +1323,7 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
     -- that the case below shows the RIDER and not the clause doing the holding.
     (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
     let drained = drain battle entered
-    Spec.assertEqWith s "it is named" (Battle.defeated (Projection.projectAll drained) [] drained) [battle]
+    Spec.assertEqWith s "it is named" (Battle.defeated (Projection.projectAll drained) (Event.triggeredSources drained) drained) [battle]
   Spec.it s "CR 704.3 and the pass that buries it reports that an action was performed" $ do
     -- CR 704.3: the check repeats while a state-based action was performed, so a
     -- pass whose only action is a defeat must SAY it acted -- otherwise
@@ -1341,10 +1341,10 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
     -- action pass BEFORE placePendingTriggers, so this window is real rather than
     -- hypothetical, and it is the whole reason the Siege above reaches exile.
     (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
-    let drained = drain battle entered
-        removal = [GameEvent.CountersRemoved (CounterChange.MkCounterChange battle CounterKind.Defense 2 0)]
-    Spec.assertBool s (Battle.awaitingAbility removal drained battle) "the ability has triggered"
-    Spec.assertEqWith s "so nothing is buried" (Battle.defeated (Projection.projectAll drained) removal drained) []
+    let removed = removal battle (drain battle entered)
+        owing = Event.triggeredSources removed
+    Spec.assertBool s (Battle.awaitingAbility owing removed battle) "the ability has triggered"
+    Spec.assertEqWith s "so nothing is buried" (Battle.defeated (Projection.projectAll removed) owing removed) []
   Spec.it s "CR 704.5w a NON-Siege battle at defense 0 is buried anyway" $ do
     -- THE PROVING CASE for rule 704.5w, and the case above is its discriminator:
     -- the same fixture, the same drain and the same unscanned event, differing in
@@ -1358,11 +1358,26 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
     -- Stripping them also takes CR 310.12b's ability away, which is what makes
     -- the board coherent -- 704.5w's world is one where no defeat ability is owed.
     (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
-    let drained = drain battle entered
-        removal = [GameEvent.CountersRemoved (CounterChange.MkCounterChange battle CounterKind.Defense 2 0)]
-        pcs = Map.adjust (\pc -> pc {PC.subtypes = Set.empty}) battle (Projection.projectAll drained)
-    Spec.assertBool s (Battle.awaitingAbility removal drained battle) "an ability has still triggered"
-    Spec.assertEqWith s "and CR 704.5w exempts nothing" (Battle.defeated pcs removal drained) [battle]
+    let removed = removal battle (drain battle entered)
+        owing = Event.triggeredSources removed
+        pcs = Map.adjust (\pc -> pc {PC.subtypes = Set.empty}) battle (Projection.projectAll removed)
+    Spec.assertBool s (Battle.awaitingAbility owing removed battle) "an ability has still triggered"
+    Spec.assertEqWith s "and CR 704.5w exempts nothing" (Battle.defeated pcs owing removed) [battle]
+  Spec.it s "CR 704.5v whole card: a Siege at defense 0 waits for its own enters ability" $ do
+    -- THE PROVING CASE for the rider's width. Synthetic Hollow Siege prints
+    -- defense 0, so CR 310.4b gives it no counters and none ever comes off: CR
+    -- 310.12b never triggers, and the one ability owed at the first CR 704.5 pass
+    -- is the enters one, still unplaced. Held, the Siege gets its three counters.
+    plains <- S.printingOf s registry "Plains"
+    hollow <- S.printingOf s registry "Synthetic Hollow Siege"
+    let stocked = snd (S.addLibraryCard plains S.alice (S.landsInPlay plains 3))
+        (gs, spellId) = S.handOne hollow stocked
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+        settled = S.runPure S.identityAnswer cast Engine.priorityLoop
+    case battleOf settled of
+      Just oid -> Spec.assertEqWith s "the Siege stands with three defense counters" (S.counterOf CounterKind.Defense oid settled) 3
+      Nothing -> Spec.assertFailure s "the Siege was buried before its enters ability was placed"
+    Spec.assertEqWith s "and it is in nobody's graveyard" (invasionsIn (S.printingName hollow) Zone.Graveyard settled) 0
 
 -- Cast the spell in `caster`'s hand at `battle`, then settle: the spell resolves,
 -- CR 310.6 takes its counters off, and CR 310.12b's ability -- if the last one came
@@ -1409,11 +1424,19 @@ angelOn gs =
         _ -> Nothing
 
 -- Set a battle's defense counters to none without any damage having been dealt, so
--- the two CR 704.5v cases differ in the unscanned event log ALONE.
+-- the two CR 704.5v cases differ in the unscanned event log ALONE. The Siege's
+-- enters ability is placed and resolved first: left unscanned, it is an ability
+-- the battle is owed, and CR 704.5v holds the battle for it too.
 drain :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 drain oid gs =
-  let empty obj = obj {Object.counters = Map.insert CounterKind.Defense 0 (Object.counters obj)}
-   in gs {GameState.objects = Map.adjust empty oid (GameState.objects gs)}
+  let entered = S.runPure S.identityAnswer gs (Engine.placePendingTriggers >> Stack.resolveTop)
+      empty obj = obj {Object.counters = Map.insert CounterKind.Defense 0 (Object.counters obj)}
+   in entered {GameState.objects = Map.adjust empty oid (GameState.objects entered)}
+
+-- Record CR 310.12b's trigger event on the drained battle, unscanned: the removal
+-- of its last two defense counters.
+removal :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+removal battle = Event.recordEvent (GameEvent.CountersRemoved (CounterChange.MkCounterChange battle CounterKind.Defense 2 0))
 
 -- How many copies of a card sit in `zone`, across every player's share of it.
 -- Counted by NAME because CR 400.7 mints a fresh id on every zone change, so the id

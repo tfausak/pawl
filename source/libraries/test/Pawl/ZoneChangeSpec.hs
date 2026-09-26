@@ -2,8 +2,8 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Pawl.Engine.Resolve over the effects that move an object between zones or
--- change a life total: library position, drawing, losing life, and the
--- life-total exchanges. The machinery is Pawl.ResolveSpec.
+-- change a life total: library position, drawing, losing life, the life-total
+-- exchanges and the zone exchanges. The machinery is Pawl.ResolveSpec.
 module Pawl.ZoneChangeSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -2892,6 +2892,69 @@ discardExceptionsSpec s registry = Spec.describe s "CR 701.9b discard exceptions
       (List.sort (S.revealsOf after))
       (List.sort (fmap (\p -> (S.bob, Set.singleton (S.printingName p))) cards))
 
+-- CR 701.12d / 701.12f on Harness Infinity and Morality Shift. alice is on her
+-- own main phase with the lands to pay; bob holds a different card in each
+-- zone the exchange names, so one reaching past "your" is caught.
+exchangeZonesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exchangeZonesSpec s registry = Spec.describe s "ExchangeZones" $ do
+  let onAlicesMain gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+      castAndResolve spellId gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice spellId)) Stack.resolveTop
+      sortedIn zone pid = List.sort . namesIn zone pid
+      nameOf printing = Just (S.nameOf (Printing.card printing))
+  -- Two cards each way, so a card sent back by the other direction's read
+  -- shows up in the wrong zone.
+  Spec.it s "CR 701.12d Harness Infinity exchanges alice's hand and graveyard, then exiles itself" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    harness <- S.printingOf s registry "Harness Infinity"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    growth <- S.printingOf s registry "Giant Growth"
+    let lands = S.landsFor forest S.alice 3 (S.landsInPlay swamp 4)
+        (harnessId, withHarness) = S.addHandCard harness S.alice lands
+        stocked =
+          List.foldl'
+            (\gs (add, printing, pid) -> snd (add printing pid gs))
+            withHarness
+            [ (S.addHandCard, bolt, S.alice),
+              (S.addHandCard, forest, S.alice),
+              (S.addGraveyardCard, elves, S.alice),
+              (S.addGraveyardCard, growth, S.alice),
+              (S.addHandCard, island, S.bob),
+              (S.addGraveyardCard, swamp, S.bob)
+            ]
+        after = castAndResolve harnessId (onAlicesMain stocked)
+    Spec.assertEqWith
+      s
+      "alice's hand is her old graveyard and her graveyard her old hand, Harness Infinity is exiled, and bob's zones are untouched"
+      (sortedIn Zone.Hand S.alice after, sortedIn Zone.Graveyard S.alice after, namesIn Zone.Exile S.alice after, namesIn Zone.Hand S.bob after, namesIn Zone.Graveyard S.bob after)
+      (List.sort [nameOf elves, nameOf growth], List.sort [nameOf bolt, nameOf forest], [nameOf harness], [nameOf island], [nameOf swamp])
+  -- CR 701.12f with the library empty: the graveyard still moves, and Morality
+  -- Shift itself reaches the graveyard afterwards (CR 608.2n), not the library.
+  Spec.it s "CR 701.12f Morality Shift exchanges alice's graveyard with her empty library" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    shift <- S.printingOf s registry "Morality Shift"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    growth <- S.printingOf s registry "Giant Growth"
+    let (shiftId, withShift) = S.addHandCard shift S.alice (S.landsInPlay swamp 7)
+        stocked =
+          List.foldl'
+            (\gs (add, printing, pid) -> snd (add printing pid gs))
+            withShift
+            [ (S.addGraveyardCard, elves, S.alice),
+              (S.addGraveyardCard, growth, S.alice),
+              (S.addLibraryCard, island, S.bob),
+              (S.addGraveyardCard, swamp, S.bob)
+            ]
+        after = castAndResolve shiftId (onAlicesMain stocked)
+    Spec.assertEqWith
+      s
+      "alice's library is her old graveyard, her graveyard holds only Morality Shift, and bob's zones are untouched"
+      (sortedIn Zone.Library S.alice after, namesIn Zone.Graveyard S.alice after, namesIn Zone.Library S.bob after, namesIn Zone.Graveyard S.bob after)
+      (List.sort [nameOf elves, nameOf growth], [nameOf shift], [nameOf island], [nameOf swamp])
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
@@ -2907,6 +2970,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   perRecipientAmountSpec s registry
   exchangeLifeTotalsSpec s registry
   exchangeValuesSpec s registry
+  exchangeZonesSpec s registry
   setLifeTotalSpec s registry
   doubleLifeTotalSpec s registry
   redistributeLifeTotalsSpec s registry

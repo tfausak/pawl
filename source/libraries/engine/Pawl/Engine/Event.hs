@@ -45,7 +45,7 @@ import qualified Pawl.Engine.CounterRestriction as CounterRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EntryRestriction as EntryRestriction
 import Pawl.Engine.Event.Match (matchesTriggerGiven)
-import Pawl.Engine.Event.Trigger (battlefieldAt, battlefieldCandidates, delayedPending, eventTriggers, interveningHolds, stateTriggers)
+import Pawl.Engine.Event.Trigger (battlefieldAt, battlefieldCandidates, delayedArmed, delayedPending, eventTriggers, interveningHolds, isReflexive, reflexiveFiring, stateTriggers)
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -62,6 +62,7 @@ import qualified Pawl.Engine.Subtype as Subtype.Engine
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.ActiveCopy as ActiveCopy
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.ActiveUnregeneratable as ActiveUnregeneratable
@@ -167,6 +168,7 @@ import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import Pawl.Types.PendingTrigger (PendingTrigger)
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
@@ -208,6 +210,8 @@ import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.Transformed as Transformed
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
+import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -5088,10 +5092,10 @@ castFromOutside caster oid requestedDest shown facing = do
 -- Not the only batch door: an Effect.MoveToZone batch goes through
 -- changeZoneEnteringIn, which carries the entry riders, the library position and
 -- the entry controller this one has no parameters for. This door carries the
--- batches whose members reach a graveyard, the command zone or exile --
--- Pawl.Engine.Sba's sweeps, the destroy funnel and CR 800.4a's fourth clause --
--- so nothing enters the battlefield and there is no `batch` set for CR 614.12a
--- to narrow.
+-- batches whose members reach a graveyard, a hand, a library, the command zone
+-- or exile -- Pawl.Engine.Sba's sweeps, the destroy funnel, CR 800.4a's fourth
+-- clause and CR 701.12d's zone exchange -- so nothing enters the battlefield and
+-- there is no `batch` set for CR 614.12a to narrow.
 --
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
@@ -8707,3 +8711,177 @@ gatherTriggers grouped gs = do
 -- re-running it would consume entries against events they never matched.
 reactionTriggers :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events gs)
+
+-- CR 704.5v's "the source of an ability that has triggered": the objects an
+-- ability has triggered from since the last scan, before any of it is placed.
+-- Asked by Pawl.Engine.Sba, whose CR 704.5 pass runs ahead of
+-- Engine.placePendingTriggers.
+--
+-- gatherTriggers' sources that need no question: the event and state scans, and
+-- the CR 603.12 reflexive entries (Invasion of Tarkir's "When you do"), each
+-- under the CR 603.4 check and then withinTriggerLimit, since a spent "only once"
+-- rider means the ability did not trigger. The rest of the CR 603.7 store is left
+-- out, because whether such an entry triggers can turn on its controller's CR
+-- 603.7b choice, which a state-based action cannot ask. No battle face in
+-- MTGJSON's 2026-08-23 dump arms one: of the texts matching "next", "until",
+-- "delayed" or "when you do", the two "when you do"s are reflexive and the rest
+-- are durations or Invasion of Alara's "exile ... until".
+--
+-- Only the event scan is proved, by Pawl.BattleSpec's "CR 704.5v whole card: a
+-- Siege at defense 0 waits for its own enters ability". The rest are fences: no
+-- Siege in data/cards/ has a state trigger, a reflexive ability, an intervening
+-- "if" or a rider, and dropping the limit filter left the suite green
+-- (2026-09-26).
+triggeredSources :: GameState -> Set ObjectId
+triggeredSources gs =
+  let reflexive = [reflexiveFiring entry | entry <- Foldable.toList (GameState.delayedTriggers gs), isReflexive entry, delayedArmed gs entry]
+      pending = filter (interveningHolds gs) (eventTriggers (unscannedGrouped gs) gs <> stateTriggers gs <> reflexive)
+   in Set.fromList [oid | TriggerSource.OfObject oid <- fmap PendingTrigger.source (withinTriggerLimit gs pending)]
+
+-- The printed riders "This ability triggers only once each turn" and "This
+-- ability triggers only once" (Pawl.Types.TriggerLimit), applied to one gathered
+-- batch: drop every entry whose ability carries a rider and has already triggered
+-- inside that rider's window. The per-TURN window needs no stored flag -- the
+-- record is CR 603.3b's own log, and GameState.events is cleared at the turn
+-- handoff, which makes "in the log" mean "this turn". The per-GAME window reads
+-- GameState.triggeredThisGame, which survives that handoff and which Engine.reactions
+-- writes. The two are read as ONE spent set: the ability VALUE is part of the key
+-- and carries its own limit, so a per-turn key and a per-game key can never be
+-- equal. CR 702.179d's inherent twin is limited here like any other, the log
+-- recording a sourceless trigger too. Keyed on the SOURCE and the ABILITY, so two
+-- permanents with the same printed ability spend separate limits (CR 113.7), one
+-- that leaves and returns re-arms (CR 400.7), and two DISTINCT abilities of one
+-- source spend separate limits; a change of CONTROL spends nothing. Spent on
+-- TRIGGERING.
+withinTriggerLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
+withinTriggerLimit gs =
+  let spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
+      go _ [] = []
+      go spent (pending : rest) = case limitedKey pending of
+        Nothing -> pending : go spent rest
+        Just key
+          | Set.member key spent -> go spent rest
+          | otherwise -> pending : go (Set.insert key spent) rest
+   in go
+        ( Set.union
+            (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+            (Set.map spentKey (GameState.triggeredThisGame gs))
+        )
+
+-- What ONE INSTANCE of a triggered ability is, for the rider's purposes: what it
+-- hangs on and which ability it is -- the discriminator Pawl.Types.TriggerEntry
+-- carries, and its haddock argues for the ability VALUE over an ordinal -- plus
+-- the controller for a SOURCELESS ability and only for one. Rule 725.2 and rule
+-- 702.179d give each player their own instance of one inherent ability with no
+-- object to tell them apart, where an object-borne ability is CR 113.7's one
+-- instance whoever controls it.
+--
+-- The controller component is proved by Pawl.TeamSpec's "CR 702.179d each
+-- active teammate's speed rises once": under the shared team turns option two
+-- active players each spend their own instance of rule 702.179d's ability.
+--
+-- Not implemented: two VALUE-IDENTICAL limited abilities on one source are one
+-- instance here, so one spends the other's turn (#3198).
+type LimitKey = (TriggerSource.TriggerSource, Maybe PlayerId, TriggeredAbility.TriggeredAbility Card (GrantedAbility.Type.GrantedAbility Card))
+
+limitKey :: TriggerSource.TriggerSource -> PlayerId -> TriggeredAbility.TriggeredAbility Card (GrantedAbility.Type.GrantedAbility Card) -> LimitKey
+limitKey src ctrl ability =
+  ( src,
+    case src of
+      TriggerSource.Sourceless -> Just ctrl
+      TriggerSource.OfObject _ -> Nothing,
+    ability
+  )
+
+-- The key one pending trigger spends, or Nothing when its ability prints no
+-- rider.
+limitedKey :: PendingTrigger.PendingTrigger -> Maybe LimitKey
+limitedKey pending =
+  let key = limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending)
+   in case TriggeredAbility.limit (PendingTrigger.ability pending) of
+        TriggerLimit.Unlimited -> Nothing
+        TriggerLimit.OncePerTurn -> Just key
+        TriggerLimit.OncePerGame -> Just key
+
+-- `triggeredEvent` read back: the record an event carries if it is one ability
+-- triggering (CR 603.3b), and nothing otherwise.
+abilityTriggeredOf :: GameEvent.GameEvent -> Maybe AbilityTriggered.AbilityTriggered
+abilityTriggeredOf event = case event of
+  GameEvent.AbilityTriggered record -> Just record
+  GameEvent.SpellCast {} -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.TurnedFaceDown _ -> Nothing
+  GameEvent.Transformed {} -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
+  GameEvent.Evolved _ -> Nothing
+  GameEvent.Mutated _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
+  GameEvent.Exploited {} -> Nothing
+  GameEvent.Trained _ -> Nothing
+  GameEvent.BecameCrewed _ -> Nothing
+  GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
+  GameEvent.Crewed _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.Moved {} -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.TookInitiative _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew {} -> Nothing
+  GameEvent.Revealed {} -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
+  GameEvent.BecameBlocking {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.AbilityCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
+  GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing
+  GameEvent.BecameAttached {} -> Nothing
+  GameEvent.BecameUnattached {} -> Nothing
+  GameEvent.LeftTheGame _ -> Nothing
+  GameEvent.Milled {} -> Nothing
+  GameEvent.Scried _ -> Nothing
+  GameEvent.DungeonCompleted _ -> Nothing
+  GameEvent.Surveiled _ -> Nothing
+  GameEvent.DiceRolled _ -> Nothing
+  GameEvent.DieResultSettled _ -> Nothing
+  GameEvent.RolledToVisit _ -> Nothing
+  GameEvent.ClassLevelSet _ -> Nothing
+  GameEvent.Plotted _ -> Nothing
+  GameEvent.Explored _ -> Nothing
+  GameEvent.Connived _ -> Nothing
+  GameEvent.Exerted _ -> Nothing
+  GameEvent.BecameAttacked _ -> Nothing
+  GameEvent.AttackersDeclared _ -> Nothing
+  GameEvent.BecameTapped _ -> Nothing
+  GameEvent.BecameUntapped _ -> Nothing
+  GameEvent.TappedForMana _ -> Nothing
+  GameEvent.ManaAdded _ -> Nothing
+  GameEvent.ManaAbilityResolved _ -> Nothing
+  GameEvent.CoinFlipped {} -> Nothing
+  GameEvent.RingTempted _ -> Nothing
+  GameEvent.Blighted _ -> Nothing
+  GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
+  GameEvent.CollectedEvidence _ -> Nothing
+  GameEvent.GaveGift _ -> Nothing
+  GameEvent.AttractionOpened _ -> Nothing
+  GameEvent.PrizeClaimed _ -> Nothing
+  GameEvent.Earthbent _ -> Nothing
+  GameEvent.Waterbent _ -> Nothing
+  GameEvent.Airbent _ -> Nothing
+  GameEvent.Firebent _ -> Nothing
+  GameEvent.ActivatedAbilityResolved _ -> Nothing
+  GameEvent.CardArrived _ -> Nothing

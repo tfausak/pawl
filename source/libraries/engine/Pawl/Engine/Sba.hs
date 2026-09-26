@@ -765,11 +765,12 @@ performStateBasedActions = Event.simultaneously $ do
       -- everything above, and living in Pawl.Engine.Battle with the rest of rule
       -- 310 the way CR 704.5s lives in Pawl.Engine.Saga.
       --
-      -- The unscanned event log is an input for the reason CR 704.5s's is: rule
-      -- 704.5v exempts a SIEGE whose ability "has triggered but not yet left the
-      -- stack", and this pass runs before placePendingTriggers. Rule 704.5w exempts
-      -- nothing. See Battle.awaitingAbility.
-      routed = Battle.defeated pcs (Event.unscannedEvents gs) gs
+      -- What has triggered off the unscanned log is an input for the reason CR
+      -- 704.5s's log is: rule 704.5v exempts a SIEGE that is the source of ANY
+      -- ability that "has triggered but not yet left the stack", and this pass
+      -- runs before placePendingTriggers. Rule 704.5w exempts nothing. See
+      -- Battle.awaitingAbility.
+      routed = Battle.defeated pcs (Event.triggeredSources gs) gs
       -- CR 704.5x / 704.5y: the battles whose protector designation has become
       -- illegal, paired with the projection and controller the re-choice needs.
       -- What "illegal" means is CR 310.11, and it lives in Pawl.Engine.Battle with
