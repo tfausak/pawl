@@ -1660,11 +1660,11 @@ turnAnchorOf gs = Maybe.fromMaybe (GameState.activePlayer gs) (GameState.turnAnc
 -- have begun" rules still fire.
 --
 -- CR 805.8: under the shared team turns option the taker's team takes the extra
--- turn, which beginTurnOf's CR 805.4 answer gives it with no arm here.
+-- turn, which beginTurnOf's CR 805.4 answer gives it with no arm here. One
+-- effect's entries are already one per team (Pawl.Engine.Resolve.Effect's
+-- TakeExtraTurn arm).
 --
--- Not implemented: CR 805.8's one turn for a team two of whose members one
--- effect gives the same turn (#4139), and CR 807.4i/j's Grand Melee turn
--- markers (#3003).
+-- Not implemented: CR 807.4i/j's Grand Melee turn markers (#3003).
 takeNextTurn :: GameState -> GameState
 takeNextTurn gs = case GameState.extraTurns gs of
   [] -> walkToNextTurn (length (GameState.turnOrder gs)) (turnAnchorOf gs) (turnAnchorOf gs) gs
