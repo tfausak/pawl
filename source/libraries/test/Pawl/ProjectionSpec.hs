@@ -1876,6 +1876,28 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the older Tidal Waste applies: Lunar is an Island" (Projection.subtypesOf lunarId gs) (Set.singleton Subtype.Type.Island)
     Spec.assertEqWith s "and Tidal is untouched" (Projection.subtypesOf tidalId gs) Set.empty
 
+  -- CR 613.8a's "what it applies to" limb closing a loop: Verdant makes a Plains
+  -- a Forest, which moves Tidal's set, and Tidal makes Verdant (a Forest) an
+  -- Island, which strips Verdant's text (CR 305.7). CR 613.8b falls back to
+  -- timestamps, so the older Verdant applies first and the Plains ends an Island.
+  Spec.it s "CR 613.8a/613.8b a setter that moves another's set applies first when older" $ do
+    plains <- S.printingOf s registry "Plains"
+    verdant <- S.printingOf s registry "Synthetic Verdant Encroachment"
+    tidal <- S.printingOf s registry "Synthetic Tidal Encroachment"
+    let (plainsId, g1) = S.addPermanent plains S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent verdant S.alice g1
+        (_, gs) = S.addPermanent tidal S.alice g2
+    Spec.assertEqWith s "a Forest by Verdant, then an Island by Tidal" (Projection.subtypesOf plainsId gs) (Set.singleton Subtype.Type.Island)
+
+  Spec.it s "CR 613.8a/613.8b the same loop under an older Tidal strips Verdant first" $ do
+    plains <- S.printingOf s registry "Plains"
+    verdant <- S.printingOf s registry "Synthetic Verdant Encroachment"
+    tidal <- S.printingOf s registry "Synthetic Tidal Encroachment"
+    let (plainsId, g1) = S.addPermanent plains S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g2) = S.addPermanent tidal S.alice g1
+        (_, gs) = S.addPermanent verdant S.alice g2
+    Spec.assertEqWith s "Verdant never applies: still a Plains" (Projection.subtypesOf plainsId gs) (Set.singleton Subtype.Type.Plains)
+
   -- CR 613.8a: applying Rootpath Purifier takes Urborg out of "nonbasic lands",
   -- so Blood Moon depends on it and waits, though Blood Moon is older. Urborg is
   -- never reached, so CR 305.7 strips nothing and its own ability makes it a
