@@ -307,7 +307,7 @@ checkControlContinuity = do
         Just obj -> case Object.sickness obj of
           Sickness.Sick -> objs
           Sickness.Settled p ->
-            if Projection.controllerOfGiven grants Set.empty oid gs == Just p
+            if Projection.controllerOfGiven grants oid gs == Just p
               then objs
               else Map.insert oid obj {Object.sickness = Sickness.Sick} objs
   State.put gs {GameState.objects = foldr interrupted (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
@@ -396,7 +396,7 @@ sampleControl = do
       sampled =
         Map.fromList $ do
           oid <- Set.toList (GameState.battlefield gs)
-          Just pid <- [Projection.controllerOfGiven grants Set.empty oid gs]
+          Just pid <- [Projection.controllerOfGiven grants oid gs]
           pure (oid, pid)
       changes = do
         (oid, after) <- Map.toList sampled
@@ -585,8 +585,7 @@ advanceSagas pid = do
 -- choice over every ability they control. Its TWO-PART process runs in the rule's
 -- own order: first every trigger whose condition isn't another ability
 -- triggering, then the rest. Both passes come out of ONE gathered batch, so the
--- split is by CONDITION -- Event.reactsToAbilityTriggering is the classification,
--- exhaustive so a new condition has to choose its pass.
+-- split is by the event each trigger fired off -- `reacts` is the classification.
 --
 -- CR 800.4d, SECOND sentence, needs no separate filter: `orderPending` groups by
 -- `apnapPlayers`, which restricts every group to a still-playing controller. Two
@@ -676,11 +675,15 @@ placePendingTriggers = do
   Monad.mapM_ placeOne second
   pure (not (null first) || not (null second))
 
--- CR 603.3b's classification, asked of one pending trigger: does its condition
--- name another ability triggering? A SOURCELESS inherent ability is classified
--- through its own condition like any other, so it needs no special case.
+-- CR 603.3b's classification, asked of one pending trigger: is the condition that
+-- fired it another ability triggering? Read off the EVENT that fired it rather
+-- than off the ability's conditions, since an ability with several (CR 603.1b) is
+-- sorted by the one that matched -- proved by Pawl.TriggerSpec's "CR 603.3b an
+-- ability with two trigger conditions is placed by the one that fired". A
+-- trigger with no event (a state trigger, a reflexive one, a batch-wide
+-- inherent gather) fired off no ability triggering, so belongs to the first pass.
 reacts :: PendingTrigger.PendingTrigger -> Bool
-reacts = Event.reactsToAbilityTriggering . TriggeredAbility.condition . PendingTrigger.ability
+reacts = Maybe.isJust . (Event.abilityTriggeredOf Monad.<=< PendingTrigger.firedBy)
 
 -- CR 603.3b: "if MULTIPLE ABILITIES HAVE TRIGGERED since the last time a player
 -- received priority" -- so an ability that triggers off another ability
@@ -692,7 +695,7 @@ reacts = Event.reactsToAbilityTriggering . TriggeredAbility.condition . PendingT
 -- event -- rule 603.3b says so by making it a trigger condition -- so the
 -- existing machinery applies unchanged. Only EVENT triggers are scanned. No
 -- bound on the rounds, and none needed: the one condition of this class
--- (Event.reactsToAbilityTriggering) watches a Saga's final chapter ability,
+-- (TriggerCondition.SagaFinalChapterTriggers) watches a Saga's final chapter ability,
 -- which triggers off lore counters (CR 714.2b), never off an ability
 -- triggering, so what reacts to it fires nothing further. Every round is
 -- filtered by `Event.withinTriggerLimit` first, the ONE place a "triggers only once"

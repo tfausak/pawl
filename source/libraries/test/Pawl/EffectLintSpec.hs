@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, effectWithNested, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
+import Pawl.CardSpec (Framing (SourceHostFramed), MintedKind (MintedEmblem), anyFace, cardAuthoredEffects, cardFilters, cardReplacementEffects, cardResolutionEffects, conditionQuantities, copyTargetsRefs, durationConditions, effectFilters, effectMintedFaces, effectWithNested, enchantSlots, faceModals, frame, framedSlotsReadSingly, grantedActivatedAbilities, grantedModifications, grantedTriggeredAbilities, instantLine, mintedFaces, mintedFacesTagged, objectRefFilters, oneFaced, overFaces, replacementEffectRiders, restrictionFilters, spellLine, triggerConditionFilters, triggerConditionSlots, vanillaFace)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect.Engine
@@ -1603,47 +1603,29 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     let offends c = Card.isAura c /= not (null (Face.enchant c))
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "Aura iff enchant" (fmap (S.nameOf . Printing.card) offenders) []
-  -- CR 702.5c makes every instance of enchant apply at once, and its last
-  -- sentence -- "The Aura can enchant only objects or players that match all of
-  -- its enchant abilities" -- conjoins the POOLS exactly as it does the Filters.
-  -- Pawl.Engine.Card.enchantTargetSlot folds the instances into ONE target slot
-  -- by Anding their Filters and keeping the FIRST instance's Pool. This lint is
-  -- what makes that fold exact, and the rule it enforces is that CR 115's Pool
-  -- enum is not closed under intersection. Three shapes, one expressible: a
-  -- NESTED pair has a Pool naming the intersection (Creatures against Permanents
-  -- is Creatures); a DISJOINT pair intersects to nothing (Creatures against
-  -- Players, which is CR 702.5d keeping an enchant-player Aura off permanents),
-  -- and no Pool names the empty set; and an OVERLAPPING pair can name a set the
-  -- enum simply lacks (AnyTarget against Permanents is
-  -- creatures-and-planeswalkers). Taking the first instance is order-dependent
-  -- even in the expressible case, so a card whose enchant abilities disagreed
-  -- would be silently judged by whichever pool was written down first.
-  --
-  -- The disjoint case is INCOHERENT rather than merely unrepresentable, and the
-  -- CR says what becomes of such an Aura without needing a pool for it: CR 303.4a
-  -- makes its spell require a target and CR 601.2c has no appropriate object or
-  -- player to announce for it, so it cannot be cast; an effect putting it onto the
-  -- battlefield leaves it where it is, or bins it if that zone is the stack (CR
-  -- 303.4g); and one that arrived anyway is put into its owner's graveyard on the
-  -- next state-based check (CR 704.5m). A card in that shape is dead text.
-  --
-  -- Unprinted rather than impossible, which is why this lives here rather than
-  -- being ruled out: nothing in CR 702.5 requires the instances to agree, and
-  -- Animate Dead prints both pools on one card ("enchant creature card in a
-  -- graveyard", then "enchant creature put onto the battlefield with this Aura")
-  -- -- only its lose-as-it-gains clause keeps the two from applying at once
-  -- (#797).
-  Spec.it s "every enchant ability on a card draws from the same pool" $ do
+  -- CR 702.5c conjoins the instances' POOLS as well as their Filters, and
+  -- Pawl.Engine.Card.poolMeet writes that intersection only where one pool sits
+  -- inside all the rest; otherwise the fold admits nothing, which is exact for a
+  -- disjoint pair (CR 702.5d) and stricter than the rule for an overlapping one
+  -- (AnyTarget against Permanents). This lint keeps a card off the latter by
+  -- refusing every non-nesting set -- read over BOTH roads to the fold
+  -- (CardSpec.enchantSlots), since Pawl.Engine.Projection appends a
+  -- Modification.GainEnchant to the printed list before the fold sees it, less
+  -- any the card's own Modification.LoseEnchant takes away: Animate Dead's
+  -- graveyard instance is gone by the time its Creatures one is gained.
+  Spec.it s "every card's enchant pools nest" $ do
     ps <- S.allPrintings s
-    let offends c = Set.size (Set.fromList (fmap TargetSlot.pool (Face.enchant c))) > 1
+    let lost c = [slot | Modification.LoseEnchant slot <- grantedModifications c]
+        live c = filter (`notElem` lost c) (enchantSlots c)
+        offends c = not (null (live c)) && Maybe.isNothing (Card.poolMeet (fmap TargetSlot.pool (live c)))
         offenders = filter (anyFace offends . Printing.card) ps
-    Spec.assertEqWith s "no card mixes enchant pools, since CR 702.5c intersects them and Pool is not closed under intersection" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "no card's enchant pools fail to nest, since the fold then admits nothing" (fmap (S.nameOf . Printing.card) offenders) []
   -- Pawl.Engine.Card.allTargetSlots binds the enchant slot under this name (Task 6), so a
   -- mode declaring it would be silently shadowed.
   -- #199: no card authors a layer-2 control modification into an effect that
   -- RESOLVES. SetControllerToSource is the payload-free constructor and is
-  -- INERT when stored: Projection.controllerOfGiven's storedSetter matches only
-  -- Modification.SetController, Projection.controlGrants reads control-granting
+  -- INERT when stored: Projection.layerTwo reads only
+  -- Modification.SetController off stored effects, Projection.controlGrants reads control-granting
   -- static abilities off Face.staticAbilities and never off stored effects, and
   -- Projection.applyModification's SetControllerToSource arm is the identity.
   -- A card authoring one would resolve, store the effect, and grant control to

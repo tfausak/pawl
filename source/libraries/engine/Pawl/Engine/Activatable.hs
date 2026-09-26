@@ -337,7 +337,7 @@ activatorOfGiven :: [Projection.ControlGrant] -> ObjectId -> GameState -> Maybe 
 activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
   Just obj -> case Object.zone obj of
-    Zone.Battlefield -> Projection.controllerOfGiven grants Set.empty oid gs
+    Zone.Battlefield -> Projection.controllerOfGiven grants oid gs
     Zone.Hand -> Just (Object.owner obj)
     Zone.Graveyard -> Just (Object.owner obj)
     Zone.Command -> Just (Object.owner obj)

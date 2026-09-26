@@ -139,7 +139,7 @@ battlefieldCandidates gs =
                 -- Unreachable: projectAll is keyed on the same battlefield set this
                 -- list walks, so every oid drawn from it has an entry.
                 Nothing -> Nothing
-                Just pc -> fmap (\ctrl -> (oid, BattlefieldCandidate.MkBattlefieldCandidate {BattlefieldCandidate.controller = ctrl, BattlefieldCandidate.characteristics = pc})) (Projection.controllerOfGiven grants Set.empty oid gs)
+                Just pc -> fmap (\ctrl -> (oid, BattlefieldCandidate.MkBattlefieldCandidate {BattlefieldCandidate.controller = ctrl, BattlefieldCandidate.characteristics = pc})) (Projection.controllerOfGiven grants oid gs)
             )
             (Set.toAscList (GameState.battlefield gs))
         )
@@ -2811,7 +2811,7 @@ stateTriggers gs
   | any (\sid -> Maybe.isNothing (Game.lookupObject sid gs)) (GameState.stack gs) = []
   | otherwise = concatMap onBattlefield (Set.toAscList (GameState.battlefield gs)) <> concatMap inCommand (Set.toAscList (GameState.command gs))
   where
-    onBattlefield oid = case Projection.controllerOfGiven grants Set.empty oid gs of
+    onBattlefield oid = case Projection.controllerOfGiven grants oid gs of
       Nothing -> []
       -- CR 603.3a / 109.5: the ability's controller is its source's, and that is
       -- what "you" in the condition means. Outside the layer fold, so the ViewOf

@@ -369,7 +369,7 @@ canAttackGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacte
 canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
-    Projection.controllerOfGiven grants Set.empty oid gs == Just pid
+    Projection.controllerOfGiven grants oid gs == Just pid
       && Turn.isActive gs pid
       -- CR 506.3 wants a permanent, so the test is battlefield MEMBERSHIP and not
       -- Object.zone: a phased-out permanent is one the game treats as not
@@ -882,7 +882,7 @@ canBlockGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacter
 canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj ->
-    Projection.controllerOfGiven grants Set.empty oid gs == Just pid
+    Projection.controllerOfGiven grants oid gs == Just pid
       -- Battlefield MEMBERSHIP, for canAttackGiven's reason above.
       && Set.member oid (GameState.battlefield gs)
       && Object.tapped obj == TapState.Untapped
@@ -1057,7 +1057,7 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- CR 109.5's "you" for the criterion is the ATTACKER's controller and the
       -- source is the attacker, the pairing every keyword-borne Filter takes.
       -- Hoisted, since it does not vary per candidate.
-      context = Filter.contextFor (Game.teams gs) (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
+      context = Filter.contextFor (Game.teams gs) (Projection.controllerOfGiven grants attacker gs) (Just attacker)
       -- The land-ness is asked HERE and never by the criterion: every clause of CR
       -- 702.14c reads "at least one LAND". Load-bearing where the criterion names
       -- no land type at all -- Vectis Gloves' artifact landwalk, Dryad
@@ -1559,7 +1559,7 @@ removeChanged gs =
       cands = Projection.gather gs
       controlChanged oid = case Map.lookup oid (Combat.joinedUnder c) of
         Nothing -> False
-        Just who -> Projection.controllerOfGiven grants Set.empty oid gs /= Just who
+        Just who -> Projection.controllerOfGiven grants oid gs /= Just who
       stoppedBeingCreature oid = not (Projection.isCreatureFrom cands oid gs)
       -- CR 506.4's becomes-a-battle clause, against the same gather.
       becameBattle oid = Projection.isBattleFrom cands oid gs

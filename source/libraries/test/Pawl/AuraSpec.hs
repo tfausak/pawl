@@ -803,9 +803,9 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
   -- AFTER every layer-2 effect it depends on. Applying Control Magic changes
   -- what the Yoke applies to, and the Yoke changes nothing about Control Magic
   -- -- it enchants bob, not carol -- so the Yoke is the dependent effect and
-  -- waits. Both timestamp orders are built, because dependency overrides CR
-  -- 613.7 and a fold that only took the latest timestamp would pass the second
-  -- board while failing the first.
+  -- waits. Both timestamp orders are built, and both are FENCES: Control Magic
+  -- names the Piker itself, so it wins whichever order the two apply in. The
+  -- next case is the board where the dependency decides.
   --
   -- THREE SEATS: carol holds the Control Magic, and on two seats she would
   -- collapse onto the Yoke's controller, leaving the Piker alice's however the
@@ -838,6 +838,21 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
     -- fold honours the dependency or only the timestamps. It is here to fail a
     -- future fix that reorders by timestamp and calls that CR 613.8b.
     Spec.assertEqWith s "CR 613.7 the other timestamp order leaves the Piker carol's too" (Projection.controllerOf creature yokeFirst) (Just S.carol)
+  -- CR 613.8a/613.8b the other way round: a steal that hands carol's Piker TO
+  -- the enchanted player changes what the Yoke applies to, so the Yoke waits
+  -- for it even though it is older, and then takes the Piker. In timestamp
+  -- order alone the Yoke would apply first, find the Piker carol's, and leave
+  -- it to the steal. The steal is a stored layer-2 effect with its own
+  -- timestamp, as an Act of Treason bob cast would leave.
+  Spec.it s "CR 613.8b a permanent stolen for the enchanted player after the Yoke is handed over" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    yoke <- S.printingOf s registry "Synthetic Puppeteer's Yoke"
+    let (creature, withCreature) = S.addPermanent piker S.carol S.threePlayerGame
+        (_, withLand) = S.addPermanent forest S.bob withCreature
+        (aura, withAura) = S.addPermanent yoke S.alice withLand
+        stolen = S.giveControl creature S.bob (S.attachTo aura (Recipient.ToPlayer S.bob) withAura)
+    Spec.assertEqWith s "alice controls carol's Piker" (Projection.controllerOf creature stolen) (Just S.alice)
   -- CR 613.1b's Attached arm reads only whether the source IS attached, never
   -- the host's own projected type (Pawl.Types.Affected's Attached haddock):
   -- CR 613.8a's dependency system is same-layer only, so a layer-2 control
@@ -967,6 +982,25 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
     Spec.assertEqWith s "the Aura entered attached to the one creature that matched both" (length (attachedTo mineTapped after)) 1
     Spec.assertEqWith s "the enchanted creature is a 2/1 plus +2/+2" (S.powerToughnessOf mineTapped settled) (Just (4, 3))
     Spec.assertEqWith s "and a state-based pass leaves it alone, since both instances still hold" (length (attachedTo mineTapped settled)) 1
+  -- CR 702.5c's last sentence over the POOLS: enchant permanent then enchant
+  -- creature admits only creatures, whichever instance is printed first. The
+  -- wider pool first is the order a first-instance fold gets wrong, offering
+  -- the land (and the creature as a bare object, ToCreature being the
+  -- narrower pool's).
+  Spec.it s "CR 702.5c enchant permanent then enchant creature offers no land" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    warden <- S.printingOf s registry "Synthetic Warden of Two Charges"
+    let base0 = S.landsInPlay plains 2
+        (land, base1) = S.addPermanent plains S.alice base0
+        (creature, base2) = S.addPermanent piker S.alice base1
+        (gs, spellId) = S.handOne warden base2
+        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) spellId theSlot gs) (Card.enchantTargetSlot (S.combinedFace warden))
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (S.cast S.alice spellId))
+        after = S.settleSba (snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop))
+    Spec.assertEqWith s "the land matches enchant permanent but not enchant creature" (fmap (Set.member (Recipient.ToObject land)) offered) (Just False)
+    Spec.assertEqWith s "the creature matches both, as a creature" (fmap (Set.member (Recipient.ToCreature creature)) offered) (Just True)
+    Spec.assertEqWith s "and the Aura enchants it: a 2/1 plus +1/+1" (S.powerToughnessOf creature after) (Just (3, 2))
   -- CR 704.5m / 303.4c with the SECOND instance broken and the first untouched:
   -- alice still controls the creature, but CR 502.3's untap step untaps it, so
   -- "enchant tapped creature" no longer admits it. An engine that read only the
@@ -1817,6 +1851,38 @@ simicGuildmageSpec s registry =
               Spec.assertEqWith s "alice's remaining creature is untouched" (S.powerToughnessOf decoy after) (Just (2, 1))
               Spec.assertEqWith s "and the Guildmage is a plain 2/2" (S.powerToughnessOf mage after) (Just (2, 2))
               Spec.assertBool s (secondDest /= firstDest) "the two destinations are distinct objects"
+        -- CR 613.8b's loop clause through two Confiscates. Alice's enchants bob's
+        -- Forest; bob's enchants alice's, so bob controls it and the Forest.
+        -- The Guildmage then moves alice's onto bob's -- bob controls both hosts,
+        -- which is the ability's destination test -- and CR 701.3c restamps it.
+        -- Each grant now names the other's source, so each depends on the other
+        -- (CR 613.8a) and the two apply in timestamp order: bob's older one first,
+        -- handing him alice's Confiscate, whose grant then hands its own
+        -- controller, bob, the Confiscate it enchants. Reversing the order gives
+        -- alice both; falling back to each Aura's owner gives each player their
+        -- own.
+        Spec.it s "CR 613.8b two Confiscates enchanting each other apply in timestamp order" $ do
+          island <- S.printingOf s registry "Island"
+          forest <- S.printingOf s registry "Forest"
+          guildmage <- S.printingOf s registry "Simic Guildmage"
+          confiscate <- S.printingOf s registry "Confiscate"
+          let base = S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers)
+              (mage, g1) = S.addPermanent guildmage S.alice base
+              (land, g2) = S.addPermanent forest S.bob g1
+              (alices, g3) = S.addPermanent confiscate S.alice g2
+              (bobs, g4) = S.addPermanent confiscate S.bob g3
+              gs = (S.attach bobs alices (S.attach alices land g4)) {GameState.priority = Just S.alice}
+          case secondAbility guildmage of
+            Nothing -> Spec.assertFailure s "Simic Guildmage should print two activated abilities"
+            Just ability -> do
+              let answer :: Prompt.Prompt r -> r
+                  answer = pickBy NonEmpty.head alices
+                  activated = S.runPure answer gs (Activate.activateAbility S.alice mage ability)
+                  after = S.runPure answer activated Stack.resolveTop
+                  hostIn o = Game.lookupObject o after >>= Object.attachedTo >>= Recipient.objectOf
+              Spec.assertEqWith s "bob controls alice's Confiscate" (Projection.controllerOf alices after) (Just S.bob)
+              Spec.assertEqWith s "and his own" (Projection.controllerOf bobs after) (Just S.bob)
+              Spec.assertEqWith s "the two Confiscates enchant each other" (hostIn alices, hostIn bobs) (Just bobs, Just alices)
 
 -- CR 303.4d's last two sentences, and CR 301.5c's, which are the same rule
 -- written twice: "an Aura can't enchant more than one object or player. If a
