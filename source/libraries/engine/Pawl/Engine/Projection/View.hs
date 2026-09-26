@@ -4,6 +4,7 @@
 -- which layers the continuous effects on top. Split out of it for size.
 module Pawl.Engine.Projection.View where
 
+import Control.Applicative ((<|>))
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -1877,46 +1878,100 @@ enchantedPlayerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
 enchantedPlayerOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.playerOf
 
 -- CR 108.4 / 613.1b: an object's controller is its owner, overridden by layer-2
--- control effects, last timestamp wins (CR 613.7). Stored continuous effects and
--- control-granting static abilities both carry a Timestamp and merge into one
--- maximum. A lean fold rather than the full projection: control precedes P/T.
+-- control effects applied in CR 613.7/613.8 order. A lean fold rather than the
+-- full projection: control precedes P/T.
 controllerOf :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
-controllerOf oid gs = controllerOfGiven (controlGrants gs) Set.empty oid gs
+controllerOf oid gs = controllerOfGiven (controlGrants gs) oid gs
 
--- controllerOf with the grant list PRECOMPUTED and a visited set. The visited set
--- is a CR 613.8b loop-escape analog, not an implementation of it (#946):
--- deriving a grant's player asks for its SOURCE's controller, which can re-enter
--- this function, and re-entering an object already under question returns its
--- owner so a cycle grants nothing. It is not the only escape: controlNames'
--- AttachedPlayerControls arm shortens the GRANT list instead, so that a
--- candidate's earlier control effects stay visible.
-controllerOfGiven :: [ControlGrant] -> Set ObjectId -> ObjectId -> GameState -> Maybe PlayerId.PlayerId
-controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
+-- controllerOf with the grant list PRECOMPUTED.
+controllerOfGiven :: [ControlGrant] -> ObjectId -> GameState -> Maybe PlayerId.PlayerId
+controllerOfGiven grants oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
-  Just obj ->
-    if Set.member oid visited
-      then Just (defaultControllerOf obj)
-      else
-        let visited2 = Set.insert oid visited
-            -- Does an affected set carried by `source` name `oid`? controlNames
-            -- below is the enumeration this membership test reads off.
-            namesFrom source a = Set.member oid (controlNames grants visited2 gs source a)
-            storedSetter eff = case ContinuousEffect.modification eff of
-              Modification.SetController pid
-                | namesFrom (ContinuousEffect.source eff) (ContinuousEffect.affected eff) ->
-                    Just (ContinuousEffect.timestamp eff, pid)
-              _ -> Nothing
-            stored = Maybe.mapMaybe storedSetter (GameState.continuousEffects gs)
-            fromGrant g =
-              if not (namesFrom (cgSource g) (cgAffected g))
-                then Nothing
-                else case controllerOfGiven grants visited2 (cgSource g) gs of
-                  Nothing -> Nothing
-                  Just who -> Just (cgTimestamp g, who)
-            derived = Maybe.mapMaybe fromGrant grants
-         in case stored <> derived of
-              [] -> Just (defaultControllerOf obj)
-              setters -> Just (snd (List.maximumBy (Ord.comparing fst) setters))
+  Just obj -> Just (Maybe.fromMaybe (defaultControllerOf obj) (Map.lookup oid (layerTwo grants gs)))
+
+-- One layer-2 control effect as the fold applies it: a stored
+-- Modification.SetController names its player, a control-granting static
+-- ability (ControlGrant) hands over to its source's controller.
+data ControlEffect = MkControlEffect
+  { ceIndex :: Int,
+    ceTimestamp :: Timestamp,
+    ceSource :: ObjectId,
+    ceAffected :: Affected.Affected,
+    cePlayer :: Maybe PlayerId.PlayerId
+  }
+
+-- CR 613.1b's layer 2 as one fold: every control effect, applied one at a time
+-- to a running table of controllers, which answers only the objects some effect
+-- moved. CR 613.7: in timestamp order. CR 613.8a: an effect waits for another
+-- whose application would change what it names or who it hands them to --
+-- judged by applying that other effect and asking again -- and CR 613.8c
+-- re-asks after every application. CR 613.8b: when every remaining effect waits,
+-- the ones on a dependency loop apply in timestamp order, the fallback
+-- Pawl.Engine.Projection's layer fold takes. Every read inside a step is the
+-- running table's, so nothing re-enters this fold.
+--
+-- Pawl.AuraSpec's "CR 613.8b two Confiscates enchanting each other apply in
+-- timestamp order" proves the loop.
+layerTwo :: [ControlGrant] -> GameState -> Map ObjectId PlayerId.PlayerId
+layerTwo grants gs =
+  let stored =
+        [ (ContinuousEffect.timestamp eff, ContinuousEffect.source eff, ContinuousEffect.affected eff, Just pid)
+        | eff <- GameState.continuousEffects gs,
+          Modification.SetController pid <- [ContinuousEffect.modification eff]
+        ]
+      granted = fmap (\g -> (cgTimestamp g, cgSource g, cgAffected g, Nothing)) grants
+      effects = zipWith (\i (ts, src, aff, who) -> MkControlEffect i ts src aff who) [0 ..] (stored <> granted)
+      controllerIn table o = case Map.lookup o table of
+        Just pid -> Just pid
+        Nothing -> fmap defaultControllerOf (Game.lookupObject o gs)
+      outcome table e =
+        let ctrl = controllerIn table
+         in (controlNames ctrl gs (ceSource e) (ceAffected e), cePlayer e <|> ctrl (ceSource e))
+      apply table e = case outcome table e of
+        (named, Just pid) -> Set.foldr (`Map.insert` pid) table named
+        (_, Nothing) -> table
+      -- A stored effect's set is fixed at creation (CR 611.2c) and its player
+      -- named, so nothing can change what it does.
+      fixed e = Maybe.isJust (cePlayer e) && isTheseObjects (ceAffected e)
+      isTheseObjects a = case a of
+        Affected.TheseObjects _ -> True
+        _ -> False
+      go table pending = case pending of
+        [] -> table
+        _ ->
+          let -- Each effect's outcome now, and the table each would leave.
+              now = Map.fromList (fmap (\e -> (ceIndex e, outcome table e)) pending)
+              afterOf = Map.fromList (fmap (\f -> (ceIndex f, apply table f)) pending)
+              dependsOn e f =
+                ceIndex f /= ceIndex e
+                  && not (fixed e)
+                  && case Map.lookup (ceIndex f) afterOf of
+                    Just after -> after /= table && Just (outcome after e) /= Map.lookup (ceIndex e) now
+                    Nothing -> False
+              waits e = any (dependsOn e) pending
+              ready = filter (not . waits) pending
+              edges = Map.fromList (fmap (\e -> (ceIndex e, fmap ceIndex (filter (dependsOn e) pending))) pending)
+              reach seen queue = case queue of
+                [] -> seen
+                x : xs ->
+                  if Set.member x seen
+                    then reach seen xs
+                    else reach (Set.insert x seen) (Map.findWithDefault [] x edges <> xs)
+              onCycle e = Set.member (ceIndex e) (reach Set.empty (Map.findWithDefault [] (ceIndex e) edges))
+              batch = case ready of
+                _ : _ -> ready
+                -- Nothing ready means every remaining effect waits, so some are
+                -- on a loop; the fallback keeps minimumBy total.
+                [] -> case filter onCycle pending of
+                  [] -> pending
+                  cyclic -> cyclic
+              next = List.minimumBy (Ord.comparing (\e -> (ceTimestamp e, ceIndex e))) batch
+           in go (apply table next) (filter ((/= ceIndex next) . ceIndex) pending)
+      byTimestamp = List.sortOn (\e -> (ceTimestamp e, ceIndex e))
+   in -- Nothing waits when every effect is fixed, so CR 613.7 alone orders them.
+      if all fixed effects
+        then List.foldl' apply Map.empty (byTimestamp effects)
+        else go Map.empty effects
 
 -- CR 801.2d: is this object within @you@'s range of influence -- controlled by a
 -- player within range, or a battle protected by one? CR 801.4
@@ -1928,13 +1983,16 @@ controllerOfGiven grants visited oid gs = case Game.lookupObject oid gs of
 -- never takes the control fold. An object's controller is CR 108.4a's owner off
 -- the battlefield and the stack, which controllerOfGiven already answers.
 objectInRangeGiven :: [ControlGrant] -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
-objectInRangeGiven grants you oid gs =
+objectInRangeGiven grants you oid gs = objectInRangeUnder (\o -> controllerOfGiven grants o gs) you oid gs
+
+-- objectInRangeGiven with the controllers supplied: layer 2's running table
+-- inside the fold, the finished fold outside it.
+objectInRangeUnder :: (ObjectId -> Maybe PlayerId.PlayerId) -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
+objectInRangeUnder ctrl you oid gs =
   let reaches = maybe False (\pid -> Game.inRangeOf you pid gs)
    in case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
         Nothing -> True
-        Just _ ->
-          reaches (controllerOfGiven grants Set.empty oid gs)
-            || reaches (Object.protector =<< Game.lookupObject oid gs)
+        Just _ -> reaches (ctrl oid) || reaches (Object.protector =<< Game.lookupObject oid gs)
 
 -- CR 801.10: is @oid@ within the range of influence of @source@'s controller?
 -- Pawl.Engine.Projection.affectsWith's cut on a static ability's dynamic set.
@@ -1943,23 +2001,21 @@ objectInRangeGiven grants you oid gs =
 inSourceRangeGiven :: [ControlGrant] -> ObjectId -> ObjectId -> GameState -> Bool
 inSourceRangeGiven grants source oid gs =
   Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs)))
-    || all (\you -> objectInRangeGiven grants you oid gs) (controllerOfGiven grants Set.empty source gs)
+    || all (\you -> objectInRangeGiven grants you oid gs) (controllerOfGiven grants source gs)
 
--- Which objects an affected set NAMES, for the CR 613.1b layer-2 control fold.
+-- Which objects an affected set NAMES, for the CR 613.1b layer-2 control fold,
+-- with every controller it needs read off `ctrl` -- the fold's running table.
 -- Parameterized by the source because Affected.Attached asks about the SOURCE's
--- state, and by the grant list and the caller's visited set because a PREDICATE
--- set has to answer control questions of its own -- CR 109.5's "you" for the
--- filter's perspective, and the candidate's own controller for a filter that
--- asks. Both go back through controllerOfGiven, never through the projection
--- (see controlGrants).
+-- state; a PREDICATE set needs controllers for CR 109.5's "you" and for a filter
+-- that asks.
 --
 -- MatchingAnywhere and MatchingOffBattlefield stay empty and so grant nothing,
 -- which is what the rule asks rather than an elision: CR 109.4 gives a
 -- controller only to an object on the battlefield or the stack, so the part of
 -- either set a control grant could observe is the part those two arms share
 -- with Matching's own.
-controlNames :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Affected.Affected -> Set ObjectId
-controlNames grants visited gs source a = case a of
+controlNames :: (ObjectId -> Maybe PlayerId.PlayerId) -> GameState -> ObjectId -> Affected.Affected -> Set ObjectId
+controlNames ctrl gs source a = case a of
   Affected.TheseObjects s -> s
   -- CR 303.4m: the source's own attachment, with no projection needed.
   Affected.Attached -> maybe Set.empty Set.singleton (hostOf source gs)
@@ -1969,38 +2025,18 @@ controlNames grants visited gs source a = case a of
   -- values, since layer 1 is the only layer before it and CR 613.8a confines
   -- dependency to one layer -- so no layer-4 type change feeds this test, which
   -- is what lets it run without projecting.
-  Affected.Matching f -> Set.filter (\oid -> matchesLeanly grants visited gs source f oid && controlReaches grants visited gs source oid) (GameState.battlefield gs)
+  Affected.Matching f -> Set.filter (\oid -> matchesLeanly ctrl gs source f oid && controlReaches ctrl gs source oid) (GameState.battlefield gs)
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.MatchingOffBattlefield _ -> Set.empty
   -- A rider is stored against the object it names (Event.permissionRiders), and
   -- the template names nothing.
   Affected.PlayedThisWay _ -> Set.empty
   -- CR 303.4b / 303.4m through a PLAYER: what the enchanted player controls,
-  -- read as Matching's battlefield walk narrowed by the candidate's own
-  -- controller. Both halves are dynamic (CR 611.3a), and the controller half is
-  -- the lean fold's, never the projection's.
-  --
-  -- That half is asked under the grant list MINUS this source's own grants, and
-  -- under a FRESH visited set rather than the caller's. CR 613.8a: applying
-  -- another layer-2 control effect changes what this one applies to, so this one
-  -- depends on it and CR 613.8b makes it wait until just after, whatever the two
-  -- timestamps are (CR 613.7). Carrying the caller's visited set instead would
-  -- answer the candidate under question its DEFAULT controller and hand over a
-  -- permanent Control Magic had already taken; Pawl.AuraSpec's "CR 613.8a/613.8b
-  -- a permanent already stolen from the enchanted player is not handed over
-  -- again" proves it does not. The reverse dependency is what is absent: an
-  -- attachment grant (CR 303.4m) changes who controls a candidate here, while
-  -- nothing this effect does changes whose attachment that grant reads.
-  --
-  -- Dropping the source's own grants is also the loop escape, at the granularity
-  -- the loop actually has: the nested read runs on a STRICTLY shorter grant
-  -- list, so the recursion is well founded even with the visited set reset. Two
-  -- Yokes, each enchanting the other's controller, terminate by that peeling
-  -- rather than by CR 613.8b's dependency-loop clause, which would apply them in
-  -- timestamp order (#946). The fold's STORED half cannot reach this arm at all:
-  -- every producer of a Modification.SetController writes an
-  -- Affected.TheseObjects set (Pawl.Engine.Resolve.Effect) and no card may
-  -- author one (#199), so no stored effect keeps the list from shrinking.
+  -- read as Matching's battlefield walk narrowed by the candidate's controller
+  -- in the running table. CR 613.8a: another control effect that moves a
+  -- candidate changes what this one applies to, so layerTwo applies it first;
+  -- Pawl.AuraSpec's "CR 613.8a/613.8b a permanent already stolen from the
+  -- enchanted player is not handed over again" proves it.
   --
   -- The battlefield bound is the arm's own, and it is what answers CR 702.26b
   -- for a phased-out permanent, which Pawl.Engine.Phasing.phaseOut removes from
@@ -2009,32 +2045,25 @@ controlNames grants visited gs source a = case a of
   Affected.AttachedPlayerControls f -> case enchantedPlayerOf source gs of
     Nothing -> Set.empty
     Just pid ->
-      let others = filter (\g -> cgSource g /= source) grants
-       in Set.filter
-            (\oid -> controllerOfGiven others Set.empty oid gs == Just pid && matchesLeanly grants visited gs source f oid)
-            (GameState.battlefield gs)
+      Set.filter
+        (\oid -> ctrl oid == Just pid && matchesLeanly ctrl gs source f oid)
+        (GameState.battlefield gs)
 
 -- CR 801.10 for a layer-2 grant: is `oid` within the range of influence of
--- `source`'s controller, judged on the controller `oid` has WITHOUT this source's
--- own grants? A grant cannot bring an object into its own reach by taking it:
--- CR 613.8a's dependency, and the AttachedPlayerControls arm's escape above,
--- whose strictly shorter grant list is also what makes this terminate. Asked of
--- the limited-range option first, so a game without it takes no control fold.
--- Pawl.RangeOfInfluenceSpec's "CR 801.10 a control grant does not take a
--- permanent outside its controller's range" proves it.
-controlReaches :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> ObjectId -> Bool
-controlReaches grants visited gs source oid =
+-- `source`'s controller, both read off the running table? A grant cannot bring
+-- an object into its own reach by taking it, since the table holds what the
+-- effects before it did. Asked of the limited-range option first, so a game
+-- without it takes no control fold. Pawl.RangeOfInfluenceSpec's "CR 801.10 a
+-- control grant does not take a permanent outside its controller's range"
+-- proves it.
+controlReaches :: (ObjectId -> Maybe PlayerId.PlayerId) -> GameState -> ObjectId -> ObjectId -> Bool
+controlReaches ctrl gs source oid =
   Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs)))
-    || all (\you -> objectInRangeGiven (filter (\g -> cgSource g /= source) grants) you oid gs) (controllerOfGiven grants visited source gs)
+    || all (\you -> objectInRangeUnder ctrl you oid gs) (ctrl source)
 
 -- Does `oid` match a layer-2 affected set's Filter, read at the copiable values
 -- controlNames explains and with CR 109.5's "you" bound to the SOURCE's
--- controller? Projection-free throughout: every controller it needs comes from
--- controllerOfGiven carrying the caller's visited set, which answers an object's
--- owner once it revisits that object, so a control-dependent conjunct terminates
--- rather than re-entering the fold that is asking (#946). Termination is
--- structural here, not a matter of Filter.View's laziness -- which is what
--- separates this path from the liveness gate #197 describes.
+-- controller? Projection-free throughout, every controller read off `ctrl`.
 --
 -- Both of those controller reads are REGRESSION FENCES rather than proved
 -- behaviour: a filter only forces either one by asking about control, and
@@ -2043,35 +2072,24 @@ controlReaches grants visited gs source oid =
 -- filterless "all permanents". Blanking the perspective leaves the suite green.
 -- The card that would prove them is #197's shape, a control-dependent conjunct
 -- under a control grant.
---
--- The recursion this opens -- each candidate whose controller is forced
--- re-enters the fold, which walks the battlefield again -- is already reached by
--- controlNames' AttachedPlayerControls arm, which asks every battlefield
--- candidate's controller outside this function. That arm escapes the loop by
--- shortening the GRANT list instead, which is why it can see an earlier control
--- effect on the candidate under question and this function cannot: here the
--- collapse to the object's owner is all that stands between a control-dependent
--- conjunct and the fold that is asking. A filter that had to see CR 613.8b's
--- ordering would need the same treatment; the card that would ask for it is the
--- #197 shape named above, which the pool does not have.
-matchesLeanly :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesLeanly grants visited gs source f oid =
+matchesLeanly :: (ObjectId -> Maybe PlayerId.PlayerId) -> GameState -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesLeanly ctrl gs source f oid =
   Filter.matches
-    (Filter.contextFor (Game.teams gs) (controllerOfGiven grants visited source gs) (Just source))
-    (leanViewOf grants visited gs oid)
+    (Filter.contextFor (Game.teams gs) (ctrl source) (Just source))
+    (leanViewOf ctrl gs oid)
     f
 
 -- The Filter.View a layer-2 affected set reads: copiable characteristics
--- (CR 613.2c) and a controller from the lean fold. The counterpart to
+-- (CR 613.2c) and a controller from the running table. The counterpart to
 -- viewOfObjectGiven for a caller that must not project at all; a host is read
 -- the same way, which is finite for the reason viewOfObjectGiven gives.
-leanViewOf :: [ControlGrant] -> Set ObjectId -> GameState -> ObjectId -> Filter.View
-leanViewOf grants visited gs oid =
+leanViewOf :: (ObjectId -> Maybe PlayerId.PlayerId) -> GameState -> ObjectId -> Filter.View
+leanViewOf ctrl gs oid =
   viewOfCharacteristics
-    (Just . leanViewOf grants visited gs)
+    (Just . leanViewOf ctrl gs)
     oid
     (copiableCharacteristics oid gs)
-    (controllerOfGiven grants visited oid gs)
+    (ctrl oid)
     (countersOf oid gs)
     gs
 
