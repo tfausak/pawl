@@ -17,10 +17,10 @@ import qualified Pawl.Types.Filter as Filter
 -- different shape, the payer dividing the count as they pay, and is not
 -- implemented (#3813).
 --
--- The counter KIND is not a field. Pawl.Types.CostComponent's sibling arm
--- RemovePlusOneCountersFromThis fixes CounterKind.PlusOnePlusOne the same way
--- and for the same reason: the printed cost states the +1\/+1 counter, so there
--- is no second kind for a card to spell.
+-- The counter KIND is not a field: the printed cost states the +1\/+1 counter,
+-- so there is no second kind for a card to spell. Pawl.Types.CostComponent's
+-- RemoveCountersFromThis carries one because Hickory Woodlot's depletion
+-- counter is such a second kind.
 --
 -- PARAMETRIC in the keyword for the Filter it carries, exactly as
 -- Pawl.Types.CostComponent is.

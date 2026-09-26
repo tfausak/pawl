@@ -4,8 +4,8 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Cost as Cost
-import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
@@ -72,16 +72,19 @@ data ManaOption = MkManaOption
     -- count 3. Printed order survives WITHIN a recipient's units, which is the
     -- only order CR 106.4 can observe: two pools have no order between them.
     yield :: Map.Map PlayerRef.PlayerRef Mana.Mana,
-    -- | CR 405.6c: what else this activation does -- everything the chosen mode
-    -- says that is not a mana production. Ancient Tomb's "This land deals 2
-    -- damage to you", which Pawl.Engine.Cost.tapForManaWith runs through its
-    -- Pawl.Types.ManaAbilityPerformer once the mana is added.
+    -- | CR 608.2c: the selection's clauses in printed order, each with its
+    -- share of `yield`, so the payment can decide each clause after the cost
+    -- is paid (Pawl.Engine.Cost.tapForManaWith) and CR 405.6c's other effects
+    -- run from the clauses that happen. Ancient Tomb's "This land deals 2
+    -- damage to you" is a clause with no share; Hickory Woodlot's "If there are
+    -- no depletion counters on this land, sacrifice it" is one whose "if" the
+    -- cost decides.
     --
     -- Part of the OPTION rather than looked up from the source afterwards, for
     -- the same reason the cost is: the option is what the player was offered,
     -- and two routes alike in cost and yield but not in what else they do are
     -- two options rather than one (ListUtils.nubOrd in
     -- Pawl.Engine.Mana.manaOptionsOfGiven compares this too).
-    effects :: [Effect.Effect Card.Card (GrantedAbility.GrantedAbility Card.Card)]
+    steps :: [(Clause.Clause Card.Card (GrantedAbility.GrantedAbility Card.Card), Map.Map PlayerRef.PlayerRef Mana.Mana)]
   }
   deriving (Eq, Ord, Show)

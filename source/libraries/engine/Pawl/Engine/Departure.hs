@@ -63,24 +63,25 @@ import qualified Pawl.Types.Zone as Zone
 depart :: Departure -> PlayerId -> Game ()
 depart reason pid = do
   -- CR 800.4a's own ordering is load-bearing, so the clauses run in the rule's
-  -- order. They run before the status flip, and THAT much is arbitrary: no
-  -- clause reads Player.status, and continuesAfterDeparture reads
-  -- GameState.turnOrder, which the flip does not touch. The flip's position is
-  -- load-bearing only for the monarch call below, which
-  -- Monarch.reassignOnDeparture requires to have already happened.
+  -- order. continuesAfterDeparture reads GameState.turnOrder, which the flip
+  -- does not touch.
   --
-  -- The status flip trailing the exile is load-bearing in one further way now
-  -- that the exile emits events: CR 603.10a reads the board as it was
-  -- immediately before the move, and CR 800.4d's filter on where a trigger may
-  -- go is applied at CR 117.5, later than either.
+  -- The status flip sits between the pure clauses and the exile. The first
+  -- clause files CR 608.2h's last known information from the board as the
+  -- player left, so it runs before; the fourth clause's exile happens after
+  -- they have left, so CR 800.4h hands a CR 616.1 choice inside it to the next
+  -- player (Replacement.chooserOf), and CR 800.4b/800.4d's gates refuse
+  -- anything a replacement there would give them. Pawl.DepartureSpec's "a
+  -- replacement choice inside the departure's exile goes to the next player"
+  -- proves the placement. Monarch.reassignOnDeparture also needs the flip done.
   continues <- State.gets continuesAfterDeparture
-  Monad.when continues $ do
+  Monad.when continues $
     State.modify' (nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid)
-    remainingControlledExiled pid
   let lose p = p {Player.status = Status.Departed reason}
   -- CR 801.2c: the seat keeps counting toward range of influence until the
   -- next turn begins.
   State.modify' (\gs -> gs {GameState.players = Map.adjust lose pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)})
+  Monad.when continues $ remainingControlledExiled pid
   Monarch.reassignOnDeparture pid
   -- CR 726.4, the same clause one rule over and for the same reason: the active
   -- player takes the initiative at the same time its holder leaves.
@@ -593,13 +594,8 @@ nonCardStackObjectsCease pid gs =
 -- 616.1 loop asks the affected object's controller, who here is the player
 -- leaving, and rule 616.1 is a RULE requiring a choice rather than an object
 -- requiring one -- CR 800.4g is the other rule, and its answer is the controller
--- picking a substitute (Pawl.Engine.Resolve.Effect.askedChooser).
---
--- Not implemented: that reassignment firing HERE. `depart` flips the status
--- after these clauses, so the departing player is still Status.Playing while the
--- exile runs and Game.ruleChooser answers them rather than the next seat. A
--- board with two applicable rewrites would show it; no card in `data/cards/`
--- replaces a permanent being exiled, so no board reaches it (#3875).
+-- picking a substitute (Pawl.Engine.Resolve.Effect.askedChooser). It fires
+-- because `depart` marks the player departed before this runs.
 --
 -- IN BATCH and in ONE event group, against that same board, for the reason the
 -- first clause files its last known information against it: "those objects are
