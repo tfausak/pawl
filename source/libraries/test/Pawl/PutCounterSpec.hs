@@ -21,8 +21,11 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TapState as TapState
@@ -66,6 +69,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   resourcefulDefenseSpec s registry
   selflessPoliceCaptainSpec s registry
   doubleEachKindSpec s registry
+  doubleEachTargetSpec s registry
 
 -- CR 603.3d's target, chosen as the trigger goes on the stack. FILTERS the
 -- offered set rather than building a recipient, so CR 608.2b's re-read at
@@ -459,3 +463,89 @@ doubleEachKindSpec s registry = Spec.describe s "CR 701.10e doubling each kind o
         Spec.assertEqWith s "the decoy keeps its one counter" (pairOn decoyId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
         Spec.assertEqWith s "and the Bairn paid its untap" (fmap Object.tapped (Game.lookupObject bairnId after)) (Just TapState.Untapped)
       _ -> Spec.assertFailure s "the board should alias the Bairn, Jace and the decoy"
+
+-- Deepglow Skate {4}{U} Creature -- Fish 3/3 and Aetheric Amplifier {3}
+-- Artifact (name, cost, type line, power, toughness and oracle text checked
+-- against Scryfall 2026-09-25), data/cards/deepglow-skate.json and
+-- data/cards/aetheric-amplifier.json:
+--
+--   When this creature enters, double the number of each kind of counter on any
+--   number of target permanents.
+--   {T}: Add one mana of any color.
+--   {4}, {T}: Choose one. Activate only as a sorcery.
+--   * Double the number of each kind of counter on target permanent.
+--   * Double the number of each kind of counter you have.
+--
+-- The Skate's targets each double THEIR OWN counters, so it is Effect.ForEach
+-- over the target slot with Vorel's self-to-self PutCountersFrom as the body.
+-- The Amplifier's second mode is CR 701.10e on a player: one GainPlayerCounters
+-- per Pawl.Types.PlayerCounterKind, each giving as many as that kind's tally.
+doubleEachTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+doubleEachTargetSpec s registry = Spec.describe s "CR 701.10e doubling each kind of counter, per target and per player" $ do
+  -- Two of three offered permanents, one of them bob's planeswalker, so each
+  -- target is read against its OWN tally and the third is left alone. The
+  -- answerer FILTERS the offered set, which keeps CR 608.2b's re-read finding
+  -- what was named.
+  Spec.it s "CR 701.10e whole card: each of the Skate's targets doubles its own counters" $ do
+    skate <- S.printingOf s registry "Deepglow Skate"
+    piker <- S.printingOf s registry "Goblin Piker"
+    jace <- S.printingOf s registry "Jace Beleren"
+    island <- S.printingOf s registry "Island"
+    let (pikerId, g1) = S.addPermanent piker S.alice (S.landsInPlay island 1)
+        (decoyId, g2) = S.addPermanent piker S.alice g1
+        (jaceId, g3) = S.addPermanent jace S.bob g2
+        stocked =
+          S.addCounter CounterKind.Loyalty 5 jaceId
+            . S.addCounter CounterKind.PlusOnePlusOne 1 decoyId
+            . S.addCounter (CounterKind.Keyword Keyword.Flying) 2 pikerId
+            . S.addCounter CounterKind.PlusOnePlusOne 3 pikerId
+            $ g3
+        (_, entered) = S.entersWithTrigger skate S.alice stocked
+        chosen = Set.fromList [pikerId, jaceId]
+        settled = S.runPure (aimingAll chosen) entered Engine.settleForPriority
+        after = S.runPure (aimingAll chosen) settled Stack.resolveTop
+    Spec.assertEqWith s "the Piker holds six +1/+1 counters and four flying counters" (pairOn pikerId after) (Map.fromList [(CounterKind.PlusOnePlusOne, 6), (CounterKind.Keyword Keyword.Flying, 4)])
+    Spec.assertEqWith s "bob's Jace holds ten loyalty counters" (pairOn jaceId after) (Map.singleton CounterKind.Loyalty 10)
+    Spec.assertEqWith s "the untargeted Piker keeps its one counter" (pairOn decoyId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+    Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack settled)) 1
+  -- alice has two kinds in different counts and none of a third; bob's poison is
+  -- the "you" the mode does not reach.
+  Spec.it s "CR 701.10e Aetheric Amplifier doubles each kind of counter its controller has" $ do
+    let amplifierBoard =
+          S.duel
+            S.precombatMain
+            ( S.settled "amplifier" "Aetheric Amplifier"
+                : fmap (\n -> S.settled n "Forest") ["f1", "f2", "f3", "f4"]
+            )
+            []
+        script =
+          S.turn
+            1
+            [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "amplifier") $
+                S.noChoices
+                  { S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
+                    -- CR 605.3a: the untapped Amplifier is itself a mana source, so
+                    -- the payment asks for an extra one; Nothing declines it.
+                    S.choiceManaSources = Seq.fromList (fmap (Just . S.aliasRef) ["f1", "f2", "f3", "f4"]) Seq.|> Nothing
+                  }
+            ]
+        playerCounters pid gs = maybe Map.empty Player.counters (Map.lookup pid (GameState.players gs))
+    built <- S.buildBoardOrFail s registry amplifierBoard
+    let stocked =
+          built
+            { S.builtState =
+                S.addPlayerCounter PlayerCounterKind.Poison 1 S.bob
+                  . S.addPlayerCounter PlayerCounterKind.Poison 2 S.alice
+                  . S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice
+                  $ S.builtState built
+            }
+    (_, after) <- S.runScriptOrFail s script stocked S.priorityGame
+    Spec.assertEqWith s "alice has six energy and four poison, and still no other kind" (playerCounters S.alice after) (Map.fromList [(PlayerCounterKind.Energy, 6), (PlayerCounterKind.Poison, 4)])
+    Spec.assertEqWith s "bob keeps his one poison counter" (playerCounters S.bob after) (Map.singleton PlayerCounterKind.Poison 1)
+
+-- `aiming` for a slot taking any number: the offered set filtered to `chosen`.
+aimingAll :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingAll chosen p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    fmap (\(_, offered) -> Set.filter (maybe False (`Set.member` chosen) . Recipient.objectOf) offered) asked
+  _ -> S.identityAnswer p

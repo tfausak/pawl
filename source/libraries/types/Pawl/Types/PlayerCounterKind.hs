@@ -12,6 +12,9 @@ module Pawl.Types.PlayerCounterKind where
 -- Ord is load-bearing: PlayerCounterKind is a Map key on Player.counters.
 -- Constructors are ordered by rule number so the type stays diffable against the
 -- rules.
+--
+-- A new constructor owes data/cards/aetheric-amplifier.json an entry: its "each
+-- kind of counter you have" (CR 701.10e) is one GainPlayerCounters per kind.
 data PlayerCounterKind
   = Energy -- CR 107.14
   | Poison -- CR 122.1f
