@@ -341,7 +341,7 @@ stackSpec s registry = Spec.describe s "Stack" $ do
         Spec.assertEqWith s "the granted permission cast Llanowar Elves onto the battlefield" (S.countOnBattlefieldByName elvesName S.alice withGrant) 1
         Spec.assertEqWith s "without the grant Llanowar Elves stays in the library" (S.countOnBattlefieldByName elvesName S.alice without, S.countByName elvesName S.alice without) (0, 1)
       _ -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
-  -- CR 702.37c / 708.4: the granted permission's affected set (a creature card
+  -- CR 702.37c / 708.4: the granted permission's affected set (a card you own
   -- in your library) still matches the 2/2 face-down creature card, so CR 601.3
   -- allows the morph cast too, and the player picks between the two casts.
   Spec.it s "CR 702.37c a granted permission offers Skirk Marauder face down while searching" $ do
