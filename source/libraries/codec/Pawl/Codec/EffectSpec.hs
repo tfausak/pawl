@@ -67,6 +67,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
@@ -2051,7 +2052,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.count = Quantity.Literal 1, RollDie.modifier = Nothing, RollDie.slot = SlotName.MkSlotName (Text.pack "result"), RollDie.other = Nothing})
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.count = Quantity.Literal 1, RollDie.modifier = Nothing, RollDie.reading = DiceReading.ChooseOne, RollDie.slot = SlotName.MkSlotName (Text.pack "result"), RollDie.other = Nothing})
       " {\"type\":\"RollDie\",\"value\":{\"sides\":20,\"slot\":\"result\"}} "
   -- CR 706.2's modifier, so the elided field above is not the only shape this
   -- arm round-trips.
@@ -2060,7 +2061,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.count = Quantity.Literal 1, RollDie.modifier = Just (Quantity.Literal 3), RollDie.slot = SlotName.MkSlotName (Text.pack "result"), RollDie.other = Nothing})
+      (Effect.RollDie RollDie.MkRollDie {RollDie.sides = 20, RollDie.count = Quantity.Literal 1, RollDie.modifier = Just (Quantity.Literal 3), RollDie.reading = DiceReading.ChooseOne, RollDie.slot = SlotName.MkSlotName (Text.pack "result"), RollDie.other = Nothing})
       " {\"type\":\"RollDie\",\"value\":{\"modifier\":{\"type\":\"Literal\",\"value\":3},\"sides\":20,\"slot\":\"result\"}} "
   Spec.it s "FlipCoin" $
     Common.assertJsonCodec

@@ -415,6 +415,8 @@ library codec
     Pawl.Codec.DevourCount
     Pawl.Codec.DevourCountSpec
     Pawl.Codec.DevourSpec
+    Pawl.Codec.DiceReading
+    Pawl.Codec.DiceReadingSpec
     Pawl.Codec.DieResult
     Pawl.Codec.DieRollR
     Pawl.Codec.DieRollRewrite
@@ -1828,6 +1830,7 @@ library types
     Pawl.Types.Devotion
     Pawl.Types.Devour
     Pawl.Types.DevourCount
+    Pawl.Types.DiceReading
     Pawl.Types.DiceRoll
     Pawl.Types.DieResult
     Pawl.Types.DieRollR

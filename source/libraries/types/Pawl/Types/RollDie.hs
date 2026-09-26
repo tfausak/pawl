@@ -1,6 +1,7 @@
 module Pawl.Types.RollDie where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -17,8 +18,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- `count` is CR 706.1's other half, how many of those dice one instruction
 -- throws. A Quantity rather than a numeral for FlipCoin's reason: Neverwinter
 -- Hydra's "roll X dice" is the announced X where Valiant Endeavor's "roll two
--- d6" is a literal. One is the value the codec elides, which is every roll in
--- data\/cards\/ but the Endeavor's.
+-- d6" is a literal. One is the value the codec elides.
 --
 -- `modifier` is CR 706.2's first sentence -- what the roll's OWN instruction
 -- adds to or subtracts from the natural result (Diviner's Portent, "roll a d20
@@ -28,10 +28,10 @@ import qualified Pawl.Types.SlotName as SlotName
 -- printing pairs a modifier with a count above one.
 --
 -- `slot` binds the result the roller USES. With one die that is the only result
--- there is; with more the roller chooses among them (CR 706.4, "roll two d6 and
--- choose one result" -- the whole Endeavor cycle), which is what
--- Pawl.Types.Prompt's ChooseDieResult asks. No slot binds the natural result:
--- CR 706.3a's striations and CR 706.4's text both read the result, and the only
+-- there is; with more, `reading` below says which number it is -- under a
+-- choice (CR 706.4, "roll two d6 and choose one result" -- the whole Endeavor
+-- cycle) the one Pawl.Types.Prompt's ChooseDieResult asks for. No slot binds
+-- the natural result: CR 706.3a's striations and CR 706.4's text both read the result, and the only
 -- reader of the natural result in rule 706 is CR 706.2b's reroll step, which
 -- Pawl.Engine.Dice.rerollOffers reads internally (Clam-I-Am's "if you roll a
 -- 3"), so a second slot would be a capability no card exercises.
@@ -53,8 +53,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- -- would seed this record's count instead of leaving it at zero. The field
 -- appears when that card does.
 --
--- Not implemented: the readings that take the results as a SET rather than one
--- at a time -- CR 706.5's doubles and a total (#3243).
+-- `reading` is how `slot` reads the results where the instruction threw more
+-- than one: the roller's choice of one (the Endeavor cycle), or their total
+-- (Neverwinter Hydra's "the total of those results"), which asks nothing and
+-- binds zero where no die was thrown. `other` is meaningful only beside the
+-- choice.
 --
 -- CR 706.3's results table is NOT a field here and never will be: a striation
 -- is a Pawl.Types.Clause of the same mode whose `condition` compares this slot
@@ -67,6 +70,7 @@ data RollDie = MkRollDie
   { sides :: Natural.Natural,
     count :: Quantity.Quantity,
     modifier :: Maybe Quantity.Quantity,
+    reading :: DiceReading.DiceReading,
     slot :: SlotName.SlotName,
     other :: Maybe SlotName.SlotName
   }
@@ -75,3 +79,8 @@ data RollDie = MkRollDie
 -- | What an instruction rolling ONE die writes, and the value the codec elides.
 defaultCount :: Quantity.Quantity
 defaultCount = Quantity.Literal 1
+
+-- | What an instruction that reads no total writes, and the value the codec
+-- elides.
+defaultReading :: DiceReading.DiceReading
+defaultReading = DiceReading.ChooseOne

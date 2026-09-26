@@ -165,6 +165,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -3906,33 +3907,37 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             Nothing -> 0
             Just quantity -> Maybe.fromMaybe 0 (Quantity.evaluateFor viewOf context gs resolving source quantity)
     (results, throwers) <- throwDice controller sides named perDie
-    Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
-      gs <- State.get
-      -- CR 706.4: WHICH result the instruction uses, where it threw more than
-      -- one ("roll two d6 and choose one result"). A choice and not a roll, so
-      -- it goes through Game.choose and CR 723.5's controller may make it.
-      -- Elided where every result is the same number: both bindings below come
-      -- out the same whichever die is named, so no board can tell the answers
-      -- apart. FILTERED, NOT TRUSTED, the ChooseBolster posture: an index past
-      -- the end takes the first die rolled.
-      index <-
-        if all (== NonEmpty.head offered) (NonEmpty.tail offered)
-          then pure 0
-          else do
-            answer <- Game.choose (Prompt.ChooseDieResult (Decide.deciderFor controller gs) controller resolving offered)
-            pure (if answer < List.genericLength results then answer else 0)
-      State.modify' (bindAmountSlot source (RollDie.slot rollDie) (Replacement.at results index (NonEmpty.head offered)))
-      -- CR 706.4's "the other result", off the same throw rather than re-derived
-      -- from the count, FlipCoin's `misses` below and for its reason. Only a
-      -- two-die instruction has an "other": at any other count what is left is
-      -- not one number, and the slot stays unbound rather than guessing which of
-      -- them the card meant. Pawl.CardSpec's lint keeps data/cards/ to counts
-      -- this can answer for.
-      Foldable.for_ (RollDie.other rollDie) $ \other ->
-        case fmap snd (filter (\(i, _) -> i /= index) (zip [0 ..] results)) of
-          [rest] -> State.modify' (bindAmountSlot source other rest)
-          _ -> pure ()
-      recordRoll controller throwers results
+    case RollDie.reading rollDie of
+      -- CR 706.4's total: every result read at once, so there is nothing to
+      -- choose, and the total of no dice is zero rather than unbound.
+      DiceReading.Total -> State.modify' (bindAmountSlot source (RollDie.slot rollDie) (sum results))
+      DiceReading.ChooseOne -> Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
+        gs <- State.get
+        -- CR 706.4: WHICH result the instruction uses, where it threw more than
+        -- one ("roll two d6 and choose one result"). A choice and not a roll, so
+        -- it goes through Game.choose and CR 723.5's controller may make it.
+        -- Elided where every result is the same number: both bindings below come
+        -- out the same whichever die is named, so no board can tell the answers
+        -- apart. FILTERED, NOT TRUSTED, the ChooseBolster posture: an index past
+        -- the end takes the first die rolled.
+        index <-
+          if all (== NonEmpty.head offered) (NonEmpty.tail offered)
+            then pure 0
+            else do
+              answer <- Game.choose (Prompt.ChooseDieResult (Decide.deciderFor controller gs) controller resolving offered)
+              pure (if answer < List.genericLength results then answer else 0)
+        State.modify' (bindAmountSlot source (RollDie.slot rollDie) (Replacement.at results index (NonEmpty.head offered)))
+        -- CR 706.4's "the other result", off the same throw rather than re-derived
+        -- from the count, FlipCoin's `misses` below and for its reason. Only a
+        -- two-die instruction has an "other": at any other count what is left is
+        -- not one number, and the slot stays unbound rather than guessing which of
+        -- them the card meant. Pawl.CardSpec's lint keeps data/cards/ to counts
+        -- this can answer for.
+        Foldable.for_ (RollDie.other rollDie) $ \other ->
+          case fmap snd (filter (\(i, _) -> i /= index) (zip [0 ..] results)) of
+            [rest] -> State.modify' (bindAmountSlot source other rest)
+            _ -> pure ()
+    Monad.unless (null results) (recordRoll controller throwers results)
   -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
   -- throwDice's window: the same die, the new face filtered back to
   -- CR 706.1a's range, and handed back through GameState.rerolledTo. No window
