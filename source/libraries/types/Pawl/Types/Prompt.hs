@@ -655,7 +655,9 @@ data Prompt r where
   ChooseAnyNumberOfPermanents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 608.2d: which one of the matching permanents a resolving effect acts
   -- on (Pawl.Types.ObjectRef.ChosenPermanent); at none the instruction is
-  -- impossible (CR 101.3). Not ChooseTargets (CR 115.1, CR 115.10a).
+  -- impossible (CR 101.3). Not ChooseTargets (CR 115.1, CR 115.10a). Also CR
+  -- 509.4: which attacker a creature entering blocking blocks, the ObjectId
+  -- then being that creature.
   ChoosePermanent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 702.122a: which untapped permanents are tapped to crew, the Natural a
   -- power threshold rather than a size (Pawl.Engine.Cost validates the sum).

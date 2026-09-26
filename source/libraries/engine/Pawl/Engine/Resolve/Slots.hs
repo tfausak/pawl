@@ -90,6 +90,7 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryAttack as EntryAttack
+import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -285,7 +286,8 @@ tokenBoxQuantities card =
     (\face -> foldMap (pure . Power.unwrap) (Face.power face) <> foldMap (pure . Toughness.unwrap) (Face.toughness face))
     (Card.Type.faces card)
 
--- The slots an entry rider READS: CR 509.4's blocking rider, CR 303.4i's
+-- The slots an entry rider READS: CR 509.4's specified block
+-- (EntryBlock.Specified), CR 303.4i's
 -- attachment, CR 508.4's
 -- specified attack (EntryAttack.SameAs) and CR 702.116a's narrowed one
 -- (EntryAttack.UnderPlayer); every other rider is a flag or a Quantity
@@ -310,7 +312,11 @@ riderSlots riders =
         Just (EntryAttack.UnderPlayer slot) -> oneSlot slot
         Just EntryAttack.Chosen -> Map.empty
         Nothing -> Map.empty
-   in joinSlots [attacked, maybe Map.empty oneSlot (EntryRiders.blocking riders), maybe Map.empty oneSlot (EntryRiders.attachedTo riders)]
+      blocked = case EntryRiders.blocking riders of
+        Just (EntryBlock.Specified slot) -> oneSlot slot
+        Just EntryBlock.Chosen -> Map.empty
+        Nothing -> Map.empty
+   in joinSlots [attacked, blocked, maybe Map.empty oneSlot (EntryRiders.attachedTo riders)]
 
 -- The slots a PlayerRef reads. EachPlayerExcept, EachOpponentExcept, InSlot,
 -- ControllerOfBound, OwnerOfBound, ChosenPlayerOfBound and Attacking name one

@@ -181,7 +181,10 @@
                         "value": 1
                       },
                       "riders": {
-                        "blocking": "soldierBlocked"
+                        "blocking": {
+                          "type": "Specified",
+                          "value": "soldierBlocked"
+                        }
                       }
                     }
                   }
@@ -250,7 +253,10 @@
                         "value": 1
                       },
                       "riders": {
-                        "blocking": "battleBlocked"
+                        "blocking": {
+                          "type": "Specified",
+                          "value": "battleBlocked"
+                        }
                       }
                     }
                   }
