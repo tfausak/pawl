@@ -400,8 +400,8 @@ objectsLeaveWith pid gs =
 --
 -- Card JSON could author a stored SetControllerToSource through
 -- Effect.ModifyTarget, and this function does not end one -- but such an effect
--- is inert: Projection.controllerOfGiven's storedSetter matches only
--- Modification.SetController, Projection.controlGrants reads control-granting
+-- is inert: Projection.layerTwo reads only Modification.SetController off
+-- stored effects, Projection.controlGrants reads control-granting
 -- static abilities off Projection.staticAbilitiesOf and never off stored effects, and
 -- Projection.applyModification's SetControllerToSource arm is the identity. A
 -- card authoring one would grant control to no one, so there is nothing here for
@@ -488,12 +488,11 @@ givesControlOnEntryTo pid active =
 --      no player: by CR 109.5 its answer is controllerOf(source), the same
 --      question one object further along.
 --
--- Source 3 is therefore not a base case but a recursion, and the proof is an
--- induction over it. Projection.controllerOfGiven carries a visited set that
--- grows on every step and returns the object's OWNER when it revisits, so the
--- recursion terminates on a finite object pool, and every leaf it terminates on
--- is source 1, source 2, or a source that has itself been deleted (answering
--- Nothing) -- none of which can be `pid`. That covers the case clause 1 alone
+-- Source 3 is therefore not a base case, and the proof is an induction over
+-- Projection.layerTwo's fold: its running table starts empty, and each step
+-- writes either source 2's player or the controller the table already gives a
+-- source -- itself source 1, source 2, an earlier write, or Nothing for a source
+-- that has been deleted. None of these can be `pid`. That covers the case clause 1 alone
 -- does not: a departing player who CONTROLS a control-granting Aura they do not
 -- OWN.
 --

@@ -1624,8 +1624,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- mode declaring it would be silently shadowed.
   -- #199: no card authors a layer-2 control modification into an effect that
   -- RESOLVES. SetControllerToSource is the payload-free constructor and is
-  -- INERT when stored: Projection.controllerOfGiven's storedSetter matches only
-  -- Modification.SetController, Projection.controlGrants reads control-granting
+  -- INERT when stored: Projection.layerTwo reads only
+  -- Modification.SetController off stored effects, Projection.controlGrants reads control-granting
   -- static abilities off Face.staticAbilities and never off stored effects, and
   -- Projection.applyModification's SetControllerToSource arm is the identity.
   -- A card authoring one would resolve, store the effect, and grant control to

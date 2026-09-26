@@ -307,7 +307,7 @@ checkControlContinuity = do
         Just obj -> case Object.sickness obj of
           Sickness.Sick -> objs
           Sickness.Settled p ->
-            if Projection.controllerOfGiven grants Set.empty oid gs == Just p
+            if Projection.controllerOfGiven grants oid gs == Just p
               then objs
               else Map.insert oid obj {Object.sickness = Sickness.Sick} objs
   State.put gs {GameState.objects = foldr interrupted (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
@@ -396,7 +396,7 @@ sampleControl = do
       sampled =
         Map.fromList $ do
           oid <- Set.toList (GameState.battlefield gs)
-          Just pid <- [Projection.controllerOfGiven grants Set.empty oid gs]
+          Just pid <- [Projection.controllerOfGiven grants oid gs]
           pure (oid, pid)
       changes = do
         (oid, after) <- Map.toList sampled
