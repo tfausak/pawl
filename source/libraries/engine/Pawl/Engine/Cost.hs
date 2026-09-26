@@ -70,6 +70,7 @@ import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Claim as Claim.Type
 import qualified Pawl.Types.ClaimAxis as ClaimAxis
+import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
@@ -79,6 +80,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Emerge as Emerge
@@ -1370,7 +1372,7 @@ substituteXInComponent x component = case component of
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
-  CostComponent.RemovePlusOneCountersFromThis _ -> component
+  CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.RemovePlusOneCounters {} -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
@@ -1442,7 +1444,7 @@ componentHasVariable component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
-  CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemovePlusOneCounters {} -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
@@ -1539,7 +1541,7 @@ componentDemandGrowsWithX component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
-  CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemovePlusOneCounters {} -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
@@ -1833,7 +1835,7 @@ loyaltyAmountOf component = case component of
   -- 606.3), gate it on the sorcery window and feed it to `combineLoyalty` (CR
   -- 606.5). Removing a +1\/+1 counter is none of that. Proven, not a fence:
   -- Pawl.CostSpec's Barkhide Troll cases both redden on a Just here.
-  CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+  CostComponent.RemoveCountersFromThis _ -> Nothing
   -- Nothing, the arm above's reason unchanged by the counters coming off
   -- another permanent: CR 606.4's loyalty symbol is what makes a loyalty
   -- ability, and this is a +1\/+1 counter.
@@ -1956,7 +1958,7 @@ zoneOfComponent component = case component of
   -- of any zone and CR 113.6's battlefield default stands. A FENCE and not proven
   -- behaviour, as ReturnThis' answer above is: Barkhide Troll's ability functions
   -- on the battlefield under either answer, so nothing separates them.
-  CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+  CostComponent.RemoveCountersFromThis _ -> Nothing
   -- Nothing for the arm above's reason and one more: the counters come off
   -- ANOTHER permanent, which CR 113.6m does not ask about either way.
   CostComponent.RemovePlusOneCounters {} -> Nothing
@@ -2042,7 +2044,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
-  CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemovePlusOneCounters {} -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
@@ -2509,7 +2511,7 @@ claimOf slots pid oid component gs =
         -- leaves any pool -- the two arms either side of this one, for their reason. A
         -- FENCE, `repeatsOf` settling before any axis matters for a cost with one
         -- component and a mana part.
-        CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+        CostComponent.RemoveCountersFromThis _ -> Nothing
         -- Nothing, the arm above's rule 122.1 reason, though this one DOES pick
         -- an object out of a pool: what it spends is the counters on that
         -- object, which are markers rather than objects, so no pool shrinks --
@@ -2819,9 +2821,9 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
 -- get it -- untapped-ness is one such pool (ClaimAxis.Tapping), which is what
 -- makes Heritage Druid beside nine untapped Elves three activations and nine
 -- mana; LIFE, through CR 119.4, so the ceiling is the life total divided by
--- `lifeOwedBy`; and the +1\/+1 COUNTERS on the source, CR 122.1's marker, so the
--- ceiling is what it carries divided by `plusOneCountersOwedBy` -- Workhorse's
--- four counters are four activations and four mana.
+-- `lifeOwedBy`; and the COUNTERS on the source, CR 122.1's marker, so each
+-- kind's ceiling is what it carries divided by `countersOwedBy` -- Workhorse's
+-- four +1\/+1 counters are four activations and four mana.
 --
 -- Each totalled and then DIVIDED for one reason: two components spending the same
 -- resource would each get the whole of it if they were asked separately, which
@@ -2849,9 +2851,7 @@ repeatsOf pid oid cost gs =
       lifeCeiling = case lifeOwedBy components of
         0 -> []
         owed -> [div (lifeTotalOf pid gs) owed]
-      counterCeiling = case plusOneCountersOwedBy components of
-        0 -> []
-        owed -> [div (countersOn CounterKind.PlusOnePlusOne oid gs) owed]
+      counterCeiling = [div (countersOn kind oid gs) owed | (kind, owed) <- Map.toList (countersOwedBy components), owed > 0]
       ceilings = objectCeiling <> lifeCeiling <> counterCeiling <> Maybe.mapMaybe uncountedCeiling components
    in case Cost.mana cost of
         Just (ManaCost.MkManaCost []) -> case ceilings of
@@ -2921,7 +2921,7 @@ uncountedCeiling component = case component of
   CostComponent.AddLoyaltyToThis _ -> Just 1
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1
   -- Counted by `counterCeiling`, CR 122.1.
-  CostComponent.RemovePlusOneCountersFromThis _ -> Nothing
+  CostComponent.RemoveCountersFromThis _ -> Nothing
   -- 1, and NOT folded into `counterCeiling`: that ceiling divides the counters
   -- on `oid`, and this component takes them off ANOTHER permanent, so the
   -- division would measure the wrong pile. An UNDERSTATEMENT -- a creature with
@@ -3151,7 +3151,7 @@ lifeOwedByComponent component = case component of
   CostComponent.PayEnergy _ -> 0
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
-  CostComponent.RemovePlusOneCountersFromThis _ -> 0
+  CostComponent.RemoveCountersFromThis _ -> 0
   CostComponent.RemovePlusOneCounters {} -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
@@ -3172,7 +3172,7 @@ lifeOwedByComponent component = case component of
   CostComponent.Behold _ -> 0
   CostComponent.MillCards _ -> 0
 
--- The +1\/+1 counters a cost takes OFF the object it is on, added up --
+-- The counters a cost takes OFF the object it is on, added up per kind --
 -- `lifeOwedBy`'s counter sibling, and `repeatsOf`'s counterCeiling is what
 -- divides by it. Total for lifeOwedBy's reason: a new component spending these
 -- counters cannot be added without answering here.
@@ -3181,51 +3181,51 @@ lifeOwedByComponent component = case component of
 -- moves the resource the other way, so folding it in would net two components
 -- that CR 122.1 never nets -- and CR 601.2h leaves the payment's ORDER to the
 -- payer, so a cost holding both has no fixed number of counters to divide.
-plusOneCountersOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
-plusOneCountersOwedBy = sum . fmap plusOneCountersOwedByComponent
+countersOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural
+countersOwedBy components = Map.fromListWith (+) [(kind, owed) | component <- components, (kind, owed) <- countersOwedByComponent component]
 
-plusOneCountersOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
-plusOneCountersOwedByComponent component = case component of
-  CostComponent.RemovePlusOneCountersFromThis n -> n
+countersOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> [(CounterKind.CounterKind Keyword.Type.Keyword, Natural)]
+countersOwedByComponent component = case component of
+  CostComponent.RemoveCountersFromThis removal -> [(CountersFromThis.kind removal, CountersFromThis.count removal)]
   -- Zero, and that is the header's "off the object it is on": this component
   -- takes its counters off ANOTHER permanent, so `counterCeiling`'s division of
   -- `oid`'s counters has nothing to learn from it.
-  CostComponent.RemovePlusOneCounters {} -> 0
-  CostComponent.PutPlusOneCountersOnThis _ -> 0
-  CostComponent.PayLife _ -> 0
-  CostComponent.PayLifeX -> 0
-  CostComponent.PayEnergyX -> 0
-  CostComponent.TapThis -> 0
-  CostComponent.UntapThis -> 0
-  CostComponent.SacrificeThis -> 0
-  CostComponent.ReturnThis -> 0
-  CostComponent.Sacrifice {} -> 0
-  CostComponent.TapForTotalPower {} -> 0
-  CostComponent.TapPermanents {} -> 0
-  CostComponent.ReturnPermanents {} -> 0
-  CostComponent.DiscardCards {} -> 0
-  CostComponent.DiscardThis _ -> 0
-  CostComponent.PutCardFromHandOntoBattlefield _ -> 0
-  CostComponent.PayEnergy _ -> 0
-  CostComponent.AddLoyaltyToThis _ -> 0
-  CostComponent.RemoveLoyaltyFromThis _ -> 0
-  CostComponent.Blight _ -> 0
-  CostComponent.BlightX -> 0
-  CostComponent.Forage -> 0
-  CostComponent.FlipCoin -> 0
-  CostComponent.ChooseOpponent -> 0
-  CostComponent.WaterbendX -> 0
-  CostComponent.Waterbend _ -> 0
-  CostComponent.ExileThisFromGraveyard -> 0
-  CostComponent.ExileThis -> 0
-  CostComponent.ExileCardsFromGraveyard {} -> 0
-  CostComponent.ExileMaterials {} -> 0
-  CostComponent.ExileTopFromGraveyard _ -> 0
-  CostComponent.CollectEvidence _ -> 0
-  CostComponent.ExileCardFromHand _ -> 0
-  CostComponent.RevealCardFromHand _ -> 0
-  CostComponent.Behold _ -> 0
-  CostComponent.MillCards _ -> 0
+  CostComponent.RemovePlusOneCounters {} -> []
+  CostComponent.PutPlusOneCountersOnThis _ -> []
+  CostComponent.PayLife _ -> []
+  CostComponent.PayLifeX -> []
+  CostComponent.PayEnergyX -> []
+  CostComponent.TapThis -> []
+  CostComponent.UntapThis -> []
+  CostComponent.SacrificeThis -> []
+  CostComponent.ReturnThis -> []
+  CostComponent.Sacrifice {} -> []
+  CostComponent.TapForTotalPower {} -> []
+  CostComponent.TapPermanents {} -> []
+  CostComponent.ReturnPermanents {} -> []
+  CostComponent.DiscardCards {} -> []
+  CostComponent.DiscardThis _ -> []
+  CostComponent.PutCardFromHandOntoBattlefield _ -> []
+  CostComponent.PayEnergy _ -> []
+  CostComponent.AddLoyaltyToThis _ -> []
+  CostComponent.RemoveLoyaltyFromThis _ -> []
+  CostComponent.Blight _ -> []
+  CostComponent.BlightX -> []
+  CostComponent.Forage -> []
+  CostComponent.FlipCoin -> []
+  CostComponent.ChooseOpponent -> []
+  CostComponent.WaterbendX -> []
+  CostComponent.Waterbend _ -> []
+  CostComponent.ExileThisFromGraveyard -> []
+  CostComponent.ExileThis -> []
+  CostComponent.ExileCardsFromGraveyard {} -> []
+  CostComponent.ExileMaterials {} -> []
+  CostComponent.ExileTopFromGraveyard _ -> []
+  CostComponent.CollectEvidence _ -> []
+  CostComponent.ExileCardFromHand _ -> []
+  CostComponent.RevealCardFromHand _ -> []
+  CostComponent.Behold _ -> []
+  CostComponent.MillCards _ -> []
 
 -- CR 118.3 for ONE component. `slots` is what CR 601.2c has bound, or would bind
 -- under the announcement the caller is measuring; every criterion below is read
@@ -3411,7 +3411,7 @@ canPayComponent slots pid oid component gs = case component of
       && Projection.controllerOf oid gs == Just pid
       && loyaltyCountersOn oid gs >= n
   -- CR 118.3: payable only while the permanent still carries at least that many
-  -- +1\/+1 counters -- "a player can't pay a cost without having the necessary
+  -- counters of the kind -- "a player can't pay a cost without having the necessary
   -- resources to pay it fully". CR 606.6 is the loyalty-only analogue and is NOT
   -- the rule here. ">=" for that arm's reason: a removal of exactly what is there
   -- is payable and leaves none.
@@ -3423,9 +3423,9 @@ canPayComponent slots pid oid component gs = case component of
   -- ability in `data/cards/` pairs this component with an Activator.AnyPlayer
   -- clause, and without one CR 602.2's default makes the payer the controller --
   -- a declared reading rather than a tested one.
-  CostComponent.RemovePlusOneCountersFromThis n ->
+  CostComponent.RemoveCountersFromThis removal ->
     Set.member oid (GameState.battlefield gs)
-      && countersOn CounterKind.PlusOnePlusOne oid gs >= n
+      && countersOn (CountersFromThis.kind removal) oid gs >= CountersFromThis.count removal
   -- CR 118.3 again, asked of the payer's BOARD rather than of `oid`: payable
   -- only while some permanent the criterion admits carries at least that many
   -- +1\/+1 counters. What it decides is the OFFER -- an activated ability whose
@@ -3550,7 +3550,7 @@ criteriaOf component = case component of
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
-  CostComponent.RemovePlusOneCountersFromThis _ -> []
+  CostComponent.RemoveCountersFromThis _ -> []
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
@@ -4254,7 +4254,7 @@ paidInSecondPass component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
-  CostComponent.RemovePlusOneCountersFromThis _ -> False
+  CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemovePlusOneCounters {} -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
@@ -4376,11 +4376,11 @@ orderSensitive component = case component of
   CostComponent.TapForTotalPower {} -> True
   CostComponent.TapPermanents {} -> True
   CostComponent.AddLoyaltyToThis _ -> True
-  -- A FENCE rather than proven behaviour, ReturnThis' above and for its reason:
-  -- Barkhide Troll is the one card that prints this component and its cost has no
-  -- second order-sensitive part, so `orderObservable` is False whichever way this
-  -- answers.
-  CostComponent.RemovePlusOneCountersFromThis _ -> True
+  -- True: the counters come off the permanent the cost is on, an object. A FENCE
+  -- rather than proven behaviour: Barkhide Troll's cost has no second
+  -- order-sensitive part, and Hickory Woodlot's {T} beside it makes the order a
+  -- question no board in the suite reads.
+  CostComponent.RemoveCountersFromThis _ -> True
   -- True, the arm above's reading over another permanent: paying this takes the
   -- counters a second part of the same cost could have taken. A FENCE rather
   -- than proven behaviour -- Zameck Guildmage's cost's other part is mana, which
@@ -4880,38 +4880,58 @@ tapForManaWith perform inFlight oid = do
             -- read, so the payment's own slots are dropped here. The ability
             -- itself has no object either -- see `perform` below.
             Payment.Paid _ -> do
+              -- CR 608.2c: the clauses in printed order, each decided as it is
+              -- reached, on the board the cost and the earlier clauses left --
+              -- Hickory Woodlot's "if there are no depletion counters" reads the
+              -- counter its own cost removed (Pawl.ManaSpec's Hickory Woodlot
+              -- group). The source stands in for the ability object CR 605.3b
+              -- leaves uncreated, and CR 608.2h's last-known information answers
+              -- for a source the cost sacrificed.
+              --
+              -- A clause that happens adds its share of the yield, then runs its
+              -- other effects -- CR 405.6c's "the mana is produced and the other
+              -- effect happens immediately", HERE, inside the window this
+              -- activation was made in. Ancient Tomb's 2 damage is charged before
+              -- the rest of the payment can spend the mana it just made
+              -- (Pawl.ManaSpec's Ancient Tomb group). The performer runs them;
+              -- Pawl.Engine.Resolve.Effect.performManaAbility is where the source
+              -- stands in for the ability object.
+              --
               -- CR 106.4: each share goes to the players its own reference
               -- names, resolved through Mana.recipientsOf -- the same function
               -- Mana.manaSuppliesGiven keeps the payer's share by, so the offer
               -- and the payment cannot disagree about whose pool a route fills.
               -- Yurlok of Scorch Thrash is the printing that observes it, and
-              -- Pawl.ManaSpec's Yurlok group is what proves it.
+              -- Pawl.ManaSpec's Yurlok group is what proves it. ORDER across
+              -- recipients is unobservable: a pool is a multiset
+              -- (Pawl.Types.Mana) and CR 101.4's ordering rule is about CHOICES,
+              -- of which the addition itself makes none.
               --
-              -- ORDER across recipients is unobservable: a pool is a multiset
-              -- (Pawl.Types.Mana) and CR 101.4's ordering rule is about
-              -- CHOICES, of which the addition itself makes none.
-              gs2 <- State.get
-              let shares = concatMap (\(ref, mana) -> fmap (\recipient -> (recipient, Mana.unitsOf mana)) (Mana.recipientsOf controller gs2 ref)) (Map.toList (ManaOption.yield chosen))
-                  -- CR 605.1b's "mana being added to a player's mana pool", one
-                  -- event per player whose pool this activation filled.
-                  added = Map.fromListWith Set.union [(recipient, Set.fromList (fmap ManaUnit.manaType units)) | (recipient, units) <- shares, not (null units)]
-              State.put (List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) gs2 shares)
-              -- CR 405.6c: "if a mana ability both produces mana and has another
-              -- effect, the mana is produced and the other effect happens
-              -- immediately" -- so the rest of the chosen mode runs HERE, inside
-              -- the window this activation was made in, rather than being queued
-              -- for a caller. Ancient Tomb's 2 damage is charged before the rest
-              -- of the payment can spend the mana it just made
-              -- (Pawl.ManaSpec's Ancient Tomb group).
-              --
-              -- AFTER the mana, which is rule 405.6c's own order and not the
-              -- printed one: the mana is produced, and then the other effect
-              -- happens.
-              --
-              -- The performer runs it against no ability object, CR 605.3b
-              -- leaving one uncreated; Pawl.Engine.Resolve.Effect.performManaAbility is
-              -- where the source stands in for it.
-              ManaAbilityPerformer.effects perform oid controller (ManaOption.effects chosen)
+              -- A clause's mana is the share the OFFER priced, so a clause whose
+              -- "if" only the cost makes true adds no mana. MTGJSON's dump of
+              -- 2026-08-23 prints no such clause (mana-ability lines matching
+              -- "Add ... . If ... add", every hit an "instead" whose "if" no cost
+              -- of its own touches); a land whose cost removes the counter its
+              -- "instead" reads would refute this.
+              let happens clause = do
+                    gsNow <- State.get
+                    let context = Filter.contextFor (Game.teams gsNow) (Just controller) (Just oid)
+                    pure (maybe True (Condition.holds (Projection.viewWithLastKnownAnywhere gsNow) context gsNow oid) (Clause.condition clause))
+                  step (filled, made) (clause, share) = do
+                    admitted <- happens clause
+                    if not admitted
+                      then pure (filled, made)
+                      else do
+                        gsNow <- State.get
+                        let shares = concatMap (\(ref, mana) -> fmap (\recipient -> (recipient, Mana.unitsOf mana)) (Mana.recipientsOf controller gsNow ref)) (Map.toList share)
+                        State.put (List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) gsNow shares)
+                        ManaAbilityPerformer.effects perform oid controller (filter (Maybe.isNothing . ManaAbility.manaProduced) (Foldable.toList (Clause.effects clause)))
+                        pure (filled <> shares, made <> concatMap Mana.unitsOf (Map.elems share))
+              (shares, producedUnits) <- Monad.foldM step ([], []) (ManaOption.steps chosen)
+              -- CR 605.1b's "mana being added to a player's mana pool", one event
+              -- per player whose pool this activation filled, and CR 106.12a's
+              -- "produced": what the clauses that happened added, whoever's pool.
+              let added = Map.fromListWith Set.union [(recipient, Set.fromList (fmap ManaUnit.manaType units)) | (recipient, units) <- shares, not (null units)]
               -- CR 602.5b: record that THIS ability of this permanent has now
               -- been activated, which is the whole of both counted riders'
               -- storage (`capacity` above is where they are read on this path).
@@ -4935,12 +4955,12 @@ tapForManaWith perform inFlight oid = do
               -- The events, not the board: a permanent tapped by {T} is also
               -- tapped by Icy Manipulator, and Pawl.Engine.Event.tap has already
               -- written GameEvent.BecameTapped for both.
-              -- Mana.yieldUnits and not the payer's share: CR 106.12a asks
+              -- Every unit produced and not the payer's share: CR 106.12a asks
               -- whether the activation PRODUCED mana, which it did whoever's
               -- pool it went to.
               let tappedForMana =
-                    [ GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = oid, TappedForMana.mana = Set.fromList (fmap ManaUnit.manaType (Mana.yieldUnits chosen))})
-                    | List.elem CostComponent.TapThis (Cost.components (ManaOption.cost chosen)) && not (null (Mana.yieldUnits chosen))
+                    [ GameEvent.TappedForMana (TappedForMana.MkTappedForMana {TappedForMana.permanent = oid, TappedForMana.mana = Set.fromList (fmap ManaUnit.manaType producedUnits)})
+                    | List.elem CostComponent.TapThis (Cost.components (ManaOption.cost chosen)) && not (null producedUnits)
                     ]
                   -- CR 605.1b's other event, whether or not {T} was paid, and
                   -- recorded at the same moment for the same CR 605.4a reason.
@@ -4951,11 +4971,11 @@ tapForManaWith perform inFlight oid = do
                   -- gated on {T} and on a yield -- CR 605.2 keeps an ability that
                   -- produced nothing a mana ability, and it resolved either way.
                   --
-                  -- Mana.yieldUnits and not the payer's share, TappedForMana's
+                  -- Every unit produced and not the payer's share, TappedForMana's
                   -- reason: "the amount of mana this creature produced" (Tyvar
                   -- the Bellicose) asks what the permanent made, whoever's pool
                   -- CR 106.4 sent it to.
-                  manaAbilityResolved = GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = oid, ManaAbilityResolved.amount = Natural.length (Mana.yieldUnits chosen)})
+                  manaAbilityResolved = GameEvent.ManaAbilityResolved (ManaAbilityResolved.MkManaAbilityResolved {ManaAbilityResolved.permanent = oid, ManaAbilityResolved.amount = Natural.length producedUnits})
               applyManaTriggers perform (tappedForMana <> manaAdded <> [manaAbilityResolved])
               pure (True, [])
 
@@ -5571,8 +5591,8 @@ payComponent moment slots pid oid component = case component of
   -- The funnel saturates, which canPayComponent has already made unreachable
   -- through this door: CR 118.3 refuses an activation the permanent cannot pay
   -- for.
-  CostComponent.RemovePlusOneCountersFromThis n -> do
-    Event.removeCounters oid CounterKind.PlusOnePlusOne n
+  CostComponent.RemoveCountersFromThis removal -> do
+    Event.removeCounters oid (CountersFromThis.kind removal) (CountersFromThis.count removal)
     pure bindsNothing
   -- The same removal aimed at ANOTHER permanent, so the payer chooses which one
   -- and this is a prompt -- elided at exactly one candidate, where the rules

@@ -357,6 +357,8 @@ library codec
     Pawl.Codec.CounterRestriction
     Pawl.Codec.CounterRestrictionSpec
     Pawl.Codec.CounterRSpec
+    Pawl.Codec.CountersFromThis
+    Pawl.Codec.CountersFromThisSpec
     Pawl.Codec.CounterSpec
     Pawl.Codec.CounterSubject
     Pawl.Codec.CounterSubjectSpec
@@ -1814,6 +1816,7 @@ library types
     Pawl.Types.CounterPlacement
     Pawl.Types.CounterR
     Pawl.Types.CounterRestriction
+    Pawl.Types.CountersFromThis
     Pawl.Types.CounterSubject
     Pawl.Types.Craft
     Pawl.Types.Create

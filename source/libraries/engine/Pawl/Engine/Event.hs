@@ -4479,7 +4479,7 @@ addEnteringCounters oid kind n =
 -- producer is CR 120.3h's and CR 120.3c's damage to a battle or a planeswalker;
 -- it belongs to no one rule in particular. Two costs come through this door as
 -- well: CR 606.4's loyalty (Pawl.Engine.Cost's RemoveLoyaltyFromThis arm) and CR
--- 118.1's +1\/+1 removal (its RemovePlusOneCountersFromThis arm).
+-- 118.1's counter removal (its RemoveCountersFromThis arm).
 --
 -- NO CR 614.16 loop, unlike putCounters above, and that asymmetry is the rule's
 -- rather than a shortcut: 614.16 replaces a PLACEMENT -- "if an effect would put

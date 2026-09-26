@@ -98,16 +98,17 @@ import qualified Pawl.Types.Zone as Zone
 -- is a nonsnow one (CR 205.4g).
 oneMana :: Color.Color -> ManaOption.ManaOption
 oneMana color =
-  ManaOption.MkManaOption
-    { ManaOption.cost = Mana.intrinsicManaCost,
-      ManaOption.restrictions = [],
-      ManaOption.ability = Nothing,
-      -- CR 305.6's intrinsic ability, which says nothing beyond its mana.
-      ManaOption.effects = [],
-      -- CR 109.5's "you", which is what a basic land's intrinsic ability means
+  let -- CR 109.5's "you", which is what a basic land's intrinsic ability means
       -- by "add" (Pawl.Codec.ManaAddition.defaultPlayer).
-      ManaOption.yield = Map.singleton (PlayerRef.Relative PlayerRelation.You) (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}])
-    }
+      yield = Map.singleton (PlayerRef.Relative PlayerRelation.You) (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty, ManaUnit.retention = ManaRetention.Ordinary, ManaUnit.restriction = Nothing, ManaUnit.rider = Nothing, ManaUnit.sourceChosenSubtype = Nothing}])
+   in ManaOption.MkManaOption
+        { ManaOption.cost = Mana.intrinsicManaCost,
+          ManaOption.restrictions = [],
+          ManaOption.ability = Nothing,
+          ManaOption.yield = yield,
+          -- CR 305.6's intrinsic ability: one clause, adding the whole yield.
+          ManaOption.steps = [(Mana.intrinsicManaClause (ManaType.Colored color), yield)]
+        }
 
 combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 combatReplaySpec s =
