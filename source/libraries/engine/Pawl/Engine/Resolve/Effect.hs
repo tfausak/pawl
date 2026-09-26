@@ -3451,7 +3451,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
     Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination subject) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination subject foundSlot) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -3553,7 +3553,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               evaluateCap q = case Quantity.evaluateFor (effectViewOf source legal gs0) (effectContext gs0 controller source legal (slotBindings resolving gs0)) gs0 resolving source q of
                 Just n | n > 0 -> Integer.toNaturalSaturating n
                 _ -> 0
-          Monad.forM_ searchers $ \searcher -> Monad.forM_ (ownersFor searcher) $ \owner -> do
+          arrivals <- fmap (concat . concat) . Monad.forM searchers $ \searcher -> Monad.forM (ownersFor searcher) $ \owner -> do
             -- CR 101.2: a player who can't search libraries does not, and finds
             -- nothing there. Asked BEFORE CR 601.3's offer below, which is made
             -- WHILE SEARCHING. The rest of the instruction still happens -- CR
@@ -3675,7 +3675,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- clauses out in order, so the slot an earlier clause bound is read
             -- as it stands now.
             host <- State.gets subjectOf
-            Monad.mapM_ (putFound searcher host destination) found
+            arrived <- concat <$> traverse (putFound searcher host destination) found
             -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
             -- The library shuffled is the one that was READ, so this seat is the
             -- owner -- and only where a LIBRARY is among the zones the searcher
@@ -3690,6 +3690,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               lib <- State.gets (Game.zoneMembers Zone.Library owner)
               shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
               State.modify' (reorderLibrary owner (Game.honourShuffle lib shuffleAnswer))
+            pure arrived
+          -- CR 608.2c: "that card" in a later clause, or in a delayed ability
+          -- this resolution arms (CR 603.7c), is what arrived.
+          Monad.forM_ foundSlot $ \slot -> case arrivals of
+            [] -> pure ()
+            [only] -> State.modify' (bindSlot resolving slot only)
+            several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   -- Exile every card in every graveyard (CR 400.7: each move funnels through
   -- changeZone). "Every graveyard" is CR 102.1's players still in the game, not
   -- the keys of GameState.players, which keep a departed seat's row -- and CR
@@ -9791,25 +9798,28 @@ changeLifeByDelta pid delta =
 -- CR 701.23: do to a found card what the search said -- a move for every
 -- destination and, for one of them, a CR 701.20a reveal first, through the CR
 -- 400.7 funnel either way.
-putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game ()
+--
+-- Answers the incarnations the move minted (CR 400.7), which is what
+-- Search.slot binds; empty where the card did not move.
+putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game [ObjectId]
 putFound searcher subject destination cardId = case destination of
   -- Nature's Lore's "put that card onto the battlefield": the plain move, with
   -- no rider naming how it enters, so CR 110.5b's defaults stand and the card
-  -- arrives untapped. That is why this is Event.changeZone rather than putTapped
+  -- arrives untapped. That is why this is the plain move rather than putTapped
   -- below -- the difference between the two arms is the card's own sentence.
-  SearchDestination.Battlefield -> Event.changeZone cardId Zone.Battlefield
-  SearchDestination.BattlefieldTapped -> putTapped cardId
+  SearchDestination.Battlefield -> Foldable.toList <$> Event.changeZoneReturning cardId Zone.Battlefield
+  SearchDestination.BattlefieldTapped -> Maybe.maybeToList <$> putTapped cardId
   -- The reveal comes FIRST, in the card's own order, and CR 701.20b makes that an
   -- order rather than decoration: revealing does not move the card. The two lines
   -- do not commute -- swapped, CR 400.7 has already ceased `cardId` and the
   -- reveal shows nothing.
   SearchDestination.RevealThenHand -> do
     Event.reveal RevealCause.Ordinary searcher cardId
-    Event.changeZone cardId Zone.Hand
+    Foldable.toList <$> Event.changeZoneReturning cardId Zone.Hand
   -- Hoarding Dragon's "exile it": the move alone, with NO Event.reveal ahead of
   -- it (CR 701.23e). Which card this instruction exiled is CR 607.2a's link,
   -- filed by recordExiledWith off the effect that ran rather than here.
-  SearchDestination.Exile -> Event.changeZone cardId Zone.Exile
+  SearchDestination.Exile -> Foldable.toList <$> Event.changeZoneReturning cardId Zone.Exile
   -- Auratouched Mage's "put that Aura card onto the battlefield attached to it",
   -- and Sovereigns of Lost Alara's "put it onto the battlefield attached to that
   -- creature". WHICH object "it" is, is Search.subject, resolved by the arm that
@@ -9819,7 +9829,7 @@ putFound searcher subject destination cardId = case destination of
   -- destination is nothing at all -- the Aura stays where the search found it (CR
   -- 303.4i).
   SearchDestination.BattlefieldAttached -> case subject of
-    Nothing -> pure ()
+    Nothing -> pure []
     Just host -> attachFound searcher host cardId
   -- The arm above with the card's second sentence added: "If this creature is
   -- still on the battlefield ... Otherwise, reveal the Aura card and put it into
@@ -9841,14 +9851,14 @@ putFound searcher subject destination cardId = case destination of
   SearchDestination.BattlefieldAttachedOrHand -> do
     gs <- State.get
     if maybe False (\host -> Set.member host (GameState.battlefield gs)) subject
-      then Monad.mapM_ (\host -> attachFound searcher host cardId) subject
+      then concat <$> traverse (\host -> attachFound searcher host cardId) (Maybe.maybeToList subject)
       else do
         -- CR 701.20b makes the order matter, for RevealThenHand's reason above:
         -- swapped, CR 400.7 has already ceased `cardId` and the reveal shows
         -- nothing. The reveal is the CARD's own instruction (CR 701.23e), which
         -- is why it is written here rather than in the searching rule.
         Event.reveal RevealCause.Ordinary searcher cardId
-        Event.changeZone cardId Zone.Hand
+        Foldable.toList <$> Event.changeZoneReturning cardId Zone.Hand
 
 -- CR 303.4's entry-attached move, shared by putFound's two attaching arms so the
 -- sentence they have in common is written once.
@@ -9871,14 +9881,14 @@ putFound searcher subject destination cardId = case destination of
 -- zone" -- unreachable from a filter naming Filter.CanAttachToSubject, since that
 -- atom is this same function, and the honest answer for a card whose filter does
 -- not.
-attachFound :: PlayerId -> ObjectId -> ObjectId -> Game ()
+attachFound :: PlayerId -> ObjectId -> ObjectId -> Game [ObjectId]
 attachFound searcher host cardId = do
   gs <- State.get
   case Attach.attachmentFor cardId (Recipient.ToObject host) gs of
-    Nothing -> pure ()
+    Nothing -> pure []
     Just seed ->
-      Monad.void
-        (Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False)
+      Foldable.toList
+        <$> Event.changeZoneAttaching Nothing Set.empty cardId Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just searcher) Nothing Facing.FaceUp False CarryOver.NotCarried False
 
 -- Put a found card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.
@@ -9887,15 +9897,15 @@ attachFound searcher host cardId = do
 -- the permanent ENTERING the battlefield tapped, and an ability that triggers when
 -- a permanent "becomes tapped" doesn't trigger if the permanent enters in that
 -- state. Routing it through the funnel would fire such an ability.
-putTapped :: ObjectId -> Game ()
+putTapped :: ObjectId -> Game (Maybe ObjectId)
 putTapped cardId = do
   before <- State.get
   Event.changeZone cardId Zone.Battlefield
   moved <- State.get
-  case newestBattlefieldOf cardId before moved of
-    Nothing -> pure ()
-    Just newId ->
-      State.put moved {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) newId (GameState.objects moved)}
+  let arrived = newestBattlefieldOf cardId before moved
+  Monad.forM_ arrived $ \newId ->
+    State.put moved {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) newId (GameState.objects moved)}
+  pure arrived
 
 -- The single battlefield id present after a one-object move that was absent
 -- before (changeZone mints a fresh id, CR 400.7).

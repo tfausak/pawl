@@ -22,6 +22,7 @@ codec =
       Arm.nullary "Perpetual" Expiry.Perpetual,
       Arm.payload "While" While.codec Expiry.While (\x -> case x of Expiry.While y -> Just y; _ -> Nothing),
       Arm.payload "AtTurnOf" PlayerId.codec Expiry.AtTurnOf (\x -> case x of Expiry.AtTurnOf y -> Just y; _ -> Nothing),
+      Arm.payload "AtUpkeepOf" PlayerId.codec Expiry.AtUpkeepOf (\x -> case x of Expiry.AtUpkeepOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOfTurnOf" AfterTurn.codec Expiry.AtEndOfTurnOf (\x -> case x of Expiry.AtEndOfTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "DuringTurnOf" AfterTurn.codec Expiry.DuringTurnOf (\x -> case x of Expiry.DuringTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOf" PhaseSelector.codec Expiry.AtEndOf (\x -> case x of Expiry.AtEndOf y -> Just y; _ -> Nothing),
@@ -37,6 +38,7 @@ tagOf x = case x of
   Expiry.Perpetual {} -> "Perpetual"
   Expiry.While {} -> "While"
   Expiry.AtTurnOf {} -> "AtTurnOf"
+  Expiry.AtUpkeepOf {} -> "AtUpkeepOf"
   Expiry.AtEndOfTurnOf {} -> "AtEndOfTurnOf"
   Expiry.DuringTurnOf {} -> "DuringTurnOf"
   Expiry.AtEndOf {} -> "AtEndOf"

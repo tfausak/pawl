@@ -2635,6 +2635,86 @@ castTheCardSpec s registry =
                 _ -> Spec.assertFailure s "one activated ability"
             _ -> Spec.assertFailure s "three printings"
 
+-- "Until the beginning of your next upkeep" (Duration.UntilYourNextUpkeep).
+-- Oracle text checked against api.scryfall.com, 2026-09-26:
+--
+-- Grinning Totem {4} Artifact -- "{2}, {T}, Sacrifice this artifact: Search
+-- target opponent's library for a card and exile it. Then that player
+-- shuffles. Until the beginning of your next upkeep, you may play that card. At
+-- the beginning of your next upkeep, if you haven't played it, put it into its
+-- owner's graveyard."
+--
+-- Elkin Bottle {3} Artifact -- "{3}, {T}: Exile the top card of your library.
+-- Until the beginning of your next upkeep, you may play that card."
+--
+-- The answerer casts the exiled Lightning Bolt the moment alice is offered it,
+-- so what the permission allows is read off bob's life.
+nextUpkeepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nextUpkeepSpec s registry =
+  let named n = Just (CardName.MkCardName (Text.pack n))
+      -- alice in her main phase with priority, the rest of her turn scheduled.
+      mainPhase gs = gs {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+      stock printing pid g = List.foldl' (\h _ -> snd (S.addLibraryCard printing pid h)) g [1 :: Int .. 4]
+      -- Whole steps, stopping BEFORE the first state `stop` holds of.
+      runUntil :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState -> Bool) -> GameState.GameState -> GameState.GameState
+      runUntil answer stop =
+        let go n g =
+              if n <= (0 :: Int) || Maybe.isJust (GameState.result g) || stop g
+                then g
+                else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+         in go 64
+      -- The rest of alice's turn and all of bob's, passing throughout.
+      untilAlicesNextTurn g0 = runUntil S.identityAnswer (\g -> GameState.activePlayer g == S.alice && GameState.turnNumber g > GameState.turnNumber g0) g0
+      -- Then alice's turn up to and including the step `target`.
+      through :: (forall r. Prompt.Prompt r -> r) -> Phase.Phase -> GameState.GameState -> GameState.GameState
+      through answer target g = snd (Engine.runGamePure answer (runUntil answer (\h -> GameState.phase h == target) g) Engine.runStep)
+      -- Casts `boltId` at bob whenever alice is offered it, and passes otherwise.
+      castingBolt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      castingBolt boltId p = case p of
+        Prompt.ChooseAction _ _ actions -> Maybe.fromMaybe A.Pass (List.find (\a -> case a of A.Cast oid _ _ -> oid == boltId; _ -> False) actions)
+        _ -> atBobAnswer p
+      activated source board = case Activatable.abilitiesFor source board of
+        [ability] -> Just (S.runPure atBobAnswer (S.runPure atBobAnswer board (Activate.activateAbility S.alice source ability)) Stack.resolveTop)
+        _ -> Nothing
+   in Spec.describe s "UntilYourNextUpkeep" $ do
+        -- CR 503.1a: the permission ends as alice's upkeep begins, before the
+        -- delayed trigger is put on the stack, so she cannot cast the card in
+        -- response to it.
+        Spec.it s "CR 611.2a Grinning Totem's card is not castable in alice's upkeep, and goes to bob's graveyard" $ do
+          ps <- traverse (S.printingOf s registry) ["Grinning Totem", "Mountain", "Island", "Lightning Bolt"]
+          case ps of
+            [totem, mountain, island, bolt] -> do
+              let (totemId, withTotem) = S.addPermanent totem S.alice (stock island S.bob (stock island S.alice (Setup.emptyGame S.bothPlayers)))
+                  withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) withTotem [1 :: Int, 2]
+                  (_, board) = S.addLibraryCard bolt S.bob withLands
+              case activated totemId (mainPhase board) of
+                Just exiled -> case Game.zoneMembers Zone.Exile S.bob exiled of
+                  [boltId] -> do
+                    let upkept = through (castingBolt boltId) (Phase.Beginning BeginningStep.Upkeep) (untilAlicesNextTurn exiled)
+                    Spec.assertEqWith s "alice could not cast the Lightning Bolt in her upkeep" (S.lifeOf S.bob upkept) (Just 20)
+                    Spec.assertEqWith s "the Lightning Bolt is in bob's graveyard" (namesIn Zone.Graveyard S.bob upkept) [named "Lightning Bolt"]
+                  _ -> Spec.assertFailure s "Grinning Totem should exile exactly one card"
+                Nothing -> Spec.assertFailure s "one activated ability"
+            _ -> Spec.assertFailure s "four printings"
+        -- CR 500.11: Eon Hub skips every upkeep, so the duration outlasts the
+        -- start of alice's next turn and she may still cast the card then.
+        Spec.it s "CR 611.2a Elkin Bottle's card stays castable into alice's next turn when Eon Hub skips her upkeep" $ do
+          ps <- traverse (S.printingOf s registry) ["Elkin Bottle", "Eon Hub", "Mountain", "Island", "Lightning Bolt"]
+          case ps of
+            [bottle, hub, mountain, island, bolt] -> do
+              let (bottleId, withBottle) = S.addPermanent bottle S.alice (stock island S.bob (stock island S.alice (Setup.emptyGame S.bothPlayers)))
+                  withHub = snd (S.addPermanent hub S.bob withBottle)
+                  withLands = List.foldl' (\g _ -> snd (S.addPermanent mountain S.alice g)) withHub [1 :: Int .. 3]
+                  (_, board) = S.addLibraryCard bolt S.alice withLands
+              case activated bottleId (mainPhase board) of
+                Just exiled -> case Game.zoneMembers Zone.Exile S.alice exiled of
+                  [boltId] -> do
+                    let drawn = through (castingBolt boltId) (Phase.Beginning BeginningStep.DrawStep) (untilAlicesNextTurn exiled)
+                    Spec.assertEqWith s "alice cast the Lightning Bolt on her next turn" (S.lifeOf S.bob drawn) (Just 17)
+                  _ -> Spec.assertFailure s "Elkin Bottle should exile exactly one card"
+                Nothing -> Spec.assertFailure s "one activated ability"
+            _ -> Spec.assertFailure s "five printings"
+
 -- Randomness over CR 400.2's PUBLIC zone, the pair of cards that exercise
 -- Pawl.Types.ObjectRef.RandomCardInGraveyard. Ghoulraiser {1}{B}{B} Creature --
 -- Zombie 2/2 (Jumpstart) -- "When this creature enters, return a Zombie card at
@@ -2818,6 +2898,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   discardExceptionsSpec s registry
   elkinLairSpec s registry
   castTheCardSpec s registry
+  nextUpkeepSpec s registry
   ghoulraiserSpec s registry
   libraryPositionSpec s registry
   aetherspoutsSpec s registry

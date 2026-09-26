@@ -819,7 +819,7 @@ effectPlayerRefs effect = case effect of
   Effect.Firebend (ManaAddition.MkManaAddition ref _ _ _ _ _) -> [ref]
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref _) -> [ref]
   Effect.MoveMana (MoveMana.MkMoveMana from to) -> [from, to]
-  Effect.Search (Search.MkSearch searcher owner _ _ _ _ _ _) -> [searcher, owner]
+  Effect.Search (Search.MkSearch searcher owner _ _ _ _ _ _ _) -> [searcher, owner]
   Effect.ExileAllGraveyards -> []
   Effect.RestartGame {} -> []
   Effect.ControlPlayerNextTurn {} -> []
@@ -1041,7 +1041,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- matches it in the resolution's own context -- Bifurcate's "with the same
   -- name as target nontoken creature" is the whole of what its target slot is
   -- for, so without this the D4 dataflow lint would call that slot unread.
-  Effect.Search (Search.MkSearch _ _ _ quantity filter_ _ _ subject) ->
+  Effect.Search (Search.MkSearch _ _ _ quantity filter_ _ _ subject _) ->
     joinTwo
       (joinTwo (joinSlots (fmap quantitySlots (Maybe.maybeToList quantity))) (filterSlotsOf filter_))
       -- CR 701.3a's fixed host, read at arity ONE: a slot naming several objects
@@ -1359,6 +1359,7 @@ durationPlayerRefs duration = case duration of
   Duration.Indefinite -> []
   Duration.Perpetual -> []
   Duration.UntilYourNextTurn -> []
+  Duration.UntilYourNextUpkeep -> []
   Duration.UntilEndOfYourNextTurn -> []
   -- A Condition's own references are Quantity.bakePlayerRef's half, reached
   -- through conditionSlots rather than through a list of references.
@@ -1375,6 +1376,7 @@ durationSlots duration = case duration of
   Duration.Indefinite -> Map.empty
   Duration.Perpetual -> Map.empty
   Duration.UntilYourNextTurn -> Map.empty
+  Duration.UntilYourNextUpkeep -> Map.empty
   Duration.UntilEndOfYourNextTurn -> Map.empty
   -- The seat the window is counted against, read exactly as every other
   -- PlayerRef position is (CR 601.2c).
@@ -1731,7 +1733,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- slotsOf reports them through Filter.boundSlots, the one walk that enumerates
   -- what a Filter reads, and no Filter atom carries a Quantity for
   -- Quantity.slotsAreExhaustive to be about.
-  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> all Quantity.slotsAreExhaustive quantity
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _ _) -> all Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.Reroll -> True
@@ -1938,6 +1940,7 @@ durationSlotsAreExhaustive duration = case duration of
   Duration.Indefinite -> True
   Duration.Perpetual -> True
   Duration.UntilYourNextTurn -> True
+  Duration.UntilYourNextUpkeep -> True
   Duration.UntilEndOfYourNextTurn -> True
   -- playerRefSlots' answer is complete for every arm: a PlayerRef names at
   -- most one slot and nothing nested inside it names another.
@@ -1983,7 +1986,7 @@ readsX =
         Effect.Firebend _ -> False
         Effect.ActivateManaAbilities _ -> False
         Effect.MoveMana _ -> False
-        Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> any Quantity.readsX quantity
+        Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _ _) -> any Quantity.readsX quantity
         Effect.ExileAllGraveyards -> False
         Effect.Proliferate -> False
         Effect.Reroll -> False
@@ -2206,7 +2209,8 @@ boundSlots effect = case effect of
   Effect.Firebend _ -> Set.empty
   Effect.ActivateManaAbilities _ -> Set.empty
   Effect.MoveMana _ -> Set.empty
-  Effect.Search {} -> Set.empty
+  -- CR 400.7: the incarnations the destination minted.
+  Effect.Search search -> foldMap Set.singleton (Search.slot search)
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
   Effect.Reroll -> Set.empty
