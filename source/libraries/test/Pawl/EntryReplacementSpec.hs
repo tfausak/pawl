@@ -55,6 +55,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -63,6 +65,7 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
@@ -1377,6 +1380,23 @@ stuffyDollSpec s registry =
               -- CR 702.12b: 3 over a toughness of 1 is lethal, and indestructible
               -- keeps it on the battlefield anyway.
               Spec.assertBool s (Set.member dollId (GameState.battlefield chosenBob)) "CR 702.12b indestructible: still on the battlefield"
+            _ -> Spec.assertFailure s "the Doll did not reach the battlefield"
+        -- CR 608.2h: the proving case's board with carol chosen, the Doll given
+        -- -2/-2 and buried by CR 704.5f while its trigger waits. The chosen player
+        -- is read off the last known information, so carol still loses 3.
+        Spec.it s "CR 608.2h a Doll that has left still damages the chosen player" $ do
+          doll <- S.printingOf s registry "Stuffy Doll"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case castDoll doll mountain S.carol of
+            (gs, Just dollId, _) -> do
+              let (pikerId, board) = S.addPermanent piker S.bob gs
+                  triggered = settleAll (S.runPure S.identityAnswer board (Damage.applyDamage [noncombat pikerId dollId 3]))
+                  minusTwo = Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-2)))
+                  gone = settleAll (S.withEffect dollId minusTwo triggered)
+                  after = resolveAll gone
+              Spec.assertEqWith s "CR 608.2h carol was chosen, so carol loses 3" (lives after) (Just 20, Just 20, Just 17)
+              Spec.assertEqWith s "and the trigger was on the stack as the Doll left" (length (GameState.stack gone), Set.member dollId (GameState.battlefield gone)) (1, False)
             _ -> Spec.assertFailure s "the Doll did not reach the battlefield"
         -- The STAMP, asserted independently of the payload, so a JSON typo in the
         -- trigger cannot hide behind a green read-back -- and the other way round.

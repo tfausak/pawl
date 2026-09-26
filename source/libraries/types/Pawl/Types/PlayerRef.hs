@@ -168,11 +168,8 @@ data PlayerRef
     -- that one is separate from InSlot: the slot holds an OBJECT, and what is
     -- asked of it is a record rather than a characteristic. Pawl.Types.ObjectRef's
     -- ChosenPlayer is the same read from the other type, for a clause whose
-    -- recipient position takes an ObjectRef (Stuffy Doll's damage).
-    --
-    -- Not implemented: CR 608.2h's look-back, which Pawl.Types.LastKnown does not
-    -- carry for this field -- a permanent that has left names nobody, the limit
-    -- ObjectRef.ChosenPlayer has (#3835).
+    -- recipient position takes an ObjectRef (Stuffy Doll's damage). A permanent
+    -- that has left answers through CR 608.2h's last known information.
     ChosenPlayerOfBound SlotName.SlotName
   | -- | CR 508.6: the players attacking the player a slot names, narrowed by
     -- relation -- Curse of Vitality's "each opponent attacking that player".

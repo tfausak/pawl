@@ -653,11 +653,13 @@ playersFor viewOf context gs ref =
         -- off Object.chosenPlayer rather than off the view -- a choice is a
         -- record, not a characteristic (CR 707.2), so no projection answers it.
         --
-        -- Unanswered where the slot names no object, names several, or names one
-        -- that has left, ControllerOfBound's posture above without its CR 608.2h
-        -- look-back (Pawl.Types.PlayerRef says why).
+        -- Unanswered where the slot names no object or names several,
+        -- ControllerOfBound's posture above; one that has left answers through
+        -- CR 608.2h's last known information. That look-back is a regression
+        -- fence: no card in data/cards/ counts over this reference, so reverting
+        -- it to the live read leaves the suite green.
         PlayerRef.ChosenPlayerOfBound slot ->
-          fmap pure (Filter.slotOneObject slot context >>= \oid -> Game.lookupObject oid gs >>= Object.chosenPlayer)
+          fmap pure (Filter.slotOneObject slot context >>= (`Game.chosenPlayerWithLastKnown` gs))
         -- CR 508.6's set: the players controlling a creature attacking the player
         -- a slot names, narrowed by the relation the card printed. The SAME fold
         -- Pawl.Engine.Resolve.Slots.playerRefPlayers makes for the reference in an
