@@ -7,7 +7,8 @@ module Pawl.Types.CastingPermission where
 -- a player permission rather than an object one and lives on
 -- Pawl.Types.PlayerEffect.CastFrom instead. Only
 -- Pawl.Engine.Cast reads this type, as a membership test per
--- arm. Two producers: Face.castingPermissions (printed) and
+-- arm. Three producers: Face.castingPermissions (printed),
+-- Modification.GainCastingPermission (a layer-6 grant) and
 -- Pawl.Engine.Keyword.castingPermissionsOf (what rule 702 gives for a keyword).
 --
 -- OBJECT-scoped throughout: every arm is a permission a CARD grants about

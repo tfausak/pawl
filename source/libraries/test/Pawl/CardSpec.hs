@@ -844,6 +844,8 @@ modificationCounts modification = case modification of
   -- gives above for the Filter inside its keyword.
   Modification.GainEnchant _ -> []
   Modification.LoseEnchant _ -> []
+  -- A closed enumeration, carrying neither a Count nor a Filter.
+  Modification.GainCastingPermission _ -> []
   -- CR 613.1f's other grant carries a whole ability, so the sweep descends into
   -- it exactly as it does into a printed one, whichever of CR 113.3's kinds it is.
   Modification.GainAbility granted -> case granted of
@@ -3861,6 +3863,7 @@ modificationFilters modification = case modification of
   -- LoseKeywordFamily's payload-free family included.
   Modification.GainEnchant slot -> targetSlotFilters slot
   Modification.LoseEnchant slot -> targetSlotFilters slot
+  Modification.GainCastingPermission _ -> []
   -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
   -- by grantedActivatedAbilities, grantedTriggeredAbilities and
   -- grantedStaticAbilities below, at the outer level, so they keep the Framing that a printed ability's do. Answering

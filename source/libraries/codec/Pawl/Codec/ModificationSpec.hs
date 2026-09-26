@@ -13,6 +13,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
@@ -73,6 +74,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.LoseEnchant (TargetSlot.required Pool.Creatures Nothing))
       " {\"type\":\"LoseEnchant\",\"value\":{\"pool\":{\"type\":\"Creatures\"}}} "
+  -- layer 6, CR 601.3: a granted casting permission.
+  Spec.it s "GainCastingPermission" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.GainCastingPermission CastingPermission.CastFromLibraryWhileSearching)
+      " {\"type\":\"GainCastingPermission\",\"value\":{\"type\":\"CastFromLibraryWhileSearching\"}} "
   -- layer 6 (Humility).
   Spec.it s "LoseAllAbilities" $
     Common.assertCodec

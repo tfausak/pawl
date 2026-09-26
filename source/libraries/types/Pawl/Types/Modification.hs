@@ -3,6 +3,7 @@ module Pawl.Types.Modification where
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter
@@ -94,6 +95,9 @@ data Modification ability
     -- equal to this one (Animate Dead's "loses 'enchant creature card in a
     -- graveyard'").
     LoseEnchant TargetSlot.TargetSlot
+  | -- | layer 6, CR 613.1f / 601.3: this object gains a permission to be cast
+    -- (a granted Panglacial Wurm clause).
+    GainCastingPermission CastingPermission.CastingPermission
   | -- | layer 6, CR 613.1f: this object gains a whole quoted ability, authored on
     -- the granting card (Presence of Gond's "Enchanted creature has '{T}: Create
     -- a 1/1 green Elf Warrior creature token.'", Sixth Sense's "Enchanted
