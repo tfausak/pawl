@@ -507,6 +507,8 @@ library codec
     Pawl.Codec.ExileCardsFromGraveyardSpec
     Pawl.Codec.ExileHaunting
     Pawl.Codec.ExileHauntingSpec
+    Pawl.Codec.ExileLink
+    Pawl.Codec.ExileLinkSpec
     Pawl.Codec.ExileLooker
     Pawl.Codec.ExileLookerSpec
     Pawl.Codec.ExileMaterials
@@ -1891,6 +1893,7 @@ library types
     Pawl.Types.ExchangeZones
     Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
+    Pawl.Types.ExileLink
     Pawl.Types.ExileLooker
     Pawl.Types.ExileMaterials
     Pawl.Types.ExilePlayPermission

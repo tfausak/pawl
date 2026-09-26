@@ -46,6 +46,7 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -2851,7 +2852,7 @@ shellPileBoard island shell piker bolt blade =
       (boltId, g3) = S.addExiledCard bolt S.bob g2
       (bladeId, g4) = S.addExiledCard blade S.bob g3
       (_, g5) = S.addExiledCard bolt S.bob g4
-   in (shellId, g5 {GameState.exiledWith = Map.fromList [(boltId, shellId), (bladeId, shellId)]})
+   in (shellId, g5 {GameState.exiledWith = Map.fromList [(boltId, ExileLink.MkExileLink {ExileLink.source = shellId, ExileLink.ability = Nothing}), (bladeId, ExileLink.MkExileLink {ExileLink.source = shellId, ExileLink.ability = Nothing})]})
 
 -- Activates the Shell's SECOND ability and answers CR 601.3's choice with the
 -- option at `wanted`, then resolves the stack down.

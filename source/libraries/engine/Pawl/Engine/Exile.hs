@@ -19,6 +19,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as View
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.ExileLooker as ExileLooker
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -97,7 +98,7 @@ looksAt pid oid gs looker = case looker of
 -- ExileLooker.ThePlayer of it.
 exilerController :: ObjectId -> GameState.GameState -> Maybe PlayerId
 exilerController oid gs = do
-  exiler <- Map.lookup oid (GameState.exiledWith gs)
+  exiler <- fmap ExileLink.source (Map.lookup oid (GameState.exiledWith gs))
   Monad.guard (Set.member exiler (GameState.battlefield gs))
   View.controllerOf exiler gs
 

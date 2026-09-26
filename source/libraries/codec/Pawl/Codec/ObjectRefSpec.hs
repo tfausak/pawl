@@ -7,6 +7,7 @@ import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -178,6 +179,13 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.EachCardExiledWithSource Nothing)
       " {\"type\":\"EachCardExiledWithSource\"} "
+  -- CR 607.2a's pile of one named exiling ability, Synthetic Split Reliquary's.
+  Spec.it s "EachCardExiledWithAbility" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachCardExiledWithAbility (AbilityName.MkAbilityName (Text.pack "warden")))
+      " {\"type\":\"EachCardExiledWithAbility\",\"value\":\"warden\"} "
   Spec.it s "EachCardEncodedOnSource" $
     Common.assertCodec
       s

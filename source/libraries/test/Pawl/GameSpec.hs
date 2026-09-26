@@ -57,6 +57,7 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -1032,7 +1033,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
             exiled = Game.zoneMembers Zone.Exile S.carol after
         case exiled of
           [exiledPiker] ->
-            Spec.assertEqWith s "CR 607.2a: the exiled card is filed against Karn" (Map.lookup exiledPiker (GameState.exiledWith after)) (Just karnId)
+            Spec.assertEqWith s "CR 607.2a: the exiled card is filed against Karn" (fmap ExileLink.source (Map.lookup exiledPiker (GameState.exiledWith after))) (Just karnId)
           _ -> Spec.assertFailure s "Karn's -3 did not exile carol's Piker"
       _ -> Spec.assertFailure s "Karn does not have exactly one ability costing three loyalty"
 
@@ -1134,7 +1135,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         gStart =
           g4
             { -- CR 607.2a's linkage, which Karn's own -3 files in the case above.
-              GameState.exiledWith = Map.fromList [(pikerId, karnId), (pacifismId, karnId)],
+              GameState.exiledWith = Map.fromList [(pikerId, ExileLink.MkExileLink {ExileLink.source = karnId, ExileLink.ability = Nothing}), (pacifismId, ExileLink.MkExileLink {ExileLink.source = karnId, ExileLink.ability = Nothing})],
               GameState.activePlayer = S.bob,
               GameState.phase = Phase.PrecombatMain,
               GameState.priority = Just S.bob

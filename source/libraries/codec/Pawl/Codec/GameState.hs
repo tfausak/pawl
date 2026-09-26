@@ -30,6 +30,7 @@ import qualified Pawl.Codec.Decider as Decider
 import qualified Pawl.Codec.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Codec.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Codec.EventGroup as EventGroup
+import qualified Pawl.Codec.ExileLink as ExileLink
 import qualified Pawl.Codec.ExtraTurn as ExtraTurn
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.GameSettings as GameSettings
@@ -192,7 +193,7 @@ codec resolve = Fields.object $ do
   movedUntilSourceLeaves <- Fields.defaulted "movedUntilSourceLeaves" Map.empty (Common.naturalMap ObjectId.codec ReturnWatch.codec) GameState.movedUntilSourceLeaves
   haunting <- Fields.defaulted "haunting" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.haunting
   encoded <- Fields.defaulted "encoded" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.encoded
-  exiledWith <- Fields.defaulted "exiledWith" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.exiledWith
+  exiledWith <- Fields.defaulted "exiledWith" Map.empty (Common.naturalMap ObjectId.codec ExileLink.codec) GameState.exiledWith
   enteredWith <- Fields.defaulted "enteredWith" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.enteredWith
   exilePiles <- Fields.defaulted "exilePiles" Map.empty (Common.naturalMap ObjectId.codec Timestamp.codec) GameState.exilePiles
   extraTurns <- Fields.defaulted "extraTurns" [] (Common.list ExtraTurn.codec) GameState.extraTurns
