@@ -845,6 +845,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- at no object at all, nothing here being read off one.
         Quantity.PermanentsDiedThisTurn ->
           Just (toInteger (length (Maybe.mapMaybe (Game.diedChange . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
+        -- CR 702.185c: how many spells, by any player, were cast this turn for the
+        -- cost that keyword family offers. PermanentsDiedThisTurn's log fold,
+        -- reading the tag the cast event copied off Object.castUsing: by now the
+        -- spell has usually left the stack, and CR 400.7 left nothing to ask.
+        --
+        -- Always a number, never Nothing, for the arm above's reason.
+        Quantity.SpellsCastUsingThisTurn family ->
+          let casts = Maybe.mapMaybe (Game.castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))
+           in Just (toInteger (length (filter (\c -> (Keyword.familyOf =<< SpellWasCast.castUsing c) == Just family) casts)))
         -- CR 100.6a / 729.1a: how many subgames have begun this match. Read off the
         -- stored tally and not the log, PermanentsDiedThisTurn's arm's opposite on
         -- that point: GameState.events is cleared at turn handoff and a subgame
@@ -1227,6 +1236,7 @@ objectSlots quantity = case quantity of
   Quantity.TimesResolvedThisTurn -> Set.empty
   Quantity.SpellsCastBefore -> Set.empty
   Quantity.PermanentsDiedThisTurn -> Set.empty
+  Quantity.SpellsCastUsingThisTurn _ -> Set.empty
   Quantity.SubgamesThisMatch -> Set.empty
   Quantity.DungeonsCompleted _ -> Set.empty
   Quantity.CompletedDungeon {} -> Set.empty
@@ -1492,6 +1502,7 @@ readsX quantity = case quantity of
   Quantity.TimesResolvedThisTurn -> False
   Quantity.SpellsCastBefore -> False
   Quantity.PermanentsDiedThisTurn -> False
+  Quantity.SpellsCastUsingThisTurn _ -> False
   Quantity.SubgamesThisMatch -> False
   Quantity.DungeonsCompleted _ -> False
   Quantity.CompletedDungeon {} -> False

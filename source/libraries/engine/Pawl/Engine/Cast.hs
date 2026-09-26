@@ -3281,7 +3281,7 @@ castProposed perform spending pid sid face castFrom preparedFor keywordsBefore c
                           -- binding above gives; a "whenever you cast ... from
                           -- your hand" trigger reads it off the event, since CR
                           -- 400.7 left `sid` no memory of it.
-                          State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g) castFrom)) g)
+                          State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g) castFrom (Object.castUsing =<< Game.lookupObject sid g))) g)
                           -- CR 722.3c's last sentence: "that permanent loses the
                           -- prepared designation AT THE TIME THE SPELL BECOMES
                           -- CAST (see rule 601.2i)". So it is here, beside rule

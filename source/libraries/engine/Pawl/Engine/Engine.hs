@@ -692,8 +692,10 @@ reacts = Event.reactsToAbilityTriggering . TriggeredAbility.condition . PendingT
 -- inspecting the pending set directly, because an ability triggering IS a game
 -- event -- rule 603.3b says so by making it a trigger condition -- so the
 -- existing machinery applies unchanged. Only EVENT triggers are scanned. No
--- artificial bound on the rounds, a pair of abilities each triggering off the
--- other being a genuine loop in the rules too (CR 104.4b's draw). Every round is
+-- bound on the rounds, and none needed: the one condition of this class
+-- (Event.reactsToAbilityTriggering) watches a Saga's final chapter ability,
+-- which triggers off lore counters (CR 714.2b), never off an ability
+-- triggering, so what reacts to it fires nothing further. Every round is
 -- filtered by `withinTriggerLimit` first, the ONE place a "triggers only once"
 -- rider is spent.
 --
@@ -905,8 +907,14 @@ perGameRecord pending = case TriggeredAbility.limit (PendingTrigger.ability pend
 -- the fillableModes/legalSets pair. A sourceless ability has no such object.
 placeOne :: PendingTrigger.PendingTrigger -> Game ()
 placeOne pending = do
-  -- CR 801.16: the ability is an object its controller controls.
-  State.modify' (Game.involve (PendingTrigger.controller pending))
+  -- CR 801.16: the ability is an object its controller controls, and a
+  -- continuous effect applying to an object its event bound is part of what
+  -- made it trigger. Only a game using limited range reads the stamp, so only
+  -- one looks the effects up.
+  gs <- State.get
+  let named = concatMap Set.toList (Map.elems (Binding.slotObjects (PendingTrigger.bindings pending)))
+      shapers = if GameSettings.rangeOfInfluence (GameState.settings gs) == RangeOfInfluence.unlimited then [] else Projection.effectControllersOn named gs
+  State.put (foldr Game.involve gs (PendingTrigger.controller pending : shapers))
   case PendingTrigger.source pending of
     -- Monarch.placeInherent names no rule of its own: it is the generic sourceless
     -- placement, which rule 702.179d's ability rides too.

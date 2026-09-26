@@ -629,7 +629,7 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- Filter in hand, so a slot it names has to hold for every cast the condition
   -- can match. Both do: GameEvent.SpellCast carries an ObjectId and a PlayerId
   -- unconditionally, so no shape of the event withholds either.
-  (TriggerCondition.SpellCast {}, GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _)) ->
+  (TriggerCondition.SpellCast {}, GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _ _)) ->
     Binding.setTriggerPlayer caster (Binding.setCastSpell spell Map.empty)
   -- CR 702.21a's "that spell or ability": the object whose announcement fired
   -- this, which ward counters and whose controller ward offers the cost to.

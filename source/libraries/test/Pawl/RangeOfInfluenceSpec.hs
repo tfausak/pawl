@@ -645,7 +645,7 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 104.4c at an unlimited range the game is a draw" (GameState.result (twice (played id))) (Just Result.Drawn)
 
   -- CR 801.16: Pawl.GameSpec's CR 104.4b loop -- alice's Sporemound mints a
-  -- Saproling, her Life and Limb makes it a Forest land, and another player's
+  -- Saproling, a Life and Limb makes it a Forest land, and another player's
   -- Aether Flash buries it -- at SIX seats, so that two players can sit outside
   -- every loop player's range and play on together. With bob's Aether Flash the
   -- draw takes alice and bob and their neighbours frank and carol. Dave and erin
@@ -659,7 +659,8 @@ spec s registry = Spec.describe s "Range of influence" $ do
     limb <- S.printingOf s registry "Life and Limb"
     sporemound <- S.printingOf s registry "Sporemound"
     forest <- S.printingOf s registry "Forest"
-    let looped flashOwner ranged = resolveAll (ranged (loopBoard flash limb sporemound forest flashOwner))
+    let loopedWith limbOwner flashOwner ranged = resolveAll (ranged (loopBoard flash limb sporemound forest limbOwner flashOwner))
+        looped = loopedWith S.alice
         limited = looped S.bob (S.withRange 1)
     Spec.assertEqWith s "CR 801.16 at range 1 dave and erin are still playing" (Game.stillPlaying limited) [S.dave, erin]
     Spec.assertEqWith s "and the game goes on" (GameState.result limited) Nothing
@@ -667,6 +668,10 @@ spec s registry = Spec.describe s "Range of influence" $ do
     -- now, so his neighbour erin draws in carol's place. (An Aether Flash out of
     -- alice's range sees no Saproling enter, CR 801.7, and is in no loop.)
     Spec.assertEqWith s "CR 801.16 with frank's Aether Flash carol and dave are still playing" (Game.stillPlaying (looped frank (S.withRange 1))) [S.carol, S.dave]
+    -- The first board with frank's Life and Limb: no trigger of his is in the
+    -- loop, but his static ability is what makes each Saproling a land for
+    -- Sporemound to see, so his neighbour erin draws too.
+    Spec.assertEqWith s "CR 801.16 with frank's Life and Limb only dave is still playing" (Game.stillPlaying (loopedWith frank S.bob (S.withRange 1))) [S.dave]
     Spec.assertEqWith s "CR 104.4b at an unlimited range the game is a draw" (GameState.result (looped S.bob id)) (Just Result.Drawn)
 
   -- CR 801.16's "involved in that loop", at the guard itself: carol's stamp
@@ -684,12 +689,13 @@ spec s registry = Spec.describe s "Range of influence" $ do
     Spec.assertEqWith s "CR 801.16 carol, the last one playing, wins" (GameState.result after) (Just (Result.Won S.carol))
   where
     -- Pawl.GameSpec's loopBoard at six seats: alice, active, in her precombat
-    -- main phase, with Life and Limb, Sporemound and a tapped Forest entering,
-    -- and `flashOwner`'s Aether Flash. Seeded ten events short of the limit.
-    loopBoard flash limb sporemound forest flashOwner =
+    -- main phase, with Sporemound and a tapped Forest entering, `limbOwner`'s
+    -- Life and Limb and `flashOwner`'s Aether Flash. Seeded ten events short of
+    -- the limit.
+    loopBoard flash limb sporemound forest limbOwner flashOwner =
       let base = Setup.emptyGame (S.alice NonEmpty.:| [S.bob, S.carol, S.dave, erin, frank])
           (_, gs1) = S.addPermanent flash flashOwner base
-          (_, gs2) = S.addPermanent limb S.alice gs1
+          (_, gs2) = S.addPermanent limb limbOwner gs1
           (_, gs3) = S.addPermanent sporemound S.alice gs2
           (forestId, gs4) = S.entersWithTrigger forest S.alice gs3
           seeded =

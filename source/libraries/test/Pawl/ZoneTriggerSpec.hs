@@ -2452,10 +2452,10 @@ representativeEvents cond =
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
         -- on the pair.
-        TriggerCondition.SpellCast {} -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics (Just Zone.Hand)))
+        TriggerCondition.SpellCast {} -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics (Just Zone.Hand) Nothing))
         -- The same event, and the only one this condition admits either. It binds
         -- nothing whichever ids the event names, since the spell IS the bearer.
-        TriggerCondition.SelfCast -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics (Just Zone.Hand)))
+        TriggerCondition.SelfCast -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics (Just Zone.Hand) Nothing))
         -- CR 601.2c's event, with the bearer as the targeted object and alice as
         -- the targeting object's controller -- an event BOTH relations admit,
         -- since matchesTrigger reads `you` from the bearer's side and this list

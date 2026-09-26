@@ -560,6 +560,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.PermanentsDiedThisTurn
       " {\"type\":\"PermanentsDiedThisTurn\"} "
+  -- CR 702.185c: the family is the payload, as CastUsing's is.
+  Spec.it s "SpellsCastUsingThisTurn" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.SpellsCastUsingThisTurn KeywordFamily.Warp)
+      " {\"type\":\"SpellsCastUsingThisTurn\",\"value\":{\"type\":\"Warp\"}} "
   -- CR 100.6a with nothing on the wire: the tally is the match's, so it names
   -- neither a player nor an object.
   Spec.it s "SubgamesThisMatch is nullary" $
