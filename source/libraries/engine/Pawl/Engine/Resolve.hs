@@ -458,7 +458,7 @@ resolveSpellWith runSubgame oid = do
 -- code: a countered spell never reaches resolveSpellWith at all, and CR 608.2b's
 -- fizzle takes the branch above this one.
 --
--- CR 702.174j's position -- ahead of the modes -- is a fence on the same footing:
+-- CR 702.174j's position -- ahead of the modes -- is a REGRESSION FENCE too:
 -- no gift printing's own text can observe the gift's product, since CR 601.2c
 -- fixed its targets before the token or card existed. Moving this call past the
 -- mode loop leaves the suite green.
