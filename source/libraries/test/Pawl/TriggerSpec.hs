@@ -1452,9 +1452,11 @@ delayedSpec s registry =
           -- The proxy, after the behaviour: the doubled cast puts no question
           -- the undoubled one did not. A COMPARISON and not an empty list, so a
           -- recorder that saw nothing could not carry it; the non-empty check is
-          -- what says the recorder is live.
+          -- what says the recorder is live. CR 613.7m's order over the two
+          -- Walls' simultaneous stamps is the one question two tokens earn, and it
+          -- is not the rider's, so it is set aside.
           Spec.assertBool s (not (null plain)) "the recorder sees the prompts the undoubled cast issues"
-          Spec.assertEqWith s "and the doubling asked nothing extra" asked plain
+          Spec.assertEqWith s "and the doubling asked nothing extra" (filter (/= Text.pack "OrderTimestamps") asked) plain
         -- CR 116.2c's OTHER use, beside ending a continuous effect: the special
         -- action is taken "usually to end a continuous effect or to stop a
         -- delayed triggered ability from triggering". Synthetic Standing Bounty

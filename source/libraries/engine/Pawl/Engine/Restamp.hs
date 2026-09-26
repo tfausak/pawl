@@ -4,16 +4,22 @@ module Pawl.Engine.Restamp where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
+import Pawl.Types.Timestamp (Timestamp)
+import qualified Pawl.Types.Zone as Zone
 
 -- | CR 613.7m: the order a batch of objects receiving timestamps at the same
 -- moment receives them in. The RESULT is the caller's fold order, so whatever
@@ -57,6 +63,63 @@ order oids = do
           pure (Game.permute group answer)
         _ -> pure group
   fmap concat (traverse ask groups)
+
+-- | CR 613.7m over a batch that has ALREADY entered the battlefield (CR 613.7d)
+-- at one moment: `arrivals` in the order they arrived, `start` the first stamp
+-- the batch could have minted. Asked AFTER the arrivals rather than before them,
+-- as `order`'s other callers ask, because what an arrival is -- its controller
+-- (CR 110.2a, CR 616.1b's rewrite), its host (CR 303.4f), the object a copy
+-- entry chose (CR 707.5) -- is settled only as it enters.
+--
+-- An in-place PERMUTATION of the stamps the batch minted, never fresh ones, so
+-- nothing outside the batch moves relative to it. Each arrival carries the stamps
+-- its own entry minted with it -- its counters' (CR 613.7c) and the stored
+-- effects it sources -- since those were received as it entered and follow it.
+-- The canonical answer is the arrival order itself, which leaves every stamp
+-- where it was.
+--
+-- Battlefield arrivals only. Elsewhere an object's stamp is read by nothing but
+-- its own static abilities functioning there (CR 113.6, CR 613.7a), and no
+-- printing's such ability writes a characteristic an order could change (MTGJSON
+-- 2026-08-23, text "As long as/While ... is in a graveyard/in exile/in your
+-- hand/in the command zone" beside a set base power, lost abilities, a set type
+-- or a set color: no hit). A card whose graveyard ability set such a value would
+-- refute that.
+--
+-- Proved by Pawl.RestampSpec's Replenish boards (Humility and Opalescence), on
+-- Pawl.Engine.Resolve's MoveToZone road. Event.createTokens and
+-- Pawl.Engine.MoveDuration.returnMoved reach it too, and no board observes
+-- either (gap #4214).
+settle :: Timestamp -> [ObjectId] -> Game ()
+settle start arrivals = do
+  gs <- State.get
+  ordered <- order (filter (\oid -> fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield) arrivals)
+  State.modify' (reassign start ordered)
+
+-- The permutation `settle` asks for: the batch's stamps, pooled and sorted, dealt
+-- out again block by block in `ordered`, each block in its own old order.
+reassign :: Timestamp -> [ObjectId] -> GameState -> GameState
+reassign start ordered gs =
+  let objects = GameState.objects gs
+      effects = GameState.continuousEffects gs
+      fresh ts = ts >= start
+      blockOf oid =
+        let own = foldMap (\obj -> Object.timestamp obj : filter fresh (Map.elems (Object.counterTimestamps obj))) (Map.lookup oid objects)
+            sourced = [ContinuousEffect.timestamp e | e <- effects, ContinuousEffect.source e == oid, fresh (ContinuousEffect.timestamp e)]
+         in Set.toAscList (Set.fromList (own <> sourced))
+      -- A stamp two blocks share -- one an instruction minted for all of them --
+      -- stays with the first, so the pool deals each stamp out once.
+      dealt = snd (List.foldl' (\(seen, acc) ts -> if Set.member ts seen then (seen, acc) else (Set.insert ts seen, acc <> [ts])) (Set.empty, []) (concatMap blockOf ordered))
+      mapping = Map.fromList (zip dealt (List.sort dealt))
+      remap ts = Map.findWithDefault ts ts mapping
+      member = (`elem` ordered)
+      restampObject oid obj
+        | member oid = obj {Object.timestamp = remap (Object.timestamp obj), Object.counterTimestamps = fmap remap (Object.counterTimestamps obj)}
+        | otherwise = obj
+      restampEffect e
+        | member (ContinuousEffect.source e) = e {ContinuousEffect.timestamp = remap (ContinuousEffect.timestamp e)}
+        | otherwise = e
+   in gs {GameState.objects = Map.mapWithKey restampObject objects, GameState.continuousEffects = fmap restampEffect effects}
 
 -- Which seat an object belongs to for CR 613.7m: its controller (CR 110.2), and
 -- its owner where it has none. Nothing only where the board holds neither, which
