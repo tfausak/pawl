@@ -70,6 +70,13 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       Expiry.codec
       (Expiry.AtTurnOf (PlayerId.MkPlayerId 1))
       " {\"type\":\"AtTurnOf\",\"value\":1} "
+  -- CR 611.2a / 503: until that player's next upkeep.
+  Spec.it s "AtUpkeepOf carries its player" $
+    Common.assertCodec
+      s
+      Expiry.codec
+      (Expiry.AtUpkeepOf (PlayerId.MkPlayerId 2))
+      " {\"type\":\"AtUpkeepOf\",\"value\":2} "
   -- CR 611.2a's other phrasing, which needs the turn as well as the player: the
   -- effect ends at the end of the first turn of theirs numbered above it.
   Spec.it s "AtEndOfTurnOf carries its player and turn" $

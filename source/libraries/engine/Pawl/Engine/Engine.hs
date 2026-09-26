@@ -2059,6 +2059,9 @@ runStepThatBegan phase = do
   Monad.when (phase == Phase.Beginning BeginningStep.Upkeep) $ do
     _ <- sampleControl
     State.gets Turn.activePlayers >>= Monad.mapM_ advanceControlClock
+    -- CR 611.2a: "until the beginning of your next upkeep" ends here, before
+    -- this step's first priority boundary puts its triggers on the stack.
+    State.gets Turn.activePlayers >>= Monad.mapM_ (State.modify' . Expiry.dropAtUpkeepOf)
   runTurnBasedActions phase
   -- Asked BEFORE the CR 704.3 check below. For every step but one the order is
   -- free -- this line is pure there -- and for the cleanup step it is forced: CR

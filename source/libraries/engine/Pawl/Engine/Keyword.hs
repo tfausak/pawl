@@ -862,7 +862,8 @@ cycling cost searchFor =
                 Search.destination = SearchDestination.RevealThenHand,
                 -- CR 702.29e's destination attaches nothing and its filter asks no
                 -- CR 701.3a question, so no object is fixed for one to be about.
-                Search.subject = Nothing
+                Search.subject = Nothing,
+                Search.slot = Nothing
               }
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis DiscardCause.ToPayCyclingCost]},
@@ -1053,7 +1054,8 @@ searchForSameManaValue cost filter_ destination =
               Search.destination = destination,
               -- Neither destination attaches anything and neither filter asks a
               -- CR 701.3a question, so no object is fixed for one to be about.
-              Search.subject = Nothing
+              Search.subject = Nothing,
+              Search.slot = Nothing
             }
    in ActivatedAbility.MkActivatedAbility
         { ActivatedAbility.cost = cost,
@@ -7944,7 +7946,8 @@ partnerWith name =
               Search.upTo = False,
               Search.destination = SearchDestination.RevealThenHand,
               -- Nothing attaches and the filter asks no CR 701.3a question.
-              Search.subject = Nothing
+              Search.subject = Nothing,
+              Search.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
