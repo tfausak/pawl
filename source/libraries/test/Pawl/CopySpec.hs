@@ -2327,8 +2327,50 @@ hammerThenTwincast answer dealerId victimId hammerId twincastId board =
         let cast2 = snd (Engine.runGamePure (pinTarget (Recipient.ToObject hammerSpell)) cast1 (S.cast S.alice twincastId))
         pure (resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne answer cast2)))
 
+-- Synthetic Mimicry's announcement, pinned per slot name and FILTERED out of the
+-- offered set for pinTarget's reason: `subject` becomes a copy of `original`.
+aimMimicry :: ObjectId -> ObjectId -> Prompt.Prompt r -> r
+aimMimicry subjectId originalId p = case p of
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let wanted = if slot == SlotName.MkSlotName (Text.pack "subject") then subjectId else originalId
+           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+      )
+      asked
+  _ -> S.identityAnswer p
+
 copySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
+  -- CR 707.1 / 707.2: a spell ON THE STACK becomes a copy of another. alice
+  -- casts Lightning Bolt at bob, then Think Twice, then Synthetic Mimicry turning
+  -- the Think Twice into a copy of the Bolt. bob at 14 needs both halves of CR
+  -- 707.2 -- the copied text AND the Bolt's target, the Think Twice having chosen
+  -- none of its own -- and either missing leaves him at 17. alice's empty hand
+  -- is the printed "draw a card" never resolving.
+  Spec.it s "CR 707.2 a spell that becomes a copy of a Bolt resolves as the Bolt, at the Bolt's target" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    mimicry <- S.printingOf s registry "Synthetic Mimicry"
+    let lands = S.landsFor island S.alice 4 (S.landsFor mountain S.alice 1 S.threePlayerGame)
+        (withBolt, boltId) = S.handOne bolt lands
+        (thinkId, withThink) = S.addHandCard thinkTwice S.alice withBolt
+        (mimicryId, withMimicry) = S.addHandCard mimicry S.alice withThink
+        -- Stocked, so the mutant's draw is a card in hand rather than CR 704.5b.
+        board = snd (S.addLibraryCard island S.alice (snd (S.addLibraryCard island S.alice withMimicry)))
+        cast1 = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) board (S.cast S.alice boltId))
+        cast2 = snd (Engine.runGamePure S.identityAnswer cast1 (S.cast S.alice thinkId))
+    case (topOfStack cast1, topOfStack cast2) of
+      (Just boltSpell, Just thinkSpell) | boltSpell /= thinkSpell -> do
+        let cast3 = snd (Engine.runGamePure (aimMimicry thinkSpell boltSpell) cast2 (S.cast S.alice mimicryId))
+            -- Mimicry, then the copied Think Twice, then the Bolt.
+            after = resolveOne S.identityAnswer (resolveOne S.identityAnswer (resolveOne S.identityAnswer cast3))
+        Spec.assertEqWith s "bob took the Bolt's 3 and the copied Think Twice's 3" (S.lifeOf S.bob after) (Just 14)
+        Spec.assertEqWith s "and alice drew nothing: the printed text never resolved" (S.handSize S.alice after) 0
+        Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+      _ -> Spec.assertFailure s "the spells never reached the stack"
   -- CR 707.10 end to end: the copy exists, carries the original's decisions (CR
   -- 707.10's "all decisions made for it" -- here the Bolt's target), resolves as
   -- a spell of its own, and then does NOT reach a graveyard.

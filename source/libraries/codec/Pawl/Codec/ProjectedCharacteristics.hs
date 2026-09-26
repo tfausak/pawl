@@ -22,6 +22,7 @@ import qualified Pawl.Codec.GrantedAbility as GrantedAbility
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.ManaCost as ManaCost
+import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Codec.RuleAbilities as RuleAbilities
@@ -34,6 +35,7 @@ import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.Face as Face.Type
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 
 -- | The wire format is unchanged by the conversion to a bundle; what it adds is
@@ -75,6 +77,7 @@ codec = Fields.object $ do
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   prepare <- Fields.defaulted "prepare" Nothing (Common.maybe (Face.codec Card.codec)) PC.prepare
   alternativeSpell <- Fields.defaulted "alternativeSpell" Nothing (Common.maybe (Face.codec Card.codec)) PC.alternativeSpell
+  spell <- Fields.defaulted "spell" Face.Type.defaultSpell (Modal.codec Card.codec (GrantedAbility.codec Card.codec)) PC.spell
   flipped <- Fields.defaulted "flipped" Nothing (Common.maybe codec) PC.flipped
   pure
     PC.MkProjectedCharacteristics
@@ -111,5 +114,6 @@ codec = Fields.object $ do
         PC.halves = halves,
         PC.prepare = prepare,
         PC.alternativeSpell = alternativeSpell,
+        PC.spell = spell,
         PC.flipped = flipped
       }

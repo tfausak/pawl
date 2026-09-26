@@ -21,6 +21,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
@@ -345,6 +346,10 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- | CR 715.2b / 720.2b: the Adventure or Omen half this object has, copiable
     -- like `prepare`, and read by Game.castableFacesOf.
     alternativeSpell :: Maybe (Face.Face Card.Card),
+    -- | CR 707.2: the spell abilities of the face this object shows (CR 113.3a),
+    -- copiable rules text, so a spell that becomes a copy resolves the copied
+    -- text (Pawl.Engine.Projection.View.spellFaceOf).
+    spell :: Modal.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card),
     -- | CR 707.3 / 710.1b: a copy snapshot's reading once the copy is flipped,
     -- and Nothing for copiable values with no flip card's alternative half.
     -- Stamped by Pawl.Engine.Event.copiedSnapshot; a printed flip card's
