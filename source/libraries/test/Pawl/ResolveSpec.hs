@@ -1683,7 +1683,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- "{B}{B}: Return this card from your graveyard to your hand. Activate only
   -- during your upkeep." The same card, in the graveyard its resolution put it
   -- in, asked at two steps of alice's turn with the same two Swamps untapped.
-  Spec.it s "CR 113.6m / 602.5b Grim Reminder's return is offered from the graveyard during its controller's upkeep only" $ do
+  Spec.it s "CR 113.6m / 602.1b Grim Reminder's return is offered from the graveyard during its controller's upkeep only" $ do
     (_, settled) <- grimReminderResolved s registry
     swamp <- S.printingOf s registry "Swamp"
     let reminders = filter (\oid -> S.soleFaceName oid settled == CardName.MkCardName (Text.pack "Grim Reminder")) (Game.zoneMembers Zone.Graveyard S.alice settled)
