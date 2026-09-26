@@ -2516,6 +2516,27 @@ auraSpec s registry = Spec.describe s "Aura" $ do
         gone = S.runPure S.identityAnswer attached (Event.changeZone aura Zone.Graveyard)
     Spec.assertEqWith s "alice controlled it" (Projection.controllerOf creature attached) (Just S.alice)
     Spec.assertEqWith s "bob controls it again" (Projection.controllerOf creature gone) (Just S.bob)
+  -- CR 604.2 / 613.1b: a control grant under an "as long as" clause takes the
+  -- Piker only while the clause holds. The two boards without Confiscate differ
+  -- in alice's Forest alone. With it, Confiscate is the NEWER effect, so in
+  -- timestamp order alone the Usurpation would apply first and still see
+  -- alice's Forest; CR 613.8a makes the Usurpation wait on the steal that
+  -- changes whether it exists, and it then finds no Forest of alice's.
+  Spec.it s "CR 604.2/613.8a a control grant applies only while its as-long-as clause holds" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    forest <- S.printingOf s registry "Forest"
+    usurpation <- S.printingOf s registry "Synthetic Sylvan Usurpation"
+    confiscate <- S.printingOf s registry "Confiscate"
+    let (creature, withCreature) = S.addPermanent piker S.bob S.threePlayerGame
+        usurped gs = let (a, g) = S.addPermanent usurpation S.alice gs in S.attach a creature g
+        (land, withLand) = S.addPermanent forest S.alice withCreature
+        withForest = usurped withLand
+        withoutForest = usurped withCreature
+        confiscated = let (c, g) = S.addPermanent confiscate S.bob withForest in S.attach c land g
+        onTurnOf pid gs = S.runPure S.identityAnswer gs {GameState.activePlayer = pid} (Engine.settleAll pid)
+    Spec.assertBool s (Combat.canAttack S.alice creature (onTurnOf S.alice withForest)) "alice, who controls a Forest, may attack with bob's Piker"
+    Spec.assertBool s (Combat.canAttack S.bob creature (onTurnOf S.bob withoutForest)) "with no Forest of alice's, bob keeps his Piker"
+    Spec.assertBool s (Combat.canAttack S.bob creature (onTurnOf S.bob confiscated)) "once bob confiscates alice's Forest, bob has his Piker back"
   -- The whole path: cast, target, enter attached, control moves.
   Spec.it s "CR 303.4: casting Control Magic takes the creature" $ do
     island <- S.printingOf s registry "Island"
