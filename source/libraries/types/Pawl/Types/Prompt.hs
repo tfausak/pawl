@@ -497,6 +497,10 @@ data Prompt r where
   -- | CR 903.9a: whether the owner returns their commander from a graveyard or
   -- exile; declining leaves it until it moves there afresh.
   ReturnCommander :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt CommandZoneDecision.CommandZoneDecision
+  -- | CR 616.1e / 903.9b: whether the affected object's controller applies the
+  -- owner's command-zone offer ahead of the other applicable replacement effects;
+  -- asked only when that controller is not the owner.
+  ChooseCommandZoneOfferFirst :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 401.2: which end of a library a card arrives at where the effect
   -- leaves it open; the owner is asked (CR 400.3), in APNAP order. Never
   -- elided; a stated end (Pawl.Types.LibraryPlacement.Stated) is not asked.

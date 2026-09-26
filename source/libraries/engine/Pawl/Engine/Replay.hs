@@ -132,6 +132,7 @@ encode p answer = case p of
   Prompt.ChooseAssistant {} -> Response.ChoseAssistant answer
   Prompt.ChooseAssistAmount {} -> Response.ChoseAssistAmount answer
   Prompt.ReturnCommander {} -> Response.ReturnedCommander answer
+  Prompt.ChooseCommandZoneOfferFirst {} -> Response.ChoseCommandZoneOfferFirst answer
   Prompt.ChooseLibraryEnd {} -> Response.ChoseLibraryEnd answer
   Prompt.ArrangeLibraryArrivals {} -> Response.ArrangedLibraryArrivals answer
   Prompt.ArrangeLibraryCards {} -> Response.ArrangedLibraryCards answer
@@ -638,6 +639,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ReturnCommander {} -> case response of
     Response.ReturnedCommander decision -> Just decision
+    _ -> Nothing
+  Prompt.ChooseCommandZoneOfferFirst {} -> case response of
+    Response.ChoseCommandZoneOfferFirst decision -> Just decision
     _ -> Nothing
   Prompt.ChooseLibraryEnd {} -> case response of
     Response.ChoseLibraryEnd position -> Just position
@@ -1195,6 +1199,10 @@ defaultAnswer p = case p of
   -- CR 903.9a is a "may", so leaving the commander where it is is always legal
   -- and is the answer that changes nothing.
   Prompt.ReturnCommander {} -> CommandZoneDecision.Leaves
+  -- CR 616.1e: declining leaves the other effects to apply first, and the owner
+  -- is still asked once they have, wherever the event is still headed for a hand
+  -- or a library.
+  Prompt.ChooseCommandZoneOfferFirst {} -> OptionalDecision.Declines
   -- CR 401.2: both ends are legal. The BOTTOM, which is
   -- LibraryPosition.defaultValue and so the end every library arrival in the tree
   -- took before an effect could name one.
