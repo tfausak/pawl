@@ -1,5 +1,8 @@
 module Pawl.Types.RevealCause where
 
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Keyword as Keyword
+
 -- | CR 701.20a: why a reveal happened. Carried by Pawl.Types.GameEvent's Revealed
 -- for Pawl.Types.DiscardCause's reason -- one logged reveal answers both of the
 -- questions the rules ask about it, rather than two log entries describing one
@@ -15,8 +18,8 @@ data RevealCause
     -- an activation cost paid from a hidden zone, a library's top card turned
     -- face up.
     Ordinary
-  | -- | CR 702.94a / CR 121.9: revealed from a hand AS IT WAS DRAWN, under
-    -- miracle's static ability. Recorded by Pawl.Engine.Event's draw funnel, the
-    -- one place that window exists.
-    ForMiracle
-  deriving (Bounded, Enum, Eq, Ord, Show)
+  | -- | CR 702.94a / CR 121.9 / 702.94b: revealed from a hand AS IT WAS DRAWN,
+    -- under the miracle ability with this cost, whose linked trigger alone it
+    -- fires (CR 607.2h).
+    ForMiracle (Cost.Cost Keyword.Keyword)
+  deriving (Eq, Ord, Show)

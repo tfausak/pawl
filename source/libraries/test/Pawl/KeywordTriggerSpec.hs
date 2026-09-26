@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Soulbond as Soulbond
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural.Extra
 import qualified Pawl.Registry as Registry
@@ -3272,6 +3273,46 @@ soulbondSpec s registry =
               -- trigger that never fired.
               Spec.assertEqWith s "and with the entrant still hers, one" (asks waiting) 1
               Spec.assertEqWith s "CR 702.95c the Wolfir stays its printed 4/4 either way" (S.powerToughnessOf wolfirId (snd (State.evalState (Engine.runGame counting (S.giveControl giantId S.bob waiting) (Stack.resolveTop >> Engine.settleForPriority)) 0))) (Just (4, 4))
+        -- CR 702.95b's "the creature another creature is paired with", asked of
+        -- the partner: Flowering Lumberknot {3}{G} Creature -- Treefolk 5\/5, "This
+        -- creature can't attack or block unless it's paired with a creature with
+        -- soulbond" (Oracle checked against api.scryfall.com 2026-09-26). A pair of
+        -- boards differing only in the partner: a Clone of bob's Wolfir, whose
+        -- soulbond is a copiable value (CR 707.2), or alice's Hill Giant, which has
+        -- none -- the partner a Wolfir has after losing its abilities, since CR
+        -- 702.95e ends no pairing for that. The Clone stays on both boards, so
+        -- neither "Lumberknot is paired" nor "alice controls a soulbond creature"
+        -- separates them; and bob's Wolfir is paired with his Goblin Piker on both,
+        -- so neither does "some soulbond creature is paired".
+        Spec.it s "CR 702.95b Flowering Lumberknot fights only beside a partner with soulbond" $ do
+          wolfir <- S.printingOf s registry "Wolfir Silverheart"
+          clone <- S.printingOf s registry "Clone"
+          lumberknot <- S.printingOf s registry "Flowering Lumberknot"
+          giant <- S.printingOf s registry "Hill Giant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let gs0 = Setup.emptyGame S.bothPlayers
+              (wolfirId, withWolfir) = S.addPermanent wolfir S.bob gs0
+              (pikerId, withPiker) = S.addPermanent piker S.bob withWolfir
+              (lumberknotId, withLumberknot) = S.addPermanent lumberknot S.alice withPiker
+              (giantId, withGiant) = S.addPermanent giant S.alice withLumberknot
+              (_, staged) = S.spellOnStack clone S.alice withGiant
+              -- The Clone copies bob's Wolfir, pinned by id, and declines its own
+              -- soulbond "may": the pairing below is the one thing the boards vary.
+              copying :: Prompt.Prompt r -> r
+              copying p = case p of
+                Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== wolfirId) legal
+                Prompt.ChooseOptional {} -> OptionalDecision.Declines
+                _ -> S.identityAnswer p
+              resolved = Soulbond.pair S.bob wolfirId pikerId (S.runPure copying staged (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority))
+              alices = Set.toList (Set.filter (\oid -> Projection.View.controllerOf oid resolved == Just S.alice) (GameState.battlefield resolved))
+          case filter (`notElem` [lumberknotId, giantId]) alices of
+            [cloneId] -> do
+              let withClone = Soulbond.pair S.alice lumberknotId cloneId resolved
+                  withGiantPartner = Soulbond.pair S.alice lumberknotId giantId resolved
+              Spec.assertEqWith s "CR 508.1c paired with the Clone of the Wolfir it can attack" (Combat.canAttack S.alice lumberknotId withClone) True
+              Spec.assertEqWith s "CR 508.1c paired with the Hill Giant it cannot" (Combat.canAttack S.alice lumberknotId withGiantPartner) False
+              Spec.assertEqWith s "CR 509.1b and it can block beside the Clone and not beside the Giant" (fmap (Combat.canBlock S.alice lumberknotId) [withClone, withGiantPartner]) [True, False]
+            other -> Spec.assertFailure s ("expected the Clone as alice's one new permanent, got " <> show (length other))
 
 graftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graftSpec s registry =
@@ -4011,7 +4052,7 @@ recoverSpec s registry =
         Spec.it s "CR 702.59a the graveyard roster mints it" $ do
           let cost = Cost.MkCost Nothing []
           Spec.assertEqWith s "recover is on the graveyard roster" (Keyword.graveyardTriggeredAbilitiesOf Set.empty (Set.singleton (Keyword.Type.Recover cost))) [Keyword.recover cost]
-          Spec.assertEqWith s "and on none of the others" (Keyword.printedTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost)) <> Keyword.exileTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost))) []
+          Spec.assertEqWith s "and on none of the others" (Keyword.handTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost)) <> Keyword.exileTriggeredAbilitiesOf (Set.singleton (Keyword.Type.Recover cost))) []
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
