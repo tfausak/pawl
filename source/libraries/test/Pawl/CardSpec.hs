@@ -1060,6 +1060,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Count.
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
+  TriggerCondition.PlayerForetells _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
@@ -3712,6 +3713,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.DesignationValue _ -> []
   Quantity.Type.ClassLevel -> []
   Quantity.Type.WasKicked -> []
+  Quantity.Type.WasForetold -> []
   Quantity.Type.TributeWasPaid -> []
   Quantity.Type.TimesPaid {} -> []
   Quantity.Type.CastUsing {} -> []
@@ -4092,6 +4094,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Filter.
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
+  TriggerCondition.PlayerForetells _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
@@ -4307,6 +4310,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
+  TriggerCondition.PlayerForetells _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
@@ -4463,6 +4467,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.EnteredThisTurn -> []
   Filter.Type.CrewedSourceThisTurn -> []
   Filter.Type.ConvokedSourceThisTurn -> []
+  Filter.Type.SaddledSourceThisTurn -> []
   Filter.Type.ControlledSinceTurnBegan -> []
   -- DESCENT, for ControlsMoreThanYou's reason.
   Filter.Type.AttachedTo f -> filterSlotsReadSingly f

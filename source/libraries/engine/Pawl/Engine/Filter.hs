@@ -324,6 +324,10 @@ data View = MkView
     -- PERMANENTS are in the set beside the spells because a spell is gone by the
     -- time its own entry trigger resolves (CR 400.7d).
     convokedThisTurn :: Set.Set ObjectId.ObjectId,
+    -- CR 702.171c: which Mounts did this candidate saddle earlier this turn?
+    -- `crewedThisTurn` above's shape and laziness, one keyword over, and a field
+    -- of its own so a saddler never satisfies CrewedSourceThisTurn.
+    saddledThisTurn :: Set.Set ObjectId.ObjectId,
     -- CR 302.6: has this candidate's CONTROLLER controlled it continuously since
     -- their most recent turn began? Read from Object.sickness, the field CR
     -- 302.6's own gates on attacking and the tap symbol are read from, and
@@ -669,6 +673,11 @@ data View = MkView
     -- object, since Pawl.Types.LastKnown keeps no such record.
     -- Pawl.Engine.Quantity's CastUsing arm is the reader.
     castUsing :: Maybe Keyword.Type.Keyword,
+    -- CR 702.143c: is this candidate a foretold card, or a spell that was one
+    -- before it was cast? Read off Object.foretold, which Pawl.Engine.Cast
+    -- carries onto the stack, and False where there is no live object, as
+    -- `castUsing` above. Pawl.Engine.Quantity's WasForetold arm is the reader.
+    foretold :: Bool,
     -- CR 400.7d / CR 107.4h: the production tags of the mana that was spent to
     -- cast the spell this candidate is, or was, or to activate the CR 602.2a
     -- ability it is -- read off Object.manaSpent, and empty where there is no
@@ -840,6 +849,7 @@ playerView pid =
       -- rules the combat fields above out for the same kind of reason.
       crewedThisTurn = Set.empty,
       convokedThisTurn = Set.empty,
+      saddledThisTurn = Set.empty,
       -- CR 302.6's continuity is about a creature a player CONTROLS, and a player
       -- is not one -- False is the answer here rather than a default.
       controlledSinceTurnBegan = False,
@@ -919,6 +929,7 @@ playerView pid =
       -- one -- `designations` above, same sentence.
       tributePaid = False,
       castUsing = Nothing,
+      foretold = False,
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
       manaSpentTagColors = Map.empty,
@@ -2053,6 +2064,11 @@ matches context view predicate = case predicate of
   Filter.ConvokedSourceThisTurn -> case source context of
     Just src -> Set.member src (convokedThisTurn view)
     Nothing -> False
+  -- CR 702.171c: CrewedSourceThisTurn's relation one keyword over, read off
+  -- its own field.
+  Filter.SaddledSourceThisTurn -> case source context of
+    Just src -> Set.member src (saddledThisTurn view)
+    Nothing -> False
   -- CR 302.6: not a look-back over the log at all, unlike AttackedThisTurn,
   -- MilledThisTurn and DealtDamageThisTurn -- the engine keeps the answer as
   -- Object.sickness, written at the untap step and cleared whenever control
@@ -2347,6 +2363,7 @@ rewrite pairs predicate = case predicate of
   Filter.EnteredThisTurn -> predicate
   Filter.CrewedSourceThisTurn -> predicate
   Filter.ConvokedSourceThisTurn -> predicate
+  Filter.SaddledSourceThisTurn -> predicate
   -- Untouched for AttackedThisTurn's reason: the atom names no subtype.
   Filter.ControlledSinceTurnBegan -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: the nested filter describes
@@ -3080,6 +3097,7 @@ bakeBound players predicate = case predicate of
   Filter.EnteredThisTurn -> predicate
   Filter.CrewedSourceThisTurn -> predicate
   Filter.ConvokedSourceThisTurn -> predicate
+  Filter.SaddledSourceThisTurn -> predicate
   -- Untouched: the atom names no slot for CR 603.2's map to substitute into.
   Filter.ControlledSinceTurnBegan -> predicate
   -- DESCENT, for ControlsMoreThanYou's reason above: a ControlledByBound written
@@ -3250,6 +3268,7 @@ manaValueThresholds predicate = case predicate of
   Filter.EnteredThisTurn -> []
   Filter.CrewedSourceThisTurn -> []
   Filter.ConvokedSourceThisTurn -> []
+  Filter.SaddledSourceThisTurn -> []
   Filter.ControlledSinceTurnBegan -> []
   -- Descended into, which OVER-reports for ControlsMoreThanYou's reason: the
   -- literals inside bound the HOST's mana value and never the candidate's. Only
@@ -3424,6 +3443,7 @@ statesAQuality predicate = case predicate of
   Filter.EnteredThisTurn -> True
   Filter.CrewedSourceThisTurn -> True
   Filter.ConvokedSourceThisTurn -> True
+  Filter.SaddledSourceThisTurn -> True
   Filter.ControlledSinceTurnBegan -> True
   -- True whatever the nest says, for ControlsMoreThanYou's reason: "attached to
   -- something" is itself a stated quality under CR 701.23b, so even the trivial

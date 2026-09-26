@@ -88,6 +88,8 @@ codec =
       -- HasDesignation above carries: which mark's value is asked is a value.
       Arm.payload "DesignationValue" Designation.codec Quantity.DesignationValue (\x -> case x of Quantity.DesignationValue y -> Just y; _ -> Nothing),
       Arm.nullary "WasKicked" Quantity.WasKicked,
+      -- CR 702.143c, nothing on the wire for WasKicked's reason.
+      Arm.nullary "WasForetold" Quantity.WasForetold,
       -- CR 702.104b's yes-or-no, with nothing on the wire for WasKicked's reason:
       -- the object is whichever one the quantity is evaluated against.
       Arm.nullary "TributeWasPaid" Quantity.TributeWasPaid,
@@ -233,6 +235,7 @@ tagOf x = case x of
   Quantity.HasDesignation {} -> "HasDesignation"
   Quantity.DesignationValue {} -> "DesignationValue"
   Quantity.WasKicked {} -> "WasKicked"
+  Quantity.WasForetold {} -> "WasForetold"
   Quantity.TributeWasPaid {} -> "TributeWasPaid"
   Quantity.TimesPaid {} -> "TimesPaid"
   Quantity.CastUsing {} -> "CastUsing"

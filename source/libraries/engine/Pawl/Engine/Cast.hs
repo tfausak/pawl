@@ -866,6 +866,20 @@ stampCastFrom sid castFrom gs =
         Map.adjust (\o -> o {Object.castFrom = castFrom}) sid (GameState.objects gs)
     }
 
+-- CR 702.143c: record on the spell the turn the card it was became foretold,
+-- which CR 400.7 would otherwise forget, so Quantity.WasForetold answers "this
+-- spell was foretold" whatever cost it was cast for. stampCastFrom's shape above.
+--
+-- Harmless to the stamp's other readers: each asks about a card in exile
+-- (Pawl.Engine.Exile, Pawl.Engine.Cast.permitsCastForetold, the exile arm of
+-- Pawl.Engine.Cost.costsFor), and the stamp dies with the spell's incarnation.
+stampForetold :: ObjectId -> Maybe Natural -> GameState -> GameState
+stampForetold sid foretold gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.foretold = foretold}) sid (GameState.objects gs)
+    }
+
 -- CR 702.140a: "if you do, it becomes a mutating creature spell and targets a
 -- non-Human creature with the same owner as this spell". The record of that
 -- announcement, stamped at the moment CR 601.2b settles on the candidate rule
@@ -2210,6 +2224,9 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- this field, and the gate above priced the same cast off the copy
           -- `asProposed` stamped.
           State.modify' (stampCastFrom sid castFrom)
+          -- CR 702.143c's "a spell that was a foretold card before it was cast",
+          -- carried across the move for `castFrom`'s reason.
+          State.modify' (stampForetold sid (Game.lookupObject oid before >>= Object.foretold))
           -- CR 601.2e's re-asking, at the announced mana value, of a prohibition
           -- and of the permission the cast is made under, judged on the same
           -- proposal board candidateAllowed judged them on.

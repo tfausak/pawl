@@ -94,6 +94,7 @@ import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -200,6 +201,7 @@ movedOf event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -237,6 +239,7 @@ movedOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -337,6 +340,7 @@ participants event =
         GameEvent.BecameCrewed c -> one (Crewing.vehicle c)
         GameEvent.Convoked c -> (Convoking.spell c : Set.toList (Convoking.convokedBy c), [])
         GameEvent.Crewed c -> (Crewing.vehicle c : Set.toList (Crewing.crewedBy c), [])
+        GameEvent.Saddled c -> (Saddling.mount c : Set.toList (Saddling.saddledBy c), [])
         GameEvent.PermanentSacrificed p -> ([PermanentWasSacrificed.permanent p], [PermanentWasSacrificed.player p])
         GameEvent.AbilityTriggered t ->
           let source = case AbilityTriggered.source t of
@@ -372,6 +376,7 @@ participants event =
         GameEvent.RingTempted pid -> player pid
         GameEvent.Blighted pid -> player pid
         GameEvent.Foraged pid -> player pid
+        GameEvent.Foretold pid -> player pid
         GameEvent.AttractionOpened pid -> player pid
         GameEvent.PrizeClaimed pid -> player pid
         GameEvent.Earthbent pid -> player pid
@@ -425,6 +430,7 @@ looksBack condition = case condition of
   -- puts counters on a permanent that stays where it is.
   TriggerCondition.PlayerBlights _ -> False
   TriggerCondition.PlayerForages _ -> False
+  TriggerCondition.PlayerForetells _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False
@@ -703,6 +709,7 @@ batchScoped condition = case condition of
   TriggerCondition.RingTemptsPlayer _ -> False
   TriggerCondition.PlayerBlights _ -> False
   TriggerCondition.PlayerForages _ -> False
+  TriggerCondition.PlayerForetells _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False
@@ -1216,6 +1223,7 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.Foretold _ -> Map.empty
         GameEvent.AttractionOpened _ -> Map.empty
         GameEvent.PrizeClaimed _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
@@ -1253,6 +1261,7 @@ eventTriggers events gs =
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
+        GameEvent.Saddled _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1509,6 +1518,7 @@ eventTriggers events gs =
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
+        GameEvent.Saddled _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1546,6 +1556,7 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.Foretold _ -> Map.empty
         GameEvent.AttractionOpened _ -> Map.empty
         GameEvent.PrizeClaimed _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
@@ -1775,6 +1786,7 @@ eventTriggers events gs =
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
+        GameEvent.Saddled _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1812,6 +1824,7 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.Foretold _ -> Map.empty
         GameEvent.AttractionOpened _ -> Map.empty
         GameEvent.PrizeClaimed _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
@@ -1932,6 +1945,7 @@ eventTriggers events gs =
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
+        GameEvent.Saddled _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1969,6 +1983,7 @@ eventTriggers events gs =
         GameEvent.RingTempted _ -> Map.empty
         GameEvent.Blighted _ -> Map.empty
         GameEvent.Foraged _ -> Map.empty
+        GameEvent.Foretold _ -> Map.empty
         GameEvent.AttractionOpened _ -> Map.empty
         GameEvent.PrizeClaimed _ -> Map.empty
         GameEvent.Earthbent _ -> Map.empty
@@ -2374,6 +2389,7 @@ zonesTriggeredFrom cond =
         -- exception does not apply.
         TriggerCondition.PlayerBlights _ -> battlefield
         TriggerCondition.PlayerForages _ -> battlefield
+        TriggerCondition.PlayerForetells _ -> battlefield
         TriggerCondition.PlayerEarthbends _ -> battlefield
         TriggerCondition.PlayerWaterbends _ -> battlefield
         TriggerCondition.PlayerAirbends _ -> battlefield
@@ -2829,6 +2845,7 @@ stateTriggers gs
               -- its own log entry, never a CR 603.8 state standing still.
               TriggerCondition.PlayerBlights _ -> False
               TriggerCondition.PlayerForages _ -> False
+              TriggerCondition.PlayerForetells _ -> False
               TriggerCondition.PlayerEarthbends _ -> False
               TriggerCondition.PlayerWaterbends _ -> False
               TriggerCondition.PlayerAirbends _ -> False

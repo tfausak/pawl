@@ -35,6 +35,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TappedForMana as TappedForMana
@@ -338,6 +339,10 @@ data GameEvent
     Crewed Crewing.Crewing
   | -- | CR 702.122e: a Vehicle BECAME CREWED, a crew ability of it resolving.
     BecameCrewed Crewing.Crewing
+  | -- | CR 702.171c: creatures SADDLED a Mount, as they were tapped to pay its
+    -- saddle ability's cost. Crewed's relation one keyword over, kept apart so
+    -- that neither reads as the other.
+    Saddled Saddling.Saddling
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice goes through,
     -- and distinct from the Moved event the same sacrifice records: CR 700.4
@@ -578,6 +583,11 @@ data GameEvent
     -- both halves of rule 701.61a already write their own Moved events, and no
     -- printing reads which half a forage took.
     Foraged PlayerId.PlayerId
+  | -- | CR 702.143c: this player foretold a card -- CR 116.2h's special action,
+    -- recorded by Pawl.Engine.Foretell.foretell and NOT by CR 702.143d's
+    -- Effect.MakeForetold, whose card becomes foretold without anyone foretelling
+    -- it.
+    Foretold PlayerId.PlayerId
   | -- | CR 701.66b: this player earthbent, written as rule 701.66a's delayed
     -- triggered ability is CREATED rather than when it later returns the land.
     -- Pawl.EventTriggerSpec's "CR 701.66b the Adept fires as rule 701.66a's

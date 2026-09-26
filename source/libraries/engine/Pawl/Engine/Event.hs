@@ -602,6 +602,7 @@ damageOf event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -639,6 +640,7 @@ damageOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -680,6 +682,7 @@ revealOf event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -717,6 +720,7 @@ revealOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -8061,6 +8065,7 @@ reactsToAbilityTriggering cond = case cond of
   -- player DOES, so it takes CR 603.3b's first pass too.
   TriggerCondition.PlayerBlights _ -> False
   TriggerCondition.PlayerForages _ -> False
+  TriggerCondition.PlayerForetells _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False
@@ -8276,6 +8281,7 @@ controllerTurnScoped cond = case cond of
   -- CR 701.68 names no turn either.
   TriggerCondition.PlayerBlights _ -> False
   TriggerCondition.PlayerForages _ -> False
+  TriggerCondition.PlayerForetells _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False

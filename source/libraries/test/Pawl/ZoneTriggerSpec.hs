@@ -2648,6 +2648,7 @@ representativeEvents cond =
         -- DISTINCT from it: an arm matching a blight here would claim the floor
         -- for the wrong keyword action.
         TriggerCondition.PlayerForages _ -> one (GameEvent.Foraged S.bob)
+        TriggerCondition.PlayerForetells _ -> one (GameEvent.Foretold S.bob)
         TriggerCondition.PlayerEarthbends _ -> one (GameEvent.Earthbent S.bob)
         TriggerCondition.PlayerWaterbends _ -> one (GameEvent.Waterbent S.bob)
         TriggerCondition.PlayerAirbends _ -> one (GameEvent.Airbent S.bob)
@@ -2948,6 +2949,9 @@ everyTriggerCondition =
     TriggerCondition.PlayerForages PlayerRelation.You,
     TriggerCondition.PlayerForages PlayerRelation.Opponent,
     TriggerCondition.PlayerForages PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerForetells PlayerRelation.You,
+    TriggerCondition.PlayerForetells PlayerRelation.Opponent,
+    TriggerCondition.PlayerForetells PlayerRelation.AnyPlayer,
     TriggerCondition.PlayerEarthbends PlayerRelation.You,
     TriggerCondition.PlayerEarthbends PlayerRelation.Opponent,
     TriggerCondition.PlayerEarthbends PlayerRelation.AnyPlayer,

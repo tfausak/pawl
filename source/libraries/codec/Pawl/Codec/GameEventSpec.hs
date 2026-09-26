@@ -64,6 +64,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -418,6 +419,19 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
             }
       )
       " {\"type\":\"BecameCrewed\",\"value\":{\"crewedBy\":[10],\"vehicle\":9}} "
+  -- CR 702.171c: the Mount and the creatures tapped to pay its saddle cost, two
+  -- saddlers so a codec that dropped all but one goes red.
+  Spec.it s "Saddled" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      ( GameEvent.Saddled
+          Saddling.MkSaddling
+            { Saddling.mount = ObjectId.MkObjectId 17,
+              Saddling.saddledBy = Set.fromList [ObjectId.MkObjectId 18, ObjectId.MkObjectId 19]
+            }
+      )
+      " {\"type\":\"Saddled\",\"value\":{\"mount\":17,\"saddledBy\":[18,19]}} "
   -- CR 701.21a: the sacrificing player and the permanent, in that order, and the
   -- id is the PRE-MOVE one -- the record is written before the zone change, which
   -- is CR 603.10a's look-back.
@@ -726,6 +740,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Foraged (PlayerId.MkPlayerId 5))
       " {\"type\":\"Foraged\",\"value\":5} "
+  Spec.it s "Foretold" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Foretold (PlayerId.MkPlayerId 6))
+      " {\"type\":\"Foretold\",\"value\":6} "
   -- CR 701.66b and CR 701.67c. One player id each, Blighted's payload above: the
   -- rules name the bending player and nothing else. DISTINCT tags, since the two
   -- are different acts at different moments -- a shared one would let an

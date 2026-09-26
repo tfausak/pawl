@@ -628,6 +628,9 @@ data TriggerCondition
     -- GameEvent.Foraged. Fires on the forage itself, so which half of rule
     -- 701.61a the forager took does not separate two forages here.
     PlayerForages PlayerRelation.PlayerRelation
+  | -- | CR 702.143c: "whenever you foretell a card" (Dream Devourer), against
+    -- GameEvent.Foretold.
+    PlayerForetells PlayerRelation.PlayerRelation
   | -- | CR 701.66b: "whenever a player earthbends"
     -- (data\/cards\/synthetic-stonelistener-adept.json), against
     -- GameEvent.Earthbent. Rule 701.66b puts the moment at the CREATION of rule

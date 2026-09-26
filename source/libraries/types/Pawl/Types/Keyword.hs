@@ -672,9 +672,6 @@ data Keyword
     -- CR 702.143d's other producer -- an effect that makes an exiled card
     -- foretold and may give it a foretell cost -- is Effect.MakeForetold, and
     -- needs no keyword at all.
-    --
-    -- Not implemented: CR 702.143c's "a card or spell that was foretold" as
-    -- something an effect can refer to (#1486).
     Foretell (Cost.Cost Keyword)
   | -- | 702.144a: demonstrate -- a cast trigger under which you may copy the
     -- spell, and an opponent you then choose copies it too.
@@ -796,8 +793,10 @@ data Keyword
     -- turn. Activate only as a sorcery." Crew's cost one rule over, with CR
     -- 702.171b's designation where crew's arm sets card types.
     --
-    -- Not implemented: CR 702.171c's "saddles" relation, which the cards saying
-    -- "a creature that saddled it this turn" need (#3705).
+    -- CR 702.171c's "saddles" relation is GameEvent.Saddled, written by
+    -- Pawl.Engine.Activate as the cost is paid and read by
+    -- Filter.SaddledSourceThisTurn; Pawl.SaddleSpec's "CR 702.171c the attacking
+    -- Beaver's counter goes on the creature that saddled it" is the proof.
     Saddle Natural.Natural
   | -- | 702.172a: "Choose one or more modes. As an additional cost to cast this
     -- spell, pay the costs associated with those modes." Payload-free: the

@@ -1304,6 +1304,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerForages PlayerRelation.You)
       " {\"type\":\"PlayerForages\",\"value\":{\"type\":\"You\"}} "
+  Spec.it s "PlayerForetells round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerForetells PlayerRelation.You)
+      " {\"type\":\"PlayerForetells\",\"value\":{\"type\":\"You\"}} "
   -- CR 701.66b and CR 701.67c, PlayerBlights' shape above. Both spelled, since a
   -- tag with no arm of its own encodes as an empty object and still compiles.
   Spec.it s "PlayerEarthbends round-trips" $

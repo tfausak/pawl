@@ -2977,6 +2977,7 @@ filterReads f = case f of
   Filter.Type.EnteredThisTurn -> Set.empty
   Filter.Type.CrewedSourceThisTurn -> Set.empty
   Filter.Type.ConvokedSourceThisTurn -> Set.empty
+  Filter.Type.SaddledSourceThisTurn -> Set.empty
   -- Reads the CONTROLLER, which layer 2 moves: CR 302.6's continuity claim is
   -- about a player, and Pawl.Engine.Engine.checkControlContinuity drops the settle when
   -- that player stops controlling the object.
@@ -3256,6 +3257,7 @@ filterReadsPeers f = case f of
   Filter.Type.EnteredThisTurn -> False
   Filter.Type.CrewedSourceThisTurn -> False
   Filter.Type.ConvokedSourceThisTurn -> False
+  Filter.Type.SaddledSourceThisTurn -> False
   Filter.Type.ControlledSinceTurnBegan -> False
   Filter.Type.IsAttachedToSource -> False
   Filter.Type.IsHostOfSource -> False
@@ -3531,6 +3533,7 @@ quantityReads q = case q of
   Quantity.Type.DesignationValue _ -> Set.empty
   Quantity.Type.ClassLevel -> Set.empty
   Quantity.Type.WasKicked -> Set.empty
+  Quantity.Type.WasForetold -> Set.empty
   Quantity.Type.TributeWasPaid -> Set.empty
   Quantity.Type.TimesPaid _ -> Set.empty
   Quantity.Type.CastUsing _ -> Set.empty
