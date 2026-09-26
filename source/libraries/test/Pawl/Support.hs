@@ -76,6 +76,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -3144,10 +3145,10 @@ addRegenShield oid gs =
   let (ts, gs1) = Game.freshTimestamp gs
       active =
         ActiveReplacement.MkActiveReplacement
-          { ActiveReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+          { ActiveReplacement.effect = ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate),
             ActiveReplacement.source = oid,
             -- CR 109.5: the shield's "you" is whoever controls the permanent it
-            -- is on. Nothing reads it -- a DestructionR carries no pattern --
+            -- is on. Nothing reads it -- this DestructionR carries no pattern --
             -- so this is honesty rather than behaviour.
             ActiveReplacement.controller = Maybe.fromMaybe alice (Projection.controllerOf oid gs),
             ActiveReplacement.timestamp = ts,

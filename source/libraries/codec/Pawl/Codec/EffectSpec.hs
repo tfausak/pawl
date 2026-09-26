@@ -66,6 +66,7 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.Discard as Discard
@@ -873,10 +874,10 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               Replace.uses = Uses.Once,
               Replace.origin = ReplacementOrigin.Other,
               Replace.condition = Nothing,
-              Replace.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
+              Replace.effect = ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate)
             }
       )
-      " {\"type\":\"Replace\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"Other\"},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}}} "
+      " {\"type\":\"Replace\",\"value\":{\"duration\":{\"type\":\"UntilEndOfTurn\"},\"uses\":{\"type\":\"Once\"},\"origin\":{\"type\":\"Other\"},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}}}} "
   -- CR 614.15 / 616.1a: a self-replacement gated on a nonzero threshold.
   -- CR 702's ability words have no rules meaning, so "Metalcraft" itself
   -- encodes nothing.

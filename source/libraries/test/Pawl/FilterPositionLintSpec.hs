@@ -67,6 +67,7 @@ import qualified Pawl.Types.CounterSubject as CounterSubject
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
@@ -2552,7 +2553,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                                 )
                             )
                         )
-                        (ReplacementEffect.DestructionR DestructionRewrite.Regenerate)
+                        (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate))
                         Set.empty
                         Nothing
                     ]

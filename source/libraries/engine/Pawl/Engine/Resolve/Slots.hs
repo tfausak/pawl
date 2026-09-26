@@ -75,6 +75,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DrawR as DrawR
@@ -1449,7 +1450,8 @@ replacementRowReads re = case re of
     ( DamagePattern.whatSource pat : (Maybe.maybeToList (DamagePattern.whatRecipient pat) <> damageRewriteFilters rewrite),
       []
     )
-  ReplacementEffect.DestructionR _ -> ([], [])
+  -- CR 614.1a's printed subject (Pyramids' "target land"); the rewrite is nullary.
+  ReplacementEffect.DestructionR (DestructionR.MkDestructionR matching _) -> (Maybe.maybeToList matching, [])
   -- The rewrite is one Scaling, which is a constructor and a Natural.
   ReplacementEffect.CounterR (CounterR.MkCounterR pat _) -> ([CounterPattern.onWhat pat], [])
   -- The pattern's Filter over what the token is; the scaling is a number and

@@ -101,6 +101,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DestructionCause as DestructionCause
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiceRoll as DiceRoll
 import qualified Pawl.Types.DieRollR as DieRollR
@@ -3393,13 +3394,13 @@ apply batch candidate event =
             pure Nothing
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR {}, _) -> pure (Just event)
-    -- CR 701.19a / 122.1c / 702.89a: under every arm the DESTRUCTION does not
+    -- CR 701.19a / 122.1c / 702.89a / 614.1a: under every arm the DESTRUCTION does not
     -- happen, so nothing downstream of it (a put-into-graveyard, and therefore Rest
     -- in Peace's redirect) ever runs. What each does INSTEAD is all that separates
-    -- them, and none of the three overlap: regeneration removes marked damage, taps
-    -- the permanent and removes it from combat; a shield counter's removal does none
-    -- of those; and umbra armor removes the damage and destroys the Aura.
-    (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid _ _) -> case rewrite of
+    -- them: regeneration removes marked damage, taps the permanent and removes it
+    -- from combat; a shield counter's removal does none of those; umbra armor
+    -- removes the damage and destroys the Aura; and a heal removes the damage.
+    (ReplacementEffect.DestructionR (DestructionR.MkDestructionR _ rewrite), ProposedEvent.WouldBeDestroyed oid _ _) -> case rewrite of
       DestructionRewrite.Regenerate -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         -- Rule 701.19a's three instructions in the order it prints them: remove
@@ -3450,6 +3451,14 @@ apply batch candidate event =
       DestructionRewrite.UmbraArmor -> do
         State.modify' (\gs -> gs {GameState.objects = Map.adjust (\obj -> obj {Object.damage = 0}) oid (GameState.objects gs)})
         destroy Regenerability.Regenerable [ReplacementCandidate.source candidate]
+        pure Nothing
+      -- CR 614.1a / 701.69a: Pyramids' "remove all damage marked on it
+      -- instead", and nothing else -- no tap and no removal from combat, which
+      -- are regeneration's (CR 701.19a). `oid` is the printed subject the row's
+      -- pattern matched. A resolution's Uses.Once row, spent as regeneration's is.
+      DestructionRewrite.Heal -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' (\gs -> gs {GameState.objects = Map.adjust (\obj -> obj {Object.damage = 0}) oid (GameState.objects gs)})
         pure Nothing
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)

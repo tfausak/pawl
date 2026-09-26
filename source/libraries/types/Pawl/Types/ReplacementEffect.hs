@@ -3,7 +3,7 @@ module Pawl.Types.ReplacementEffect where
 import qualified Pawl.Types.CoinFlipR as CoinFlipR
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.DamageR as DamageR
-import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DieRollR as DieRollR
 import qualified Pawl.Types.DrawCountR as DrawCountR
 import qualified Pawl.Types.DrawR as DrawR
@@ -28,13 +28,15 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- An (effect, event) pair whose arms disagree simply does not apply, so the type
 -- rules out "redirect a damage event" without a validity pass.
 --
--- DestructionR and UntapR carry NO pattern: each rewrite names its subject in its
--- own rule's words, which Pawl.Engine.Replacement.scopes reads off the board. CR 201.5 makes a card's reference to itself by name mean
--- just that object, so "regenerate this creature" (CR 701.19a) names no other;
--- CR 122.1c's replacement is minted onto the permanent whose counters create it,
--- so "this permanent" is the object it was minted for; and CR 702.89a's
--- "enchanted permanent" is an attachment away from the Aura the row is minted
--- onto. The field appears when a card needs it.
+-- UntapR carries NO pattern, and DestructionR's is optional: absent, each
+-- rewrite names its subject in its own rule's words, which
+-- Pawl.Engine.Replacement.scopes reads off the board. CR 201.5 makes a card's
+-- reference to itself by name mean just that object, so "regenerate this
+-- creature" (CR 701.19a) names no other; CR 122.1c's replacement is minted onto
+-- the permanent whose counters create it, so "this permanent" is the object it
+-- was minted for; and CR 702.89a's "enchanted permanent" is an attachment away
+-- from the Aura the row is minted onto. Pyramids' "target land" is the printed
+-- subject a DestructionR pattern carries.
 --
 -- EntryR's pattern is a bare Filter rather than a pattern RECORD, which is CR
 -- 614.1c and CR 614.1d collapsing into one field: 614.1c's "as [this permanent]
@@ -87,7 +89,7 @@ data ReplacementEffect card ability effect
   = ZoneChangeR ZoneChangeR.ZoneChangeR
   | EntryR (EntryR.EntryR ability effect)
   | DamageR (DamageR.DamageR effect)
-  | DestructionR DestructionRewrite.DestructionRewrite
+  | DestructionR DestructionR.DestructionR
   | CounterR CounterR.CounterR
   | TokenR (TokenR.TokenR card)
   | -- | CR 614.1e: "As [this permanent] is turned face up . . ." A separate arm
@@ -114,7 +116,7 @@ data ReplacementEffect card ability effect
     -- 701.26b's action, which CR 502.3's turn-based action, an Effect.Untap and
     -- CR 107.6's untap symbol in a cost all perform.
     --
-    -- Carries NO pattern, for DestructionR's reason exactly: rule 122.1d's
+    -- Carries NO pattern, for an unpatterned DestructionR's reason: rule 122.1d's
     -- effect is minted onto the permanent whose counters create it, so "a
     -- permanent with a stun counter on it" is the object it was minted for. The
     -- field appears when a card needs it.
