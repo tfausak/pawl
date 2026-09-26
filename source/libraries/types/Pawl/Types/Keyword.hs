@@ -449,10 +449,6 @@ data Keyword
   | -- | 702.94a: miracle [cost] -- a static ability linked (CR 603.11) to a
     -- triggered one, letting the card be revealed as the turn's first draw and
     -- then cast for [cost].
-    --
-    -- Not implemented: both halves live in the hand (CR 113.6b) and so are read
-    -- off a card's printed keywords, which misses an effect that granted miracle
-    -- there (#1859).
     Miracle (Cost.Cost Keyword)
   | -- | 702.95a: soulbond -- two triggered abilities that may pair this creature
     -- with another unpaired creature its controller controls, on either one's

@@ -600,6 +600,30 @@ miracleSpec s registry =
       Spec.assertEqWith s "the Wrath was cast off it" (namedIn (S.printingName thunder) Zone.Graveyard S.alice after) 1
       Spec.assertEqWith s "and bob takes 5" (S.lifeOf S.bob after) (fmap (subtract 5) (S.lifeOf S.bob gs))
 
+    -- CR 613.1 names no zone, so Molecule Man's "nonland cards in your hand have
+    -- miracle {0}" reaches the Goblin Piker the moment it is drawn. A pair of
+    -- boards differing only in whether Molecule Man is in play: the Piker has no
+    -- printed miracle, and alice's lone Mountain after Think Twice cannot pay its
+    -- {1}{R}, so a Piker on the battlefield can only have been cast for {0}.
+    Spec.it s "CR 702.94a Molecule Man's granted miracle opens the window on a drawn Goblin Piker" $ do
+      island <- S.printingOf s registry "Island"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      thunder <- S.printingOf s registry "Thunderous Wrath"
+      man <- S.printingOf s registry "Molecule Man"
+      let (without, thinks) = miracleBoard island mountain piker think thunder 1 1
+          withMan = snd (S.addPermanent man S.alice without)
+          name = S.printingName piker
+      case thinks of
+        [thinkId] -> do
+          let granted = resolveCastWith miracleTaken withMan thinkId
+              printed = resolveCastWith miracleTaken without thinkId
+          Spec.assertEqWith s "with Molecule Man the drawn Piker is cast for {0}" (namedIn name Zone.Battlefield S.alice granted) 1
+          Spec.assertEqWith s "without it the Piker stays in alice's hand" (namedIn name Zone.Hand S.alice printed) 1
+          Spec.assertEqWith s "and no miracle reveal was offered" (length (filter isMiracleReveal (S.eventsOf printed))) 0
+        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
+
 -- alice, in her precombat main phase on turn 2 (so CR 103.8a's skipped draw step
 -- is not in play), holding `copies` Think Twice, with two Islands per copy and one
 -- Mountain out -- {R} exactly, which is the miracle cost and nowhere near
