@@ -149,8 +149,16 @@
                         "type": "MoveToZone",
                         "value": {
                           "ref": {
-                            "type": "InSlot",
-                            "value": "thatDiscardedCard"
+                            "type": "EachCardFromAmong",
+                            "value": {
+                              "filter": {
+                                "type": "IsInZone",
+                                "value": {
+                                  "type": "Graveyard"
+                                }
+                              },
+                              "slot": "thatDiscardedCard"
+                            }
                           },
                           "riders": {
                             "tapped": {

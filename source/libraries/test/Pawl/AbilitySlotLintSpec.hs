@@ -380,6 +380,14 @@ tapsForTotalPowerAsCost =
 -- Not offered on the CAST side (Pawl.CardSpec's cardOffends): no printing in
 -- `data/cards/` exiles the spell itself as an additional cost, so the exemption
 -- would fence nothing.
+exilesSelfAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+exilesSelfAsCost =
+  let isExile component = case component of
+        CostComponent.ExileThis -> True
+        CostComponent.ExileThisFromGraveyard -> True
+        _ -> False
+   in any isExile . Cost.Type.components
+
 -- Does this cost DISCARD the card it is on? exilesSelfAsCost's shape, for
 -- Binding.discardedCard (Cost.payComponent's DiscardThis arm): Calim, Djinn
 -- Emperor's "return Calim from your graveyard".
@@ -389,14 +397,6 @@ discardsSelfAsCost =
         CostComponent.DiscardThis {} -> True
         _ -> False
    in any isDiscard . Cost.Type.components
-
-exilesSelfAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
-exilesSelfAsCost =
-  let isExile component = case component of
-        CostComponent.ExileThis -> True
-        CostComponent.ExileThisFromGraveyard -> True
-        _ -> False
-   in any isExile . Cost.Type.components
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?

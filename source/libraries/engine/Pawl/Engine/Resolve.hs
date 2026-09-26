@@ -33,7 +33,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import Pawl.Engine.Resolve.Effect (apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, clauseIsImpossible, noSubgame, performManaAbility, targetSlotsOf)
-import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, effectViewOf, objectRefObjects, slotBindings, slotsAreExhaustive, slotsOf)
+import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, effectSlotObjects, effectViewOf, objectRefObjects, slotBindings, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Integer as Integer
 import Pawl.Types.AbilityName (AbilityName)
@@ -1319,9 +1319,11 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
               context = effectContext gs controller source legal (slotBindings resolving gs)
            in maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source quantity)
       cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (describedCost resolving controller source legal gs gate))
-      -- The resolving object's slots, so a component's criterion can name what
-      -- its cost moved (Binding.discardedCard); Pawl.ConjureSpec's Calim's Breath pair proves it.
-      slots = maybe Map.empty (Binding.slotObjects . Object.bindings) (Game.lookupObject resolving gs)
+      -- effectContext's slot map, so a component's criterion reads what every
+      -- other filter of this resolution reads -- CR 608.2b's legal targets, the
+      -- reserved cost slots among them (Binding.discardedCard), and the groups.
+      -- Pawl.ConjureSpec's Calim's Breath cases prove it.
+      slots = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf (slotBindings resolving gs))
   if notElem payer (Game.stillPlaying gs) || not (Cost.canPayReading slots PaymentSubject.ForNeither payer source cost gs)
     then pure False
     else do

@@ -1426,7 +1426,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- card its own cost discarded (Binding.discardedCard), and "other" is that
   -- card left out of what the gate may exile.
   Spec.it s "CR 400.7j Calim's Breath returns the Calim its cost discarded, tapped" $ do
-    (final, _) <- calimsBreath s registry 2
+    (final, _) <- calimsBreath s registry False 2
     Spec.assertEqWith
       s
       "a tapped Calim is on alice's battlefield, and the two others are in exile"
@@ -1435,13 +1435,23 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- The pair: ONE other Calim. The discarded Calim is not "other", so the gate
   -- cannot be paid and neither card leaves the graveyard.
   Spec.it s "CR 400.7j Calim's Breath cannot exile the discarded Calim as one of the two others" $ do
-    (final, offered) <- calimsBreath s registry 1
+    (final, offered) <- calimsBreath s registry False 1
     Spec.assertEqWith
       s
       "both Calims stay in alice's graveyard"
       (length (namedIn calimName Zone.Graveyard final), namedIn calimName Zone.Battlefield final)
       (2, [])
     Spec.assertEqWith s "and alice was never offered the exile" offered 0
+  -- The first case's board with bob's Leyline of the Void, which exiles the
+  -- discarded Calim instead. CR 400.7j still finds it in exile, but "return Calim
+  -- from your graveyard" names a graveyard, so it stays there.
+  Spec.it s "CR 400.7j Calim's Breath does not return a Calim its discard put into exile" $ do
+    (final, _) <- calimsBreath s registry True 2
+    Spec.assertEqWith
+      s
+      "no Calim is on alice's battlefield, and all three are in exile"
+      (namedIn calimName Zone.Battlefield final, length (namedIn calimName Zone.Exile final))
+      ([], 3)
 
   -- Mine Security ({1}{R} Creature -- Kavu Soldier 3/1, trample, "When this
   -- creature enters, conjure a card named Flametongue Kavu into the top eight
@@ -1504,16 +1514,18 @@ libraryIndexOf name gs = Seq.findIndexL (\oid -> S.soleFaceName oid gs == name) 
 
 -- Calim in alice's hand at her precombat main, two Islands to pay {1}{U}, bob's
 -- Goblin Piker as the target, ten Islands in her library for the discard
--- trigger's conjure, and `others` more Calims in her graveyard. She activates
--- Calim's Breath and everything resolves; every offer to pay is accepted and
--- counted.
-calimsBreath :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (GameState.GameState, Int)
-calimsBreath s registry others = do
+-- trigger's conjure, `others` more Calims in her graveyard, and, when
+-- `leyline`, bob's Leyline of the Void. She activates Calim's Breath and
+-- everything resolves; every offer to pay is accepted and counted.
+calimsBreath :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> Int -> m (GameState.GameState, Int)
+calimsBreath s registry leyline others = do
   calim <- S.printingOf s registry "Calim, Djinn Emperor"
   island <- S.printingOf s registry "Island"
   piker <- S.printingOf s registry "Goblin Piker"
+  void_ <- S.printingOf s registry "Leyline of the Void"
   reference <- mapM (S.cardOf s registry) ["Calim, Djinn Emperor"]
-  let base = islandsInLibrary island 10 (S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers))
+  let empty = islandsInLibrary island 10 (S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers))
+      base = if leyline then snd (S.addPermanent void_ S.bob empty) else empty
       (pikerId, withPiker) = S.addPermanent piker S.bob base
       stocked = List.foldl' (\g _ -> snd (S.addGraveyardCard calim S.alice g)) withPiker [1 .. others]
       (calimId, inHand) = S.addHandCard calim S.alice stocked
