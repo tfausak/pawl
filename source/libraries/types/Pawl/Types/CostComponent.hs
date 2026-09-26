@@ -222,8 +222,11 @@ data CostComponent keyword
     -- waterbend {4} taxed {2} more by Suppression Field may tap four permanents
     -- and no more.
     --
-    -- Not implemented: a waterbend cost in any other position -- a spell's
-    -- additional cost, a ward cost, an unless cost, an alternative cost (#3901).
+    -- A SPELL's mandatory additional waterbend cost rides the same way, its mana
+    -- and this licence one Face.additionalCostChoices option (Water Whip).
+    --
+    -- Not implemented: a spell's OPTIONAL waterbend cost, a ward cost, an unless
+    -- cost, an alternative cost (#3901).
     Waterbend Natural.Natural
   | -- | CR 107.3a / 601.2b / Katara, Water Tribe's Hope: X as a waterbend
     -- amount, announced by the activator and rewritten to a Waterbend by

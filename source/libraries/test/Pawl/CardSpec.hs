@@ -1496,7 +1496,8 @@ spellCostsOf face =
     <> Map.elems (Face.modeCosts face)
     -- CR 118.8's choice costs, each option on its own: they are additional costs
     -- of the same CR 601.2f total, so an X in one would bind Binding.variableX as
-    -- any other does. No printing puts an X in one.
+    -- any other does. Not implemented: Crashing Wave's "waterbend {X}", the
+    -- first printing to put one there (#3901).
     <> concatMap (NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices face)
 
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
@@ -6214,18 +6215,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (prints grantedEnchantSlots) "the pool grants an enchant slot"
     Spec.assertEqWith s "no enchant slot names a slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 118.8 / 601.2b: a choice with ONE option is a mandatory additional cost,
-  -- which Face.additionalCosts already carries -- written as a choice it puts a
-  -- Prompt.ChooseCost in front of a caster with nothing to decide. The empty
-  -- choice is refused on the wire (Pawl.Codec.CostChoice), so one option is the
-  -- mistranscription left for a lint to catch.
-  Spec.it s "a choice cost offers more than one payment" $ do
+  -- which Face.additionalCosts carries unless it holds MANA -- Water Whip's
+  -- waterbend {5}, a CostComponent list having no mana part. The empty choice is
+  -- refused on the wire (Pawl.Codec.CostChoice), so one option stating no mana
+  -- is the mistranscription left for a lint to catch.
+  Spec.it s "a choice cost offers more than one payment or pays mana" $ do
     ps <- S.allPrintings s
     let choicesOf = concatMap Face.additionalCostChoices . Card.Type.faces . Printing.card
-        offenders = filter (any ((< 2) . length . CostChoice.unwrap) . choicesOf) ps
-    -- A guard, since a pool printing no choice cost at all would pass saying
-    -- nothing (Caustic Exhale).
-    Spec.assertBool s (not (all (null . choicesOf) ps)) "the pool prints a choice cost"
-    Spec.assertEqWith s "no choice cost offers one payment" (fmap (S.nameOf . Printing.card) offenders) []
+        paysMana cost = not (null (foldMap ManaCost.unwrap (Cost.Type.mana cost)))
+        misfiled choice = case CostChoice.unwrap choice of
+          only NonEmpty.:| [] -> not (paysMana only)
+          _ -> False
+        offenders = filter (any misfiled . choicesOf) ps
+    -- Guards, since a pool printing neither shape would pass saying nothing
+    -- (Caustic Exhale, Water Whip).
+    Spec.assertBool s (any (any ((> 1) . length . CostChoice.unwrap) . choicesOf) ps) "the pool prints a choice cost"
+    Spec.assertBool s (any (any ((== 1) . length . CostChoice.unwrap) . choicesOf) ps) "the pool prints a mandatory additional cost paying mana"
+    Spec.assertEqWith s "no one-option choice cost states a cost Face.additionalCosts could carry" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 706.4's "the other result", which only a TWO-die instruction has: with
   -- any other count what the roller did not choose is not one number, and
   -- Pawl.Engine.Resolve leaves the slot unbound rather than guessing which of
