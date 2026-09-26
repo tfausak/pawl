@@ -28,6 +28,7 @@ import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
+import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -37,6 +38,7 @@ import qualified Pawl.Types.Exploited as Exploited
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
@@ -44,6 +46,7 @@ import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
+import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
@@ -462,8 +465,12 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- Filter narrows WHICH attackers made the condition fire and says nothing about
   -- who declared them, so "that player" still needs the seat. Total War reads it
   -- twice over, for "that player controls" and for the creatures it spares.
-  (TriggerCondition.PlayerAttacksWith {}, GameEvent.AttackersDeclared attacker) ->
-    Binding.setAttackingPlayer attacker Map.empty
+  --
+  -- The attackers the Filter admitted go under Binding.attackingCreatures,
+  -- Tyvar the Bellicose's "they": admittedAttackers, the set matchesTrigger
+  -- counted against the floor, so the slot is never empty given a match.
+  (TriggerCondition.PlayerAttacksWith p, GameEvent.AttackersDeclared attacker) ->
+    Binding.setAttackingPlayer attacker (Binding.setAttackingCreatures (admittedAttackers gs bearer you p attacker) Map.empty)
   -- CR 508.3e's TWO subjects, both off the one event. Whom the declaration was
   -- aimed at goes under the reserved "that player" slot, which is what the
   -- phrase means in Seifer, Balamb Rival's "goad target creature that player
@@ -1009,6 +1016,19 @@ admittedDepartures gs bearer you p = Seq.filter admits . Moved.departures
       Nothing -> False
       Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view (CardLeavesZone.filter p)
 
+-- The attackers `attacker` declared that the condition's Filter admits, CR
+-- 508.3c's "a creature that player controls" read through Combat.joinedUnder
+-- (CR 506.4) and each viewed through viewWithLastKnown, framed by the bearer.
+-- The relation and the floor are PlayerAttacksWith's match arm's questions, not
+-- this one's.
+admittedAttackers :: GameState -> ObjectId -> PlayerId -> PlayerAttacksWith.PlayerAttacksWith -> PlayerId -> Seq.Seq ObjectId
+admittedAttackers gs bearer you p attacker = Seq.fromList (filter admits (Set.toList (Combat.declaredAttackers combat)))
+  where
+    combat = GameState.combat gs
+    admits oid =
+      Map.lookup oid (Combat.joinedUnder combat) == Just attacker
+        && maybe False (\view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view (PlayerAttacksWith.filter p)) (Projection.viewWithLastKnown oid gs oid)
+
 -- CR 400.7e's `became` slot, in the plural CR 712.21c asks for: "if an effect
 -- can find the new object that a melded permanent becomes as it leaves the
 -- battlefield, it finds both cards... If that effect causes actions to be taken
@@ -1309,13 +1329,14 @@ eventBindingSlots cond = case cond of
   -- Unconditional, as this classification has to be: every
   -- GameEvent.AttackersDeclared carries a PlayerId.
   TriggerCondition.PlayerAttacks _ -> Set.singleton Binding.attackingPlayer
-  -- The DECLARING player and not the creatures, for the arm above's reason: rule
-  -- 508.3c's Filter names a SET of them, where the player it makes its subject is
-  -- one seat. Total War's "that player controls" is the phrase.
+  -- The DECLARING player, for the arm above's reason (Total War's "that player
+  -- controls"), and beside it the SET rule 508.3c's Filter admitted, as a group
+  -- (Tyvar the Bellicose's "they").
   --
-  -- Unconditional, as this classification has to be: every
-  -- GameEvent.AttackersDeclared carries a PlayerId.
-  TriggerCondition.PlayerAttacksWith {} -> Set.singleton Binding.attackingPlayer
+  -- Both unconditional, as this classification has to be: every
+  -- GameEvent.AttackersDeclared carries a PlayerId, and the group is stamped
+  -- even when empty.
+  TriggerCondition.PlayerAttacksWith {} -> Set.fromList [Binding.attackingPlayer, Binding.attackingCreatures]
   -- BOTH of rule 508.3e's players: the attacked one under the reserved "that
   -- player" slot, which Seifer, Balamb Rival's "that player controls" reads, and
   -- the attacking one under the slot the PlayerAttacks arm above uses, which
