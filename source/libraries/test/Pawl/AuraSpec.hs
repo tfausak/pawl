@@ -970,7 +970,7 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
   -- CR 702.5c's last sentence over the POOLS: enchant permanent then enchant
   -- creature admits only creatures, whichever instance is printed first. The
   -- wider pool first is the order a first-instance fold gets wrong, offering
-  -- the land (and the creature untagged, CR 115.1a's ToCreature being the
+  -- the land (and the creature as a bare object, ToCreature being the
   -- narrower pool's).
   Spec.it s "CR 702.5c enchant permanent then enchant creature offers no land" $ do
     plains <- S.printingOf s registry "Plains"

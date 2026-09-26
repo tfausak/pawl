@@ -1610,11 +1610,15 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   -- (AnyTarget against Permanents). This lint keeps a card off the latter by
   -- refusing every non-nesting set -- read over BOTH roads to the fold
   -- (CardSpec.enchantSlots), since Pawl.Engine.Projection appends a
-  -- Modification.GainEnchant to the printed list before the fold sees it.
+  -- Modification.GainEnchant to the printed list before the fold sees it, less
+  -- any the card's own Modification.LoseEnchant takes away: Animate Dead's
+  -- graveyard instance is gone by the time its Creatures one is gained.
   Spec.it s "every card's enchant pools nest" $ do
     ps <- S.allPrintings s
-    let offends c = Maybe.isNothing (Card.poolMeet (fmap TargetSlot.pool (enchantSlots c)))
-        offenders = filter (anyFace (\c -> not (null (enchantSlots c)) && offends c) . Printing.card) ps
+    let lost c = [slot | Modification.LoseEnchant slot <- grantedModifications c]
+        live c = filter (`notElem` lost c) (enchantSlots c)
+        offends c = not (null (live c)) && Maybe.isNothing (Card.poolMeet (fmap TargetSlot.pool (live c)))
+        offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card's enchant pools fail to nest, since the fold then admits nothing" (fmap (S.nameOf . Printing.card) offenders) []
   -- Pawl.Engine.Card.allTargetSlots binds the enchant slot under this name (Task 6), so a
   -- mode declaring it would be silently shadowed.

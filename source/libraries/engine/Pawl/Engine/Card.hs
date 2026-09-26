@@ -1859,6 +1859,8 @@ foldEnchant slots = case slots of
           -- The empty disjunction, which matches nothing: no candidate for CR
           -- 601.2c to choose, so CR 303.4a leaves the spell uncastable, CR 303.4g
           -- keeps an entering one where it is and CR 704.5m bins one attached.
+          -- A fence rather than a proven arm: the lint poolMeet names keeps
+          -- every card off it, so no test observes it.
           Nothing -> first {TargetSlot.filter = Just (Filter.Or [])}
       )
 
