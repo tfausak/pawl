@@ -596,15 +596,9 @@ mintedBy keyword ability = ability {ActivatedAbility.keyword = Just keyword}
 -- activated from here" rather than which rule produced any of them, which each
 -- ability carries for itself once `mintedBy` has stamped it.
 --
--- Printed keywords rather than a projection's post-layer ones, the same rules fact
--- castingPermissionsOf records: CR 113.6b confines an ability to the zones it
--- states, and rules 702.29a and 702.77a state the hand.
---
--- Not implemented: a card in a hand whose CYCLING or REINFORCE an effect granted
--- or removed, which the printed set misses (#1859). Narrowed to those two rules
--- rather than to keywords at large -- Teferi, Mage of Zhalfir does grant a
--- keyword to a card in a hand, and Cast.instantSpeed reads that one through the
--- projection.
+-- CR 113.6b confines an ability to the zones it states, and rules 702.29a and
+-- 702.77a state the hand. The keyword set is the caller's:
+-- Activatable.abilitiesForGiven hands it the projection's.
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
@@ -1180,10 +1174,8 @@ ninjutsu cost =
 -- scavenge, CR 702.128a's embalm, CR 702.129a's eternalize and CR 702.141a's
 -- encore.
 --
--- PRINTED keywords, as handAbilitiesOf takes them and for the same reason: the
--- projection does not reach a graveyard card (#1859; see
--- Pawl.Engine.Projection.projectGiven), and Pawl.Engine.Activate's graveyard arm
--- is what calls this.
+-- The keyword set is the caller's, as handAbilitiesOf's is:
+-- Activatable.abilitiesForGiven's graveyard arm hands it the projection's.
 --
 -- MEMBERSHIP and not a count: each of these abilities moves the one card, so a
 -- second instance has nothing left to do once the first has resolved.
@@ -1817,9 +1809,8 @@ encoreSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEff
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
 -- sibling one zone over.
 --
--- POST-LAYER keywords, unlike handAbilitiesOf's printed ones, and the contrast is
--- CR 113.6 again: this ability functions on the battlefield, which the projection
--- does reach. So Humility takes crew away at CR 613.1f layer 6 for free.
+-- POST-LAYER keywords, so Humility takes crew away at CR 613.1f layer 6 for
+-- free.
 --
 -- One ability PER INSTANCE, rule 702.70b's reading rather than rule 702.164b's: CR
 -- 702.122a states a whole self-contained ability, so a permanent with crew twice
