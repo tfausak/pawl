@@ -74,6 +74,7 @@ import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DestructionCause as DestructionCause
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiceRoll as DiceRoll
 import qualified Pawl.Types.DieRollR as DieRollR
@@ -536,9 +537,11 @@ admits regenerability cause rewrite = case rewrite of
   -- and umbra armor is not a regeneration, so CR 701.19c's prohibition leaves it
   -- standing.
   DestructionRewrite.UmbraArmor -> True
+  -- Pyramids' shield is not a regeneration (CR 701.19c) and names no cause.
+  DestructionRewrite.Heal -> True
 
--- CR 614.1: which permanent's destruction each rewrite watches for -- the one
--- fact about a DestructionR that is not in a pattern.
+-- CR 614.1: which permanent's destruction each rewrite watches for when its row
+-- prints no subject of its own.
 --
 -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the ability's own
 -- source, so a regeneration is self-only. CR 122.1c's "this permanent" is the
@@ -547,9 +550,9 @@ admits regenerability cause rewrite = case rewrite of
 -- -- the ability is the Aura's and the event is the enchanted permanent's -- which
 -- is why this is a function of the board rather than an equality.
 --
--- A function rather than a Filter pattern on the constructor because no card
--- describes the set: two of the three rules name the source itself and the third
--- names its attachment.
+-- A function rather than a Filter written onto every such row because these
+-- subjects are the RULES' words, not a card's: two of the three name the source
+-- itself and the third names its attachment.
 scopes :: GameState -> DestructionRewrite.DestructionRewrite -> ObjectId -> ObjectId -> Bool
 scopes gs rewrite src oid = case rewrite of
   DestructionRewrite.Regenerate -> src == oid
@@ -560,6 +563,9 @@ scopes gs rewrite src oid = case rewrite of
   -- is a permanent.
   DestructionRewrite.UmbraArmor ->
     (Recipient.objectOf =<< (Object.attachedTo =<< Game.lookupObject src gs)) == Just oid
+  -- Read only for a row printing no subject, which no heal shield does; the
+  -- self-scope is regeneration's reading of an unnamed subject.
+  DestructionRewrite.Heal -> src == oid
 
 -- CR 615.7: a spent shield is not an applicable prevention effect at all, and is
 -- refused HERE rather than applied for nothing -- as `admits` refuses a
@@ -712,10 +718,11 @@ matchesPrinted gs event candidate =
             && admitsRecipient src rewrite de
             && (not (redirects rewrite) || redirectable gs de)
             && (not (prevents rewrite) || preventsInRange gs (ReplacementCandidate.controller candidate) pat rewrite de)
-        -- DestructionR carries no pattern: each rewrite names its subject by
-        -- identity or by attachment, which `scopes` reads off the board.
-        (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid regenerability cause) ->
-          scopes gs rewrite src oid && admits regenerability cause rewrite
+        -- CR 614.1a: a printed subject (Pyramids' "target land") is matched as
+        -- a Filter; absent one, the rewrite names its subject by identity or by
+        -- attachment, which `scopes` reads off the board.
+        (ReplacementEffect.DestructionR (DestructionR.MkDestructionR matching rewrite), ProposedEvent.WouldBeDestroyed oid regenerability cause) ->
+          maybe (scopes gs rewrite src oid) (\f -> matchesFiltered gs candidate f oid) matching && admits regenerability cause rewrite
         (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldPutCounters cause oid kind _) ->
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.

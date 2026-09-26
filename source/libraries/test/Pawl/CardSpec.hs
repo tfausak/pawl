@@ -135,6 +135,7 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.Discard as Discard
@@ -4838,7 +4839,8 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   -- (Pariah's "enchanted creature"), which damageRewriteFilters below answers.
   ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite _) ->
     unframed (DamagePattern.whatSource damagePattern : Maybe.maybeToList (DamagePattern.whatRecipient damagePattern) <> damageRewriteFilters rewrite)
-  ReplacementEffect.DestructionR _ -> []
+  -- CR 614.1a's printed subject (Pyramids' "target land").
+  ReplacementEffect.DestructionR (DestructionR.MkDestructionR matching _) -> unframed (Maybe.maybeToList matching)
   -- CR 111.1: what the token being created is (Queen Allenal of Ruadach's
   -- "creature tokens"). The appended token's own Filters are the MINTED
   -- object's, and reach the sweep through replacementMintedCards instead.

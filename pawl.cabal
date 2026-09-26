@@ -407,8 +407,10 @@ library codec
     Pawl.Codec.DesignationSpec
     Pawl.Codec.Destroy
     Pawl.Codec.DestroySpec
+    Pawl.Codec.DestructionR
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DestructionRewriteSpec
+    Pawl.Codec.DestructionRSpec
     Pawl.Codec.Devotion
     Pawl.Codec.DevotionSpec
     Pawl.Codec.Devour
@@ -1829,6 +1831,7 @@ library types
     Pawl.Types.Designation
     Pawl.Types.Destroy
     Pawl.Types.DestructionCause
+    Pawl.Types.DestructionR
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
     Pawl.Types.Devotion

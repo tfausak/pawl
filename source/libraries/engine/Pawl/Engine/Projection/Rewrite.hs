@@ -77,6 +77,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DrawR as DrawR
@@ -1291,10 +1292,11 @@ rewriteReplacementEffect pairs effect = case effect of
           DamageR.rewrite = rewriteDamageRewrite pairs (DamageR.rewrite r),
           DamageR.riders = fmap (rewriteEffect pairs) (DamageR.riders r)
         }
-  -- CR 701.19a's regeneration and CR 122.1c's shield: two nullary rewrites with
-  -- no pattern beside them, so there is nothing to swap. CR 122.1d's untap
-  -- replacement is the same shape one event class over.
-  ReplacementEffect.DestructionR _ -> effect
+  -- CR 614.1a's printed subject; the rewrite beside it is nullary.
+  ReplacementEffect.DestructionR r ->
+    ReplacementEffect.DestructionR r {DestructionR.matching = fmap (Filter.rewrite pairs) (DestructionR.matching r)}
+  -- CR 122.1d's untap replacement: a nullary rewrite with no pattern beside it,
+  -- so there is nothing to swap.
   ReplacementEffect.UntapR _ -> effect
   -- CR 614.1a / 120.4c: a LifeLossPattern is one CR 109.5 relation and one cause,
   -- and no arm of the rewrite names a Filter or a card. No printed word, so
