@@ -157,6 +157,8 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   -- CR 101.1: the ceilings this face's own words put on CR 601.2b's announced X
   -- (Pawl.Types.Face).
   maximumX <- Fields.defaulted "maximumX" [] (Common.list Quantity.codec) Face.maximumX
+  -- CR 101.1: the floor on that X, emitted only for a face that states one.
+  minimumX <- Fields.defaulted "minimumX" 0 Common.natural Face.minimumX
   alternativeCosts <- Fields.defaulted "alternativeCosts" [] (Common.list AlternativeCost.codec) Face.alternativeCosts
   -- CR 601.2f: the reductions this face applies to its own cost to cast
   -- (Pawl.Types.CostReduction).
@@ -215,6 +217,7 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
         Face.additionalCostChoices = additionalCostChoices,
         Face.modeCosts = modeCosts,
         Face.maximumX = maximumX,
+        Face.minimumX = minimumX,
         Face.alternativeCosts = alternativeCosts,
         Face.costReductions = costReductions,
         Face.mulliganActions = mulliganActions,

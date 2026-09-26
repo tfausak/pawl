@@ -9126,7 +9126,9 @@ bindEarthbentLand resolving land gs =
 -- The KEYWORDS are granted one modification per written instance, CR 613.1f's
 -- reading that Pawl.Engine.Projection.applyModification's GainKeyword arm
 -- already takes: a card printing a keyword twice grants it twice. Backup's own
--- family is dropped, rule 702.165a's "non-backup".
+-- family is dropped, rule 702.165a's "non-backup", and so is every keyword the
+-- card prints ABOVE this backup line, its "printed below this one" (Saiba
+-- Cryptomancer's flash).
 --
 -- A STATIC ability travels the same way, as a GainAbility that the projection
 -- gathers from its new host (Pawl.Engine.Projection.View's
@@ -9142,10 +9144,12 @@ bindEarthbentLand resolving land gs =
 -- in no grant (#1942) (Scryfall `keyword:backup`, 2026-09-24).
 expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
 expandGrant resolving source gs modification = case modification of
-  Modification.GainAbilitiesOfSource ->
+  Modification.GainAbilitiesOfSource above ->
     let pc = Maybe.fromMaybe (Projection.copiableCharacteristics source gs) (Binding.placedSourceCopyOf (slotBindings resolving gs))
+        printedAbove keyword = Set.member keyword above
         granted keyword count
           | Keyword.familyOf keyword == Just KeywordFamily.Backup = []
+          | printedAbove keyword = []
           | otherwise = List.genericReplicate count (Modification.GainKeyword keyword)
      in concatMap (uncurry granted) (Map.toAscList (PC.keywords pc))
           <> fmap (Modification.GainAbility . GrantedAbility.Activated) (PC.activatedAbilities pc)

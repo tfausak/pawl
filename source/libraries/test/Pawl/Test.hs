@@ -68,6 +68,7 @@ import qualified Pawl.Codec.AttackTargetSpec
 import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
 import qualified Pawl.Codec.AttackingPlayersSpec
+import qualified Pawl.Codec.BackupSpec
 import qualified Pawl.Codec.BattlefieldCandidateSpec
 import qualified Pawl.Codec.BecameAttackedSpec
 import qualified Pawl.Codec.BecameBlockingSpec
@@ -864,6 +865,7 @@ spec s registry = do
   Pawl.Codec.ConjureSpec.spec s
   Pawl.Codec.CreateSpec.spec s
   Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec.spec s
+  Pawl.Codec.BackupSpec.spec s
   Pawl.Codec.CyclingSpec.spec s
   Pawl.Codec.DamageDirectionSpec.spec s
   Pawl.Codec.DamageEventSpec.spec s

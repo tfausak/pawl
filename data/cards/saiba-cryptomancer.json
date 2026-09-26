@@ -3,9 +3,20 @@
     {
       "keywords": [
         {
+          "type": "Flash"
+        },
+        {
+          "type": "Hexproof"
+        },
+        {
           "type": "Backup",
           "value": {
-            "count": 1
+            "count": 1,
+            "printedAbove": [
+              {
+                "type": "Flash"
+              }
+            ]
           }
         }
       ],
@@ -19,42 +30,27 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Green"
+              "type": "Blue"
             }
           }
         }
       ],
-      "name": "Streetwise Negotiator",
+      "name": "Saiba Cryptomancer",
       "power": {
         "type": "Literal",
         "value": 0
       },
-      "staticAbilities": [
-        {
-          "affected": {
-            "type": "Matching",
-            "value": {
-              "type": "IsSource"
-            }
-          },
-          "modifications": [
-            {
-              "type": "AssignCombatDamageWithToughness"
-            }
-          ]
-        }
-      ],
       "toughness": {
         "type": "Literal",
-        "value": 2
+        "value": 1
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Cat"
+            "type": "Moonfolk"
           },
           {
-            "type": "Citizen"
+            "type": "Ninja"
           }
         ],
         "types": [

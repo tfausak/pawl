@@ -3029,6 +3029,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   merrowSkyswimmerSpec s registry
   geyserLeaperSpec s registry
   kataraSpec s registry
+  mindGrindSpec s registry
   flashSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
@@ -3207,6 +3208,19 @@ omniscienceSpec s registry =
       Spec.assertBool s (not (wasAskedForX (responsesFor payingGrant))) "the grant's {0} does not"
       Spec.assertEqWith s "so the printed cast deals its announced 1" (S.lifeOf S.alice (resolveWith payingPrinted)) (Just 19)
       Spec.assertEqWith s "and the free cast deals 0 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice (resolveWith payingGrant)) (Just 20)
+    -- CR 107.3b's 0 against CR 101.1's floor: Mind Grind's "X can't be 0" leaves
+    -- the grant's {0} no legal X, so the cast is not offered at all (Mind Grind's
+    -- Scryfall ruling says the same). A pair differing in the card alone: Blaze's
+    -- {X}{R}, with no floor, is offered off the same landless grant.
+    Spec.it s "CR 101.1/107.3b the grant does not offer a spell whose X can't be 0" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      grind <- S.printingOf s registry "Mind Grind"
+      blaze <- S.printingOf s registry "Blaze"
+      let (grindId, grindGs) = omniscienceBoard mountain omniscience grind 0 True
+          (blazeId, blazeGs) = omniscienceBoard mountain omniscience blaze 0 True
+      Spec.assertBool s (not (any (S.isCastOf grindId) (Action.legalActions S.alice grindGs))) "CR 101.1 Mind Grind is not offered under the grant"
+      Spec.assertBool s (any (S.isCastOf blazeId) (Action.legalActions S.alice blazeGs)) "and Blaze, whose X has no floor, is"
 
 -- Three seats. alice holds Ertai's Scorn ({1}{U}{U}) over an Island and a Swamp;
 -- bob holds one Fog over one Forest, carol two Fogs over two Forests. `bobFirst`
@@ -6082,6 +6096,60 @@ kataraSpec s registry = Spec.describe s "Katara, Water Tribe's Hope" $ do
         tapped = S.tapObject kataraId untapped
     Spec.assertBool s (not (any (isActivateOf kataraId) (Action.legalActions S.alice tapped))) "with Katara tapped nothing can waterbend {1}, so no activation is offered"
     Spec.assertBool s (any (isActivateOf kataraId) (Action.legalActions S.alice untapped)) "and untapped she can tap for it herself, so one is"
+
+-- Mind Grind {X}{U}{B} Sorcery: "Each opponent reveals cards from the top of
+-- their library until they reveal X land cards, then puts all cards revealed
+-- this way into their graveyard. X can't be 0." The last sentence is
+-- Face.minimumX (CR 101.1): the floor pair proves the announcement side, the
+-- offer pair the castability gate. The free cast CR 107.3b fixes at 0 is
+-- omniscienceSpec's.
+mindGrindSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mindGrindSpec s registry = Spec.describe s "Mind Grind" $ do
+  -- A pair varying the ANNOUNCED value alone, on one board. X=1 is answered
+  -- with the least value ChooseX carries, so the prompt's floor is read too.
+  Spec.it s "CR 101.1 an announced X of 0 is refused, and the floor of 1 is not" $ do
+    (spell, gs) <- mindGrindBoard s registry 2
+    let castAt :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+        castAt answer = S.runPure answer gs (do Cast.castSpell S.manaPerformer S.alice spell (S.soleFaceName spell gs) Facing.FaceUp; Stack.resolveTop)
+        zero = castAt (\p -> case p of Prompt.ChooseX {} -> 0; _ -> S.identityAnswer p)
+        least = castAt (\p -> case p of Prompt.ChooseX _ _ _ floorX _ -> floorX; _ -> S.identityAnswer p)
+        graveyard pid = length . Game.zoneMembers Zone.Graveyard pid
+    Spec.assertEqWith s "CR 101.1 at X=0 Mind Grind is still in alice's hand" (S.handSize S.alice zero) 1
+    Spec.assertEqWith s "and bob milled nothing" (graveyard S.bob zero) 0
+    Spec.assertEqWith s "at the prompt's least X bob milled down to his first land" (graveyard S.bob least) 2
+    Spec.assertEqWith s "and carol hers" (graveyard S.carol least) 1
+    Spec.assertEqWith s "and alice, no opponent, kept her library" (length (Game.zoneMembers Zone.Library S.alice least)) 1
+  -- The gate's side: X=1 is the cheapest announcement, so {U}{B} alone does not
+  -- offer the cast. A pair differing in one Mountain.
+  Spec.it s "CR 101.1/601.2 Mind Grind is not offered when no X of 1 or more is payable" $ do
+    (short, shortGs) <- mindGrindBoard s registry 0
+    (enough, enoughGs) <- mindGrindBoard s registry 1
+    Spec.assertBool s (not (any (S.isCastOf short) (Action.legalActions S.alice shortGs))) "with only {U}{B} no X of 1 is payable, so no cast is offered"
+    Spec.assertBool s (any (S.isCastOf enough) (Action.legalActions S.alice enoughGs)) "and one Mountain more pays X=1, so one is"
+
+-- Three seats, so "each opponent" is not each player. alice has an Island, a
+-- Swamp and `n` Mountains, one card in her library and Mind Grind in hand; bob's
+-- library is Piker, Mountain, Piker from the top and carol's Mountain, Piker.
+mindGrindBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, GameState.GameState)
+mindGrindBoard s registry n = do
+  grind <- S.printingOf s registry "Mind Grind"
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let lands = S.landsFor mountain S.alice n (S.landsFor swamp S.alice 1 (S.landsFor island S.alice 1 S.threePlayerGame))
+      stock pid printings g = List.foldl' (\acc p -> snd (S.addLibraryCard p pid acc)) g printings
+      -- Each added card goes on top, so these lists read bottom-up.
+      stocked = stock S.carol [piker, mountain] (stock S.bob [piker, mountain, piker] (stock S.alice [mountain] lands))
+      (spell, gs) = S.addHandCard grind S.alice stocked
+  pure
+    ( spell,
+      gs
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
 
 -- Katara alone on alice's landless battlefield, alice holding priority in her
 -- own precombat main phase.

@@ -171,6 +171,8 @@ library codec
     Pawl.Codec.AttackTargetKind
     Pawl.Codec.AttackTargetKindSpec
     Pawl.Codec.AttackTargetSpec
+    Pawl.Codec.Backup
+    Pawl.Codec.BackupSpec
     Pawl.Codec.BattlefieldCandidate
     Pawl.Codec.BattlefieldCandidateSpec
     Pawl.Codec.BecameAttached
@@ -1696,6 +1698,7 @@ library types
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.AttackTargetKind
+    Pawl.Types.Backup
     Pawl.Types.BattlefieldCandidate
     Pawl.Types.BecameAttached
     Pawl.Types.BecameAttacked

@@ -262,13 +262,13 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.AddChosenColor
       " {\"type\":\"AddChosenColor\"} "
   -- layer 6, CR 702.165a: the abilities come off the effect's SOURCE, so the arm
-  -- itself is payload-free.
+  -- carries only the keywords printed above the backup line.
   Spec.it s "GainAbilitiesOfSource" $
     Common.assertCodec
       s
       codec
-      Modification.GainAbilitiesOfSource
-      " {\"type\":\"GainAbilitiesOfSource\"} "
+      (Modification.GainAbilitiesOfSource (Set.singleton Keyword.Flash))
+      " {\"type\":\"GainAbilitiesOfSource\",\"value\":[{\"type\":\"Flash\"}]} "
   -- layer 3, CR 612.5: the two sides come from the effect's affected set, so
   -- the arm itself is payload-free.
   Spec.it s "ExchangeTextBoxes" $
