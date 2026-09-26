@@ -778,8 +778,9 @@ data Prompt r where
   -- only one survives the gate.
   ChooseOfferedCastSpell :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty (ObjectId.ObjectId, CardName.CardName) -> Prompt (ObjectId.ObjectId, CardName.CardName)
   -- | CR 702.94a / 121.9: whether the drawn card is revealed for miracle, the
-  -- cast being OfferedCast's separate "may"; never elided where asked.
-  OfferedMiracleReveal :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
+  -- cast being OfferedCast's separate "may"; asked once per miracle ability,
+  -- named by its cost, until one is taken (CR 702.94b).
+  OfferedMiracleReveal :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Cost.Cost Keyword.Keyword -> Prompt OptionalDecision.OptionalDecision
   -- | CR 118.12 / 118.12a: whether the named player -- the one the effects are
   -- aimed at, not the resolving controller -- pays the cost a resolving object
   -- offers, once per payment in APNAP order. Not asked where CR 118.3 leaves

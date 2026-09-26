@@ -1905,15 +1905,17 @@ eventTriggers events gs =
       -- mint would leave this source with nothing to find. The keywords are the
       -- PROJECTION's (CR 613.1), Event.offerMiracleReveal's read, so a miracle an
       -- effect granted in the hand mints the trigger its reveal was offered for.
+      -- Only the revealed ability's own trigger, of the card's miracle abilities
+      -- (Keyword.revealedForMiracle).
       --
       -- The controller is the OWNER, CR 113.8's second clause, for `inGraveyards`'
       -- reason: CR 108.4 gives a card in a hand no controller. Rule 702.94a's
       -- reveal is one a player makes from their own hand, so the owner is also the
       -- revealer, and CR 109.5's "you" lands on the same seat either way.
       revealedInHand event = case event of
-        GameEvent.Revealed (Revealed.MkRevealed _ oid RevealCause.ForMiracle _) -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
+        GameEvent.Revealed (Revealed.MkRevealed _ oid (RevealCause.ForMiracle cost) _) -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
           (Just obj, Just face) ->
-            case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.handTriggeredAbilitiesOf (Map.keysSet (Projection.keywordsOf oid gs))) of
+            case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Hand) (Face.triggeredAbilities face <> Keyword.handTriggeredAbilitiesOf (Keyword.revealedForMiracle cost (Map.keysSet (Projection.keywordsOf oid gs)))) of
               [] -> Map.empty
               abilities -> Map.singleton oid (Object.owner obj, abilities)
           _ -> Map.empty

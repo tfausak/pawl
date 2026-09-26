@@ -36,6 +36,7 @@ import qualified Pawl.Types.CardName as CardName.Type
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -223,7 +224,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     Spec.it s "GameEvent.Revealed round-trips with its snapshot" $ do
       typhoidRats <- S.printingOf s registry "Typhoid Rats"
       let (ratId, gs) = S.addLibraryCard typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
-      roundTrip s "revealed" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Revealed (Revealed.MkRevealed S.alice ratId RevealCause.ForMiracle (Projection.project ratId gs)))
+      roundTrip s "revealed" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Revealed (Revealed.MkRevealed S.alice ratId (RevealCause.ForMiracle (Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})) (Projection.project ratId gs)))
     -- TriggerCondition's own per-constructor coverage lives in
     -- Pawl.Codec.TriggerConditionSpec now.
     Spec.it s "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $

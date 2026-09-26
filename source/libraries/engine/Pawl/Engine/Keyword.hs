@@ -4580,7 +4580,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Companion _ -> []
   -- CR 702.94a's static half is a PERMISSION to reveal, not a replacement: CR
   -- 121.9's window changes nothing about the draw, so there is no event to
-  -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCost directly.
+  -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCosts directly.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
@@ -8055,20 +8055,29 @@ miracle cost =
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
--- CR 702.94a's STATIC half, read as the one thing its reader needs: what this
--- card would cost if its controller took the reveal. Nothing when the card has no
--- miracle ability at all, which is also "no window to open".
+-- CR 702.94a's STATIC half: the cost of each distinct miracle ability, one per
+-- reveal the player may choose to make (CR 702.94b's "its miracle ability").
+-- Empty when the card has none, which is also "no window to open".
 --
 -- Asked of the card's PROJECTED keywords (Event.offerMiracleReveal): rule
 -- 702.94a's abilities function in the hand (CR 113.6b), where an effect may
--- grant one (Molecule Man). ONE cost per card (the ascending-least), morphCost's
--- shape.
-miracleCost :: Set Keyword -> Maybe (Cost Keyword)
-miracleCost keywords =
+-- grant one (Molecule Man).
+miracleCosts :: Set Keyword -> [Cost Keyword]
+miracleCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Miracle cost -> Just cost
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- The keywords a reveal for the miracle ability with this cost leaves live: every
+-- other miracle ability's linked trigger refers only to its own reveal (CR
+-- 607.2h), so the mint drops them.
+revealedForMiracle :: Cost Keyword -> Set Keyword -> Set Keyword
+revealedForMiracle revealed =
+  let keep keyword = case keyword of
+        Keyword.Miracle cost -> cost == revealed
+        _ -> True
+   in Set.filter keep
 
 -- The triggered abilities rule 702 mints for a card in a HAND, off the keywords
 -- its caller hands over. `triggeredAbilitiesOf`'s sibling, and the same roster:

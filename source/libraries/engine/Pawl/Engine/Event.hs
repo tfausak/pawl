@@ -7878,13 +7878,19 @@ offerMiracleReveal :: PlayerId -> ObjectId -> Game ()
 offerMiracleReveal pid drawn = do
   gs <- State.get
   case Game.faceOf drawn gs of
-    Just face | Maybe.isJust (Keyword.miracleCost (Map.keysSet (Projection.keywordsOf drawn gs))) -> do
+    Just face -> do
       let decider = Decide.deciderFor pid gs
-      decision <- Game.choose (Prompt.OfferedMiracleReveal decider pid drawn (Face.name face))
-      case decision of
-        OptionalDecision.Declines -> pure ()
-        OptionalDecision.Exercises -> reveal RevealCause.ForMiracle pid drawn
-    _ -> pure ()
+          -- One reveal, under one miracle ability (CR 702.94b): each is offered
+          -- in turn until the player takes one.
+          offer costs = case costs of
+            [] -> pure ()
+            cost : rest -> do
+              decision <- Game.choose (Prompt.OfferedMiracleReveal decider pid drawn (Face.name face) cost)
+              case decision of
+                OptionalDecision.Declines -> offer rest
+                OptionalDecision.Exercises -> reveal (RevealCause.ForMiracle cost) pid drawn
+      offer (Keyword.miracleCosts (Map.keysSet (Projection.keywordsOf drawn gs)))
+    Nothing -> pure ()
 
 -- The single discard funnel (CR 701.9a). `pid` is the discarding player, whom that
 -- rule makes the card's owner either way, and `cause` is why (see DiscardCause).
