@@ -1272,7 +1272,7 @@ youngPyromancerSpec s registry =
 -- The printed rider "This ability triggers only once each turn"
 -- (Pawl.Types.TriggerLimit), on top of the trigger event the group above covers.
 -- No comprehensive rule states the clause; CR 702.179d is where the rulebook
--- prints it verbatim, and Pawl.Engine.Engine.withinTriggerLimit is what spends it.
+-- prints it verbatim, and Pawl.Engine.Event.withinTriggerLimit is what spends it.
 --
 -- Whispering Wizard, {3}{U} Creature -- Human Wizard 3/2: "Whenever you cast a
 -- noncreature spell, create a 1/1 white Spirit creature token with flying. This
@@ -1443,7 +1443,7 @@ whisperingWizardSpec s registry =
 -- rather than once per turn (Pawl.Types.TriggerLimit's OncePerGame). No
 -- comprehensive rule states it either; it is the per-turn clause of
 -- `whisperingWizardSpec` above with the window widened, and
--- Pawl.Engine.Engine.withinTriggerLimit spends both.
+-- Pawl.Engine.Event.withinTriggerLimit spends both.
 --
 -- Acrobatic Cheerleader, {1}{W} Creature -- Human Survivor 2/2: "Survival -- At
 -- the beginning of your second main phase, if this creature is tapped, put a

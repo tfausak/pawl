@@ -688,7 +688,7 @@ resolveTrigger answer gs =
    in S.runPure answer placed Stack.resolveTop
 
 -- CR 702.179d's "only once each turn" allowance, read the way
--- Engine.withinTriggerLimit spends it: the players whose SOURCELESS ability is in
+-- Event.withinTriggerLimit spends it: the players whose SOURCELESS ability is in
 -- this turn's CR 603.3b log.
 inherentTriggersSpent :: GameState.GameState -> [PlayerId.PlayerId]
 inherentTriggersSpent gs =

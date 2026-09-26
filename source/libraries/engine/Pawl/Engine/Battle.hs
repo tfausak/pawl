@@ -59,12 +59,10 @@ import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Combat as Combat
-import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import Pawl.Types.Game (Game)
-import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -378,26 +376,21 @@ defenseOn oid gs = case Game.lookupObject oid gs of
 -- a fresh id on every zone change, so a battle that flickered is not the source of
 -- the old one's ability.
 --
--- The stack half is rule 704.5v's own width -- ANY ability, where rule 704.5s says
--- "a chapter ability". The PENDING half is narrower than that: it recognizes only
--- CR 310.12b's own trigger, because reading a general "would any of this
--- permanent's abilities fire on any unscanned event" means the CR 603 matcher,
--- which lives above this module. NOT IMPLEMENTED: a Siege at defense 0 owing some
--- OTHER triggered ability that has fired and not yet been placed (#902).
+-- Both halves are rule 704.5v's own width -- ANY ability, where rule 704.5s says
+-- "a chapter ability". So the pending half is every object an ability has
+-- triggered from, not only CR 310.12b's: Pawl.BattleSpec's "CR 704.5v whole card:
+-- a Siege at defense 0 waits for its own enters ability" is the case where the
+-- defeat ability is not among them.
 --
--- The unscanned events arrive as an ARGUMENT for awaitingChapter's reason:
--- Pawl.Engine.Event owns the watermark and this module sits below it.
-awaitingAbility :: [GameEvent.GameEvent] -> GameState -> ObjectId.ObjectId -> Bool
-awaitingAbility events gs oid =
+-- The pending sources arrive as an ARGUMENT, awaitingChapter's reason widened:
+-- Pawl.Engine.Event owns both the watermark and the CR 603 matcher, and this
+-- module sits below it. Pawl.Engine.Sba hands in Event.triggeredSources.
+awaitingAbility :: Set.Set ObjectId.ObjectId -> GameState -> ObjectId.ObjectId -> Bool
+awaitingAbility pending gs oid =
   let onStack sid = case fmap Object.source (Game.lookupObject sid gs) of
         Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == oid
         _ -> False
-      -- CR 310.12b's condition, matched exactly as Event.matchesTrigger matches it:
-      -- an unscanned removal on this permanent that took its last defense counter.
-      pending event = case event of
-        GameEvent.CountersRemoved (CounterChange.MkCounterChange target CounterKind.Defense _ after) -> target == oid && after == 0
-        _ -> False
-   in any onStack (GameState.stack gs) || any pending events
+   in any onStack (GameState.stack gs) || Set.member oid pending
 
 -- CR 310.7 / CR 704.5v and CR 310.8 / CR 704.5w: the battles put into their owners'
 -- graveyards at defense 0. The state-based action's CLASSIFIER half, taking the
@@ -424,18 +417,19 @@ awaitingAbility events gs oid =
 -- For a SIEGE the graveyard is normally unreachable, and that is CR 704.5v's whole
 -- design: the counters hitting 0 fires CR 310.12b, the exemption holds the battle
 -- on the battlefield while that ability resolves, and the ability exiles it. What
--- reaches this clause as a Siege is one with no defeat ability left to fire --
--- layer 6 removed it, or it already resolved.
+-- reaches this clause as a Siege is one owing no ability at all -- layer 6 removed
+-- its defeat ability, that ability already resolved, or no counter ever came off
+-- (a Siege printed with defense 0).
 --
 -- Ascending, for Saga.sacrificing's reason.
-defeated :: Map.Map ObjectId.ObjectId PC.ProjectedCharacteristics -> [GameEvent.GameEvent] -> GameState -> [ObjectId.ObjectId]
-defeated pcs events gs =
+defeated :: Map.Map ObjectId.ObjectId PC.ProjectedCharacteristics -> Set.Set ObjectId.ObjectId -> GameState -> [ObjectId.ObjectId]
+defeated pcs pending gs =
   let gone oid = case Map.lookup oid pcs of
         Nothing -> Nothing
         Just pc
           | isBattle pc,
             defenseOn oid gs == 0,
-            not (Set.member Subtype.Siege (battleTypes pc) && awaitingAbility events gs oid) ->
+            not (Set.member Subtype.Siege (battleTypes pc) && awaitingAbility pending gs oid) ->
               Just oid
           | otherwise -> Nothing
    in Maybe.mapMaybe gone (Set.toAscList (GameState.battlefield gs))

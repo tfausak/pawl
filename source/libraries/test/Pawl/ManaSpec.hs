@@ -3835,7 +3835,7 @@ tyvarSpec s registry = Spec.describe s "Tyvar the Bellicose" $ do
     Spec.assertEqWith s "the PlayerRelation: bob's Elf is no creature ALICE controls, so it gets nothing" (S.counterOf CounterKind.PlusOnePlusOne theirElves theirs) 0
     Spec.assertEqWith s "CR 605.5a the granted trigger went ON the stack, being no mana ability" (length (GameState.stack waiting)) 1
     Spec.assertEqWith s "and the Myr's own {C}{C} reached alice's pool" (poolTypes S.alice settled) [ManaType.Colorless, ManaType.Colorless]
-  -- The printed rider, spent by Engine.withinTriggerLimit over CR 603.3b's log.
+  -- The printed rider, spent by Event.withinTriggerLimit over CR 603.3b's log.
   -- The Myr is untapped between the two activations through Event.untap, the
   -- road CR 502.3 takes, so the second one pays the same {T} the first did.
   Spec.it s "the rider: a second resolution the same turn triggers nothing more" $ do
