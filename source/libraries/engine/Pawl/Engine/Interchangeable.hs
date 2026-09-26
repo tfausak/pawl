@@ -101,8 +101,7 @@ representatives pcs gs candidates =
 --     GameState.extraTurns and the per-player counters (landsPlayed,
 --     drawsThisTurn, departedThisTurn, spellsCastLastTurn, castsLastTurn) are
 --     keyed by or valued at a PLAYER and name no object.
---   * GameState.lastKnown is about objects that have LEFT, and
---     GameState.playedThisTurn about cards that left by being played.
+--   * GameState.lastKnown is about objects that have LEFT.
 --   * GameState.events, GameState.controlSample and
 --     GameState.battlefieldWhenTriggered are bookkeeping, and pawl has neither a
 --     tap game event nor a tap trigger condition, so nothing scans them because
@@ -237,6 +236,8 @@ namedByRelation oid gs =
         || relates Set.singleton (GameState.encoded gs)
         || relates Set.singleton (GameState.exiledWith gs)
         || relates pileNames (GameState.exilePiles gs)
+        -- CR 305.1 / 601.2a: keyed by the spell or permanent a play made, too.
+        || relates (const Set.empty) (GameState.cardsPlayed gs)
 
 -- The objects a GameState.phasedOut row names BEYOND its key: none, since CR
 -- 702.26a's stored value is the player the permanent phased out under.

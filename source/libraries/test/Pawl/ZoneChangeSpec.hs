@@ -33,6 +33,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.TurnSpec as TurnSpec
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -2540,6 +2541,100 @@ elkinLairSpec s registry =
           Spec.assertEqWith s "nothing triggered at bob's end step" (length (GameState.stack ending)) 0
           Spec.assertEqWith s "bob played the Mountain" (namesIn Zone.Battlefield S.bob played) [named "Mountain", named "Mountain", named "Mountain"]
 
+-- Elkin Lair's third clause with "you" as the player and "cast" as the verb
+-- (Quantity.PlayedBy). Oracle text checked against api.scryfall.com,
+-- 2026-09-26:
+--
+-- Psychic Theft {1}{U} Sorcery -- "Target player reveals their hand. You choose
+-- an instant or sorcery card from it and exile that card. You may cast that card
+-- for as long as it remains exiled. At the beginning of the next end step, if
+-- you haven't cast the card, return it to its owner's hand."
+--
+-- Planeswalker's Mischief {2}{U} Enchantment -- "{3}{U}: Target opponent
+-- reveals a card at random from their hand. If it's an instant or sorcery card,
+-- exile it. You may cast it without paying its mana cost for as long as it
+-- remains exiled. At the beginning of the next end step, if you haven't cast it,
+-- return it to its owner's hand. Activate only as a sorcery."
+--
+-- Bob's Goblin Piker is there so Psychic Theft's choice has a card to pass over.
+castTheCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+castTheCardSpec s registry =
+  let -- Alice's end step begun, its triggers put on the stack, none resolved.
+      alicesEndStep :: GameState.GameState -> GameState.GameState
+      alicesEndStep gs =
+        let step = Phase.Ending EndingStep.EndStep
+         in S.runPure atBobAnswer (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan step S.alice)) gs {GameState.phase = step}) Engine.settleForPriority
+      -- Two Mountains, so a Mountain spent on Psychic Theft's {1} still leaves
+      -- the {R} the Lightning Bolt asks for.
+      theftBoard theft island mountain = theftBoardWith theft [island, island, mountain, mountain]
+      theftBoardWith theft alicesLands bolt piker =
+        let lands = List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) (Setup.emptyGame S.bothPlayers) alicesLands
+            withBobs = List.foldl' (\g q -> snd (S.addHandCard q S.bob g)) lands [piker, bolt]
+            (theftId, gs) = S.addHandCard theft S.alice withBobs
+            cast = S.runPure atBobAnswer gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice} (S.cast S.alice theftId)
+         in S.runPure atBobAnswer cast Stack.resolveTop
+      named n = Just (CardName.MkCardName (Text.pack n))
+   in Spec.describe s "CastTheCard" $ do
+        Spec.it s "CR 603.4 Psychic Theft returns the card alice never cast to bob's hand" $ do
+          ps <- traverse (S.printingOf s registry) ["Psychic Theft", "Island", "Mountain", "Lightning Bolt", "Goblin Piker"]
+          case ps of
+            [theft, island, mountain, bolt, piker] -> do
+              let exiled = theftBoard theft island mountain bolt piker
+                  after = S.runPure atBobAnswer (alicesEndStep exiled) Engine.priorityLoop
+              Spec.assertEqWith s "the Lightning Bolt is back in bob's hand" (List.sort (namesIn Zone.Hand S.bob after)) [named "Goblin Piker", named "Lightning Bolt"]
+              Spec.assertEqWith s "having been exiled until then" (namesIn Zone.Exile S.bob exiled) [named "Lightning Bolt"]
+            _ -> Spec.assertFailure s "five printings"
+        Spec.it s "CR 603.4 Psychic Theft's card, once alice casts it, triggers nothing at her end step" $ do
+          ps <- traverse (S.printingOf s registry) ["Psychic Theft", "Island", "Mountain", "Lightning Bolt", "Goblin Piker"]
+          case ps of
+            [theft, island, mountain, bolt, piker] -> do
+              let exiled = theftBoard theft island mountain bolt piker
+              case Game.zoneMembers Zone.Exile S.bob exiled of
+                [boltId] -> do
+                  let cast = S.runPure atBobAnswer exiled (S.cast S.alice boltId)
+                      resolved = S.runPure atBobAnswer cast Stack.resolveTop
+                  Spec.assertEqWith s "nothing triggered at alice's end step" (length (GameState.stack (alicesEndStep resolved))) 0
+                  Spec.assertEqWith s "alice's Lightning Bolt hit bob" (S.lifeOf S.bob resolved) (Just 17)
+                _ -> Spec.assertFailure s "Psychic Theft should exile exactly one card"
+            _ -> Spec.assertFailure s "five printings"
+        -- CR 724.1e: Time Stop skips alice's end step, so the delayed trigger
+        -- waits for bob's. "Haven't cast" has no "this turn", so the play alice
+        -- made on the turn before still answers it.
+        Spec.it s "CR 724.1e Psychic Theft's card cast before a Time Stop triggers nothing at the next turn's end step" $ do
+          ps <- traverse (S.printingOf s registry) ["Psychic Theft", "Island", "Mountain", "Lightning Bolt", "Goblin Piker", "Time Stop"]
+          case ps of
+            [theft, island, mountain, bolt, piker, timeStop] -> do
+              let exiled = theftBoardWith theft (replicate 5 island <> replicate 4 mountain) bolt piker
+              case Game.zoneMembers Zone.Exile S.bob exiled of
+                [boltId] -> do
+                  let resolved = S.runPure atBobAnswer (S.runPure atBobAnswer exiled (S.cast S.alice boltId)) Stack.resolveTop
+                      (stopId, holding) = S.addHandCard timeStop S.alice resolved
+                      stopped = S.runPure atBobAnswer holding (S.cast S.alice stopId)
+                      bobsTurn = fst (TurnSpec.runTurn atBobAnswer stopped)
+                      step = Phase.Ending EndingStep.EndStep
+                      ending = S.runPure atBobAnswer (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan step S.bob)) bobsTurn {GameState.phase = step, GameState.activePlayer = S.bob}) Engine.settleForPriority
+                  Spec.assertEqWith s "nothing triggered at bob's end step" (length (GameState.stack ending)) 0
+                  Spec.assertEqWith s "the trigger was still waiting when bob's turn began" (length (GameState.delayedTriggers bobsTurn), GameState.activePlayer bobsTurn) (1, S.bob)
+                _ -> Spec.assertFailure s "Psychic Theft should exile exactly one card"
+            _ -> Spec.assertFailure s "six printings"
+        Spec.it s "CR 603.4 Planeswalker's Mischief returns the card alice never cast to bob's hand" $ do
+          ps <- traverse (S.printingOf s registry) ["Planeswalker's Mischief", "Island", "Lightning Bolt"]
+          case ps of
+            [mischief, island, bolt] -> do
+              let (mischiefId, withMischief) = S.addPermanent mischief S.alice (Setup.emptyGame S.bothPlayers)
+                  lands = List.foldl' (\g _ -> snd (S.addPermanent island S.alice g)) withMischief [1 :: Int .. 4]
+                  (_, gs) = S.addHandCard bolt S.bob lands
+                  board = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+              case Activatable.abilitiesFor mischiefId board of
+                [ability] -> do
+                  let activated = S.runPure atBobAnswer board (Activate.activateAbility S.alice mischiefId ability)
+                      exiled = S.runPure atBobAnswer activated Stack.resolveTop
+                      after = S.runPure atBobAnswer (alicesEndStep exiled) Engine.priorityLoop
+                  Spec.assertEqWith s "the Lightning Bolt is back in bob's hand" (namesIn Zone.Hand S.bob after) [named "Lightning Bolt"]
+                  Spec.assertEqWith s "having been exiled until then" (namesIn Zone.Exile S.bob exiled) [named "Lightning Bolt"]
+                _ -> Spec.assertFailure s "one activated ability"
+            _ -> Spec.assertFailure s "three printings"
+
 -- Randomness over CR 400.2's PUBLIC zone, the pair of cards that exercise
 -- Pawl.Types.ObjectRef.RandomCardInGraveyard. Ghoulraiser {1}{B}{B} Creature --
 -- Zombie 2/2 (Jumpstart) -- "When this creature enters, return a Zombie card at
@@ -2722,6 +2817,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
   discardExceptionsSpec s registry
   elkinLairSpec s registry
+  castTheCardSpec s registry
   ghoulraiserSpec s registry
   libraryPositionSpec s registry
   aetherspoutsSpec s registry

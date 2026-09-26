@@ -349,10 +349,10 @@ gameStateRoundTripSpec s registry = do
     mountain <- S.printingOf s registry "Mountain"
     roundTrips "a departure this turn" (S.oneMountainState mountain Phase.PrecombatMain) {GameState.departedThisTurn = Set.singleton S.bob}
 
-  -- GameState.playedThisTurn, CR 305.1 / 601.2a's plays this turn.
-  Spec.it s "a card played this turn round trips" $ do
+  -- GameState.cardsPlayed, CR 305.1 / 601.2a's plays.
+  Spec.it s "a played card round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
-    roundTrips "a play this turn" (S.oneMountainState mountain Phase.PrecombatMain) {GameState.playedThisTurn = Map.singleton (ObjectId.MkObjectId 7) S.bob}
+    roundTrips "a play" (S.oneMountainState mountain Phase.PrecombatMain) {GameState.cardsPlayed = Map.singleton (ObjectId.MkObjectId 7) S.bob}
 
   Spec.it s "a non-empty stack round trips" $ do
     mountain <- S.printingOf s registry "Mountain"

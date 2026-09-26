@@ -634,11 +634,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
           _ -> Nothing
         -- CR 305.1 / 601.2a as a 0/1. CR 400.7 gives the played card a new id,
         -- and a slot captured before the play still names the old one, which
-        -- GameState.playedThisTurn keys too. Off the BOARD for
+        -- GameState.cardsPlayed keys too. Off the BOARD for
         -- ControlGainedSinceLastUpkeep's reason: it relates an object to a
         -- player.
-        Quantity.PlayedThisTurnBy ref -> case (playersOf ref, mOid) of
-          (Just [pid], Just oid) -> Just (if Map.lookup oid (GameState.playedThisTurn gs) == Just pid then 1 else 0)
+        Quantity.PlayedBy ref -> case (playersOf ref, mOid) of
+          (Just [pid], Just oid) -> Just (if Map.lookup oid (GameState.cardsPlayed gs) == Just pid then 1 else 0)
           _ -> Nothing
         -- CR 120.1's damage as a total, read off the event log for the object the
         -- quantity is aimed at (Game.damageDealtToThisTurn) rather than off its view:
@@ -1244,7 +1244,7 @@ objectSlots quantity = case quantity of
   Quantity.WasBlocking -> Set.empty
   Quantity.WasBlockedThisTurn -> Set.empty
   Quantity.ControlGainedSinceLastUpkeep _ -> Set.empty
-  Quantity.PlayedThisTurnBy _ -> Set.empty
+  Quantity.PlayedBy _ -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.AttackersDeclaredThisTurn _ -> Set.empty
@@ -1513,7 +1513,7 @@ readsX quantity = case quantity of
   Quantity.WasBlocking -> False
   Quantity.WasBlockedThisTurn -> False
   Quantity.ControlGainedSinceLastUpkeep _ -> False
-  Quantity.PlayedThisTurnBy _ -> False
+  Quantity.PlayedBy _ -> False
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.AttackersDeclaredThisTurn _ -> False

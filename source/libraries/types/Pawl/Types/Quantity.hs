@@ -187,9 +187,9 @@ data Quantity
     -- of that player's last upkeep, else 0.
     ControlGainedSinceLastUpkeep PlayerRef.PlayerRef
   | -- | CR 305.1 / 601.2a: 1 if the player that reference names played the
-    -- object this quantity is evaluated against this turn, else 0, read off
-    -- GameState.playedThisTurn.
-    PlayedThisTurnBy PlayerRef.PlayerRef
+    -- object this quantity is evaluated against, else 0, read off
+    -- GameState.cardsPlayed.
+    PlayedBy PlayerRef.PlayerRef
   | -- | CR 508.3b: how many of that player's opponents were declared attacked
     -- this combat (Combat.declaredAttacked) -- rule 702.121a's melee.
     --
