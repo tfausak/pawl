@@ -7,7 +7,9 @@ module Pawl.PutCounterSpec where
 
 import qualified Data.List as List
 import qualified Data.Map as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -23,6 +25,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- Iron Apprentice {1} Artifact Creature -- Construct 0/0 (Kamigawa: Neon
@@ -62,6 +65,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   putCountersFromSpec s registry
   resourcefulDefenseSpec s registry
   selflessPoliceCaptainSpec s registry
+  doubleEachKindSpec s registry
 
 -- CR 603.3d's target, chosen as the trigger goes on the stack. FILTERS the
 -- offered set rather than building a recipient, so CR 608.2b's re-read at
@@ -354,3 +358,104 @@ selflessPoliceCaptainSpec s registry = Spec.describe s "CR 122.8 putting only th
     Spec.assertEqWith s "the Piker is the plain 2/1 it started as, with no flying" (bodyOf takerId after) (Just 2, Just 1, False)
     Spec.assertEqWith s "and bears no counters at all" (pairOn takerId after) Map.empty
     Spec.assertEqWith s "the trigger reached the stack all the same -- the card writes no intervening if" (length (GameState.stack settled)) 1
+
+-- Vorel of the Hull Clade {1}{G}{U} Legendary Creature -- Human Merfolk 1/4 and
+-- Gilder Bairn {1}{G/U}{G/U} Creature -- Ouphe 1/3 (name, cost, type line,
+-- power, toughness and oracle text checked against Scryfall 2026-09-25),
+-- data/cards/vorel-of-the-hull-clade.json and data/cards/gilder-bairn.json:
+--
+--   {G}{U}, {T}: Double the number of each kind of counter on target artifact,
+--   creature, or land.
+--   {2}{G/U}, {Q}: Double the number of each kind of counter on target permanent.
+--
+-- CR 701.10e is stated about A kind: "give that player or permanent as many of
+-- those counters as that player or permanent already has". "Each kind" applies
+-- it once per kind the target bears, which is rule 122.8's per-kind tally with
+-- the target as both the first object and the second -- so the cards are written
+-- as Effect.PutCountersFrom from the target slot onto itself. CR 614.16 then
+-- sees one placement per kind, which the Hardened Scales case reads.
+doubleEachKindSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+doubleEachKindSpec s registry = Spec.describe s "CR 701.10e doubling each kind of counter" $ do
+  let -- alice: Vorel, its two lands, the Goblin Piker it aims at bearing two kinds
+      -- in DIFFERENT counts, and a decoy Piker bearing one +1/+1 counter, so the
+      -- target is a real choice and a doubling of every permanent says so.
+      -- `extra` is what a case adds beside them, the ONLY difference between the
+      -- boards.
+      vorelBoard extra =
+        S.duel
+          S.precombatMain
+          ( [ S.settled "vorel" "Vorel of the Hull Clade",
+              S.settled "forest" "Forest",
+              S.settled "island" "Island",
+              (S.settled "taker" "Goblin Piker") {S.objectCounters = Map.fromList [(CounterKind.PlusOnePlusOne, 3), (CounterKind.Keyword Keyword.Flying, 2)]},
+              (S.settled "decoy" "Goblin Piker") {S.objectCounters = Map.singleton CounterKind.PlusOnePlusOne 1}
+            ]
+              <> extra
+          )
+          [S.settled "theirs" "Goblin Piker"]
+      vorelScript =
+        S.turn
+          1
+          [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "vorel") $
+              S.noChoices
+                { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "taker")],
+                  S.choiceManaSources = Seq.fromList [Just (S.aliasRef "forest"), Just (S.aliasRef "island")]
+                }
+          ]
+      aliasIn name built = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
+  -- THE CASE THIS GROUP EXISTS FOR. 3 -> 6 and 2 -> 4, so doubling is not adding
+  -- one, and each kind doubles by its OWN count rather than by the sum (5).
+  Spec.it s "CR 701.10e whole card: every kind on Vorel's target doubles by its own count" $ do
+    built <- S.buildBoardOrFail s registry (vorelBoard [])
+    case (aliasIn "vorel" built, aliasIn "taker" built, aliasIn "decoy" built) of
+      (Just vorelId, Just takerId, Just decoyId) -> do
+        (_, after) <- S.runScriptOrFail s vorelScript built S.priorityGame
+        Spec.assertEqWith s "the Piker holds six +1/+1 counters and four flying counters" (pairOn takerId after) (Map.fromList [(CounterKind.PlusOnePlusOne, 6), (CounterKind.Keyword Keyword.Flying, 4)])
+        Spec.assertEqWith s "which makes it an 8/7 that flies" (bodyOf takerId after) (Just 8, Just 7, True)
+        Spec.assertEqWith s "the decoy keeps its one counter, so only the target doubled" (pairOn decoyId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+        Spec.assertEqWith s "and Vorel paid its tap" (fmap Object.tapped (Game.lookupObject vorelId after)) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "the board should alias Vorel, the taker and the decoy"
+  -- CR 614.16: a replacement applies to each placement, one per kind. Hardened
+  -- Scales adds one to the +1/+1 placement (3 + 3 + 1) and has nothing to say
+  -- about the flying one.
+  Spec.it s "CR 614.16 Hardened Scales sees the +1/+1 placement and not the flying one" $ do
+    built <- S.buildBoardOrFail s registry (vorelBoard [S.settled "scales" "Hardened Scales"])
+    case aliasIn "taker" built of
+      Just takerId -> do
+        (_, after) <- S.runScriptOrFail s vorelScript built S.priorityGame
+        Spec.assertEqWith s "the Piker holds seven +1/+1 counters and four flying counters" (pairOn takerId after) (Map.fromList [(CounterKind.PlusOnePlusOne, 7), (CounterKind.Keyword Keyword.Flying, 4)])
+      _ -> Spec.assertFailure s "the board should alias the taker"
+  -- Gilder Bairn's "target permanent" reaches a planeswalker, so CR 122.1e's
+  -- loyalty counters are a kind like any other. The Bairn starts TAPPED, which
+  -- CR 107.6's {Q} needs. Forests alone, so {G/U}'s blue half is unpayable and
+  -- CR 601.2b's AnnounceHybridHalf is elided -- the harness has no vocabulary
+  -- for it.
+  Spec.it s "CR 701.10e Gilder Bairn doubles a planeswalker's loyalty" $ do
+    let bairnBoard =
+          S.duel
+            S.precombatMain
+            [ (S.settled "bairn" "Gilder Bairn") {S.objectTapState = TapState.Tapped},
+              S.settled "forest1" "Forest",
+              S.settled "forest2" "Forest",
+              S.settled "forest3" "Forest",
+              (S.settled "jace" "Jace Beleren") {S.objectCounters = Map.singleton CounterKind.Loyalty 3},
+              (S.settled "decoy" "Goblin Piker") {S.objectCounters = Map.singleton CounterKind.PlusOnePlusOne 1}
+            ]
+            []
+        bairnScript =
+          S.turn
+            1
+            [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "bairn") $
+                S.noChoices
+                  { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "jace")],
+                    S.choiceManaSources = Seq.fromList [Just (S.aliasRef "forest1"), Just (S.aliasRef "forest2"), Just (S.aliasRef "forest3")]
+                  }
+            ]
+    built <- S.buildBoardOrFail s registry bairnBoard
+    case (aliasIn "bairn" built, aliasIn "jace" built, aliasIn "decoy" built) of
+      (Just bairnId, Just jaceId, Just decoyId) -> do
+        (_, after) <- S.runScriptOrFail s bairnScript built S.priorityGame
+        Spec.assertEqWith s "Jace holds six loyalty counters" (pairOn jaceId after) (Map.singleton CounterKind.Loyalty 6)
+        Spec.assertEqWith s "the decoy keeps its one counter" (pairOn decoyId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+        Spec.assertEqWith s "and the Bairn paid its untap" (fmap Object.tapped (Game.lookupObject bairnId after)) (Just TapState.Untapped)
+      _ -> Spec.assertFailure s "the board should alias the Bairn, Jace and the decoy"

@@ -13,9 +13,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- distinction that type draws.
 --
 -- ONE kind per instruction, which is all CR 701.10e's sentence asks for and what
--- Aragorn, Hornburg Hero writes; a card's "each kind of counter" (Vorel of the
--- Hull Clade) has no quantifier over the kinds a permanent happens to carry
--- (gap #3913).
+-- Aragorn, Hornburg Hero writes. A card's "each kind of counter" (Vorel of the
+-- Hull Clade) is Pawl.Types.PutCountersFrom from a permanent onto itself.
 --
 -- Each named permanent gets its OWN call to Event.putCounters, because CR 614.16
 -- replaces one placement at a time: a Hardened Scales seeing three creatures gets
