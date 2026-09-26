@@ -307,7 +307,8 @@ data Face card = MkFace
     -- Insight's discarded land) excuses a cast an effect instructs "if able".
     --
     -- MANDATORY, every one of them: an additional cost whose payment offers the
-    -- caster a choice rides 'additionalCostChoices' below.
+    -- caster a choice, or one that pays mana, rides 'additionalCostChoices'
+    -- below.
     additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
     -- | CR 118.8 / 601.2b: this face's printed additional costs whose payment
     -- offers the caster a CHOICE -- Caustic Exhale's "behold a Dragon or pay
@@ -317,7 +318,9 @@ data Face card = MkFace
     -- A SECOND field rather than a shape on the one above, because an option can
     -- be MANA: CR 601.2f splits a cost into a mana part and the non-mana
     -- components, a CostComponent is the second half alone, and "or pay {1}" is
-    -- the first. Pawl.Types.CostChoice carries the argument.
+    -- the first. Pawl.Types.CostChoice carries the argument, and it is why a
+    -- MANDATORY additional cost paying mana is a choice of one option here --
+    -- Water Whip's "waterbend {5}" (CR 701.67b).
     --
     -- Every option applies on top of whichever candidate cost the caster
     -- announced, exactly as 'additionalCosts' does (CR 118.9d), which is why

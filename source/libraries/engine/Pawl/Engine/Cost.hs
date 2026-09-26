@@ -1212,9 +1212,8 @@ substitutionsOffering offersFor slots pid oid gs manaCost =
       -- two together rather than apiece. A FENCE: the only printing that states
       -- both is Hogaak, Arisen Necropolis, which cannot be transcribed (see
       -- Pawl.Engine.Keyword.manaSubstitutesFor), so no card in `data/cards/`
-      -- reaches a vector this drops. A waterbend cost beside one of those
-      -- keywords is the other pair, and it wants the spell half rule 701.67a is
-      -- not carried in yet (#3901).
+      -- reaches a vector this drops. A spell's waterbend cost beside one of
+      -- those keywords is the other pair, bounded here the same way.
       withinCost vector = all (\(symbol, n, _, _) -> sum [k | (s, _, _, k) <- vector, s == symbol] <= n) vector
       entry vector =
         ( List.foldl' (\acc (symbol, _, _, k) -> withoutMana symbol k acc) manaCost vector,
