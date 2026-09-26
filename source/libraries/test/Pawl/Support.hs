@@ -2744,7 +2744,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseClause decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OfferedCast decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseOfferedCastSpell decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.OfferedMiracleReveal decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.OfferedMiracleReveal decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseToPay decider _ _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.AnnouncePhyrexianPayment decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.AnnounceHybridPayment decider _ _ _ _ -> Just (Decider.unwrap decider)

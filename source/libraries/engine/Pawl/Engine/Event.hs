@@ -7865,6 +7865,11 @@ performDraw pid = do
 -- what makes the linked trigger (CR 603.11) findable: `eventTriggers`' hand source
 -- reads that event and nothing else knows a miracle happened.
 --
+-- The miracle ability is read through the projection (CR 613.1), since it
+-- functions in the hand (CR 113.6b) and an effect may grant it there --
+-- Molecule Man's "nonland cards in your hand have miracle {0}".
+-- Pawl.EventTriggerSpec's Molecule Man pair proves it.
+--
 -- Not implemented: CR 702.94b's LASTING reveal -- the card stays revealed until it
 -- leaves the hand or the ability leaves the stack -- which needs a per-object
 -- revealed flag (#1408). Nor CR 121.8's face-down drawn card
@@ -7873,13 +7878,19 @@ offerMiracleReveal :: PlayerId -> ObjectId -> Game ()
 offerMiracleReveal pid drawn = do
   gs <- State.get
   case Game.faceOf drawn gs of
-    Just face | Maybe.isJust (Keyword.miracleCost (Face.keywordSet face)) -> do
+    Just face -> do
       let decider = Decide.deciderFor pid gs
-      decision <- Game.choose (Prompt.OfferedMiracleReveal decider pid drawn (Face.name face))
-      case decision of
-        OptionalDecision.Declines -> pure ()
-        OptionalDecision.Exercises -> reveal RevealCause.ForMiracle pid drawn
-    _ -> pure ()
+          -- One reveal, under one miracle ability (CR 702.94b): each is offered
+          -- in turn until the player takes one.
+          offer costs = case costs of
+            [] -> pure ()
+            cost : rest -> do
+              decision <- Game.choose (Prompt.OfferedMiracleReveal decider pid drawn (Face.name face) cost)
+              case decision of
+                OptionalDecision.Declines -> offer rest
+                OptionalDecision.Exercises -> reveal (RevealCause.ForMiracle cost) pid drawn
+      offer (Keyword.miracleCosts (Map.keysSet (Projection.keywordsOf drawn gs)))
+    Nothing -> pure ()
 
 -- The single discard funnel (CR 701.9a). `pid` is the discarding player, whom that
 -- rule makes the card's owner either way, and `cause` is why (see DiscardCause).
