@@ -2042,8 +2042,8 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
         -- no printed ability's `n` moves.
         --
         -- CR 613.7a's timestamp: the permanent's or the grant's, whichever
-        -- is later, a regression fence: the pool's one granted static is a
-        -- CR 613.11 marker, which no order can change. CR 612.3: no text
+        -- is later, a regression fence: no test orders a granted static
+        -- against another effect in its layer. CR 612.3: no text
         -- change reaches it, so no word pairs. CR 613.1f in timestamp order:
         -- only a removal applied AFTER the grant takes it away.
         --
