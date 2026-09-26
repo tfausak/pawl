@@ -325,7 +325,11 @@ activatedAbilityOffends ability =
         if exilesSelfAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.exiledCard
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled]) (ActivatedAbility.modal ability)
+      discarded =
+        if discardsSelfAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.discardedCard
+          else Set.empty
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded]) (ActivatedAbility.modal ability)
 
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
@@ -376,6 +380,16 @@ tapsForTotalPowerAsCost =
 -- Not offered on the CAST side (Pawl.CardSpec's cardOffends): no printing in
 -- `data/cards/` exiles the spell itself as an additional cost, so the exemption
 -- would fence nothing.
+-- Does this cost DISCARD the card it is on? exilesSelfAsCost's shape, for
+-- Binding.discardedCard (Cost.payComponent's DiscardThis arm): Calim, Djinn
+-- Emperor's "return Calim from your graveyard".
+discardsSelfAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+discardsSelfAsCost =
+  let isDiscard component = case component of
+        CostComponent.DiscardThis {} -> True
+        _ -> False
+   in any isDiscard . Cost.Type.components
+
 exilesSelfAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 exilesSelfAsCost =
   let isExile component = case component of

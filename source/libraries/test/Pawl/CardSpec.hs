@@ -2442,6 +2442,7 @@ reservedSlots =
       Binding.sacrificedPermanent,
       Binding.returnedPermanent,
       Binding.exiledCard,
+      Binding.discardedCard,
       Binding.tappedPermanent,
       Binding.tappedForTotalPower,
       Binding.revealedCard,
