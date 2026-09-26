@@ -186,6 +186,10 @@ data Quantity
     -- control the object this quantity is evaluated against since the beginning
     -- of that player's last upkeep, else 0.
     ControlGainedSinceLastUpkeep PlayerRef.PlayerRef
+  | -- | CR 305.1 / 601.2a: 1 if the player that reference names played the
+    -- object this quantity is evaluated against this turn, else 0, read off
+    -- GameState.playedThisTurn.
+    PlayedThisTurnBy PlayerRef.PlayerRef
   | -- | CR 508.3b: how many of that player's opponents were declared attacked
     -- this combat (Combat.declaredAttacked) -- rule 702.121a's melee.
     --
@@ -229,6 +233,8 @@ data Quantity
   | -- | CR 601.2i / 608.2i: how many spells that player cast last turn, read off
     -- GameState.castsLastTurn (not CR 502.2's active-player scalar).
     SpellsCastLastTurn PlayerRef.PlayerRef
+  | -- | CR 601.2i / 608.2i: how many spells that player cast this turn.
+    SpellsCastThisTurn PlayerRef.PlayerRef
   | -- | CR 608.2n \/ 608.2i: how many times the ACTIVATED ABILITY this quantity is
     -- evaluated against has resolved this turn, folded from the turn-scoped
     -- GameEvent.ActivatedAbilityResolved log and counting the resolution asking.

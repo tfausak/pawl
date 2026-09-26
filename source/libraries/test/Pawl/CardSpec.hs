@@ -1829,6 +1829,7 @@ cardCounts card =
     -- literal amount or a Filter, never a fold over a zone.
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . PlayerStaticAbility.condition) (Face.playerAbilities card)
     <> concatMap (quantityCounts . CostReduction.perEach) (Face.costReductions card)
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . CostReduction.condition) (Face.costReductions card)
     <> ruleAbilitiesCounts (Projection.ruleAbilitiesOfFace card)
 
 -- Every Count reachable from the thirteen CR 613.11 rule-ability families, a
@@ -3731,6 +3732,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.WasBlocking -> []
   Quantity.Type.WasBlockedThisTurn -> []
   Quantity.Type.ControlGainedSinceLastUpkeep _ -> []
+  Quantity.Type.PlayedThisTurnBy _ -> []
   Quantity.Type.DamageDealtToThisTurn -> []
   -- CR 122.1's PER-PLAYER tally, whose kind is a Pawl.Types.PlayerCounterKind --
   -- a disjoint domain from the object kinds, carrying no Keyword and so no
@@ -3754,6 +3756,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> []
   Quantity.Type.SpellsCastLastTurn _ -> []
+  Quantity.Type.SpellsCastThisTurn _ -> []
   Quantity.Type.TimesResolvedThisTurn -> []
   Quantity.Type.SpellsCastBefore -> []
   Quantity.Type.PermanentsDiedThisTurn -> []
@@ -6021,6 +6024,7 @@ cardFilters card =
         <> concatMap (unframed . concatMap costFilters . NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices card)
         <> concatMap (frame Unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
+        <> concatMap (concatMap conditionFilters . Maybe.maybeToList . CostReduction.condition) (Face.costReductions card)
         <> concatMap (slotlessCost . specialActionFilters) (Face.specialActions card)
         <> ruleAbilitiesFilters (Projection.ruleAbilitiesOfFace card)
     )

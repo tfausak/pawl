@@ -434,6 +434,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.WasBlocking -> False
   Quantity.Type.WasBlockedThisTurn -> False
   Quantity.Type.ControlGainedSinceLastUpkeep {} -> False
+  Quantity.Type.PlayedThisTurnBy {} -> False
   Quantity.Type.DamageDealtToThisTurn -> False
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.AttackersDeclaredThisTurn {} -> False
@@ -443,6 +444,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False
   Quantity.Type.DamageDealtToPlayersThisTurn {} -> False
   Quantity.Type.SpellsCastLastTurn {} -> False
+  Quantity.Type.SpellsCastThisTurn {} -> False
   Quantity.Type.TimesResolvedThisTurn -> False
   Quantity.Type.SpellsCastBefore -> False
   Quantity.Type.PermanentsDiedThisTurn -> False

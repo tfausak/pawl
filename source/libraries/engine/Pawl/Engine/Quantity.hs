@@ -632,6 +632,14 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.ControlGainedSinceLastUpkeep ref -> case (playersOf ref, mOid) of
           (Just [pid], Just oid) -> Just (if Map.lookup pid (controlClockOf gs oid) == Just ControlClock.SinceLastUpkeep then 1 else 0)
           _ -> Nothing
+        -- CR 305.1 / 601.2a as a 0/1. CR 400.7 gives the played card a new id,
+        -- and a slot captured before the play still names the old one, which
+        -- GameState.playedThisTurn keys too. Off the BOARD for
+        -- ControlGainedSinceLastUpkeep's reason: it relates an object to a
+        -- player.
+        Quantity.PlayedThisTurnBy ref -> case (playersOf ref, mOid) of
+          (Just [pid], Just oid) -> Just (if Map.lookup oid (GameState.playedThisTurn gs) == Just pid then 1 else 0)
+          _ -> Nothing
         -- CR 120.1's damage as a total, read off the event log for the object the
         -- quantity is aimed at (Game.damageDealtToThisTurn) rather than off its view:
         -- CR 608.2i is what makes the question answerable at all for a creature CR
@@ -788,6 +796,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- unanswered is only the reference.
         Quantity.SpellsCastLastTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (GameState.castsLastTurn gs)))
+          _ -> Nothing
+        -- CR 601.2i / 608.2i: the arm above, for the turn in progress, read off the live
+        -- log through the same fold GameState.castsLastTurn snapshots. Ertai's Scorn's
+        -- "an opponent cast two or more" is the Greatest of it over opponents, not a
+        -- sum, which two opponents casting one each would satisfy.
+        Quantity.SpellsCastThisTurn ref -> case playersOf ref of
+          Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (Game.castsPerPlayer gs)))
           _ -> Nothing
         -- CR 608.2n / 608.2i: how many times the ACTIVATED ABILITY this evaluation is
         -- aimed at has resolved this turn, folded off the turn-scoped log.
@@ -1229,6 +1244,7 @@ objectSlots quantity = case quantity of
   Quantity.WasBlocking -> Set.empty
   Quantity.WasBlockedThisTurn -> Set.empty
   Quantity.ControlGainedSinceLastUpkeep _ -> Set.empty
+  Quantity.PlayedThisTurnBy _ -> Set.empty
   Quantity.DamageDealtToThisTurn -> Set.empty
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.AttackersDeclaredThisTurn _ -> Set.empty
@@ -1238,6 +1254,7 @@ objectSlots quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.SpellsCastLastTurn _ -> Set.empty
+  Quantity.SpellsCastThisTurn _ -> Set.empty
   Quantity.TimesResolvedThisTurn -> Set.empty
   Quantity.SpellsCastBefore -> Set.empty
   Quantity.PermanentsDiedThisTurn -> Set.empty
@@ -1496,6 +1513,7 @@ readsX quantity = case quantity of
   Quantity.WasBlocking -> False
   Quantity.WasBlockedThisTurn -> False
   Quantity.ControlGainedSinceLastUpkeep _ -> False
+  Quantity.PlayedThisTurnBy _ -> False
   Quantity.DamageDealtToThisTurn -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.AttackersDeclaredThisTurn _ -> False
@@ -1505,6 +1523,7 @@ readsX quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> False
   Quantity.DamageDealtToPlayersThisTurn _ -> False
   Quantity.SpellsCastLastTurn _ -> False
+  Quantity.SpellsCastThisTurn _ -> False
   Quantity.TimesResolvedThisTurn -> False
   Quantity.SpellsCastBefore -> False
   Quantity.PermanentsDiedThisTurn -> False

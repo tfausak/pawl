@@ -186,6 +186,7 @@ overSlots f quantity =
         -- And another in that same position, CR 601.2i's cast tally having nothing
         -- beside its PlayerRef either.
         Quantity.SpellsCastLastTurn _ -> pure quantity
+        Quantity.SpellsCastThisTurn _ -> pure quantity
         Quantity.TimesResolvedThisTurn -> pure quantity
         Quantity.SpellsCastBefore -> pure quantity
         Quantity.PermanentsDiedThisTurn -> pure quantity
@@ -214,6 +215,7 @@ overSlots f quantity =
         -- having nothing beside it: the OBJECT it asks about is the one the
         -- evaluation is aimed at, as ObjectCounters' is.
         Quantity.ControlGainedSinceLastUpkeep _ -> pure quantity
+        Quantity.PlayedThisTurnBy _ -> pure quantity
         -- The one arm that names a TARGET slot and is visited here anyway. Every other
         -- nested target slot is a PlayerRef this function leaves to nestedRefs below;
         -- reporting this one here is what keeps Soul's Majesty's declared target on the
@@ -314,6 +316,7 @@ nestedRefs quantity = case quantity of
   Quantity.IsStartingPlayer ref -> Set.singleton (Left ref)
   Quantity.IsActivePlayer ref -> Set.singleton (Left ref)
   Quantity.ControlGainedSinceLastUpkeep ref -> Set.singleton (Left ref)
+  Quantity.PlayedThisTurnBy ref -> Set.singleton (Left ref)
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> Set.singleton (Left ref)
   Quantity.Devotion d -> Set.singleton (Left (Devotion.player d))
   Quantity.ObjectCounters _ -> Set.empty
@@ -346,6 +349,7 @@ nestedRefs quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn ref -> Set.singleton (Left ref)
   Quantity.DamageDealtToPlayersThisTurn ref -> Set.singleton (Left ref)
   Quantity.SpellsCastLastTurn ref -> Set.singleton (Left ref)
+  Quantity.SpellsCastThisTurn ref -> Set.singleton (Left ref)
   Quantity.TimesResolvedThisTurn -> Set.empty
   Quantity.SpellsCastBefore -> Set.empty
   Quantity.PermanentsDiedThisTurn -> Set.empty
@@ -421,6 +425,7 @@ nestedCounts quantity = case quantity of
   Quantity.IsStartingPlayer _ -> []
   Quantity.IsActivePlayer _ -> []
   Quantity.ControlGainedSinceLastUpkeep _ -> []
+  Quantity.PlayedThisTurnBy _ -> []
   Quantity.HasDesignation _ -> []
   Quantity.DesignationValue _ -> []
   Quantity.ClassLevel -> []
@@ -456,6 +461,7 @@ nestedCounts quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> []
   Quantity.DamageDealtToPlayersThisTurn _ -> []
   Quantity.SpellsCastLastTurn _ -> []
+  Quantity.SpellsCastThisTurn _ -> []
   Quantity.TimesResolvedThisTurn -> []
   Quantity.SpellsCastBefore -> []
   Quantity.PermanentsDiedThisTurn -> []
@@ -586,6 +592,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.IsStartingPlayer ref -> Quantity.IsStartingPlayer (f ref)
         Quantity.IsActivePlayer ref -> Quantity.IsActivePlayer (f ref)
         Quantity.ControlGainedSinceLastUpkeep ref -> Quantity.ControlGainedSinceLastUpkeep (f ref)
+        Quantity.PlayedThisTurnBy ref -> Quantity.PlayedThisTurnBy (f ref)
         Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (f ref) kind)
         Quantity.Devotion d -> Quantity.Devotion d {Devotion.player = f (Devotion.player d)}
         Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
@@ -596,6 +603,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
         Quantity.DamageDealtToPlayersThisTurn ref -> Quantity.DamageDealtToPlayersThisTurn (f ref)
         Quantity.SpellsCastLastTurn ref -> Quantity.SpellsCastLastTurn (f ref)
+        Quantity.SpellsCastThisTurn ref -> Quantity.SpellsCastThisTurn (f ref)
         Quantity.TimesResolvedThisTurn -> quantity
         Quantity.SpellsCastBefore -> quantity
         Quantity.PermanentsDiedThisTurn -> quantity

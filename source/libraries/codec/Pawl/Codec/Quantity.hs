@@ -120,6 +120,7 @@ codec =
       -- and the answer comes off the log rather than off that object.
       Arm.nullary "WasBlockedThisTurn" Quantity.WasBlockedThisTurn,
       Arm.payload "ControlGainedSinceLastUpkeep" PlayerRef.codec Quantity.ControlGainedSinceLastUpkeep (\x -> case x of Quantity.ControlGainedSinceLastUpkeep y -> Just y; _ -> Nothing),
+      Arm.payload "PlayedThisTurnBy" PlayerRef.codec Quantity.PlayedThisTurnBy (\x -> case x of Quantity.PlayedThisTurnBy y -> Just y; _ -> Nothing),
       Arm.nullary "ClassLevel" Quantity.ClassLevel,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
       -- comes from the combat record rather than from anything the card names.
@@ -160,6 +161,7 @@ codec =
       -- from. The thresholds that turn the count into "no spells were cast" and
       -- "a player cast two or more" are the Comparison's, not this arm's.
       Arm.payload "SpellsCastLastTurn" PlayerRef.codec Quantity.SpellsCastLastTurn (\x -> case x of Quantity.SpellsCastLastTurn y -> Just y; _ -> Nothing),
+      Arm.payload "SpellsCastThisTurn" PlayerRef.codec Quantity.SpellsCastThisTurn (\x -> case x of Quantity.SpellsCastThisTurn y -> Just y; _ -> Nothing),
       -- CR 608.2n with nothing on the wire: the ability is the one the quantity
       -- is evaluated against, which a card names through AgainstSlot over CR
       -- 602.2a's reserved "thisAbility" slot, and "this turn" is the event log's
@@ -247,6 +249,7 @@ tagOf x = case x of
   Quantity.WasBlocking {} -> "WasBlocking"
   Quantity.WasBlockedThisTurn {} -> "WasBlockedThisTurn"
   Quantity.ControlGainedSinceLastUpkeep {} -> "ControlGainedSinceLastUpkeep"
+  Quantity.PlayedThisTurnBy {} -> "PlayedThisTurnBy"
   Quantity.ClassLevel {} -> "ClassLevel"
   Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
   Quantity.AttackersDeclaredThisTurn {} -> "AttackersDeclaredThisTurn"
@@ -257,6 +260,7 @@ tagOf x = case x of
   Quantity.DamageDealtToPlayersThisTurn {} -> "DamageDealtToPlayersThisTurn"
   Quantity.DamageDealtToThisTurn {} -> "DamageDealtToThisTurn"
   Quantity.SpellsCastLastTurn {} -> "SpellsCastLastTurn"
+  Quantity.SpellsCastThisTurn {} -> "SpellsCastThisTurn"
   Quantity.TimesResolvedThisTurn {} -> "TimesResolvedThisTurn"
   Quantity.SpellsCastBefore {} -> "SpellsCastBefore"
   Quantity.PermanentsDiedThisTurn {} -> "PermanentsDiedThisTurn"

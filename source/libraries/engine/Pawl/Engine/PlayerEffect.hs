@@ -27,7 +27,6 @@
 module Pawl.Engine.PlayerEffect where
 
 import qualified Data.Containers.ListUtils as ListUtils
-import qualified Data.Foldable as Foldable
 import qualified Data.Functor.Const as Functor
 import qualified Data.Functor.Identity as Functor
 import qualified Data.List as List
@@ -71,7 +70,6 @@ import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LastKnown as LastKnown
-import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
@@ -92,7 +90,6 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
 import Pawl.Types.Timestamp (Timestamp)
@@ -464,24 +461,11 @@ applying pid gs =
 -- negative and CR 502.2's reader (GameState.spellsCastLastTurn, snapshotted by
 -- Engine.beginTurnOf) holds one.
 --
--- Read out of castsPerPlayer below rather than folding the log itself, so the
+-- Read out of Game.castsPerPlayer rather than folding the log itself, so the
 -- per-seat map Engine.beginTurnOf snapshots and this one seat's count are the
 -- same fold.
 castsThisTurn :: PlayerId -> GameState -> Natural
-castsThisTurn pid gs = Map.findWithDefault 0 pid (castsPerPlayer gs)
-
--- castsThisTurn asked of every player at once, which is what
--- GameState.castsLastTurn is a snapshot of. ONE fold rather than a second reader
--- of the same log: the scalar above is defined in terms of this, so the per-seat
--- map and the one-seat count cannot disagree.
---
--- SPARSE: a player who cast nothing has no entry, and every reader takes 0 for an
--- absent one.
-castsPerPlayer :: GameState -> Map.Map PlayerId Natural
-castsPerPlayer gs =
-  Map.fromListWith
-    (+)
-    (fmap (\cast -> (SpellWasCast.player cast, 1)) (Maybe.mapMaybe (Game.castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+castsThisTurn pid gs = Map.findWithDefault 0 pid (Game.castsPerPlayer gs)
 
 -- CR 601.3: a player can begin to cast a spell only if no rule or effect
 -- prohibits it. The prohibit half. Cast.permitsCastWhileSearching is not the

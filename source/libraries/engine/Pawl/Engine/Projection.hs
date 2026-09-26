@@ -3545,6 +3545,7 @@ quantityReads q = case q of
   Quantity.Type.WasBlocking -> Set.empty
   Quantity.Type.WasBlockedThisTurn -> Set.empty
   Quantity.Type.ControlGainedSinceLastUpkeep _ -> Set.empty
+  Quantity.Type.PlayedThisTurnBy _ -> Set.empty
   Quantity.Type.DamageDealtToThisTurn -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.AttackersDeclaredThisTurn _ -> Set.empty
@@ -3554,6 +3555,7 @@ quantityReads q = case q of
   Quantity.Type.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.Type.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.Type.SpellsCastLastTurn _ -> Set.empty
+  Quantity.Type.SpellsCastThisTurn _ -> Set.empty
   Quantity.Type.TimesResolvedThisTurn -> Set.empty
   Quantity.Type.SpellsCastBefore -> Set.empty
   Quantity.Type.PermanentsDiedThisTurn -> Set.empty

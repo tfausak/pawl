@@ -925,8 +925,8 @@ spellAdjustments pid oid gs =
         adjustments
           { CostAdjustments.reductions =
               -- Floored at zero and never confined to coloured mana: Thrasta's
-              -- sentence states neither restriction, so CR 601.2f's own {0} and
-              -- CR 118.7b-d's spill both stand.
+              -- and Ertai's Scorn's sentences state neither restriction, so CR
+              -- 601.2f's own {0} and CR 118.7b-d's spill both stand.
               CostAdjustments.reductions adjustments
                 <> fmap (\amount -> AppliedReduction.MkAppliedReduction amount 0 False) (selfReductions pid oid gs)
           }
@@ -953,6 +953,9 @@ selfReductions pid oid gs =
       -- Projection.controllerOf, which answers Nothing for a card in a hand.
       -- The source is the spell itself, the reduction being printed on it.
       context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
+      -- CR 601.2f: a conditional reduction is asked here, as the total is
+      -- determined, against the same perspective as its count.
+      applies reduction = all (Condition.holds (Projection.fullView gs) context gs oid) (CostReduction.condition reduction)
       scaled reduction =
         let copies = Quantity.evaluate (Projection.fullView gs) context gs oid (CostReduction.perEach reduction)
             -- Saturating rather than partial: an Int cannot hold every Integer.
@@ -962,7 +965,7 @@ selfReductions pid oid gs =
    in case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
         (Just obj, Just card, Just printedFace) ->
           let face = Game.castingFaceOf obj card printedFace
-           in Maybe.mapMaybe scaled (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face))
+           in Maybe.mapMaybe scaled (filter applies (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face)))
         _ -> []
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes

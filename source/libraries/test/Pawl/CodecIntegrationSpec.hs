@@ -50,6 +50,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -347,6 +348,11 @@ gameStateRoundTripSpec s registry = do
   Spec.it s "a seat emptied this turn round trips" $ do
     mountain <- S.printingOf s registry "Mountain"
     roundTrips "a departure this turn" (S.oneMountainState mountain Phase.PrecombatMain) {GameState.departedThisTurn = Set.singleton S.bob}
+
+  -- GameState.playedThisTurn, CR 305.1 / 601.2a's plays this turn.
+  Spec.it s "a card played this turn round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    roundTrips "a play this turn" (S.oneMountainState mountain Phase.PrecombatMain) {GameState.playedThisTurn = Map.singleton (ObjectId.MkObjectId 7) S.bob}
 
   Spec.it s "a non-empty stack round trips" $ do
     mountain <- S.printingOf s registry "Mountain"

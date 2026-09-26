@@ -364,6 +364,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.ControlGainedSinceLastUpkeep (PlayerRef.Relative PlayerRelation.You))
       " {\"type\":\"ControlGainedSinceLastUpkeep\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
+  -- CR 305.1 / 601.2a's play, the same shape.
+  Spec.it s "PlayedThisTurnBy" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.PlayedThisTurnBy (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))))
+      " {\"type\":\"PlayedThisTurnBy\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}} "
   -- CR 120.1's damage total, on the wire the same way and for the same reason.
   Spec.it s "DamageDealtToThisTurn" $
     Common.assertCodec
@@ -541,6 +548,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.SpellsCastLastTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"SpellsCastLastTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  -- Ertai's Scorn's per-opponent tally, SpellsCastLastTurn's wire one turn over.
+  Spec.it s "SpellsCastThisTurn carries its PlayerRef" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.SpellsCastThisTurn PlayerRef.Candidate)
+      " {\"type\":\"SpellsCastThisTurn\",\"value\":{\"type\":\"Candidate\"}} "
   -- CR 608.2n with nothing on the wire either: the ability is the one the
   -- quantity is evaluated against, reached through AgainstSlot over CR 602.2a's
   -- "thisAbility", and "this turn" is the event log's own extent.

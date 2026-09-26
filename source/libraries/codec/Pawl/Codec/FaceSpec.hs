@@ -285,7 +285,7 @@ populatedFace =
       Face.modeCosts = Map.empty,
       Face.maximumX = [Quantity.ManaValue],
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
-      Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)],
+      Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing],
       Face.counterability = Counterability.CantBeCountered,
       Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw]],
       Face.openingHandActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw]],
@@ -631,7 +631,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)]}
+        baseFace {Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing]}
         (init baseFaceJson <> ",\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}]}")
     Spec.it s "counterability" $
       Common.assertJsonCodec
