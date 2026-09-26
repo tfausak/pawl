@@ -505,6 +505,22 @@ armingEventSlots card =
         (Face.triggeredAbilities card)
     )
 
+-- The third half: the reserved slot an ACTIVATED arming ability's own cost
+-- bound as it was paid (CR 400.7j), which Pawl.Engine.Activate folds onto the
+-- ability and CR 603.7c then captures -- Calim, Djinn Emperor's reflexive "return
+-- Calim from your graveyard" reading Binding.discardedCard. LOOSE about which
+-- activated ability armed, armingTargetSlots' caveat.
+armingCostSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+armingCostSlots card =
+  Set.unions
+    ( fmap
+        ( \ability ->
+            let cost = ActivatedAbility.cost ability
+             in Set.fromList ([Binding.discardedCard | discardsSelfAsCost cost] <> [Binding.exiledCard | exilesSelfAsCost cost])
+        )
+        (Face.activatedAbilities card)
+    )
+
 abilitySlotLintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- The AbilityName half of the D4 dataflow lint (CR 603.7): an
@@ -579,7 +595,9 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- is CR 603.7c's captured environment -- Ray of Command's third sentence), an
   -- event slot a TRIGGERED arming ability's condition stamped into that same
   -- environment (armingEventSlots -- Ivory Gargoyle's delayed return reading CR
-  -- 400.7e's `became`), or a CR 603.2 event slot the entry's own condition binds as it fires
+  -- 400.7e's `became`), a slot an ACTIVATED arming ability's own cost bound
+  -- (armingCostSlots -- Calim, Djinn Emperor's discarded card), or a CR 603.2
+  -- event slot the entry's own condition binds as it fires
   -- (Event.eventBindingSlots -- False Cure's "that player ... they gained", which
   -- Event.delayedPending stamps on top of the captured environment exactly as
   -- eventTriggers does for an object's trigger). The
@@ -597,7 +615,7 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
   -- ability declaring a slot no effect of its reads fails here too.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
-    let cardBound card = Set.insert Binding.triggerSource (Set.unions [armingTargetSlots card, armingEventSlots card, Resolve.definedSlots (cardResolutionEffects card)])
+    let cardBound card = Set.insert Binding.triggerSource (Set.unions [armingTargetSlots card, armingEventSlots card, armingCostSlots card, Resolve.definedSlots (cardResolutionEffects card)])
         abilityOffends card ability =
           modalSlotsOffend
             (Set.unions [cardBound card, Event.eventBindingSlots (TriggeredAbility.condition ability), Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)])
