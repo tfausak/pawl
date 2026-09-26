@@ -1082,6 +1082,22 @@ wildEvocationSpec s registry =
           Spec.assertEqWith s "bob drew two, so the spell really resolved" (List.sort (bobsHand after)) ["Bog Wraith", "Goblin Piker", "Lightning Bolt"]
           Spec.assertEqWith s "and nothing was put onto the battlefield as a land" (S.countOnBattlefieldByName (named "Forest") S.bob after) 0
           Spec.assertEqWith s "stack empty: the trigger and the Insight both resolved" (length (GameState.stack after)) 0
+        -- CR 118.8's "or applied to a spell ... from another effect": Synthetic
+        -- Curator's Levy (alice's) makes every spell cost an additional "Discard
+        -- a creature card", a stated quality in bob's hand. The Piker prints no
+        -- additional cost, so only the applied one can excuse it. The pair
+        -- differs in the Levy alone; the hand holds two more creature cards, so
+        -- the cost is payable on both boards.
+        Spec.it s "CR 118.8c an additional cost another effect applies excuses the cast too" $ do
+          evocation <- S.printingOf s registry "Wild Evocation"
+          levy <- S.printingOf s registry "Synthetic Curator's Levy"
+          ps <- traverse (S.printingOf s registry) spells
+          let without = board evocation ps
+              levied = snd (S.addPermanent levy S.alice without)
+              after = runBobsUpkeep (rolling 0) levied
+          Spec.assertEqWith s "with the Levy out, bob was ASKED whether to cast the Piker" (offersUnder 0 levied) 1
+          Spec.assertEqWith s "and declining left his whole hand in place" (bobsHand after) ["Goblin Piker", "Bog Wraith", "Bird Maiden"]
+          Spec.assertEqWith s "without it, the same hand is still instructed" (offersUnder 0 without) 0
         -- CR 609.3 at the empty end: the reveal names nothing, so the slot goes
         -- unbound, Resolve.slotOne answers Nothing and the "otherwise" clause --
         -- whose AtMost 0 count DOES hold over an empty hand -- offers nothing.

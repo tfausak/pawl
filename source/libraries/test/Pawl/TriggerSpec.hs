@@ -2688,7 +2688,7 @@ runToTurnStep turn phase answer gs0 =
 -- each player, in APNAP order, puts all remaining triggered abilities they
 -- control on the stack in any order they choose."
 --
--- The pool's one producer of the second class, and the only printed card of the
+-- The pool's one printed producer of the second class, and the only printing of the
 -- shape: Historian's Boon, "{3}{W} Enchantment -- Whenever the final chapter
 -- ability of a Saga you control triggers, create a 4/4 white Angel creature token
 -- with flying and vigilance", paired with History of Benalia.
@@ -2782,6 +2782,63 @@ secondPlacementPassSpec s registry =
               Spec.assertBool s (Map.member Keyword.Type.Vigilance (Projection.keywordsOf token resolved)) "and vigilance"
             other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
           Spec.assertBool s (not (S.onBattlefield sagaId resolved)) "and the Saga's story is told, so CR 704.5s sacrifices it"
+
+-- CR 603.3b sorts by the trigger condition that FIRED, which an ability with two
+-- (CR 603.1b) makes a per-trigger question. Synthetic Chronicle of Two Omens,
+-- {2}{W} Enchantment, "Whenever a creature you control enters or the final
+-- chapter ability of a Saga you control triggers, you gain 3 life": one ability,
+-- one clause of each class. SYNTHETIC: Scryfall `o:/(ability|abilities)[^.]*
+-- triggers?\b/ o:/^(when|whenever)[^.]* or /`, 2026-09-26, has no card mixing
+-- the classes in one ability. Historian's Boon, the nearest, writes
+-- them as two.
+--
+-- One batch holds both: chapter III (CR 714.2b) and a Hill Giant token entering.
+-- The Chronicle triggers twice, once per clause. Its entering trigger is
+-- first-class and shares alice's first-pass ordering with chapter III; its
+-- chapter trigger is second-class and goes on top alone. `chronicleFirst`
+-- puts the entering trigger on the stack before chapter III, so the stack from
+-- the top reads Chronicle, Saga, Chronicle. Classifying by the whole ability
+-- instead would put both Chronicle triggers in the second pass, above the Saga.
+matchedClausePassSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+matchedClausePassSpec s registry =
+  let -- Answers CR 603.3b's ordering prompt with the Chronicle's entries placed
+      -- first, recording every batch it was offered.
+      chronicleFirst :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[TriggerEntry.TriggerEntry]] r
+      chronicleFirst chronicleId p = case p of
+        Prompt.OrderTriggers _ _ entries -> do
+          State.modify' (<> [entries])
+          let indexed = zip [0 ..] entries
+              isChronicle = (== TriggerSource.OfObject chronicleId) . TriggerEntry.source . snd
+          pure (fmap fst (filter isChronicle indexed <> filter (not . isChronicle) indexed))
+        _ -> pure (S.identityAnswer p)
+      triggerSourcesOnStack gs =
+        Maybe.mapMaybe
+          ( \sid -> case fmap Object.source (Game.lookupObject sid gs) of
+              Just (Source.OfTrigger triggered) -> Just (TriggeredAbilitySource.source triggered)
+              _ -> Nothing
+          )
+          (GameState.stack gs)
+   in Spec.describe s "MatchedClausePass" . Spec.it s "CR 603.3b an ability with two trigger conditions is placed by the one that fired" $ do
+        benalia <- S.printingOf s registry "History of Benalia"
+        chronicle <- S.printingOf s registry "Synthetic Chronicle of Two Omens"
+        giant <- S.printingOf s registry "Hill Giant"
+        let (sagaId, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
+            (chronicleId, withChronicle) = S.addPermanent chronicle S.alice base
+            ready =
+              (S.addCounter CounterKind.Lore 2 sagaId withChronicle)
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            batch = do
+              Engine.runTurnBasedActions Phase.PrecombatMain
+              Event.createTokens S.alice (Printing.card giant) Nothing 1 TapState.Untapped Map.empty Nothing
+            advanced = S.runPure S.identityAnswer ready batch
+            ((_, settled), asked) = State.runState (Engine.runGame (chronicleFirst chronicleId) advanced Engine.settleForPriority) []
+        Spec.assertEqWith s "the Chronicle's chapter trigger on top, then chapter III, then its entering trigger" (triggerSourcesOnStack settled) [chronicleId, sagaId, chronicleId]
+        Spec.assertEqWith s "alice ordered chapter III against the entering trigger, once" (fmap (Set.fromList . fmap TriggerEntry.source) asked) [Set.fromList [TriggerSource.OfObject sagaId, TriggerSource.OfObject chronicleId]]
+        let ((_, resolved), _) = State.runState (Engine.runGame (chronicleFirst chronicleId) advanced Engine.priorityLoop) []
+        Spec.assertEqWith s "both triggers resolve, 3 life each" (S.lifeOf S.alice resolved) (fmap (+ 6) (S.lifeOf S.alice advanced))
 
 -- CR 603.3b's second class read for what the EVENT names, which the pool's one
 -- printed bearer never asks; see #1029. Synthetic Chronicle Warden, {2}{W}
@@ -3086,6 +3143,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   towershellSkipSpec s registry
   orderingSpec s registry
   secondPlacementPassSpec s registry
+  matchedClausePassSpec s registry
   chronicleWardenSpec s registry
   sagaDiesBeforeScanSpec s registry
   monarchOrderingSpec s registry

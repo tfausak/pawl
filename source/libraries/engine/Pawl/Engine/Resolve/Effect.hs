@@ -1371,12 +1371,13 @@ offerCastOnce context named caster optionality verb retake offer = do
               then
                 -- CR 118.8c, read off the same candidates the cast will be
                 -- announced with: CR 118.9d keeps the face's additional costs on
-                -- an alternative, so every candidate already carries them.
-                --
-                -- Not implemented: a cost APPLIED from another effect (CR 118.8)
-                -- arrives as CostAdjustments.components and is not read here
-                -- (#1834).
-                Just (oid, name, applied, any (Cost.statesHiddenQuality . CandidateCost.cost) candidates)
+                -- an alternative, so every candidate already carries them. A
+                -- cost APPLIED from another effect (CR 118.8) is appended by
+                -- Cost.plusComponents, the funnel Cast.payableCostAt measures
+                -- through. Pawl.InvestigateSpec's "CR 118.8c an additional cost
+                -- another effect applies excuses the cast too" proves it.
+                let excused = any (Cost.statesHiddenQuality . Cost.plusComponents (Cost.spellAdjustments caster oid proposed) . CandidateCost.cost) candidates
+                 in Just (oid, name, applied, excused)
               else Nothing
       -- EVERY object the reference names, each contributing one entry per
       -- castable half (CR 709.3a) -- Shell of the Last Kappa's whole exiled pile
