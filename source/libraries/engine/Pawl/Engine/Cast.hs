@@ -1907,7 +1907,11 @@ castableWhileSearching pid gs =
             -- CR 702.37a's morph ability functions from a library, but CR 601.3
             -- is what would have to permit the cast from there and the
             -- Panglacial permission is printed text the face-down object does
-            -- not have (CR 708.2a). Unreachable either way -- no card holds both.
+            -- not have (CR 708.2a).
+            --
+            -- Not implemented: a GRANTED permission (Synthetic Glacial
+            -- Blessing) still reaches the face-down card, whose cast is not
+            -- offered here (#4223).
             proposed = asProposed oid name Facing.FaceUp gs
          in permitsCastWhileSearching oid face proposed
               && castableWhenOffered ManaSpending.AsProduced pid oid name (Cost.candidateCostsFor pid name oid proposed) proposed

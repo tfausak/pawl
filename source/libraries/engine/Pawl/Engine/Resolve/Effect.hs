@@ -2428,7 +2428,8 @@ targetsOnStack oid gs =
 -- CR 707.10's three nouns it is. A CLASSIFICATION off the object's Source, like
 -- copyOnStackOf above and never which card it is.
 --
--- A card-backed object reads its printed face (targetSlotsOf). An ability has no
+-- A card-backed object reads its face (targetSlotsOf over Projection.spellFaceOf,
+-- whose spell text is the copiable one, CR 707.2). An ability has no
 -- card behind it -- CR 113.7a makes it an object in its own right, and
 -- Game.cardOf answers Nothing for one -- so its slots come off the modal its
 -- Source carries, which is where Pawl.Engine.Activate announced them against and
@@ -2443,7 +2444,7 @@ targetsOnStack oid gs =
 stackTargetSlots :: Object.Object -> ObjectId -> GameState -> Map.Map SlotName TargetSlot.TargetSlot
 stackTargetSlots obj oid gs =
   let chosen = Binding.modesOf (Object.bindings obj)
-      fromFace = maybe Map.empty (targetSlotsOf obj oid gs) (Game.faceOf oid gs)
+      fromFace = maybe Map.empty (targetSlotsOf obj oid gs) (Projection.spellFaceOf oid gs)
       -- CR 603.2's player slots baked in, off the object's OWN bindings -- the
       -- map Pawl.Engine.Engine.placeBorne baked with as the ability went on the
       -- stack, and which CR 707.10 copied onto a copy verbatim. Not optional:
@@ -2683,6 +2684,29 @@ chooseNewTargetsFor controller copyId = do
         Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
           let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
+
+-- CR 707.2: a spell on the stack that becomes a copy acquires the original's
+-- "choices made when casting or activating it (mode, targets, the value of X,
+-- whether it was kicked ...)", replacing its own -- and has none when the
+-- original is not on the stack, as Transcantation's ruling reads it ("it stops
+-- having any targets"). That half is a REGRESSION FENCE: Synthetic Mimicry's
+-- original is always a spell, and Transcantation waits on #4221.
+-- CopyStackObject's arm carries the same decisions by copying the
+-- whole object (CR 707.10); here the object stays, so the decisions are named:
+-- every binding but the reserved ones that are the subject's own (its
+-- controller, itself, its copy stamp), and the cast records rule 707.2 lists.
+-- Pawl.CopySpec's "CR 707.2 a spell that becomes a copy of a Bolt" proves it.
+acquireChoices :: Maybe Object.Object -> Object.Object -> Object.Object
+acquireChoices mOriginal subject =
+  let own = Set.fromList [Binding.you, Binding.triggerSource, Binding.copySource, Binding.flippedMergeSource, Binding.turnedMergeSource]
+      decisions = maybe Map.empty (\o -> Map.withoutKeys (Object.bindings o) own) mOriginal
+   in subject
+        { Object.bindings = Map.union (Map.restrictKeys (Object.bindings subject) own) decisions,
+          Object.announcedX = mOriginal >>= Object.announcedX,
+          Object.paidCosts = maybe Map.empty Object.paidCosts mOriginal,
+          Object.boughtBack = any Object.boughtBack mOriginal,
+          Object.castUsing = mOriginal >>= Object.castUsing
+        }
 
 -- The carrier CR 707.9a's "this ability" points at: the RESOLVING object's own
 -- Pawl.Types.Source, since rule 602.2a and rule 603.3 both put the ability's text
@@ -6426,10 +6450,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     State.modify' $ \gs ->
       -- CR 707.1: each named subject becomes a copy of the named original, in
       -- whatever zone it already sits -- CR 707.4's "while remaining on the
-      -- battlefield" for a permanent, and Synthetic Mirror of the Fallen's card
-      -- in a graveyard otherwise, no zone change happening either way (CR
-      -- 400.7). Both sides are enumerated ONCE off the same
-      -- `gs` (CR 608.2f), so an illegal slot, a player recipient and a set that
+      -- battlefield" for a permanent, Synthetic Mirror of the Fallen's card in a
+      -- graveyard and Synthetic Mimicry's spell on the stack otherwise, no zone
+      -- change happening in any of them (CR 400.7). Both sides are enumerated
+      -- ONCE off the same `gs` (CR 608.2f), so an illegal slot, a player recipient and a set that
       -- matched nothing all arrive empty and copy nothing. ONE original: CR 707.2
       -- copies the values of "the original object", singular.
       --
@@ -6459,12 +6483,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               snapshotFor subject = Replacement.applyCopyExceptions (thisAbilitySource resolving gs) (Just (Event.copiedSnapshot subject gs)) exceptions copied
               write subject = Map.adjust (\o -> o {Object.bindings = Binding.setCopy (snapshotFor subject) (Object.bindings o)}) subject
               subjects = objectRefObjects legal resolving controller source gs subjectRef
+              -- CR 707.2's second half, for a subject on the STACK: it acquires
+              -- the original's "choices made when casting or activating it" --
+              -- none when the original is not on the stack. Off the pre-effect
+              -- `gs` for the reason above.
+              acquire g = g {GameState.objects = foldr (Map.adjust (acquireChoices (onStack original))) (GameState.objects g) (filter (Maybe.isJust . onStack) subjects)}
+              onStack oid = List.find ((== Zone.Stack) . Object.zone) (Game.lookupObject oid gs)
            in case duration of
                 -- CR 707.3: the card states no ending, so the copiable values go
                 -- onto the subject itself (Binding.setCopy) and nothing has to
                 -- remember them. CR 613.7 puts them over any stored row already
                 -- covering the subject (Game.supersedeStoredCopies).
-                Nothing -> Game.supersedeStoredCopies (Set.fromList subjects) gs {GameState.objects = foldr write (GameState.objects gs) subjects}
+                Nothing -> acquire (Game.supersedeStoredCopies (Set.fromList subjects) gs {GameState.objects = foldr write (GameState.objects gs) subjects})
                 Just stated -> case Expiry.arm legal controller source stated gs of
                   -- CR 611.2b: the duration never started, so nothing is stored.
                   Nothing -> gs
@@ -6485,7 +6515,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                               ActiveCopy.snapshot = pc
                             }
                         rows = fmap row . Map.toList . Map.fromListWith Set.union $ fmap (\subject -> (snapshotFor subject, Set.singleton subject)) subjects
-                     in gs1 {GameState.copyEffects = rows <> GameState.copyEffects gs1}
+                     in acquire gs1 {GameState.copyEffects = rows <> GameState.copyEffects gs1}
         _ -> gs
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity copierRef exceptions) -> do
     gs <- State.get
