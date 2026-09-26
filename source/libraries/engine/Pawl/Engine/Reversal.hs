@@ -118,6 +118,7 @@ withoutAnnouncement before entry closed = do
   loopInvolvement <- newest GameState.loopInvolvement
   drewFromEmpty <- setOf GameState.drewFromEmpty
   landsPlayed <- mapOf GameState.landsPlayed
+  playedThisTurn <- mapOf GameState.playedThisTurn
   drawsThisTurn <- mapOf GameState.drawsThisTurn
   departedThisTurn <- setOf GameState.departedThisTurn
   activatedThisTurn <- mapOfSets GameState.activatedThisTurn
@@ -216,6 +217,7 @@ withoutAnnouncement before entry closed = do
         GameState.loopInvolvement = loopInvolvement,
         GameState.drewFromEmpty = drewFromEmpty,
         GameState.landsPlayed = landsPlayed,
+        GameState.playedThisTurn = playedThisTurn,
         GameState.drawsThisTurn = drawsThisTurn,
         GameState.departedThisTurn = departedThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,

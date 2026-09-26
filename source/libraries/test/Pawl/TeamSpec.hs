@@ -408,7 +408,8 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
   --
   -- Elkin Lair, {3}{R} World Enchantment: "At the beginning of each player's
   -- upkeep, that player exiles a card at random from their hand. ..." Each hand
-  -- holds one card, so the random pick is forced.
+  -- holds one card, so the random pick is forced. Nobody plays it, so by the end
+  -- of the turn its third clause has put each one into a graveyard.
   Spec.it s "CR 805.4d an each-player's-upkeep trigger fires once per active teammate" $ do
     island <- S.printingOf s registry "Island"
     lair <- S.printingOf s registry "Elkin Lair"
@@ -416,8 +417,8 @@ sharedTurnsSpec s registry = Spec.describe s "SharedTeamTurns" $ do
           let (_, placed) = S.addPermanent lair S.carol (stockedWith island option)
               board = List.foldl' (\g pid -> snd (S.addHandCard island pid g)) placed [S.alice, S.bob]
               after = fst (TurnSpec.runTurn S.identityAnswer board)
-           in fmap (\pid -> length (Game.zoneMembers Zone.Exile pid after)) [S.alice, S.bob]
-    Spec.assertEqWith s "alice and bob each exiled their card" (run sharedTurns) [1, 1]
+           in fmap (\pid -> length (Game.zoneMembers Zone.Graveyard pid after)) [S.alice, S.bob]
+    Spec.assertEqWith s "alice and bob each lost their card to the Lair" (run sharedTurns) [1, 1]
     Spec.assertEqWith s "without the option only alice did" (run id) [1, 0]
   -- CR 805.4d / 603.4: the intervening "if" is asked of each opponent in turn.
   -- Only bob holds seven, so a single trigger naming alice would do nothing.
