@@ -2,6 +2,7 @@
 
 module Pawl.Codec.RollDie where
 
+import qualified Pawl.Codec.DiceReading as DiceReading
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -17,13 +18,15 @@ import qualified Pawl.Types.RollDie as RollDie
 -- CR 706.2's modifier is ELIDED when absent, as Draw's slot is: most rolls
 -- print none, and a card that does write one (Diviner's Portent) carries the
 -- Quantity the instruction adds. CR 706.1's `count` elides to one and `other`
--- to nothing for the same reason: every roll but the Endeavor cycle's throws one
--- die and reads one result.
+-- to nothing, and `reading` to the choice, for the same reason: every roll but
+-- the Endeavor cycle's and Neverwinter Hydra's throws one die and reads one
+-- result.
 codec :: Codec.Codec RollDie.RollDie
 codec = Fields.object $ do
   sides <- Fields.required "sides" Common.natural RollDie.sides
   count <- Fields.defaulted "count" RollDie.defaultCount Quantity.codec RollDie.count
   modifier <- Fields.defaulted "modifier" Nothing (Common.maybe Quantity.codec) RollDie.modifier
+  reading <- Fields.defaulted "reading" RollDie.defaultReading DiceReading.codec RollDie.reading
   slot <- Fields.required "slot" SlotName.codec RollDie.slot
   other <- Fields.defaulted "other" Nothing (Common.maybe SlotName.codec) RollDie.other
-  pure RollDie.MkRollDie {RollDie.sides = sides, RollDie.count = count, RollDie.modifier = modifier, RollDie.slot = slot, RollDie.other = other}
+  pure RollDie.MkRollDie {RollDie.sides = sides, RollDie.count = count, RollDie.modifier = modifier, RollDie.reading = reading, RollDie.slot = slot, RollDie.other = other}

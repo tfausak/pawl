@@ -1,0 +1,126 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Gift",
+          "value": {
+            "type": "Food"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Crumb and Get It",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "modification": {
+                        "type": "ModifyPowerToughness",
+                        "value": {
+                          "power": {
+                            "type": "Literal",
+                            "value": 2
+                          },
+                          "toughness": {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        }
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "condition": {
+                  "type": "Compares",
+                  "value": {
+                    "comparison": {
+                      "type": "AtLeast"
+                    },
+                    "measured": {
+                      "type": "TimesPaid",
+                      "value": {
+                        "type": "Gift",
+                        "value": {
+                          "type": "Food"
+                        }
+                      }
+                    },
+                    "threshold": {
+                      "type": "Literal",
+                      "value": 1
+                    }
+                  }
+                },
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "modification": {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Indestructible"
+                        }
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "target": {
+                "filter": {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

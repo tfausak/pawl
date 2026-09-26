@@ -6,7 +6,7 @@
 -- roll is externalised through. The transcript legs live in Pawl.ReplaySpec
 -- with the other randomness prompts.
 --
--- EIGHT FIXTURES. Ancient Copper Dragon ("Flying /
+-- THE FIXTURES. Ancient Copper Dragon ("Flying /
 -- Whenever this creature deals combat damage to a player, roll a d20. You create
 -- a number of Treasure tokens equal to the result") is CR 706.4's, the result
 -- read straight into a count; Djinni Windseer ("Flying / When this creature
@@ -20,6 +20,7 @@
 -- that result. Then create a number of 2/2 white Knight creature tokens with
 -- vigilance equal to the other result") is the fourth fixture and CR 706.1's
 -- count, CR 706.4's choice among the results and the "other result" beside it.
+-- Neverwinter Hydra, after it, reads CR 706.4's total of the results instead.
 -- CR 614.1a's replacement over the roll is the fifth fixture, Pixie Guide, at the
 -- bottom of this file -- the ignore of CR 706.6 rides it, no instruction in
 -- data\/cards\/ printing one of its own.
@@ -31,8 +32,8 @@
 -- CR 706.2b's second step is the EIGHTH, Night Shift of the Living Dead, at the
 -- very bottom -- a modifier from another source that increases or decreases the
 -- result, with a life cost and a once-each-turn budget.
--- Left out: no "Roll again" (#2124), and no reading that takes the results as a
--- set (#3243). CR 706.1's roll does record its event, but the trigger
+-- Left out: no "Roll again" (#2124), and no CR 706.5 doubles (#3243). CR
+-- 706.1's roll does record its event, but the trigger
 -- reading it lives in Pawl.EventTriggerSpec beside the other condition cases.
 --
 -- THE ASSERTED QUANTITY on the DRAGON's boards is how many Treasure tokens alice
@@ -99,6 +100,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -120,6 +122,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   resultsTableSpec s registry
   modifierSpec s registry
   severalDiceSpec s registry
+  totalSpec s registry
   dieRollRSpec s registry
   rerollSpec s registry
   costedRerollSpec s registry
@@ -566,6 +569,77 @@ severalDiceSpec s registry = Spec.describe s "RollSeveralDice" $ do
     let (offers, choices) = endeavorPrompts [5, 2] spell board
     Spec.assertEqWith s "asked twice, offering six sides each" offers [6, 6]
     Spec.assertEqWith s "and offered both results, in roll order" choices [[5, 2]]
+
+-- CR 706.4's total, whose producer is Neverwinter Hydra ({X}{X}{G}{G} Creature
+-- -- Hydra 0/0, "As this creature enters, roll X d6. It enters with a number of
+-- +1/+1 counters on it equal to the total of those results. / Trample / Ward
+-- {4}"; checked against api.scryfall.com 2026-09-25). alice casts it from hand
+-- over eight Forests, with X announced by the answerer.
+--
+-- THE ASSERTED QUANTITY is the Hydra's +1/+1 counters once the spell has
+-- resolved and the board settled. Nothing else on the board puts a counter, so
+-- the count is the total. The rolls are 2, 5 and 4: distinct, so a reading that
+-- took the first (2), the largest (5), the last (4) or the number of dice (3)
+-- is a different number from their total (11).
+--
+-- Not implemented: the counters are PUT on the Hydra just after it enters rather
+-- than entering with it, since an as-enters effect runs after the entry (#1639).
+hydraBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+hydraBoard s registry = do
+  hydra <- S.printingOf s registry "Neverwinter Hydra"
+  forest <- S.printingOf s registry "Forest"
+  let (held, spell) = S.handOne hydra (S.landsInPlay forest 8)
+  pure (spell, held)
+
+-- Answers X with `x` and each die with the next of `rolls`, six once they run
+-- out; records every die prompt's sides and every result choice it was shown.
+-- STATEFUL for endeavorAnswer's reason: the die prompts are structurally
+-- identical.
+hydraAnswer :: Natural.Natural -> Prompt.Prompt r -> State.State ([Natural.Natural], [Natural.Natural], [[Natural.Natural]]) r
+hydraAnswer x p = case p of
+  Prompt.ChooseX {} -> pure x
+  Prompt.RollDie sides -> do
+    (scripted, seen, asked) <- State.get
+    case scripted of
+      h : t -> do
+        State.put (t, sides : seen, asked)
+        pure h
+      [] -> do
+        State.put ([], sides : seen, asked)
+        pure 6
+  Prompt.ChooseDieResult _ _ _ candidates -> do
+    State.modify' (\(scripted, seen, asked) -> (scripted, seen, NonEmpty.toList candidates : asked))
+    pure 0
+  _ -> pure (S.identityAnswer p)
+
+-- Cast the Hydra with X = `x`, resolve it and settle. Returns the board, the
+-- die prompts' sides and the result choices shown, both in order.
+runHydra :: Natural.Natural -> [Natural.Natural] -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [Natural.Natural], [[Natural.Natural]])
+runHydra x rolls spell board =
+  let ((_, after), (_, seen, asked)) = State.runState (Engine.runGame (hydraAnswer x) board (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) (rolls, [], [])
+   in (after, reverse seen, reverse asked)
+
+-- The +1/+1 counters on each of alice's battlefield Hydras.
+hydraCounters :: GameState.GameState -> [Natural.Natural]
+hydraCounters gs =
+  let named oid = fmap S.nameOf (Game.cardOf oid gs) == Just (CardName.MkCardName (Text.pack "Neverwinter Hydra"))
+   in fmap (\oid -> S.counterOf CounterKind.PlusOnePlusOne oid gs) (filter named (Game.zoneMembers Zone.Battlefield S.alice gs))
+
+totalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+totalSpec s registry = Spec.describe s "RollDiceTotal" $ do
+  -- The pair of boards differs in ONE thing, X, over the same scripted rolls:
+  -- the third die is what X = 3 adds and X = 2 does not.
+  Spec.it s "CR 706.4 the Hydra's counters are the total of X dice" $ do
+    (spell, board) <- hydraBoard s registry
+    let (three, seen, asked) = runHydra 3 [2, 5, 4] spell board
+        (two, _, _) = runHydra 2 [2, 5, 4] spell board
+    -- THE GAMEPLAY ASSERTION, first: 2 + 5 + 4.
+    Spec.assertEqWith s "CR 706.4: three dice showing 2, 5 and 4 put eleven counters on the Hydra" (hydraCounters three) [11]
+    Spec.assertEqWith s "CR 107.3m: X = 2 rolls two of them, and 2 + 5 is seven" (hydraCounters two) [7]
+    -- Supporting, after the counts: X d6 were offered, and a total is not a
+    -- choice, so no result was offered to choose from.
+    Spec.assertEqWith s "asked three times, offering six sides each" seen [6, 6, 6]
+    Spec.assertEqWith s "and nothing was asked to choose" asked []
 
 -- CR 614.1a over CR 706.1, and CR 706.6 behind it: Pixie Guide's "if you would
 -- roll one or more dice, instead roll that many dice plus one and ignore the

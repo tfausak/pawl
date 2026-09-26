@@ -5267,6 +5267,83 @@ giftSpec s registry = Spec.describe s "Gift" $ do
     Spec.assertEqWith s "CR 702.174k no gift was promised, so no Fish token exists" (namedOnBattlefield "Fish Token" after) []
     Spec.assertEqWith s "and no counter went on, so bob's 3/3 survives and alice's 2/2 does not" (length (namedOnBattlefield "Hill Giant" after), length (namedOnBattlefield "Cabal Evangel" after)) (1, 0)
 
+  -- CR 702.174d on Crumb and Get It {W} Instant, "Gift a Food / Target creature
+  -- you control gets +2/+2 until end of turn. If the gift was promised, that
+  -- creature also gains indestructible until end of turn." (Oracle text checked
+  -- on Scryfall, 2026-09-25.)
+  --
+  -- The Food is proved by EATING it: carol pays CR 111.10b's {2} with her own
+  -- two Plains and gains 3 life, which a token that were only named Food could
+  -- not do.
+  Spec.it s "CR 702.174d the promised opponent creates a Food, and it gains her 3 life" $ do
+    (crumbId, board) <- crumbBoard s registry
+    let after = castResolved (promising S.carol) crumbId board
+    case namedOnBattlefield "Food Token" after of
+      [food] -> do
+        let eat = mapM_ (Activate.activateAbility S.carol food) (take 1 (Projection.abilitiesOf food after)) *> Stack.resolveTop
+            ate = S.runPure S.identityAnswer after {GameState.priority = Just S.carol} eat
+        Spec.assertEqWith s "CR 111.10b carol sacrificed her Food for 3 life" (S.lifeOf S.carol ate, namedOnBattlefield "Food Token" ate) (Just 23, [])
+        Spec.assertEqWith s "CR 111.2 the Food was carol's" (View.controllerOf food after) (Just S.carol)
+        Spec.assertEqWith s "CR 702.174k the gift was promised, so alice's 4/4 is indestructible" (fmap (\o -> (S.powerToughnessOf o after, Projection.hasKeyword Keyword.Indestructible o after)) (namedOnBattlefield "Cabal Evangel" after)) [(Just (4, 4), True)]
+      other -> Spec.assertFailure s ("expected one Food token, got " <> show (length other))
+  -- CR 702.174h on Blooming Blast {1}{R} Instant, "Gift a Treasure / Blooming
+  -- Blast deals 2 damage to target creature. If the gift was promised, Blooming
+  -- Blast also deals 3 damage to that creature's controller." (Oracle text
+  -- checked on Scryfall, 2026-09-25.)
+  --
+  -- The Treasure is proved by SPENDING it: carol has no land, so her Lightning
+  -- Bolt is cast only if CR 111.10a's mana ability pays its {R}.
+  Spec.it s "CR 702.174h the promised opponent creates a Treasure, and it pays for her spell" $ do
+    (blastId, boltId, board) <- blastBoard s registry
+    let after = castResolved (promising S.carol) blastId board
+        spent = S.runPure tappingForRed after {GameState.priority = Just S.carol} (S.cast S.carol boltId)
+    Spec.assertEqWith s "CR 111.10a carol's Bolt went on the stack, paid for by sacrificing her Treasure" (length (GameState.stack spent), namedOnBattlefield "Treasure Token" spent) (1, [])
+    Spec.assertEqWith s "CR 111.2 the Treasure was carol's" (fmap (`View.controllerOf` after) (namedOnBattlefield "Treasure Token" after)) [Just S.carol]
+    Spec.assertEqWith s "CR 702.174k promised, bob's 3/3 took 2 and bob took 3" (S.lifeOf S.bob after, fmap (fmap Object.damage . (`Game.lookupObject` after)) (namedOnBattlefield "Hill Giant" after)) (Just 17, [Just 2])
+  -- The same board differing in exactly one thing: the answer to rule 702.174a's
+  -- "you may".
+  Spec.it s "CR 603.4 unpromised, a gift instant makes no Treasure" $ do
+    (blastId, _, board) <- blastBoard s registry
+    let after = castResolved declining blastId board
+    Spec.assertEqWith s "CR 702.174k no gift was promised, so no Treasure token exists" (namedOnBattlefield "Treasure Token" after) []
+    Spec.assertEqWith s "and bob's 3/3 took 2 while bob took nothing" (S.lifeOf S.bob after, fmap (fmap Object.damage . (`Game.lookupObject` after)) (namedOnBattlefield "Hill Giant" after)) (Just 20, [Just 2])
+
+-- carol's Bolt aimed at bob and paid with red from whichever mana source is
+-- offered first -- on blastBoard her Treasure is the only one -- where
+-- S.identityAnswer aims at nothing and taps nothing.
+tappingForRed :: Prompt.Prompt r -> r
+tappingForRed p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  Prompt.ChooseManaYield _ _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (any ((== ManaType.Colored Color.Red) . ManaUnit.manaType) . Mana.yieldUnits) (NonEmpty.toList candidates))
+  _ -> S.identityAnswer p
+
+-- alice on turn with one Plains, Crumb and Get It in hand and her own Cabal
+-- Evangel 2/2 as its one legal target; carol, the promised seat, with two Plains
+-- for the Food's {2}. Three seats for scrapshooterBoard's reason.
+crumbBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+crumbBoard s registry = do
+  plains <- S.printingOf s registry "Plains"
+  crumb <- S.printingOf s registry "Crumb and Get It"
+  evangel <- S.printingOf s registry "Cabal Evangel"
+  let (crumbId, gs1) = S.addHandCard crumb S.alice (S.landsFor plains S.carol 2 (S.landsFor plains S.alice 1 S.threePlayerGame))
+      (_, gs2) = S.addPermanent evangel S.alice gs1
+  pure (crumbId, aliceOnTurn gs2)
+
+-- alice on turn with two Mountains and Blooming Blast in hand, bob's Hill Giant
+-- 3/3 as its one legal target, and carol, the promised seat, with no land and a
+-- Lightning Bolt in hand. Three seats for scrapshooterBoard's reason.
+blastBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+blastBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  blast <- S.printingOf s registry "Blooming Blast"
+  giant <- S.printingOf s registry "Hill Giant"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  let (blastId, gs1) = S.addHandCard blast S.alice (S.landsFor mountain S.alice 2 S.threePlayerGame)
+      (_, gs2) = S.addPermanent giant S.bob gs1
+      (boltId, gs3) = S.addHandCard bolt S.carol gs2
+  pure (blastId, boltId, aliceOnTurn gs3)
+
 -- alice on turn with one Forest and Longstalk Brawl in hand, her own Cabal
 -- Evangel 2/2 for the spell's "target creature you control" and bob's Hill Giant
 -- 3/3 for "target creature you don't control". Three seats for
