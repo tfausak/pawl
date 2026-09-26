@@ -508,6 +508,14 @@ attackTargetWithLastKnown oid gs = case lookupObject oid gs of
   Just _ -> attackTargetOf oid gs
   Nothing -> LastKnown.attackTarget =<< Map.lookup oid (GameState.lastKnown gs)
 
+-- CR 614.1c / 702.174a's chosen player, through CR 608.2h: the live object's
+-- Object.chosenPlayer, else the one it carried as it left
+-- (Pawl.Types.LastKnown.chosenPlayer).
+chosenPlayerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId
+chosenPlayerWithLastKnown oid gs = case lookupObject oid gs of
+  Just obj -> Object.chosenPlayer obj
+  Nothing -> LastKnown.chosenPlayer =<< Map.lookup oid (GameState.lastKnown gs)
+
 -- CR 509.1g: is this creature blocking? Combat.blockers is keyed by ATTACKER, so
 -- the answer is membership in some attacker's set rather than a key lookup.
 --

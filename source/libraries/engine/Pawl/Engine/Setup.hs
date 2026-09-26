@@ -1232,6 +1232,7 @@ applyCrossings finalSub parent =
                 -- while the answer still exists (CR 603.10a).
                 (Game.attachments oid g)
                 (Object.chosenNames obj)
+                (Object.chosenPlayer obj)
                 -- CR 508.1k, the sibling read of the same record.
                 (Game.isAttacking oid g)
                 (Game.attackTargetOf oid g)

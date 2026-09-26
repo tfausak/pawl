@@ -19,27 +19,22 @@ import qualified Pawl.Types.Zone as Zone
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Fourteen things rather than the characteristics alone, because the other
--- thirteen questions CR 608.2h is asked have no home in that fold. Control is not a
--- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
--- asks of a triggered ability whose source is gone. Neither is the object's
--- SOURCE: the projection folds characteristics, and CR 603.7's delayed-ability
--- declarations are read straight from the card, so an ArmDelayedTrigger whose
--- source has just exiled itself has nowhere else to find the ability it names.
--- Nor are COUNTERS -- CR 109.3's list has none -- and unlike the other two the
--- projection actively CONSUMES them (CR 613.4c), so the record has to be taken
--- beside it rather than out of it. The COPIABLE values are the fourth, for the
--- reason its own field gives. Nor is the ATTACHMENT, the fifth -- CR 109.3
--- names "what an Aura enchants" as an example of what is not one. Nor are the
--- CHOSEN NAMES, the sixth, for the reason its own field gives. Nor is the
--- OWNER, the seventh -- CR 109.3's list has no owner either -- for the reason
--- its own field gives. Nor is the COMBAT STATUS, the eighth through tenth, for
--- the reason their own fields give. Nor is the PROTECTOR, the eleventh, for the
--- reason its own field gives. Nor are the COSTS PAID, the twelfth, nor the
--- CONTROL CLOCK, the thirteenth, for the reasons their own fields give.
+-- More than the characteristics alone, because the other questions CR 608.2h
+-- is asked have no home in that fold. Control is not a characteristic (CR
+-- 109.3), yet "who controlled it" is what CR 603.3a asks of a triggered ability
+-- whose source is gone. Neither is the object's SOURCE: the projection folds
+-- characteristics, and CR 603.7's delayed-ability declarations are read straight
+-- from the card, so an ArmDelayedTrigger whose source has just exiled itself has
+-- nowhere else to find the ability it names. Nor are COUNTERS -- CR 109.3's list
+-- has none -- and unlike the other two the projection actively CONSUMES them (CR
+-- 613.4c), so the record has to be taken beside it rather than out of it. Nor is
+-- the ATTACHMENT -- CR 109.3 names "what an Aura enchants" as an example of what
+-- is not one. The COPIABLE values, the OWNER, the CHOSEN NAMES and PLAYER, the
+-- COMBAT STATUS, the PROTECTOR, the COSTS PAID and the CONTROL CLOCK sit beside
+-- them for the reasons their own fields give.
 --
--- All fourteen fields STRICT (!): entries are keyed by an id that no longer exists
--- and are never pruned, so an unforced field would be a thunk retaining the whole
+-- Every field STRICT (!): entries are keyed by an id that no longer exists and
+-- are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
   { characteristics :: !ProjectedCharacteristics.ProjectedCharacteristics,
@@ -126,6 +121,13 @@ data LastKnown = MkLastKnown
     -- changes nothing the projection folds. So it sits beside them for
     -- `controller`'s reason.
     chosenNames :: !(Set.Set CardName.CardName),
+    -- | CR 614.1c / 702.174a: the player chosen for it -- the same
+    -- Object.chosenPlayer the live object carried. What CR 608.2h answers for a
+    -- gift trigger whose permanent has left (Pawl.CastSpec's Scrapshooter killed
+    -- in response) and for Stuffy Doll's damage once the Doll is gone
+    -- (Pawl.EntryReplacementSpec). Not a characteristic, for `chosenNames`'
+    -- reason.
+    chosenPlayer :: !(Maybe PlayerId.PlayerId),
     -- | CR 508.1k: was it attacking as it left -- the same membership
     -- Pawl.Engine.Filter.View's `attacking` reports, through the one classifier
     -- Game.isAttacking, read off GameState.combat before the object ceased.

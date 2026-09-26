@@ -74,6 +74,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -84,6 +85,7 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
@@ -5132,6 +5134,20 @@ giftSpec s registry = Spec.describe s "Gift" $ do
     Spec.assertEqWith s "CR 702.174e the promised carol drew a card and bob did not" (S.handSize S.carol after, S.handSize S.bob after) (1, 0)
     Spec.assertEqWith s "CR 702.174b the gift was promised, so bob's Bonesplitter was destroyed" (namedOnBattlefield "Bonesplitter" after) []
     Spec.assertEqWith s "and the 4/4 entered with the stack empty" (fmap (`S.powerToughnessOf` after) (namedOnBattlefield "Scrapshooter" after), length (GameState.stack after)) ([Just (4, 4)], 0)
+  -- CR 608.2h: the case above's board, the 4/4 given -5/-5 and buried by CR
+  -- 704.5f while both its enters triggers wait. The chosen player is read off
+  -- the last known information, so carol still draws.
+  Spec.it s "CR 608.2h a Scrapshooter killed in response still has the promised opponent draw" $ do
+    (shooterId, board) <- scrapshooterBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = promising S.carol
+        onStack = S.runPure answer (S.runPure answer board (S.cast S.alice shooterId)) (Stack.resolveTop >> Engine.settleForPriority)
+        minusFive = Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-5)) (Quantity.Type.Literal (-5)))
+        dead = S.runPure answer (foldr (`S.withEffect` minusFive) onStack (namedOnBattlefield "Scrapshooter" onStack)) Engine.settleForPriority
+        after = S.runPure answer dead (Monad.replicateM_ (2 :: Int) (Stack.resolveTop >> Engine.settleForPriority))
+    Spec.assertEqWith s "CR 608.2h the promised carol drew a card and bob did not" (S.handSize S.carol after, S.handSize S.bob after) (1, 0)
+    Spec.assertEqWith s "and both triggers were on the stack as the 4/4 died" (length (GameState.stack dead), namedOnBattlefield "Scrapshooter" dead) (2, [])
+    Spec.assertEqWith s "and both resolved" (length (GameState.stack after)) 0
   -- The same board differing in exactly one thing: the answer to rule 702.174a's
   -- "you may".
   Spec.it s "CR 603.4 unpromised, nobody draws and the trigger does not fire" $ do
