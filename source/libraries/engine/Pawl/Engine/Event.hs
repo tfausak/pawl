@@ -641,6 +641,8 @@ damageOf event = case event of
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
   GameEvent.Foretold _ -> Nothing
+  GameEvent.CollectedEvidence _ -> Nothing
+  GameEvent.GaveGift _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -721,6 +723,8 @@ revealOf event = case event of
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
   GameEvent.Foretold _ -> Nothing
+  GameEvent.CollectedEvidence _ -> Nothing
+  GameEvent.GaveGift _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -8066,6 +8070,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerBlights _ -> False
   TriggerCondition.PlayerForages _ -> False
   TriggerCondition.PlayerForetells _ -> False
+  TriggerCondition.PlayerCollectsEvidence _ -> False
+  TriggerCondition.PlayerGivesGift _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False
@@ -8282,6 +8288,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerBlights _ -> False
   TriggerCondition.PlayerForages _ -> False
   TriggerCondition.PlayerForetells _ -> False
+  TriggerCondition.PlayerCollectsEvidence _ -> False
+  TriggerCondition.PlayerGivesGift _ -> False
   TriggerCondition.PlayerEarthbends _ -> False
   TriggerCondition.PlayerWaterbends _ -> False
   TriggerCondition.PlayerAirbends _ -> False

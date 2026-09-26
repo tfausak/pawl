@@ -450,12 +450,8 @@ resolveSpellWith runSubgame oid = do
 -- promised gift spell gives the gift again. That is the opposite of the permanent
 -- half's answer one rule over, where CR 707.2 copies no such record onto a Clone.
 --
--- That guard is a REGRESSION FENCE too, and for the reason
--- Pawl.Engine.Keyword.gift's intervening "if" is: widening it to admit an unpaid
--- gift leaves Pawl.CastSpec's Gift group green, because the effect's only read is
--- the chosen player and Object.chosenPlayer is empty in exactly the case rule
--- 702.174k excludes. What would tell them apart is CR 702.174c's "whenever a
--- player gives a gift" (#3945).
+-- Effect.GiveGift follows, once per spell however many gifts it promised: CR
+-- 702.174c's "gives a gift" is the promised spell resolving.
 --
 -- Rule 702.174j's second sentence -- "if the spell is countered or otherwise
 -- leaves the stack before resolving, the gift effect doesn't happen" -- needs no
@@ -472,9 +468,6 @@ resolveSpellWith runSubgame oid = do
 -- `self`, which Pawl.Engine.Cast.castSpell stamps on the spell alongside the
 -- chosen seat -- Resolve.Slots' ChosenPlayerOfBound arm reads Object.chosenPlayer
 -- off whatever that slot names.
---
--- Not implemented: CR 702.174c's "whenever a player gives a gift", which watches
--- both this and the permanent half resolve (#3945).
 giftOnSpellResolution :: Game Result -> ObjectId -> PlayerId -> Game ()
 giftOnSpellResolution runSubgame oid controller = do
   gs <- State.get
@@ -483,7 +476,9 @@ giftOnSpellResolution runSubgame oid controller = do
       slots = maybe Map.empty (Binding.targetsOf . Object.bindings) object
       gifts = [something | Keyword.Gift something <- Map.keys (Projection.keywordsOf oid gs), Map.findWithDefault 0 (Keyword.Gift something) promised > 0]
       give something = applyEffectWith runSubgame oid oid controller slots slots (Keyword.Engine.giftEffect something)
-  Monad.when (Keyword.Engine.isSpellCard (Projection.cardTypesOf oid gs)) (Monad.forM_ gifts give)
+  Monad.when (Keyword.Engine.isSpellCard (Projection.cardTypesOf oid gs) && not (null gifts)) $ do
+    Monad.forM_ gifts give
+    applyEffectWith runSubgame oid oid controller slots slots Effect.GiveGift
 
 -- CR 702.50a's two SPELL abilities, performed as the last part of the spell's
 -- resolution and ahead of finishSpell's move: "for the rest of the game, you

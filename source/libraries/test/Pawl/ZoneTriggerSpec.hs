@@ -2649,6 +2649,8 @@ representativeEvents cond =
         -- for the wrong keyword action.
         TriggerCondition.PlayerForages _ -> one (GameEvent.Foraged S.bob)
         TriggerCondition.PlayerForetells _ -> one (GameEvent.Foretold S.bob)
+        TriggerCondition.PlayerCollectsEvidence _ -> one (GameEvent.CollectedEvidence S.bob)
+        TriggerCondition.PlayerGivesGift _ -> one (GameEvent.GaveGift S.bob)
         TriggerCondition.PlayerEarthbends _ -> one (GameEvent.Earthbent S.bob)
         TriggerCondition.PlayerWaterbends _ -> one (GameEvent.Waterbent S.bob)
         TriggerCondition.PlayerAirbends _ -> one (GameEvent.Airbent S.bob)
@@ -2952,6 +2954,12 @@ everyTriggerCondition =
     TriggerCondition.PlayerForetells PlayerRelation.You,
     TriggerCondition.PlayerForetells PlayerRelation.Opponent,
     TriggerCondition.PlayerForetells PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerCollectsEvidence PlayerRelation.You,
+    TriggerCondition.PlayerCollectsEvidence PlayerRelation.Opponent,
+    TriggerCondition.PlayerCollectsEvidence PlayerRelation.AnyPlayer,
+    TriggerCondition.PlayerGivesGift PlayerRelation.You,
+    TriggerCondition.PlayerGivesGift PlayerRelation.Opponent,
+    TriggerCondition.PlayerGivesGift PlayerRelation.AnyPlayer,
     TriggerCondition.PlayerEarthbends PlayerRelation.You,
     TriggerCondition.PlayerEarthbends PlayerRelation.Opponent,
     TriggerCondition.PlayerEarthbends PlayerRelation.AnyPlayer,

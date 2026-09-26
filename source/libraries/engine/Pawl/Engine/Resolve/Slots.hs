@@ -737,6 +737,7 @@ effectObjectRefs effect = case effect of
   Effect.Evolve {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
+  Effect.GiveGift -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
   Effect.ExileUntilMonarch {} -> []
@@ -919,6 +920,7 @@ effectPlayerRefs effect = case effect of
   Effect.Evolve {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
+  Effect.GiveGift -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
   Effect.ExileUntilMonarch {} -> []
@@ -1294,6 +1296,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.Evolve slot -> oneSlot slot
   Effect.Mentor slot -> oneSlot slot
   Effect.Exploit -> Map.empty
+  Effect.GiveGift -> Map.empty
   Effect.Train slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
   Effect.ExileUntilMonarch slot -> oneSlot slot
@@ -1899,6 +1902,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Evolve _ -> True
   Effect.Mentor _ -> True
   Effect.Exploit -> True
+  Effect.GiveGift -> True
   Effect.Train _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
@@ -2109,6 +2113,7 @@ readsX =
         Effect.Evolve _ -> False
         Effect.Mentor _ -> False
         Effect.Exploit -> False
+        Effect.GiveGift -> False
         Effect.Train _ -> False
         Effect.ItBecomes _ -> False
         Effect.ExileUntilMonarch _ -> False
@@ -2344,6 +2349,7 @@ boundSlots effect = case effect of
   Effect.Evolve _ -> Set.empty
   Effect.Mentor _ -> Set.empty
   Effect.Exploit -> Set.empty
+  Effect.GiveGift -> Set.empty
   Effect.Train _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty

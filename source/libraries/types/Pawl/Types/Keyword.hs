@@ -819,8 +819,6 @@ data Keyword
     -- Rule 702.174b's OTHER half, on an instant or a sorcery, is a SPELL ability
     -- and is minted nowhere: Pawl.Engine.Resolve.giftOnSpellResolution performs
     -- it as the spell resolves.
-    --
-    -- Not implemented: CR 702.174c's "whenever a player gives a gift" (#3945).
     Gift Gift.Gift
   | -- | 702.173a: freerunning [cost] -- you may pay [cost] rather than this
     -- spell's mana cost if a player was dealt combat damage this turn by a

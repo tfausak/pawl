@@ -2904,6 +2904,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Evolve {} -> False
   Effect.Mentor {} -> False
   Effect.Exploit -> False
+  Effect.GiveGift -> False
   Effect.Train {} -> False
   Effect.ItBecomes {} -> False
   Effect.ExileUntilMonarch {} -> False
@@ -7499,6 +7500,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ victims $ \victim -> do
       Event.sacrifice controller victim
       State.modify' (Event.recordEvent (GameEvent.Exploited (Exploited.MkExploited source victim)))
+  -- CR 702.174c's marker, Firebend's reading of who gives it: `controller`
+  -- controls the resolving gift spell or gift triggered ability.
+  Effect.GiveGift -> State.modify' (Event.recordEvent (GameEvent.GaveGift controller))
   -- CR 731.1: the GAME gains the designation; what that entails is
   -- Pawl.Engine.Daytime's. Nobody is named and nothing is prompted.
   Effect.ItBecomes designation -> do
