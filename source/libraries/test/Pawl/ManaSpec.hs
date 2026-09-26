@@ -3810,11 +3810,8 @@ poolUnitsOf pid gs = case Game.poolOf pid gs of
 -- that is no creature and so was granted nothing, and bob's Llanowar Elves is
 -- the first again under the other seat.
 --
--- Not implemented: Tyvar's OTHER printed ability, "Whenever one or more Elves
--- you control attack, they gain deathtouch until end of turn" -- CR 508.3c's
--- condition (TriggerCondition.PlayerAttacksWith) binds the attacking PLAYER and
--- nothing names the creatures the declaration announced, so "they" cannot be
--- written. pawl's Tyvar is STRICTER than printed (#3723).
+-- Tyvar's other ability, CR 508.3c's attack trigger, is Pawl.CardTriggerSpec's
+-- "Tyvar the Bellicose, attacking".
 tyvarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tyvarSpec s registry = Spec.describe s "Tyvar the Bellicose" $ do
   Spec.it s "CR 605.1b a creature's mana ability resolving puts a counter on it per mana it produced" $ do

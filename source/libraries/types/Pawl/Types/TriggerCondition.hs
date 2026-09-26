@@ -155,7 +155,8 @@ data TriggerCondition
     PlayerAttacks PlayerRelation.PlayerRelation
   | -- | CR 508.3c: "whenever [a player] attacks with [n or more creatures]"
     -- (Military Intelligence) -- the arm above narrowed by a Filter over the
-    -- creatures declared and by how many of them the declaration names.
+    -- creatures declared and by how many of them the declaration names; the
+    -- creatures it admitted are bound under Pawl.Engine.Binding.attackingCreatures.
     PlayerAttacksWith PlayerAttacksWith.PlayerAttacksWith
   | -- | CR 508.3e: "whenever [a player] attacks [another player]" (Seifer,
     -- Balamb Rival), once per pair; only AttackTarget.OfPlayer matches. Both

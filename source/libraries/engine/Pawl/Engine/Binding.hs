@@ -894,6 +894,20 @@ blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 attackingCreature :: SlotName
 attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 
+-- CR 508.3c: the reserved slot under which the attackers a batch attack trigger
+-- counted are bound -- Tyvar the Bellicose's "whenever one or more Elves you
+-- control attack, THEY gain deathtouch". Stamped by
+-- Pawl.Engine.Event.Binding.eventBindings off GameEvent.AttackersDeclared: the
+-- declared attackers that player controls which the condition's Filter admits,
+-- so "they" names exactly what made the trigger fire.
+--
+-- A GROUP (Binding.objects), crewers' reason: named, never targeted (CR
+-- 115.10a), and a set CR 611.2c freezes when a resolution's effect begins, so a
+-- creature that joins the attack later is not among them. Unordered; nothing may
+-- read it positionally.
+attackingCreatures :: SlotName
+attackingCreatures = SlotName.MkSlotName (Text.pack "thoseAttackingCreatures")
+
 -- CR 508.3d / 508.3e: the reserved slot under which the player who DECLARED the
 -- attackers is bound. Stamped by Pawl.Engine.Event.Binding.eventBindings off
 -- GameEvent.AttackersDeclared and GameEvent.BecameAttacked as the trigger is
@@ -1133,6 +1147,10 @@ setBlockedCreature oid = Map.insert blockedCreature (toObject oid)
 -- Bind an object under the reserved attackingCreature slot (CR 506.5).
 setAttackingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setAttackingCreature oid = Map.insert attackingCreature (toObject oid)
+
+-- Bind the counted attackers under the reserved attackingCreatures slot (CR 508.3c).
+setAttackingCreatures :: Seq ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setAttackingCreatures oids = Map.insert attackingCreatures (toObjects oids)
 
 -- Bind a player under the reserved attackingPlayer slot (CR 508.3d / 508.3e).
 setAttackingPlayer :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
