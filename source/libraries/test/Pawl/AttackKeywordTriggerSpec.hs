@@ -1844,6 +1844,82 @@ mobilizeSpec s registry =
               Spec.assertBool s (S.onBattlefield pikerId ended) "and so is the Piker that attacked beside them"
             Nothing -> Spec.assertFailure s "fixture should give alice a Packbeasts and a Piker"
 
+-- CR 702.181a's N restated as a count: Avenger of the Fallen {2}{B} Creature --
+-- Human Warrior 2/4, "Deathtouch / Mobilize X, where X is the number of creature
+-- cards in your graveyard". Nothing is omitted, so pawl's Avenger is neither
+-- stricter nor weaker than printed.
+--
+-- THE GRAVEYARDS keep every misreading distinct from the right answer of three:
+-- a Lightning Bolt beside alice's three creature cards (every card in her
+-- graveyard is four), a Goblin Piker in bob's (every graveyard's creature cards
+-- is four too, from the other side), and the Avenger's own power is two.
+avengerOfTheFallenSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+avengerOfTheFallenSpec s registry =
+  let plan :: Prompt.Prompt r -> r
+      plan p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      attackedBy oid gs = Map.lookup oid (Combat.Type.attackers (GameState.combat gs))
+   in Spec.describe s "Avenger of the Fallen" $ do
+        Spec.it s "CR 702.181a mobilize X makes one token per creature card in its controller's graveyard" $ do
+          avenger <- S.printingOf s registry "Avenger of the Fallen"
+          piker <- S.printingOf s registry "Goblin Piker"
+          traveler <- S.printingOf s registry "Doomed Traveler"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          case S.combatBoardOf [avenger] [] of
+            (gs, [avengerId], _) -> do
+              let stocked =
+                    List.foldl'
+                      (\g (p, pid) -> snd (S.addGraveyardCard p pid g))
+                      gs
+                      [(piker, S.alice), (traveler, S.alice), (traveler, S.alice), (bolt, S.alice), (piker, S.bob)]
+                  after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) plan stocked
+                  tokens = S.tokensOf after
+              -- THE gameplay assertion, ahead of every proxy.
+              Spec.assertEqWith
+                s
+                "CR 702.181a three tokens, each attacking the player the Avenger did"
+                (fmap (`attackedBy` after) tokens)
+                (replicate 3 (Just (AttackTarget.OfPlayer S.bob)))
+              Spec.assertBool s (all (`Game.isTapped` after) tokens) "CR 702.181a and each entered tapped"
+              Spec.assertEqWith s "while the Avenger itself attacks bob" (attackedBy avengerId after) (Just (AttackTarget.OfPlayer S.bob))
+            _ -> Spec.assertFailure s "fixture should give alice an Avenger"
+
+-- CR 702.181a's N restated as the power of a creature the keyword is GRANTED
+-- to: Infantry Shield {2}{R} Artifact -- Equipment, "Equipped creature has menace
+-- and mobilize X, where X is its power. / Equip {2}". Nothing is omitted, so
+-- pawl's Shield is neither stricter nor weaker than printed.
+--
+-- The Shield rides a Goblin Piker, power two. X read off the Shield itself, which
+-- has no power, makes none; the Doomed Traveler attacking beside it, power one,
+-- would add one more if the grant reached it too.
+infantryShieldSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+infantryShieldSpec s registry =
+  let plan :: Prompt.Prompt r -> r
+      plan p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      attackedBy oid gs = Map.lookup oid (Combat.Type.attackers (GameState.combat gs))
+   in Spec.describe s "Infantry Shield" $ do
+        Spec.it s "CR 702.181a the granted mobilize X reads the equipped creature's power" $ do
+          shield <- S.printingOf s registry "Infantry Shield"
+          piker <- S.printingOf s registry "Goblin Piker"
+          traveler <- S.printingOf s registry "Doomed Traveler"
+          case S.combatBoardOf [shield, piker, traveler] [] of
+            (gs, [shieldId, pikerId, travelerId], _) -> do
+              let equipped = S.attach shieldId pikerId gs
+                  after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) plan equipped
+                  tokens = S.tokensOf after
+              -- THE gameplay assertion, ahead of every proxy.
+              Spec.assertEqWith
+                s
+                "CR 702.181a two tokens, one per point of the Piker's power"
+                (fmap (`attackedBy` after) tokens)
+                (replicate 2 (Just (AttackTarget.OfPlayer S.bob)))
+              Spec.assertEqWith s "while the Piker attacks bob" (attackedBy pikerId after) (Just (AttackTarget.OfPlayer S.bob))
+              Spec.assertEqWith s "and so does the Traveler" (attackedBy travelerId after) (Just (AttackTarget.OfPlayer S.bob))
+            _ -> Spec.assertFailure s "fixture should give alice a Shield, a Piker and a Traveler"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   frenzySpec s registry
@@ -1855,6 +1931,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   decayedSpec s registry
   myriadSpec s registry
   mobilizeSpec s registry
+  avengerOfTheFallenSpec s registry
+  infantryShieldSpec s registry
   provokeSpec s registry
   trygonPredatorSpec s registry
   questingBeastSpec s registry

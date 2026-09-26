@@ -20,6 +20,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -1016,16 +1017,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Mobilize 3)
-      " {\"type\":\"Mobilize\",\"value\":3} "
+      (Keyword.Mobilize (KeywordCount.Fixed 3))
+      " {\"type\":\"Mobilize\",\"value\":{\"type\":\"Fixed\",\"value\":3}} "
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Firebending 2)
-      " {\"type\":\"Firebending\",\"value\":2} "
+      (Keyword.Firebending KeywordCount.Power)
+      " {\"type\":\"Firebending\",\"value\":{\"type\":\"Power\"}} "
     Spec.assertBool
       s
-      (Codec.encode Keyword.codec (Keyword.Mobilize 2) /= Codec.encode Keyword.codec (Keyword.Firebending 2))
+      (Codec.encode Keyword.codec (Keyword.Mobilize (KeywordCount.Fixed 2)) /= Codec.encode Keyword.codec (Keyword.Firebending (KeywordCount.Fixed 2)))
       "mobilize 2 is not firebending 2"
   -- CR 702.23a's N rides the constructor the same way.
   Spec.it s "Rampage carries its N" $ do
