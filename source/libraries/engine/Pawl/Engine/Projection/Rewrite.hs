@@ -443,6 +443,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- sentence keeps a subtype swap off a name.
   PlayerEffect.HasProtectionFromChosenName -> effect
   PlayerEffect.CantBecomeMonarch -> effect
+  PlayerEffect.CantAttackWithCreatures -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
   PlayerEffect.PlayLandsFrom _ -> effect
   -- A counter KIND is not a word CR 612.2's subtype pairs could reach either.

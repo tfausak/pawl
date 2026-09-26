@@ -1164,7 +1164,8 @@ data Context = MkContext
     -- where a target slot's Filter is matched, and
     -- Pawl.Engine.Resolve.Slots.effectContext, which is what every one of a
     -- resolution's positions goes through (Bifurcate's search filter, Hour of
-    -- Glory's hand sweep, an attach destination).
+    -- Glory's hand sweep, Grim Reminder's life loss amount, an attach
+    -- destination).
     --
     -- Separate from `slotObjects` above rather than derived from it, and that is
     -- the same division sourcePower makes against `source`: an id is not a name
@@ -1180,8 +1181,8 @@ data Context = MkContext
     -- slotControllers' SameControllerAsBound chooses True where this one chooses
     -- False.
     --
-    -- What keeps a card out of those positions is Pawl.CardSpec's
-    -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot, a search filter or a hand sweep",
+    -- What keeps a card out of those positions is Pawl.FilterPositionLintSpec's
+    -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot, a search filter, a hand sweep or a life loss amount",
     -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName),
     -- CR 110.2: the CONTROLLERS of the objects the surrounding announcement's

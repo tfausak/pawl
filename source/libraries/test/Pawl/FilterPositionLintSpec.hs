@@ -11,7 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (AttachDestination, ClauseGateFramed, HandSweepFramed, InTargetSlot, KeywordFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (AttachDestination, ClauseGateFramed, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
@@ -367,6 +367,8 @@ hostFramed framing = case framing of
   -- Pawl.Engine.Resolve.gateHolds takes effectContext as it stands, with no
   -- host overlay.
   ClauseGateFramed -> False
+  -- The LoseLife arm takes effectContext as it stands too.
+  LifeLossAmountFramed -> False
 
 -- How many CR 701.3a atoms this card carries in a position framed by an attach
 -- -- Effect.AttachTarget's destination, Effect.AttachTargetToEach's, or CR
@@ -715,10 +717,10 @@ ofChosenPlayerOffends card =
 sameNameAsBoundTag :: Text.Text
 sameNameAsBoundTag = Text.pack "SameNameAsBound"
 
--- How many CR 709.4a atoms this card carries in one of the three ADMITTED
--- positions -- a MODE's target slot filter (Harness the Storm), a CR 701.23
--- search filter (Bifurcate) or a CR 608.2c hand sweep's (Hour of Glory) -- and
--- how many anywhere else. The second number is the offence.
+-- How many CR 709.4a atoms this card carries in one of the ADMITTED positions
+-- -- a MODE's target slot filter (Harness the Storm), a CR 701.23 search filter
+-- (Bifurcate), a CR 608.2c hand sweep's (Hour of Glory) or a CR 119.3 life
+-- loss amount's Count filter (Grim Reminder) -- and how many anywhere else. The second number is the offence.
 --
 -- An ALLOWLIST rather than "wherever Filter.Context.slotNames is filled",
 -- which is the wider set: every position a resolution
@@ -730,7 +732,7 @@ sameNameAsBoundTag = Text.pack "SameNameAsBound"
 -- SlotlessCostFramed and what the hand sweep's own entry is.
 sameNameAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sameNameAsBoundCounts card =
-  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameNameAsBoundTag f) (filter (\(framing, _) -> elem framing [InTargetSlot, SearchFramed, HandSweepFramed] == wanted) (cardFilters card)))
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameNameAsBoundTag f) (filter (\(framing, _) -> elem framing [InTargetSlot, SearchFramed, HandSweepFramed, LifeLossAmountFramed] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 709.4a's bound-name comparison is answerable only where
@@ -739,15 +741,15 @@ sameNameAsBoundCounts card =
 -- Pawl.Engine.Resolve.Slots.effectContext, which all but one of a resolution's
 -- positions go through -- the search filter and the mill tally among them.
 -- Filter.contextFor and Filter.contextComparingPower leave it empty, so
--- Filter.SameNameAsBound in a Count filter, an affected set or a cost criterion
--- is a silent False rather than a rejected card. This is where that is made loud.
+-- Filter.SameNameAsBound in a Count filter read outside a resolution, an
+-- affected set or a cost criterion is a silent False rather than a rejected card. This is where that is made loud.
 --
--- The two positions sameNameAsBoundCounts admits are narrower than that, on
+-- The positions sameNameAsBoundCounts admits are narrower than that, on
 -- purpose: see its own note. So a card rejected here is not necessarily one the
 -- engine would answer wrong.
 --
 -- Two offences under one name, for canHostSubjectOffends' two reasons: the
--- traversal found the atom outside those two positions, or the traversal and the codec
+-- traversal found the atom outside those positions, or the traversal and the codec
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence.
@@ -1261,21 +1263,22 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (length (concatMap (searchZoneSets . S.combinedFace) ps) > 5) "and the pool gives the sweep other searches to be about"
   -- CR 709.4a's Filter.SameNameAsBound is in CR 701.3a's position one axis over:
   -- answerable only where Filter.Context.slotNames is filled, and unanswerable --
-  -- a silent False -- everywhere else. The three positions ADMITTED here are a
-  -- MODE's target slot, a CR 701.23 search filter and a CR 608.2c hand sweep's
-  -- own filter, the last two since their arms took their context from the
-  -- resolution (Pawl.ResolveSpec's Bifurcate and Hour of Glory cases). That set
+  -- a silent False -- everywhere else. The positions ADMITTED here are a MODE's
+  -- target slot, a CR 701.23 search filter, a CR 608.2c hand sweep's own filter
+  -- and a CR 119.3 life loss amount, the last three since their arms take their
+  -- context from the resolution (Pawl.ResolveSpec's Bifurcate, Hour of Glory and
+  -- Grim Reminder cases). That set
   -- is narrower than the set that would answer -- sameNameAsBoundCounts says why
   -- -- so this rejects in the safe direction only. See sameNameAsBoundOffends
   -- for the two offences and Framing for why CR 303.4a's enchant slot is not one
   -- of the safe positions.
-  Spec.it s "CR 709.4a no card asks SameNameAsBound outside a mode's target slot, a search filter or a hand sweep" $ do
+  Spec.it s "CR 709.4a no card asks SameNameAsBound outside a mode's target slot, a search filter, a hand sweep or a life loss amount" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace sameNameAsBoundOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only in a target slot's, a search's or a hand sweep's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "the atom sits only in a target slot's, a search's, a hand sweep's or a life loss amount's filter" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous, the way the sibling sweeps would be alone: the pool authors the
-    -- atom, and the three cards that do are ACCEPTED here rather than skipped --
-    -- one in each admitted position, so no member of the set is unwitnessed.
+    -- atom, and the cards that do are ACCEPTED here rather than skipped -- one in
+    -- each admitted position, so no member of the set is unwitnessed.
     harness <- S.printingOf s registry "Harness the Storm"
     Spec.assertEqWith
       s
@@ -1294,11 +1297,17 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Hour of Glory's one atom is in its hand sweep's filter"
       (sameNameAsBoundCounts (S.combinedFace glory))
       (1, 0)
+    reminder <- S.printingOf s registry "Grim Reminder"
     Spec.assertEqWith
       s
-      "and they are the pool's only three"
+      "Grim Reminder's one atom is in its life loss amount's Count filter"
+      (sameNameAsBoundCounts (S.combinedFace reminder))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . sameNameAsBoundCounts . S.combinedFace) ps))
-      3
+      4
     -- Both sides of the split, with room to spare under the pool's real figures:
     -- a traversal that had stopped walking, or a Framing that had stopped marking
     -- target slots, would fail here rather than pass the sweep above by iterating
@@ -2147,7 +2156,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         (MintedTargetSlot, [bound]),
         (MillTallyFramed, [bound]),
         (HandSweepFramed, [bound]),
-        (ClauseGateFramed, [bound])
+        (ClauseGateFramed, [bound]),
+        (LifeLossAmountFramed, [bound])
       ]
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
@@ -2631,7 +2641,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- each is asserted through sameNameAsBoundCounts as well as the predicate -- the
   -- counts say the TRAVERSAL put it in that position, where the predicate alone is
   -- also satisfied by the codec half noticing an atom the traversal missed.
-  Spec.it s "the lint itself catches SameNameAsBound outside a mode's target slot, a search filter or a hand sweep" $ do
+  Spec.it s "the lint itself catches SameNameAsBound outside a mode's target slot, a search filter, a hand sweep or a life loss amount" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     harness <- S.printingOf s registry "Harness the Storm"

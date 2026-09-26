@@ -466,13 +466,13 @@ payableCost aimable = payableCostAt aimable 0
 -- announcement exposes.
 payableCostAt :: [Map.Map SlotName (Set.Set ObjectId)] -> Natural -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt aimable x stamp pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.activationManaSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletion slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [Map.Map SlotName (Set.Set ObjectId)] -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven aimable sources pcs x stamp pid srcId gs cost =
-  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.activationManaSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
+  aimingSomewhere (Cost.readsBoundSlot (Cost.substituteX x cost)) aimable stamp (Cost.loyaltyKindOf cost) pid srcId gs (\slots adjustments -> let totalled = Cost.plusComponents adjustments (Cost.substituteX x cost) in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Activating srcId) ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.waterbendSubstitutions (Cost.Type.components totalled) slots pid srcId gs) totalled gs)
 
 -- CR 601.2f's totalling asked where CR 601.2c's targets do not exist yet: the
 -- predicate holds if SOME aiming this activation could still take leaves the

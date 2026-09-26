@@ -27,7 +27,9 @@ data PlayerStaticAbility = MkPlayerStaticAbility
     --
     -- Evaluated against the SOURCE permanent and from its controller's
     -- perspective, which is what makes "your turn" the Class controller's turn
-    -- rather than the taxed player's -- CR 109.5's "you". Pawl.Engine.PlayerEffect
+    -- rather than the taxed player's -- CR 109.5's "you". The taxed player is
+    -- PlayerRef.Candidate, asked once per player in scope: Angelic Arbiter's
+    -- "each opponent who cast a spell this turn". Pawl.Engine.PlayerEffect
     -- gathers these rows AFTER the seven layers (CR 613.10/613.11), so the clause
     -- reads the finished projection, the answer CR 702.178a's max speed gate takes
     -- for the same reason.

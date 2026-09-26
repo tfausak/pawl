@@ -9673,9 +9673,9 @@ activateWhileRolling pid oid ability = do
       loyalty = Cost.loyaltyKindOf (ActivatedAbility.cost ability)
       gathered = Cost.activationAdjustments Set.empty stamp AbilityKind.NonManaAbility loyalty pid oid before
       totalled = Cost.plusComponents gathered (ActivatedAbility.cost ability)
-  (announced, _) <- Cost.announce (PaymentSubject.Activating oid) ManaSpending.AsProduced pid oid (Cost.substitutedManas (Cost.activationManaSubstitutions (Cost.Type.components totalled) Map.empty pid oid before) (Cost.totalManas gathered)) totalled
+  (announced, _) <- Cost.announce (PaymentSubject.Activating oid) ManaSpending.AsProduced pid oid (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components totalled) Map.empty pid oid before) (Cost.totalManas gathered)) totalled
   adjustments <- Cost.announceReductions pid oid before announced gathered
-  (payment, _) <- Cost.paySubstituting performManaAbility before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating oid) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.activationManaSubstitutions pid oid) (Cost.totalWith adjustments announced)
+  (payment, _) <- Cost.paySubstituting performManaAbility before [] PaymentMoment.OutsideResolution (PaymentSubject.Activating oid) Nothing ManaSpending.AsProduced pid oid (Cost.announceSubstitutions Cost.waterbendSubstitutions pid oid) (Cost.totalWith adjustments announced)
   case payment of
     -- CR 733.1: the payment reversed the activation back to `before` itself.
     Payment.Unpaid -> pure False
@@ -9827,12 +9827,12 @@ changeLifeByDelta pid delta =
       settled <- Event.resolveLifeGain pid (Integer.toNaturalSaturating delta)
       Event.changeLife pid (toInteger settled)
 
--- CR 701.23: do to a found card what the search said -- a move for every
--- destination and, for one of them, a CR 701.20a reveal first, through the CR
--- 400.7 funnel either way.
+-- CR 701.23: do to a found card what the search said -- a move, a CR 701.20a
+-- reveal, or both, every move through the CR 400.7 funnel.
 --
--- Answers the incarnations the move minted (CR 400.7), which is what
--- Search.slot binds; empty where the card did not move.
+-- Answers what Search.slot binds: the incarnations a move minted (CR 400.7), the
+-- found card itself where the instruction only revealed it, and nothing where a
+-- move did not happen.
 putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game [ObjectId]
 putFound searcher subject destination cardId = case destination of
   -- Nature's Lore's "put that card onto the battlefield": the plain move, with
@@ -9891,6 +9891,11 @@ putFound searcher subject destination cardId = case destination of
         -- is why it is written here rather than in the searching rule.
         Event.reveal RevealCause.Ordinary searcher cardId
         Foldable.toList <$> Event.changeZoneReturning cardId Zone.Hand
+  -- Grim Reminder's "reveal it": CR 701.20b leaves the card in the library, so the
+  -- object found is the object a later clause names.
+  SearchDestination.Reveal -> do
+    Event.reveal RevealCause.Ordinary searcher cardId
+    pure [cardId]
 
 -- CR 303.4's entry-attached move, shared by putFound's two attaching arms so the
 -- sentence they have in common is written once.
