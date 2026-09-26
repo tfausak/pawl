@@ -90,7 +90,7 @@ import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Times as Times
-import Pawl.Types.Timestamp (Timestamp)
+import Pawl.Types.Timestamp (Timestamp (MkTimestamp))
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
@@ -1464,9 +1464,13 @@ liveGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(Object
 liveGiven functioning setEffs oid gs =
   not
     ( hasLandType (baseCharacteristics oid gs)
-        && any (\(src, aff) -> affectsBase src oid aff gs && not (escapes src aff)) (appliedSetEffects setEffs gs)
+        && any strips (List.inits applied `zip` applied)
     )
   where
+    applied = appliedSetEffects setEffs gs
+    -- A setter of `oid`'s own that CR 613.8b's loop applied earlier is not undone
+    -- by this one's strip.
+    strips (earlier, (src, aff)) = affectsBase src oid aff gs && not (escapes src aff) && not (any ((== oid) . fst) earlier)
     -- CR 613.8a/613.8b: the other layer-4 effects that apply before this setter.
     -- One the setter would strip (a rules-text ability of a land it reaches)
     -- depends on it too, and that loop falls back to timestamps; any other the
@@ -1587,17 +1591,22 @@ setSubtypeStripped cands setEffs gs = case appliedSetEffects setEffs gs of
 -- PERMANENT's (CR 613.7d), and a source that has left has none, sorting last.
 -- Indices carry the identity, since two permanents can generate equal pairs.
 --
--- Not implemented: CR 613.8a clause (b)'s "what it applies to" limb for these
--- effects (#2405). `dependsOn` asks only whether the other effect strips THIS
--- one's source -- the existence limb, over one object -- and never whether it
--- moves this setter's affected set, so a pair whose dependency shows up only in
--- the set falls back to CR 613.8b's timestamp order.
+-- CR 613.8a clause (b)'s two limbs that can hold between two setters: the other
+-- strips this one's source (existence), or applying it moves an object into or
+-- out of this one's set (what it applies to).
 appliedSetEffects :: [(ObjectId, Affected.Affected)] -> GameState -> [(ObjectId, Affected.Affected)]
 appliedSetEffects setEffs gs =
   let indexed = zip [0 :: Int ..] setEffs
       stampOf (_, (src, _)) = fmap Object.timestamp (Game.lookupObject src gs)
-      -- CR 613.8a, for these effects: does `other` strip `e`'s source?
-      dependsOn (_, (src, _)) (_, (osrc, oaff)) = affectsBase osrc src oaff gs
+      -- CR 613.8a, for these effects: does `other` strip `e`'s source, or move
+      -- what `e` applies to?
+      dependsOn (_, (src, aff)) (_, (osrc, oaff)) = affectsBase osrc src oaff gs || movesSet osrc oaff src aff
+      movesSet osrc oaff src aff =
+        let parts = setterPartsOf osrc oaff gs
+            reached = filter (\x -> affectsBase osrc x oaff gs) (Set.toList (candidatesFor oaff gs))
+            before x = affectsGiven (baseView gs) src x aff (projectWith (<= Layer.Type) [] x gs) gs
+            after x = affectsGiven (baseView gs) src x aff (projectWith (<= Layer.Type) parts x gs) gs
+         in not (null parts) && any (\x -> before x /= after x) reached
       earliest :: [(Int, (ObjectId, Affected.Affected))] -> (Int, (ObjectId, Affected.Affected))
       earliest = List.minimumBy (Ord.comparing (\e -> (stampOf e, fst e)))
       go remaining applied = case remaining of
@@ -1611,6 +1620,27 @@ appliedSetEffects setEffs gs =
               stripped = any (\(src, aff) -> affectsBase src nsrc aff gs) applied
            in go (filter (\o -> fst o /= fst next) remaining) (if stripped then applied else snd next : applied)
    in go indexed []
+
+-- The layer-4 parts of the setter setLandSubtypeEffectsGiven listed as (`src`,
+-- `aff`), for appliedSetEffects' "what it applies to" test. Matched on the
+-- affected set, which setLandSubtypeEffectsGiven stores rewritten.
+setterPartsOf :: ObjectId -> Affected.Affected -> GameState -> [Gathered]
+setterPartsOf src aff gs =
+  let part m =
+        MkGathered
+          { gEffect = Nothing,
+            gSource = src,
+            gAffected = aff,
+            gLayer = Layer.Type,
+            gLowest = Layer.Type,
+            gTimestamp = MkTimestamp 0,
+            gModification = m
+          }
+      changes = textChangesAffecting src gs
+      stored = [ContinuousEffect.modification eff | eff <- GameState.continuousEffects gs, ContinuousEffect.source eff == src, ContinuousEffect.affected eff == aff]
+      printed = [m | sa <- staticAbilitiesOf src gs, rewriteAffected changes (StaticAbility.affected sa) == aff, m <- NonEmpty.toList (StaticAbility.modifications sa)]
+      granted = [m | (_, sa) <- grantedStaticAbilitiesOf src gs, StaticAbility.affected sa == aff, m <- NonEmpty.toList (StaticAbility.modifications sa)]
+   in fmap part (filter setsLandSubtype (stored <> printed <> granted))
 
 -- CR 612.1: the subtype-word swaps the rules text `oid` carries has taken, as one
 -- lookup table -- every word paired with the word it ends up as. CR 612.2's
