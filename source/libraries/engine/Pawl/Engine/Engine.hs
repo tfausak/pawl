@@ -92,7 +92,6 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.LastKnown as LastKnown
-import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Mode as Mode
@@ -699,7 +698,7 @@ reacts = Maybe.isJust . (abilityTriggeredOf Monad.<=< PendingTrigger.firedBy)
 -- (TriggerCondition.SagaFinalChapterTriggers) watches a Saga's final chapter ability,
 -- which triggers off lore counters (CR 714.2b), never off an ability
 -- triggering, so what reacts to it fires nothing further. Every round is
--- filtered by `withinTriggerLimit` first, the ONE place a "triggers only once"
+-- filtered by `Event.withinTriggerLimit` first, the ONE place a "triggers only once"
 -- rider is spent.
 --
 -- Not implemented: a CR 603.7 DELAYED ability whose trigger event is another
@@ -707,7 +706,7 @@ reacts = Maybe.isJust . (abilityTriggeredOf Monad.<=< PendingTrigger.firedBy)
 reactions :: [PendingTrigger.PendingTrigger] -> Game [PendingTrigger.PendingTrigger]
 reactions incoming = do
   before <- State.get
-  case withinTriggerLimit before incoming of
+  case Event.withinTriggerLimit before incoming of
     [] -> pure []
     batch -> do
       -- One CR 704.3 event group EACH, not one `Event.simultaneously` bracket
@@ -731,154 +730,6 @@ reactions incoming = do
         )
       rest <- reactions fresh
       pure (batch <> rest)
-
--- The printed riders "This ability triggers only once each turn" and "This
--- ability triggers only once" (Pawl.Types.TriggerLimit), applied to one gathered
--- batch: drop every entry whose ability carries a rider and has already triggered
--- inside that rider's window. The per-TURN window needs no stored flag -- the
--- record is CR 603.3b's own log, and GameState.events is cleared at the turn
--- handoff, which makes "in the log" mean "this turn". The per-GAME window reads
--- GameState.triggeredThisGame, which survives that handoff and which `reactions`
--- writes. The two are read as ONE spent set: the ability VALUE is part of the key
--- and carries its own limit, so a per-turn key and a per-game key can never be
--- equal. CR 702.179d's inherent twin is limited here like any other, the log
--- recording a sourceless trigger too. Keyed on the SOURCE and the ABILITY, so two
--- permanents with the same printed ability spend separate limits (CR 113.7), one
--- that leaves and returns re-arms (CR 400.7), and two DISTINCT abilities of one
--- source spend separate limits; a change of CONTROL spends nothing. Spent on
--- TRIGGERING.
-withinTriggerLimit :: GameState -> [PendingTrigger.PendingTrigger] -> [PendingTrigger.PendingTrigger]
-withinTriggerLimit gs =
-  let spentKey record = limitKey (AbilityTriggered.source record) (AbilityTriggered.controller record) (AbilityTriggered.ability record)
-      go _ [] = []
-      go spent (pending : rest) = case limitedKey pending of
-        Nothing -> pending : go spent rest
-        Just key
-          | Set.member key spent -> go spent rest
-          | otherwise -> pending : go (Set.insert key spent) rest
-   in go
-        ( Set.union
-            (Set.fromList (Maybe.mapMaybe (fmap spentKey . abilityTriggeredOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
-            (Set.map spentKey (GameState.triggeredThisGame gs))
-        )
-
--- What ONE INSTANCE of a triggered ability is, for the rider's purposes: what it
--- hangs on and which ability it is -- the discriminator Pawl.Types.TriggerEntry
--- carries, and its haddock argues for the ability VALUE over an ordinal -- plus
--- the controller for a SOURCELESS ability and only for one. Rule 725.2 and rule
--- 702.179d give each player their own instance of one inherent ability with no
--- object to tell them apart, where an object-borne ability is CR 113.7's one
--- instance whoever controls it.
---
--- The controller component is proved by Pawl.TeamSpec's "CR 702.179d each
--- active teammate's speed rises once": under the shared team turns option two
--- active players each spend their own instance of rule 702.179d's ability.
---
--- Not implemented: two VALUE-IDENTICAL limited abilities on one source are one
--- instance here, so one spends the other's turn (#3198).
-type LimitKey = (TriggerSource.TriggerSource, Maybe PlayerId, TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))
-
-limitKey :: TriggerSource.TriggerSource -> PlayerId -> TriggeredAbility.TriggeredAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> LimitKey
-limitKey src ctrl ability =
-  ( src,
-    case src of
-      TriggerSource.Sourceless -> Just ctrl
-      TriggerSource.OfObject _ -> Nothing,
-    ability
-  )
-
--- The key one pending trigger spends, or Nothing when its ability prints no
--- rider.
-limitedKey :: PendingTrigger.PendingTrigger -> Maybe LimitKey
-limitedKey pending =
-  let key = limitKey (PendingTrigger.source pending) (PendingTrigger.controller pending) (PendingTrigger.ability pending)
-   in case TriggeredAbility.limit (PendingTrigger.ability pending) of
-        TriggerLimit.Unlimited -> Nothing
-        TriggerLimit.OncePerTurn -> Just key
-        TriggerLimit.OncePerGame -> Just key
-
--- `triggeredEvent` read back: the record an event carries if it is one ability
--- triggering (CR 603.3b), and nothing otherwise.
-abilityTriggeredOf :: GameEvent.GameEvent -> Maybe AbilityTriggered.AbilityTriggered
-abilityTriggeredOf event = case event of
-  GameEvent.AbilityTriggered record -> Just record
-  GameEvent.SpellCast {} -> Nothing
-  GameEvent.HalfUnlocked {} -> Nothing
-  GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.TurnedFaceDown _ -> Nothing
-  GameEvent.Transformed {} -> Nothing
-  GameEvent.BecameDesignated {} -> Nothing
-  GameEvent.Evolved _ -> Nothing
-  GameEvent.Mutated _ -> Nothing
-  GameEvent.Mentored {} -> Nothing
-  GameEvent.Exploited {} -> Nothing
-  GameEvent.Trained _ -> Nothing
-  GameEvent.BecameCrewed _ -> Nothing
-  GameEvent.Convoked _ -> Nothing
-  GameEvent.Saddled _ -> Nothing
-  GameEvent.Crewed _ -> Nothing
-  GameEvent.PermanentSacrificed {} -> Nothing
-  GameEvent.Moved {} -> Nothing
-  GameEvent.DamageDealt _ -> Nothing
-  GameEvent.DamagePrevented {} -> Nothing
-  GameEvent.StepBegan {} -> Nothing
-  GameEvent.BecameMonarch _ -> Nothing
-  GameEvent.TookInitiative _ -> Nothing
-  GameEvent.Discarded {} -> Nothing
-  GameEvent.Drew {} -> Nothing
-  GameEvent.Revealed {} -> Nothing
-  GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BecameBlocking {} -> Nothing
-  GameEvent.BlocksDeclared {} -> Nothing
-  GameEvent.AttackerBlocked {} -> Nothing
-  GameEvent.AttackerUnblocked _ -> Nothing
-  GameEvent.SpellCountered _ -> Nothing
-  GameEvent.AbilityCountered _ -> Nothing
-  GameEvent.LoyaltyAbilityActivated _ -> Nothing
-  GameEvent.LifeLost {} -> Nothing
-  GameEvent.LifeGained {} -> Nothing
-  GameEvent.CountersPut {} -> Nothing
-  GameEvent.CountersRemoved {} -> Nothing
-  GameEvent.ControlChanged {} -> Nothing
-  GameEvent.VentureMarkerEntered {} -> Nothing
-  GameEvent.BecameTarget {} -> Nothing
-  GameEvent.BecameAttached {} -> Nothing
-  GameEvent.BecameUnattached {} -> Nothing
-  GameEvent.LeftTheGame _ -> Nothing
-  GameEvent.Milled {} -> Nothing
-  GameEvent.Scried _ -> Nothing
-  GameEvent.DungeonCompleted _ -> Nothing
-  GameEvent.Surveiled _ -> Nothing
-  GameEvent.DiceRolled _ -> Nothing
-  GameEvent.DieResultSettled _ -> Nothing
-  GameEvent.RolledToVisit _ -> Nothing
-  GameEvent.ClassLevelSet _ -> Nothing
-  GameEvent.Plotted _ -> Nothing
-  GameEvent.Explored _ -> Nothing
-  GameEvent.Connived _ -> Nothing
-  GameEvent.Exerted _ -> Nothing
-  GameEvent.BecameAttacked _ -> Nothing
-  GameEvent.AttackersDeclared _ -> Nothing
-  GameEvent.BecameTapped _ -> Nothing
-  GameEvent.BecameUntapped _ -> Nothing
-  GameEvent.TappedForMana _ -> Nothing
-  GameEvent.ManaAdded _ -> Nothing
-  GameEvent.ManaAbilityResolved _ -> Nothing
-  GameEvent.CoinFlipped {} -> Nothing
-  GameEvent.RingTempted _ -> Nothing
-  GameEvent.Blighted _ -> Nothing
-  GameEvent.Foraged _ -> Nothing
-  GameEvent.Foretold _ -> Nothing
-  GameEvent.CollectedEvidence _ -> Nothing
-  GameEvent.GaveGift _ -> Nothing
-  GameEvent.AttractionOpened _ -> Nothing
-  GameEvent.PrizeClaimed _ -> Nothing
-  GameEvent.Earthbent _ -> Nothing
-  GameEvent.Waterbent _ -> Nothing
-  GameEvent.Airbent _ -> Nothing
-  GameEvent.Firebent _ -> Nothing
-  GameEvent.ActivatedAbilityResolved _ -> Nothing
-  GameEvent.CardArrived _ -> Nothing
 
 -- CR 603.3b's record of one ability triggering: what it hangs on (CR 113.7), its
 -- controller as it triggered (CR 603.3a) and WHICH ABILITY it is. Every pending

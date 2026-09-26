@@ -34,6 +34,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Fight as Fight
@@ -288,6 +289,9 @@ data Effect card ability
   | -- | CR 701.12g: two numerical values -- a life total, a power, a toughness --
     -- each become the other's previous value.
     ExchangeValues ExchangeValues.ExchangeValues
+  | -- | CR 701.12d / 701.12f: the named players each exchange the cards in two
+    -- of their own zones, even where one is empty.
+    ExchangeZones ExchangeZones.ExchangeZones
   | -- | CR 119.5: the players the PlayerRef names each gain or lose the
     -- necessary amount to end up with this life total (Magister Sphinx).
     SetLifeTotal PlayerQuantity.PlayerQuantity

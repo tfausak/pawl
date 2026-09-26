@@ -24,7 +24,7 @@ data TriggeredAbility card ability = MkTriggeredAbility
     -- occurrence, and the rider says the ability declines all but the first.
     -- Unlimited for every ability that prints no such rider.
     --
-    -- Enforced at Pawl.Engine.Engine.withinTriggerLimit, off the turn-scoped log
+    -- Enforced at Pawl.Engine.Event.withinTriggerLimit, off the turn-scoped log
     -- for the per-turn rider and off Pawl.Types.GameState.triggeredThisGame for
     -- the per-game one.
     limit :: TriggerLimit.TriggerLimit

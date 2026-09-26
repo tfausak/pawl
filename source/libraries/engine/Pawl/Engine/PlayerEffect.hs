@@ -306,7 +306,10 @@ printedRows gs =
                     -- turn". The taxed player is PlayerRef.Candidate instead,
                     -- substituted per affected player (Condition.forCandidate):
                     -- Angelic Arbiter's "each opponent who cast a spell this
-                    -- turn" asks each opponent about themselves.
+                    -- turn" asks each opponent about themselves. The same player
+                    -- is the Context's recipient, so Ethersworn Canonist's "each
+                    -- player who has cast a nonartifact spell" counts their own
+                    -- casts through Filter.ControlledByRecipient.
                     --
                     -- The clause takes the same CR 612.1 word swap the effect
                     -- beside it does, since one ability's two halves cannot
@@ -316,7 +319,7 @@ printedRows gs =
                       Just c ->
                         Condition.holds
                           (Projection.fullView gs)
-                          (Filter.contextFor (Game.teams gs) (Just controller) (Just oid))
+                          ((Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) {Filter.recipient = Just pid})
                           gs
                           oid
                           (Condition.forCandidate pid (if null changes then c else Projection.rewriteCondition changes c))

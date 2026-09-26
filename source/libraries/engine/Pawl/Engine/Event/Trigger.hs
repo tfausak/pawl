@@ -3107,6 +3107,68 @@ stateTriggers gs
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (maybe Map.empty (Binding.paidCostRecord . Object.bindings) (Game.lookupObject oid gs)) Nothing Nothing
          in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
+-- CR 603.7a's floor is the watermark's job, and is all an ordinary entry
+-- needs. This is the card's OWN further restriction: an ability printed "on
+-- your next turn" fires on that one turn and no other, whatever its
+-- condition matches. Read against the LIVE turn number, so an entry with no
+-- onset is untouched.
+delayedArmed :: GameState -> DelayedTrigger -> Bool
+delayedArmed gs entry = case DelayedTrigger.window entry of
+  TurnWindow.AnyTurn -> True
+  -- The named turn has not begun, so no occurrence counts -- including one
+  -- in the turn that armed the ability, which is why the onset exists.
+  TurnWindow.ControllersNextTurn -> False
+  -- EQUALITY, not a floor: CR 603.7a is a claim about ONE named turn, so the
+  -- window has an upper end and not merely a lower one.
+  TurnWindow.OnTurn n -> n == GameState.turnNumber gs
+
+-- CR 603.12: is this delayed entry REFLEXIVE? The exception to delayedPending's
+-- matching below, and the ONE place the reflexive form differs from an ordinary
+-- CR 603.7 entry: it is "checked immediately
+-- after being created" and triggers "based on whether the trigger event or
+-- events occurred earlier during the resolution of the spell or ability
+-- that created them" -- which is a question about the resolution that is
+-- over, not about this batch's log. Pawl.Engine.Resolve appends such an
+-- entry only where that question was answered yes -- from the CR 118.12
+-- pay-gate branch that actually ran, and from
+-- Resolve.applyClauseEffects, which skips the arm when the preceding
+-- instruction neither recorded an event nor changed the state (CR 603.12,
+-- 701.28e) -- and
+-- Pawl.Engine.Combat.declareAttackers appends one only where CR 702.154a's
+-- enlist cost was actually paid, so the entry's
+-- EXISTENCE is the affirmative answer and no event is needed. It
+-- therefore fires at the first gather after it was armed, which CR 603.3
+-- makes the next time a player would receive priority.
+--
+-- `delayedArmed` still gates it, so the data cannot say two things at once: an
+-- onset would name a turn CR 603.12's "immediately" has already denied, and
+-- the entry would sit unfired rather than firing early. No card can reach
+-- that -- CardSpec's onset lint needs a controller-scoped condition and this
+-- one is not -- so the guard is a fence, not a live branch.
+isReflexive :: DelayedTrigger -> Bool
+isReflexive entry = TriggeredAbility.condition (DelayedTrigger.ability entry) == TriggerCondition.Reflexive
+
+-- One firing, whatever the batch holds. CR 603.12a's second sentence wants
+-- exactly that for a cost payable several times, and delayedPending's `spent`
+-- retires the entry immediately after, an expiry-less entry having CR 603.7b's one
+-- shot. Not implemented: that rule's FIRST sentence, once per occurrence
+-- (#2121).
+reflexiveFiring :: DelayedTrigger -> PendingTrigger
+reflexiveFiring entry =
+  PendingTrigger.MkPendingTrigger
+    (TriggerSource.OfObject (DelayedTrigger.source entry))
+    (DelayedTrigger.controller entry)
+    (DelayedTrigger.ability entry)
+    (DelayedTrigger.bindings entry)
+    -- CR 603.12: a reflexive ability follows CR 603.7, so it carries the
+    -- creation moment too. No card exercises the pairing -- nothing
+    -- reflexive transforms -- so this is CR 701.27f as the rule states it
+    -- rather than a behaviour a test pins.
+    (Just (DelayedTrigger.createdAt entry))
+    -- CR 603.12: the entry's existence is the affirmative answer, so there
+    -- is no one event this fired from.
+    Nothing
+
 -- CR 603.7: delayed abilities whose trigger event is among these events. An entry
 -- that TRIGGERS is REMOVED from the store (CR 603.7b) unless it carries a stated
 -- duration, which is that rule's own exception -- one of Expiry's sweeps ends
@@ -3116,7 +3178,7 @@ stateTriggers gs
 -- is gone.
 --
 -- `matching` matches its condition only against EVENTS, never live game state -- the
--- turn number `armed` reads is CR 603.7a's arming gate, which can only withhold a
+-- turn number `delayedArmed` reads is CR 603.7a's arming gate, which can only withhold a
 -- match. So a stored entry whose condition is StateIs would never fire, and
 -- without a stated duration would never leave the store. Not a live gap: no card
 -- in this pool arms a delayed ability with a StateIs condition.
@@ -3131,20 +3193,7 @@ stateTriggers gs
 -- only two exits.
 delayedPending :: [LoggedEvent.LoggedEvent] -> GameState -> Game ([PendingTrigger], Seq.Seq DelayedTrigger)
 delayedPending grouped gs =
-  let -- CR 603.7a's floor is the watermark's job, and is all an ordinary entry
-      -- needs. This is the card's OWN further restriction: an ability printed "on
-      -- your next turn" fires on that one turn and no other, whatever its
-      -- condition matches. Read against the LIVE turn number, so an entry with no
-      -- onset is untouched.
-      armed entry = case DelayedTrigger.window entry of
-        TurnWindow.AnyTurn -> True
-        -- The named turn has not begun, so no occurrence counts -- including one
-        -- in the turn that armed the ability, which is why the onset exists.
-        TurnWindow.ControllersNextTurn -> False
-        -- EQUALITY, not a floor: CR 603.7a is a claim about ONE named turn, so the
-        -- window has an upper end and not merely a lower one.
-        TurnWindow.OnTurn n -> n == GameState.turnNumber gs
-      -- WHICH events fired the entry, rather than merely whether one did: the
+  let -- WHICH events fired the entry, rather than merely whether one did: the
       -- payload reads CR 603.2's event through eventBindings below, so the match
       -- has to hand each event forward.
       matching entry =
@@ -3153,7 +3202,7 @@ delayedPending grouped gs =
             -- TriggerCondition.LoseControlOfBound asks about an object named as the
             -- arming spell resolved, and the store is the only thing that still
             -- remembers it.
-            if armed entry
+            if delayedArmed gs entry
               then
                 filter
                   ( \logged ->
@@ -3186,10 +3235,10 @@ delayedPending grouped gs =
       -- asking: the CR 101.4c ordering below has to know before the first
       -- question is raised. The three gates are firedBy's own, read through this
       -- one predicate rather than restated -- a stated duration lifts the rule
-      -- entirely, a reflexive entry never reaches firedBy, and one candidate is
+      -- entirely, a isReflexive entry never reaches firedBy, and one candidate is
       -- no choice.
       asks entry =
-        not (reflexive entry)
+        not (isReflexive entry)
           && Maybe.isNothing (DelayedTrigger.expiry entry)
           && case eventGroups (occurrences entry) of
             block : _ -> not (null (NonEmpty.tail block))
@@ -3274,48 +3323,6 @@ delayedPending grouped gs =
           -- CR 603.2's event, the same one the slots above were read off.
           (Just (LoggedEvent.event logged))
       store = GameState.delayedTriggers gs
-      -- CR 603.12's exception to all of the above, and the ONE place the reflexive
-      -- form differs from an ordinary CR 603.7 entry: it is "checked immediately
-      -- after being created" and triggers "based on whether the trigger event or
-      -- events occurred earlier during the resolution of the spell or ability
-      -- that created them" -- which is a question about the resolution that is
-      -- over, not about this batch's log. Pawl.Engine.Resolve appends such an
-      -- entry only where that question was answered yes -- from the CR 118.12
-      -- pay-gate branch that actually ran, and from
-      -- Resolve.applyClauseEffects, which skips the arm when the preceding
-      -- instruction neither recorded an event nor changed the state (CR 603.12,
-      -- 701.28e) -- and
-      -- Pawl.Engine.Combat.declareAttackers appends one only where CR 702.154a's
-      -- enlist cost was actually paid, so the entry's
-      -- EXISTENCE is the affirmative answer and no event is needed. It
-      -- therefore fires at the first gather after it was armed, which CR 603.3
-      -- makes the next time a player would receive priority.
-      --
-      -- `armed` still gates it, so the data cannot say two things at once: an
-      -- onset would name a turn CR 603.12's "immediately" has already denied, and
-      -- the entry would sit unfired rather than firing early. No card can reach
-      -- that -- CardSpec's onset lint needs a controller-scoped condition and this
-      -- one is not -- so the guard is a fence, not a live branch.
-      reflexive entry = TriggeredAbility.condition (DelayedTrigger.ability entry) == TriggerCondition.Reflexive
-      -- One firing, whatever the batch holds. CR 603.12a's second sentence wants
-      -- exactly that for a cost payable several times, and `spent` below retires
-      -- the entry immediately after, an expiry-less entry having CR 603.7b's one
-      -- shot. Not implemented: that rule's FIRST sentence, once per occurrence
-      -- (#2121).
-      bare entry =
-        PendingTrigger.MkPendingTrigger
-          (TriggerSource.OfObject (DelayedTrigger.source entry))
-          (DelayedTrigger.controller entry)
-          (DelayedTrigger.ability entry)
-          (DelayedTrigger.bindings entry)
-          -- CR 603.12: a reflexive ability follows CR 603.7, so it carries the
-          -- creation moment too. No card exercises the pairing -- nothing
-          -- reflexive transforms -- so this is CR 701.27f as the rule states it
-          -- rather than a behaviour a test pins.
-          (Just (DelayedTrigger.createdAt entry))
-          -- CR 603.12: the entry's existence is the affirmative answer, so there
-          -- is no one event this fired from.
-          Nothing
       -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
       -- which together are what "triggered" means. Per occurrence, since CR 603.4
       -- asks about the moment the event occurs. AFTER firedBy rather than inside
@@ -3327,7 +3334,7 @@ delayedPending grouped gs =
       -- occurrences whose "if" holds: CR 603.7b gives the controller every event
       -- that OCCURRED, and CR 603.4 then answers for the one they picked.
       triggered entry
-        | reflexive entry = pure (filter (interveningHolds gs) (if armed entry then [bare entry] else []))
+        | isReflexive entry = pure (filter (interveningHolds gs) (if delayedArmed gs entry then [reflexiveFiring entry] else []))
         | otherwise = fmap (filter (interveningHolds gs) . fmap (pend entry)) (firedBy entry)
       -- Triggering spends the one shot only for an entry with no stated duration.
       spent (entry, fired) = not (null fired) && Maybe.isNothing (DelayedTrigger.expiry entry)

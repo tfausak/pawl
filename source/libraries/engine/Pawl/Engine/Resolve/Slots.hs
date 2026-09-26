@@ -95,6 +95,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
@@ -642,6 +643,7 @@ effectObjectRefs effect = case effect of
   Effect.GainLife {} -> []
   Effect.ExchangeLifeTotals {} -> []
   Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other _) -> foldMap exchangedObjectRefs [one, other]
+  Effect.ExchangeZones {} -> []
   Effect.SetLifeTotal {} -> []
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -851,6 +853,7 @@ effectPlayerRefs effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.ExchangeLifeTotals {} -> []
   Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> foldMap exchangedPlayerRefs [one, other] <> durationPlayerRefs duration
+  Effect.ExchangeZones x -> [ExchangeZones.player x]
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.LoseGame ref -> [ref]
   Effect.WinGame ref -> [ref]
@@ -1132,6 +1135,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
   -- Both sides' references are effectObjectRefs' and effectPlayerRefs' halves.
   Effect.ExchangeValues x -> durationSlots (ExchangeValues.duration x)
+  Effect.ExchangeZones {} -> Map.empty
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.LoseGame {} -> Map.empty
   Effect.WinGame {} -> Map.empty
@@ -1791,6 +1795,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
   Effect.ExchangeValues x -> durationSlotsAreExhaustive (ExchangeValues.duration x)
+  Effect.ExchangeZones {} -> True
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.LoseGame {} -> True
   Effect.WinGame {} -> True
@@ -2045,6 +2050,7 @@ readsX =
         Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.ExchangeLifeTotals _ -> False
         Effect.ExchangeValues _ -> False
+        Effect.ExchangeZones _ -> False
         Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.LoseGame {} -> False
         Effect.WinGame {} -> False
@@ -2281,6 +2287,7 @@ boundSlots effect = case effect of
   Effect.GainLife {} -> Set.empty
   Effect.ExchangeLifeTotals _ -> Set.empty
   Effect.ExchangeValues _ -> Set.empty
+  Effect.ExchangeZones _ -> Set.empty
   Effect.SetLifeTotal {} -> Set.empty
   Effect.LoseGame {} -> Set.empty
   Effect.WinGame {} -> Set.empty

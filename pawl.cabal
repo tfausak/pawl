@@ -501,6 +501,8 @@ library codec
     Pawl.Codec.ExchangeSidesSpec
     Pawl.Codec.ExchangeValues
     Pawl.Codec.ExchangeValuesSpec
+    Pawl.Codec.ExchangeZones
+    Pawl.Codec.ExchangeZonesSpec
     Pawl.Codec.ExileCardsFromGraveyard
     Pawl.Codec.ExileCardsFromGraveyardSpec
     Pawl.Codec.ExileHaunting
@@ -1094,6 +1096,8 @@ library codec
     Pawl.Codec.ZoneChangeR
     Pawl.Codec.ZoneChangeRSpec
     Pawl.Codec.ZoneChangeSpec
+    Pawl.Codec.ZonePair
+    Pawl.Codec.ZonePairSpec
     Pawl.Codec.ZoneScope
     Pawl.Codec.ZoneScopeSpec
     Pawl.Codec.ZoneSpec
@@ -1884,6 +1888,7 @@ library types
     Pawl.Types.ExchangedValue
     Pawl.Types.ExchangeSides
     Pawl.Types.ExchangeValues
+    Pawl.Types.ExchangeZones
     Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
     Pawl.Types.ExileLooker
@@ -2223,6 +2228,7 @@ library types
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern
     Pawl.Types.ZoneChangeR
+    Pawl.Types.ZonePair
     Pawl.Types.ZoneScope
 
 -- URI components, and the encoding each of them takes.
