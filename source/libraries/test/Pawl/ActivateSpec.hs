@@ -5143,10 +5143,9 @@ hoistDifferentialSpec s registry = do
 -- your graveyard to the battlefield. X can't be greater than the greatest
 -- toughness among creatures you control. Activate only as a sorcery."
 --
--- Not implemented: the enters-the-battlefield trigger, whose perpetual +1/+1
--- applies to CARDS IN A GRAVEYARD rather than to permanents (#3123). Its omission
--- leaves pawl's copy STRICTER than printed, and nothing below reads a graveyard
--- card's power or toughness.
+-- The enters trigger is not exercised here: every board below places the
+-- Nightmare without an enters event. Pawl.ExpirySpec's "Blighted Nightmare's
+-- perpetual +1/+1 applies in the graveyard and follows the card out" proves it.
 --
 -- THE FALSIFIER for the whole group is an X that reaches neither the ceiling nor
 -- the slot. A blight's demand never grows (Cost.demandGrowsWithX), so the
