@@ -808,7 +808,7 @@ thaliaSpec s registry =
       Spec.assertEqWith
         s
         "exactly seven Forests still afford it, so castableWhileSearching offers it"
-        (fmap fst (Cast.castableWhileSearching S.alice gs))
+        (fmap (\(oid, _, _) -> oid) (Cast.castableWhileSearching S.alice gs))
         [wurm]
 
     -- The proving test for Projection.liveAfterLayers, CR 305.7's CR
