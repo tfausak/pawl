@@ -589,6 +589,10 @@ data Effect card ability
     -- NULLARY where the siblings take a slot: rule 702.110a states no parameter,
     -- and the creature is chosen rather than targeted, so there is no slot to name.
     Exploit
+  | -- | CR 702.174c's marker: this effect's controller gives a gift. Last in
+    -- both of rule 702.174b's abilities, after the gift's own effect
+    -- (Pawl.Engine.Keyword.gift, Pawl.Engine.Resolve.giftOnSpellResolution).
+    GiveGift
   | -- | CR 731.1: "it becomes day" / "it becomes night" -- the game gains that
     -- designation, which CR 702.145c and CR 702.145f make daybound and
     -- nightbound permanents transform for.

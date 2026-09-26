@@ -2608,6 +2608,8 @@ evidenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n 
 evidenceSpec s registry =
   let play held = S.cast S.alice held >> Stack.resolveTop >> Engine.placePendingTriggers >> Stack.resolveTop
       spiders = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Spider Token")) S.alice
+      thopters = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Thopter Token")) S.alice
+      clues = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Clue Token")) S.alice
    in Spec.describe s "Collect evidence (CR 701.59)" $ do
         Spec.it s "CR 701.59c Vitu-Ghazi Inspector's enters ability reads the evidence its spell collected" $ do
           (gs, held, piker) <- evidenceBoard s registry "Vitu-Ghazi Inspector" 2
@@ -2622,6 +2624,30 @@ evidenceSpec s registry =
               declined = S.runPure (collectingEvidence False S.noSource) gs (play held)
           Spec.assertEqWith s "CR 118.12 collecting evidence made two Spiders, declining made none" (spiders collected, spiders declined) (2, 0)
           Spec.assertEqWith s "CR 701.59a and the collection exiled both Soils" (length (Game.zoneMembers Zone.Exile S.alice collected), length (Game.zoneMembers Zone.Exile S.alice declined)) (2, 0)
+        -- Surveillance Monitor {3}{U} 3/3: "When this creature enters, you may
+        -- collect evidence 4. / Whenever you collect evidence, create a 1/1
+        -- colorless Thopter artifact creature token with flying." Evidence
+        -- Examiner {G}{U} 2/2: "At the beginning of combat on your turn, you may
+        -- collect evidence 4. / Whenever you collect evidence, investigate."
+        -- (Oracle checked against Scryfall 2026-09-26.) The Monitor collects at
+        -- CR 118.12's resolution; the Examiner watches the Inspector's CR 601.2b
+        -- cast-time collection -- the cost's two moments.
+        Spec.it s "CR 701.59a Surveillance Monitor makes a Thopter only when alice collects evidence" $ do
+          (gs, held) <- monitorBoard s registry
+          let resolveAll = S.cast S.alice held >> Monad.replicateM_ (3 :: Int) (Engine.settleForPriority >> Stack.resolveTop)
+              collected = S.runPure (collectingEvidence True S.noSource) gs resolveAll
+              declined = S.runPure (collectingEvidence False S.noSource) gs resolveAll
+          Spec.assertEqWith s "CR 701.59a collecting evidence made a Thopter, declining made none" (thopters collected, thopters declined) (1, 0)
+          Spec.assertEqWith s "and both runs ended with the stack empty and the Monitor in play" (fmap (\g -> (length (GameState.stack g), S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Surveillance Monitor")) S.alice g)) [collected, declined]) [(0, 1), (0, 1)]
+        Spec.it s "CR 701.59a Evidence Examiner investigates when the Inspector's cost collects evidence" $ do
+          (base, held, piker) <- evidenceBoard s registry "Vitu-Ghazi Inspector" 2
+          examiner <- S.printingOf s registry "Evidence Examiner"
+          let (_, gs) = S.addPermanent examiner S.alice base
+              resolveAll = S.cast S.alice held >> Monad.replicateM_ (3 :: Int) (Engine.settleForPriority >> Stack.resolveTop)
+              collected = S.runPure (collectingEvidence True piker) gs resolveAll
+              declined = S.runPure (collectingEvidence False piker) gs resolveAll
+          Spec.assertEqWith s "CR 701.59a collecting evidence made a Clue, declining made none" (clues collected, clues declined) (1, 0)
+          Spec.assertEqWith s "and both runs ended with the stack empty" (length (GameState.stack collected), length (GameState.stack declined)) (0, 0)
         -- CR 609.7a's third class, over the Inspector SPELL: the record its cost
         -- bound says only whether evidence was collected (CR 701.59c), so the
         -- exiled Soils are no object it refers to. bob answers the Inspector with
@@ -2656,6 +2682,19 @@ evidenceBoard s registry card lands = do
       heldId,
       pikerId
     )
+
+-- Surveillance Monitor in alice's hand over four Islands and two Acidic Soils
+-- (mana value 3 each) in her graveyard, in her precombat main phase with
+-- priority.
+monitorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+monitorBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  soil <- S.printingOf s registry "Acidic Soil"
+  monitor <- S.printingOf s registry "Surveillance Monitor"
+  let (_, oneSoil) = S.addGraveyardCard soil S.alice (S.landsFor island S.alice 4 (Setup.emptyGame S.bothPlayers))
+      (_, twoSoils) = S.addGraveyardCard soil S.alice oneSoil
+      (heldId, gs) = S.addHandCard monitor S.alice twoSoils
+  pure (gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}, heldId)
 
 -- Collect evidence or decline it, at either moment the card offers it: CR
 -- 601.2b's choice among the costs (the Inspector) and CR 118.12's offer at

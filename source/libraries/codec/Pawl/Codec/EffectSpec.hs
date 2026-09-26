@@ -1979,6 +1979,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Exploit
       " {\"type\":\"Exploit\"} "
+  Spec.it s "GiveGift" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.GiveGift
+      " {\"type\":\"GiveGift\"} "
   -- CR 702.149a's counter and CR 702.149c's marker. Back to Evolve's "self": rule
   -- 702.149a puts its counter on the training creature itself.
   Spec.it s "Train" $
