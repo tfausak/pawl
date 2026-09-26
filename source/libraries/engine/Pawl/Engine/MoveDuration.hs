@@ -14,9 +14,11 @@ module Pawl.Engine.MoveDuration where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Restamp as Restamp
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -78,7 +80,11 @@ returnMoved = do
   if null due
     then pure False
     else do
-      Monad.forM_ due $ \(oid, watch) -> do
-        _ <- Event.changeZoneInBatchReturning gs oid (ReturnWatch.zone watch)
+      arrived <- Monad.forM due $ \(oid, watch) -> do
+        back <- Event.changeZoneInBatchReturning gs oid (ReturnWatch.zone watch)
         State.modify' (\g -> g {GameState.movedUntilSourceLeaves = Map.delete oid (GameState.movedUntilSourceLeaves g)})
+        pure back
+      -- CR 613.7m: what returned together is stamped in APNAP order, each seat
+      -- choosing its own.
+      Restamp.settle (GameState.nextTimestamp gs) (concatMap Foldable.toList arrived)
       pure True
