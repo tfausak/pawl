@@ -880,6 +880,8 @@ lastKnownRiderSpec s registry =
                     LastKnown.attached = Set.empty,
                     -- CR 201.4: nothing named a card here.
                     LastKnown.chosenNames = Set.empty,
+                    -- CR 614.1c: nothing here chose a player.
+                    LastKnown.chosenPlayer = Nothing,
                     -- CR 508.1k / 509.1g: this board declares no combat at all.
                     LastKnown.attacking = False,
                     LastKnown.attackTarget = Nothing,

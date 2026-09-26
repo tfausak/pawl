@@ -1,0 +1,130 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "UntapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 2
+              },
+              {
+                "type": "Hybrid",
+                "value": {
+                  "left": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Green"
+                    }
+                  },
+                  "right": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Blue"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PutCountersFrom",
+                        "value": {
+                          "from": "target",
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "pool": {
+                      "type": "Permanents"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        },
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        }
+      ],
+      "name": "Gilder Bairn",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Ouphe"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

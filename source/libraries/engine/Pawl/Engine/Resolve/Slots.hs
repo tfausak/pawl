@@ -2454,13 +2454,11 @@ playerRefPlayers legal controller gs ref =
           Nothing -> []
         -- CR 614.1c / CR 702.174b: the player that object CHOSE -- "the chosen
         -- player" of the gift ability Pawl.Engine.Keyword mints, read off CR
-        -- 113.7a's source slot. The arm above's read one record over.
-        --
-        -- NO last-known look-back, where the arm above has one: CR 608.2h's
-        -- record carries no chosen player, so a permanent that has left names
-        -- nobody and CR 101.3 ignores that share (Pawl.Types.PlayerRef).
+        -- 113.7a's source slot. The arm above's read one record over, through
+        -- the same CR 608.2h look-back: Pawl.CastSpec's Scrapshooter killed in
+        -- response still has the promised opponent draw.
         PlayerRef.ChosenPlayerOfBound slot -> case legalOne slot legal >>= Recipient.objectOf of
-          Just oid -> Maybe.maybeToList (Game.lookupObject oid gs >>= Object.chosenPlayer)
+          Just oid -> Maybe.maybeToList (Game.chosenPlayerWithLastKnown oid gs)
           Nothing -> []
         -- CR 508.6: the players controlling a creature that is attacking the player the
         -- slot names, narrowed by the relation the card printed -- Curse of Vitality's
