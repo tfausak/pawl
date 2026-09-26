@@ -505,14 +505,14 @@ tappedPermanent = SlotName.MkSlotName (Text.pack "thatTappedPermanent")
 -- cost carrying both components (data/cards/synthetic-crewed-battery.json) would
 -- otherwise answer Binding.onlyOne Nothing for either question.
 --
--- CR 702.122b is what reads it: a creature "crews a Vehicle" when it is tapped to
--- pay a crew ability's cost, and Pawl.Engine.Activate puts this set on
--- GameEvent.Crewed as the payment completes so that Gearshift Ace's "whenever
--- this creature crews a Vehicle" can find itself in it. The component is not
--- crew's alone, so the slot is named for the component; on a non-crew cost
--- nothing reads it. CR 702.122c's look-back reads that same event rather than
--- this slot (Pawl.Engine.Projection.View's crewedByIt), the relation outliving
--- the payment.
+-- CR 702.122b and CR 702.171c are what read it: a creature "crews a Vehicle" or
+-- "saddles" a Mount when it is tapped to pay that ability's cost, and
+-- Pawl.Engine.Activate puts this set on GameEvent.Crewed or GameEvent.Saddled as
+-- the payment completes so that Gearshift Ace's "whenever this creature crews a
+-- Vehicle" can find itself in it. The component is not those two keywords' alone,
+-- so the slot is named for the component; on any other cost nothing reads it.
+-- CR 702.122c's look-back reads that same event rather than this slot
+-- (Pawl.Engine.Projection.View's crewedByIt), the relation outliving the payment.
 --
 -- SET-VALUED and read as a set: CR 702.122a's "any number" is a set by
 -- construction, so a reader taking Binding.onlyOne of it would go quiet on every
