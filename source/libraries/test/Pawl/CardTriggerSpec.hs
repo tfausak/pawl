@@ -20,6 +20,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Departure as Departure
@@ -54,6 +55,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -3989,8 +3991,69 @@ profanerSpec s registry =
           Spec.assertBool s (S.onBattlefield giantId after) "and the Hill Giant alice did not choose stayed"
           Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 702.110a the Goblin Piker she did choose was sacrificed"
 
+-- Fire Lord Zuko {R}{W}{B} Legendary Creature -- Ally Human Noble 2/4,
+-- "Firebending X, where X is Fire Lord Zuko's power. / Whenever you cast a spell
+-- from exile and whenever a permanent you control enters from exile, put a
+-- +1/+1 counter on each creature you control." Written as two triggered
+-- abilities, one per trigger event: no cast is also an entry, so they never
+-- fire on the same event. The entry half is Breathless Knight's intervening
+-- EnteredFrom, which reads the event log and so answers the same at resolution
+-- (Pawl.Engine.Quantity's EnteredFrom arm). Nothing is omitted, so pawl's Zuko
+-- is neither stricter nor weaker than printed.
+fireLordZukoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fireLordZukoSpec s registry =
+  let named name gs = filter (\o -> fmap S.nameOf (Game.cardOf o gs) == Just (CardName.MkCardName (Text.pack name))) (Set.toList (GameState.battlefield gs))
+      step gs action = S.runPure S.identityAnswer gs (action >> Engine.settleForPriority)
+   in Spec.describe s "Fire Lord Zuko" $ do
+        -- Embereth Shieldbreaker's Adventure is cast from HAND, and the creature
+        -- then cast from EXILE enters from the stack: of the three events only the
+        -- second is either trigger's, so Zuko gets one counter and the Knight,
+        -- entering after the trigger resolved, none.
+        Spec.it s "a spell cast from exile puts a counter on each creature you control" $ do
+          zuko <- S.printingOf s registry "Fire Lord Zuko"
+          shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+          mountain <- S.printingOf s registry "Mountain"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          let (zukoId, withZuko) = S.addPermanent zuko S.alice (S.landsInPlay mountain 3)
+              (_, board) = S.addPermanent bonesplitter S.alice withZuko
+              (gs, oid) = S.handOne shieldbreaker board
+              adventured = step (step gs (Cast.castSpell S.manaPerformer S.alice oid (CardName.MkCardName (Text.pack "Battle Display")) Facing.FaceUp)) Stack.resolveTop
+          case Game.zoneMembers Zone.Exile S.alice adventured of
+            [exiledId] -> do
+              let recast = step adventured (Cast.castSpell S.manaPerformer S.alice exiledId (CardName.MkCardName (Text.pack "Embereth Shieldbreaker")) Facing.FaceUp)
+                  after = step (step recast Stack.resolveTop) Stack.resolveTop
+              Spec.assertEqWith
+                s
+                "the cast from exile gave Zuko one counter, and the Knight none"
+                (S.powerToughnessOf zukoId after, fmap (`S.powerToughnessOf` after) (named "Embereth Shieldbreaker" after))
+                (Just (3, 5), [Just (2, 1)])
+            other -> Spec.assertFailure s ("expected one card on an adventure, got " <> show (length other))
+        -- Flicker of Fate, cast from hand, returns the Traveler from exile: the
+        -- entry trigger's only event here, and it counters the returned Traveler too.
+        Spec.it s "a permanent entering from exile puts a counter on each creature you control" $ do
+          zuko <- S.printingOf s registry "Fire Lord Zuko"
+          traveler <- S.printingOf s registry "Doomed Traveler"
+          plains <- S.printingOf s registry "Plains"
+          flicker <- S.printingOf s registry "Flicker of Fate"
+          let (zukoId, withZuko) = S.addPermanent zuko S.alice (S.landsInPlay plains 2)
+              (travelerId, board) = S.addPermanent traveler S.alice withZuko
+              (gs, flickerId) = S.handOne flicker board
+              aimed :: Prompt.Prompt r -> r
+              aimed p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> S.preferring ((== Just travelerId) . Recipient.objectOf) sets
+                _ -> S.identityAnswer p
+              aimedStep g action = S.runPure aimed g (action >> Engine.settleForPriority)
+              flickered = aimedStep (aimedStep gs (S.cast S.alice flickerId)) Stack.resolveTop
+              after = aimedStep flickered Stack.resolveTop
+          Spec.assertEqWith
+            s
+            "the entry from exile gave Zuko and the returned Traveler one counter each"
+            (S.powerToughnessOf zukoId after, fmap (`S.powerToughnessOf` after) (named "Doomed Traveler" after))
+            (Just (3, 5), [Just (2, 2)])
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
+  fireLordZukoSpec s registry
   profanerSpec s registry
   ferventChargeSpec s registry
   conjurersMantleSpec s registry
