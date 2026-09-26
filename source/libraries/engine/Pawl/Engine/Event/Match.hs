@@ -10971,6 +10971,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
