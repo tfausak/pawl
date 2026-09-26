@@ -16,7 +16,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
-import Pawl.Engine.Event.Binding (admittedDepartures)
+import Pawl.Engine.Event.Binding (admittedAttackers, admittedDepartures)
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -2626,15 +2626,13 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   --
   -- viewWithLastKnown and the Filter context framed by the bearer, exactly as
   -- SelfBlocksOneOrMore's arm below does it. Nothing is bound, so the context's
-  -- empty slot map is honest here.
-  TriggerCondition.PlayerAttacksWith (PlayerAttacksWith.MkPlayerAttacksWith relation f floor_) -> case event of
+  -- empty slot map is honest here. The set is Event.Binding.admittedAttackers,
+  -- which eventBindings also stamps under Binding.attackingCreatures, so the
+  -- creatures counted here are the ones the payload's "they" names.
+  TriggerCondition.PlayerAttacksWith p@(PlayerAttacksWith.MkPlayerAttacksWith relation _ floor_) -> case event of
     GameEvent.AttackersDeclared attacker
       | PlayerRelation.holds (Game.teams gs) relation you attacker ->
-          let combat = GameState.combat gs
-              admits oid =
-                Map.lookup oid (Combat.joinedUnder combat) == Just attacker
-                  && maybe False (\view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown oid gs oid)
-           in Natural.length (filter admits (Set.toList (Combat.declaredAttackers combat))) >= floor_
+          Natural.length (admittedAttackers gs bearer you p attacker) >= floor_
     GameEvent.AttackersDeclared _ -> False
     GameEvent.BecameTapped _ -> False
     GameEvent.BecameUntapped _ -> False
@@ -7112,11 +7110,14 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- cast happened in -- so the active player standing now is the one the cast
   -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
   -- 603.3a), exactly as the StepBegins arm above reads its own.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal) -> case event of
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal window) -> case event of
     GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom _) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
         turnScopeAdmits gs scope (GameState.activePlayer gs) you
+          -- "During combat" off the GAME STATE, the TurnScope's reason: the cast
+          -- happened in this same settle, so the phase standing now is its phase.
+          && maybe True (`Turn.inWindow` GameState.phase gs) window
           -- CR 601.2a's zone, read off the EVENT and not off the spell: rule
           -- 400.7 left the stack incarnation with no memory of it. A condition
           -- that names no zone admits every cast, which is what almost every

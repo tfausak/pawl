@@ -14,6 +14,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
@@ -2191,6 +2192,37 @@ primaryOf gs pid =
    in case [seat | (previous, seat) <- zip before seats, mate seat, not (mate previous)] of
         primary : _ -> primary
         [] -> pid
+
+-- CR 725.4 / 726.4: who a departing holder's monarch or initiative passes to --
+-- the active player, else the next player in turn order, `eligible` answering
+-- who may take it. Called with the holder ALREADY marked departed.
+--
+-- CR 805.9 names one active player for an ABILITY; for these rules nothing
+-- does, so the active team decides, and CR 805.2 gives its unsettled choice to
+-- its primary player. Asked only between two or more eligible active players;
+-- the answer is filtered, not trusted. Without the shared team turns option
+-- Turn.activePlayers is the active seat alone, so nothing is asked. Pawl.TeamSpec's
+-- "CR 725.4 the active team's primary player names the new monarch" proves it.
+--
+-- The walk anchors on the ACTIVE seat and excludes it, unlike
+-- Engine.nextStillPlaying's CR 800.4a walk, which anchors on the departing
+-- seat. CR 800.4j keeps GameState.activePlayer naming a departed seat, so "there
+-- is no active player" is that seat failing `eligible`.
+heirOnDeparture :: (PlayerId -> Bool) -> Game (Maybe PlayerId)
+heirOnDeparture eligible = do
+  gs <- State.get
+  let active = GameState.activePlayer gs
+      live = filter eligible (Turn.activePlayers gs)
+      walk = case List.break (== active) (GameState.turnOrder gs) of
+        (before, _ : after) -> after <> before
+        (before, []) -> before
+  case live of
+    [] -> pure (List.find eligible walk)
+    [one] -> pure (Just one)
+    first : rest -> do
+      let chooser = primaryOf gs active
+      answer <- choose (Prompt.ChooseActivePlayer (Decide.deciderFor chooser gs) chooser (first NonEmpty.:| rest))
+      pure (Just (if List.elem answer live then answer else first))
 
 -- apnapOrder's generalisation: the seating roster rotated to start with the
 -- player NAMED rather than with the active player. CR 701.38a's vote is the

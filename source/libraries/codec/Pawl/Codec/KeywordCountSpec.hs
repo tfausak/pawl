@@ -11,6 +11,8 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.KeywordTally as KeywordTally
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Scope as Scope
@@ -41,4 +43,11 @@ spec s = Spec.describe s "Pawl.Codec.KeywordCount" $ do
             }
       )
       " {\"type\":\"Tally\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"scope\":{\"type\":\"InZone\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zone\":{\"type\":\"Graveyard\"}}}}} "
+  -- Zuko, Firebending Master's "the number of experience counters you have".
+  Spec.it s "PlayerCounters carries a player and a kind" $
+    Common.assertCodec
+      s
+      codec
+      (KeywordCount.PlayerCounters PlayerCounterTally.MkPlayerCounterTally {PlayerCounterTally.player = PlayerRef.Relative PlayerRelation.You, PlayerCounterTally.kind = PlayerCounterKind.Experience})
+      " {\"type\":\"PlayerCounters\",\"value\":{\"kind\":{\"type\":\"Experience\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

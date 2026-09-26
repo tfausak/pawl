@@ -9047,7 +9047,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         --
         -- Observable: APNAP order decides which of two players takes their extra
         -- turn first.
-        takers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+        --
+        -- CR 805.8: under the shared team turns option one effect giving several
+        -- players on a team the same turn gives that team one, so the team's
+        -- first player in APNAP order takes the entry, as Effect.SkipNextPhase's
+        -- arm keeps one skip. Proved by Pawl.TeamSpec's "CR 805.8 one effect
+        -- gives a team one extra turn".
+        takers = List.foldl' (\kept pid -> if any (Turn.sharesTurn gs pid) kept then kept else kept <> [pid]) [] (filter (\pid -> List.elem pid named) (Game.apnapOrder gs))
     -- CR 500.7: the most recently created turn is taken first, so each taker is
     -- pushed onto the head and the last pushed is the first popped -- a stack.
     --

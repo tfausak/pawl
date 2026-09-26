@@ -4,6 +4,7 @@ import qualified Pawl.Codec.SpellCast as SpellCast
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -20,7 +21,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
           { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
             SpellCast.scope = TurnScope.EachTurn,
             SpellCast.zone = Nothing,
-            SpellCast.ordinal = Nothing
+            SpellCast.ordinal = Nothing,
+            SpellCast.phase = Nothing
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"}} "
@@ -34,7 +36,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
           { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
             SpellCast.scope = TurnScope.OpponentsTurn,
             SpellCast.zone = Nothing,
-            SpellCast.ordinal = Nothing
+            SpellCast.ordinal = Nothing,
+            SpellCast.phase = Nothing
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"OpponentsTurn\"}} "
@@ -48,7 +51,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
           { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
             SpellCast.scope = TurnScope.EachTurn,
             SpellCast.zone = Just Zone.Hand,
-            SpellCast.ordinal = Nothing
+            SpellCast.ordinal = Nothing,
+            SpellCast.phase = Nothing
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"zone\":{\"type\":\"Hand\"}} "
@@ -62,8 +66,24 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
           { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
             SpellCast.scope = TurnScope.EachTurn,
             SpellCast.zone = Nothing,
-            SpellCast.ordinal = Just 2
+            SpellCast.ordinal = Just 2,
+            SpellCast.phase = Nothing
           }
       )
       " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"ordinal\":2} "
+  -- Zuko, Firebending Master's "during combat", elided when absent like the
+  -- ordinal.
+  Spec.it s "MkSpellCast, a window naming the phase" $
+    Common.assertCodec
+      s
+      SpellCast.codec
+      ( SpellCast.MkSpellCast
+          { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
+            SpellCast.scope = TurnScope.EachTurn,
+            SpellCast.zone = Nothing,
+            SpellCast.ordinal = Nothing,
+            SpellCast.phase = Just PhaseSelector.CombatPhase
+          }
+      )
+      " {\"filter\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"phase\":{\"type\":\"CombatPhase\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SpellCast.codec

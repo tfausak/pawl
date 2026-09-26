@@ -62,13 +62,10 @@ import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.StepBegan as StepBegan
-import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -966,11 +963,10 @@ extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
           (turnTakers 4 resolved)
           [S.alice, S.bob, S.bob, S.alice]
       _ -> Spec.assertFailure s "warpBoard should deal exactly two Time Warps"
-  -- CR 500.7's APNAP clause, which no card in the pool reaches: Time
-  -- Warp names one player, so the order between takers is vacuous for
-  -- it. Applied directly, as the emblem and Aura cases in the sibling
-  -- specs do, because the rule is real and the opcode's PlayerRef can
-  -- name a set.
+  -- CR 500.7's APNAP clause: Time Warp names one player, so the order
+  -- between takers is vacuous for it. Bob casts Synthetic Common Hour
+  -- ({3}{U}{U} Sorcery, "Each player takes an extra turn after this
+  -- one.") on his own turn.
   --
   -- bob is the active player, so CR 101.4 orders the takers [bob,
   -- alice]; they are added one at a time in that order, which leaves
@@ -978,13 +974,10 @@ extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
   -- against a push in seating order, which would answer [bob, alice].
   Spec.it s "CR 500.7 several extra turns from one effect are added in APNAP order" $ do
     island <- S.printingOf s registry "Island"
-    let gs = (S.landsInPlay island 1) {GameState.activePlayer = S.bob}
-        source = ObjectId.MkObjectId 0
-        after =
-          S.runPure
-            S.identityAnswer
-            gs
-            (Resolve.applyEffect source source S.bob Map.empty Map.empty (Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = PlayerRef.EachPlayer, TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Literal 1}))
+    hour <- S.printingOf s registry "Synthetic Common Hour"
+    let (held, staged) = S.addHandCard hour S.bob (S.landsFor island S.bob 5 (Setup.emptyGame S.bothPlayers))
+        gs = staged {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+        after = S.runPure S.identityAnswer gs (S.cast S.bob held >> Stack.resolveTop)
     Spec.assertEqWith s "added in APNAP order, so taken in reverse" (takersOf after) [S.alice, S.bob]
 
 -- alice in her precombat main phase with priority, three Islands and a Mountain

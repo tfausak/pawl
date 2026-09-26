@@ -507,6 +507,9 @@ data Response
     -- ChoseOpponent and ChoseProtector above for the reason Prompt.ChoosePlayer
     -- gives: "a player" offers every seat, the chooser included.
     ChosePlayer PlayerId.PlayerId
+  | -- | CR 725.4 / 726.4 with CR 805.2: the active player the active team's
+    -- primary player chose to take a departing holder's monarch or initiative.
+    ChoseActivePlayer PlayerId.PlayerId
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as
     -- a permutation of the offered indices.
     OrderedTriggers [Natural.Natural]

@@ -319,28 +319,12 @@ returnExiledForMonarch = do
         State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g)})
       pure True
 
--- CR 725.4: reassign the crown when the monarch leaves the game.
---
--- `playing` is the still-playing seats in SEATING order, injected by the caller
--- rather than computed here. Pawl.Engine.Departure passes the seats it has just
--- recomputed from the same post-flip state, so `Game.stillPlayingInOrder gs`
--- would give the identical answer; the injection makes the caller's snapshot
--- explicit at the one moment the answer is changing.
---
--- Deliberately NOT a call to Engine.nextStillPlaying, which walks the same
--- seating order for CR 800.4a's priority successor: that anchors on the
--- DEPARTING seat and can return it, where this anchors on the ACTIVE seat and
--- excludes it (the active player's own case is the branch below), and this
--- answers Maybe, because CR 725.4's third sentence lets the game continue with
--- no monarch. Changing either walk without checking the other risks a mismatch.
+-- CR 725.4: reassign the crown when the monarch leaves the game. Who takes it is
+-- Game.heirOnDeparture's question, shared with CR 726.4.
 --
 -- Called with `leaving` ALREADY marked departed, so "is leaving the game" and
 -- "has left the game" are one test and the rule's first two sentences collapse
--- to "is the active player still in the game?". CR 800.4j is why "there is no
--- active player" needs no separate arm: GameState.activePlayer still names a
--- departed seat, so that absence IS the seat having departed. "The next player
--- in turn order" counts from the active player's seat, the only position the
--- rule gives.
+-- to "is an active player still in the game?".
 --
 -- "Who can become the monarch" is CR 725.4's own words, and the eligibility half
 -- of it is Pawl.Engine.PlayerEffect's question (Jared Carthalion, True Heir).
@@ -363,24 +347,13 @@ returnExiledForMonarch = do
 -- directly, and rightly: it crowns nobody, so it records no event and marks no
 -- watch. "An opponent becomes the monarch" is never satisfied by there being no
 -- monarch.
---
--- Not implemented: which active player "the active player" is under the shared
--- team turns option (#4142).
-reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
-reassignOnDeparture leaving playing gs =
-  if GameState.monarch gs /= Just leaving
-    then gs
-    else
-      let active = GameState.activePlayer gs
-          walk = case List.break (== active) (GameState.turnOrder gs) of
-            (before, _ : after) -> after <> before
-            (before, []) -> before
-          eligible pid = List.elem pid playing && not (PlayerEffect.prohibitsBecomingMonarch pid gs)
-          next = List.find eligible walk
-          crowned =
-            if eligible active
-              then Just active
-              else next
-       in case crowned of
-            Nothing -> gs {GameState.monarch = Nothing}
-            Just pid -> crown pid gs
+reassignOnDeparture :: PlayerId -> Game ()
+reassignOnDeparture leaving = do
+  held <- State.gets GameState.monarch
+  Monad.when (held == Just leaving) $ do
+    gs <- State.get
+    let eligible pid = List.elem pid (Game.stillPlaying gs) && not (PlayerEffect.prohibitsBecomingMonarch pid gs)
+    crowned <- Game.heirOnDeparture eligible
+    State.modify' $ \g -> case crowned of
+      Nothing -> g {GameState.monarch = Nothing}
+      Just pid -> crown pid g
