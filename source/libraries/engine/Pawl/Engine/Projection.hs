@@ -735,6 +735,9 @@ data Gathered = MkGathered
 -- entering Saproling a land another object's ability watches for. Read against
 -- each object's whole projection; an object no longer on the board contributes
 -- nothing.
+--
+-- Not implemented: whether the trigger would still have fired without the
+-- effect, so an effect that only touches the object counts too (#4152).
 effectControllersOn :: [ObjectId] -> GameState -> [PlayerId.PlayerId]
 effectControllersOn oids gs =
   let cands = gather gs
