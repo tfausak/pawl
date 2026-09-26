@@ -1654,9 +1654,6 @@ gather gs =
 -- looked at. What the seed pass gets, so the list the real gate reads is the
 -- widest one -- an ability wrongly kept there can only over-project the state a
 -- condition is judged against, never leave gather to re-enter itself.
---
--- Not implemented: controlGrants reads the printed list without the gate at all
--- (#1529).
 alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
 alwaysFunctioning _ _ _ = True
 
