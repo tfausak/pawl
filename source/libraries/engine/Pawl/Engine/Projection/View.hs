@@ -1152,12 +1152,12 @@ staticTimestampOf carrier obj gs
 -- indexes the same list, so the two walks must agree on what is at each position.
 -- Printed abilities keep their indices; a minted one takes the position after.
 --
--- Off the COPIABLE keywords, like the rest of this function. So a living metal
--- another object's ability grants is not expanded (#2523): what a keyword MEANS
--- would otherwise have to be known before layer 6 has decided who holds it.
--- Devoid and changeling take the other road out of that -- grantedDefiningParts
--- emits their defining half as a second PART of whatever grants the keyword, so
--- neither needs an ability minted here.
+-- Off the COPIABLE keywords, like the rest of this function: what a keyword
+-- MEANS would otherwise have to be known before layer 6 has decided who holds
+-- it. A living metal a resolution grants is minted by grantedStaticAbilitiesOf
+-- below instead. Devoid and changeling take the other road out of that --
+-- grantedDefiningParts emits their defining half as a second PART of whatever
+-- grants the keyword, so neither needs an ability minted here.
 --
 -- CR 612.5 reads the list off textBoxHolderOf above, so a text box an exchange
 -- moved brings its static abilities with it. Pawl.ProjectionSpec's "CR 612.5
@@ -1180,12 +1180,21 @@ staticAbilitiesOf carrier gs =
 --
 -- Read off `oid` itself and never off textBoxHolderOf: a granted ability is not
 -- rules text (CR 612.3), so an exchange of text boxes leaves it where it is.
+--
+-- A stored grant of a KEYWORD whose meaning rule 702 states as a static ability
+-- (CR 702.161a's living metal) gives that ability too, minted as
+-- staticAbilitiesOf mints a printed one, at the grant's timestamp. Its effect
+-- then applies in its own layer (CR 613.1d), not in the grant's.
+-- Pawl.ProjectionSpec's "CR 702.161a living metal granted by a RESOLUTION"
+-- proves it. Not implemented: such a keyword granted by another static ability
+-- rather than by a resolution (#1942).
 grantedStaticAbilitiesOf :: ObjectId -> GameState -> [(Timestamp, StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Type.Card))]
 grantedStaticAbilitiesOf oid gs =
   let grant eff = case (ContinuousEffect.modification eff, ContinuousEffect.affected eff) of
-        (Modification.GainAbility (GrantedAbility.Static sa), Affected.TheseObjects held) | Set.member oid held -> Just (ContinuousEffect.timestamp eff, sa)
-        _ -> Nothing
-   in List.sortOn fst (Maybe.mapMaybe grant (GameState.continuousEffects gs))
+        (Modification.GainAbility (GrantedAbility.Static sa), Affected.TheseObjects held) | Set.member oid held -> [(ContinuousEffect.timestamp eff, sa)]
+        (Modification.GainKeyword keyword, Affected.TheseObjects held) | Set.member oid held -> fmap ((,) (ContinuousEffect.timestamp eff)) (Keyword.mintedStaticAbilitiesOf (Set.singleton keyword))
+        _ -> []
+   in List.sortOn fst (concatMap grant (GameState.continuousEffects gs))
 
 -- CR 116.2: the special actions this object's copiable rules text grants -- its
 -- copy snapshot's when it has one, its printed face's otherwise.
