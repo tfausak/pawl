@@ -4635,6 +4635,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 725 names no quality either: the designation has no parts (Jared
   -- Carthalion, True Heir).
   PlayerEffect.CantBecomeMonarch -> []
+  PlayerEffect.CantAttackWithCreatures -> []
   -- CR 601.3a's Filter half, which is exactly a quality of the spell (Damping
   -- Engine's "artifact, creature, or enchantment spells").
   PlayerEffect.CantCastMatching f -> [f]

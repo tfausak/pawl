@@ -217,8 +217,10 @@ playerAbilitiesOf carrier gs =
 -- CR 613.7a: the PRINTED carrier's rows -- printed as opposed to CR 611.2c's
 -- stored one, the list itself being the COPIABLE one above -- one per player
 -- ability on one battlefield permanent that still has it, as
--- (timestamp, source, ability name, controller, scope, effect) -- the shape
--- `applying` below sorts, filters and strips.
+-- (timestamp, source, ability name, reaches, effect) -- the shape `applying`
+-- below sorts, filters and strips. `reaches` answers whether the row applies to
+-- a given player: its scope, CR 801.10's range, and its condition asked about
+-- that player.
 --
 -- Top-level and shared rather than local to that function, because a second
 -- question needs the same walk and needs it read DIFFERENTLY: `applying` drops
@@ -228,7 +230,7 @@ playerAbilitiesOf carrier gs =
 --
 -- UNSORTED and UNFILTERED. Both are `applying`'s job, and neither reader may
 -- assume the other's.
-printedRows :: GameState -> [(Timestamp, Maybe ObjectId, Maybe AbilityName.AbilityName, PlayerId, AffectedPlayers.AffectedPlayers PlayerId, PlayerEffect)]
+printedRows :: GameState -> [(Timestamp, Maybe ObjectId, Maybe AbilityName.AbilityName, PlayerId -> Bool, PlayerEffect)]
 printedRows gs =
   let -- Hoisted out of the walk exactly as Projection.gather hoists it: an
       -- inlined call would recompute the whole game's SetLandSubtype list once
@@ -301,13 +303,15 @@ printedRows gs =
                     -- source is the permanent, so CR 109.5's "you" inside the
                     -- clause is the Class controller rather than the taxed
                     -- player -- which is the whole content of "during YOUR
-                    -- turn". The taxed player rides
-                    -- PlayerStaticAbility.scope instead and never reaches here.
+                    -- turn". The taxed player is PlayerRef.Candidate instead,
+                    -- substituted per affected player (Condition.forCandidate):
+                    -- Angelic Arbiter's "each opponent who cast a spell this
+                    -- turn" asks each opponent about themselves.
                     --
                     -- The clause takes the same CR 612.1 word swap the effect
                     -- beside it does, since one ability's two halves cannot
                     -- disagree about what a word means.
-                    lives ability = case PlayerStaticAbility.condition ability of
+                    lives ability pid = case PlayerStaticAbility.condition ability of
                       Nothing -> True
                       Just c ->
                         Condition.holds
@@ -315,8 +319,11 @@ printedRows gs =
                           (Filter.contextFor (Game.teams gs) (Just controller) (Just oid))
                           gs
                           oid
-                          (if null changes then c else Projection.rewriteCondition changes c)
-                 in fmap (\ability -> (Projection.staticTimestampOf oid object gs, Just oid, PlayerStaticAbility.name ability, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) (filter lives abilities)
+                          (Condition.forCandidate pid (if null changes then c else Projection.rewriteCondition changes c))
+                    reaches ability pid =
+                      applies pid controller gs (AffectedPlayers.Scoped (PlayerStaticAbility.scope ability))
+                        && lives ability pid
+                 in fmap (\ability -> (Projection.staticTimestampOf oid object gs, Just oid, PlayerStaticAbility.name ability, reaches ability, readAs (PlayerStaticAbility.effect ability))) abilities
               else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 
@@ -342,8 +349,8 @@ printedRows gs =
 -- player offers the action and taking it suppresses both.
 affectedBy :: PlayerId -> ObjectId -> AbilityName.AbilityName -> GameState -> Bool
 affectedBy pid oid name gs =
-  let affected (_, source, abilityName, controller, scope, _) =
-        source == Just oid && abilityName == Just name && applies pid controller gs scope
+  let affected (_, source, abilityName, reaches, _) =
+        source == Just oid && abilityName == Just name && reaches pid
    in any affected (printedRows gs)
 
 -- CR 604.2: every player effect applying to `pid` right now. Gathered LIVE from
@@ -357,7 +364,7 @@ affectedBy pid oid name gs =
 -- by CR 601.2c rather than by that rule -- the target was chosen as the spell was
 -- cast.
 --
--- The (timestamp, source, controller, scope, effect) rows go no further than this
+-- The (timestamp, source, name, reaches, effect) rows go no further than this
 -- module: no consumer sees more than the (source, effect) pair returned here, and
 -- printedRows above is read by exactly one other question inside it.
 --
@@ -420,8 +427,7 @@ applying pid gs =
           -- is the same reason `notIgnored` below is applied to the printed
           -- carrier alone.
           Nothing,
-          ActivePlayerEffect.controller active,
-          ActivePlayerEffect.scope active,
+          \who -> applies who (ActivePlayerEffect.controller active) gs (ActivePlayerEffect.scope active),
           ActivePlayerEffect.effect active
         )
       -- CR 611.2a: a row whose window has not begun applies to nobody yet --
@@ -445,10 +451,10 @@ applying pid gs =
       -- load-bearing now that a stored row names its source: an activated
       -- ability of a permanent stores rows under that permanent's own id, which
       -- a shared filter would suppress on a rule the ability is not subject to.
-      notIgnored (_, source, name, _, _, _) = not (any (\s -> IgnoredAbility.ignoredBy pid s name gs) source)
-      applyingScope (_, _, _, controller, scope, _) = applies pid controller gs scope
-      effectOf (_, source, _, _, _, effect) = (source, effect)
-      stampOf (timestamp, _, _, _, _, _) = timestamp
+      notIgnored (_, source, name, _, _) = not (any (\s -> IgnoredAbility.ignoredBy pid s name gs) source)
+      applyingScope (_, _, _, reaches, _) = reaches pid
+      effectOf (_, source, _, _, effect) = (source, effect)
+      stampOf (timestamp, _, _, _, _) = timestamp
    in fmap effectOf (List.sortOn stampOf (filter applyingScope (filter notIgnored printed <> stored)))
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
@@ -583,6 +589,7 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         -- CR 601.3a's other quality shape: a Filter over the spell's own
         -- characteristics rather than over its name, read off the proposal's
         -- projection so Damping Engine's "artifact, creature, or enchantment
@@ -752,6 +759,7 @@ prohibitsPlayingLand pid names oid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         -- CR 305.1 once more: Damping Engine's own cast half stops no land play,
         -- however its Filter reads -- which is exactly why its one printed
         -- sentence declares two abilities.
@@ -826,6 +834,7 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -891,6 +900,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -920,6 +930,7 @@ prohibitsBecomingMonarch :: PlayerId -> GameState -> Bool
 prohibitsBecomingMonarch pid gs =
   let prohibits effect = case effect of
         PlayerEffect.CantBecomeMonarch -> True
+        PlayerEffect.CantAttackWithCreatures -> False
         -- Every other arm is about casting, playing, targeting, countering,
         -- searching, paying, keeping mana, gaining or losing life, rule 702
         -- protection or how a coin flip came out. CR 725.1's designation is none of
@@ -950,6 +961,57 @@ prohibitsBecomingMonarch pid gs =
         -- become the monarch" names nobody), so shroud is not an eligibility
         -- restriction; where a card does target (Jared's own first clause), CR
         -- 115.1's own check turns it away before this one is asked.
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.DamageCantBeRedirected _ -> False
+        PlayerEffect.CantSearchLibraries _ -> False
+        PlayerEffect.HasProtectionFromChosenName -> False
+        PlayerEffect.HasProtectionFrom _ -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CastOnlyAtSorcerySpeed -> False
+        PlayerEffect.CantPlayLands _ -> False
+        PlayerEffect.CastFrom _ -> False
+        PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+        PlayerEffect.CantGetCounters _ -> False
+        PlayerEffect.StateCoinFlip _ -> False
+        PlayerEffect.ModifyDieRoll _ -> False
+        PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.CantGainLife -> False
+        PlayerEffect.CantLoseLife -> False
+   in any (prohibits . snd) (applying pid gs)
+
+-- CR 508.1c / 101.2: is `pid` forbidden from attacking with creatures? A
+-- restriction on the PLAYER (Angelic Arbiter), read by
+-- Pawl.Engine.CombatRestriction.cantAttack for every creature that player
+-- controls. A DISJUNCTION for CR 101.2's reason.
+prohibitsAttackingWithCreatures :: PlayerId -> GameState -> Bool
+prohibitsAttackingWithCreatures pid gs =
+  let prohibits effect = case effect of
+        PlayerEffect.CantAttackWithCreatures -> True
+        PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost {} -> False
+        PlayerEffect.IncreaseActivationCost {} -> False
+        PlayerEffect.ReduceSpellCost {} -> False
+        PlayerEffect.ReduceActivationCost {} -> False
+        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AddSpellCost {} -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.IncreaseMaximumHandSize _ -> False
+        PlayerEffect.ReduceMaximumHandSize _ -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.LoseLifeForUnspentMana -> False
+        PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
@@ -1234,6 +1296,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -1281,6 +1344,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -1331,6 +1395,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -1487,6 +1552,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -1547,6 +1613,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -1605,6 +1672,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -1718,6 +1786,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.HasProtectionFromChosenName -> Nothing
   PlayerEffect.HasProtectionFrom _ -> Nothing
   PlayerEffect.CantBecomeMonarch -> Nothing
+  PlayerEffect.CantAttackWithCreatures -> Nothing
   PlayerEffect.CantCastMatching _ -> Nothing
   PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
   PlayerEffect.CantPlayLands _ -> Nothing
@@ -1919,6 +1988,7 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         -- A PROHIBITION, and CR 601.3 asks the two halves separately:
         -- prohibitsCasting above is where Damping Engine and Silence are read.
         PlayerEffect.CantCastMatching _ -> False
@@ -2126,6 +2196,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         -- The PROHIBITIONS, read at their own gate (prohibitsCasting above): CR
         -- 101.2 makes a "can't" beat any cost this offers, and folding them here
         -- would let a permission outvote one.
@@ -2196,6 +2267,7 @@ playLandPiles pid gs =
         PlayerEffect.HasProtectionFromChosenName -> []
         PlayerEffect.HasProtectionFrom _ -> []
         PlayerEffect.CantBecomeMonarch -> []
+        PlayerEffect.CantAttackWithCreatures -> []
         -- The PROHIBITIONS, which prohibitsPlayingLand above is what reads: CR
         -- 101.2 makes a "can't" beat this permission, and the two are folded at
         -- separate gates so that neither can outvote the other by accident.
@@ -2287,6 +2359,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -2376,6 +2449,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -2455,6 +2529,7 @@ protectionCarriers gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -2530,6 +2605,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -2592,6 +2668,7 @@ votesAllowed pid gs =
         PlayerEffect.DamageCantBeRedirected {} -> Nothing
         PlayerEffect.CantSearchLibraries {} -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching {} -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands {} -> Nothing
@@ -2679,6 +2756,7 @@ maximumHandSize pid gs =
         PlayerEffect.HasProtectionFromChosenName -> current
         PlayerEffect.HasProtectionFrom _ -> current
         PlayerEffect.CantBecomeMonarch -> current
+        PlayerEffect.CantAttackWithCreatures -> current
         PlayerEffect.CantCastMatching _ -> current
         PlayerEffect.CastOnlyAtSorcerySpeed -> current
         PlayerEffect.CantPlayLands _ -> current
@@ -2751,6 +2829,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -2815,6 +2894,7 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -2880,6 +2960,7 @@ prohibitsGainingLife pid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -2940,6 +3021,7 @@ prohibitsLosingLife pid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -3001,6 +3083,7 @@ spendManaAsThough pid gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -3081,6 +3164,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CastOnlyAtSorcerySpeed -> False
         PlayerEffect.CantPlayLands _ -> False
@@ -3146,6 +3230,7 @@ unpreventable gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -3216,6 +3301,7 @@ unredirectable gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -3311,6 +3397,7 @@ statedFlips pid gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -3377,6 +3464,7 @@ rollModifiers pid gs =
         PlayerEffect.HasProtectionFromChosenName -> Nothing
         PlayerEffect.HasProtectionFrom _ -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
         PlayerEffect.CantPlayLands _ -> Nothing
@@ -3463,6 +3551,7 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.DamageCantBeRedirected _ -> pure effect
   PlayerEffect.CantSearchLibraries _ -> pure effect
   PlayerEffect.CantBecomeMonarch -> pure effect
+  PlayerEffect.CantAttackWithCreatures -> pure effect
   PlayerEffect.CantCastMatching _ -> pure effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> pure effect
   PlayerEffect.CantPlayLands _ -> pure effect
@@ -3530,6 +3619,7 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.DamageCantBeRedirected pattern_ -> fmap PlayerEffect.DamageCantBeRedirected (f pattern_)
   PlayerEffect.CantSearchLibraries _ -> pure effect
   PlayerEffect.CantBecomeMonarch -> pure effect
+  PlayerEffect.CantAttackWithCreatures -> pure effect
   PlayerEffect.CantCastMatching _ -> pure effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> pure effect
   PlayerEffect.CantPlayLands _ -> pure effect
