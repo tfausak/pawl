@@ -270,6 +270,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       Quantity.WasKicked
       " {\"type\":\"WasKicked\"} "
+  Spec.it s "WasForetold" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.WasForetold
+      " {\"type\":\"WasForetold\"} "
   -- CR 702.104b, with nothing on the wire for WasKicked's reason: the object is
   -- whichever one the quantity is evaluated against.
   Spec.it s "TributeWasPaid" $

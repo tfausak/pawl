@@ -2311,6 +2311,7 @@ castOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -2393,6 +2394,7 @@ activatedAbilityResolved event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -2485,6 +2487,7 @@ discardOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -2606,6 +2609,7 @@ movedChange event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -2717,6 +2721,7 @@ damageDealt event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing
@@ -2992,6 +2997,7 @@ lifeGainOf event = case event of
   GameEvent.RingTempted _ -> Nothing
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
+  GameEvent.Foretold _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing

@@ -54,6 +54,7 @@ substituteStar star quantity = case quantity of
   Quantity.DesignationValue _ -> quantity
   Quantity.ClassLevel -> quantity
   Quantity.WasKicked -> quantity
+  Quantity.WasForetold -> quantity
   Quantity.TributeWasPaid -> quantity
   -- CR 601.2b's per-keyword read, WasKicked's arm above in every respect: the
   -- Keyword it carries is the IDENTIFIER of one ability's cost, matched against

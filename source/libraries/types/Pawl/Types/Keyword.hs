@@ -671,9 +671,6 @@ data Keyword
     -- CR 702.143d's other producer -- an effect that makes an exiled card
     -- foretold and may give it a foretell cost -- is Effect.MakeForetold, and
     -- needs no keyword at all.
-    --
-    -- Not implemented: CR 702.143c's "a card or spell that was foretold" as
-    -- something an effect can refer to (#1486).
     Foretell (Cost.Cost Keyword)
   | -- | 702.144a: demonstrate -- a cast trigger under which you may copy the
     -- spell, and an opponent you then choose copies it too.

@@ -667,6 +667,11 @@ data View = MkView
     -- object, since Pawl.Types.LastKnown keeps no such record.
     -- Pawl.Engine.Quantity's CastUsing arm is the reader.
     castUsing :: Maybe Keyword.Type.Keyword,
+    -- CR 702.143c: is this candidate a foretold card, or a spell that was one
+    -- before it was cast? Read off Object.foretold, which Pawl.Engine.Cast
+    -- carries onto the stack, and False where there is no live object, as
+    -- `castUsing` above. Pawl.Engine.Quantity's WasForetold arm is the reader.
+    foretold :: Bool,
     -- CR 400.7d / CR 107.4h: the production tags of the mana that was spent to
     -- cast the spell this candidate is, or was, or to activate the CR 602.2a
     -- ability it is -- read off Object.manaSpent, and empty where there is no
@@ -917,6 +922,7 @@ playerView pid =
       -- one -- `designations` above, same sentence.
       tributePaid = False,
       castUsing = Nothing,
+      foretold = False,
       -- CR 202.1a's mana cost is spent to cast a CARD, and CR 109.1's list of
       -- what an object is has no player in it -- `manaValue` above, same rule.
       manaSpentTagColors = Map.empty,

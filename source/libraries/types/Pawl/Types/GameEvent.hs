@@ -578,6 +578,11 @@ data GameEvent
     -- both halves of rule 701.61a already write their own Moved events, and no
     -- printing reads which half a forage took.
     Foraged PlayerId.PlayerId
+  | -- | CR 702.143c: this player foretold a card -- CR 116.2h's special action,
+    -- recorded by Pawl.Engine.Foretell.foretell and NOT by CR 702.143d's
+    -- Effect.MakeForetold, whose card becomes foretold without anyone foretelling
+    -- it.
+    Foretold PlayerId.PlayerId
   | -- | CR 701.66b: this player earthbent, written as rule 701.66a's delayed
     -- triggered ability is CREATED rather than when it later returns the land.
     -- Pawl.EventTriggerSpec's "CR 701.66b the Adept fires as rule 701.66a's
