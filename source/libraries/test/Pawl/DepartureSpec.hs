@@ -39,7 +39,9 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -55,6 +57,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import Pawl.Types.Printing (Printing)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
@@ -147,6 +150,26 @@ soleObjectOf printing gs =
         Source.OfCard printingId -> Game.printingOf printingId gs == Just printing
         _ -> False
    in List.find (\(_, obj) -> isIt obj) (Map.toList (GameState.objects gs))
+
+-- Hand `holder` control of a permanent by CR 110.2a alone, whoever owns it --
+-- the state the Towershell case reaches through the engine, written directly.
+underControlOf :: PlayerId.PlayerId -> ObjectId -> GameState.GameState -> GameState.GameState
+underControlOf holder oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.enteredUnder = Just holder}) oid (GameState.objects gs)}
+
+-- Run `action`, answering each CR 616.1 prompt with the row whose source
+-- `wanted` names for the seat asked -- pinned by source rather than by index --
+-- and keeping the seats asked in order.
+replacementRace :: (PlayerId.PlayerId -> ObjectId) -> GameState.GameState -> Game.Type.Game a -> ([PlayerId.PlayerId], GameState.GameState)
+replacementRace wanted board action =
+  let pick pid entries = maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> ReplacementEntry.source entry == wanted pid) entries)
+      step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      step p = case p of
+        Prompt.ChooseReplacement _ pid entries -> do
+          State.modify' (<> [pid])
+          pure (pick pid entries)
+        _ -> pure (S.identityAnswer p)
+      ((_, after), asked) = State.runState (Engine.runGame step board action) []
+   in (asked, after)
 
 -- Run whole steps until the board is at `phase` on turn `turn`, WITHOUT running
 -- that step. Bounded so a bug cannot loop forever; stops on a finished game.
@@ -1147,23 +1170,52 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     let (islandId, g1) = S.addPermanent island S.carol S.threePlayerGame
         (diversionId, g2) = S.addPermanent diversion S.bob g1
         (reclamationId, g3) = S.addPermanent reclamation S.carol g2
-        board = g3 {GameState.objects = Map.adjust (\o -> o {Object.enteredUnder = Just S.alice}) islandId (GameState.objects g3)}
-        -- bob takes Reclamation's library row, anyone else Diversion's graveyard
-        -- row, pinned by source rather than by index.
-        pick :: PlayerId.PlayerId -> [ReplacementEntry.ReplacementEntry] -> Natural
-        pick pid entries =
-          let wanted = if pid == S.bob then reclamationId else diversionId
-           in maybe 0 Int.toNaturalSaturating (List.findIndex (\entry -> ReplacementEntry.source entry == wanted) entries)
-        step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
-        step p = case p of
-          Prompt.ChooseReplacement _ pid entries -> do
-            State.modify' (<> [pid])
-            pure (pick pid entries)
-          _ -> pure (S.identityAnswer p)
-        ((_, after), asked) = State.runState (Engine.runGame step board (Departure.leaveGame Departure.Type.Conceded S.alice)) []
+        board = underControlOf S.alice islandId g3
+        -- bob takes Reclamation's library row, anyone else Diversion's.
+        wanted pid = if pid == S.bob then reclamationId else diversionId
+        (asked, after) = replacementRace wanted board (Departure.leaveGame Departure.Type.Conceded S.alice)
     Spec.assertEqWith s "alice controls carol's Island by CR 110.2a alone" (Projection.controllerOf islandId board) (Just S.alice)
     Spec.assertEqWith s "CR 800.4h bob, the next seat, chose Reclamation's row: the Island is in carol's library" (fmap (Object.zone . snd) (soleObjectOf island after)) (Just Zone.Library)
     Spec.assertEqWith s "and bob was the only seat asked" asked [S.bob]
+
+  -- The same race when two players lose in ONE state-based action check (CR
+  -- 704.3, CR 104.3b): dave and alice are at 0 life, dave leaves first (the
+  -- check's order), and the seat after dave is alice -- who is leaving in the
+  -- same event, so CR 800.4h skips her too and bob chooses.
+  Spec.it s "CR 704.3/800.4h a replacement choice inside the departure's exile skips a seat leaving in the same event" $ do
+    island <- S.printingOf s registry "Island"
+    diversion <- S.printingOf s registry "Synthetic Exile Diversion"
+    reclamation <- S.printingOf s registry "Synthetic Exile Reclamation"
+    let (islandId, g1) = S.addPermanent island S.bob S.fourPlayerGame
+        (diversionId, g2) = S.addPermanent diversion S.bob g1
+        (reclamationId, g3) = S.addPermanent reclamation S.carol g2
+        dying player = player {Player.life = 0}
+        controlled = underControlOf S.dave islandId g3
+        board = controlled {GameState.players = Map.adjust dying S.alice (Map.adjust dying S.dave (GameState.players controlled))}
+        -- bob takes Reclamation's library row, anyone else Diversion's.
+        wanted pid = if pid == S.bob then reclamationId else diversionId
+        (asked, after) = replacementRace wanted board Sba.performStateBasedActions
+    Spec.assertEqWith s "dave controls bob's Island by CR 110.2a alone" (Projection.controllerOf islandId board) (Just S.dave)
+    Spec.assertEqWith s "CR 800.4h bob, past alice, chose Reclamation's row: the Island is in bob's library" (fmap (Object.zone . snd) (soleObjectOf island after)) (Just Zone.Library)
+    Spec.assertEqWith s "and bob was the only seat asked" asked [S.bob]
+
+  -- CR 801.2c fixes the seats in range as each turn begins, so a permanent whose
+  -- controller has just left is still in range of the rows that reached that
+  -- seat (CR 801.2d, 801.13a). Four seats at range 1: bob sits beside alice,
+  -- carol two seats away. The PAIR differs only in who controls the Diversion.
+  Spec.it s "CR 801.2c a survivor's exile replacement still reaches a departing neighbour's permanent" $ do
+    island <- S.printingOf s registry "Island"
+    diversion <- S.printingOf s registry "Synthetic Exile Diversion"
+    let ranged gs =
+          let ranges = RangeOfInfluence.MkRangeOfInfluence (Map.fromList (fmap (\pid -> (pid, 1)) (GameState.turnOrder gs)))
+           in gs {GameState.settings = (GameState.settings gs) {GameSettings.rangeOfInfluence = ranges}}
+        boardWith holder =
+          let (islandId, g1) = S.addPermanent island S.carol (ranged S.fourPlayerGame)
+              (_, g2) = S.addPermanent diversion holder g1
+           in underControlOf S.alice islandId g2
+        landing holder = fmap (Object.zone . snd) (soleObjectOf island (S.runPure S.identityAnswer (boardWith holder) (Departure.leaveGame Departure.Type.Conceded S.alice)))
+    Spec.assertEqWith s "bob, in alice's range as the turn began, diverts the Island to carol's graveyard" (landing S.bob) (Just Zone.Graveyard)
+    Spec.assertEqWith s "carol, two seats from alice, does not reach it, so it is exiled" (landing S.carol) (Just Zone.Exile)
 
 -- alice with Door to Nothingness and one land per colored symbol of its
 -- activation cost, plus whatever other seats the case wants.
