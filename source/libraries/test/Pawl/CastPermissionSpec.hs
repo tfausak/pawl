@@ -403,6 +403,20 @@ sigardasAidSpec s registry =
       Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
       Spec.assertEqWith s "and without the Aid it never left her hand" (S.countOnBattlefieldByName (S.printingName rollicker) S.alice (play bare)) 0
 
+    -- CR 601.2e: the lookahead lets the cast BEGIN, and only the bestow cost
+    -- keeps the Aid naming the spell, so that is the cost announced -- the
+    -- Rollicker enters attached to the Piker rather than as a creature.
+    Spec.it s "CR 601.3b / 601.2e under Sigarda's Aid on the opponent's turn only the bestow cost is announced" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      rollicker <- S.printingOf s registry "Nyxborn Rollicker"
+      aid <- S.printingOf s registry "Sigarda's Aid"
+      let (_, extras, board) = flashBoard mountain rollicker [piker, aid]
+          after = S.runPure S.castAnswer board Engine.priorityLoop
+          named oid = fmap Face.name (Game.faceOf oid after) == Just (S.printingName rollicker)
+          hosts = fmap (\oid -> Game.lookupObject oid after >>= Object.attachedTo) (filter named (Game.zoneMembers Zone.Battlefield S.alice after))
+      Spec.assertEqWith s "the Rollicker is attached to the Piker" hosts [fmap Recipient.ToCreature (Maybe.listToMaybe extras)]
+
     -- CR 702.103b is what the lookahead consults and nothing else: with the
     -- bestow card in hand and NO Aid, the window stays shut, so the choice space
     -- is not a permission of its own.
@@ -428,6 +442,37 @@ sigardasAidSpec s registry =
       Spec.assertBool s (not (Set.member Subtype.Aura (Filter.subtypes view))) "no Aura subtype"
       Spec.assertBool s (Set.member CardType.Creature (Filter.cardTypes view)) "still a creature card"
       Spec.assertBool s (Set.member Subtype.Aura (Filter.subtypes (Projection.bestowedView oid board))) "which only the hypothetical carries"
+
+-- Synthetic Untimely Aluren {2}{G} Enchantment: "You may cast creature spells
+-- with mana value 4 or greater as though they had flash." Protean Hydra ({X}{G})
+-- is mana value 1 in hand (CR 202.3e), so only X can bring it under the grant.
+-- flashBoard's ten Forests keep mana from being why a cast fails.
+untimelyAlurenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+untimelyAlurenSpec s registry =
+  let board withAluren = do
+        forest <- S.printingOf s registry "Forest"
+        hydra <- S.printingOf s registry "Protean Hydra"
+        aluren <- S.printingOf s registry "Synthetic Untimely Aluren"
+        let (oid, _, gs) = flashBoard forest hydra [aluren | withAluren]
+        pure (oid, gs)
+   in Spec.describe s "UntimelyAluren" $ do
+        -- CR 601.3b's second sentence over X: the pair differs in the Aluren.
+        Spec.it s "CR 601.3b Untimely Aluren lets Protean Hydra begin on the opponent's turn" $ do
+          (oid, gs) <- board True
+          (bareOid, bare) <- board False
+          Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice gs)) "offered under the Aluren"
+          Spec.assertBool s (not (any (S.isCastOf bareOid) (Action.legalActions S.alice bare))) "and not without it"
+
+        -- CR 601.2e: the announced X is then judged against "4 or greater".
+        Spec.it s "CR 601.2e Untimely Aluren takes back Protean Hydra at X = 2 and not at X = 3" $ do
+          (oid, gs) <- board True
+          let announcing :: Natural -> Prompt.Prompt r -> r
+              announcing x p = case p of
+                Prompt.ChooseX {} -> x
+                _ -> S.identityAnswer p
+              castAt x = S.runPure (announcing x) gs (S.cast S.alice oid)
+          Spec.assertEqWith s "X = 2: mana value 3, so the cast is taken back and the Hydra stays in hand" (elem oid (Game.zoneMembers Zone.Hand S.alice (castAt 2))) True
+          Spec.assertEqWith s "X = 3: mana value 4, so the Hydra is cast" (length (GameState.stack (castAt 3))) 1
 
 -- ONE board for both halves of CR 701.6a's "a spell or ability": alice has a
 -- SPELL of the caller's choosing on the stack and a settled Prodigal Sorcerer
@@ -2457,6 +2502,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   extraLandDropsSpec s registry
   vedalkenOrrerySpec s registry
   sigardasAidSpec s registry
+  untimelyAlurenSpec s registry
   yawgmothsWillSpec s registry
   crucibleSpec s registry
   garruksHordeSpec s registry

@@ -1183,13 +1183,8 @@ contextFor you src gs =
 -- "CR 107.3b a free cast fixes X at 0, so the {X} spell is refused as even" is
 -- the proof, off Omniscience.
 --
--- FINITE by Filter.manaValueThresholds' argument: two steps past the greatest
--- literal the criterion compares against, nothing but parity is left to change,
--- so `climb + 2` samples have seen every verdict the criterion can give. A cost
--- with no variable never gets here at all.
---
--- Lenience to BEGIN only: CR 601.2e judges the announced X, which
--- prohibitsAtManaValue below asks.
+-- Sampled by reachableManaValues below. Lenience to BEGIN only: CR 601.2e
+-- judges the announced X, which prohibitsAtManaValue below asks.
 choiceCouldEscape :: PlayerId -> Maybe ObjectId -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
 choiceCouldEscape you src criterion oid variable gs =
   let variables = case variable of
@@ -1201,12 +1196,25 @@ choiceCouldEscape you src criterion oid variable gs =
       -- perspective included.
       context = contextFor (Just you) src gs
       view = Projection.viewOfObject oid gs
-      escapes base =
-        let limit = 2 + maximum (0 : Filter.manaValueThresholds criterion)
-            climb = if limit <= base then 0 else div (limit - base + variables - 1) variables
-            reachable = fmap (\x -> base + variables * x) [0 .. climb + 2]
-         in any (\mv -> not (Filter.matches context view {Filter.manaValue = Just mv} criterion)) reachable
-   in variables > 0 && maybe False escapes (Filter.manaValue view)
+      escapes base = any (\mv -> not (Filter.matches context view {Filter.manaValue = Just mv} criterion)) (reachableManaValues criterion variables base)
+   in maybe False escapes (Filter.manaValue view)
+
+-- CR 202.3e: the mana values a spell whose mana cost prints `variables` X's can
+-- have once X is announced, from `base`, its mana value off the stack --
+-- enough of them to see every verdict `criterion` can give. Empty when nothing
+-- varies.
+--
+-- FINITE by Filter.manaValueThresholds' argument: two steps past the greatest
+-- literal the criterion compares against, nothing but parity is left to change,
+-- so `climb + 2` samples have seen every verdict. choiceCouldEscape above and
+-- choiceCouldApply below are its two readers.
+reachableManaValues :: Filter Keyword -> Integer -> Integer -> [Integer]
+reachableManaValues criterion variables base
+  | variables <= 0 = []
+  | otherwise =
+      let limit = 2 + maximum (0 : Filter.manaValueThresholds criterion)
+          climb = if limit <= base then 0 else div (limit - base + variables - 1) variables
+       in fmap (\x -> base + variables * x) [0 .. climb + 2]
 
 -- How many variables the object's mana cost prints -- CR 107.3's {X}, counted
 -- rather than tested, because a cost printing the symbol twice moves the mana
@@ -1819,12 +1827,18 @@ castFlashGrant effect = case effect of
 -- takes it as a disjunct. CR 601.3a's twin, choiceCouldEscape above, is the same
 -- question asked of a prohibition and answered in the other direction.
 --
--- ONE choice can do it in pawl, and bestow is that choice: CR 702.103b makes a
+-- TWO choices can do it in pawl. Bestow is one: CR 702.103b makes a
 -- spell cast bestowed an Aura enchantment with enchant creature, which is a card
 -- type and a subtype a criterion can read, and rule 601.3b's own example is that
 -- card in that hand. Projection.bestowedView is what the choice would make of the
 -- object, applied to no state -- nothing is stamped, since the player has not
 -- chosen anything yet.
+--
+-- X is the other, CR 202.3e's: the card in hand counts X as zero, so a
+-- permission naming a mana value it lacks may still name the spell, sampled as
+-- choiceCouldEscape samples it. Pawl.CastPermissionSpec's "CR 601.3b Untimely
+-- Aluren lets Protean Hydra begin on the opponent's turn" is the proof;
+-- Cast.flashRefusedAt judges the X announced.
 --
 -- A HYPOTHETICAL here where CR 601.3a's prohibition side takes the stamp instead,
 -- and the difference is which question the caller is asking. Pawl.Engine.Cast
@@ -1841,22 +1855,51 @@ castFlashGrant effect = case effect of
 -- one proposal.
 --
 -- Asks only whether the choice EXISTS, not whether its cost is payable, which is
--- choiceCouldEscape's posture toward X: the rule lets the player BEGIN, and a
--- proposal that then announces the printed cost instead has still begun legally.
+-- choiceCouldEscape's posture toward X: the rule lets the player BEGIN.
 -- Cast.castable's own affordability conjunct is what refuses a card no cost of
--- which can be paid.
+-- which can be paid, and Cast.windowedCandidates withholds a cost whose own
+-- choice leaves the permission not naming the spell (flashNamesCandidate).
 --
 -- Read off the PROJECTION's keywords, which is where Cost.costsFor reads the same
 -- ability from and for its CR 613.1 reason: a bestow granted where the card lies
 -- offers rule 702.103a's choice as much as a printed one does.
---
--- Not implemented: the other proposal choice CR 202.3e makes visible -- the X
--- whose announcement fixes the spell's mana value -- so a permission naming a
--- mana value this card does not yet have is not searched (#2512).
 choiceCouldApply :: Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -> Bool
 choiceCouldApply src criterion oid gs =
   let bestowable = not (null (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs))))
-   in bestowable && Filter.matches (contextFrom src oid gs) (Projection.bestowedView oid gs) criterion
+   in (bestowable && Filter.matches (contextFrom src oid gs) (Projection.bestowedView oid gs) criterion)
+        || xCouldApply src criterion oid VariableChoice.Announced gs
+
+-- choiceCouldApply's X half: could some X the candidate lets its caster announce
+-- (CR 107.3b fixes it at 0 under FixedAtZero) make `criterion` name `oid`?
+xCouldApply :: Maybe ObjectId -> Filter Keyword -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
+xCouldApply src criterion oid variable gs =
+  let context = contextFrom src oid gs
+      view = Projection.viewOfObject oid gs
+      variables = case variable of
+        VariableChoice.Announced -> variablesIn oid gs
+        VariableChoice.FixedAtZero -> 0
+      announceable base = any (\mv -> Filter.matches context view {Filter.manaValue = Just mv} criterion) (reachableManaValues criterion variables base)
+   in maybe False announceable (Filter.manaValue view)
+
+-- CR 601.3b asked of ONE candidate, on the board its own choice produces
+-- (Cast.proposedFor): does a cast-scoped flash grant name the spell that
+-- candidate makes, searching only the X still to be announced? The choice the
+-- candidate stands for has been made, so bestow is not searched again.
+-- Pawl.Engine.Cast.windowedCandidates is the caller.
+flashNamesCandidate :: PlayerId -> ObjectId -> VariableChoice.VariableChoice -> GameState -> Bool
+flashNamesCandidate pid oid variable gs =
+  let names (source, effect) = maybe False (\criterion -> matchesObjectFrom source criterion oid gs || xCouldApply source criterion oid variable gs) (castFlashGrant effect)
+   in any names (applying pid gs)
+
+-- CR 601.2e / 601.3b: does a grant on castFlashGrant's axis applying to `pid`
+-- name `oid` at `manaValue`? mayCastAsThoughItHadFlash with the mana value
+-- replaced and no lookahead, since the choices it searched have been made.
+-- Pawl.Engine.Cast.flashRefusedAt is the one caller.
+mayCastAsThoughItHadFlashAt :: PlayerId -> ObjectId -> Integer -> GameState -> Bool
+mayCastAsThoughItHadFlashAt pid oid manaValue gs =
+  let view = (Projection.viewOfObject oid gs) {Filter.manaValue = Just manaValue}
+      admits (source, effect) = maybe False (Filter.matches (contextFrom source oid gs) view) (castFlashGrant effect)
+   in any admits (applying pid gs)
 
 -- CR 400.1: whose copies of a zone a reference inside a permission applying to
 -- `pid` names. The perspective is the AFFECTED player and not the row's
