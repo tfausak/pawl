@@ -896,6 +896,8 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.Blighted _ -> Nothing
   GameEvent.Foraged _ -> Nothing
   GameEvent.Foretold _ -> Nothing
+  GameEvent.CollectedEvidence _ -> Nothing
+  GameEvent.GaveGift _ -> Nothing
   GameEvent.AttractionOpened _ -> Nothing
   GameEvent.PrizeClaimed _ -> Nothing
   GameEvent.Earthbent _ -> Nothing

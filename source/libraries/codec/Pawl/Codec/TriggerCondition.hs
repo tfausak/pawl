@@ -185,6 +185,8 @@ codec =
           -- CR 701.61a's "whenever you forage", the arm above's shape.
           Arm.payload "PlayerForages" PlayerRelation.codec TriggerCondition.PlayerForages (\x -> case x of TriggerCondition.PlayerForages y -> Just y; _ -> Nothing),
           Arm.payload "PlayerForetells" PlayerRelation.codec TriggerCondition.PlayerForetells (\x -> case x of TriggerCondition.PlayerForetells y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerCollectsEvidence" PlayerRelation.codec TriggerCondition.PlayerCollectsEvidence (\x -> case x of TriggerCondition.PlayerCollectsEvidence y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerGivesGift" PlayerRelation.codec TriggerCondition.PlayerGivesGift (\x -> case x of TriggerCondition.PlayerGivesGift y -> Just y; _ -> Nothing),
           Arm.payload "PlayerEarthbends" PlayerRelation.codec TriggerCondition.PlayerEarthbends (\x -> case x of TriggerCondition.PlayerEarthbends y -> Just y; _ -> Nothing),
           Arm.payload "PlayerWaterbends" PlayerRelation.codec TriggerCondition.PlayerWaterbends (\x -> case x of TriggerCondition.PlayerWaterbends y -> Just y; _ -> Nothing),
           Arm.payload "PlayerAirbends" PlayerRelation.codec TriggerCondition.PlayerAirbends (\x -> case x of TriggerCondition.PlayerAirbends y -> Just y; _ -> Nothing),
@@ -325,6 +327,8 @@ tagOf x = case x of
   TriggerCondition.PlayerBlights {} -> "PlayerBlights"
   TriggerCondition.PlayerForages {} -> "PlayerForages"
   TriggerCondition.PlayerForetells {} -> "PlayerForetells"
+  TriggerCondition.PlayerCollectsEvidence {} -> "PlayerCollectsEvidence"
+  TriggerCondition.PlayerGivesGift {} -> "PlayerGivesGift"
   TriggerCondition.PlayerEarthbends {} -> "PlayerEarthbends"
   TriggerCondition.PlayerWaterbends {} -> "PlayerWaterbends"
   TriggerCondition.PlayerAirbends {} -> "PlayerAirbends"

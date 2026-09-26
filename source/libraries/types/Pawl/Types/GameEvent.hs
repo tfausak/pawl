@@ -588,6 +588,14 @@ data GameEvent
     -- Effect.MakeForetold, whose card becomes foretold without anyone foretelling
     -- it.
     Foretold PlayerId.PlayerId
+  | -- | CR 701.59a: this player collected evidence -- recorded by
+    -- Pawl.Engine.Cost's CollectEvidence payment once the cards are exiled, and
+    -- by nothing else, since collecting evidence is only ever a cost.
+    CollectedEvidence PlayerId.PlayerId
+  | -- | CR 702.174c: this player gave a gift -- a promised gift instant or sorcery
+    -- they controlled resolved, or a permanent's gift triggered ability did.
+    -- Written by Effect.GiveGift alone.
+    GaveGift PlayerId.PlayerId
   | -- | CR 701.66b: this player earthbent, written as rule 701.66a's delayed
     -- triggered ability is CREATED rather than when it later returns the land.
     -- Pawl.EventTriggerSpec's "CR 701.66b the Adept fires as rule 701.66a's

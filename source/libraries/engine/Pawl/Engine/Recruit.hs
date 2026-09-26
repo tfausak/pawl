@@ -101,6 +101,7 @@ soldierToken =
               Face.additionalCostChoices = [],
               Face.modeCosts = Map.empty,
               Face.maximumX = [],
+              Face.minimumX = 0,
               Face.alternativeCosts = [],
               Face.costReductions = [],
               Face.playerAbilities = [],

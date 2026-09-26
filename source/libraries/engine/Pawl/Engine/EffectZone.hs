@@ -279,6 +279,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
   Effect.Exploit -> Nothing
+  Effect.GiveGift -> Nothing
   Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing

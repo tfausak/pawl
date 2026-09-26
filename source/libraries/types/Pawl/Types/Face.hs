@@ -382,6 +382,10 @@ data Face card = MkFace
     -- the X announced through CR 602.2b and lives on
     -- Pawl.Types.ActivatedAbility.maximumX, one card being able to print both.
     maximumX :: [Quantity.Quantity],
+    -- | CR 101.1: the floor this face's own words put on that X -- Mind Grind's
+    -- "X can't be 0". 0 for a face that states none. A SPELL's X alone, as
+    -- above; an ability's is Pawl.Types.ActivatedAbility.minimumX.
+    minimumX :: Natural.Natural,
     -- | CR 118.9: this face's printed alternative costs, which its controller MAY
     -- pay rather than the spell's mana cost (Fireblast). CR 118.9c: this does not
     -- change the card's mana cost.

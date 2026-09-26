@@ -2608,6 +2608,8 @@ evidenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n 
 evidenceSpec s registry =
   let play held = S.cast S.alice held >> Stack.resolveTop >> Engine.placePendingTriggers >> Stack.resolveTop
       spiders = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Spider Token")) S.alice
+      thopters = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Thopter Token")) S.alice
+      clues = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Clue Token")) S.alice
    in Spec.describe s "Collect evidence (CR 701.59)" $ do
         Spec.it s "CR 701.59c Vitu-Ghazi Inspector's enters ability reads the evidence its spell collected" $ do
           (gs, held, piker) <- evidenceBoard s registry "Vitu-Ghazi Inspector" 2
@@ -2622,6 +2624,30 @@ evidenceSpec s registry =
               declined = S.runPure (collectingEvidence False S.noSource) gs (play held)
           Spec.assertEqWith s "CR 118.12 collecting evidence made two Spiders, declining made none" (spiders collected, spiders declined) (2, 0)
           Spec.assertEqWith s "CR 701.59a and the collection exiled both Soils" (length (Game.zoneMembers Zone.Exile S.alice collected), length (Game.zoneMembers Zone.Exile S.alice declined)) (2, 0)
+        -- Surveillance Monitor {3}{U} 3/3: "When this creature enters, you may
+        -- collect evidence 4. / Whenever you collect evidence, create a 1/1
+        -- colorless Thopter artifact creature token with flying." Evidence
+        -- Examiner {G}{U} 2/2: "At the beginning of combat on your turn, you may
+        -- collect evidence 4. / Whenever you collect evidence, investigate."
+        -- (Oracle checked against Scryfall 2026-09-26.) The Monitor collects at
+        -- CR 118.12's resolution; the Examiner watches the Inspector's CR 601.2b
+        -- cast-time collection -- the cost's two moments.
+        Spec.it s "CR 701.59a Surveillance Monitor makes a Thopter only when alice collects evidence" $ do
+          (gs, held) <- monitorBoard s registry
+          let resolveAll = S.cast S.alice held >> Monad.replicateM_ (3 :: Int) (Engine.settleForPriority >> Stack.resolveTop)
+              collected = S.runPure (collectingEvidence True S.noSource) gs resolveAll
+              declined = S.runPure (collectingEvidence False S.noSource) gs resolveAll
+          Spec.assertEqWith s "CR 701.59a collecting evidence made a Thopter, declining made none" (thopters collected, thopters declined) (1, 0)
+          Spec.assertEqWith s "and both runs ended with the stack empty and the Monitor in play" (fmap (\g -> (length (GameState.stack g), S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Surveillance Monitor")) S.alice g)) [collected, declined]) [(0, 1), (0, 1)]
+        Spec.it s "CR 701.59a Evidence Examiner investigates when the Inspector's cost collects evidence" $ do
+          (base, held, piker) <- evidenceBoard s registry "Vitu-Ghazi Inspector" 2
+          examiner <- S.printingOf s registry "Evidence Examiner"
+          let (_, gs) = S.addPermanent examiner S.alice base
+              resolveAll = S.cast S.alice held >> Monad.replicateM_ (3 :: Int) (Engine.settleForPriority >> Stack.resolveTop)
+              collected = S.runPure (collectingEvidence True piker) gs resolveAll
+              declined = S.runPure (collectingEvidence False piker) gs resolveAll
+          Spec.assertEqWith s "CR 701.59a collecting evidence made a Clue, declining made none" (clues collected, clues declined) (1, 0)
+          Spec.assertEqWith s "and both runs ended with the stack empty" (length (GameState.stack collected), length (GameState.stack declined)) (0, 0)
         -- CR 609.7a's third class, over the Inspector SPELL: the record its cost
         -- bound says only whether evidence was collected (CR 701.59c), so the
         -- exiled Soils are no object it refers to. bob answers the Inspector with
@@ -2656,6 +2682,19 @@ evidenceBoard s registry card lands = do
       heldId,
       pikerId
     )
+
+-- Surveillance Monitor in alice's hand over four Islands and two Acidic Soils
+-- (mana value 3 each) in her graveyard, in her precombat main phase with
+-- priority.
+monitorBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+monitorBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  soil <- S.printingOf s registry "Acidic Soil"
+  monitor <- S.printingOf s registry "Surveillance Monitor"
+  let (_, oneSoil) = S.addGraveyardCard soil S.alice (S.landsFor island S.alice 4 (Setup.emptyGame S.bothPlayers))
+      (_, twoSoils) = S.addGraveyardCard soil S.alice oneSoil
+      (heldId, gs) = S.addHandCard monitor S.alice twoSoils
+  pure (gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}, heldId)
 
 -- Collect evidence or decline it, at either moment the card offers it: CR
 -- 601.2b's choice among the costs (the Inspector) and CR 118.12's offer at
@@ -2991,6 +3030,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   geyserLeaperSpec s registry
   kataraSpec s registry
   waterWhipSpec s registry
+  mindGrindSpec s registry
   flashSpec s registry
 
 -- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
@@ -3169,6 +3209,19 @@ omniscienceSpec s registry =
       Spec.assertBool s (not (wasAskedForX (responsesFor payingGrant))) "the grant's {0} does not"
       Spec.assertEqWith s "so the printed cast deals its announced 1" (S.lifeOf S.alice (resolveWith payingPrinted)) (Just 19)
       Spec.assertEqWith s "and the free cast deals 0 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice (resolveWith payingGrant)) (Just 20)
+    -- CR 107.3b's 0 against CR 101.1's floor: Mind Grind's "X can't be 0" leaves
+    -- the grant's {0} no legal X, so the cast is not offered at all (Mind Grind's
+    -- Scryfall ruling says the same). A pair differing in the card alone: Blaze's
+    -- {X}{R}, with no floor, is offered off the same landless grant.
+    Spec.it s "CR 101.1/107.3b the grant does not offer a spell whose X can't be 0" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      grind <- S.printingOf s registry "Mind Grind"
+      blaze <- S.printingOf s registry "Blaze"
+      let (grindId, grindGs) = omniscienceBoard mountain omniscience grind 0 True
+          (blazeId, blazeGs) = omniscienceBoard mountain omniscience blaze 0 True
+      Spec.assertBool s (not (any (S.isCastOf grindId) (Action.legalActions S.alice grindGs))) "CR 101.1 Mind Grind is not offered under the grant"
+      Spec.assertBool s (any (S.isCastOf blazeId) (Action.legalActions S.alice blazeGs)) "and Blaze, whose X has no floor, is"
 
 -- Three seats. alice holds Ertai's Scorn ({1}{U}{U}) over an Island and a Swamp;
 -- bob holds one Fog over one Forest, carol two Fogs over two Forests. `bobFirst`
@@ -6044,6 +6097,60 @@ kataraSpec s registry = Spec.describe s "Katara, Water Tribe's Hope" $ do
         tapped = S.tapObject kataraId untapped
     Spec.assertBool s (not (any (isActivateOf kataraId) (Action.legalActions S.alice tapped))) "with Katara tapped nothing can waterbend {1}, so no activation is offered"
     Spec.assertBool s (any (isActivateOf kataraId) (Action.legalActions S.alice untapped)) "and untapped she can tap for it herself, so one is"
+
+-- Mind Grind {X}{U}{B} Sorcery: "Each opponent reveals cards from the top of
+-- their library until they reveal X land cards, then puts all cards revealed
+-- this way into their graveyard. X can't be 0." The last sentence is
+-- Face.minimumX (CR 101.1): the floor pair proves the announcement side, the
+-- offer pair the castability gate. The free cast CR 107.3b fixes at 0 is
+-- omniscienceSpec's.
+mindGrindSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mindGrindSpec s registry = Spec.describe s "Mind Grind" $ do
+  -- A pair varying the ANNOUNCED value alone, on one board. X=1 is answered
+  -- with the least value ChooseX carries, so the prompt's floor is read too.
+  Spec.it s "CR 101.1 an announced X of 0 is refused, and the floor of 1 is not" $ do
+    (spell, gs) <- mindGrindBoard s registry 2
+    let castAt :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+        castAt answer = S.runPure answer gs (do Cast.castSpell S.manaPerformer S.alice spell (S.soleFaceName spell gs) Facing.FaceUp; Stack.resolveTop)
+        zero = castAt (\p -> case p of Prompt.ChooseX {} -> 0; _ -> S.identityAnswer p)
+        least = castAt (\p -> case p of Prompt.ChooseX _ _ _ floorX _ -> floorX; _ -> S.identityAnswer p)
+        graveyard pid = length . Game.zoneMembers Zone.Graveyard pid
+    Spec.assertEqWith s "CR 101.1 at X=0 Mind Grind is still in alice's hand" (S.handSize S.alice zero) 1
+    Spec.assertEqWith s "and bob milled nothing" (graveyard S.bob zero) 0
+    Spec.assertEqWith s "at the prompt's least X bob milled down to his first land" (graveyard S.bob least) 2
+    Spec.assertEqWith s "and carol hers" (graveyard S.carol least) 1
+    Spec.assertEqWith s "and alice, no opponent, kept her library" (length (Game.zoneMembers Zone.Library S.alice least)) 1
+  -- The gate's side: X=1 is the cheapest announcement, so {U}{B} alone does not
+  -- offer the cast. A pair differing in one Mountain.
+  Spec.it s "CR 101.1/601.2 Mind Grind is not offered when no X of 1 or more is payable" $ do
+    (short, shortGs) <- mindGrindBoard s registry 0
+    (enough, enoughGs) <- mindGrindBoard s registry 1
+    Spec.assertBool s (not (any (S.isCastOf short) (Action.legalActions S.alice shortGs))) "with only {U}{B} no X of 1 is payable, so no cast is offered"
+    Spec.assertBool s (any (S.isCastOf enough) (Action.legalActions S.alice enoughGs)) "and one Mountain more pays X=1, so one is"
+
+-- Three seats, so "each opponent" is not each player. alice has an Island, a
+-- Swamp and `n` Mountains, one card in her library and Mind Grind in hand; bob's
+-- library is Piker, Mountain, Piker from the top and carol's Mountain, Piker.
+mindGrindBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, GameState.GameState)
+mindGrindBoard s registry n = do
+  grind <- S.printingOf s registry "Mind Grind"
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let lands = S.landsFor mountain S.alice n (S.landsFor swamp S.alice 1 (S.landsFor island S.alice 1 S.threePlayerGame))
+      stock pid printings g = List.foldl' (\acc p -> snd (S.addLibraryCard p pid acc)) g printings
+      -- Each added card goes on top, so these lists read bottom-up.
+      stocked = stock S.carol [piker, mountain] (stock S.bob [piker, mountain, piker] (stock S.alice [mountain] lands))
+      (spell, gs) = S.addHandCard grind S.alice stocked
+  pure
+    ( spell,
+      gs
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
 
 -- Katara alone on alice's landless battlefield, alice holding priority in her
 -- own precombat main phase.

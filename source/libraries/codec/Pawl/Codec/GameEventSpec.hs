@@ -748,6 +748,18 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Foretold (PlayerId.MkPlayerId 6))
       " {\"type\":\"Foretold\",\"value\":6} "
+  Spec.it s "CollectedEvidence" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.CollectedEvidence (PlayerId.MkPlayerId 7))
+      " {\"type\":\"CollectedEvidence\",\"value\":7} "
+  Spec.it s "GaveGift" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.GaveGift (PlayerId.MkPlayerId 8))
+      " {\"type\":\"GaveGift\",\"value\":8} "
   -- CR 701.66b and CR 701.67c. One player id each, Blighted's payload above: the
   -- rules name the bending player and nothing else. DISTINCT tags, since the two
   -- are different acts at different moments -- a shared one would let an

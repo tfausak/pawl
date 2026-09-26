@@ -5796,6 +5796,8 @@ payComponent moment slots pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && collected >= toInteger n
       then do
         Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
+        -- CR 701.59a's "whenever you collect evidence" reads this.
+        State.modify' (Event.recordEvent (GameEvent.CollectedEvidence pid))
         pure (Payment.Paid (Map.singleton Binding.collectedEvidence (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 406.2 with no prompt: CR 404.2's order determines the card. Unpaid where

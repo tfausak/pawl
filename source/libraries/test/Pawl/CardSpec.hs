@@ -386,6 +386,7 @@ vanillaFace name typeLine =
       Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
+      Face.minimumX = 0,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.enchant = [],
@@ -1064,6 +1065,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
   TriggerCondition.PlayerForetells _ -> []
+  TriggerCondition.PlayerCollectsEvidence _ -> []
+  TriggerCondition.PlayerGivesGift _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
@@ -1309,6 +1312,7 @@ ownCounts effect = case effect of
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
+  Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -1696,6 +1700,7 @@ effectNestedEffects effect = case effect of
   Effect.Evolve {} -> []
   Effect.Mentor {} -> []
   Effect.Exploit -> []
+  Effect.GiveGift -> []
   Effect.Train {} -> []
   Effect.ItBecomes {} -> []
   Effect.ExileUntilMonarch {} -> []
@@ -2207,6 +2212,7 @@ effectReplacements effect = case effect of
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
+  Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -2677,6 +2683,7 @@ effectMintedFaces effect = case effect of
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
+  Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -4107,6 +4114,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
   TriggerCondition.PlayerForetells _ -> []
+  TriggerCondition.PlayerCollectsEvidence _ -> []
+  TriggerCondition.PlayerGivesGift _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
@@ -4323,6 +4332,8 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerBlights _ -> []
   TriggerCondition.PlayerForages _ -> []
   TriggerCondition.PlayerForetells _ -> []
+  TriggerCondition.PlayerCollectsEvidence _ -> []
+  TriggerCondition.PlayerGivesGift _ -> []
   TriggerCondition.PlayerEarthbends _ -> []
   TriggerCondition.PlayerWaterbends _ -> []
   TriggerCondition.PlayerAirbends _ -> []
@@ -5648,6 +5659,7 @@ effectFilters effect = case effect of
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
   Effect.Exploit -> []
+  Effect.GiveGift -> []
   Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []

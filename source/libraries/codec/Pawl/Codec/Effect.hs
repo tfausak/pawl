@@ -237,6 +237,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Evolve" SlotName.codec Effect.Evolve (\x -> case x of Effect.Evolve y -> Just y; _ -> Nothing),
           Arm.payload "Mentor" SlotName.codec Effect.Mentor (\x -> case x of Effect.Mentor y -> Just y; _ -> Nothing),
           Arm.nullary "Exploit" Effect.Exploit,
+          Arm.nullary "GiveGift" Effect.GiveGift,
           Arm.payload "Train" SlotName.codec Effect.Train (\x -> case x of Effect.Train y -> Just y; _ -> Nothing),
           Arm.payload "Firebend" ManaAddition.codec Effect.Firebend (\x -> case x of Effect.Firebend y -> Just y; _ -> Nothing),
           Arm.payload "ItBecomes" Daytime.codec Effect.ItBecomes (\x -> case x of Effect.ItBecomes y -> Just y; _ -> Nothing),
@@ -389,6 +390,7 @@ tagOf x = case x of
   Effect.Evolve {} -> "Evolve"
   Effect.Mentor {} -> "Mentor"
   Effect.Exploit {} -> "Exploit"
+  Effect.GiveGift {} -> "GiveGift"
   Effect.Train {} -> "Train"
   Effect.Firebend {} -> "Firebend"
   Effect.ItBecomes {} -> "ItBecomes"
