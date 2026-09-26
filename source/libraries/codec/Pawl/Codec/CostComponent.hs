@@ -1,6 +1,7 @@
 module Pawl.Codec.CostComponent where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.CountersFromThis as CountersFromThis
 import qualified Pawl.Codec.DiscardCards as DiscardCards
 import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Codec.ExileMaterials as ExileMaterials
@@ -55,7 +56,7 @@ codec keywordCodec =
       Arm.nullary "PayEnergyX" CostComponent.PayEnergyX,
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
-      Arm.payload "RemovePlusOneCountersFromThis" Common.natural CostComponent.RemovePlusOneCountersFromThis (\x -> case x of CostComponent.RemovePlusOneCountersFromThis y -> Just y; _ -> Nothing),
+      Arm.payload "RemoveCountersFromThis" (CountersFromThis.codec keywordCodec) CostComponent.RemoveCountersFromThis (\x -> case x of CostComponent.RemoveCountersFromThis y -> Just y; _ -> Nothing),
       Arm.payload "RemovePlusOneCounters" (RemovePlusOneCounters.codec keywordCodec) CostComponent.RemovePlusOneCounters (\x -> case x of CostComponent.RemovePlusOneCounters y -> Just y; _ -> Nothing),
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis (\x -> case x of CostComponent.PutPlusOneCountersOnThis y -> Just y; _ -> Nothing),
       Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
@@ -96,7 +97,7 @@ tagOf x = case x of
   CostComponent.PayEnergyX {} -> "PayEnergyX"
   CostComponent.AddLoyaltyToThis {} -> "AddLoyaltyToThis"
   CostComponent.RemoveLoyaltyFromThis {} -> "RemoveLoyaltyFromThis"
-  CostComponent.RemovePlusOneCountersFromThis {} -> "RemovePlusOneCountersFromThis"
+  CostComponent.RemoveCountersFromThis {} -> "RemoveCountersFromThis"
   CostComponent.RemovePlusOneCounters {} -> "RemovePlusOneCounters"
   CostComponent.PutPlusOneCountersOnThis {} -> "PutPlusOneCountersOnThis"
   CostComponent.Blight {} -> "Blight"

@@ -10,6 +10,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Claim as Claim
@@ -71,6 +72,7 @@ import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -282,33 +284,37 @@ producedTypes oid gs production = case production of
 -- player controls, and each of the two projection reads here was a fresh gather
 -- per source (#200).
 --
--- A clause whose printed "if" (Clause.condition) fails on this board adds
--- nothing and does nothing, mana and non-mana effects alike (CR 608.2c), read
--- from the source controller's seat as manaOptionsOfGiven reads a count.
--- Pawl.ManaSpec's Synthetic Confluence Obelisk group, one ability with two
--- independent gates, is what proves it.
+-- The FOURTH element is the selection's clauses in printed order, each with the
+-- mana it OFFERS: a clause whose printed "if" (Clause.condition) fails on this
+-- board offers none (CR 608.2c), read from the source controller's seat as
+-- manaOptionsOfGiven reads a count. Pawl.ManaSpec's Synthetic Confluence
+-- Obelisk group, one ability with two independent gates, is what proves it.
+-- Every clause is carried, offering or not, because the cost can flip the
+-- "if" and Pawl.Engine.Cost.tapForManaWith decides it again once the cost is
+-- paid; CR 405.6c's other effects are run from there. The mana is split off by
+-- the classification the rest of the mana path runs on
+-- (ManaAbility.manaProduced), so the rules core stays off effect identity.
 --
--- Not implemented: deciding a clause after the activation's cost is paid, and
--- any rider but the "if". The gate reads the board the route is offered on,
--- and a clause's "may" or "unless ... pays" is ignored (#4204).
+-- Not implemented: a clause's "unless ... pays", whose mana is offered and
+-- added as if nobody paid (#4204).
+--
+-- A clause's printed "may", "if you do" and "or" are not read either: MTGJSON's
+-- dump of 2026-08-23 has no mana ability printing one on a clause (mana-ability
+-- lines matching "may", "If you do" or "unless"; Rhystic Cave's "unless" is the
+-- one hit, above). Thomil, the Destroyer's "You may sacrifice a creature. If
+-- you do, add {B}{B}{B}" is a loyalty ability and so no mana ability (CR 605.1a).
 --
 -- The THIRD element is the ability itself, which CR 602.5b's counted rider needs
 -- and no other clause of a route can stand in for -- Pawl.Types.ManaOption
 -- carries it onward for the same reason. Nothing for CR 305.6's intrinsic route,
--- which is printed on no card.
---
--- The FIFTH element is CR 405.6c's other half: what the selection says beyond
--- its mana. Split by the same classification the rest of the mana path runs on
--- (ManaAbility.manaProduced), so the rules core stays off effect identity, and
--- carried rather than discarded because Pawl.Engine.Cost.tapForManaWith has to
--- run it. CR 305.6's intrinsic route says nothing beyond its mana.
-manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)), [ManaAddition.ManaAddition], [Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)])]
+-- which is printed on no card and whose one clause is minted here.
+manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ActivationRestriction.ActivationRestriction], Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)), [(Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card), [ManaAddition.ManaAddition])])]
 manaRoutesOfGiven pcs oid gs =
   let pc = Projection.projectGiven pcs oid gs
       fromSubtypes
         | Subtype.Engine.intrinsicManaAbilityOf pc =
             fmap
-              (\manaType -> (intrinsicManaCost, [], Nothing, [intrinsicManaAddition manaType], []))
+              (\manaType -> (intrinsicManaCost, [], Nothing, [(intrinsicManaClause manaType, [intrinsicManaAddition manaType])]))
               (Maybe.mapMaybe Subtype.Engine.subtypeMana (Set.toList (PC.subtypes pc)))
         | otherwise = []
       context = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
@@ -316,8 +322,8 @@ manaRoutesOfGiven pcs oid gs =
       selectionRoutes ability =
         fmap
           ( \clauses ->
-              let effects = concatMap (Foldable.toList . Clause.effects) (filter applies clauses)
-               in (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Just ability, Maybe.mapMaybe ManaAbility.manaProduced effects, filter (Maybe.isNothing . ManaAbility.manaProduced) effects)
+              let offered clause = if applies clause then Maybe.mapMaybe ManaAbility.manaProduced (Foldable.toList (Clause.effects clause)) else []
+               in (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Just ability, fmap (\clause -> (clause, offered clause)) clauses)
           )
           (Modal.selectionClauses (ActivatedAbility.modal ability))
       fromAbilities = concatMap selectionRoutes (filter ManaAbility.isManaAbility (Projection.abilitiesGiven pcs oid gs))
@@ -333,6 +339,18 @@ intrinsicManaCost =
   Cost.MkCost
     { Cost.mana = Just (ManaCost.MkManaCost []),
       Cost.components = [CostComponent.TapThis]
+    }
+
+-- The ability above's one clause, carrying the instruction below and no rider.
+intrinsicManaClause :: ManaType -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)
+intrinsicManaClause manaType =
+  Clause.MkClause
+    { Clause.ifTaken = Nothing,
+      Clause.condition = Nothing,
+      Clause.orElse = Nothing,
+      Clause.optionality = Optionality.Mandatory,
+      Clause.payGate = Nothing,
+      Clause.effects = Seq.singleton (Effect.AddMana (intrinsicManaAddition manaType))
     }
 
 -- The instruction the ability above gives: CR 305.6 writes it out as "{T}: Add
@@ -532,10 +550,24 @@ manaOptionsOfGiven pcs oid gs =
       -- Shizuko, Caller of Autumn's three {G} additions are one entry of three
       -- units -- which is why the combine is flipped: Map.insertWith hands the
       -- NEW value first.
-      expand (cost, restrictions, ability, additions, others) =
-        fmap
-          (\parts -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.restrictions = restrictions, ManaOption.ability = ability, ManaOption.yield = List.foldl' (\acc (ref, units) -> Map.insertWith (\new old -> Mana.MkMana (unitsOf old <> unitsOf new)) ref (Mana.MkMana units) acc) Map.empty parts, ManaOption.effects = others})
-          (traverse (\addition -> fmap ((,) (ManaAddition.player addition) . replicate (howMany addition) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) additions)
+      --
+      -- Each part remembers its CLAUSE's position, so the option can hand every
+      -- clause its own share (ManaOption.steps) beside the whole yield.
+      pooled :: [(PlayerRef.PlayerRef, [ManaUnit])] -> Map.Map PlayerRef.PlayerRef Mana
+      pooled = List.foldl' (\acc (ref, units) -> Map.insertWith (\new old -> Mana.MkMana (unitsOf old <> unitsOf new)) ref (Mana.MkMana units) acc) Map.empty
+      expand (cost, restrictions, ability, clauses) =
+        let indexed = zip [0 :: Int ..] clauses
+         in fmap
+              ( \parts ->
+                  ManaOption.MkManaOption
+                    { ManaOption.cost = cost,
+                      ManaOption.restrictions = restrictions,
+                      ManaOption.ability = ability,
+                      ManaOption.yield = pooled (fmap snd parts),
+                      ManaOption.steps = fmap (\(i, (clause, _)) -> (clause, pooled [part | (j, part) <- parts, j == i])) indexed
+                    }
+              )
+              (traverse (\(i, addition) -> fmap ((,) i . (,) (ManaAddition.player addition) . replicate (howMany addition) . unitFor addition) (producedTypes oid gs (ManaAddition.production addition))) [(i, addition) | (i, (_, additions)) <- indexed, addition <- additions])
    in ListUtils.nubOrd (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- Every unit one option adds, whoever gets it, in printed order within each
@@ -894,7 +926,7 @@ manaSourcesGiven inFlight capacity grants pcs pid gs =
       -- the tap and sickness rules reach only such a cost. A Blood Pet is a
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
-      isSource oid = any (\(cost, restrictions, ability, _, _) -> not (inFlightRoute inFlight oid ability) && Activations.times (capacity ForOffer pcs pid oid cost restrictions ability gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      isSource oid = any (\(cost, restrictions, ability, _) -> not (inFlightRoute inFlight oid ability) && Activations.times (capacity ForOffer pcs pid oid cost restrictions ability gs) > 0) (manaRoutesOfGiven pcs oid gs)
       -- CR 723.7, in the one form a card prints it: Word of Command's "the
       -- player can activate mana abilities only if they're from lands that
       -- player controls". Read off the control row rather than from the
