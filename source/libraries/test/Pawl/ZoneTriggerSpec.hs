@@ -507,7 +507,7 @@ graveyardTriggerSpec s registry =
           -- which no longer exists, so nothing returns.
           Spec.assertBool s (Set.member ghastName (namesIn Zone.Exile S.alice after)) "and stays there after its trigger resolves"
           Spec.assertEqWith s "and the ability left the stack" (length (GameState.stack after)) 0
-        -- Bloodghast's second line, a CR 604.2 static read of "an opponent has 10
+        -- Bloodghast's second line, a static ability reading "an opponent has 10
         -- or less life": the greatest negated opponent life total is at least -10.
         -- alice's own life is the control, since "an opponent" excludes her.
         Spec.it s "Bloodghast has haste only while an opponent has 10 or less life" $ do

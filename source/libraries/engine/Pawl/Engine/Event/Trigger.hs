@@ -1437,8 +1437,9 @@ eventTriggers events gs =
       -- `laterGroups`' graveyard twin: entry i holds every card that left a
       -- graveyard at a STRICTLY LATER group, recovered from CR 608.2h last known
       -- information. It was in the graveyard immediately after group i's events,
-      -- so its CR 113.6k abilities are checked against them -- Bloodghast's
-      -- landfall seeing a land that entered before the same resolution exiled it.
+      -- so what CR 113.6k and 113.6m let function there is checked against them --
+      -- Bloodghast's landfall seeing a land that entered before the same
+      -- resolution exiled it.
       -- Strictly later because a card removed by this group's own event did not
       -- exist immediately after it; CR 603.10a's look-back list names no
       -- graveyard-functioning condition that would ask otherwise.
