@@ -6384,6 +6384,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     minted <- case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
+            -- Not implemented: CR 613.7m over copies of SEVERAL sources, which
+            -- enter together but are settled one createTokens call at a time
+            -- (#4222).
             fmap concat . Monad.forM sources $ \src ->
               fmap concat . Monad.forM (Maybe.maybeToList (Game.cardOfWithLastKnown src gs)) $ \card -> do
                 -- CR 707.2 copies no counters, so what the token arrives with
