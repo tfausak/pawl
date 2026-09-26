@@ -2262,12 +2262,23 @@ putOntoBattlefieldAttacking choice oid = do
                 }
     _ -> pure ()
 
--- CR 509.4: a creature put onto the battlefield blocking. The ATTACKER is a
--- parameter rather than a prompt, because CR 509.4's parenthetical is the case
--- every printing of this shape is in -- "unless the effect that put it onto the
--- battlefield specifies what it's blocking" -- and Resolve reads that attacker
--- out of the slot the effect named (EntryRiders.blocking). CR 509.4's main
--- clause, where the controller chooses instead, has no printing (#2089).
+-- What an effect leaves open about CR 509.4's choice, AttackChoice's twin:
+-- settled by Pawl.Engine.Resolve.Effect's read of Pawl.Types.EntryBlock.
+data BlockChoice
+  = -- | CR 509.4's main clause: the controller chooses the attacker.
+    AnyAttacker
+  | -- | CR 509.4's parenthetical: the effect named this attacker.
+    SpecifiedAttacker ObjectId
+  deriving (Eq, Ord, Show)
+
+-- CR 509.4: a creature put onto the battlefield blocking. `choice` is the
+-- rule's two readings: SpecifiedAttacker is the parenthetical, which asks
+-- nobody, and AnyAttacker is the main clause, prompted per permanent over the
+-- attackers CR 506.3e leaves it able to block -- those attacking its controller,
+-- a planeswalker they control or a battle they protect -- and elided at one
+-- candidate; with none it enters unblocking, CR 506.3e's no-op.
+-- Pawl.CombatCostSpec's Synthetic Sudden Interposition case proves the prompt
+-- and its filter.
 --
 -- putOntoBattlefieldAttacking's twin, and its difference from
 -- attemptBlockDeclaration is the same shape as that function's from
@@ -2306,10 +2317,11 @@ putOntoBattlefieldAttacking choice oid = do
 -- battle that player protects". Pawl.CombatSpec's Synthetic Siege Muster pair
 -- proves CR 506.3f.
 --
--- The last two guards are REGRESSION FENCES rather than proved behaviour:
--- dropping both leaves the whole suite green. Neither pooled producer can reach
--- them. Flash Foliage's target slot is Filter.IsAttackingPlayer You, which
--- is STRICTLY NARROWER than rule 506.3e's three cases -- it admits only a
+-- The last two guards are `blockable`. On the AnyAttacker road the second is the
+-- candidate filter, which the Synthetic Sudden Interposition case proves. On the
+-- SpecifiedAttacker road both are REGRESSION FENCES rather than proved
+-- behaviour: no specifying producer can reach them. Flash Foliage's target slot
+-- is Filter.IsAttackingPlayer You, which is STRICTLY NARROWER than rule 506.3e's three cases -- it admits only a
 -- creature attacking the caster themselves, never one attacking a planeswalker
 -- they control -- and it is re-read at CR 608.2b; Aetherplasm's slot is the
 -- attacker its own blocking trigger bound, which CR 509.1a already had attacking
@@ -2320,77 +2332,97 @@ putOntoBattlefieldAttacking choice oid = do
 -- defending players, but Aetherplasm's own trigger still binds an attacker its
 -- controller was allowed to block; the first needs a card that removes the
 -- target from combat between targeting and resolution.
-putOntoBattlefieldBlocking :: ObjectId -> ObjectId -> Game ()
-putOntoBattlefieldBlocking oid attacker = do
+putOntoBattlefieldBlocking :: BlockChoice -> ObjectId -> Game ()
+putOntoBattlefieldBlocking choice oid = do
+  start <- State.get
+  let blockable controller attacker =
+        -- CR 509.4a's first clause
+        Map.member attacker (Combat.attackers (GameState.combat start))
+          -- CR 506.3e / CR 509.4a's second clause
+          && Defender.playerOfAttacker Projection.controllerWithLastKnown attacker start == Just controller
+  case Projection.controllerOf oid start of
+    Just controller
+      | Set.member oid (GameState.battlefield start),
+        -- CR 506.3a
+        isCreatureObject oid start,
+        -- CR 506.3f
+        not (Projection.isBattleOf oid start) -> do
+          mAttacker <- case choice of
+            SpecifiedAttacker attacker -> pure (if blockable controller attacker then Just attacker else Nothing)
+            AnyAttacker -> case NonEmpty.nonEmpty (filter (blockable controller) (Map.keys (Combat.attackers (GameState.combat start)))) of
+              Nothing -> pure Nothing
+              Just (only NonEmpty.:| []) -> pure (Just only)
+              Just candidates -> do
+                answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller start) controller oid candidates)
+                -- An out-of-list answer degrades to the first candidate,
+                -- announceAttackTarget's posture.
+                pure . Just $
+                  if List.elem answer (NonEmpty.toList candidates)
+                    then answer
+                    else NonEmpty.head candidates
+          Monad.forM_ mAttacker (enterBlocking controller oid)
+    _ -> pure ()
+
+-- putOntoBattlefieldBlocking's write, once the attacker is settled.
+enterBlocking :: PlayerId -> ObjectId -> ObjectId -> Game ()
+enterBlocking controller oid attacker = do
   gs <- State.get
   let c = GameState.combat gs
-  case Projection.controllerOf oid gs of
-    Just controller
-      | Set.member oid (GameState.battlefield gs),
-        -- CR 506.3a
-        isCreatureObject oid gs,
-        -- CR 506.3f
-        not (Projection.isBattleOf oid gs),
-        -- CR 509.4a's first clause
-        Map.member attacker (Combat.attackers c),
-        -- CR 506.3e / CR 509.4a's second clause
-        Defender.playerOfAttacker Projection.controllerWithLastKnown attacker gs == Just controller -> do
-          -- CR 509.3c's "was an unblocked creature at that time", read BEFORE the
-          -- write below, and CR 509.3e's comparand read at the same moment: the
-          -- creatures blocking this attacker before this one joined them. The two
-          -- are not the same question, rule 509.1h leaving an attacker blocked by
-          -- an EMPTY set.
-          let wasBlocked = Map.member attacker (Combat.blockers c)
-              before = Map.findWithDefault Set.empty attacker (Combat.blockers c)
-          State.put
-            gs
-              { GameState.combat =
-                  c
-                    { -- insertWith and not adjust: the attacker this creature is
-                      -- put onto the battlefield blocking need not have been
-                      -- blocked already, so the key may be absent.
-                      Combat.blockers = Map.insertWith Set.union attacker (Set.singleton oid) (Combat.blockers c),
-                      -- CR 506.4's comparand: this is where the creature joins
-                      -- combat.
-                      Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c)
-                    }
-              }
-          -- CR 509.3d's third producer, in that rule's own words: "In addition,
-          -- it will trigger if a creature is put onto the battlefield blocking
-          -- that creature." No guard of its own -- the rule states none, where
-          -- its "an effect causes a creature to block" clause carries one --
-          -- and unconditional on wasBlocked, since another creature already
-          -- blocking this attacker does not make this creature's arrival any
-          -- less a blocker for it.
-          --
-          -- The flag is CR 509.4's exclusion: rule 509.3b reads the same event
-          -- and must NOT fire off this one.
-          --
-          -- `wasBlocked` rides the event because no reader can re-derive it
-          -- afterwards: the write above has already put this creature into the
-          -- attacker's entry, and CR 509.1h lets that entry be an EMPTY set for
-          -- an attacker that is blocked all the same. CR 509.3e's filtered form
-          -- is the reader.
-          --
-          -- `before` rides it for a stronger version of the same reason: several
-          -- creatures can be put onto the battlefield blocking one attacker
-          -- before any trigger is scanned, so the entry read at the scan holds
-          -- the arrivals that came AFTER this one too. Both of rule 509.3e's
-          -- forms read it.
-          State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = wasBlocked, BecameBlocking.blockersBefore = before})))
-          -- CR 509.3c: the attacker became a blocked creature. The defending
-          -- player rides the event as it does off the declaration; the guard
-          -- above has already settled that it is this creature's controller.
-          --
-          -- Blocked by ONE creature, and that is not a shortcut: this event is
-          -- withheld unless the attacker was unblocked, so the arrival that
-          -- records it is the only creature blocking the attacker at the moment
-          -- it becomes blocked. A doubled arrival's second token joins AFTER
-          -- this becoming, and CR 509.3e's count reads that off its own
-          -- GameEvent.BecameBlocking instead.
-          Monad.unless wasBlocked $
-            State.modify' (Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker controller 1)))
-    _ -> pure ()
+  -- CR 509.3c's "was an unblocked creature at that time", read BEFORE the
+  -- write below, and CR 509.3e's comparand read at the same moment: the
+  -- creatures blocking this attacker before this one joined them. The two
+  -- are not the same question, rule 509.1h leaving an attacker blocked by
+  -- an EMPTY set.
+  let wasBlocked = Map.member attacker (Combat.blockers c)
+      before = Map.findWithDefault Set.empty attacker (Combat.blockers c)
+  State.put
+    gs
+      { GameState.combat =
+          c
+            { -- insertWith and not adjust: the attacker this creature is
+              -- put onto the battlefield blocking need not have been
+              -- blocked already, so the key may be absent.
+              Combat.blockers = Map.insertWith Set.union attacker (Set.singleton oid) (Combat.blockers c),
+              -- CR 506.4's comparand: this is where the creature joins
+              -- combat.
+              Combat.joinedUnder = Map.insert oid controller (Combat.joinedUnder c)
+            }
+      }
+  -- CR 509.3d's third producer, in that rule's own words: "In addition,
+  -- it will trigger if a creature is put onto the battlefield blocking
+  -- that creature." No guard of its own -- the rule states none, where
+  -- its "an effect causes a creature to block" clause carries one --
+  -- and unconditional on wasBlocked, since another creature already
+  -- blocking this attacker does not make this creature's arrival any
+  -- less a blocker for it.
+  --
+  -- The flag is CR 509.4's exclusion: rule 509.3b reads the same event
+  -- and must NOT fire off this one.
+  --
+  -- `wasBlocked` rides the event because no reader can re-derive it
+  -- afterwards: the write above has already put this creature into the
+  -- attacker's entry, and CR 509.1h lets that entry be an EMPTY set for
+  -- an attacker that is blocked all the same. CR 509.3e's filtered form
+  -- is the reader.
+  --
+  -- `before` rides it for a stronger version of the same reason: several
+  -- creatures can be put onto the battlefield blocking one attacker
+  -- before any trigger is scanned, so the entry read at the scan holds
+  -- the arrivals that came AFTER this one too. Both of rule 509.3e's
+  -- forms read it.
+  State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = wasBlocked, BecameBlocking.blockersBefore = before})))
+  -- CR 509.3c: the attacker became a blocked creature. The defending
+  -- player rides the event as it does off the declaration; the guard
+  -- above has already settled that it is this creature's controller.
+  --
+  -- Blocked by ONE creature, and that is not a shortcut: this event is
+  -- withheld unless the attacker was unblocked, so the arrival that
+  -- records it is the only creature blocking the attacker at the moment
+  -- it becomes blocked. A doubled arrival's second token joins AFTER
+  -- this becoming, and CR 509.3e's count reads that off its own
+  -- GameEvent.BecameBlocking instead.
+  Monad.unless wasBlocked $
+    State.modify' (Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker controller 1)))
 
 -- CR 509.1 / CR 802.4: each defending player declares blockers, in APNAP order
 -- (CR 101.4) -- the order Defender.defendingPlayers already comes back in. One

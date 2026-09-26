@@ -159,6 +159,7 @@ import qualified Pawl.Codec.CounterSpec
 import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
+import qualified Pawl.Codec.CountersFromThisSpec
 import qualified Pawl.Codec.CraftSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
@@ -215,6 +216,7 @@ import qualified Pawl.Codec.EndTurnSignalSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntersWithSpec
 import qualified Pawl.Codec.EntryAttackSpec
+import qualified Pawl.Codec.EntryBlockSpec
 import qualified Pawl.Codec.EntryFlipSpec
 import qualified Pawl.Codec.EntryOptionSpec
 import qualified Pawl.Codec.EntryRSpec
@@ -919,6 +921,7 @@ spec s registry = do
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntersWithSpec.spec s
   Pawl.Codec.EntryAttackSpec.spec s
+  Pawl.Codec.EntryBlockSpec.spec s
   Pawl.Codec.EntryFlipSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
   Pawl.Codec.EntryRSpec.spec s
@@ -1129,6 +1132,7 @@ spec s registry = do
   Pawl.Codec.ReinforceSpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
   Pawl.Codec.RemovePlusOneCountersSpec.spec s
+  Pawl.Codec.CountersFromThisSpec.spec s
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s

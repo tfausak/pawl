@@ -11,6 +11,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryAttack as EntryAttack
+import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
@@ -36,7 +37,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       (EntryRiders.codec Common.text)
       EntryRiders.defaultValue {EntryRiders.attacking = Just (EntryAttack.SameAs (SlotName.MkSlotName (Text.pack "returned")))}
       " {\"attacking\":{\"type\":\"SameAs\",\"value\":\"returned\"}} "
-  -- CR 509.4's rider, which is a SLOT and not a flag: the effect specifies which
+  -- CR 509.4's rider, which is not a flag: here the effect specifies which
   -- attacking creature the entering creature blocks (Flash Foliage's target),
   -- and it implies nothing about tapped-ness -- CR 509.4b exempts the creature
   -- from CR 509.1a's untapped condition either way.
@@ -44,8 +45,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Common.assertCodec
       s
       (EntryRiders.codec Common.text)
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Just (SlotName.MkSlotName (Text.pack "target")), EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False}
-      " {\"blocking\":\"target\"} "
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = Nothing, EntryRiders.blocking = Just (EntryBlock.Specified (SlotName.MkSlotName (Text.pack "target"))), EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.attachedTo = Nothing, EntryRiders.faceDown = Nothing, EntryRiders.noted = False}
+      " {\"blocking\":{\"type\":\"Specified\",\"value\":\"target\"}} "
   -- CR 712.14a's rider, which no other rider implies: a card returned
   -- transformed is not tapped and not attacking by that fact.
   Spec.it s "MkEntryRiders, transformed alone" $

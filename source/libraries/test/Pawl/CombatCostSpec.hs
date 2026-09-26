@@ -1265,6 +1265,26 @@ planeswalkerFoliageBoard forest jace attacker foliage =
         ([attackerId], [jaceId]) -> Just (S.addCounter CounterKind.Loyalty 5 jaceId stocked, attackerId, jaceId)
         _ -> Nothing
 
+-- Attack bob with everything but `carols`, which attacks carol (CR 802.3), and
+-- decline every block.
+splitAttack :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+splitAttack carols p = case p of
+  Prompt.ChooseAttackTarget _ _ oid options ->
+    let want = if oid == carols then S.carol else S.bob
+     in Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer want) (NonEmpty.toList options))
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- splitAttack, casting whatever is castable, and answering CR 509.4's choice
+-- with `carols` if offered, else `chosen` -- filtering the offer, so an attacker
+-- the engine withholds cannot be picked.
+interpose :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+interpose carols chosen p = case p of
+  Prompt.ChoosePermanent _ _ _ options ->
+    Maybe.fromMaybe (NonEmpty.head options) (List.find (`List.elem` NonEmpty.toList options) [carols, chosen])
+  Prompt.ChooseAction {} -> S.castAnswer p
+  _ -> splitAttack carols p
+
 -- Decline every block -- bob has nothing to declare anyway -- cast whatever is
 -- castable, and aim the target at `victim`. The offered set is FILTERED rather
 -- than replaced, so a leg whose target the card's own slot does not admit takes
@@ -1501,6 +1521,31 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertEqWith s "control: nothing is blocking anything" (Combat.Type.blockers (GameState.combat uncast)) Map.empty
         Spec.assertEqWith s "control: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob uncast)) 1
       _ -> Spec.assertFailure s "fixture should have two attackers"
+  -- CR 509.4's MAIN clause: the effect names no attacker, so the Bear's
+  -- controller chooses one as it enters, among those CR 506.3e leaves it able
+  -- to block. Three seats, so "attacking bob" and "attacking" differ: alice
+  -- sends the Thopter and the Prey at bob and the Piker at carol.
+  --
+  -- The answer prefers the Piker, then the Prey -- never the head of the list.
+  -- Skipping the prompt blocks the Thopter (bob at 19); offering the Piker
+  -- blocks it (bob at 17). Only the filtered, asked road leaves bob at 18.
+  Spec.it s "CR 509.4 whole card: Synthetic Sudden Interposition's Bear blocks the attacker its controller chooses" $ do
+    forest <- S.printingOf s registry "Forest"
+    thopter <- S.printingOf s registry "Spined Thopter"
+    prey <- S.printingOf s registry "Sacred Prey"
+    piker <- S.printingOf s registry "Goblin Piker"
+    interposition <- S.printingOf s registry "Synthetic Sudden Interposition"
+    case S.threePlayerCombat [thopter, prey, piker] [] [] of
+      (gs0, [_, ground, carols], _, _) -> do
+        let lands = List.foldl' (\g _ -> snd (S.addPermanent forest S.bob g)) gs0 [1 :: Int, 2]
+            gs = snd (S.addHandCard interposition S.bob lands)
+            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (splitAttack carols) gs
+            blocking = S.runToStep (Phase.Combat CombatStep.CombatDamage) (interpose carols ground) atBlockers
+            atEnd = runToEndOfCombat (interpose carols ground) atBlockers
+        Spec.assertEqWith s "CR 509.4 / 506.3e: bob chose the Prey from the attackers at him, so only the Thopter's 2 connects" (S.lifeOf S.bob atEnd) (Just 18)
+        Spec.assertEqWith s "CR 509.4: the Bear is blocking the Prey" (Combat.blockersOf ground blocking) (Set.fromList (S.tokensOf blocking))
+        Spec.assertEqWith s "and carol's attacker was never offered, so its 2 reaches carol" (S.lifeOf S.carol atEnd) (Just 18)
+      _ -> Spec.assertFailure s "fixture should have three attackers"
   -- CR 509.1a / CR 802.4a: "attacking you" is CR 508.1b's PLAYER and not CR
   -- 508.5's defending player. Both rules write the subject list as three
   -- separate things -- "attacking that player, a planeswalker they control, or a

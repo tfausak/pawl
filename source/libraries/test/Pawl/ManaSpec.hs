@@ -3915,6 +3915,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   yurlokSpec s registry
   almsEngineSpec s registry
   confluenceObeliskSpec s registry
+  hickoryWoodlotSpec s registry
   recipientsSpec s registry
 
 -- CR 605.3b's road has no ability object, so a mana addition naming a BINDING
@@ -4003,6 +4004,52 @@ confluenceObeliskSpec s registry = Spec.describe s "Synthetic Confluence Obelisk
         List.sort [ManaType.Colorless, ManaType.Colored Color.Green],
         List.sort [ManaType.Colorless, ManaType.Colored Color.Green, ManaType.Colored Color.Blue]
       ]
+    -- The OFFER reads the same gates before anything is paid (CR 106.7), which
+    -- the pool above cannot show: the payment decides each clause again.
+    Spec.assertEqWith
+      s
+      "CR 106.7 the Obelisk could produce only {C} without a Forest, and {C} or {G} with one"
+      (fmap (List.sort . Mana.manaTypesOf obeliskId) [bare, withForest])
+      [[ManaType.Colorless], List.sort [ManaType.Colorless, ManaType.Colored Color.Green]]
+
+-- Hickory Woodlot (Land, Oracle text checked against Scryfall 2026-09-26):
+-- "This land enters tapped with two depletion counters on it. {T}, Remove a
+-- depletion counter from this land: Add {G}{G}. If there are no depletion
+-- counters on this land, sacrifice it."
+--
+-- CR 608.2c / 602.2b: the "if" is read as the ability resolves, after its cost
+-- removed a counter, so the activation that takes the LAST counter sacrifices
+-- the land and the one before it does not. The pair differs only in how many
+-- counters the land starts with.
+hickoryWoodlotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hickoryWoodlotSpec s registry = Spec.describe s "Hickory Woodlot" $ do
+  Spec.it s "CR 608.2c the sacrifice reads the counter its own cost removed" $ do
+    woodlot <- S.printingOf s registry "Hickory Woodlot"
+    let (woodlotId, base) = S.addPermanent woodlot S.alice (Setup.emptyGame S.bothPlayers)
+        depletion = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "depletion"))
+        tapWith n =
+          let after = S.runPure S.identityAnswer (S.addCounter depletion n woodlotId base) (Cost.tapForMana S.manaPerformer woodlotId)
+           in (poolTypes S.alice after, Set.member woodlotId (GameState.battlefield after))
+    Spec.assertEqWith
+      s
+      "CR 608.2c {G}{G} either way, and the land is sacrificed only when the cost took its last counter"
+      (fmap tapWith [2, 1])
+      [ ([ManaType.Colored Color.Green, ManaType.Colored Color.Green], True),
+        ([ManaType.Colored Color.Green, ManaType.Colored Color.Green], False)
+      ]
+
+  -- The card's first line, which the case above sets by hand.
+  Spec.it s "CR 614.1c Hickory Woodlot enters tapped with two depletion counters" $ do
+    woodlot <- S.printingOf s registry "Hickory Woodlot"
+    let (_, inHand) = S.addHandCard woodlot S.alice (Setup.emptyGame S.bothPlayers)
+        board = inHand {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        played = S.runPure S.playLandAnswer board Engine.priorityLoop
+        depletion = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "depletion"))
+    Spec.assertEqWith
+      s
+      "CR 614.1c the land arrives tapped, carrying two depletion counters"
+      (fmap (\oid -> (fmap Object.tapped (Game.lookupObject oid played), S.counterOf depletion oid played)) (Set.toList (GameState.battlefield played)))
+      [(Just TapState.Tapped, 2)]
 
 -- CR 106.4: "adds that mana" says nothing about whose pool, and CR 106.3's
 -- "instructs a player to add" is the sentence a card fills in. Yurlok of Scorch

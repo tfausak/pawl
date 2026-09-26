@@ -2837,6 +2837,30 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member Subtype.Type.Goblin (Projection.subtypesOf pikerId after)) "and still the printed Goblin (CR 205.1b: the add keeps the rest)"
     Spec.assertBool s (Projection.hasKeyword Keyword.Changeling pikerId after) "and the keyword itself is there (CR 613.1f layer 6)"
 
+  -- Living metal's twin of the case above: a keyword granted in layer 6 whose
+  -- meaning (CR 702.161a) is a layer-4 static ability. Synthetic Living Alloy
+  -- ("target permanent gains living metal") is the producer; Scryfall
+  -- `o:"living metal"`, 2026-09-26, finds only Transformers back faces printing it.
+  --
+  -- One board, handed over to bob: an unconditional artifact-creature grant would
+  -- agree with the rule on alice's turn and differ only on bob's.
+  Spec.it s "CR 702.161a living metal granted by a RESOLUTION makes the Vehicle a creature on its controller's turn only" $ do
+    island <- S.printingOf s registry "Island"
+    dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+    alloy <- S.printingOf s registry "Synthetic Living Alloy"
+    let (vehicleId, before) = S.addPermanent dreadnought S.alice (S.landsInPlay island 1)
+        (withAlloy, alloyId) = S.handOne alloy before
+        aim :: Prompt.Prompt r -> r
+        aim p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (\r -> Recipient.objectOf r == Just vehicleId) . snd) sets
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure aim withAlloy (S.cast S.alice alloyId))
+        after = snd (Engine.runGamePure aim cast Stack.resolveTop)
+        bobsTurn = S.runPure S.identityAnswer after Engine.handoffTurn
+    Spec.assertEqWith s "granted, it is an artifact creature during alice's turn" (Projection.cardTypesOf vehicleId after) (Set.fromList [CardType.Artifact, CardType.Creature])
+    Spec.assertEqWith s "and only an artifact during bob's" (Projection.cardTypesOf vehicleId bobsTurn) (Set.singleton CardType.Artifact)
+    Spec.assertEqWith s "ungranted, only an artifact during alice's turn too" (Projection.cardTypesOf vehicleId before) (Set.singleton CardType.Artifact)
+
   -- CR 613.8b's loop clause reached by two PRINTED cards, and the proving pair
   -- for deciding CR 613.8a over the whole board rather than per projected object.
   -- Each permanent shows one edge only (see limbBloodMoon), so a per-object

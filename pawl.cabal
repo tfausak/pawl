@@ -357,6 +357,8 @@ library codec
     Pawl.Codec.CounterRestriction
     Pawl.Codec.CounterRestrictionSpec
     Pawl.Codec.CounterRSpec
+    Pawl.Codec.CountersFromThis
+    Pawl.Codec.CountersFromThisSpec
     Pawl.Codec.CounterSpec
     Pawl.Codec.CounterSubject
     Pawl.Codec.CounterSubjectSpec
@@ -475,6 +477,8 @@ library codec
     Pawl.Codec.EntersWithSpec
     Pawl.Codec.EntryAttack
     Pawl.Codec.EntryAttackSpec
+    Pawl.Codec.EntryBlock
+    Pawl.Codec.EntryBlockSpec
     Pawl.Codec.EntryFlip
     Pawl.Codec.EntryFlipSpec
     Pawl.Codec.EntryOption
@@ -1812,6 +1816,7 @@ library types
     Pawl.Types.CounterPlacement
     Pawl.Types.CounterR
     Pawl.Types.CounterRestriction
+    Pawl.Types.CountersFromThis
     Pawl.Types.CounterSubject
     Pawl.Types.Craft
     Pawl.Types.Create
@@ -1876,6 +1881,7 @@ library types
     Pawl.Types.EndTurnSignal
     Pawl.Types.EntersWith
     Pawl.Types.EntryAttack
+    Pawl.Types.EntryBlock
     Pawl.Types.EntryFlip
     Pawl.Types.EntryOption
     Pawl.Types.EntryR
