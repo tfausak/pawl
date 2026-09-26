@@ -2029,6 +2029,52 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and every hand is empty" (fmap (\pid -> namesIn Zone.Hand pid after) [S.alice, S.bob, S.carol]) [[], [], []]
     Spec.assertEqWith s "three asks and no search" asked [(Text.pack "may", S.alice), (Text.pack "may", S.bob), (Text.pack "may", S.carol)]
     Spec.assertEqWith s "the Wayfinder itself still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jungle Wayfinder")) S.alice after) 1
+  -- Synthetic Shared Excavation -- "{2}{U} Sorcery. Each player searches your
+  -- library for a card and exiles it. Then shuffle." Synthetic because every
+  -- printed several-player search has each player search their own library
+  -- (MTGJSON 2026-08-23, "each player/opponent ... search", no other shape), so
+  -- no printing puts two searchers into one library (CR 701.23i).
+  --
+  -- Alice, bob and carol search alice's library of five. Alice and bob both
+  -- name the Forest and carol the Mountain. Under CR 701.23i all three look at
+  -- the same five cards, so bob may find the Forest too, and it is exiled once.
+  -- Searching one after another, bob is offered four cards, his Forest is
+  -- refused, CR 701.23d completes his find from the head, and three cards go.
+  -- The shuffle answer rotates by one, so ONE shuffle of the three left is
+  -- told apart from one per searcher, which rotates them back to where they
+  -- were.
+  Spec.it s "CR 701.23i whole card: several searchers of one library look at the same cards" $ do
+    island <- S.printingOf s registry "Island"
+    excavation <- S.printingOf s registry "Synthetic Shared Excavation"
+    plains <- S.printingOf s registry "Plains"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    let g0 = S.landsFor island S.alice 3 S.threePlayerGame
+        (_, g1) = S.addLibraryCard swamp S.alice g0
+        (_, g2) = S.addLibraryCard island S.alice g1
+        (mountainId, g3) = S.addLibraryCard mountain S.alice g2
+        (forestId, g4) = S.addLibraryCard forest S.alice g3
+        (_, g5) = S.addLibraryCard plains S.alice g4
+        (gs, spellId) = S.handOne excavation g5
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.Search _ pid _ _ -> if pid == S.carol then [mountainId] else [forestId]
+          Prompt.Shuffle (x : xs) -> xs <> [x]
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure answer cast Engine.priorityLoop)
+        nameOf = Just . CardName.MkCardName . Text.pack
+    Spec.assertEqWith
+      s
+      "bob found the Forest alice found, so exile holds it once and carol's Mountain"
+      (List.sort (namesIn Zone.Exile S.alice settled))
+      (List.sort [nameOf "Forest", nameOf "Mountain"])
+    Spec.assertEqWith
+      s
+      "alice's library was shuffled once, not once per searcher"
+      (namesIn Zone.Library S.alice settled)
+      [nameOf "Island", nameOf "Swamp", nameOf "Plains"]
   -- Delivery Moogle -- "{3}{W} Creature -- Moogle 3/2. Flying. When this
   -- creature enters, search your library and/or graveyard for an artifact card
   -- with mana value 2 or less, reveal it, and put it into your hand. If you
