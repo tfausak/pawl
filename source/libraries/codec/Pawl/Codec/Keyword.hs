@@ -8,6 +8,7 @@ import qualified Pawl.Codec.Devour as Devour
 import qualified Pawl.Codec.Emerge as Emerge
 import qualified Pawl.Codec.Equip as Equip
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.ForetellCost as ForetellCost
 import qualified Pawl.Codec.Gift as Gift
 import qualified Pawl.Codec.Impending as Impending
 import qualified Pawl.Codec.KeywordCount as KeywordCount
@@ -207,7 +208,7 @@ codec =
       Arm.payload "Backup" Common.natural Keyword.Backup (\x -> case x of Keyword.Backup y -> Just y; _ -> Nothing),
       Arm.payload "Disguise" (Cost.codec codec) Keyword.Disguise (\x -> case x of Keyword.Disguise y -> Just y; _ -> Nothing),
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot (\x -> case x of Keyword.Plot y -> Just y; _ -> Nothing),
-      Arm.payload "Foretell" (Cost.codec codec) Keyword.Foretell (\x -> case x of Keyword.Foretell y -> Just y; _ -> Nothing),
+      Arm.payload "Foretell" (ForetellCost.codec codec) Keyword.Foretell (\x -> case x of Keyword.Foretell y -> Just y; _ -> Nothing),
       Arm.nullary "Demonstrate" Keyword.Demonstrate,
       Arm.payload "Escape" (Cost.codec codec) Keyword.Escape (\x -> case x of Keyword.Escape y -> Just y; _ -> Nothing),
       Arm.payload "Companion" (Filter.codec codec) Keyword.Companion (\x -> case x of Keyword.Companion y -> Just y; _ -> Nothing),

@@ -91,6 +91,7 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
+import Pawl.Types.ForetellCost (ForetellCost)
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -3765,8 +3766,12 @@ plotCost keywords =
 -- give one, which Pawl.Engine.Cost.grantedForetellCost settles per face off
 -- Object.foretellCostReduction, and that module offers both.
 --
+-- The payload as stated, which may be a reduction off the card's own mana cost
+-- (Dream Devourer's grant): Pawl.Engine.Cost.foretellCostFor settles it against
+-- a face.
+--
 -- A wildcard, and ONE cost per card (the ascending-least), morphCost's shape.
-foretellCost :: Set Keyword -> Maybe (Cost Keyword)
+foretellCost :: Set Keyword -> Maybe (ForetellCost Keyword)
 foretellCost keywords =
   let costOf keyword = case keyword of
         Keyword.Foretell cost -> Just cost

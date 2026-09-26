@@ -469,6 +469,18 @@ returnedPermanent = SlotName.MkSlotName (Text.pack "thatReturnedPermanent")
 exiledCard :: SlotName
 exiledCard = SlotName.MkSlotName (Text.pack "thatExiledCard")
 
+-- CR 400.7j: the reserved slot under which the card a DiscardThis COST payment
+-- discarded is bound, as the object it became in the graveyard -- Calim, Djinn
+-- Emperor's "return Calim from your graveyard to the battlefield tapped" after
+-- "Discard Calim". exiledCard's route and posture: the new incarnation, so every
+-- read is CURRENT information, and unbound where the card did not arrive in a
+-- public zone.
+--
+-- Not a target, so the same CR 608.2b posture and the same "no card's
+-- targetSlots may name it" sweep as sacrificedPermanent above.
+discardedCard :: SlotName
+discardedCard = SlotName.MkSlotName (Text.pack "thatDiscardedCard")
+
 -- CR 601.2f: the reserved slot under which the permanents a COST payment TAPPED
 -- are bound -- "the tapped creature" in Unerring Sling's "deals damage equal to
 -- the tapped creature's power". Stamped by Pawl.Engine.Activate off the payment

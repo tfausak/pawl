@@ -173,6 +173,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GameState as GameState
@@ -2443,6 +2444,7 @@ reservedSlots =
       Binding.sacrificedPermanent,
       Binding.returnedPermanent,
       Binding.exiledCard,
+      Binding.discardedCard,
       Binding.tappedPermanent,
       Binding.tappedForTotalPower,
       Binding.revealedCard,
@@ -2886,11 +2888,11 @@ withCountersFilters w =
 -- same reason riderFilters is one -- the two halves of a gate must not be swept
 -- apart.
 --
--- The COST half is SlotlessCostFramed: Pawl.Engine.Resolve.payGatePaidBy pays it
--- through Pawl.Engine.Cost, whose Filter.Context comes from
--- Pawl.Engine.Filter.contextFor and carries none of the resolution's slots, so
--- Filter.IsBound there is a silent False. Unframed promised the opposite; see
--- #2881.
+-- The COST half is Unframed, an announced cost's framing: Pawl.Engine.Resolve.payGatePaidBy
+-- measures and pays it with the resolving object's slots (Cost.canPayReading,
+-- Cost.payReading), the map Cost.announcedSlots hands an announced cost, so
+-- Filter.IsBound there reads them -- Calim, Djinn Emperor's "two other cards
+-- named Calim". It was SlotlessCostFramed while the gate read no slots (#2881).
 --
 -- The MULTIPLIER half is left as quantityFilters tags it, which is Unframed for
 -- an ordinary Count and KeywordFramed for a CR 122.1b keyword counter. Unframed
@@ -2899,7 +2901,7 @@ withCountersFilters w =
 -- resolution's slots.
 payGateFilters :: PayGate.PayGate -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 payGateFilters gate =
-  slotlessCost (costFilters (PayGate.cost gate))
+  fmap ((,) Unframed) (costFilters (PayGate.cost gate))
     <> concatMap quantityFilters (Maybe.maybeToList (PayGate.perEach gate))
 
 -- CR 122.1b: the one counter kind with a Filter under it, since it carries a
@@ -3028,8 +3030,10 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Plot cost -> costFilters cost
   -- CR 702.168a: the disguise cost, reached the same way as morph's below.
   Keyword.Disguise cost -> costFilters cost
-  -- CR 702.143a: the foretell cost, reached the same way.
-  Keyword.Foretell cost -> costFilters cost
+  -- CR 702.143a: the foretell cost, reached the same way. A cost read off the
+  -- card's own mana cost names no Filter.
+  Keyword.Foretell (ForetellCost.Stated cost) -> costFilters cost
+  Keyword.Foretell (ForetellCost.ManaCostReducedBy _) -> []
   -- CR 702.62a: the suspend cost, reached the same way; its N is a number.
   Keyword.Suspend (Suspend.MkSuspend _ cost) -> costFilters cost
   -- CR 702.139a's condition, which is a Filter rather than a Cost. KeywordFramed
@@ -5108,17 +5112,15 @@ data Framing
     -- OutsideTheGameFramed, and for the mirror-image reason: the candidate is
     -- an object all right, but no slot of any announcement names it.
     --
-    -- The positions: CR 118.12's gate cost, paid by
-    -- Pawl.Engine.Resolve.payGatePaidBy; CR 116.2d's ignore cost, paid by
-    -- Pawl.Engine.Ignore; CR 116.2c's UntilPaid price, paid by
-    -- Pawl.Engine.EndEffect; and CR 508.1h's and CR 509.1d's per-creature
-    -- combat tolls, paid by Pawl.Engine.Cost.payTagged. Each is unanswerable by
-    -- the RULE and not merely by this engine: a special action uses no stack
-    -- (CR 116.1), a declaration announces no target, and a gate is paid as
-    -- something resolves rather than as it is announced. Card text reaches the
-    -- first -- Lithophage's "unless you sacrifice a Mountain" -- so all are
-    -- swept rather than dropped. The gate was tagged first, see #2881; the
-    -- ignore cost followed, see #2883; the toll and the price last, see #2927.
+    -- The positions: CR 116.2d's ignore cost, paid by Pawl.Engine.Ignore; CR
+    -- 116.2c's UntilPaid price, paid by Pawl.Engine.EndEffect; and CR 508.1h's
+    -- and CR 509.1d's per-creature combat tolls, paid by
+    -- Pawl.Engine.Cost.payTagged. Each is unanswerable by the RULE and not
+    -- merely by this engine: a special action uses no stack (CR 116.1), and a
+    -- declaration announces no target. The ignore cost was tagged first, see
+    -- #2883; the toll and the price last, see #2927. CR 118.12's gate cost was
+    -- here too (#2881) until Pawl.Engine.Resolve.payGatePaidBy handed it the
+    -- resolving object's slots.
     --
     -- NOT the costs an announcement pays -- CR 601.2f's additional cost, CR
     -- 118.9's alternative, an activated ability's own, and CR 613.11's two
