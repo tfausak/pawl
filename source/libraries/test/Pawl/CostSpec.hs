@@ -4387,7 +4387,7 @@ counterRemovalsOf gs =
 -- +1/+1 counter from this creature: This creature gains hexproof until end of
 -- turn."
 --
--- The producer for CostComponent.RemovePlusOneCountersFromThis, CR 118.1's
+-- A producer for CostComponent.RemoveCountersFromThis, CR 118.1's
 -- counter removal as an activation cost. The counter is what CR 613.4c's layer 7c
 -- reads, so the payment is observable as a SIZE and not only as a map entry: an
 -- implementation that does not remove it leaves a 3/3 that can pay again.

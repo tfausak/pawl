@@ -7,6 +7,8 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
@@ -136,12 +138,12 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       (CostComponent.RemoveLoyaltyFromThis 1)
       " {\"type\":\"RemoveLoyaltyFromThis\",\"value\":1} "
   -- CR 118.1's counter removal as an activation cost, Barkhide Troll's.
-  Spec.it s "RemovePlusOneCountersFromThis" $
+  Spec.it s "RemoveCountersFromThis" $
     Common.assertCodec
       s
       codec
-      (CostComponent.RemovePlusOneCountersFromThis 1)
-      " {\"type\":\"RemovePlusOneCountersFromThis\",\"value\":1} "
+      (CostComponent.RemoveCountersFromThis (CountersFromThis.MkCountersFromThis CounterKind.PlusOnePlusOne 1))
+      " {\"type\":\"RemoveCountersFromThis\",\"value\":{\"count\":1,\"kind\":{\"type\":\"PlusOnePlusOne\"}}} "
   -- The same removal aimed at a permanent the payer chooses, Zameck Guildmage's.
   Spec.it s "RemovePlusOneCounters" $
     Common.assertCodec

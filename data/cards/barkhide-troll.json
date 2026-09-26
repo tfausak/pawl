@@ -6,8 +6,13 @@
           "cost": {
             "components": [
               {
-                "type": "RemovePlusOneCountersFromThis",
-                "value": 1
+                "type": "RemoveCountersFromThis",
+                "value": {
+                  "count": 1,
+                  "kind": {
+                    "type": "PlusOnePlusOne"
+                  }
+                }
               }
             ],
             "mana": [

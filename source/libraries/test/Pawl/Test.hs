@@ -159,6 +159,7 @@ import qualified Pawl.Codec.CounterSpec
 import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
+import qualified Pawl.Codec.CountersFromThisSpec
 import qualified Pawl.Codec.CraftSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
@@ -1131,6 +1132,7 @@ spec s registry = do
   Pawl.Codec.ReinforceSpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
   Pawl.Codec.RemovePlusOneCountersSpec.spec s
+  Pawl.Codec.CountersFromThisSpec.spec s
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s

@@ -1,6 +1,7 @@
 module Pawl.Types.CostComponent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
@@ -81,9 +82,9 @@ data CostComponent keyword
   | -- | CR 606.4's other half / Jace Beleren: remove this many loyalty counters
     -- from the permanent the cost is on, which CR 606.6 gates on it having them.
     RemoveLoyaltyFromThis Natural.Natural
-  | -- | CR 118.1 as a cost / Barkhide Troll: remove this many +1\/+1 counters from
-    -- the permanent the cost is on.
-    RemovePlusOneCountersFromThis Natural.Natural
+  | -- | CR 118.1 as a cost / Barkhide Troll, Hickory Woodlot: remove this many
+    -- counters of one kind from the permanent the cost is on.
+    RemoveCountersFromThis (CountersFromThis.CountersFromThis keyword)
   | -- | CR 118.1 as a cost / Zameck Guildmage: remove this many +1\/+1 counters
     -- from one permanent matching the Filter, which the payer chooses.
     RemovePlusOneCounters (RemovePlusOneCounters.RemovePlusOneCounters keyword)
