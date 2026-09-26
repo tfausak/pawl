@@ -81,10 +81,10 @@ depart reason pid = do
   -- CR 801.2c: the seat keeps counting toward range of influence until the
   -- next turn begins.
   State.modify' (\gs -> gs {GameState.players = Map.adjust lose pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)})
-  State.modify' (\gs -> Monarch.reassignOnDeparture pid (Game.stillPlayingInOrder gs) gs)
+  Monarch.reassignOnDeparture pid
   -- CR 726.4, the same clause one rule over and for the same reason: the active
   -- player takes the initiative at the same time its holder leaves.
-  State.modify' (\gs -> Initiative.reassignOnDeparture pid (Game.stillPlayingInOrder gs) gs)
+  Initiative.reassignOnDeparture pid
 
 -- CR 800.4: a multiplayer game can continue after players leave, and CR 800.1
 -- makes "multiplayer" mean a game that BEGINS with more than two players.

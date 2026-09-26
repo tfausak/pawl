@@ -151,6 +151,7 @@ encode p answer = case p of
   Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
   Prompt.ChooseProtector {} -> Response.ChoseProtector answer
   Prompt.ChoosePlayer {} -> Response.ChosePlayer answer
+  Prompt.ChooseActivePlayer {} -> Response.ChoseActivePlayer answer
   Prompt.ChooseBasicLandType {} -> Response.ChoseBasicLandType answer
   Prompt.ChooseCreatureType {} -> Response.ChoseCreatureType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
@@ -465,6 +466,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChoosePlayer {} -> case response of
     Response.ChosePlayer pid -> Just pid
+    _ -> Nothing
+  Prompt.ChooseActivePlayer {} -> case response of
+    Response.ChoseActivePlayer pid -> Just pid
     _ -> Nothing
   Prompt.ChooseBasicLandType {} -> case response of
     Response.ChoseBasicLandType t -> Just t
@@ -986,6 +990,8 @@ defaultAnswer p = case p of
   -- CR 102.1: every candidate is a player in the game, so the head is legal --
   -- the same filter-not-trust fallback Event's arm applies to a wrong answer.
   Prompt.ChoosePlayer _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 725.4 / 726.4: every candidate is a live active player who may take it.
+  Prompt.ChooseActivePlayer _ _ candidates -> NonEmpty.head candidates
   -- CR 305.6: any of the five basic land types is legal. Mountain is what the
   -- ChooseLandTypeSwap arm above falls back to, so the two agree on which type
   -- a short transcript conjures.

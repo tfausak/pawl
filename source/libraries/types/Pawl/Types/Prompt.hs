@@ -577,6 +577,11 @@ data Prompt r where
   -- come from the caller, and this constructor rather than ChooseOpponent above
   -- is the one raised exactly when they include the chooser.
   ChoosePlayer :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
+  -- | CR 725.4 / 726.4 with CR 805.2: which active player becomes the monarch,
+  -- then which takes the initiative, as the holder leaves under the shared team
+  -- turns option; the active team's primary player chooses, and only between
+  -- two or more candidates.
+  ChooseActivePlayer :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | An order over one player's triggered abilities, a permutation of the
   -- entries' indices. At Pawl.Engine.Engine.orderPending it is CR 603.3b's
   -- stack order, the last named resolving first, elided unless two or more
