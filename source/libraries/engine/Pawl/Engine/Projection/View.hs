@@ -42,6 +42,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Convoking as Convoking
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1811,12 +1812,14 @@ viewOfRecipient peers gs r = case Recipient.playerOf r of
   Just pid -> Just (Count.playerView gs pid)
   Nothing -> Recipient.objectOf r >>= peers
 
--- One control-granting static ability, flattened: the source and the timestamp
--- its effect takes (CR 613.7a).
+-- One control-granting static ability, flattened: the source, the timestamp
+-- its effect takes (CR 613.7a), and its CR 604.2 "as long as" clause, which
+-- layerTwo asks against its running table.
 data ControlGrant = MkControlGrant
   { cgSource :: ObjectId,
     cgAffected :: Affected.Affected,
-    cgTimestamp :: Timestamp
+    cgTimestamp :: Timestamp,
+    cgCondition :: Maybe Condition.Type.Condition
   }
   deriving (Eq, Ord, Show)
 
@@ -1837,8 +1840,8 @@ data ControlGrant = MkControlGrant
 -- Goblin Dominion, the one that is not an Aura. A regression fence, kept because
 -- the three walks over abilitySources must agree on which list they read.
 --
--- Not implemented: CR 604.2's "as long as" gate, which setLandSubtypeEffects
--- does ask -- the same mutual recursion rules it out here (#1529).
+-- CR 604.2's "as long as" clause is carried rather than asked: it is judged
+-- inside layerTwo, where the controllers it reads are the fold's own.
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let grantsOf permId = case Game.lookupObject permId gs of
@@ -1852,7 +1855,8 @@ controlGrants gs =
                 MkControlGrant
                   { cgSource = permId,
                     cgAffected = StaticAbility.affected sa,
-                    cgTimestamp = ts
+                    cgTimestamp = ts,
+                    cgCondition = StaticAbility.condition sa
                   }
               keeps sa = isControl sa && functionsFromZone Zone.Battlefield sa
            in -- A granted ability too, at CR 613.7a's later of the two timestamps,
@@ -1897,7 +1901,8 @@ data ControlEffect = MkControlEffect
     ceTimestamp :: Timestamp,
     ceSource :: ObjectId,
     ceAffected :: Affected.Affected,
-    cePlayer :: Maybe PlayerId.PlayerId
+    cePlayer :: Maybe PlayerId.PlayerId,
+    ceCondition :: Maybe Condition.Type.Condition
   }
 
 -- CR 613.1b's layer 2 as one fold: every control effect, applied one at a time
@@ -1915,18 +1920,32 @@ data ControlEffect = MkControlEffect
 layerTwo :: [ControlGrant] -> GameState -> Map ObjectId PlayerId.PlayerId
 layerTwo grants gs =
   let stored =
-        [ (ContinuousEffect.timestamp eff, ContinuousEffect.source eff, ContinuousEffect.affected eff, Just pid)
+        [ (ContinuousEffect.timestamp eff, ContinuousEffect.source eff, ContinuousEffect.affected eff, Just pid, Nothing)
         | eff <- GameState.continuousEffects gs,
           Modification.SetController pid <- [ContinuousEffect.modification eff]
         ]
-      granted = fmap (\g -> (cgTimestamp g, cgSource g, cgAffected g, Nothing)) grants
-      effects = zipWith (\i (ts, src, aff, who) -> MkControlEffect i ts src aff who) [0 ..] (stored <> granted)
+      granted = fmap (\g -> (cgTimestamp g, cgSource g, cgAffected g, Nothing, cgCondition g)) grants
+      effects = zipWith (\i (ts, src, aff, who, cond) -> MkControlEffect i ts src aff who cond) [0 ..] (stored <> granted)
       controllerIn table o = case Map.lookup o table of
         Just pid -> Just pid
         Nothing -> fmap defaultControllerOf (Game.lookupObject o gs)
+      -- CR 604.2: a grant whose "as long as" clause is false names nothing. The
+      -- clause is judged at CR 613.6's decision point, its own layer, so the
+      -- view is copiable values and the table's controllers, as conditionHolds
+      -- bounds any other clause; CR 109.5's "you" is the source's controller
+      -- there. Asked through the table, a steal that flips the clause is one
+      -- this effect waits on (CR 613.8a). Pawl.AuraSpec's "CR 604.2/613.8a a
+      -- control grant applies only while its as-long-as clause holds" proves
+      -- both.
+      holdsIn ctrl e = case ceCondition e of
+        Nothing -> True
+        Just cond ->
+          let src = ceSource e
+           in Condition.holds (Just . leanViewOf ctrl gs) ((Filter.contextFor (Game.teams gs) (ctrl src) (Just src)) {Filter.sourceAttachedTo = hostOf src gs}) gs src cond
       outcome table e =
         let ctrl = controllerIn table
-         in (controlNames ctrl gs (ceSource e) (ceAffected e), cePlayer e <|> ctrl (ceSource e))
+            named = if holdsIn ctrl e then controlNames ctrl gs (ceSource e) (ceAffected e) else Set.empty
+         in (named, cePlayer e <|> ctrl (ceSource e))
       apply table e = case outcome table e of
         (named, Just pid) -> Set.foldr (`Map.insert` pid) table named
         (_, Nothing) -> table
