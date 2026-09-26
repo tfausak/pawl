@@ -3334,7 +3334,8 @@ oneLessPerEach :: Count.Count Quantity.Quantity -> CostReduction.CostReduction
 oneLessPerEach count =
   CostReduction.MkCostReduction
     { CostReduction.amount = ManaCost.MkManaCost [ManaSymbol.Generic 1],
-      CostReduction.perEach = Quantity.Count count
+      CostReduction.perEach = Quantity.Count count,
+      CostReduction.condition = Nothing
     }
 
 -- CR 702.160a / CR 718.1: the PROTOTYPE inset frames -- the second mana cost,

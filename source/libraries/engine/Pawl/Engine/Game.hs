@@ -2369,6 +2369,19 @@ castOf event = case event of
   GameEvent.ActivatedAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
+-- CR 601.2i: how many spells each player has cast this turn, off the whole log,
+-- which Engine.handoffTurn clears. GameState.castsLastTurn is a snapshot of it,
+-- and Pawl.Engine.PlayerEffect.castsThisTurn and Pawl.Engine.Quantity's
+-- SpellsCastThisTurn arm read one seat out of it, so the three cannot disagree.
+--
+-- SPARSE: a player who cast nothing has no entry, and every reader takes 0 for an
+-- absent one.
+castsPerPlayer :: GameState -> Map.Map PlayerId Natural
+castsPerPlayer gs =
+  Map.fromListWith
+    (+)
+    (fmap (\cast -> (SpellWasCast.player cast, 1)) (Maybe.mapMaybe (castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+
 -- CR 608.2n: the ACTIVATED ABILITY an event describes RESOLVING, if it describes
 -- one -- the source object and the ability, which is the pair CR 707.10b counts
 -- by. castOf above's shape and placement, and its fold's twin:

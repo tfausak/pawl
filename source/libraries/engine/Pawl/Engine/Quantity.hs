@@ -789,6 +789,13 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.SpellsCastLastTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (GameState.castsLastTurn gs)))
           _ -> Nothing
+        -- CR 601.2i / 608.2i: the arm above, for the turn in progress, read off the live
+        -- log through the same fold GameState.castsLastTurn snapshots. Ertai's Scorn's
+        -- "an opponent cast two or more" is the Greatest of it over opponents, not a
+        -- sum, which two opponents casting one each would satisfy.
+        Quantity.SpellsCastThisTurn ref -> case playersOf ref of
+          Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (Game.castsPerPlayer gs)))
+          _ -> Nothing
         -- CR 608.2n / 608.2i: how many times the ACTIVATED ABILITY this evaluation is
         -- aimed at has resolved this turn, folded off the turn-scoped log.
         --
@@ -1238,6 +1245,7 @@ objectSlots quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.DamageDealtToPlayersThisTurn _ -> Set.empty
   Quantity.SpellsCastLastTurn _ -> Set.empty
+  Quantity.SpellsCastThisTurn _ -> Set.empty
   Quantity.TimesResolvedThisTurn -> Set.empty
   Quantity.SpellsCastBefore -> Set.empty
   Quantity.PermanentsDiedThisTurn -> Set.empty
@@ -1505,6 +1513,7 @@ readsX quantity = case quantity of
   Quantity.PlayersDealtDamageThisTurn _ -> False
   Quantity.DamageDealtToPlayersThisTurn _ -> False
   Quantity.SpellsCastLastTurn _ -> False
+  Quantity.SpellsCastThisTurn _ -> False
   Quantity.TimesResolvedThisTurn -> False
   Quantity.SpellsCastBefore -> False
   Quantity.PermanentsDiedThisTurn -> False
