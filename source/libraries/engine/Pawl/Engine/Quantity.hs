@@ -632,11 +632,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.ControlGainedSinceLastUpkeep ref -> case (playersOf ref, mOid) of
           (Just [pid], Just oid) -> Just (if Map.lookup pid (controlClockOf gs oid) == Just ControlClock.SinceLastUpkeep then 1 else 0)
           _ -> Nothing
-        -- CR 305.1 / 601.2a as a 0/1, keyed on the id the card had where it was
-        -- played from: CR 400.7 gives the played card a new one, so the question
-        -- is asked of the incarnation a slot captured before the play. Off the
-        -- BOARD for ControlGainedSinceLastUpkeep's reason: it relates an object
-        -- to a player.
+        -- CR 305.1 / 601.2a as a 0/1. CR 400.7 gives the played card a new id,
+        -- and a slot captured before the play still names the old one, which
+        -- GameState.playedThisTurn keys too. Off the BOARD for
+        -- ControlGainedSinceLastUpkeep's reason: it relates an object to a
+        -- player.
         Quantity.PlayedThisTurnBy ref -> case (playersOf ref, mOid) of
           (Just [pid], Just oid) -> Just (if Map.lookup oid (GameState.playedThisTurn gs) == Just pid then 1 else 0)
           _ -> Nothing
