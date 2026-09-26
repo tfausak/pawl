@@ -70,16 +70,15 @@ sicknessOkGiven pcs pid srcId ability =
 -- the one place that zone question is asked, so no caller repeats it.
 --
 -- On the battlefield: the PROJECTION's, so Humility (layer 6) strips them. In a
--- hand: the ones rule 702 mints for the card's printed keywords -- cycling (CR
--- 702.29a), reinforce (CR 702.77a) and ninjutsu (CR 702.49a) -- read off the PRINTED
--- card, which misses an effect that granted one there (#1859); CR 113.6b is the rule
+-- hand: the ones rule 702 mints for the card's PROJECTED keywords -- cycling (CR
+-- 702.29a), reinforce (CR 702.77a) and ninjutsu (CR 702.49a); CR 113.6b is the rule
 -- that lets an ability name its own zone -- PLUS the card's own printed
 -- abilities that name the hand, per CR 113.6j and CR 113.6m (Faerie Macabre's
 -- "Discard this card: ...") or through the keyword written on them (CR
--- 702.57a's forecast). In a graveyard: the PRINTED abilities
--- whose own cost or effect names the graveyard, per CR 113.6m -- both zones
--- through zoneAbilitiesOf. In the COMMAND zone: the same reader again, whose CR
--- 113.6p limb keeps an emblem's (CR 114.4) and a face-up vanguard card's (CR
+-- 702.57a's forecast). In a graveyard: the same pair one zone over, the
+-- printed half being abilities whose own cost or effect names the graveyard,
+-- per CR 113.6m -- both zones' printed halves through zoneAbilitiesOf. In the
+-- COMMAND zone: the same reader again, whose CR 113.6p limb keeps an emblem's (CR 114.4) and a face-up vanguard card's (CR
 -- 902.7) rows that state no zone at all. Anywhere else: nothing -- flashback and
 -- rule 702's other zone abilities are CASTING permissions (CR 702.34a), so they reach
 -- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fifth zone adds
@@ -107,9 +106,8 @@ abilitiesFor = abilitiesForGiven Map.empty
 
 -- The ...Given half of the pair, and the one the enumeration calls:
 -- Action.legalActions hands it the board it projected once, so nothing here
--- re-derives a projection per object. Only the battlefield arm reads that board
--- at all -- a hand or graveyard object's absence from it is not a miss (#1859; see
--- Projection.projectGiven).
+-- re-derives a projection per object. A hand or graveyard object is absent from
+-- that board, and Projection.projectGiven projects it afresh.
 abilitiesForGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
   -- Filtered by CR 113.6m's "functions ONLY in that zone", exactly as the
@@ -130,13 +128,18 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- all a card's own text. Pawl.Engine.Event.battlefieldAbilitiesOf carries the
   -- same pairing and the same note.
   Just Zone.Battlefield -> filter (functionsIn (Game.delayedAbilitiesOf oid gs) Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)
-  -- CR 113.6j: the MINTED abilities rule 702 gives the printed keywords, plus the
+  -- CR 113.6j: the MINTED abilities rule 702 gives the keywords, plus the
   -- card's own AUTHORED ones that name the hand. The two are disjoint by
-  -- construction -- handAbilitiesOf reads Face.keywords and zoneAbilitiesOf reads
+  -- construction -- handAbilitiesOf reads keywords and zoneAbilitiesOf reads
   -- Face.activatedAbilities -- so nothing is offered twice.
-  Just Zone.Hand -> case Game.faceOf oid gs of
-    Nothing -> []
-    Just face -> Keyword.handAbilitiesOf (Face.keywordSet face) <> zoneAbilitiesOf Zone.Hand oid gs
+  --
+  -- The keywords are the PROJECTION's (CR 613.1f names no zone), so a card that
+  -- is a copy of another (CR 707.2) offers the copy's. Pawl.CopySpec's Synthetic
+  -- Mirror of the Fallen pair proves the graveyard arm below. The hand read is
+  -- a regression fence: nothing in data/cards/ changes a hand card's cycling,
+  -- reinforce or ninjutsu, and Tectonic Reformation's granted cycling would
+  -- prove it.
+  Just Zone.Hand -> Keyword.handAbilitiesOf (cardKeywords oid) <> zoneAbilitiesOf Zone.Hand oid gs
   -- The hand arm's shape one zone over, on TWO rules rather than one: rule 702's
   -- MINTED graveyard abilities (Pawl.Engine.Keyword.graveyardAbilitiesOf) plus
   -- the card's own AUTHORED ones that name the graveyard, disjoint by the same
@@ -151,7 +154,7 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- 702.129a's COSTS exile the card from a graveyard, CR 113.6m's other reading,
   -- which the cost's own payability gate enforces
   -- (Pawl.Engine.Keyword.graveyardTokenCopy).
-  Just Zone.Graveyard -> Keyword.graveyardAbilitiesOf (maybe Set.empty Face.keywordSet (Game.faceOf oid gs)) <> zoneAbilitiesOf Zone.Graveyard oid gs
+  Just Zone.Graveyard -> Keyword.graveyardAbilitiesOf (cardKeywords oid) <> zoneAbilitiesOf Zone.Graveyard oid gs
   -- CR 114.4 and CR 902.7's third limb, "its activated abilities may be
   -- activated". The narrowing to the objects rule 113.6p names is inside
   -- zoneAbilitiesOf, so a commander or a dungeon card sharing this zone offers
@@ -159,6 +162,11 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
   -- fromCommandZone and Pawl.Engine.Event's inCommand make with the same test.
   Just Zone.Command -> zoneAbilitiesOf Zone.Command oid gs
   _ -> []
+  where
+    -- None for an object with no card behind it -- a token, an ability.
+    cardKeywords objectId
+      | Maybe.isJust (Game.faceOf objectId gs) = Map.keysSet (Projection.keywordsGiven pcs objectId gs)
+      | otherwise = Set.empty
 
 -- CR 113.6j + CR 113.6m + CR 702.178b: the AUTHORED abilities a card outside the
 -- battlefield offers from the zone it is in. Three zones ask it today -- the
@@ -188,10 +196,10 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 -- so the GRANT functions in the graveyard too -- which is exactly this gate being
 -- asked of a card that is not on the battlefield.
 --
--- The PRINTED abilities, not the projection's (#1859), the Face.castingPermissions
--- precedent. Not a claim about the rules -- CR 613.1f does reach a card outside
--- the battlefield, and Cast.instantSpeed reads rule 702.8a's keyword there -- and
--- observationally identical while nothing can rewrite a graveyard card's text.
+-- Not implemented: the abilities are the PRINTED card's, not the projection's,
+-- so a graveyard card that Synthetic Mirror of the Fallen made a copy of
+-- Reassembling Skeleton is not offered the Skeleton's return (#1859). CR 613.1f
+-- and CR 707.2 name no zone; abilitiesForGiven's minted half reads the projection.
 --
 -- The condition's perspective is the OWNER. CR 109.5's "your" is the ability's
 -- controller, and the Max Speed glossary entry says which player that is for a
