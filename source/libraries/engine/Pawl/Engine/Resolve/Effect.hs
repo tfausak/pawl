@@ -9128,9 +9128,7 @@ bindEarthbentLand resolving land gs =
 -- already takes: a card printing a keyword twice grants it twice. Backup's own
 -- family is dropped, rule 702.165a's "non-backup", and so is every keyword the
 -- card prints ABOVE this backup line, its "printed below this one" (Saiba
--- Cryptomancer's flash). Matched by family where the keyword has one, so a
--- payload a CR 612 text change rewrote on one side and not the other
--- (Gloomfang Mauler's swampcycling) still names the same printed ability.
+-- Cryptomancer's flash).
 --
 -- A STATIC ability travels the same way, as a GainAbility that the projection
 -- gathers from its new host (Pawl.Engine.Projection.View's
@@ -9148,7 +9146,7 @@ expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (G
 expandGrant resolving source gs modification = case modification of
   Modification.GainAbilitiesOfSource above ->
     let pc = Maybe.fromMaybe (Projection.copiableCharacteristics source gs) (Binding.placedSourceCopyOf (slotBindings resolving gs))
-        printedAbove keyword = any (\a -> a == keyword || (Maybe.isJust (Keyword.familyOf a) && Keyword.familyOf a == Keyword.familyOf keyword)) above
+        printedAbove keyword = Set.member keyword above
         granted keyword count
           | Keyword.familyOf keyword == Just KeywordFamily.Backup = []
           | printedAbove keyword = []
