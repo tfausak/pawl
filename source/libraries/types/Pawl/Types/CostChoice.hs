@@ -21,8 +21,9 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- NONEMPTY because a choice with no options would be a cost with no way to pay
 -- it, which is CR 118.6's unpayable cost written by accident rather than by a
--- card. Two or more is what makes it a choice at all -- one option is a
--- mandatory additional cost, which Face.additionalCosts already carries -- and
+-- card. Two or more is what makes it a choice at all. One option is a mandatory
+-- additional cost, which belongs here only when it pays MANA that
+-- Face.additionalCosts has no part for -- Water Whip's waterbend {5} -- and
 -- Pawl.CardSpec is what holds a card to that.
 --
 -- The options are in PRINTED order, which is the order Prompt.ChooseCost offers

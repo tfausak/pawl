@@ -74,6 +74,7 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.BlockCost as BlockCost
@@ -847,9 +848,9 @@ modificationCounts modification = case modification of
     GrantedAbility.Static ability -> staticAbilityCounts ability
     GrantedAbility.Rules rules -> ruleAbilitiesCounts rules
     GrantedAbility.Replacement ability -> concatMap conditionCounts (Maybe.maybeToList (PrintedReplacement.condition ability))
-  -- Payload-free: rule 702.165a's grant names the source and carries no text of
-  -- its own, so there is nothing here to sweep.
-  Modification.GainAbilitiesOfSource -> []
+  -- Rule 702.165a's grant names the source, and the keywords it carries are
+  -- minted from the card's Backup keyword, swept there.
+  Modification.GainAbilitiesOfSource _ -> []
   Modification.LoseAllAbilities -> []
   -- Carries a name, which reaches no Count.
   Modification.LoseNamedAbility _ -> []
@@ -1494,7 +1495,8 @@ spellCostsOf face =
     <> Map.elems (Face.modeCosts face)
     -- CR 118.8's choice costs, each option on its own: they are additional costs
     -- of the same CR 601.2f total, so an X in one would bind Binding.variableX as
-    -- any other does. No printing puts an X in one.
+    -- any other does. Not implemented: Crashing Wave's "waterbend {X}", the
+    -- first printing to put one there (#3901).
     <> concatMap (NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices face)
 
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
@@ -3343,7 +3345,8 @@ keywordPayloadFilters keyword = case keyword of
   -- Filter, and rule 702.160a's ability names no quality.
   Keyword.Prototype _ -> []
   Keyword.Toxic _ -> []
-  Keyword.Backup _ -> []
+  -- The keywords printed above the backup line are card text like any other.
+  Keyword.Backup b -> concatMap keywordPayloadFilters (Set.toList (Backup.printedAbove b))
   -- CR 702.184a is payload-free: the "another untapped creature you control" the
   -- cost taps is written into the ability Pawl.Engine.Keyword.station mints, not
   -- into the keyword.
@@ -3855,8 +3858,8 @@ modificationFilters modification = case modification of
   -- here would flatten them to unframed and lose CR 701.3a's attach-destination
   -- distinction.
   Modification.GainAbility _ -> []
-  -- Payload-free, so no Filter of its own -- see modificationCounts.
-  Modification.GainAbilitiesOfSource -> []
+  -- Minted, and swept as the Backup keyword -- see modificationCounts.
+  Modification.GainAbilitiesOfSource _ -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> foldMap quantityFilters p <> foldMap quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []
@@ -6219,18 +6222,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (prints grantedEnchantSlots) "the pool grants an enchant slot"
     Spec.assertEqWith s "no enchant slot names a slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 118.8 / 601.2b: a choice with ONE option is a mandatory additional cost,
-  -- which Face.additionalCosts already carries -- written as a choice it puts a
-  -- Prompt.ChooseCost in front of a caster with nothing to decide. The empty
-  -- choice is refused on the wire (Pawl.Codec.CostChoice), so one option is the
-  -- mistranscription left for a lint to catch.
-  Spec.it s "a choice cost offers more than one payment" $ do
+  -- which Face.additionalCosts carries unless it holds MANA -- Water Whip's
+  -- waterbend {5}, a CostComponent list having no mana part. The empty choice is
+  -- refused on the wire (Pawl.Codec.CostChoice), so one option stating no mana
+  -- is the mistranscription left for a lint to catch.
+  Spec.it s "a choice cost offers more than one payment or pays mana" $ do
     ps <- S.allPrintings s
     let choicesOf = concatMap Face.additionalCostChoices . Card.Type.faces . Printing.card
-        offenders = filter (any ((< 2) . length . CostChoice.unwrap) . choicesOf) ps
-    -- A guard, since a pool printing no choice cost at all would pass saying
-    -- nothing (Caustic Exhale).
-    Spec.assertBool s (not (all (null . choicesOf) ps)) "the pool prints a choice cost"
-    Spec.assertEqWith s "no choice cost offers one payment" (fmap (S.nameOf . Printing.card) offenders) []
+        paysMana cost = not (null (foldMap ManaCost.unwrap (Cost.Type.mana cost)))
+        misfiled choice = case CostChoice.unwrap choice of
+          only NonEmpty.:| [] -> not (paysMana only)
+          _ -> False
+        offenders = filter (any misfiled . choicesOf) ps
+    -- Guards, since a pool printing neither shape would pass saying nothing
+    -- (Caustic Exhale, Water Whip).
+    Spec.assertBool s (any (any ((> 1) . length . CostChoice.unwrap) . choicesOf) ps) "the pool prints a choice cost"
+    Spec.assertBool s (any (any ((== 1) . length . CostChoice.unwrap) . choicesOf) ps) "the pool prints a mandatory additional cost paying mana"
+    Spec.assertEqWith s "no one-option choice cost states a cost Face.additionalCosts could carry" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 706.4's "the other result", which only a TWO-die instruction has: with
   -- any other count what the roller did not choose is not one number, and
   -- Pawl.Engine.Resolve leaves the slot unbound rather than guessing which of
