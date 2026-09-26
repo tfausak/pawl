@@ -1,15 +1,10 @@
 {
   "faces": [
     {
-      "castingRestrictions": [
-        {
-          "type": "AfterBlockersDeclared"
-        }
-      ],
       "manaCost": [
         {
           "type": "Generic",
-          "value": 2
+          "value": 1
         },
         {
           "type": "OfType",
@@ -21,7 +16,7 @@
           }
         }
       ],
-      "name": "Flash Foliage",
+      "name": "Synthetic Sudden Interposition",
       "spell": {
         "modes": [
           {
@@ -39,19 +34,19 @@
                                 "type": "Green"
                               }
                             ],
-                            "name": "Saproling Token",
+                            "name": "Bear Token",
                             "power": {
                               "type": "Literal",
-                              "value": 1
+                              "value": 2
                             },
                             "toughness": {
                               "type": "Literal",
-                              "value": 1
+                              "value": 2
                             },
                             "typeLine": {
                               "subtypes": [
                                 {
-                                  "type": "Saproling"
+                                  "type": "Bear"
                                 }
                               ],
                               "types": [
@@ -69,43 +64,14 @@
                       },
                       "riders": {
                         "blocking": {
-                          "type": "Specified",
-                          "value": "target"
+                          "type": "Chosen"
                         }
-                      }
-                    }
-                  },
-                  {
-                    "type": "Draw",
-                    "value": {
-                      "player": {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      "quantity": {
-                        "type": "Literal",
-                        "value": 1
                       }
                     }
                   }
                 ]
               }
-            ],
-            "targetSlots": {
-              "target": {
-                "filter": {
-                  "type": "IsAttackingPlayer",
-                  "value": {
-                    "type": "You"
-                  }
-                },
-                "pool": {
-                  "type": "Creatures"
-                }
-              }
-            }
+            ]
           }
         ]
       },

@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryAttack as EntryAttack
+import qualified Pawl.Codec.EntryBlock as EntryBlock
 import qualified Pawl.Codec.FaceDownState as FaceDownState
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Quantity as Quantity
@@ -43,7 +44,7 @@ codec :: (Typeable.Typeable ability, Eq ability) => Codec.Codec ability -> Codec
 codec abilityCodec = Fields.object $ do
   tapped <- Fields.defaulted "tapped" defaultTapped TapState.codec EntryRiders.tapped
   attacking <- Fields.defaulted "attacking" Nothing (Common.maybe EntryAttack.codec) EntryRiders.attacking
-  blocking <- Fields.defaulted "blocking" Nothing (Common.maybe SlotName.codec) EntryRiders.blocking
+  blocking <- Fields.defaulted "blocking" Nothing (Common.maybe EntryBlock.codec) EntryRiders.blocking
   transformed <- Fields.defaulted "transformed" False Common.boolean EntryRiders.transformed
   counters <- Fields.defaulted "counters" Map.empty (Common.keyedList counter) EntryRiders.counters
   underOwner <- Fields.defaulted "underOwner" False Common.boolean EntryRiders.underOwner
