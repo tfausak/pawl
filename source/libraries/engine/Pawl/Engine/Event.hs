@@ -56,6 +56,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype.Engine
@@ -7284,6 +7285,10 @@ createTokens controller card copy n tapped entering attached = do
               let siblingsOf oid = Set.delete oid (Set.fromList ids)
               Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
               Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
+              -- CR 613.7m: the tokens entered together, so their stamps are
+              -- ordered by the seat that controls them, asked after every entry
+              -- loop has settled who that is (CR 616.1b) and what each became.
+              Restamp.settle (GameState.nextTimestamp unminted) ids
               -- No prior incarnation to snapshot, so a token's last known information
               -- IS what it is now (CR 111.3). Recorded after every entry loop, so the
               -- events describe settled objects.
