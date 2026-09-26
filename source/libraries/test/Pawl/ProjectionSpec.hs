@@ -1876,6 +1876,36 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the older Tidal Waste applies: Lunar is an Island" (Projection.subtypesOf lunarId gs) (Set.singleton Subtype.Type.Island)
     Spec.assertEqWith s "and Tidal is untouched" (Projection.subtypesOf tidalId gs) Set.empty
 
+  -- CR 613.8a: applying Rootpath Purifier takes Urborg out of "nonbasic lands",
+  -- so Blood Moon depends on it and waits, though Blood Moon is older. Urborg is
+  -- never reached, so CR 305.7 strips nothing and its own ability makes it a
+  -- Swamp.
+  Spec.it s "CR 305.7/613.8a Rootpath Purifier applies first: Urborg keeps its text under an older Blood Moon" $ do
+    forest <- S.printingOf s registry "Forest"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    purifier <- S.printingOf s registry "Rootpath Purifier"
+    let (_, urborgId, moon) = bloodMoonUrborg forest urborg bloodMoon True
+        (_, gs) = S.addPermanent purifier S.alice moon
+    Spec.assertEqWith s "Urborg is a Swamp by its own ability" (Projection.subtypesOf urborgId gs) (Set.singleton Subtype.Type.Swamp)
+
+  -- CR 613.8a both ways: the land's own layer-4 ability moves it out of Blood
+  -- Moon's set, and Blood Moon would strip that ability (CR 305.7). CR 613.8b's
+  -- loop falls back to timestamps, so the older of the two wins.
+  Spec.it s "CR 305.7/613.8b a land that makes itself basic escapes a younger Blood Moon" $ do
+    claim <- S.printingOf s registry "Synthetic Primeval Claim"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (claimId, g1) = S.addPermanent claim S.alice (Setup.emptyGame S.bothPlayers)
+        (_, gs) = S.addPermanent bloodMoon S.alice g1
+    Spec.assertEqWith s "the older land applies first: no Mountain" (Projection.subtypesOf claimId gs) Set.empty
+
+  Spec.it s "CR 305.7/613.8b the same land under an older Blood Moon is stripped" $ do
+    claim <- S.printingOf s registry "Synthetic Primeval Claim"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (_, g1) = S.addPermanent bloodMoon S.alice (Setup.emptyGame S.bothPlayers)
+        (claimId, gs) = S.addPermanent claim S.alice g1
+    Spec.assertEqWith s "the older Blood Moon applies first: a Mountain" (Projection.subtypesOf claimId gs) (Set.singleton Subtype.Type.Mountain)
+
   -- CR 613.8a clause (c)'s SECOND limb: the dependency rule applies when BOTH
   -- effects come from characteristic-defining abilities. CR 613.4a puts both of
   -- these in layer 7a -- the Mimic's count reads a power the Nightmare's own CDA
