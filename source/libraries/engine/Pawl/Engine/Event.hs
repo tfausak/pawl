@@ -5092,10 +5092,10 @@ castFromOutside caster oid requestedDest shown facing = do
 -- Not the only batch door: an Effect.MoveToZone batch goes through
 -- changeZoneEnteringIn, which carries the entry riders, the library position and
 -- the entry controller this one has no parameters for. This door carries the
--- batches whose members reach a graveyard, the command zone or exile --
--- Pawl.Engine.Sba's sweeps, the destroy funnel and CR 800.4a's fourth clause --
--- so nothing enters the battlefield and there is no `batch` set for CR 614.12a
--- to narrow.
+-- batches whose members reach a graveyard, a hand, a library, the command zone
+-- or exile -- Pawl.Engine.Sba's sweeps, the destroy funnel, CR 800.4a's fourth
+-- clause and CR 701.12d's zone exchange -- so nothing enters the battlefield and
+-- there is no `batch` set for CR 614.12a to narrow.
 --
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.

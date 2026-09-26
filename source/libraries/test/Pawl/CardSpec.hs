@@ -162,6 +162,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
+import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ExchangedValue as ExchangedValue
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
@@ -332,6 +333,7 @@ import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
+import qualified Pawl.Types.ZonePair as ZonePair
 import qualified System.Directory as Directory
 
 -- Not red-specific despite its first callers: just the Maybe wrapper every
@@ -670,6 +672,7 @@ playerRefPositions =
         ("gain-life", Effect.GainLife (playerQuantity "gl"), [plantedPlayer "gl"]),
         ("set-life-total", Effect.SetLifeTotal (playerQuantity "sl"), [plantedPlayer "sl"]),
         ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.LifeTotal (plantedPlayer "xv-one")) (ExchangedValue.LifeTotal (plantedPlayer "xv-other")) Duration.Indefinite), [plantedPlayer "xv-one", plantedPlayer "xv-other"]),
+        ("exchange-zones", Effect.ExchangeZones (ExchangeZones.MkExchangeZones (plantedPlayer "xz") ZonePair.HandAndGraveyard), [plantedPlayer "xz"]),
         ("lose-game", Effect.LoseGame (plantedPlayer "lg"), [plantedPlayer "lg"]),
         ("win-game", Effect.WinGame (plantedPlayer "wg"), [plantedPlayer "wg"]),
         ("increase-speed", Effect.IncreaseSpeed (playerQuantity "is"), [plantedPlayer "is"]),
@@ -1213,6 +1216,7 @@ ownCounts effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues x -> durationCounts (ExchangeValues.duration x)
+  Effect.ExchangeZones _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -1651,6 +1655,7 @@ effectNestedEffects effect = case effect of
   Effect.GainLife {} -> []
   Effect.ExchangeLifeTotals {} -> []
   Effect.ExchangeValues {} -> []
+  Effect.ExchangeZones {} -> []
   Effect.SetLifeTotal {} -> []
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -2143,6 +2148,7 @@ effectReplacements effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues _ -> []
+  Effect.ExchangeZones _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -2612,6 +2618,7 @@ effectMintedFaces effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues _ -> []
+  Effect.ExchangeZones _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -5525,6 +5532,7 @@ effectFilters effect = case effect of
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (foldMap objectRefFilters (foldMap Resolve.exchangedObjectRefs [one, other]))
+  Effect.ExchangeZones _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []

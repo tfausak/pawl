@@ -618,6 +618,7 @@ rewriteEffect pairs effect = case effect of
           ExchangedValue.Power ref -> ExchangedValue.Power (rewriteObjectRef pairs ref)
           ExchangedValue.Toughness ref -> ExchangedValue.Toughness (rewriteObjectRef pairs ref)
      in Effect.ExchangeValues (ExchangeValues.MkExchangeValues (side one) (side other) (rewriteDuration pairs duration))
+  Effect.ExchangeZones {} -> effect
   Effect.SetLifeTotal x -> Effect.SetLifeTotal (rewritePlayerQuantity pairs x)
   Effect.LoseGame {} -> effect
   Effect.WinGame {} -> effect

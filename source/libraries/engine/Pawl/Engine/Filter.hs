@@ -1074,9 +1074,11 @@ data Context = MkContext
     -- atom that asks (ControlledByRecipient) -- Biorhythm's "the number of
     -- creatures they control", Stronghold Discipline's "1 life for each creature
     -- they control". Supplied by the caller for defendingPlayer's reason, and by
-    -- one caller: Pawl.Engine.Resolve's evaluateForRecipient, which every
+    -- two callers: Pawl.Engine.Resolve's evaluateForRecipient, which every
     -- per-player opcode evaluates its amount through, once per recipient with this
-    -- field pointed at each in turn.
+    -- field pointed at each in turn; and Pawl.Engine.PlayerEffect.printedRows,
+    -- which asks a player static ability's condition once per affected player
+    -- (Ethersworn Canonist's "each player who has cast a nonartifact spell").
     --
     -- NOT `perspective` re-pointed, which would be the cheap version of the same
     -- thing and a wrong one: CR 109.5's "you" is the resolving spell's controller
