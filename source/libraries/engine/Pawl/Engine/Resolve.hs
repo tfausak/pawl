@@ -1524,17 +1524,28 @@ runEntryEffects = do
 -- `resolving` and `source` are both the permanent (CR 113.7), runPreventionRider's
 -- posture. The slot maps are empty because a static ability targets nothing (CR
 -- 115.10a).
+--
+-- CR 107.3m: an X these effects read is the one announced for the spell that
+-- became the permanent (Neverwinter Hydra's "roll X d6"), bound on the permanent
+-- only while they run, since that clause makes the permanent's own X 0.
 runEntryEffect :: PendingEntryEffect.PendingEntryEffect -> Game ()
-runEntryEffect pending =
+runEntryEffect pending = do
+  let oid = PendingEntryEffect.object pending
+      setX value gs = gs {GameState.objects = Map.adjust (\o -> o {Object.bindings = Map.alter (const value) Binding.variableX (Object.bindings o)}) oid (GameState.objects gs)}
+  entering <- State.gets (Game.lookupObject oid)
+  let announced = entering >>= Object.announcedX
+      before = entering >>= Map.lookup Binding.variableX . Object.bindings
+  Foldable.for_ announced $ \n -> State.modify' (setX (Just (Binding.toAmount n)))
   Foldable.traverse_
     ( applyEffect
-        (PendingEntryEffect.object pending)
-        (PendingEntryEffect.object pending)
+        oid
+        oid
         (PendingEntryEffect.controller pending)
         Map.empty
         Map.empty
     )
     (PendingEntryEffect.effects pending)
+  Foldable.for_ announced $ \_ -> State.modify' (setX before)
 
 -- CR 608.2c: the bindings a resolution reads before each of its own effects --
 -- the LIVE ones off the stack object, so a slot an earlier effect DEFINED is
