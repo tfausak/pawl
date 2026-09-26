@@ -2298,6 +2298,7 @@ castOf event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -2381,6 +2382,7 @@ activatedAbilityResolved event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -2476,6 +2478,7 @@ discardOf event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -2599,6 +2602,7 @@ movedChange event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -2714,6 +2718,7 @@ damageDealt event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -2989,6 +2994,7 @@ lifeGainOf event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing

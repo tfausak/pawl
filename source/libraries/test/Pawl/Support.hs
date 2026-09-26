@@ -3688,6 +3688,8 @@ stubView table oid =
                 -- field above's reason, so ConvokedSourceThisTurn is vacuously
                 -- False against this stub.
                 Filter.convokedThisTurn = Set.empty,
+                -- CR 702.171c: nor any saddling, for the same reason.
+                Filter.saddledThisTurn = Set.empty,
                 -- CR 302.6: the table registers no sickness, and no Count in the
                 -- pool filters by one, so ControlledSinceTurnBegan is vacuously
                 -- False against this stub.

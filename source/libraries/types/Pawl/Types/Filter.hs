@@ -400,6 +400,10 @@ data Filter keyword
     -- it onto the permanent that spell became -- CR 400.7d, which lets an ability
     -- of a permanent reference what costs were paid to cast the spell it was.
     ConvokedSourceThisTurn
+  | -- | CR 702.171c: the candidate is a creature that SADDLED the SOURCE earlier
+    -- this turn -- Giant Beaver's "target creature that saddled it this turn",
+    -- read back off GameEvent.Saddled.
+    SaddledSourceThisTurn
   | -- | CR 120.1 / 608.2i: the candidate -- an object or a player, since CR 120.1
     -- has damage dealt to both -- was DEALT DAMAGE earlier this turn.
     -- AttackedThisTurn's look-back read one event arm over
