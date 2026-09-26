@@ -4,6 +4,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Containers.ListUtils as ListUtils
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -12,6 +13,7 @@ import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Claim as Claim
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -33,6 +35,7 @@ import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Claim (Claim)
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
@@ -268,7 +271,7 @@ producedTypes oid gs production = case production of
 -- Gliding Licid, which sets Enchantment on a creature holding no basic land
 -- type, so no board can tell the conjunct from its absence.
 --
--- One route per SELECTION (Modal.selectionEffects), not per mode: CR 700.2's
+-- One route per SELECTION (Modal.selectionClauses), not per mode: CR 700.2's
 -- selection is what a player actually makes, so a choose-two ability's route is
 -- the CONCATENATION of a legal pair of modes' yields and its options are the
 -- pairs. For "choose exactly one", which is every printed mana ability, that is
@@ -279,16 +282,15 @@ producedTypes oid gs production = case production of
 -- player controls, and each of the two projection reads here was a fresh gather
 -- per source (#200).
 --
--- Not implemented: a route that reads its clauses' CR 701.46a-shaped gates.
--- Modal.selectionEffects flattens every clause of a mode whatever
--- Clause.condition says, so an ability written as "Add {C}. If ..., instead add
--- one mana of any color" would route both manas at once, which is weaker than
--- printed. Gemstone Caverns says that sentence as two abilities whose
--- ActivatedAbility.conditions are complements instead -- a gate abilitiesGiven
--- does apply, with the board in hand (#1924). The fourth element below is
--- flattened by the same call and carries the same limit: a non-mana clause
--- gated by a condition, or one its controller may decline, would run
--- unconditionally. No mana ability in `data/cards/` prints one.
+-- A clause whose printed "if" (Clause.condition) fails on this board adds
+-- nothing and does nothing, mana and non-mana effects alike (CR 608.2c), read
+-- from the source controller's seat as manaOptionsOfGiven reads a count.
+-- Pawl.ManaSpec's Synthetic Confluence Obelisk group, one ability with two
+-- independent gates, is what proves it.
+--
+-- Not implemented: deciding a clause after the activation's cost is paid, and
+-- any rider but the "if". The gate reads the board the route is offered on,
+-- and a clause's "may" or "unless ... pays" is ignored (#4204).
 --
 -- The THIRD element is the ability itself, which CR 602.5b's counted rider needs
 -- and no other clause of a route can stand in for -- Pawl.Types.ManaOption
@@ -309,10 +311,15 @@ manaRoutesOfGiven pcs oid gs =
               (\manaType -> (intrinsicManaCost, [], Nothing, [intrinsicManaAddition manaType], []))
               (Maybe.mapMaybe Subtype.Engine.subtypeMana (Set.toList (PC.subtypes pc)))
         | otherwise = []
+      context = Filter.contextFor (Game.teams gs) (Projection.controllerOf oid gs) (Just oid)
+      applies = maybe True (Condition.holds (Projection.fullView gs) context gs oid) . Clause.condition
       selectionRoutes ability =
         fmap
-          (\effects -> (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Just ability, Maybe.mapMaybe ManaAbility.manaProduced effects, filter (Maybe.isNothing . ManaAbility.manaProduced) effects))
-          (Modal.selectionEffects (ActivatedAbility.modal ability))
+          ( \clauses ->
+              let effects = concatMap (Foldable.toList . Clause.effects) (filter applies clauses)
+               in (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Just ability, Maybe.mapMaybe ManaAbility.manaProduced effects, filter (Maybe.isNothing . ManaAbility.manaProduced) effects)
+          )
+          (Modal.selectionClauses (ActivatedAbility.modal ability))
       fromAbilities = concatMap selectionRoutes (filter ManaAbility.isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
 
