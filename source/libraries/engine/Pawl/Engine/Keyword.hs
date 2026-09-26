@@ -224,7 +224,7 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- cost, a casting permission and a replacement effect, none of whose readers learn
 -- that flashback produced them. All three function in the graveyard or on the
 -- stack (CR 113.6), and the graveyard reads go through the projection
--- (Cost.costsFor, Cast.graveyardKeywords).
+-- (Cost.costsFor, Cast.projectedKeywords).
 --
 -- Not implemented: what is read while the object is on the STACK stays printed
 -- (#1859).
@@ -2518,11 +2518,8 @@ reconfigureTarget = SlotName.MkSlotName (Text.pack "reconfigured")
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions are a separate, additive list.
 --
--- WHICH keyword set is the caller's to choose: a card in a GRAVEYARD is read
+-- The keyword set is the caller's: Pawl.Engine.Cast.permissionsOf reads it
 -- through the projection, so a granted flashback grants its permission too.
---
--- Not implemented: a card in a LIBRARY is read as printed instead (#1859), which
--- is where Panglacial Wurm's permission is consulted.
 --
 -- The card types come along because rule 702.34a's permission is CONDITIONAL on
 -- them, and they are the types of the one FACE being proposed.
@@ -2729,7 +2726,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- CR 702.146a permits a cast from a graveyard and still gets no permission
   -- here, where escape's arm above gets one: the permission is to cast the card
   -- TRANSFORMED, so it belongs to the back face, and this function is asked
-  -- about the keywords the proposed half has (Pawl.Engine.Cast.graveyardKeywords)
+  -- about the keywords the proposed half has (Pawl.Engine.Cast.projectedKeywords)
   -- -- which for the back face are the back face's and never include this one.
   -- Granting it here would make the FRONT face castable from a graveyard for its
   -- printed cost, which rule 702.146a does not say.

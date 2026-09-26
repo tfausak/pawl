@@ -41,6 +41,7 @@ sampleSnapshot =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
       PC.enchant = [],
+      PC.castingPermissions = [],
       PC.ruleAbilities = mempty,
       PC.lostAllAbilities = False,
       PC.subtypeWordChanges = [],

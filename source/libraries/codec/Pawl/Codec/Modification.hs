@@ -3,6 +3,7 @@ module Pawl.Codec.Modification where
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Filter as Filter
@@ -36,6 +37,7 @@ codec abilityCodec =
           Arm.nullary "GainFlashbackAtManaCost" Modification.GainFlashbackAtManaCost,
           Arm.payload "GainEnchant" TargetSlot.codec Modification.GainEnchant (\x -> case x of Modification.GainEnchant y -> Just y; _ -> Nothing),
           Arm.payload "LoseEnchant" TargetSlot.codec Modification.LoseEnchant (\x -> case x of Modification.LoseEnchant y -> Just y; _ -> Nothing),
+          Arm.payload "GainCastingPermission" CastingPermission.codec Modification.GainCastingPermission (\x -> case x of Modification.GainCastingPermission y -> Just y; _ -> Nothing),
           Arm.payload "GainAbilitiesOfSource" (Common.set Keyword.codec) Modification.GainAbilitiesOfSource (\x -> case x of Modification.GainAbilitiesOfSource y -> Just y; _ -> Nothing),
           Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
           Arm.payload "LoseNamedAbility" AbilityName.codec Modification.LoseNamedAbility (\x -> case x of Modification.LoseNamedAbility y -> Just y; _ -> Nothing),
@@ -76,6 +78,7 @@ tagOf x = case x of
   Modification.GainFlashbackAtManaCost {} -> "GainFlashbackAtManaCost"
   Modification.GainEnchant {} -> "GainEnchant"
   Modification.LoseEnchant {} -> "LoseEnchant"
+  Modification.GainCastingPermission {} -> "GainCastingPermission"
   Modification.GainAbilitiesOfSource {} -> "GainAbilitiesOfSource"
   Modification.LoseAllAbilities {} -> "LoseAllAbilities"
   Modification.LoseNamedAbility {} -> "LoseNamedAbility"

@@ -113,6 +113,7 @@ layer m = case m of
   -- types.
   Modification.GainEnchant _ -> Layer.Ability
   Modification.LoseEnchant _ -> Layer.Ability
+  Modification.GainCastingPermission _ -> Layer.Ability
   Modification.GainAbility _ -> Layer.Ability
   Modification.GainAbilitiesOfSource _ -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
@@ -226,6 +227,9 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         -- other instances stay.
         Modification.LoseEnchant slot ->
           pc {PC.enchant = filter (/= slot) (PC.enchant pc)}
+        -- CR 613.1f layer 6 / CR 601.3: an APPEND beside the printed ones.
+        Modification.GainCastingPermission permission ->
+          pc {PC.castingPermissions = PC.castingPermissions pc <> [permission]}
         -- CR 613.1f layer 6: one whole quoted ability. Appended to the card's own
         -- printed abilities, which is what makes it the RECEIVER's (CR 113.7, CR
         -- 602.2, CR 603.3a, CR 303.4e) and lets two grants stack in CR 613.7
@@ -272,7 +276,10 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
               -- it with the rest. Unproven: Humility reaches only creatures and
               -- nothing in the pool wipes a noncreature permanent's abilities, so
               -- dropping this line leaves the suite green.
-              PC.enchant = []
+              PC.enchant = [],
+              -- CR 601.3's permission is an ability too. Unproven: nothing in
+              -- the pool wipes the abilities of a card in a library.
+              PC.castingPermissions = []
             }
         -- CR 613.1f layer 6, the wipe above narrowed to one name: every ability
         -- the card gave this name goes, and every other ability stays. A Licid
@@ -564,6 +571,7 @@ cardTypesAfter m types = case m of
   Modification.GainFlashbackAtManaCost -> types
   Modification.GainEnchant _ -> types
   Modification.LoseEnchant _ -> types
+  Modification.GainCastingPermission _ -> types
   Modification.GainAbility _ -> types
   Modification.GainAbilitiesOfSource _ -> types
   Modification.LoseAllAbilities -> types
@@ -644,6 +652,7 @@ exchangeTextBoxFrom from pc =
       PC.triggeredAbilities = PC.triggeredAbilities from,
       PC.replacementEffects = PC.replacementEffects from,
       PC.enchant = PC.enchant from,
+      PC.castingPermissions = PC.castingPermissions from,
       -- CR 604.3: a characteristic-defining ability is printed in the text box,
       -- so it moves with it. A regression fence rather than a proved behaviour:
       -- the one producer's test board uses two literal power/toughness boxes.
@@ -686,7 +695,9 @@ setLandSubtypeTo types s pc
           -- CR 305.7's strip reaches an enchant ability for CR 613.1f's reason
           -- above. Unproven for the same reason: no board in the pool sets the
           -- land subtype of a permanent that has one.
-          PC.enchant = []
+          PC.enchant = [],
+          -- CR 601.3's permission is an ability too; unproven for the same reason.
+          PC.castingPermissions = []
         }
 
 -- CR 613.4b: layer 7b establishes base P/T, so an object with no printed P/T
@@ -1190,6 +1201,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.GainFlashbackAtManaCost -> Just m
         Modification.GainEnchant _ -> Just m
         Modification.LoseEnchant _ -> Just m
+        Modification.GainCastingPermission _ -> Just m
         -- The granted ability's own quantities are NOT frozen: CR 611.2d fixes a
         -- variable in this effect, not in a quoted ability's own future one.
         Modification.GainAbility _ -> Just m
@@ -1239,6 +1251,7 @@ quantitiesOf m = case m of
   -- gives above, whose keyword can nest one too.
   Modification.GainEnchant _ -> []
   Modification.LoseEnchant _ -> []
+  Modification.GainCastingPermission _ -> []
   -- The layer fold evaluates nothing inside a quoted ability.
   Modification.GainAbility _ -> []
   Modification.GainAbilitiesOfSource _ -> []
@@ -1285,6 +1298,7 @@ referenceQuery m = case m of
   Modification.GainFlashbackAtManaCost -> Nothing
   Modification.GainEnchant _ -> Nothing
   Modification.LoseEnchant _ -> Nothing
+  Modification.GainCastingPermission _ -> Nothing
   Modification.GainAbility _ -> Nothing
   Modification.GainAbilitiesOfSource _ -> Nothing
   Modification.LoseAllAbilities -> Nothing
@@ -1339,6 +1353,7 @@ setsLandSubtype m = case m of
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
   Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
   -- A control op, not a type change.
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
@@ -2347,6 +2362,7 @@ removesAbilities m = case m of
   -- FALSE for LoseKeyword's reason: it takes one enchant instance out of the
   -- projected list and leaves every other ability, so nothing is gated.
   Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
   -- The other direction of CR 613.1f: a grant is not a removal, so timestamp
   -- order alone decides whether a granted ability survives Humility. Proven
   -- through the FOLD by Pawl.ActivateSpec's "Presence of Gond" pair; this arm's
@@ -3405,6 +3421,9 @@ modificationWrites m = case m of
   -- leaves the suite green.
   Modification.GainEnchant _ -> Set.singleton Keywords
   Modification.LoseEnchant _ -> Set.singleton Keywords
+  -- Writes ProjectedCharacteristics.castingPermissions, which no Filter atom
+  -- reads, so no Aspect names it.
+  Modification.GainCastingPermission _ -> Set.empty
   -- Writes ProjectedCharacteristics.activatedAbilities or .triggeredAbilities,
   -- which Aspect has no finer grain for than Keywords -- the same answer
   -- LoseNamedAbility gives below, this being the same write in the other
@@ -3506,6 +3525,7 @@ modificationReads m = case m of
   -- Carries no Quantity of its own; its Filter is read where the slot is matched.
   Modification.GainEnchant _ -> Set.empty
   Modification.LoseEnchant _ -> Set.empty
+  Modification.GainCastingPermission _ -> Set.empty
   -- A quoted ability's quantities are read at ITS resolution.
   Modification.GainAbility _ -> Set.empty
   Modification.GainAbilitiesOfSource _ -> Set.empty
@@ -5116,6 +5136,7 @@ grantsKeywordWhere p m = case m of
   Modification.GainEnchant _ -> False
   -- Takes CR 702.5a's enchant away, and hands out nothing.
   Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
   -- Hands out an ability, which is a keyword grant only when it is a static
   -- one whose own modifications grant one.
   Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
@@ -5194,6 +5215,7 @@ grantsMintingType m = case m of
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
   Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
   -- A granted static ability's own parts, grantsKeywordWhere's reason.
   Modification.GainAbility g -> grantedStaticWrites grantsMintingType g
   Modification.GainAbilitiesOfSource _ -> False
