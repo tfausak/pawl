@@ -41,6 +41,8 @@ codec = Fields.object $ do
   -- source, which is every card file already written and the reading CR 113.7
   -- gives a search that names no slot.
   subject <- Fields.defaulted "subject" Nothing (Common.maybe SlotName.codec) Search.subject
+  -- Defaulted: an absent key is a search whose finds no later clause names.
+  slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Search.slot
   pure
     Search.MkSearch
       { Search.searcher = searcher,
@@ -50,5 +52,6 @@ codec = Fields.object $ do
         Search.filter = filter_,
         Search.upTo = upTo,
         Search.destination = destination,
-        Search.subject = subject
+        Search.subject = subject,
+        Search.slot = slot
       }

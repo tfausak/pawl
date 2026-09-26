@@ -100,6 +100,8 @@ arm targets controller source duration gs = case duration of
   -- find (Pawl.Engine.Event.perpetuate).
   Duration.Perpetual -> Just Expiry.Perpetual
   Duration.UntilYourNextTurn -> Just (Expiry.AtTurnOf controller)
+  -- CR 503 / 611.2a: the arm above's seat, ended at that player's next upkeep.
+  Duration.UntilYourNextUpkeep -> Just (Expiry.AtUpkeepOf controller)
   -- CR 611.2a: "until the end of your next turn". Two samples, both taken here
   -- and neither ever rewritten: the controller (CR 109.5's "you", as above) and
   -- the turn this duration began on. dropAtCleanup ends it at the first turn of
@@ -241,6 +243,7 @@ perSeat duration = case duration of
   Duration.Indefinite -> Nothing
   Duration.Perpetual -> Nothing
   Duration.UntilYourNextTurn -> Nothing
+  Duration.UntilYourNextUpkeep -> Nothing
   Duration.UntilEndOfYourNextTurn -> Nothing
   Duration.DuringYourNextTurn -> Nothing
   Duration.ForAsLongAs _ -> Nothing
@@ -265,6 +268,7 @@ follows expiry = case expiry of
   Expiry.Never -> False
   Expiry.While {} -> False
   Expiry.AtTurnOf _ -> False
+  Expiry.AtUpkeepOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
   Expiry.AtEndOf _ -> False
@@ -297,6 +301,7 @@ begun gs expiry = case expiry of
   Expiry.Perpetual -> True
   Expiry.While {} -> True
   Expiry.AtTurnOf _ -> True
+  Expiry.AtUpkeepOf _ -> True
   Expiry.AtEndOfTurnOf _ -> True
   Expiry.AtEndOf _ -> True
   Expiry.AtEndOfCombatOn _ -> True
@@ -320,6 +325,7 @@ dropAtCleanup gs =
         Expiry.Perpetual -> True
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
+        Expiry.AtUpkeepOf _ -> True
         -- CR 611.2a: "until the end of your next turn" ends as that turn ends,
         -- and the cleanup step is where a turn's effects end -- so the sweep
         -- CR 514.2 runs for the until-end-of-turn ones ends this too, one NAMED
@@ -409,6 +415,7 @@ sweepConditional = do
         -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.
         Expiry.Perpetual -> True
         Expiry.AtTurnOf _ -> True
+        Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
         Expiry.AtEndOf _ -> True
@@ -567,6 +574,9 @@ dropAtTurnOf pid gs =
       departed = List.notElem pid (Game.stillPlaying gs)
       survives expiry = case expiry of
         Expiry.AtTurnOf p -> p /= pid
+        -- CR 800.4m's "a specific point in that turn": a departed player's
+        -- upkeep never begins, so the duration ends where that turn would have.
+        Expiry.AtUpkeepOf p -> not (departed && p == pid)
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         -- Alchemy's "perpetually" lasts for the rest of the game, as Never does.
@@ -645,13 +655,42 @@ dropAtEndOf ending gs =
         Expiry.Perpetual -> True
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
+        Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
         -- CR 116.2c: no window of the turn ends it.
         Expiry.WhenPaid _ -> True
         -- No step or phase ending is a use.
         Expiry.WhenUsed -> True
-      keepEffect eff = survives (ContinuousEffect.expiry eff)
+   in keepSurvivors survives gs
+
+-- CR 503 / 611.2a: "until the beginning of your next upkeep" ends as that
+-- upkeep step begins. Engine.runStepThatBegan calls this for every active
+-- player (CR 805.4, a shared team turn) before anything triggered then is put on
+-- the stack (CR 503.1a), so a permission it ends is gone by the time such a
+-- trigger resolves. A skipped upkeep (CR 500.11) never begins, so the duration
+-- runs on to the next upkeep that does.
+dropAtUpkeepOf :: PlayerId -> GameState -> GameState
+dropAtUpkeepOf pid =
+  keepSurvivors $ \expiry -> case expiry of
+    Expiry.AtUpkeepOf p -> p /= pid
+    Expiry.AtCleanup -> True
+    Expiry.Never -> True
+    Expiry.Perpetual -> True
+    Expiry.While {} -> True
+    Expiry.AtTurnOf _ -> True
+    Expiry.AtEndOfTurnOf _ -> True
+    Expiry.DuringTurnOf _ -> True
+    Expiry.AtEndOf _ -> True
+    Expiry.AtEndOfCombatOn _ -> True
+    Expiry.WhenPaid _ -> True
+    Expiry.WhenUsed -> True
+
+-- CR 611.2a: a sweep whose survivors are named by the expiry alone, over every
+-- carrier. Shared by dropAtEndOf and dropAtUpkeepOf.
+keepSurvivors :: (Expiry -> Bool) -> GameState -> GameState
+keepSurvivors survives gs =
+  let keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepCopy active = survives (ActiveCopy.expiry active)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)
@@ -699,6 +738,7 @@ paidExpiries gs =
         Expiry.Perpetual -> []
         Expiry.While {} -> []
         Expiry.AtTurnOf _ -> []
+        Expiry.AtUpkeepOf _ -> []
         Expiry.AtEndOfTurnOf _ -> []
         Expiry.DuringTurnOf _ -> []
         Expiry.AtEndOf _ -> []
@@ -745,6 +785,7 @@ dropWhenPaidBy oid gs =
         Expiry.Perpetual -> True
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
+        Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
         Expiry.AtEndOf _ -> True
@@ -793,6 +834,7 @@ expiresWhenUsed expiry = case expiry of
   Expiry.Perpetual -> False
   Expiry.While {} -> False
   Expiry.AtTurnOf _ -> False
+  Expiry.AtUpkeepOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
   Expiry.AtEndOf _ -> False

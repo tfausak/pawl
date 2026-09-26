@@ -506,7 +506,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Firebend addition -> Effect.Firebend (rewriteManaAddition pairs addition)
   Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref filter_) -> Effect.ActivateManaAbilities (ActivateManaAbilities.MkActivateManaAbilities ref (Filter.rewrite pairs filter_))
   Effect.MoveMana _ -> effect
-  Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination subject) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject)
+  Effect.Search (Search.MkSearch searcher owner zones quantity filter_ upTo destination subject slot) -> Effect.Search (Search.MkSearch searcher owner zones (fmap (rewriteQuantity pairs) quantity) (Filter.rewrite pairs filter_) upTo destination subject slot)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.Reroll -> effect
@@ -1875,6 +1875,7 @@ rewriteDuration pairs duration = case duration of
   Duration.Indefinite -> duration
   Duration.Perpetual -> duration
   Duration.UntilYourNextTurn -> duration
+  Duration.UntilYourNextUpkeep -> duration
   Duration.UntilEndOfYourNextTurn -> duration
   -- A PlayerRef names its seat structurally -- by slot or by relation -- and
   -- carries no word CR 612.1 can swap, so the reference is left alone.

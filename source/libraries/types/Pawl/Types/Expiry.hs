@@ -37,6 +37,10 @@ data Expiry
   | -- | CR 611.2a: "until your next turn", as a concrete player. Ends as that
     -- player's turn begins.
     AtTurnOf PlayerId.PlayerId
+  | -- | CR 611.2a / 503: "until the beginning of your next upkeep", as a
+    -- concrete player. Ends as that player's next upkeep step begins, before
+    -- anything triggered then is put on the stack (CR 503.1a).
+    AtUpkeepOf PlayerId.PlayerId
   | -- | CR 611.2a: "until the end of your next turn", as a concrete player and
     -- the turn the duration began on. Ends as that player's next turn ends, in
     -- its cleanup step (CR 514) -- a whole turn later than AtTurnOf above.
