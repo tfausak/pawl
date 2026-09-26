@@ -134,6 +134,7 @@ faceDownFace listed =
       Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
+      Face.minimumX = 0,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],
@@ -594,6 +595,8 @@ merge2 l r =
           -- fused cast is priced against. Reachable since fuse landed,
           -- Face.costReductions' reason.
           Face.maximumX = Face.maximumX l <> Face.maximumX r,
+          -- The floor's side of the same sentence: each binds, so the greater.
+          Face.minimumX = max (Face.minimumX l) (Face.minimumX r),
           -- CR 709.4c once more: "this spell can't be countered" is an ability in a
           -- half's text box (CR 113.6g puts it on the stack), so the combined view has
           -- it if EITHER half prints it -- and CR 702.102b hands that to a fused split
@@ -1560,6 +1563,7 @@ subtractHalf face =
       Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
+      Face.minimumX = 0,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],

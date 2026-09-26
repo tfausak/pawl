@@ -2000,9 +2000,10 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
               || not (jointlyFillableGiven pcs grants pools perspective seed source slots sets gs)
               then Nothing
               else Just (ModeIndex.MkModeIndex i)
-      -- CR 601.2b's X=0 FLOOR, the value every castability and activation gate
-      -- is asked at: a slot counting the announced X demands no target until
-      -- that announcement exists, and announcing zero is a legal answer.
+      -- CR 601.2b's X=0: a slot counting the announced X demands no target until
+      -- that announcement exists. A printed floor (Face.minimumX,
+      -- ActivatedAbility.minimumX) is not read here, so this gate is the looser
+      -- one, and the announced X is judged again once named (above).
       --
       -- Measured against slotCapacities rather than the candidate count, for that
       -- function's reason: a graveyard-scoped slot is offered the union over the

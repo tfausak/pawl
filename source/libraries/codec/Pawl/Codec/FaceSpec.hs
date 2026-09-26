@@ -167,6 +167,7 @@ baseFace =
       Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
+      Face.minimumX = 0,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.mulliganActions = [],
@@ -209,6 +210,7 @@ minimalFace =
       Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [],
+      Face.minimumX = 0,
       Face.alternativeCosts = [],
       Face.costReductions = [],
       Face.playerAbilities = [],
@@ -284,6 +286,7 @@ populatedFace =
       Face.additionalCostChoices = [],
       Face.modeCosts = Map.empty,
       Face.maximumX = [Quantity.ManaValue],
+      Face.minimumX = 1,
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
       Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing],
       Face.counterability = Counterability.CantBeCountered,
@@ -325,6 +328,7 @@ populatedFaceJson =
     <> "\"blockCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perBlocker\":{\"type\":\"Fixed\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"maximumX\":[{\"type\":\"ManaValue\"}],"
+    <> "\"minimumX\":1,"
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
     <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
