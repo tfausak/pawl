@@ -110,6 +110,30 @@ spec s registry = Spec.describe s "Heal" $ do
         after = S.settleSba (S.settleSba (S.markDamage land 1 shielded))
     Spec.assertBool s (Set.member land (GameState.battlefield after)) "CR 704.5g the Arbor survives lethal damage"
     Spec.assertEqWith s "CR 701.69a with its damage removed and, unlike a regeneration, untapped" (fmap (\o -> (Object.damage o, Object.tapped o)) (Game.lookupObject land after)) (Just (0, TapState.Untapped))
+  -- CR 701.19c: Terror's "can't be regenerated" stops a regeneration shield and
+  -- nothing else, so the same Terror at the same shielded Arbor is survived under
+  -- Pyramids' heal and not under Death Ward's regeneration. One board, one shield
+  -- apiece, differing only in which card made it.
+  Spec.it s "CR 701.19c can't be regenerated stops Death Ward's shield and not Pyramids'" $ do
+    plains <- S.printingOf s registry "Plains"
+    swamp <- S.printingOf s registry "Swamp"
+    pyramids <- S.printingOf s registry "Pyramids"
+    arbor <- S.printingOf s registry "Dryad Arbor"
+    growth <- S.printingOf s registry "Wild Growth"
+    terror <- S.printingOf s registry "Terror"
+    ward <- S.printingOf s registry "Death Ward"
+    let (source, land, _, before) = pyramidsBoard plains pyramids arbor growth
+        (shield, warded) = S.addHandCard ward S.alice before
+        -- The Swamps arrive once the shield is up, so paying for it cannot
+        -- spend the Terror's {B}.
+        survivesTerror g =
+          let (kill, armed) = S.addHandCard terror S.alice (S.landsFor swamp S.alice 2 g)
+           in Set.member land (GameState.battlefield (S.settleSba (castAt land kill armed)))
+    Spec.assertEqWith
+      s
+      "CR 701.19c the Arbor survives Terror under the heal and dies under the regeneration"
+      (survivesTerror (pyramidsMode pyramids source 1 land before), survivesTerror (castAt land shield warded))
+      (True, False)
   -- Pyramids' first mode: "Destroy target Aura attached to a land".
   Spec.it s "CR 701.8a Pyramids' first mode destroys the Aura on a land" $ do
     plains <- S.printingOf s registry "Plains"
