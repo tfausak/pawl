@@ -983,7 +983,8 @@ timesPaidOffends card =
 -- that a nested one cannot smuggle either in.
 --
 -- A CR 603.8 STATE trigger, because the two kinds of condition are gathered by
--- different scans: Pawl.Engine.Event.Trigger.stateTriggers walks the battlefield asking
+-- different scans: Pawl.Engine.Event.Trigger.stateTriggers walks the battlefield (and the
+-- command zone) asking
 -- whether the state holds, and Event.matchesTrigger walks the event log. An
 -- ability that was both would be gathered by stateTriggers whenever any clause
 -- held (that arm answers `any`), and CR 603.8's "not again until the ability has
