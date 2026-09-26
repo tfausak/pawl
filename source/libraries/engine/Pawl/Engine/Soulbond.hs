@@ -57,7 +57,7 @@ pair under one other gs =
       eligible oid =
         Set.member oid (GameState.battlefield gs)
           && maybe False (Set.member CardType.Creature . PC.cardTypes) (Map.lookup oid pcs)
-          && Projection.controllerOfGiven grants Set.empty oid gs == Just under
+          && Projection.controllerOfGiven grants oid gs == Just under
           && maybe True (Maybe.isNothing . Object.paired) (Game.lookupObject oid gs)
       mark partner = Map.adjust (\o -> o {Object.paired = Just (Pairing.MkPairing {Pairing.partner = partner, Pairing.under = under})})
    in if one == other || not (eligible one) || not (eligible other)
@@ -104,7 +104,7 @@ endWhenBroken = do
           holds under oid =
             Set.member oid (GameState.battlefield gs)
               && maybe False (Set.member CardType.Creature . PC.cardTypes) (Map.lookup oid pcs)
-              && Projection.controllerOfGiven grants Set.empty oid gs == Just under
+              && Projection.controllerOfGiven grants oid gs == Just under
           lapsed (oid, pairing) =
             not (holds (Pairing.under pairing) oid && holds (Pairing.under pairing) (Pairing.partner pairing))
           broken = fmap fst (filter lapsed marked)

@@ -234,7 +234,7 @@ becomesUnattached pcs grants gs oid = case Game.lookupObject oid gs of
 outOfReach :: [Projection.ControlGrant] -> GameState -> ObjectId -> Recipient.Recipient -> Bool
 outOfReach grants gs oid host
   | Map.null (RangeOfInfluence.unwrap (GameSettings.rangeOfInfluence (GameState.settings gs))) = False
-  | otherwise = case Projection.controllerOfGiven grants Set.empty oid gs of
+  | otherwise = case Projection.controllerOfGiven grants oid gs of
       Nothing -> False
       Just you -> not (Target.inRangeGiven grants you host gs)
 
@@ -471,7 +471,7 @@ stillLegalEnchant pcs grants pools gs source slot recipient = case (slot, recipi
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
   -- The Aura is on the battlefield when this SBA asks, so its controller is
   -- live -- the CR 608.2b case this perspective exists for cannot arise here.
-  _ -> Target.stillAdmitted pcs grants pools (Projection.controllerOfGiven grants Set.empty source gs) source recipient slot gs
+  _ -> Target.stillAdmitted pcs grants pools (Projection.controllerOfGiven grants source gs) source recipient slot gs
 
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the
@@ -601,7 +601,7 @@ worldVictims pcs gs =
       worlds = Maybe.mapMaybe stamped (Set.toList (GameState.battlefield gs))
       grants = Projection.controlGrants gs
       rivalsOf oid =
-        let controller = Projection.controllerOfGiven grants Set.empty oid gs
+        let controller = Projection.controllerOfGiven grants oid gs
          in filter (\(_, other) -> other == oid || all (\you -> Projection.objectInRangeGiven grants you other gs) controller) worlds
       buried (ts, oid) = case fmap fst (rivalsOf oid) of
         [] -> False

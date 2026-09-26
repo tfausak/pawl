@@ -5276,10 +5276,10 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
           -- eventTriggers below.
           --
           -- The `Object.owner` fallback is unreachable rather than a guess:
-          -- Projection.controllerOfGiven's own base case returns
-          -- `Just (Object.owner obj)` for any id that resolves, and `oid`
-          -- resolves in `lki` (either it is `gs`, which this branch matched
-          -- `Just obj` against, or the guard above found it). It is written as a
+          -- Projection.controllerOfGiven returns a `Just` for any id that
+          -- resolves, and `oid` resolves in `lki` (either it is `gs`, which
+          -- this branch matched `Just obj` against, or the guard above found
+          -- it). It is written as a
           -- fallback only because controllerOf's type is honest about ids that
           -- do not.
           --

@@ -159,7 +159,7 @@ applies pid controller gs affected =
 permanentLeader :: GameState -> Maybe PlayerId
 permanentLeader gs =
   let grants = Projection.controlGrants gs
-      controls pid = length (filter (\oid -> Projection.controllerOfGiven grants Set.empty oid gs == Just pid) (Set.toList (GameState.battlefield gs)))
+      controls pid = length (filter (\oid -> Projection.controllerOfGiven grants oid gs == Just pid) (Set.toList (GameState.battlefield gs)))
       tallies = fmap (\pid -> (pid, controls pid)) (Game.stillPlaying gs)
    in case tallies of
         [] -> Nothing
