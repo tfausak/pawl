@@ -15,6 +15,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- object had, and 'Just' is Selfless Police Captain's "put its +1\/+1
 -- counters", that kind's tally alone.
 --
+-- `from` and `ref` naming the SAME permanent is CR 701.10e's "double the number
+-- of each kind of counter" -- Vorel of the Hull Clade, Gilder Bairn -- the rule
+-- giving each kind "as many of those counters as that ... permanent already
+-- has", one placement per kind.
+--
 -- One kind and not a set, though the rule says "kind(s)": no printing names two.
 -- Scryfall @oracle:\/put (its|those)[^.]*counters on\/@ with
 -- @unique=cards&include_extras=true@, 2026-08-31: of everything it returns, only

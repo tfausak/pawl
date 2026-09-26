@@ -1379,7 +1379,8 @@ aetherjetIds gs =
 -- The doubling itself is CR 701.10e, and this group is what proves it: "as many
 -- of those counters as that player or permanent already has" is the 2 -> 4 below.
 -- The rule's sentence is about A kind, the one PutCounters carries. A card's
--- "each kind of counter" quantifies over kinds instead; see #3913.
+-- "each kind of counter" quantifies over kinds instead, which Pawl.PutCounterSpec
+-- proves with Vorel of the Hull Clade.
 --
 -- Aragorn arrives BETWEEN the two combats so the Maulers takes its two counters
 -- from printed renown 2 alone: with him out on the first swing the Maulers would
