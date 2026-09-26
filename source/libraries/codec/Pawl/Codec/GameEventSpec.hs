@@ -31,6 +31,7 @@ import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.Convoking as Convoking
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
@@ -52,6 +53,7 @@ import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Milled as Milled
@@ -169,8 +171,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.Revealed (Revealed.MkRevealed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) RevealCause.ForMiracle ProjectedCharacteristicsSpec.testCharacteristics))
-      ("{\"type\":\"Revealed\",\"value\":{\"player\":0,\"card\":7,\"cause\":{\"type\":\"ForMiracle\"},\"characteristics\":" <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "}}")
+      (GameEvent.Revealed (Revealed.MkRevealed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) (RevealCause.ForMiracle (Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []})) ProjectedCharacteristicsSpec.testCharacteristics))
+      ("{\"type\":\"Revealed\",\"value\":{\"player\":0,\"card\":7,\"cause\":{\"type\":\"ForMiracle\",\"value\":{\"mana\":[]}},\"characteristics\":" <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "}}")
   -- An object, a player, CR 508.1b's announcement and CR 506.5's declaration
   -- size. Distinct numbers throughout, so a codec that permuted them would fail,
   -- and the announcement is a PLANESWALKER rather than the defending player: the

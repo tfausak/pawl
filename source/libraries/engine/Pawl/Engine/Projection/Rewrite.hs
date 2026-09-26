@@ -1961,7 +1961,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.WasBlocking -> quantity
   Quantity.Type.WasBlockedThisTurn -> quantity
   Quantity.Type.ControlGainedSinceLastUpkeep _ -> quantity
-  Quantity.Type.PlayedThisTurnBy _ -> quantity
+  Quantity.Type.PlayedBy _ -> quantity
   Quantity.Type.DamageDealtToThisTurn -> quantity
   Quantity.Type.PlayerCounters {} -> quantity
   -- A leaf: CR 612.2 swaps a subtype word, and CR 700.5's payload is a PlayerRef

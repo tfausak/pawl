@@ -1764,8 +1764,6 @@ beginTurnOf pid gs =
             -- CR 121.1's per-turn draw tally, cleared for EVERY player: a player
             -- draws on turns that are not theirs, so "each turn" is the whole map.
             GameState.drawsThisTurn = Map.empty,
-            -- CR 305.1 / 601.2a's plays, turn-scoped for the log's reason.
-            GameState.playedThisTurn = Map.empty,
             -- CR 801.2c: who is in range is fixed as each turn begins, so the
             -- seats emptied during the outgoing turn close up here.
             GameState.departedThisTurn = Set.empty,

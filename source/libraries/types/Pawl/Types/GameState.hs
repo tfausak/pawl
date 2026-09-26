@@ -297,10 +297,11 @@ data GameState = MkGameState
     -- because CR 305.2 lets an effect raise the allowance; cleared per player
     -- at their untap step.
     landsPlayed :: Map.Map PlayerId.PlayerId Natural.Natural,
-    -- | CR 305.1 / 601.2a: each card played this turn, keyed by the id it had
+    -- | CR 305.1 / 601.2a: each card played this game, keyed by the id it had
     -- where it was played from and by the one the play gave it (CR 400.7h,
-    -- 400.7i), naming who played it; cleared at turn handoff.
-    playedThisTurn :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
+    -- 400.7i), naming who played it. Never cleared: a delayed trigger may ask on
+    -- a later turn (CR 724.1e), and CR 400.7 never reuses an id.
+    cardsPlayed :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | CR 121.1: how many cards each player has drawn this turn, stamped as the
     -- ordinal onto GameEvent.Drew; cleared for every player at turn handoff,
     -- and after CR 103.3's opening hands.

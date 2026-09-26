@@ -3937,6 +3937,14 @@ isActivationOf oid a = case a of
   A.Activate o _ -> o == oid
   _ -> False
 
+-- Synthetic Mirror of the Fallen's two slots, FILTERED from the offered set
+-- rather than built, so CR 608.2b's re-read finds the recipients the engine
+-- offered. One predicate for both: the pools are opposite graveyards.
+mirrorTargets :: ObjectId -> ObjectId -> Prompt.Prompt r -> r
+mirrorTargets subject original p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (\r -> r == Recipient.ToObject subject || r == Recipient.ToObject original) . snd) sets
+  _ -> S.identityAnswer p
+
 -- Is Doom Blade, sitting in alice's hand, castable? CR 601.2c: only with a legal
 -- target, and its one slot is "target nonblack creature".
 doomBladeOffered :: ObjectId -> GameState.GameState -> Bool
@@ -4030,6 +4038,32 @@ graveyardTokenCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             Spec.assertEqWith s "and has mana value 0" (PC.manaValue (Projection.project cloneId cloned)) (Just 0)
           Nothing -> Spec.assertFailure s "the Clone should be on the battlefield"
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- CR 707.2 / 613.1f: a graveyard card's keywords are its PROJECTED ones, so
+  -- Synthetic Mirror of the Fallen ("Target card in your graveyard becomes a
+  -- copy of target card in an opponent's graveyard") changes which embalm it
+  -- offers. One board, two casts differing only in the targets: alice's
+  -- Skirmisher becomes a Hill Giant, or her Goblin Piker becomes bob's
+  -- Skirmisher. Each cast leaves the other's subject untouched, so each
+  -- negative has the other board's positive as its control; both leave four
+  -- Islands, exactly embalm's {3}{U}.
+  Spec.it s "CR 707.2 a graveyard card offers the embalm of what it is a copy of, not its printed one" $ do
+    island <- S.printingOf s registry "Island"
+    skirmisher <- S.printingOf s registry "Tah-Crop Skirmisher"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    mirror <- S.printingOf s registry "Synthetic Mirror of the Fallen"
+    let (ownSkirmisher, _, base) = graveyardCopyBoard skirmisher island 6 0
+        (ownPiker, withPiker) = S.addGraveyardCard piker S.alice base
+        (theirSkirmisher, withTheirs) = S.addGraveyardCard skirmisher S.bob withPiker
+        (theirGiant, board) = S.addGraveyardCard giant S.bob withTheirs
+        mirrored subject original = castAndResolve (mirrorTargets subject original) mirror board
+        skirmisherAsGiant = mirrored ownSkirmisher theirGiant
+        pikerAsSkirmisher = mirrored ownPiker theirSkirmisher
+        offered oid gs = any (isActivationOf oid) (Action.legalActions S.alice gs)
+    Spec.assertBool s (not (offered ownSkirmisher skirmisherAsGiant)) "a Skirmisher that is a copy of Hill Giant offers no embalm"
+    Spec.assertBool s (offered ownPiker pikerAsSkirmisher) "a Goblin Piker that is a copy of Tah-Crop Skirmisher offers embalm"
+    Spec.assertBool s (offered ownSkirmisher pikerAsSkirmisher) "where the Skirmisher the Mirror did not touch still does"
 
 -- CR 707.2's token copy entering tapped and attacking (CR 110.5b, CR 508.4), and
 -- named later in the same resolution (CR 603.7c): Flamerush Rider, "Whenever this

@@ -596,15 +596,9 @@ mintedBy keyword ability = ability {ActivatedAbility.keyword = Just keyword}
 -- activated from here" rather than which rule produced any of them, which each
 -- ability carries for itself once `mintedBy` has stamped it.
 --
--- Printed keywords rather than a projection's post-layer ones, the same rules fact
--- castingPermissionsOf records: CR 113.6b confines an ability to the zones it
--- states, and rules 702.29a and 702.77a state the hand.
---
--- Not implemented: a card in a hand whose CYCLING or REINFORCE an effect granted
--- or removed, which the printed set misses (#1859). Narrowed to those two rules
--- rather than to keywords at large -- Teferi, Mage of Zhalfir does grant a
--- keyword to a card in a hand, and Cast.instantSpeed reads that one through the
--- projection.
+-- CR 113.6b confines an ability to the zones it states, and rules 702.29a and
+-- 702.77a state the hand. The keyword set is the caller's:
+-- Activatable.abilitiesForGiven hands it the projection's.
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
@@ -1178,10 +1172,8 @@ ninjutsu cost =
 -- scavenge, CR 702.128a's embalm, CR 702.129a's eternalize and CR 702.141a's
 -- encore.
 --
--- PRINTED keywords, as handAbilitiesOf takes them and for the same reason: the
--- projection does not reach a graveyard card (#1859; see
--- Pawl.Engine.Projection.projectGiven), and Pawl.Engine.Activate's graveyard arm
--- is what calls this.
+-- The keyword set is the caller's, as handAbilitiesOf's is:
+-- Activatable.abilitiesForGiven's graveyard arm hands it the projection's.
 --
 -- MEMBERSHIP and not a count: each of these abilities moves the one card, so a
 -- second instance has nothing left to do once the first has resolved.
@@ -1815,9 +1807,8 @@ encoreSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEff
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
 -- sibling one zone over.
 --
--- POST-LAYER keywords, unlike handAbilitiesOf's printed ones, and the contrast is
--- CR 113.6 again: this ability functions on the battlefield, which the projection
--- does reach. So Humility takes crew away at CR 613.1f layer 6 for free.
+-- POST-LAYER keywords, so Humility takes crew away at CR 613.1f layer 6 for
+-- free.
 --
 -- One ability PER INSTANCE, rule 702.70b's reading rather than rule 702.164b's: CR
 -- 702.122a states a whole self-contained ability, so a permanent with crew twice
@@ -3922,7 +3913,7 @@ castFromGraveyardExile =
 -- and CR 122.2 keeps every row it holds off a card in a hand. This one is read
 -- off the printed face by Pawl.Engine.Projection.replacementsAffecting's hand
 -- walk, where a granted madness would not be seen (gap #1859) -- the reading
--- `miracleCost` and `suspendOf` take one clause of CR 113.6 apart.
+-- `suspendOf` takes one clause of CR 113.6 apart.
 --
 -- ONE ROW however many madness abilities, unlike riot's per-instance rows: rule
 -- 702.35a's replacement says only where the card goes, so two of them would be
@@ -4581,7 +4572,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Companion _ -> []
   -- CR 702.94a's static half is a PERMISSION to reveal, not a replacement: CR
   -- 121.9's window changes nothing about the draw, so there is no event to
-  -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCost directly.
+  -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCosts directly.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Ascend -> []
@@ -8052,40 +8043,46 @@ miracle cost =
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
--- CR 702.94a's STATIC half, read as the one thing its reader needs: what this
--- card would cost if its controller took the reveal. Nothing when the card has no
--- miracle ability at all, which is also "no window to open".
+-- CR 702.94a's STATIC half: the cost of each distinct miracle ability, one per
+-- reveal the player may choose to make (CR 702.94b's "its miracle ability").
+-- Empty when the card has none, which is also "no window to open".
 --
--- morphCost's shape exactly, and asked of the card's PRINTED keywords for
--- flashbackCosts' reason: rule 702.94a's abilities function in the hand
--- (CR 113.6b).
--- ONE cost per card (the ascending-least), morphCost's shape.
---
--- Not implemented: a card in a hand whose MIRACLE an effect granted or removed
--- (#1859).
-miracleCost :: Set Keyword -> Maybe (Cost Keyword)
-miracleCost keywords =
+-- Asked of the card's PROJECTED keywords (Event.offerMiracleReveal): rule
+-- 702.94a's abilities function in the hand (CR 113.6b), where an effect may
+-- grant one (Molecule Man).
+miracleCosts :: Set Keyword -> [Cost Keyword]
+miracleCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Miracle cost -> Just cost
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Maybe.mapMaybe costOf (Set.toAscList keywords)
 
--- The triggered abilities rule 702 mints for a card read OUTSIDE the battlefield,
--- off its printed keywords. `triggeredAbilitiesOf`'s sibling, and the same
--- roster: a set rather than the printed counts, `exileTriggeredAbilitiesOf`'s
--- reading, since rule 702.94a states no per-instance clause.
+-- The keywords a reveal for the miracle ability with this cost leaves live: every
+-- other miracle ability's linked trigger refers only to its own reveal (CR
+-- 607.2h), so the mint drops them.
+revealedForMiracle :: Cost Keyword -> Set Keyword -> Set Keyword
+revealedForMiracle revealed =
+  let keep keyword = case keyword of
+        Keyword.Miracle cost -> cost == revealed
+        _ -> True
+   in Set.filter keep
+
+-- The triggered abilities rule 702 mints for a card in a HAND, off the keywords
+-- its caller hands over. `triggeredAbilitiesOf`'s sibling, and the same roster:
+-- a set rather than counts, `exileTriggeredAbilitiesOf`'s reading, since rule
+-- 702.94a states no per-instance clause.
 --
 -- Rule 702.94a's miracle is the only one any of them reaches today, and CR 113.6k
 -- is what decides that -- Pawl.Engine.Event filters this list by
 -- `functionsIn`, so a drawn Doomed Traveler's dies trigger is offered from no
 -- hand.
-printedTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
-printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
+handTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card (GrantedAbility.GrantedAbility Card)]
+handTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 
 -- CR 702.62a's SECOND and THIRD abilities, "the second and third are triggered
 -- abilities that function in the exile zone", and CR 702.35a's second -- the
 -- roster the exile scan in Pawl.Engine.Event.Trigger mints,
--- `printedTriggeredAbilitiesOf`'s sibling one zone over.
+-- `handTriggeredAbilitiesOf`'s sibling one zone over.
 --
 -- UNGATED BY CR 113.6, which is the whole reason it is its own function: rule
 -- 702.62a states the zone itself, so the exile scan takes this list without
@@ -8101,7 +8098,7 @@ printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 -- free play watches that removal. Vanishing's pair one rule over has the same
 -- two shapes.
 --
--- A SET rather than a count-carrying Map, `printedTriggeredAbilitiesOf`'s
+-- A SET rather than a count-carrying Map, `handTriggeredAbilitiesOf`'s
 -- reading: rules 702.62 and 702.35 state no per-instance clause, and no card in
 -- data/cards/ prints either keyword twice, so the caller hands over the distinct
 -- keywords (Face.keywordSet). Rule 702.85c and its siblings do state one, which

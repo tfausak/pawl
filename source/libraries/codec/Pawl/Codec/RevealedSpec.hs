@@ -4,6 +4,8 @@ import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteris
 import qualified Pawl.Codec.Revealed as Revealed
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.RevealCause as RevealCause
@@ -19,11 +21,11 @@ spec s = Spec.describe s "Pawl.Codec.Revealed" $ do
       ( Revealed.MkRevealed
           { Revealed.player = PlayerId.MkPlayerId 0,
             Revealed.card = ObjectId.MkObjectId 7,
-            Revealed.cause = RevealCause.ForMiracle,
+            Revealed.cause = RevealCause.ForMiracle (Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}),
             Revealed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics
           }
       )
-      ( "{\"player\":0,\"card\":7,\"cause\":{\"type\":\"ForMiracle\"},\"characteristics\":"
+      ( "{\"player\":0,\"card\":7,\"cause\":{\"type\":\"ForMiracle\",\"value\":{\"mana\":[]}},\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> "}"
       )

@@ -1316,7 +1316,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- draw, and re-reading GameState.drawsThisTurn at the scan would ask about the
   -- board one CR 117.5 boundary later.
   TriggerCondition.SelfRevealedForMiracle -> case event of
-    GameEvent.Revealed (Revealed.MkRevealed _ oid RevealCause.ForMiracle _) -> oid == bearer
+    GameEvent.Revealed (Revealed.MkRevealed _ oid (RevealCause.ForMiracle _) _) -> oid == bearer
     GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.Ordinary _) -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
