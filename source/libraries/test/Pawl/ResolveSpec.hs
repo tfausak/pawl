@@ -1428,6 +1428,19 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     board <- twoDragonBoard s registry
     Spec.assertEqWith s "the second Dragon's artifact came back to her hand" (handNames (kill (secondDragon board) board)) [secondArtifact board]
     Spec.assertEqWith s "and the first Dragon's is still in exile" (exileNames (kill (secondDragon board) board)) [firstArtifact board]
+  -- Synthetic Split Reliquary -- "{3} Artifact. Warden -- {T}: Exile target
+  -- creature card from your graveyard. Scholar -- {T}: Exile target land card
+  -- from your graveyard. {T}, Sacrifice this artifact: Return the cards exiled
+  -- with its warden ability to your hand." SYNTHETIC because no printing links a
+  -- reference to one of two exiling abilities of one object (MTGJSON 2026-08-23,
+  -- `exiled with [^.]*ability`: Soulflayer's delve, its only exiler). One object
+  -- exiled both cards, so only CR 607.2a's per-ABILITY link keeps the land out.
+  Spec.it s "CR 607.2a Synthetic Split Reliquary returns only what its warden ability exiled" $ do
+    settled <- splitReliquary s registry
+    -- The gameplay assertion, and first: an object-keyed link returns the Forest
+    -- too, and a link that lost the name returns nothing.
+    Spec.assertEqWith s "the warden ability's Piker came back to her hand, and nothing else" (handNames settled) [CardName.MkCardName (Text.pack "Goblin Piker")]
+    Spec.assertEqWith s "the scholar ability's Forest is still in exile" (exileNames settled) [CardName.MkCardName (Text.pack "Forest")]
   -- Fertilid's Favor -- "Target player searches their library for a basic land
   -- card, puts it onto the battlefield tapped, then shuffles. Put two +1/+1
   -- counters on up to one target artifact or creature." The whole-card proof that
@@ -4008,6 +4021,28 @@ twiceSphinx s registry = do
           first_ = once "Goblin Piker" board
           untapped = S.runPure S.identityAnswer first_ (Event.untap sphinxId)
       pure (once "Chromatic Star" untapped)
+
+-- Alice's Synthetic Split Reliquary over a graveyard of one creature card and
+-- one land card: each exiling ability takes its one candidate on its own
+-- resolution, then the third ability is activated and resolved. Event.untap
+-- between them is twiceSphinx's road to a real second {T}.
+splitReliquary :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+splitReliquary s registry = do
+  reliquary <- S.printingOf s registry "Synthetic Split Reliquary"
+  piker <- S.printingOf s registry "Goblin Piker"
+  forest <- S.printingOf s registry "Forest"
+  let (reliquaryId, g0) = S.addPermanent reliquary S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g1) = S.addGraveyardCard piker S.alice g0
+      (_, g2) = S.addGraveyardCard forest S.alice g1
+      board = g2 {GameState.priority = Just S.alice}
+      run ability gs = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice reliquaryId ability >> Stack.resolveTop)
+      untap gs = S.runPure S.identityAnswer gs (Event.untap reliquaryId)
+  case Face.activatedAbilities (S.combinedFace reliquary) of
+    [warden, scholar, back] -> do
+      let exiled = untap (run scholar (untap (run warden board)))
+      Spec.assertEqWith s "both exiling abilities exiled their card" (List.sort (exileNames exiled)) [CardName.MkCardName (Text.pack "Forest"), CardName.MkCardName (Text.pack "Goblin Piker")]
+      pure (run back exiled)
+    _ -> Spec.assertFailure s "Synthetic Split Reliquary should declare three activated abilities"
 
 -- findFirstExercising with the FIND pinned to one named card. The two Dragons of
 -- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be

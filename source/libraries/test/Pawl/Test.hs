@@ -231,6 +231,7 @@ import qualified Pawl.Codec.ExchangeZonesSpec
 import qualified Pawl.Codec.ExchangedValueSpec
 import qualified Pawl.Codec.ExileCardsFromGraveyardSpec
 import qualified Pawl.Codec.ExileHauntingSpec
+import qualified Pawl.Codec.ExileLinkSpec
 import qualified Pawl.Codec.ExileLookerSpec
 import qualified Pawl.Codec.ExileMaterialsSpec
 import qualified Pawl.Codec.ExilePlayPermissionSpec
@@ -940,6 +941,7 @@ spec s registry = do
   Pawl.Codec.ExileCardsFromGraveyardSpec.spec s
   Pawl.Codec.ExileMaterialsSpec.spec s
   Pawl.Codec.ExileHauntingSpec.spec s
+  Pawl.Codec.ExileLinkSpec.spec s
   Pawl.Codec.ExileLookerSpec.spec s
   Pawl.Codec.ExilePlayPermissionSpec.spec s
   Pawl.Codec.ExpansionSpec.spec s

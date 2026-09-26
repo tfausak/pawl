@@ -976,6 +976,7 @@ rewriteObjectRef pairs ref = case ref of
   -- the text of, so dropping the rewrite here leaves the suite green.
   ObjectRef.EachCardInYourLibrary f -> ObjectRef.EachCardInYourLibrary (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
+  ObjectRef.EachCardExiledWithAbility name -> ObjectRef.EachCardExiledWithAbility name
   ObjectRef.EachCardEncodedOnSource f -> ObjectRef.EachCardEncodedOnSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachSpell f -> ObjectRef.EachSpell (Filter.rewrite pairs f)
   ObjectRef.EachAbility f -> ObjectRef.EachAbility (Filter.rewrite pairs f)

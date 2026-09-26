@@ -122,6 +122,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventGroup as EventGroup
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
@@ -2654,7 +2655,7 @@ apply batch candidate event =
             Monad.forM_ chosen $ \card -> do
               arrivals <- changeZoneReturning card Zone.Exile
               State.modify' $ \gs2 ->
-                gs2 {GameState.exiledWith = foldr (\arrival -> Map.insert arrival oid) (GameState.exiledWith gs2) arrivals}
+                gs2 {GameState.exiledWith = foldr (\arrival -> Map.insert arrival ExileLink.MkExileLink {ExileLink.source = oid, ExileLink.ability = Nothing}) (GameState.exiledWith gs2) arrivals}
             pure (Just event)
       -- CR 614.1c with CR 301.5e: "as this Equipment enters, choose a creature
       -- you control it could be attached to. If you do, it enters attached to
@@ -6133,7 +6134,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- CR 607.2b's link is exactly such a finding.
               Monad.forM_ (if dest == Zone.Exile then exiledBy else Nothing) $ \linked ->
                 Monad.forM_ arrivals $ \arrival ->
-                  State.modify' (\g -> g {GameState.exiledWith = Map.insert arrival linked (GameState.exiledWith g)})
+                  State.modify' (\g -> g {GameState.exiledWith = Map.insert arrival ExileLink.MkExileLink {ExileLink.source = linked, ExileLink.ability = Nothing} (GameState.exiledWith g)})
               -- ONE Moved event for the whole move, which is CR 712.21's first
               -- clause: one permanent leaves the battlefield. `newId` is the
               -- first arrival, so a trigger reading the destination end of this
@@ -7965,7 +7966,7 @@ discardReturning cause pid oid = do
   -- A REGRESSION FENCE rather than a proof: neutralizing the conjunct leaves the
   -- suite green, since the card that would tell it from the exiledWith test alone
   -- is the one printing both madness and a hand-functioning self-exiling row.
-  let exiledForMadness newId = hasMadness && Map.lookup newId (GameState.exiledWith after) == Just oid
+  let exiledForMadness newId = hasMadness && fmap ExileLink.source (Map.lookup newId (GameState.exiledWith after)) == Just oid
   -- One record per arrival: a card discarded is a card, so this loop runs once
   -- for every move the funnel makes. A melded permanent is never in a hand, so
   -- the sequence never holds two here.
