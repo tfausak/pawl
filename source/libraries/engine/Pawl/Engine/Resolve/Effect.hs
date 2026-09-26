@@ -4804,7 +4804,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   now <- State.get
                   let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
                   fmap (reverse . snd) (Event.simultaneously (moveOne mAttack mBlocked riders now (Set.empty, []) arrival))
-                else fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
+                else do
+                  batch <- fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
+                  -- CR 613.7m: the members that entered the battlefield together
+                  -- take their stamps in APNAP order, each seat choosing its own.
+                  -- Not on the one-at-a-time road above, whose cards enter at
+                  -- separate moments.
+                  Restamp.settle (GameState.nextTimestamp before) (concatMap Foldable.toList batch)
+                  pure batch
             Monad.mapM_ (\slot -> bindArrivals slot (concatMap Foldable.toList arrived)) mSlot
   -- CR 701.12d / 701.12f: every named player's two zones swap their cards, an
   -- empty zone included. Both zones are the player's own (CR 400.3), so every
@@ -7663,7 +7670,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case legalOne destination legal of
       Just recipient -> do
         gs <- State.get
-        Foldable.for_ (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)) $ \mover ->
+        -- CR 613.7m: movers becoming attached together take CR 701.3c's stamps
+        -- in APNAP order, each seat choosing its own, asked before the fold that
+        -- mints them, as turnPermanentsOver asks -- and only of the movers the
+        -- move will restamp, since Event.attach refuses the rest (CR 701.3b).
+        -- No board observes the order (gap #4214).
+        let movers = objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)
+            restamped mover = case Attach.attachmentFor mover recipient gs of
+              Just attachment -> fmap Object.attachedTo (Game.lookupObject mover gs) /= Just (Just attachment)
+              Nothing -> False
+        ordered <- Restamp.order (filter restamped movers)
+        Foldable.for_ (ordered <> filter (not . restamped) movers) $ \mover ->
           Event.attach mover recipient
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
       Nothing -> pure ()
