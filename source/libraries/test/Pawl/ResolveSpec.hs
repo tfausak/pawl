@@ -19,6 +19,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
@@ -1667,6 +1668,29 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "and only the targeted creature reached exile"
       (length (Game.zoneMembers Zone.Exile S.bob settled))
       1
+  -- Grim Reminder -- "Search your library for a nonland card and reveal it. Each
+  -- opponent who cast a spell this turn with the same name as that card loses 6
+  -- life. Then shuffle." Three seats, so "each opponent" is two players: bob cast
+  -- Fog and carol cast Boil. alice's library holds both, and the answer pins the
+  -- Fog, which is not the first match -- so bob alone cast the revealed name, and
+  -- carol's untouched life is what a filter missing either atom (the caster, CR
+  -- 110.2; the name, CR 201.2a) would have cost her.
+  Spec.it s "CR 701.20b whole card: Grim Reminder's revealed card stays in the library and costs only the opponent who cast its name" $ do
+    (fogId, settled) <- grimReminderResolved s registry
+    Spec.assertEqWith s "bob cast a Fog this turn and the revealed card is a Fog: he loses 6" (S.lifeOf S.bob settled) (Just 14)
+    Spec.assertEqWith s "carol cast only a Boil: she loses nothing" (S.lifeOf S.carol settled) (Just 20)
+    Spec.assertBool s (elem fogId (Game.zoneMembers Zone.Library S.alice settled)) "CR 701.20b the revealed Fog is still in alice's library"
+  -- "{B}{B}: Return this card from your graveyard to your hand. Activate only
+  -- during your upkeep." The same card, in the graveyard its resolution put it
+  -- in, asked at two steps of alice's turn with the same two Swamps untapped.
+  Spec.it s "CR 113.6m / 602.5b Grim Reminder's return is offered from the graveyard during its controller's upkeep only" $ do
+    (_, settled) <- grimReminderResolved s registry
+    swamp <- S.printingOf s registry "Swamp"
+    let reminders = filter (\oid -> S.soleFaceName oid settled == CardName.MkCardName (Text.pack "Grim Reminder")) (Game.zoneMembers Zone.Graveyard S.alice settled)
+        board = S.landsFor swamp S.alice 2 settled
+        offeredAt step = any (\a -> case a of A.Activate o _ -> elem o reminders; _ -> False) (Action.legalActions S.alice board {GameState.activePlayer = S.alice, GameState.priority = Just S.alice, GameState.phase = Phase.Beginning step})
+    Spec.assertBool s (offeredAt BeginningStep.Upkeep) "offered in alice's upkeep"
+    Spec.assertBool s (not (offeredAt BeginningStep.DrawStep)) "and not in her draw step"
   -- Mana Severance -- "Search your library for any number of land cards, exile
   -- them, then shuffle." The whole-card proof that a search can state NO count
   -- (CR 701.23a: the find is bounded by what the zone holds, not by a number the
@@ -3250,6 +3274,37 @@ untappedOf pid gs =
 
 -- Finds as many as the search allows, taking them off the head of the offered
 -- list -- one card for the searches that ask for one.
+-- Grim Reminder's board, three seats and all in alice's main phase: bob casts a
+-- Fog off a Forest and carol a Boil off four Mountains, each resolved, and then
+-- alice casts Grim Reminder off three Swamps. Her library is a Fog, a Boil and a
+-- Swamp, the Swamp on top so the filter has a land to reject, and the Boil above
+-- the Fog so a search taking the first match would reveal the wrong name. Answers
+-- the library Fog's id and the settled board.
+grimReminderResolved :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+grimReminderResolved s registry = do
+  swamp <- S.printingOf s registry "Swamp"
+  forest <- S.printingOf s registry "Forest"
+  mountain <- S.printingOf s registry "Mountain"
+  fog <- S.printingOf s registry "Fog"
+  boil <- S.printingOf s registry "Boil"
+  reminder <- S.printingOf s registry "Grim Reminder"
+  let lands = S.landsFor mountain S.carol 4 (S.landsFor forest S.bob 1 (S.landsFor swamp S.alice 3 (Setup.emptyGame S.threePlayers)))
+      (fogId, base1) = S.addLibraryCard fog S.alice lands
+      (_, base2) = S.addLibraryCard boil S.alice base1
+      (_, base3) = S.addLibraryCard swamp S.alice base2
+      (bobFog, base4) = S.addHandCard fog S.bob base3
+      (carolBoil, base5) = S.addHandCard boil S.carol base4
+      (reminderId, gs) = S.addHandCard reminder S.alice base5
+      castAndResolve pid oid g = snd (Engine.runGamePure (findWanted fogId) (g {GameState.priority = Just pid}) (S.cast pid oid >> Stack.resolveTop))
+  pure (fogId, castAndResolve S.alice reminderId (castAndResolve S.carol carolBoil (castAndResolve S.bob bobFog gs)))
+
+-- Finds exactly the card named, out of the matches the engine OFFERED, so a
+-- search that did not admit it finds nothing rather than being repaired.
+findWanted :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+findWanted wanted p = case p of
+  Prompt.Search _ _ matches _ -> filter (== wanted) matches
+  _ -> S.identityAnswer p
+
 findFirst :: Prompt.Prompt r -> r
 findFirst p = case p of
   Prompt.Search _ _ matches cap -> List.genericTake cap matches
