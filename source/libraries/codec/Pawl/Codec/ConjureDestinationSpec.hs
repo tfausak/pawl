@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.ConjureEntry as ConjureEntry
+import qualified Pawl.Types.LibraryDepth as LibraryDepth
 import qualified Pawl.Types.TapState as TapState
 
 -- | A case PER CONSTRUCTOR, where an 'Pawl.JsonCodec.Arm.enum' codec needed
@@ -24,8 +25,15 @@ spec s = Spec.describe s "Pawl.Codec.ConjureDestination" $ do
     Common.assertCodec
       s
       ConjureDestination.codec
-      ConjureDestination.Library
+      (ConjureDestination.Library Nothing)
       " {\"type\":\"Library\"} "
+  -- Calim, Djinn Emperor's "into your library seventh from the top".
+  Spec.it s "Library seventh from the top" $
+    Common.assertCodec
+      s
+      ConjureDestination.codec
+      (ConjureDestination.Library (Just (LibraryDepth.FromTop 7)))
+      " {\"type\":\"Library\",\"value\":{\"type\":\"FromTop\",\"value\":7}} "
   Spec.it s "Graveyard" $
     Common.assertCodec
       s

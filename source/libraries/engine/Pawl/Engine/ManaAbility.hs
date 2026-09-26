@@ -598,7 +598,7 @@ movesLibraryCard effect = case effect of
   -- test-backed behaviour.
   Effect.Conjure (Conjure.MkConjure _ _ _ destination _) -> case destination of
     ConjureDestination.Hand -> False
-    ConjureDestination.Library -> True
+    ConjureDestination.Library _ -> True
     ConjureDestination.Graveyard -> False
     ConjureDestination.Battlefield _ -> False
     ConjureDestination.Exile -> False

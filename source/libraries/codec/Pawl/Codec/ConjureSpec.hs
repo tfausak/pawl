@@ -46,7 +46,7 @@ spec s = Spec.describe s "Pawl.Codec.Conjure" $ do
           { Conjure.quantity = Quantity.Literal 4,
             Conjure.cards = ConjureCards.Written (Text.pack "Lightning Bolt" NonEmpty.:| []),
             Conjure.selection = Conjure.defaultSelection,
-            Conjure.destination = ConjureDestination.Library,
+            Conjure.destination = ConjureDestination.Library Nothing,
             Conjure.slot = Nothing
           }
       )

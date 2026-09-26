@@ -600,6 +600,8 @@ library codec
     Pawl.Codec.LastKnownSpec
     Pawl.Codec.Layout
     Pawl.Codec.LayoutSpec
+    Pawl.Codec.LibraryDepth
+    Pawl.Codec.LibraryDepthSpec
     Pawl.Codec.LibraryPlacement
     Pawl.Codec.LibraryPlacementSpec
     Pawl.Codec.LibraryPosition
@@ -1936,6 +1938,7 @@ library types
     Pawl.Types.Layer
     Pawl.Types.Layout
     Pawl.Types.LearnMode
+    Pawl.Types.LibraryDepth
     Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition
     Pawl.Types.LifeChange

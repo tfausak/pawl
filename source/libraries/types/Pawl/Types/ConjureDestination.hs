@@ -1,6 +1,7 @@
 module Pawl.Types.ConjureDestination where
 
 import qualified Pawl.Types.ConjureEntry as ConjureEntry
+import qualified Pawl.Types.LibraryDepth as LibraryDepth
 
 -- | Where an Alchemy conjure puts the card it creates.
 --
@@ -18,24 +19,12 @@ data ConjureDestination
     -- hand".
     Hand
   | -- | Toralf\'s Disciple\'s "conjure four cards named Lightning Bolt into your
-    -- library, then shuffle".
-    --
-    -- Not implemented: a stated position. Printings state two different things,
-    -- and only one of them is a thing
-    -- 'Pawl.Types.LibraryPosition.LibraryPosition' could say. An END -- always
-    -- the TOP: Jewel Mine Overseer\'s "conjure seven cards named Seven Dwarves on
-    -- top of your library" and Pampered Loamfrill\'s "onto the top of your
-    -- library". A depth, which is no end at all: Calim, Djinn Emperor\'s
-    -- "seventh from the top" and Jessie Zane, Fangbringer\'s "into the top six
-    -- cards of your library at random".
-    --
-    -- The resolver hands 'Pawl.Types.LibraryPosition.defaultValue' to every
-    -- arrival, and that is the BOTTOM -- the opposite end from the one every
-    -- printing above names. Nothing is red because none of those printings is in
-    -- @data\/cards\/@, and this arm\'s own producer shuffles immediately, which
-    -- makes the end unobservable there. Pampered Loamfrill is the one that would
-    -- OBSERVE it, since it never shuffles (#3972).
-    Library
+    -- library, then shuffle" names no place, so Nothing, and the card lands at
+    -- 'Pawl.Types.LibraryPosition.defaultValue' for the shuffle to move. Calim,
+    -- Djinn Emperor\'s "seventh from the top" and Mine Security\'s "into the top
+    -- eight cards of your library at random" state a depth, and "on top of your
+    -- library" (Jewel Mine Overseer) is @FromTop 1@.
+    Library (Maybe LibraryDepth.LibraryDepth)
   | -- | Shellfish Scholar\'s "conjure a card named Think Twice into your
     -- graveyard" (CR 404.1).
     Graveyard
