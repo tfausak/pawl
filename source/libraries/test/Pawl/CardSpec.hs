@@ -4467,6 +4467,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.EnteredThisTurn -> []
   Filter.Type.CrewedSourceThisTurn -> []
   Filter.Type.ConvokedSourceThisTurn -> []
+  Filter.Type.SaddledSourceThisTurn -> []
   Filter.Type.ControlledSinceTurnBegan -> []
   -- DESCENT, for ControlsMoreThanYou's reason.
   Filter.Type.AttachedTo f -> filterSlotsReadSingly f

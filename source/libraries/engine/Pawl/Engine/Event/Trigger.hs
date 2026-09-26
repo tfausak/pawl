@@ -94,6 +94,7 @@ import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.Saddling as Saddling
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -200,6 +201,7 @@ movedOf event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -338,6 +340,7 @@ participants event =
         GameEvent.BecameCrewed c -> one (Crewing.vehicle c)
         GameEvent.Convoked c -> (Convoking.spell c : Set.toList (Convoking.convokedBy c), [])
         GameEvent.Crewed c -> (Crewing.vehicle c : Set.toList (Crewing.crewedBy c), [])
+        GameEvent.Saddled c -> (Saddling.mount c : Set.toList (Saddling.saddledBy c), [])
         GameEvent.PermanentSacrificed p -> ([PermanentWasSacrificed.permanent p], [PermanentWasSacrificed.player p])
         GameEvent.AbilityTriggered t ->
           let source = case AbilityTriggered.source t of
@@ -1258,6 +1261,7 @@ eventTriggers events gs =
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
+        GameEvent.Saddled _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1514,6 +1518,7 @@ eventTriggers events gs =
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
+        GameEvent.Saddled _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1781,6 +1786,7 @@ eventTriggers events gs =
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
+        GameEvent.Saddled _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -1939,6 +1945,7 @@ eventTriggers events gs =
         GameEvent.Trained _ -> Map.empty
         GameEvent.BecameCrewed _ -> Map.empty
         GameEvent.Convoked _ -> Map.empty
+        GameEvent.Saddled _ -> Map.empty
         GameEvent.Crewed _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty

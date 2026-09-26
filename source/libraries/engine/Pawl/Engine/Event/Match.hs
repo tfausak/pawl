@@ -326,6 +326,7 @@ countersRemovedFrom bearer wanted event = case event of
   GameEvent.Trained _ -> Nothing
   GameEvent.BecameCrewed _ -> Nothing
   GameEvent.Convoked _ -> Nothing
+  GameEvent.Saddled _ -> Nothing
   GameEvent.Crewed _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -381,6 +382,7 @@ boundDeparts bindings destinations slot event = case event of
   GameEvent.Trained _ -> False
   GameEvent.BecameCrewed _ -> False
   GameEvent.Convoked _ -> False
+  GameEvent.Saddled _ -> False
   GameEvent.Crewed _ -> False
   GameEvent.PermanentSacrificed {} -> False
   GameEvent.AbilityTriggered {} -> False
@@ -472,6 +474,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -575,6 +578,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -656,6 +660,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -749,6 +754,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -838,6 +844,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -928,6 +935,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1016,6 +1024,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1112,6 +1121,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1214,6 +1224,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1313,6 +1324,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1399,6 +1411,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1484,6 +1497,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1578,6 +1592,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1672,6 +1687,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1763,6 +1779,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1853,6 +1870,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -1944,6 +1962,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2047,6 +2066,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2148,6 +2168,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2240,6 +2261,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2331,6 +2353,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2418,6 +2441,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2544,6 +2568,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2656,6 +2681,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2732,6 +2758,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2824,6 +2851,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2937,6 +2965,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3033,6 +3062,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3141,6 +3171,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3219,6 +3250,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3325,6 +3357,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3410,6 +3443,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3511,6 +3545,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3599,6 +3634,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3698,6 +3734,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3792,6 +3829,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3947,6 +3985,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
+          GameEvent.Saddled _ -> False
           GameEvent.Crewed _ -> False
           GameEvent.PermanentSacrificed {} -> False
           GameEvent.AbilityTriggered {} -> False
@@ -4097,6 +4136,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
+          GameEvent.Saddled _ -> False
           GameEvent.Crewed _ -> False
           GameEvent.PermanentSacrificed {} -> False
           GameEvent.AbilityTriggered {} -> False
@@ -4183,6 +4223,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4269,6 +4310,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4361,6 +4403,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4461,6 +4504,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4585,6 +4629,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
+          GameEvent.Saddled _ -> False
           GameEvent.Crewed _ -> False
           GameEvent.PermanentSacrificed {} -> False
           GameEvent.AbilityTriggered {} -> False
@@ -4673,6 +4718,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4775,6 +4821,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4914,6 +4961,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5021,6 +5069,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5102,6 +5151,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5169,6 +5219,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5275,6 +5326,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5380,6 +5432,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5465,6 +5518,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5553,6 +5607,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5680,6 +5735,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -5773,6 +5829,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
+          GameEvent.Saddled _ -> False
           GameEvent.Crewed _ -> False
           GameEvent.PermanentSacrificed {} -> False
           GameEvent.AbilityTriggered {} -> False
@@ -5876,6 +5933,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
+          GameEvent.Saddled _ -> False
           GameEvent.Crewed _ -> False
           GameEvent.PermanentSacrificed {} -> False
           GameEvent.AbilityTriggered {} -> False
@@ -5935,6 +5993,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6073,6 +6132,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Trained _ -> False
           GameEvent.BecameCrewed _ -> False
           GameEvent.Convoked _ -> False
+          GameEvent.Saddled _ -> False
           GameEvent.Crewed _ -> False
           GameEvent.PermanentSacrificed {} -> False
           GameEvent.AbilityTriggered {} -> False
@@ -6137,6 +6197,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6226,6 +6287,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6337,6 +6399,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6442,6 +6505,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6542,6 +6606,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6641,6 +6706,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6783,6 +6849,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -6879,6 +6946,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7005,6 +7073,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7068,6 +7137,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7171,6 +7241,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7297,6 +7368,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7393,6 +7465,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7499,6 +7572,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7533,6 +7607,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7621,6 +7696,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7712,6 +7788,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7837,6 +7914,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -7944,6 +8022,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8025,6 +8104,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8106,6 +8186,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -8186,6 +8267,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -8277,6 +8359,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -8352,6 +8435,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained oid -> oid == bearer
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mutated _ -> False
@@ -8437,6 +8521,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mutated _ -> False
@@ -8530,6 +8615,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         -- clearing the log is what makes it "each turn".
         TriggerFrequency.FirstTimeEachTurn -> crewingsOf bearer gs <= 1
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.Trained _ -> False
     GameEvent.Evolved _ -> False
@@ -8613,6 +8699,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- a creature tapped for any other reason is not among these.
   TriggerCondition.SelfCrewsVehicle -> case event of
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed ev -> Set.member bearer (Crewing.crewedBy ev)
     GameEvent.BecameCrewed _ -> False
     GameEvent.Trained _ -> False
@@ -8702,6 +8789,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.TurnedFaceDown _ -> False
@@ -8802,6 +8890,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -8906,6 +8995,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
@@ -9034,6 +9124,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
@@ -9170,6 +9261,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
@@ -9255,6 +9347,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
@@ -9317,6 +9410,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9401,6 +9495,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9484,6 +9579,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9563,6 +9659,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9653,6 +9750,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9732,6 +9830,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9814,6 +9913,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9901,6 +10001,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -9985,6 +10086,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10069,6 +10171,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10157,6 +10260,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10243,6 +10347,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10326,6 +10431,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10418,6 +10524,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10512,6 +10619,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10603,6 +10711,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10695,6 +10804,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10779,6 +10889,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10858,6 +10969,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -10936,6 +11048,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -11014,6 +11127,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -11099,6 +11213,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -11182,6 +11297,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -11259,6 +11375,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -11337,6 +11454,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Trained _ -> False
     GameEvent.BecameCrewed _ -> False
     GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
     GameEvent.Crewed _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
