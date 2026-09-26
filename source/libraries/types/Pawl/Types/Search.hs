@@ -106,6 +106,10 @@ data Search = MkSearch
     -- 608.2c). A slot naming no object, or more than one, leaves the question
     -- unanswerable, which Pawl.Engine.Filter.slotOneObject reports as Nothing and
     -- the arm reads as a search that finds nothing.
-    subject :: Maybe SlotName.SlotName
+    subject :: Maybe SlotName.SlotName,
+    -- | CR 608.2c: the slot the found cards are bound to, as the incarnations
+    -- the destination minted (CR 400.7), so a later clause or a delayed ability
+    -- can say "that card" -- Grinning Totem's "you may play that card".
+    slot :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)
