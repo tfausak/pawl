@@ -42,6 +42,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -2413,12 +2414,6 @@ soulsMajestySpec s registry = Spec.describe s "SoulsMajesty" $ do
 -- 2026-09-11, one hit), so Effect.MoveToZone's gather asking randomCardsInHand
 -- is what this card is here to exercise.
 --
--- Not implemented: "at the beginning of the next end step, if the player hasn't
--- played the card, they put it into their graveyard" (#3843). An unplayed card
--- stays in exile instead of reaching a graveyard, which leaves pawl's Elkin Lair
--- stricter than printed for every seat alike -- the trigger is symmetric, so the
--- omission favours nobody.
---
 -- TWO SEATS, and ALICE controls the enchantment while BOB takes the upkeep:
 -- "that player" and "the resolving controller" are the same seat on a one-seat
 -- board, and alice holds a card of her own so a gather reading the controller's
@@ -2440,14 +2435,20 @@ elkinLairSpec s registry =
       -- BOB's upkeep, stamped and recorded -- the half TurnScope.EachTurn buys,
       -- since under ControllersTurn the trigger would not fire here at all.
       runBobsUpkeep :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-      runBobsUpkeep answer gs =
-        let upkeep = Phase.Beginning BeginningStep.Upkeep
-            began =
+      runBobsUpkeep answer gs = S.runPure answer (bobsStepBegins (Phase.Beginning BeginningStep.Upkeep) answer gs) Engine.priorityLoop
+      -- A step of bob's begun and its triggers put on the stack, none resolved.
+      bobsStepBegins :: Phase.Phase -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      bobsStepBegins step answer gs =
+        let began =
               Event.recordEvent
-                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.bob))
-                (gs {GameState.phase = upkeep, GameState.activePlayer = S.bob})
-            settled = S.runPure answer began Engine.settleForPriority
-         in S.runPure answer settled Engine.priorityLoop
+                (GameEvent.StepBegan (StepBegan.MkStepBegan step S.bob))
+                (gs {GameState.phase = step, GameState.activePlayer = S.bob})
+         in S.runPure answer began Engine.settleForPriority
+      endStep = Phase.Ending EndingStep.EndStep
+      -- Bob's main phase after that upkeep, where S.castAnswer plays whatever
+      -- he may: the exiled card is the only card he could play.
+      bobsMainPlaying :: GameState.GameState -> GameState.GameState
+      bobsMainPlaying gs = S.runPure S.castAnswer gs {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob} Engine.priorityLoop
       -- Pinned by INDEX into the offer rather than read off the prompt's fields:
       -- an answerer that hunted for "a legal card" would go on answering legally
       -- after a mutation broke which card the engine honours.
@@ -2505,6 +2506,39 @@ elkinLairSpec s registry =
               Spec.assertEqWith s "the Lightning Bolt is the card in exile" (namesIn Zone.Exile S.bob after) [named "Lightning Bolt"]
               Spec.assertEqWith s "and alice has tapped nothing" (S.tappedCount S.alice after) 0
             _ -> Spec.assertFailure s "bob's upkeep should exile exactly one card"
+        -- The THIRD clause: "at the beginning of the next end step, if the player
+        -- hasn't played the card, they put it into their graveyard". Three boards
+        -- differing only in what bob did with the card between: nothing, cast it
+        -- (CR 601.2a), or played it as a land (CR 305.1). Two Mountains each, so
+        -- the unplayed Goblin Piker was affordable and stayed unplayed.
+        Spec.it s "CR 603.4 an unplayed card goes to the graveyard at the next end step" $ do
+          lair <- S.printingOf s registry "Elkin Lair"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let withMana g = snd (S.addPermanent mountain S.bob (snd (S.addPermanent mountain S.bob g)))
+              upkept = runBobsUpkeep (rolling 0) (withMana (board lair [] [piker]))
+              after = S.runPure S.identityAnswer (bobsStepBegins endStep S.identityAnswer upkept) Engine.priorityLoop
+          Spec.assertEqWith s "the Goblin Piker bob never played is in his graveyard" (namesIn Zone.Graveyard S.bob after) [named "Goblin Piker"]
+          Spec.assertEqWith s "and no longer in exile" (namesIn Zone.Exile S.bob upkept, namesIn Zone.Exile S.bob after) ([named "Goblin Piker"], [])
+        -- CR 603.4: the condition is false as the end step begins, so the ability
+        -- never triggers -- not merely finds nothing (CR 603.7c) on resolution.
+        Spec.it s "CR 603.4 a card cast from exile was played, so the end step trigger does not trigger" $ do
+          lair <- S.printingOf s registry "Elkin Lair"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let withMana g = snd (S.addPermanent mountain S.bob (snd (S.addPermanent mountain S.bob g)))
+              played = bobsMainPlaying (runBobsUpkeep (rolling 0) (withMana (board lair [] [piker])))
+              ending = bobsStepBegins endStep S.identityAnswer played
+          Spec.assertEqWith s "nothing triggered at bob's end step" (length (GameState.stack ending)) 0
+          Spec.assertEqWith s "bob cast the Goblin Piker" (namesIn Zone.Battlefield S.bob played) [named "Mountain", named "Mountain", named "Goblin Piker"]
+        Spec.it s "CR 603.4 a land card played from exile was played, so the end step trigger does not trigger" $ do
+          lair <- S.printingOf s registry "Elkin Lair"
+          mountain <- S.printingOf s registry "Mountain"
+          let withMana g = snd (S.addPermanent mountain S.bob (snd (S.addPermanent mountain S.bob g)))
+              played = bobsMainPlaying (runBobsUpkeep (rolling 0) (withMana (board lair [] [mountain])))
+              ending = bobsStepBegins endStep S.identityAnswer played
+          Spec.assertEqWith s "nothing triggered at bob's end step" (length (GameState.stack ending)) 0
+          Spec.assertEqWith s "bob played the Mountain" (namesIn Zone.Battlefield S.bob played) [named "Mountain", named "Mountain", named "Mountain"]
 
 -- Randomness over CR 400.2's PUBLIC zone, the pair of cards that exercise
 -- Pawl.Types.ObjectRef.RandomCardInGraveyard. Ghoulraiser {1}{B}{B} Creature --

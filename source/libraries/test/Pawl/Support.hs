@@ -3423,6 +3423,7 @@ oneMountainState mountain ph =
           GameState.loopInvolvement = Map.empty,
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
+          GameState.playedThisTurn = mempty,
           GameState.drawsThisTurn = mempty,
           GameState.departedThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
