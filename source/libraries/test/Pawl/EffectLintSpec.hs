@@ -230,7 +230,7 @@ ownQuantities effect = case effect of
   Effect.Firebend _ -> []
   Effect.ActivateManaAbilities _ -> []
   Effect.MoveMana _ -> []
-  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> Maybe.maybeToList quantity
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _ _) -> Maybe.maybeToList quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []

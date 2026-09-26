@@ -817,6 +817,22 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
         Spec.assertEqWith s "the stack is empty" (GameState.stack resolved) []
       _ -> Spec.assertFailure s "expected exactly one cycling ability"
 
+  -- CR 613.1f in a hand: Tectonic Reformation {1}{R} Enchantment, "Each land
+  -- card in your hand has cycling {R}. Cycling {2}" (checked against Scryfall).
+  -- A Forest in alice's hand prints no cycling, so the offer is the grant's;
+  -- the two boards differ only in whether the Reformation is on the
+  -- battlefield, and one Mountain pays the granted {R} on both.
+  Spec.it s "CR 613.1f Tectonic Reformation's granted cycling is offered from the hand" $ do
+    reformation <- S.printingOf s registry "Tectonic Reformation"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, stocked) = S.addLibraryCard piker S.alice (S.landsInPlay mountain 1)
+        (bare, forestId) = S.handOne forest stocked
+        granted = snd (S.addPermanent reformation S.alice bare)
+        offered gs = any (isActivationOf forestId) (Action.legalActions S.alice gs {GameState.priority = Just S.alice})
+    Spec.assertEqWith s "the Forest can be cycled with the Reformation out, and not without it" (offered granted, offered bare) (True, False)
+
   -- The zone gate, from the other side. CR 702.29b: the ability still EXISTS
   -- on the battlefield ("it continues to exist ... in all other zones"), so
   -- this is not the ability being absent -- it is not being activatable

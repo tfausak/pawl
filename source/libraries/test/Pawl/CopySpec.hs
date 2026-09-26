@@ -4065,6 +4065,29 @@ graveyardTokenCopySpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertBool s (offered ownPiker pikerAsSkirmisher) "a Goblin Piker that is a copy of Tah-Crop Skirmisher offers embalm"
     Spec.assertBool s (offered ownSkirmisher pikerAsSkirmisher) "where the Skirmisher the Mirror did not touch still does"
 
+  -- The same Mirror, and the same crossed pair, for a card's own AUTHORED
+  -- ability rather than a keyword's: Reassembling Skeleton's "{1}{B}: Return
+  -- this card from your graveyard to the battlefield tapped" (CR 113.6m). Both
+  -- casts leave two Swamps, exactly the return's {1}{B}, so the positive is the
+  -- negative's control.
+  Spec.it s "CR 707.2 a graveyard card offers the authored abilities of what it is a copy of" $ do
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    skeleton <- S.printingOf s registry "Reassembling Skeleton"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    mirror <- S.printingOf s registry "Synthetic Mirror of the Fallen"
+    let lands = S.landsFor island S.alice 2 (S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (ownSkeleton, withSkeleton) = S.addGraveyardCard skeleton S.alice lands
+        (ownPiker, withPiker) = S.addGraveyardCard piker S.alice withSkeleton
+        (theirSkeleton, withTheirs) = S.addGraveyardCard skeleton S.bob withPiker
+        (theirGiant, withGiant) = S.addGraveyardCard giant S.bob withTheirs
+        board = withGiant {GameState.priority = Just S.alice, GameState.activePlayer = S.alice, GameState.phase = Phase.PostcombatMain}
+        mirrored subject original = castAndResolve (mirrorTargets subject original) mirror board
+        offered oid gs = any (isActivationOf oid) (Action.legalActions S.alice gs)
+    Spec.assertBool s (not (offered ownSkeleton (mirrored ownSkeleton theirGiant))) "a Skeleton that is a copy of Hill Giant offers no return"
+    Spec.assertBool s (offered ownPiker (mirrored ownPiker theirSkeleton)) "a Goblin Piker that is a copy of Reassembling Skeleton offers the return"
+
 -- CR 707.2's token copy entering tapped and attacking (CR 110.5b, CR 508.4), and
 -- named later in the same resolution (CR 603.7c): Flamerush Rider, "Whenever this
 -- creature attacks, create a token that's a copy of another target attacking

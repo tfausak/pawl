@@ -658,7 +658,7 @@ playerRefPositions =
       affecting effect = Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.You) effect)
    in [ ("add-mana", Effect.AddMana (ManaAddition.MkManaAddition (plantedPlayer "am") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "am"]),
         ("firebend", Effect.Firebend (ManaAddition.MkManaAddition (plantedPlayer "fb") ManaProduction.AnyColor (Quantity.Type.Literal 1) ManaRetention.Ordinary Nothing Nothing), [plantedPlayer "fb"]),
-        ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
+        ("search", Effect.Search (Search.MkSearch (plantedPlayer "se-searcher") (plantedPlayer "se-owner") Set.empty Nothing (Filter.Type.And []) False SearchDestination.Battlefield Nothing Nothing), [plantedPlayer "se-searcher", plantedPlayer "se-owner"]),
         ("draw", Effect.Draw (Draw.MkDraw (plantedPlayer "dr") one Nothing), [plantedPlayer "dr"]),
         ("mill", Effect.Mill (Mill.MkMill (plantedPlayer "mi") one Nothing Nothing), [plantedPlayer "mi"]),
         ("scry", Effect.Scry (playerQuantity "sc"), [plantedPlayer "sc"]),
@@ -806,6 +806,7 @@ durationConditions duration = case duration of
   Duration.Indefinite -> []
   Duration.Perpetual -> []
   Duration.UntilYourNextTurn -> []
+  Duration.UntilYourNextUpkeep -> []
   Duration.UntilEndOfYourNextTurn -> []
   -- A PlayerRef carries no Condition, and so no Count.
   Duration.UntilEndOfNextTurnOf _ -> []
@@ -1148,7 +1149,7 @@ ownCounts effect = case effect of
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
   -- "up to two" -- so its Counts are reachable from here. A search stating no
   -- count (Mana Severance) has none to reach.
-  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _) -> foldMap quantityCounts quantity
+  Effect.Search (Search.MkSearch _ _ _ quantity _ _ _ _ _) -> foldMap quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
@@ -3816,6 +3817,7 @@ durationFilters duration =
           Duration.Indefinite -> []
           Duration.Perpetual -> []
           Duration.UntilYourNextTurn -> []
+          Duration.UntilYourNextUpkeep -> []
           Duration.UntilEndOfYourNextTurn -> []
           Duration.UntilEndOfNextTurnOf _ -> []
           Duration.DuringNextTurnOf _ -> []
@@ -5399,7 +5401,7 @@ effectFilters effect = case effect of
   -- THE one search-framed position. CR 701.3a from the candidate's side:
   -- Auratouched Mage's "an Aura card that could enchant it", where the host is
   -- fixed for the whole evaluation and the Aura varies per candidate.
-  Effect.Search (Search.MkSearch _ _ _ _ f _ _ _) -> searchFramed [f]
+  Effect.Search (Search.MkSearch _ _ _ _ f _ _ _ _) -> searchFramed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Reroll -> []
