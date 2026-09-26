@@ -1,6 +1,183 @@
 {
   "faces": [
     {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "DiscardThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 1
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Blue"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Tap",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "Draw",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "ArmDelayedTrigger",
+                        "value": {
+                          "name": "return Calim"
+                        }
+                      }
+                    ],
+                    "payGate": {
+                      "branch": {
+                        "type": "IfPaid"
+                      },
+                      "cost": {
+                        "components": [
+                          {
+                            "type": "ExileCardsFromGraveyard",
+                            "value": {
+                              "count": 2,
+                              "whichCards": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasName",
+                                    "value": "Calim, Djinn Emperor"
+                                  },
+                                  {
+                                    "type": "Not",
+                                    "value": {
+                                      "type": "IsBound",
+                                      "value": "thatDiscardedCard"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        ],
+                        "mana": []
+                      },
+                      "payer": {
+                        "type": "InSlot",
+                        "value": "you"
+                      }
+                    }
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "count": {
+                      "type": "Printed",
+                      "value": {
+                        "least": 0,
+                        "most": 1
+                      }
+                    },
+                    "filter": {
+                      "type": "Not",
+                      "value": {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Land"
+                        }
+                      }
+                    },
+                    "pool": {
+                      "type": "Permanents"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "delayedAbilities": {
+        "return Calim": {
+          "condition": {
+            "type": "Reflexive"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "EachCardFromAmong",
+                            "value": {
+                              "filter": {
+                                "type": "IsInZone",
+                                "value": {
+                                  "type": "Graveyard"
+                                }
+                              },
+                              "slot": "thatDiscardedCard"
+                            }
+                          },
+                          "riders": {
+                            "tapped": {
+                              "type": "Tapped"
+                            }
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
       "keywords": [
         {
           "type": "Flying"
