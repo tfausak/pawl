@@ -1329,12 +1329,13 @@ eventBindingSlots cond = case cond of
   -- Unconditional, as this classification has to be: every
   -- GameEvent.AttackersDeclared carries a PlayerId.
   TriggerCondition.PlayerAttacks _ -> Set.singleton Binding.attackingPlayer
-  -- The DECLARING player and not the creatures, for the arm above's reason: rule
-  -- 508.3c's Filter names a SET of them, where the player it makes its subject is
-  -- one seat. Total War's "that player controls" is the phrase.
+  -- The DECLARING player, for the arm above's reason (Total War's "that player
+  -- controls"), and beside it the SET rule 508.3c's Filter admitted, as a group
+  -- (Tyvar the Bellicose's "they").
   --
-  -- Unconditional, as this classification has to be: every
-  -- GameEvent.AttackersDeclared carries a PlayerId.
+  -- Both unconditional, as this classification has to be: every
+  -- GameEvent.AttackersDeclared carries a PlayerId, and the group is stamped
+  -- even when empty.
   TriggerCondition.PlayerAttacksWith {} -> Set.fromList [Binding.attackingPlayer, Binding.attackingCreatures]
   -- BOTH of rule 508.3e's players: the attacked one under the reserved "that
   -- player" slot, which Seifer, Balamb Rival's "that player controls" reads, and
