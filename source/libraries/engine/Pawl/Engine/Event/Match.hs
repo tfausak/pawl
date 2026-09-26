@@ -6975,7 +6975,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
   -- 603.3a), exactly as the StepBegins arm above reads its own.
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal) -> case event of
-    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom) -> case Game.lookupObject spell gs of
+    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom _) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
         turnScopeAdmits gs scope (GameState.activePlayer gs) you
@@ -7074,7 +7074,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- carries: CR 601.2a puts the card on the stack as it is cast and leaves it
   -- there, so eventTriggers' `spellCast` source offers exactly that incarnation.
   TriggerCondition.SelfCast -> case event of
-    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast _ spell _ _) -> spell == bearer
+    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast _ spell _ _ _) -> spell == bearer
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False

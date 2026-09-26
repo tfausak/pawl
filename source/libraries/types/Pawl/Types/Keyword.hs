@@ -988,9 +988,6 @@ data Keyword
   | -- | 702.185a: warp [cost] -- an alternative cost paid from the HAND alone;
     -- the permanent it becomes is exiled at the next end step and its owner may
     -- cast it from exile on a later turn (CR 702.185b's warped card).
-    --
-    -- Not implemented: CR 702.185c's "a spell was warped this turn", which no
-    -- condition can yet ask (#3711).
     Warp (Cost.Cost Keyword)
   | -- | 702.146a: disturb [cost] -- cast this card TRANSFORMED from your
     -- graveyard for [cost] rather than its mana cost (CR 712.8c). The ability is

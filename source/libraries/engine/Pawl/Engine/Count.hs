@@ -745,6 +745,8 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot _ _ _) -> case shape of
     EventShape.MovedBetween (MovedBetween.MkMovedBetween from to) ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to then Just (departedView gs zc snapshot) else Nothing
+    EventShape.MovedFrom from ->
+      if ZoneChange.from zc == from then Just (departedView gs zc snapshot) else Nothing
     -- CR 712.21e's second half, whose unit is the CARD: this event announces the
     -- move's LEADING arrival (Pawl.Engine.Event.changeZoneAttaching), so it is
     -- worth one card here and each arrival after it is worth another through the
@@ -770,7 +772,7 @@ snapshotView viewOf gs shape event = case event of
   -- which it can -- CR 601.2i's trigger is checked while the spell is still
   -- there. The CHARACTERISTICS, that is: castOwner below reads the live object
   -- for the one field a snapshot cannot carry, wherever there still is one.
-  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell snapshot _) -> case shape of
+  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell snapshot _ _) -> case shape of
     -- CR 601.2a: "that player becomes its controller", so the caster the event
     -- recorded IS the view's controller and Filter.ControlledBy You answers "a
     -- spell you've cast". The spell's id is deliberately left out of the view
@@ -788,6 +790,7 @@ snapshotView viewOf gs shape event = case event of
     -- (Pawl.CountSpec).
     EventShape.SpellCast -> Just (viewOfSnapshot False (Just caster) (castOwner gs spell) False Map.empty snapshot)
     EventShape.MovedBetween {} -> Nothing
+    EventShape.MovedFrom {} -> Nothing
     -- CR 601.2a moves a card to the STACK, so a cast IS a card arriving there --
     -- but the Moved event the same cast emits is what says so, and answering here
     -- too would count one cast twice.
@@ -851,7 +854,21 @@ snapshotView viewOf gs shape event = case event of
   GameEvent.BecameUnattached {} -> Nothing
   -- CR 701.17a names its cards by id and snapshots no characteristics.
   GameEvent.Milled {} -> Nothing
-  GameEvent.LeftTheGame _ -> Nothing
+  -- CR 603.6c's other road off the battlefield: this event is recorded only for a
+  -- phased-in permanent leaving the game, so it answers MovedFrom Battlefield
+  -- and nothing else, read off the CR 608.2h record filed under its id.
+  GameEvent.LeftTheGame oid -> case shape of
+    EventShape.MovedFrom Zone.Battlefield -> fmap leftView (Map.lookup oid (GameState.lastKnown gs))
+    _ -> Nothing
+    where
+      leftView lastKnown =
+        viewOfSnapshot
+          (deployIn gs Zone.Battlefield)
+          (Just (LastKnown.controller lastKnown))
+          (Just (LastKnown.owner lastKnown))
+          (Game.sourceIsToken (LastKnown.source lastKnown))
+          (LastKnown.counters lastKnown)
+          (LastKnown.characteristics lastKnown)
   GameEvent.Scried _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
@@ -912,6 +929,7 @@ snapshotView viewOf gs shape event = case event of
           Nothing -> fmap (departedView gs zc . LastKnown.characteristics) (Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs))
         else Nothing
     EventShape.MovedBetween {} -> Nothing
+    EventShape.MovedFrom {} -> Nothing
     EventShape.SpellCast -> Nothing
 
 -- CR 400.7: the view of the object that ARRIVED, for the one shape whose unit is

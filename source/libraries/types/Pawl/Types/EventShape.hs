@@ -2,15 +2,16 @@ module Pawl.Types.EventShape where
 
 import qualified Pawl.Types.CardArrivedIn as CardArrivedIn
 import qualified Pawl.Types.MovedBetween as MovedBetween
+import qualified Pawl.Types.Zone as Zone
 
 -- | Which recorded events a history count folds over. GameState.events is cleared
 -- at the turn change (Pawl.Engine.Engine), an engine choice made under CR 608.2i
 -- because every history-reading card in the pool asks "this turn" -- so the
 -- log's extent IS the window and none is carried here.
 --
--- Only MovedBetween, CardArrivedIn and SpellCast exist: every other GameEvent
--- constructor is recorded in the log with no EventShape arm, so a count cannot
--- fold over any of them (#162).
+-- Only the zone changes, GameEvent.LeftTheGame and the cast have a shape: every
+-- other GameEvent constructor is recorded in the log with no EventShape arm, so a
+-- count cannot fold over any of them (#162).
 --
 -- That is not the same as the log being unreadable for those events, and the
 -- readers that exist do not come through here. A fold is the wrong instrument
@@ -24,6 +25,9 @@ import qualified Pawl.Types.MovedBetween as MovedBetween
 data EventShape
   = -- | CR 700.4: "dies" is MovedBetween Battlefield Graveyard.
     MovedBetween MovedBetween.MovedBetween
+  | -- | CR 603.6c: an object left this zone, for anywhere -- "left the
+    -- battlefield", which GameEvent.LeftTheGame answers too.
+    MovedFrom Zone.Zone
   | -- | CR 712.21e's second half: how many CARDS were put into this zone, from
     -- anywhere.
     --

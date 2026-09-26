@@ -1974,6 +1974,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.TimesResolvedThisTurn -> quantity
   Quantity.Type.SpellsCastBefore -> quantity
   Quantity.Type.PermanentsDiedThisTurn -> quantity
+  Quantity.Type.SpellsCastUsingThisTurn _ -> quantity
   Quantity.Type.SubgamesThisMatch -> quantity
   Quantity.Type.DungeonsCompleted _ -> quantity
   Quantity.Type.CompletedDungeon {} -> quantity

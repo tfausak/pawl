@@ -166,6 +166,7 @@ codec =
       Arm.nullary "TimesResolvedThisTurn" Quantity.TimesResolvedThisTurn,
       Arm.nullary "SpellsCastBefore" Quantity.SpellsCastBefore,
       Arm.nullary "PermanentsDiedThisTurn" Quantity.PermanentsDiedThisTurn,
+      Arm.payload "SpellsCastUsingThisTurn" KeywordFamily.codec Quantity.SpellsCastUsingThisTurn (\x -> case x of Quantity.SpellsCastUsingThisTurn y -> Just y; _ -> Nothing),
       Arm.nullary "SubgamesThisMatch" Quantity.SubgamesThisMatch,
       -- CR 309.7's tally, with only a PlayerRef on the wire for
       -- CardsDiscardedThisTurn's reason above -- read off the player rather than
@@ -256,6 +257,7 @@ tagOf x = case x of
   Quantity.TimesResolvedThisTurn {} -> "TimesResolvedThisTurn"
   Quantity.SpellsCastBefore {} -> "SpellsCastBefore"
   Quantity.PermanentsDiedThisTurn {} -> "PermanentsDiedThisTurn"
+  Quantity.SpellsCastUsingThisTurn {} -> "SpellsCastUsingThisTurn"
   Quantity.SubgamesThisMatch {} -> "SubgamesThisMatch"
   Quantity.DungeonsCompleted {} -> "DungeonsCompleted"
   Quantity.CompletedDungeon {} -> "CompletedDungeon"

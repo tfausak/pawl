@@ -730,6 +730,20 @@ data Gathered = MkGathered
     gModification :: Modification
   }
 
+-- CR 801.16: the players controlling a source of a continuous effect that
+-- applies to one of these objects -- whose static ability, say, makes an
+-- entering Saproling a land another object's ability watches for. Read against
+-- each object's whole projection; an object no longer on the board contributes
+-- nothing.
+--
+-- Not implemented: whether the trigger would still have fired without the
+-- effect, so an effect that only touches the object counts too (#4152).
+effectControllersOn :: [ObjectId] -> GameState -> [PlayerId.PlayerId]
+effectControllersOn oids gs =
+  let cands = gather gs
+      applies oid c = affects (gSource c) oid (gAffected c) (project oid gs) gs
+   in Maybe.mapMaybe (`controllerWithLastKnown` gs) [gSource c | oid <- oids, Maybe.isJust (Map.lookup oid (GameState.objects gs)), c <- cands, applies oid c]
+
 -- CR 611.2c / 613: does the effect from `source` apply to `oid`, given the
 -- PARTIAL projection built by the layers below this one? CR 109.5: an
 -- affected-set filter's "you" is the SOURCE's controller. For callers OUTSIDE the
@@ -3540,6 +3554,7 @@ quantityReads q = case q of
   Quantity.Type.TimesResolvedThisTurn -> Set.empty
   Quantity.Type.SpellsCastBefore -> Set.empty
   Quantity.Type.PermanentsDiedThisTurn -> Set.empty
+  Quantity.Type.SpellsCastUsingThisTurn _ -> Set.empty
   Quantity.Type.SubgamesThisMatch -> Set.empty
   Quantity.Type.DungeonsCompleted _ -> Set.empty
   Quantity.Type.CompletedDungeon {} -> Set.empty
