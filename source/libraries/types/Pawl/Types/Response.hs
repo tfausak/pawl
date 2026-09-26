@@ -18,6 +18,7 @@ import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ForageMode as ForageMode
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
@@ -411,11 +412,11 @@ data Response
   | -- | CR 701.23: the cards a search found, in whichever of the zones it looked
     -- through held them (empty = failed to find).
     Searched [ObjectId.ObjectId]
-  | -- | CR 601.3 (Panglacial): the library card cast while searching, paired with
-    -- the CR 709.3 half being cast (Nothing = declined). The name is part of the
-    -- answer for ChoseAction's reason: a transcript that recorded only the card
-    -- would replay a split card's other half.
-    CastWhileSearched (Maybe (ObjectId.ObjectId, CardName.CardName))
+  | -- | CR 601.3 (Panglacial): the library card cast while searching, with the
+    -- CR 709.3 half and CR 708.4 facing being cast (Nothing = declined). Both are
+    -- part of the answer for ChoseAction's reason: a transcript that recorded
+    -- only the card would replay a split card's other half.
+    CastWhileSearched (Maybe (ObjectId.ObjectId, CardName.CardName, Facing.Facing))
   | -- | CR 601.2b: the value of X a caster chose.
     ChoseX Natural.Natural
   | -- | CR 601.2b: the mode(s) a caster chose for a modal spell. A Seq, since CR
