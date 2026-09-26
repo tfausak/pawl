@@ -100,6 +100,7 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
@@ -356,8 +357,9 @@ targetable castFor pid oid name gs = case proposedFace oid name gs of
         given = Map.union (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) (Card.mutateSlotMapGiven (maybe False Object.mutating (Game.lookupObject oid gs)))
      in Modal.selectionPossible (Target.fillableModes (Just pid) Map.empty oid given modal gs) (Modal.Type.selection modal)
 
--- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
--- affordable when it is payable with X=0 (the caster may always choose 0)
+-- CR 601.2b's least X measured at CR 601.2f's total: a candidate cost is
+-- affordable when it is payable at the least X the caster may announce -- 0, or
+-- CR 101.1's printed floor (Face.minimumX, Mind Grind's "X can't be 0") --
 -- against the TOTAL cost, not the printed one. Taxing castability without taxing
 -- payment lets the player underpay; taxing payment without taxing castability
 -- offers a cast that cannot be afforded, and nothing REPAIRS a cast partway:
@@ -382,7 +384,7 @@ targetable castFor pid oid name gs = case proposedFace oid name gs of
 -- board would answer this cast's question about the wrong object. `spendingWith`
 -- is what the pre-move callers derive it with.
 payableCost :: [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCost = payableCostAt 0
+payableCost extra spending pid oid gs = payableCostAt (maybe 0 Face.minimumX (Game.faceOf oid gs)) extra spending pid oid gs
 
 -- The same question asked at some OTHER value of X. `payableCost` is this at CR
 -- 601.2b's floor, and `affordableX` is this climbed; one predicate, so what the
@@ -628,7 +630,7 @@ modeCostTotal costs chosen =
 --      cast would announce fewer modes than CR 702.42a says it chose, and
 --      castSpell's own size check would turn the whole cast into a silent no-op.
 --   3. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
---      additional costs", at CR 601.2b's X=0 floor and with the same payableCost
+--      additional costs", at CR 601.2b's least X and with the same payableCost
 --      predicate castability was gated on. An option the player cannot take is
 --      not offered.
 --
@@ -676,7 +678,7 @@ withOptionalPayments paid candidate =
 --      which half's costs those are. Each rule's first ability is a static ability
 --      of the spell itself (CR 702.33a, CR 702.157a).
 --   2. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
---      additional costs", at CR 601.2b's X=0 floor and with the same payableCost
+--      additional costs", at CR 601.2b's least X and with the same payableCost
 --      predicate castability was gated on. An option the player cannot take is not
 --      offered.
 --
@@ -979,9 +981,21 @@ proposedFor oid castFor gs =
 -- 107.3b fixes X at 0 for one that pays neither the mana cost nor an
 -- alternative cost including X: Omniscience's {0} route on Molten Disaster is
 -- an even spell however the printed {X}{R}{R} beside it might be announced.
+--
+-- The same rule withholds a candidate from a face printing a floor on X (CR
+-- 101.1, Face.minimumX): CR 107.3b's 0 is below it, so Mind Grind cast "without
+-- paying its mana cost" is no cast at all.
 candidateAllowed :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> CandidateCost.CandidateCost -> Bool
 candidateAllowed pid oid name proposed candidate =
-  not (PlayerEffect.prohibitsCasting pid oid name (Cost.variableChoice (CandidateCost.cost candidate)) (proposedFor oid (CandidateCost.keyword candidate) proposed))
+  let board = proposedFor oid (CandidateCost.keyword candidate) proposed
+      choice = Cost.variableChoice (CandidateCost.cost candidate)
+      fixedBelowFloor = case Game.faceOf oid board of
+        Just face ->
+          choice == VariableChoice.FixedAtZero
+            && Face.minimumX face > 0
+            && Cost.hasVariable (Cost.Type.MkCost (Face.manaCost face) [])
+        Nothing -> False
+   in not fixedBelowFloor && not (PlayerEffect.prohibitsCasting pid oid name choice board)
 
 -- CR 601.2c asked of ONE candidate, on the same board rule 702.103d judges it on:
 -- a bestowed Nyxborn Rollicker is an Aura spell with enchant creature, so it is
@@ -2949,12 +2963,10 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
               -- narrowed to what the card permits. The affordable half rides the
               -- CHOSEN cost, and nothing filters the answer against it: an
               -- unaffordable announcement still reverses the whole cast (#417).
-              --
-              -- Not implemented: a spell's printed floor ("X can't be 0"), so the
-              -- least value offered is always 0 (#4027).
+              -- Its least value is CR 101.1's printed floor, off the same face.
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid 0 (affordableX mCeiling chosenReductions spending pid sid bestowedGs chosenCost)))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (Face.minimumX face) (affordableX mCeiling chosenReductions spending pid sid bestowedGs chosenCost)))
                   else pure Nothing
               -- CR 101.1, and CR 101.2 for its direction: the card's sentence
               -- overrides the rule that would otherwise leave X free, and a
@@ -2968,10 +2980,12 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
               let overCeiling = case (mCeiling, mAmount) of
                     (Just c, Just x) -> x > c
                     _ -> False
+                  -- The floor's side of the same sentence, rejected the same way.
+                  underFloor = maybe False (< Face.minimumX face) mAmount
               -- CR 601.2: a step the player cannot comply with makes the casting
               -- illegal and returns the game to before it was proposed. The X just
               -- named is where that can first become true, since every candidate
-              -- offered above passed payableCost at CR 601.2b's X=0 FLOOR -- the
+              -- offered above passed payableCost at CR 601.2b's LEAST X -- the
               -- only value castability can measure before the announcement exists.
               --
               -- Asked with the same predicate the floor was asked with, so a gate
@@ -3004,7 +3018,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   withX o = o {Object.bindings = Map.union (Binding.fromChoices Map.empty mAmount Seq.empty) (Object.bindings o)}
                   announcedBoard = bestowedGs {GameState.objects = Map.adjust withX sid (GameState.objects bestowedGs)}
                   refused = Maybe.isJust mAmount && maybe False (refusedAt castFor permissionUsed) (Filter.manaValue (Projection.viewOfObject sid announcedBoard))
-              if overCeiling || refused || not (payableCost chosenReductions spending pid sid announcedBoard announcedAtX)
+              if overCeiling || underFloor || refused || not (payableCost chosenReductions spending pid sid announcedBoard announcedAtX)
                 then reject
                 else do
                   -- CR 601.2b's own order puts the hybrid and Phyrexian
