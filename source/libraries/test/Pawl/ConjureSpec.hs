@@ -57,6 +57,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -103,6 +104,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.Printing as Printing
@@ -1403,9 +1405,6 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
   -- Djinn Emperor into your library seventh from the top"). Ten Islands under
   -- it, so both the seventh place and the bottom are real places, and the two
   -- readings land the conjured Calim at different indices.
-  --
-  -- Not implemented: Calim's Breath, the activated ability paid by discarding
-  -- Calim, which returns it from the graveyard (#4166).
   Spec.it s "a conjure seventh from the top puts the card under six cards" $ do
     calim <- S.printingOf s registry "Calim, Djinn Emperor"
     island <- S.printingOf s registry "Island"
@@ -1419,6 +1418,40 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
       (libraryIndexOf calimName final, Seq.length (libraryOf final))
       (Just 6, 11)
     Spec.assertEqWith s "a stated depth asks randomness nothing" asked []
+
+  -- Calim's Breath, "{1}{U}, Discard Calim: Tap up to one target nonland
+  -- permanent. Draw a card. Then you may exile two other cards named Calim,
+  -- Djinn Emperor from your graveyard. When you do, return Calim from your
+  -- graveyard to the battlefield tapped." CR 400.7j lets the ability find the
+  -- card its own cost discarded (Binding.discardedCard), and "other" is that
+  -- card left out of what the gate may exile.
+  Spec.it s "CR 400.7j Calim's Breath returns the Calim its cost discarded, tapped" $ do
+    (final, _) <- calimsBreath s registry False 2
+    Spec.assertEqWith
+      s
+      "a tapped Calim is on alice's battlefield, and the two others are in exile"
+      (fmap (\oid -> Object.tapped <$> Game.lookupObject oid final) (namedIn calimName Zone.Battlefield final), length (namedIn calimName Zone.Exile final))
+      ([Just TapState.Tapped], 2)
+  -- The pair: ONE other Calim. The discarded Calim is not "other", so the gate
+  -- cannot be paid and neither card leaves the graveyard.
+  Spec.it s "CR 400.7j Calim's Breath cannot exile the discarded Calim as one of the two others" $ do
+    (final, offered) <- calimsBreath s registry False 1
+    Spec.assertEqWith
+      s
+      "both Calims stay in alice's graveyard"
+      (length (namedIn calimName Zone.Graveyard final), namedIn calimName Zone.Battlefield final)
+      (2, [])
+    Spec.assertEqWith s "and alice was never offered the exile" offered 0
+  -- The first case's board with bob's Leyline of the Void, which exiles the
+  -- discarded Calim instead. CR 400.7j still finds it in exile, but "return Calim
+  -- from your graveyard" names a graveyard, so it stays there.
+  Spec.it s "CR 400.7j Calim's Breath does not return a Calim its discard put into exile" $ do
+    (final, _) <- calimsBreath s registry True 2
+    Spec.assertEqWith
+      s
+      "no Calim is on alice's battlefield, and all three are in exile"
+      (namedIn calimName Zone.Battlefield final, length (namedIn calimName Zone.Exile final))
+      ([], 3)
 
   -- Mine Security ({1}{R} Creature -- Kavu Soldier 3/1, trample, "When this
   -- creature enters, conjure a card named Flametongue Kavu into the top eight
@@ -1478,6 +1511,47 @@ libraryOf gs = Map.findWithDefault Seq.empty S.alice (GameState.library gs)
 -- Where a card of this name sits in alice's library, 0 being the top.
 libraryIndexOf :: CardName.CardName -> GameState.GameState -> Maybe Int
 libraryIndexOf name gs = Seq.findIndexL (\oid -> S.soleFaceName oid gs == name) (libraryOf gs)
+
+-- Calim in alice's hand at her precombat main, two Islands to pay {1}{U}, bob's
+-- Goblin Piker as the target, ten Islands in her library for the discard
+-- trigger's conjure, `others` more Calims in her graveyard, and, when
+-- `leyline`, bob's Leyline of the Void. She activates Calim's Breath and
+-- everything resolves; every offer to pay is accepted and counted.
+calimsBreath :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> Int -> m (GameState.GameState, Int)
+calimsBreath s registry leyline others = do
+  calim <- S.printingOf s registry "Calim, Djinn Emperor"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  void_ <- S.printingOf s registry "Leyline of the Void"
+  reference <- mapM (S.cardOf s registry) ["Calim, Djinn Emperor"]
+  let empty = islandsInLibrary island 10 (S.landsFor island S.alice 2 (Setup.emptyGame S.bothPlayers))
+      base = if leyline then snd (S.addPermanent void_ S.bob empty) else empty
+      (pikerId, withPiker) = S.addPermanent piker S.bob base
+      stocked = List.foldl' (\g _ -> snd (S.addGraveyardCard calim S.alice g)) withPiker [1 .. others]
+      (calimId, inHand) = S.addHandCard calim S.alice stocked
+      board = inHand {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+      ability = case Game.faceOf calimId board of
+        Just face -> take 1 (Face.activatedAbilities face)
+        Nothing -> []
+      fixture =
+        Registry.MkRegistry
+          { Registry.fetchCard = \name -> pure (List.find (\card -> S.nameOf card == name) reference),
+            Registry.cards = pure reference
+          }
+      answer :: Asked.Asked r -> State.State Int r
+      answer asked = case Asked.prompt asked of
+        Prompt.ChooseToPay {} -> do
+          State.modify' (+ 1)
+          pure PaymentDecision.Pays
+        Prompt.ChooseTargets _ _ _ sets -> pure (fmap (Set.filter ((== Just pikerId) . Recipient.objectOf) . snd) sets)
+        p -> pure (S.identityAnswer p)
+      asking :: Asked.Asked r -> State.State Int r
+      asking = Interpreter.lookingUpCards fixture answer
+      run = do
+        (_, activated) <- Engine.runGameAsked asking board (Monad.mapM_ (Activate.activateAbility S.alice calimId) ability)
+        Engine.runGameAsked asking activated Engine.priorityLoop
+      ((_, final), offered) = State.runState run 0
+  pure (final, offered)
 
 -- Settle the pending trigger and resolve it, looking card names up in
 -- `reference` and answering every Prompt.RandomDepth with `depth`. The reaches

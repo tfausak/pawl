@@ -25,6 +25,7 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Expansion as Expansion
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KeywordCount as KeywordCount
@@ -2798,8 +2799,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.174a's payload is a [something] and not a Cost, so a CR 612.2 land-type
   -- change has nothing in it to rewrite.
   Keyword.Type.Gift _ -> keyword
-  -- CR 702.143a states a cost too, so it is reached the same way.
-  Keyword.Type.Foretell cost -> Keyword.Type.Foretell (rewriteCost pairs cost)
+  -- CR 702.143a states a cost too, so it is reached the same way. A cost read
+  -- off the card's own mana cost prints no word to swap.
+  Keyword.Type.Foretell (ForetellCost.Stated cost) -> Keyword.Type.Foretell (ForetellCost.Stated (rewriteCost pairs cost))
+  Keyword.Type.Foretell (ForetellCost.ManaCostReducedBy _) -> keyword
   -- CR 702.139a states a CONDITION rather than a cost, so `rewrite` reaches it
   -- as landwalk's criterion is reached. No text-changing effect can be in play
   -- when it is read (CR 103.2b runs before the game begins), so this descent is
