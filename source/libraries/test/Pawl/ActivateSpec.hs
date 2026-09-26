@@ -6,6 +6,7 @@
 -- its unhoisted wrappers give, at hoistDifferentialSpec.
 module Pawl.ActivateSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -374,6 +375,55 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
       [skel]
     Spec.assertEqWith s "survived the first destruction (regenerated)" (Set.member skel (GameState.battlefield firstKill)) True
     Spec.assertEqWith s "died to the second (one-shot shield consumed)" (Set.member skel (GameState.battlefield secondKill)) False
+
+  -- CR 701.19a's "Regenerate [permanent]" aimed at a TARGET, through the
+  -- DestructionR subject. Tel-Jilad Lifebreather shields the blocking Goblin
+  -- Piker, and both blockers take lethal combat damage: the Piker regenerates
+  -- (tapped, out of combat) and the Lifebreather, the shield's SOURCE, dies. A row
+  -- that fell back to regeneration's self-scope would do the opposite. Read at
+  -- the end of combat step, while CR 506.4's removal is still observable. The
+  -- one Forest pays {G} and is then sacrificed, so no sacrifice choice arises.
+  Spec.it s "CR 701.19a a targeted regeneration shields its target and not its source" $ do
+    let piker = S.aliasRef "piker"
+        breather = S.aliasRef "breather"
+        forest = S.aliasRef "forest"
+        giantA = S.aliasRef "giantA"
+        giantB = S.aliasRef "giantB"
+        setup =
+          S.board
+            ( S.battlefield S.alice [S.settled "piker" "Goblin Piker", S.settled "breather" "Tel-Jilad Lifebreather", S.settled "forest" "Forest"]
+                NonEmpty.:| [S.battlefield S.bob [S.settled "giantA" "Hill Giant", S.settled "giantB" "Hill Giant"]]
+            )
+            S.bob
+            S.beginningOfCombat
+        choices =
+          S.noChoices
+            { S.choiceTargets = Just [S.MkObjectTarget piker],
+              S.choiceManaSources = Seq.singleton (Just forest),
+              S.choiceCostOrder = Just [0, 1]
+            }
+        script =
+          S.turn
+            1
+            [ S.on S.declareAttackers S.bob (S.attack [giantA, giantB]),
+              S.on S.declareBlockers S.alice (S.block [(piker, giantA), (breather, giantB)]),
+              S.on S.declareBlockers S.alice (S.activateAction breather choices)
+            ]
+        toEndOfCombat =
+          let go n = do
+                gs <- State.get
+                Monad.unless (n <= (0 :: Int) || GameState.phase gs == S.endOfCombat || Maybe.isJust (GameState.result gs)) (Engine.runStep >> go (n - 1))
+           in go 8
+    built <- S.buildBoardOrFail s registry setup
+    (_, after) <- S.runScriptOrFail s script built toEndOfCombat
+    let alias name = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
+        onField oid = Set.member oid (GameState.battlefield after)
+    Spec.assertEqWith s "CR 701.19a the Piker survives, and the Lifebreather that shielded it does not" (fmap onField (alias "piker"), fmap onField (alias "breather")) (Just True, Just False)
+    Spec.assertEqWith
+      s
+      "CR 701.19a the Piker is tapped and removed from combat"
+      (fmap (\oid -> (fmap Object.tapped (Game.lookupObject oid after), Set.member oid (Combat.combatants (GameState.combat after)))) (alias "piker"))
+      (Just (Just TapState.Tapped, False))
 
   -- CR 113.8: the controller of an activated ability on the stack is the
   -- player who activated it; the controller of a triggered ability on the

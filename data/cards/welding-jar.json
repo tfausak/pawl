@@ -1,0 +1,78 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "SacrificeThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Replace",
+                        "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "effect": {
+                            "type": "DestructionR",
+                            "value": {
+                              "matching": {
+                                "type": "IsBound",
+                                "value": "artifact"
+                              },
+                              "rewrite": {
+                                "type": "Regenerate"
+                              }
+                            }
+                          },
+                          "origin": {
+                            "type": "Other"
+                          },
+                          "uses": {
+                            "type": "Once"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "artifact": {
+                    "filter": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Artifact"
+                      }
+                    },
+                    "pool": {
+                      "type": "Permanents"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [],
+      "name": "Welding Jar",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
