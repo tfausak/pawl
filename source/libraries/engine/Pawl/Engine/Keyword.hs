@@ -99,8 +99,10 @@ import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.KeywordTally as KeywordTally
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -5761,12 +5763,12 @@ mobilizeSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeE
 -- The batch is BOUND so the delayed ability can name "them" (CR 603.7c reads the
 -- environment captured as it was armed), and the arm shares a clause with the
 -- create, myriad's arrangement.
-mobilize :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+mobilize :: KeywordCount.KeywordCount Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 mobilize n =
   let spawn =
         Effect.Create
           Create.MkCreate
-            { Create.quantity = Quantity.Literal (toInteger n),
+            { Create.quantity = keywordCount n,
               Create.card = warriorToken,
               Create.riders =
                 EntryRiders.MkEntryRiders
@@ -5802,6 +5804,15 @@ mobilize n =
           TriggeredAbility.limit = TriggerLimit.Unlimited
         }
 
+-- The quantity mobilize's and firebending's N reads as the ability resolves
+-- (CR 608.2h). Power reads the triggered ability's source, the object carrying
+-- the keyword (CR 113.7); a tally's "you" is the ability's controller (CR 109.5).
+keywordCount :: KeywordCount.KeywordCount Keyword -> Quantity.Quantity
+keywordCount n = case n of
+  KeywordCount.Fixed k -> Quantity.Literal (toInteger k)
+  KeywordCount.Power -> Quantity.Power
+  KeywordCount.Tally tally -> Quantity.Count Count.MkCount {Count.scope = KeywordTally.scope tally, Count.filter = KeywordTally.filter tally, Count.aggregation = Aggregation.Members}
+
 -- | CR 702.181a's token: 1\/1 red Warrior creature. Rule 702.181a names no name,
 -- so CR 111.4 supplies one -- rebelToken's shape one rule over.
 warriorToken :: Card
@@ -5824,7 +5835,7 @@ warriorToken = creatureToken (Text.pack "Warrior Token") (Set.singleton Subtype.
 -- it watches, and an attack is neither an activated mana ability resolving nor
 -- mana being added (Pawl.Engine.ManaAbility.firedFromManaAbility), so this uses
 -- the stack.
-firebending :: Natural -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+firebending :: KeywordCount.KeywordCount Keyword -> TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 firebending n =
   let added =
         Effect.Firebend
@@ -5832,7 +5843,7 @@ firebending n =
             { -- CR 109.5: rule 702.189a's "you" is the ability's controller.
               ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
               ManaAddition.production = ManaProduction.OfType (ManaType.Colored Color.Red),
-              ManaAddition.count = Quantity.Literal (toInteger n),
+              ManaAddition.count = keywordCount n,
               ManaAddition.retention = ManaRetention.UntilEndOfCombat,
               ManaAddition.restriction = Nothing,
               ManaAddition.rider = Nothing
