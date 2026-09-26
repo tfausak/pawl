@@ -472,25 +472,29 @@ graveyardTriggerSpec s registry =
           Spec.assertBool s (Set.member merenName (namesIn Zone.Battlefield S.alice resolved)) "a fresh Meren stands on the battlefield: she really did leave the graveyard"
           Spec.assertBool s (not (Set.member merenName (namesIn Zone.Graveyard S.alice resolved))) "with nothing of hers left in it"
         -- CR 603.10's first sentence for a graveyard card gone by the CR 117.5
-        -- boundary, watching an event that is NOT its own arrival. Synthetic
-        -- Sunder the Loam puts a Forest onto the battlefield and then exiles every
-        -- graveyard in one resolution: Bloodghast was in alice's graveyard
-        -- immediately after the land entered, so its landfall triggers although
-        -- the card is in exile by the boundary. Its "may" is exercised, so the
-        -- return finding nothing is CR 400.7 at work rather than a declined choice.
-        Spec.it s "CR 603.10 Bloodghast sees a land enter before the same resolution exiles it" $ do
-          swamp <- S.printingOf s registry "Swamp"
+        -- boundary, watching an event that is NOT its own arrival. alice votes
+        -- Redhorn Pass and bob Mines of Moria, so Travel Through Caradhras puts a
+        -- Forest onto the battlefield and then returns Bloodghast to alice's hand
+        -- in one resolution: Bloodghast was in her graveyard immediately after the
+        -- land entered, so its landfall triggers although the card is in her hand
+        -- by the boundary. Its "may" is exercised, so the return finding nothing
+        -- is CR 400.7 at work rather than a declined choice.
+        Spec.it s "CR 603.10 Bloodghast sees a land enter before the same resolution returns it to hand" $ do
           forest <- S.printingOf s registry "Forest"
-          sunder <- S.printingOf s registry "Synthetic Sunder the Loam"
+          caradhras <- S.printingOf s registry "Travel Through Caradhras"
           bloodghast <- S.printingOf s registry "Bloodghast"
-          let base = S.landsFor forest S.alice 2 (S.landsInPlay swamp 2)
+          let base = S.landsInPlay forest 6
               (_, g1) = S.addGraveyardCard bloodghast S.alice base
               (_, g2) = S.addLibraryCard forest S.alice g1
-              (g3, spellId) = S.handOne sunder g2
+              (g3, spellId) = S.handOne caradhras g2
               gs = g3 {GameState.priority = Just S.alice}
               answer :: Prompt.Prompt r -> r
               answer p = case p of
+                Prompt.ChooseVoteWord _ voter _ choices
+                  | voter == S.alice -> NonEmpty.head choices
+                  | otherwise -> NonEmpty.last choices
                 Prompt.Search _ _ matches cap -> List.genericTake cap matches
+                Prompt.ChooseCardInGraveyard _ _ _ offered -> NonEmpty.head offered
                 Prompt.ChooseOptional {} -> OptionalDecision.Exercises
                 _ -> S.identityAnswer p
               cast = S.runPure answer gs (S.cast S.alice spellId)
@@ -499,13 +503,13 @@ graveyardTriggerSpec s registry =
               after = S.runPure answer placed Stack.resolveTop
               ghastName = CardName.MkCardName $ Text.pack "Bloodghast"
           Spec.assertEqWith s "CR 603.10 Bloodghast's landfall reached the stack" (length (GameState.stack placed)) 1
-          -- The board the case needs: the land entered, and Bloodghast was exiled
-          -- by the same resolution, so no live read of the graveyard finds it.
-          Spec.assertEqWith s "a Forest entered" (length (filter (== CardName.MkCardName (Text.pack "Forest")) (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid resolved)) (Game.zoneMembers Zone.Battlefield S.alice resolved)))) 3
-          Spec.assertBool s (Set.member ghastName (namesIn Zone.Exile S.alice resolved)) "Bloodghast is in exile at the boundary"
+          -- The board the case needs: the land entered, and Bloodghast left the
+          -- graveyard in the same resolution, so no live read of it finds the card.
+          Spec.assertEqWith s "a Forest entered" (length (filter (== CardName.MkCardName (Text.pack "Forest")) (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid resolved)) (Game.zoneMembers Zone.Battlefield S.alice resolved)))) 7
+          Spec.assertBool s (Set.member ghastName (namesIn Zone.Hand S.alice resolved)) "Bloodghast is in alice's hand at the boundary"
           -- CR 400.7: the ability's "this card" is the graveyard incarnation,
           -- which no longer exists, so nothing returns.
-          Spec.assertBool s (Set.member ghastName (namesIn Zone.Exile S.alice after)) "and stays there after its trigger resolves"
+          Spec.assertBool s (Set.member ghastName (namesIn Zone.Hand S.alice after)) "and stays there after its trigger resolves"
           Spec.assertEqWith s "and the ability left the stack" (length (GameState.stack after)) 0
         -- Bloodghast's second line, a static ability reading "an opponent has 10
         -- or less life": the greatest negated opponent life total is at least -10.
