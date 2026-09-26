@@ -22,6 +22,8 @@
 -- casing on the rulebook, as Pawl.Engine.Dungeon's haddock puts it.
 module Pawl.Engine.Initiative where
 
+import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -30,10 +32,12 @@ import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Match as Event
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Effect as Effect
+import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -202,40 +206,23 @@ inherentPending events gs =
 takeInitiative :: PlayerId -> GameState -> GameState
 takeInitiative pid gs = Event.recordEvent (GameEvent.TookInitiative pid) gs {GameState.initiative = Just pid}
 
--- | CR 726.4: hand the initiative on when its holder leaves the game.
+-- | CR 726.4: hand the initiative on when its holder leaves the game. Who takes
+-- it is Game.heirOnDeparture's question, shared with CR 725.4.
 --
--- `playing` is the still-playing seats in SEATING order, injected by the caller
--- for Monarch.reassignOnDeparture's reason, and called with `leaving` ALREADY
--- marked departed, so "is leaving the game" and "has left the game" are one test.
--- CR 800.4j is why "there is no active player" needs no separate arm:
--- GameState.activePlayer still names a departed seat, so that absence IS the seat
--- having departed.
---
--- No eligibility gate, where CR 725.4 has one: rule 726 states no "can't take the
--- initiative" effect for one to read, and Pawl.Types.PlayerEffect has no such arm
--- to consult.
+-- No eligibility gate beyond still playing, where CR 725.4 has one: rule 726
+-- states no "can't take the initiative" effect for one to read, and
+-- Pawl.Types.PlayerEffect has no such arm to consult.
 --
 -- Nothing left to take it is unreachable rather than a rule: CR 104.2a ends the
 -- game as soon as one player is left, so no departure empties the seats. Answered
 -- Nothing rather than left naming the departed holder, because a designation held
 -- by a player who has left the game is a state no rule describes.
---
--- Not implemented: which active player "the active player" is under the shared
--- team turns option (#4142).
-reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
-reassignOnDeparture leaving playing gs =
-  if GameState.initiative gs /= Just leaving
-    then gs
-    else
-      let active = GameState.activePlayer gs
-          walk = case List.break (== active) (GameState.turnOrder gs) of
-            (before, _ : after) -> after <> before
-            (before, []) -> before
-          eligible pid = List.elem pid playing
-          taker =
-            if eligible active
-              then Just active
-              else List.find eligible walk
-       in case taker of
-            Nothing -> gs {GameState.initiative = Nothing}
-            Just pid -> takeInitiative pid gs
+reassignOnDeparture :: PlayerId -> Game ()
+reassignOnDeparture leaving = do
+  held <- State.gets GameState.initiative
+  Monad.when (held == Just leaving) $ do
+    playing <- State.gets Game.stillPlaying
+    taker <- Game.heirOnDeparture (`List.elem` playing)
+    State.modify' $ \gs -> case taker of
+      Nothing -> gs {GameState.initiative = Nothing}
+      Just pid -> takeInitiative pid gs

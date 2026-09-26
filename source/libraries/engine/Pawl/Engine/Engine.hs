@@ -168,7 +168,7 @@ nextInOrder order pid = case dropWhile (/= pid) order of
 -- (GameState.turnOrder is never shortened), so a player who has ALREADY departed
 -- still has a position from which to find their successor -- which is how
 -- priorityLoop's concede arm calls this. Total. Deliberately NOT shared with
--- Monarch.reassignOnDeparture (CR 725.4), which anchors on the ACTIVE seat,
+-- Game.heirOnDeparture (CR 725.4 / 726.4), which anchors on the ACTIVE seat,
 -- excludes it, and must return a Maybe.
 nextStillPlaying :: GameState -> PlayerId -> PlayerId
 nextStillPlaying gs pid =
