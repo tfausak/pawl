@@ -2547,7 +2547,8 @@ zonesTriggeredFrom cond =
         -- -- Mayhem Devil watches every sacrifice from the board it stands on.
         TriggerCondition.PermanentSacrificed {} -> battlefield
         -- CR 603.8's state triggers are not event triggers, so this scan is not their
-        -- reader in any zone; stateTriggers below gathers them from the battlefield.
+        -- reader in any zone; stateTriggers below gathers them from the battlefield
+        -- and, for CR 113.6p's objects, the command zone.
         TriggerCondition.StateIs _ -> battlefield
         TriggerCondition.SelfDealsCombatDamageToPlayer _ -> battlefield
         -- CR 113.6's default once more, and for the arm above's reason: the bearer
@@ -2788,9 +2789,9 @@ zonesTriggeredFrom cond =
 -- would not terminate. No card in the pool can do that, and the first that could
 -- is the one that must revisit this.
 --
--- Not implemented: a state trigger borne by an EMBLEM, which CR 114.4 would have
--- function in the command zone -- this scan reads the battlefield alone, where
--- eventTriggers reads both (#1400).
+-- The command zone too, for eventTriggers' `inCommand` reasons and by the same
+-- walk: CR 114.4 makes an emblem's abilities function there, and CR 603.8 does not
+-- restrict the bearer. Pawl.ZoneTriggerSpec's "CommandZoneStateTrigger" proves it.
 stateTriggers :: GameState -> [PendingTrigger]
 stateTriggers gs
   -- A stack id whose object can't be found: fail CLOSED, not open. This runs
@@ -2801,8 +2802,21 @@ stateTriggers gs
   -- check it replaces amounted to: one unreadable stack entry suppressed every
   -- ability of every source.
   | any (\sid -> Maybe.isNothing (Game.lookupObject sid gs)) (GameState.stack gs) = []
-  | otherwise = concatMap forOne (Set.toAscList (GameState.battlefield gs))
+  | otherwise = concatMap onBattlefield (Set.toAscList (GameState.battlefield gs)) <> concatMap inCommand (Set.toAscList (GameState.command gs))
   where
+    onBattlefield oid = case Projection.controllerOfGiven grants oid gs of
+      Nothing -> []
+      -- CR 603.3a / 109.5: the ability's controller is its source's, and that is
+      -- what "you" in the condition means. Outside the layer fold, so the ViewOf
+      -- is the FULL projection rather than the layer-bounded one.
+      Just ctrl -> forOne oid ctrl (Projection.triggeredAbilitiesOf oid gs)
+    -- eventTriggers' `commandCandidate`, read the same way: CR 113.6p's objects
+    -- only, unfiltered by `functionsIn` (CR 114.4 is about the object), the owner
+    -- as controller (CR 114.2, CR 902.6), and the printed abilities (CR 114.3).
+    inCommand oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
+      (Just obj, Just face)
+        | Vanguard.functionsFromCommandZone oid gs -> forOne oid (Object.owner obj) (Face.triggeredAbilities face)
+      _ -> []
     -- The same hoist eventTriggers' `grants` binding makes.
     grants = Projection.controlGrants gs
     -- CR 603.8's suppression, COUNTED rather than tested. Scoped to (source,
@@ -2828,277 +2842,272 @@ stateTriggers gs
             Just (Source.OfTrigger triggered) -> TriggeredAbilitySource.source triggered == srcId && TriggeredAbilitySource.ability triggered == ab
             _ -> False
        in length (filter isInstance (GameState.stack gs))
-    forOne oid = case Projection.controllerOfGiven grants oid gs of
-      Nothing -> []
-      -- CR 603.3a / 109.5: the ability's controller is its source's, and that is
-      -- what "you" in the condition means. Outside the layer fold, so the ViewOf
-      -- is the FULL projection rather than the layer-bounded one.
-      Just ctrl ->
-        let live ab = liveCondition (TriggeredAbility.condition ab)
-            liveCondition condition = case condition of
-              TriggerCondition.StateIs cond ->
-                Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just ctrl) (Just oid)) gs oid cond
-              TriggerCondition.SelfEnters -> False
-              -- CR 309.4c is an EVENT trigger too: the marker MOVING into the room
-              -- is what fires it, not the marker sitting there.
-              TriggerCondition.RoomEntered _ -> False
-              -- CR 603.2 again: CR 309.7's completion is the dungeon card's
-              -- removal happening, not a state that could be true standing still.
-              TriggerCondition.PlayerCompletesDungeon _ -> False
-              -- CR 603.2 event triggers, all four: a scry, a surveil, a card
-              -- becoming plotted and an explore are things that HAPPEN, each with
-              -- its own log entry, and none of them is a CR 603.8 state that could
-              -- be true standing still.
-              TriggerCondition.PlayerScries _ -> False
-              TriggerCondition.RingTemptsPlayer _ -> False
-              TriggerCondition.PlayerSurveils _ -> False
-              TriggerCondition.SelfBecomesPlotted -> False
-              TriggerCondition.PermanentExplores _ -> False
-              TriggerCondition.PermanentConnives _ -> False
-              -- CR 603.2 once more: a blight is something that HAPPENS, with
-              -- its own log entry, never a CR 603.8 state standing still.
-              TriggerCondition.PlayerBlights _ -> False
-              TriggerCondition.PlayerForages _ -> False
-              TriggerCondition.PlayerForetells _ -> False
-              TriggerCondition.PlayerCollectsEvidence _ -> False
-              TriggerCondition.PlayerGivesGift _ -> False
-              TriggerCondition.PlayerEarthbends _ -> False
-              TriggerCondition.PlayerWaterbends _ -> False
-              TriggerCondition.PlayerAirbends _ -> False
-              TriggerCondition.PlayerFirebends _ -> False
-              -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
-              -- entry, never a CR 603.8 state that could be true standing still.
-              TriggerCondition.PlayerRollsDice _ -> False
-              TriggerCondition.PlayerRollsResult _ -> False
-              TriggerCondition.Visit -> False
-              TriggerCondition.PlayerOpensAttraction _ -> False
-              TriggerCondition.PlayerClaimsPrize _ -> False
-              TriggerCondition.PlayerWinsCoinFlip _ -> False
-              TriggerCondition.PlayerLosesCoinFlip _ -> False
-              -- CR 603.2 again: being exerted is something that happens, with its
-              -- own log entry, and CR 701.43b makes "already exerted" no bar to
-              -- exerting again -- so there is no standing state to be true.
-              TriggerCondition.SelfExerted -> False
-              -- CR 603.2 once more: becoming attached is something that HAPPENS,
-              -- with its own log entry. Standing attached is a state, but no
-              -- condition here asks about it.
-              TriggerCondition.SelfBecomesAttachedBy _ -> False
-              TriggerCondition.SelfBecomesAttachedTo _ -> False
-              -- And becoming unattached likewise. Standing UNattached is a state
-              -- CR 704.5m acts on, but it is a state-based action rather than a
-              -- CR 603.8 trigger, and no condition here asks about it.
-              TriggerCondition.SelfBecomesUnattachedFrom _ -> False
-              -- CR 603.6a is an EVENT trigger, matched against the log; nothing
-              -- about it is a CR 603.8 state.
-              TriggerCondition.PermanentEnters _ -> False
-              TriggerCondition.StepBegins {} -> False
-              TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
-              TriggerCondition.SelfDealsDamageToPlayer _ -> False
-              TriggerCondition.SelfDealsDamageToCreature -> False
-              TriggerCondition.SelfIsDealtDamage -> False
-              TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
-              TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
-              TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
-              TriggerCondition.CreaturesDealtCombatDamageToInitiative -> False
-              TriggerCondition.PlayerTookInitiative -> False
-              TriggerCondition.OpponentLostLifeDuringYourTurn -> False
-              TriggerCondition.SelfAttacks _ -> False
-              TriggerCondition.SelfAttacksWithAnother _ -> False
-              TriggerCondition.SelfAttacksPermanent _ -> False
-              TriggerCondition.CreatureAttacksAlone _ -> False
-              TriggerCondition.CreatureAttacksYou -> False
-              TriggerCondition.CreatureAttacks _ -> False
-              TriggerCondition.AttachedPlayerIsAttacked -> False
-              TriggerCondition.SelfIsAttacked -> False
-              TriggerCondition.PlayerAttacks _ -> False
-              TriggerCondition.PlayerAttacksWith {} -> False
-              TriggerCondition.PlayerAttacksPlayer {} -> False
-              TriggerCondition.SelfAttacksPlayerWithMostLife -> False
-              TriggerCondition.SelfAttacksWhileSaddled -> False
-              TriggerCondition.SelfAttacksWhile _ -> False
-              TriggerCondition.SelfBlocks -> False
-              TriggerCondition.SelfBlocksCreature _ -> False
-              TriggerCondition.SelfBlocksAtLeast _ -> False
-              TriggerCondition.SelfBlocksOneOrMore _ -> False
-              TriggerCondition.SelfBecomesBlocked -> False
-              TriggerCondition.SelfBecomesBlockedBy _ -> False
-              TriggerCondition.PermanentBecomesBlockedBy _ -> False
-              TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
-              TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
-              TriggerCondition.SelfAttacksUnblocked -> False
-              TriggerCondition.SelfCycled -> False
-              TriggerCondition.SelfRevealedForMiracle -> False
-              TriggerCondition.SelfDiscarded -> False
-              TriggerCondition.SelfExiledForMadness -> False
-              TriggerCondition.PlayerDiscards _ -> False
-              TriggerCondition.PlayerDiscardsCards _ -> False
-              TriggerCondition.PlayerCycles _ -> False
-              TriggerCondition.PlayerDrawsNthCard {} -> False
-              TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
-              TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
-              TriggerCondition.SelfPutIntoGraveyardDuringResolution -> False
-              TriggerCondition.CardPutIntoGraveyard _ -> False
-              TriggerCondition.SelfDies -> False
-              TriggerCondition.PermanentDies _ -> False
-              TriggerCondition.PermanentsDie _ -> False
-              TriggerCondition.SelfLeavesTheBattlefield -> False
-              TriggerCondition.PermanentLeavesTheBattlefield _ -> False
-              TriggerCondition.PermanentReturnedToHand _ -> False
-              TriggerCondition.PermanentsReturnedToHand _ -> False
-              TriggerCondition.CardLeavesZone {} -> False
-              TriggerCondition.CardsLeaveZone {} -> False
-              TriggerCondition.HauntedCreatureDies -> False
-              TriggerCondition.SpellOrAbilityCounters _ -> False
-              TriggerCondition.AbilityIsCountered -> False
-              TriggerCondition.DamageToPlayerPrevented _ -> False
-              TriggerCondition.SelfPreventsDamage _ -> False
-              TriggerCondition.PlayerGainsLife _ -> False
-              TriggerCondition.PlayersGainLife _ -> False
-              TriggerCondition.PlayerLosesLife _ -> False
-              -- CR 603.3b's condition is an EVENT trigger too, and the event is
-              -- another ability triggering: nothing about it is a state a settle
-              -- could re-read.
-              TriggerCondition.SagaFinalChapterTriggers _ -> False
-              -- CR 603.2 event trigger, not a CR 603.8 state: this fires on a
-              -- player BECOMING the monarch, and a settle re-reading "is the
-              -- monarch" would fire it again every time until the crown moved.
-              TriggerCondition.PlayerBecomesMonarch _ -> False
-              -- CR 603.2 event trigger too, and not a state: it fires on control
-              -- CHANGING, and a settle re-reading "somebody else controls it" would
-              -- fire it again on every pass thereafter.
-              TriggerCondition.LoseControlOfBound _ -> False
-              -- CR 603.2 event trigger too: it fires on the land BEING put into a
-              -- graveyard or into exile, not on its being there.
-              TriggerCondition.BoundDiesOrIsExiled _ -> False
-              -- CR 603.2 event trigger too, and for the arm above's reason: it
-              -- fires on the creature BEING put into a graveyard, not on its
-              -- lying there.
-              TriggerCondition.BoundDies _ -> False
-              -- CR 603.12 sends a reflexive through rule 603.7, and CR 603.8's
-              -- state triggers are a different family: nothing about "when you
-              -- do" is a state that could be standing true.
-              TriggerCondition.Reflexive -> False
-              -- CR 709.5h is an EVENT trigger: it fires on the permanent BEING
-              -- GIVEN the designation, which CR 709.5c leaves it holding
-              -- thereafter, so a state read would fire it again every time the
-              -- board settles.
-              TriggerCondition.SelfHalfUnlocked _ -> False
-              -- CR 708.7 is an EVENT trigger for the same reason: it fires on the
-              -- permanent BEING turned face up, and CR 708.8 leaves it face up
-              -- thereafter -- so a state read would fire it again every settle,
-              -- for as long as the permanent stayed on the battlefield.
-              TriggerCondition.SelfTurnedFaceUp -> False
-              -- CR 701.27a is an EVENT trigger for that reason exactly: CR
-              -- 712.18 leaves the permanent on its new face thereafter, so a
-              -- state read would fire it again on every settle.
-              TriggerCondition.SelfTransformedInto _ -> False
-              -- And the bystander's form of it is an EVENT trigger for the
-              -- same reason: a board showing a permanent on its back face
-              -- says nothing about when it turned over.
-              TriggerCondition.PermanentTransforms _ -> False
-              -- And the watcher's form is an EVENT trigger for the same reason,
-              -- more plainly still: a board on which some permanent is face up
-              -- says nothing about which of them was ever TURNED over, so there
-              -- is no state here to read at all.
-              TriggerCondition.PermanentTurnedFaceUp _ -> False
-              TriggerCondition.PermanentTurnedFaceDown _ -> False
-              -- CR 702.112b's designation is exactly that shape once more: the
-              -- permanent keeps it, so a state read would fire every settle.
-              TriggerCondition.PermanentBecomesDesignated {} -> False
-              -- CR 702.100b is an EVENT trigger and leaves no state at all behind:
-              -- the counters it put are indistinguishable from any others.
-              TriggerCondition.SelfEvolves -> False
-              TriggerCondition.SelfMutates -> False
-              -- CR 702.134c likewise, and one step further removed: what it fires
-              -- on is a resolution, and the counter that resolution put is a
-              -- counter like any other, so the board afterwards says nothing about
-              -- which creature mentored which.
-              TriggerCondition.AttachedCreatureMentors -> False
-              -- CR 700.4's death is an EVENT, and the board afterwards cannot
-              -- say which permanent an Aura in a graveyard used to enchant.
-              TriggerCondition.AttachedCreatureDies -> False
-              -- CR 701.26a's tap is an EVENT too. A tapped enchanted permanent is
-              -- a state the board can read, which is exactly why this must be
-              -- False: CR 603.2e says a "becomes" condition does not retrigger
-              -- while the state persists, and a state trigger would do nothing but.
-              TriggerCondition.AttachedCreatureBecomesTapped -> False
-              TriggerCondition.PermanentsBecomeTapped _ -> False
-              -- CR 701.26b's untap is an EVENT for the identical reason,
-              -- read off the bearer instead of its host.
-              TriggerCondition.SelfBecomesUntapped -> False
-              -- CR 106.12a is an EVENT too, and more plainly than the arm
-              -- above: a mana ability having resolved is nothing a later
-              -- board read can recover.
-              TriggerCondition.AttachedPermanentTappedForMana -> False
-              -- The same resolution read by a bystander, so the same answer.
-              TriggerCondition.PermanentTappedForMana {} -> False
-              -- CR 605.1b's mana-added event: the same answer, for the same reason.
-              TriggerCondition.AbilityAddsMana {} -> False
-              -- CR 605.3b's resolution likewise: the counters it puts are
-              -- counters like any other, so the board afterwards cannot say a
-              -- mana ability was what resolved.
-              TriggerCondition.SelfManaAbilityResolves -> False
-              -- CR 702.149c the same: it fires on a resolution, and the counter
-              -- that resolution put is a counter like any other, so the board
-              -- afterwards says nothing about which creature trained.
-              TriggerCondition.SelfTrains -> False
-              -- CR 702.110b the same: it fires on a resolution, and a creature
-              -- missing from the battlefield afterwards could have left for any
-              -- reason, so the board says nothing about who exploited it.
-              TriggerCondition.SelfExploits -> False
-              -- CR 702.122e likewise fires on a resolution, and the board
-              -- afterwards -- an animated Vehicle -- is CR 702.122a's effect
-              -- rather than a record of the crewing.
-              TriggerCondition.SelfBecomesCrewed {} -> False
-              -- Rule 702.122b fires on that same resolution, and a tapped
-              -- creature is CR 702.122a's cost rather than a record of which
-              -- Vehicle it paid for.
-              TriggerCondition.SelfCrewsVehicle -> False
-              -- CR 701.21a is a game ACTION, so this is an event trigger too: it
-              -- fires on the moment the permanent is sacrificed, and the board
-              -- afterwards holds no state a read could recover.
-              TriggerCondition.PermanentSacrificed {} -> False
-              -- CR 714.2b is an EVENT trigger too: it fires on the moment counters
-              -- are PUT ON, not on the count standing at or above N -- which is
-              -- exactly the difference CR 603.8 draws, and the reason a Saga does
-              -- not re-run its final chapter for as long as it sits there.
-              TriggerCondition.SelfCountersReached {} -> False
-              TriggerCondition.SelfBecomesClassLevel _ -> False
-              TriggerCondition.SelfLastCounterRemoved _ -> False
-              TriggerCondition.SelfCountersRemoved _ -> False
-              TriggerCondition.PermanentsGetCounters {} -> False
-              TriggerCondition.PermanentGetsCounters {} -> False
-              TriggerCondition.SpellCast {} -> False
-              TriggerCondition.SelfCast -> False
-              TriggerCondition.SelfBecomesTargeted _ -> False
-              TriggerCondition.ControllerBecomesTarget {} -> False
-              TriggerCondition.PermanentsBecomeTargeted {} -> False
-              TriggerCondition.PermanentBecomesTargeted {} -> False
-              -- CR 709.5i is an EVENT trigger, for CR 709.5h's reason one arm up:
-              -- it fires on the LAST designation arriving, and CR 709.5c leaves
-              -- the permanent holding both thereafter, so a state read would fire
-              -- it again on every settle.
-              TriggerCondition.RoomFullyUnlocked _ -> False
-              -- `any`, which is matchesTrigger's AnyOf arm read into this scan:
-              -- an ability with a CR 603.8 clause is a state trigger, whatever
-              -- else it also has. Never True today -- Pawl.CardSpec's lint
-              -- forbids a StateIs inside an AnyOf, precisely so that an ability
-              -- cannot be gathered by this scan and by the event scan at once --
-              -- so what this arm really says is that the classification stays
-              -- coherent if that lint is ever relaxed.
-              TriggerCondition.AnyOf conditions -> any liveCondition conditions
-            lives = filter live (Projection.triggeredAbilitiesOf oid gs)
-            -- Each live copy against the copies of itself that came earlier in
-            -- the list, which gives it a 1-based ordinal among its equals: the
-            -- j-th copy is armed exactly when fewer than j instances of it are
-            -- already on the stack. That is the N-minus-K subtraction
-            -- instancesOnStack describes, written without ever needing an Ord on
-            -- a triggered ability.
-            armed (before, ab) = 1 + length (filter (ab ==) before) > instancesOnStack oid ab
-            -- CR 400.7d, the event scan's stamp above on this road too. A
-            -- fence: no state trigger in data/cards/ reads the record.
-            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (maybe Map.empty (Binding.paidCostRecord . Object.bindings) (Game.lookupObject oid gs)) Nothing Nothing
-         in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
+    forOne oid ctrl abilities =
+      let live ab = liveCondition (TriggeredAbility.condition ab)
+          liveCondition condition = case condition of
+            TriggerCondition.StateIs cond ->
+              Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just ctrl) (Just oid)) gs oid cond
+            TriggerCondition.SelfEnters -> False
+            -- CR 309.4c is an EVENT trigger too: the marker MOVING into the room
+            -- is what fires it, not the marker sitting there.
+            TriggerCondition.RoomEntered _ -> False
+            -- CR 603.2 again: CR 309.7's completion is the dungeon card's
+            -- removal happening, not a state that could be true standing still.
+            TriggerCondition.PlayerCompletesDungeon _ -> False
+            -- CR 603.2 event triggers, all four: a scry, a surveil, a card
+            -- becoming plotted and an explore are things that HAPPEN, each with
+            -- its own log entry, and none of them is a CR 603.8 state that could
+            -- be true standing still.
+            TriggerCondition.PlayerScries _ -> False
+            TriggerCondition.RingTemptsPlayer _ -> False
+            TriggerCondition.PlayerSurveils _ -> False
+            TriggerCondition.SelfBecomesPlotted -> False
+            TriggerCondition.PermanentExplores _ -> False
+            TriggerCondition.PermanentConnives _ -> False
+            -- CR 603.2 once more: a blight is something that HAPPENS, with
+            -- its own log entry, never a CR 603.8 state standing still.
+            TriggerCondition.PlayerBlights _ -> False
+            TriggerCondition.PlayerForages _ -> False
+            TriggerCondition.PlayerForetells _ -> False
+            TriggerCondition.PlayerCollectsEvidence _ -> False
+            TriggerCondition.PlayerGivesGift _ -> False
+            TriggerCondition.PlayerEarthbends _ -> False
+            TriggerCondition.PlayerWaterbends _ -> False
+            TriggerCondition.PlayerAirbends _ -> False
+            TriggerCondition.PlayerFirebends _ -> False
+            -- CR 603.2 once more: a die roll is something that HAPPENS, with its own log
+            -- entry, never a CR 603.8 state that could be true standing still.
+            TriggerCondition.PlayerRollsDice _ -> False
+            TriggerCondition.PlayerRollsResult _ -> False
+            TriggerCondition.Visit -> False
+            TriggerCondition.PlayerOpensAttraction _ -> False
+            TriggerCondition.PlayerClaimsPrize _ -> False
+            TriggerCondition.PlayerWinsCoinFlip _ -> False
+            TriggerCondition.PlayerLosesCoinFlip _ -> False
+            -- CR 603.2 again: being exerted is something that happens, with its
+            -- own log entry, and CR 701.43b makes "already exerted" no bar to
+            -- exerting again -- so there is no standing state to be true.
+            TriggerCondition.SelfExerted -> False
+            -- CR 603.2 once more: becoming attached is something that HAPPENS,
+            -- with its own log entry. Standing attached is a state, but no
+            -- condition here asks about it.
+            TriggerCondition.SelfBecomesAttachedBy _ -> False
+            TriggerCondition.SelfBecomesAttachedTo _ -> False
+            -- And becoming unattached likewise. Standing UNattached is a state
+            -- CR 704.5m acts on, but it is a state-based action rather than a
+            -- CR 603.8 trigger, and no condition here asks about it.
+            TriggerCondition.SelfBecomesUnattachedFrom _ -> False
+            -- CR 603.6a is an EVENT trigger, matched against the log; nothing
+            -- about it is a CR 603.8 state.
+            TriggerCondition.PermanentEnters _ -> False
+            TriggerCondition.StepBegins {} -> False
+            TriggerCondition.SelfDealsCombatDamageToPlayer _ -> False
+            TriggerCondition.SelfDealsDamageToPlayer _ -> False
+            TriggerCondition.SelfDealsDamageToCreature -> False
+            TriggerCondition.SelfIsDealtDamage -> False
+            TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
+            TriggerCondition.PermanentsDealCombatDamageToPlayer _ -> False
+            TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+            TriggerCondition.CreaturesDealtCombatDamageToInitiative -> False
+            TriggerCondition.PlayerTookInitiative -> False
+            TriggerCondition.OpponentLostLifeDuringYourTurn -> False
+            TriggerCondition.SelfAttacks _ -> False
+            TriggerCondition.SelfAttacksWithAnother _ -> False
+            TriggerCondition.SelfAttacksPermanent _ -> False
+            TriggerCondition.CreatureAttacksAlone _ -> False
+            TriggerCondition.CreatureAttacksYou -> False
+            TriggerCondition.CreatureAttacks _ -> False
+            TriggerCondition.AttachedPlayerIsAttacked -> False
+            TriggerCondition.SelfIsAttacked -> False
+            TriggerCondition.PlayerAttacks _ -> False
+            TriggerCondition.PlayerAttacksWith {} -> False
+            TriggerCondition.PlayerAttacksPlayer {} -> False
+            TriggerCondition.SelfAttacksPlayerWithMostLife -> False
+            TriggerCondition.SelfAttacksWhileSaddled -> False
+            TriggerCondition.SelfAttacksWhile _ -> False
+            TriggerCondition.SelfBlocks -> False
+            TriggerCondition.SelfBlocksCreature _ -> False
+            TriggerCondition.SelfBlocksAtLeast _ -> False
+            TriggerCondition.SelfBlocksOneOrMore _ -> False
+            TriggerCondition.SelfBecomesBlocked -> False
+            TriggerCondition.SelfBecomesBlockedBy _ -> False
+            TriggerCondition.PermanentBecomesBlockedBy _ -> False
+            TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+            TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> False
+            TriggerCondition.SelfAttacksUnblocked -> False
+            TriggerCondition.SelfCycled -> False
+            TriggerCondition.SelfRevealedForMiracle -> False
+            TriggerCondition.SelfDiscarded -> False
+            TriggerCondition.SelfExiledForMadness -> False
+            TriggerCondition.PlayerDiscards _ -> False
+            TriggerCondition.PlayerDiscardsCards _ -> False
+            TriggerCondition.PlayerCycles _ -> False
+            TriggerCondition.PlayerDrawsNthCard {} -> False
+            TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
+            TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+            TriggerCondition.SelfPutIntoGraveyardDuringResolution -> False
+            TriggerCondition.CardPutIntoGraveyard _ -> False
+            TriggerCondition.SelfDies -> False
+            TriggerCondition.PermanentDies _ -> False
+            TriggerCondition.PermanentsDie _ -> False
+            TriggerCondition.SelfLeavesTheBattlefield -> False
+            TriggerCondition.PermanentLeavesTheBattlefield _ -> False
+            TriggerCondition.PermanentReturnedToHand _ -> False
+            TriggerCondition.PermanentsReturnedToHand _ -> False
+            TriggerCondition.CardLeavesZone {} -> False
+            TriggerCondition.CardsLeaveZone {} -> False
+            TriggerCondition.HauntedCreatureDies -> False
+            TriggerCondition.SpellOrAbilityCounters _ -> False
+            TriggerCondition.AbilityIsCountered -> False
+            TriggerCondition.DamageToPlayerPrevented _ -> False
+            TriggerCondition.SelfPreventsDamage _ -> False
+            TriggerCondition.PlayerGainsLife _ -> False
+            TriggerCondition.PlayersGainLife _ -> False
+            TriggerCondition.PlayerLosesLife _ -> False
+            -- CR 603.3b's condition is an EVENT trigger too, and the event is
+            -- another ability triggering: nothing about it is a state a settle
+            -- could re-read.
+            TriggerCondition.SagaFinalChapterTriggers _ -> False
+            -- CR 603.2 event trigger, not a CR 603.8 state: this fires on a
+            -- player BECOMING the monarch, and a settle re-reading "is the
+            -- monarch" would fire it again every time until the crown moved.
+            TriggerCondition.PlayerBecomesMonarch _ -> False
+            -- CR 603.2 event trigger too, and not a state: it fires on control
+            -- CHANGING, and a settle re-reading "somebody else controls it" would
+            -- fire it again on every pass thereafter.
+            TriggerCondition.LoseControlOfBound _ -> False
+            -- CR 603.2 event trigger too: it fires on the land BEING put into a
+            -- graveyard or into exile, not on its being there.
+            TriggerCondition.BoundDiesOrIsExiled _ -> False
+            -- CR 603.2 event trigger too, and for the arm above's reason: it
+            -- fires on the creature BEING put into a graveyard, not on its
+            -- lying there.
+            TriggerCondition.BoundDies _ -> False
+            -- CR 603.12 sends a reflexive through rule 603.7, and CR 603.8's
+            -- state triggers are a different family: nothing about "when you
+            -- do" is a state that could be standing true.
+            TriggerCondition.Reflexive -> False
+            -- CR 709.5h is an EVENT trigger: it fires on the permanent BEING
+            -- GIVEN the designation, which CR 709.5c leaves it holding
+            -- thereafter, so a state read would fire it again every time the
+            -- board settles.
+            TriggerCondition.SelfHalfUnlocked _ -> False
+            -- CR 708.7 is an EVENT trigger for the same reason: it fires on the
+            -- permanent BEING turned face up, and CR 708.8 leaves it face up
+            -- thereafter -- so a state read would fire it again every settle,
+            -- for as long as the permanent stayed on the battlefield.
+            TriggerCondition.SelfTurnedFaceUp -> False
+            -- CR 701.27a is an EVENT trigger for that reason exactly: CR
+            -- 712.18 leaves the permanent on its new face thereafter, so a
+            -- state read would fire it again on every settle.
+            TriggerCondition.SelfTransformedInto _ -> False
+            -- And the bystander's form of it is an EVENT trigger for the
+            -- same reason: a board showing a permanent on its back face
+            -- says nothing about when it turned over.
+            TriggerCondition.PermanentTransforms _ -> False
+            -- And the watcher's form is an EVENT trigger for the same reason,
+            -- more plainly still: a board on which some permanent is face up
+            -- says nothing about which of them was ever TURNED over, so there
+            -- is no state here to read at all.
+            TriggerCondition.PermanentTurnedFaceUp _ -> False
+            TriggerCondition.PermanentTurnedFaceDown _ -> False
+            -- CR 702.112b's designation is exactly that shape once more: the
+            -- permanent keeps it, so a state read would fire every settle.
+            TriggerCondition.PermanentBecomesDesignated {} -> False
+            -- CR 702.100b is an EVENT trigger and leaves no state at all behind:
+            -- the counters it put are indistinguishable from any others.
+            TriggerCondition.SelfEvolves -> False
+            TriggerCondition.SelfMutates -> False
+            -- CR 702.134c likewise, and one step further removed: what it fires
+            -- on is a resolution, and the counter that resolution put is a
+            -- counter like any other, so the board afterwards says nothing about
+            -- which creature mentored which.
+            TriggerCondition.AttachedCreatureMentors -> False
+            -- CR 700.4's death is an EVENT, and the board afterwards cannot
+            -- say which permanent an Aura in a graveyard used to enchant.
+            TriggerCondition.AttachedCreatureDies -> False
+            -- CR 701.26a's tap is an EVENT too. A tapped enchanted permanent is
+            -- a state the board can read, which is exactly why this must be
+            -- False: CR 603.2e says a "becomes" condition does not retrigger
+            -- while the state persists, and a state trigger would do nothing but.
+            TriggerCondition.AttachedCreatureBecomesTapped -> False
+            TriggerCondition.PermanentsBecomeTapped _ -> False
+            -- CR 701.26b's untap is an EVENT for the identical reason,
+            -- read off the bearer instead of its host.
+            TriggerCondition.SelfBecomesUntapped -> False
+            -- CR 106.12a is an EVENT too, and more plainly than the arm
+            -- above: a mana ability having resolved is nothing a later
+            -- board read can recover.
+            TriggerCondition.AttachedPermanentTappedForMana -> False
+            -- The same resolution read by a bystander, so the same answer.
+            TriggerCondition.PermanentTappedForMana {} -> False
+            -- CR 605.1b's mana-added event: the same answer, for the same reason.
+            TriggerCondition.AbilityAddsMana {} -> False
+            -- CR 605.3b's resolution likewise: the counters it puts are
+            -- counters like any other, so the board afterwards cannot say a
+            -- mana ability was what resolved.
+            TriggerCondition.SelfManaAbilityResolves -> False
+            -- CR 702.149c the same: it fires on a resolution, and the counter
+            -- that resolution put is a counter like any other, so the board
+            -- afterwards says nothing about which creature trained.
+            TriggerCondition.SelfTrains -> False
+            -- CR 702.110b the same: it fires on a resolution, and a creature
+            -- missing from the battlefield afterwards could have left for any
+            -- reason, so the board says nothing about who exploited it.
+            TriggerCondition.SelfExploits -> False
+            -- CR 702.122e likewise fires on a resolution, and the board
+            -- afterwards -- an animated Vehicle -- is CR 702.122a's effect
+            -- rather than a record of the crewing.
+            TriggerCondition.SelfBecomesCrewed {} -> False
+            -- Rule 702.122b fires on that same resolution, and a tapped
+            -- creature is CR 702.122a's cost rather than a record of which
+            -- Vehicle it paid for.
+            TriggerCondition.SelfCrewsVehicle -> False
+            -- CR 701.21a is a game ACTION, so this is an event trigger too: it
+            -- fires on the moment the permanent is sacrificed, and the board
+            -- afterwards holds no state a read could recover.
+            TriggerCondition.PermanentSacrificed {} -> False
+            -- CR 714.2b is an EVENT trigger too: it fires on the moment counters
+            -- are PUT ON, not on the count standing at or above N -- which is
+            -- exactly the difference CR 603.8 draws, and the reason a Saga does
+            -- not re-run its final chapter for as long as it sits there.
+            TriggerCondition.SelfCountersReached {} -> False
+            TriggerCondition.SelfBecomesClassLevel _ -> False
+            TriggerCondition.SelfLastCounterRemoved _ -> False
+            TriggerCondition.SelfCountersRemoved _ -> False
+            TriggerCondition.PermanentsGetCounters {} -> False
+            TriggerCondition.PermanentGetsCounters {} -> False
+            TriggerCondition.SpellCast {} -> False
+            TriggerCondition.SelfCast -> False
+            TriggerCondition.SelfBecomesTargeted _ -> False
+            TriggerCondition.ControllerBecomesTarget {} -> False
+            TriggerCondition.PermanentsBecomeTargeted {} -> False
+            TriggerCondition.PermanentBecomesTargeted {} -> False
+            -- CR 709.5i is an EVENT trigger, for CR 709.5h's reason one arm up:
+            -- it fires on the LAST designation arriving, and CR 709.5c leaves
+            -- the permanent holding both thereafter, so a state read would fire
+            -- it again on every settle.
+            TriggerCondition.RoomFullyUnlocked _ -> False
+            -- `any`, which is matchesTrigger's AnyOf arm read into this scan:
+            -- an ability with a CR 603.8 clause is a state trigger, whatever
+            -- else it also has. Never True today -- Pawl.CardSpec's lint
+            -- forbids a StateIs inside an AnyOf, precisely so that an ability
+            -- cannot be gathered by this scan and by the event scan at once --
+            -- so what this arm really says is that the classification stays
+            -- coherent if that lint is ever relaxed.
+            TriggerCondition.AnyOf conditions -> any liveCondition conditions
+          lives = filter live abilities
+          -- Each live copy against the copies of itself that came earlier in
+          -- the list, which gives it a 1-based ordinal among its equals: the
+          -- j-th copy is armed exactly when fewer than j instances of it are
+          -- already on the stack. That is the N-minus-K subtraction
+          -- instancesOnStack describes, written without ever needing an Ord on
+          -- a triggered ability.
+          armed (before, ab) = 1 + length (filter (ab ==) before) > instancesOnStack oid ab
+          -- CR 400.7d, the event scan's stamp above on this road too. A
+          -- fence: no state trigger in data/cards/ reads the record.
+          pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (maybe Map.empty (Binding.paidCostRecord . Object.bindings) (Game.lookupObject oid gs)) Nothing Nothing
+       in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
 -- CR 603.7a's floor is the watermark's job, and is all an ordinary entry
 -- needs. This is the card's OWN further restriction: an ability printed "on
