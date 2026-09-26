@@ -3406,8 +3406,14 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
 -- CR 614.3's `uses` is Once and its expiry is Never: a spell leaves the stack
 -- exactly once, and the ability has no duration.
 armCastFromGraveyard :: PlayerId -> Set Keyword -> Maybe Keyword -> ObjectId -> Game ()
-armCastFromGraveyard caster keywords castFor spellId =
-  let arm re = State.modify' $ \gs ->
+armCastFromGraveyard caster keywords castFor spellId = State.modify' (installCastFromGraveyard caster keywords castFor spellId)
+
+-- `armCastFromGraveyard`'s rows, as a pure step: also what
+-- Pawl.Engine.Resolve.Effect.acquireChoices re-arms when a spell on the stack
+-- becomes a copy and so takes on another keyword set and cast record (CR 707.2).
+installCastFromGraveyard :: PlayerId -> Set Keyword -> Maybe Keyword -> ObjectId -> GameState -> GameState
+installCastFromGraveyard caster keywords castFor spellId gs0 =
+  let arm gs re =
         let (ts, gs1) = Game.freshTimestamp gs
             active =
               ActiveReplacement.MkActiveReplacement
@@ -3433,4 +3439,4 @@ armCastFromGraveyard caster keywords castFor spellId =
                   ActiveReplacement.slots = Map.empty
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
-   in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf keywords castFor)
+   in List.foldl' arm gs0 (Keyword.castFromGraveyardReplacementsOf keywords castFor)
