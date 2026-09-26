@@ -79,6 +79,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Draw as Draw
@@ -600,7 +601,7 @@ engineOnlyOffends replacement = case replacement of
   -- CR 122.1c's destruction half is engine-minted for the same reason its damage
   -- half is, so the sweep reaches it through this arm rather than through a lint
   -- of its own.
-  ReplacementEffect.DestructionR rewrite -> engineMintedDestruction rewrite
+  ReplacementEffect.DestructionR (DestructionR.MkDestructionR _ rewrite) -> engineMintedDestruction rewrite
   -- CR 122.1d's row is engine-minted for CR 122.1c's reason, and the WHOLE arm
   -- rather than one rewrite of it: printed regeneration shares DestructionR, so
   -- that arm needs a per-rewrite test, where nothing a card may print replaces an
@@ -677,6 +678,7 @@ engineMintedDestruction rewrite = case rewrite of
   DestructionRewrite.RemoveShieldCounter -> True
   DestructionRewrite.UmbraArmor -> True
   DestructionRewrite.Regenerate -> False
+  DestructionRewrite.Heal -> False
 
 -- The non-vacuity half of the same lint: is this the replacement that carries a
 -- PhasePattern at all? A wildcard is right here, where it is not above -- this
@@ -2809,8 +2811,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     -- answered one way for every redirect.
     Spec.assertBool s (any (engineOnlyOffends . bakeRedirect) printed) "and so is a redirection naming its destination by id"
     Spec.assertBool s (not (any (engineOnlyOffends . printRedirect) printed)) "while one describing that destination is accepted"
-    Spec.assertBool s (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter)) "and so is CR 122.1c's destruction half"
-    Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))) "while CR 701.19a's printed regeneration is accepted"
+    Spec.assertBool s (engineOnlyOffends (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.RemoveShieldCounter))) "and so is CR 122.1c's destruction half"
+    Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate)))) "while CR 701.19a's printed regeneration is accepted"
     -- CR 122.1d's row, which only Projection.stunOf may mint -- the whole arm,
     -- with no printed rewrite beside it to accept.
     Spec.assertBool s (engineOnlyOffends (ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter)) "and so is CR 122.1d's untap replacement"

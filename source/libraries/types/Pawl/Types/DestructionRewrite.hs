@@ -31,7 +31,7 @@ data DestructionRewrite
     -- Pawl.Types.Keyword's UmbraArmor onto the AURA (Pawl.Engine.Keyword's
     -- mintedReplacementsFor), never authored.
     --
-    -- The first arm that is not self-scoped: the other two replace their own
+    -- The first arm that is not self-scoped: the two above replace their own
     -- source's destruction, where this one replaces the destruction of whatever
     -- its source is attached to. Pawl.Engine.Replacement.scopes is where that
     -- difference lives, so the Aura stays the row's source and CR 616.1's choice
@@ -43,4 +43,7 @@ data DestructionRewrite
     -- either, so Pawl.Engine.Replacement.admits refuses it neither cause nor an
     -- unregeneratable destruction.
     UmbraArmor
+  | -- | CR 614.1a / 701.69a: "remove all damage marked on it instead" (Pyramids).
+    -- Not a regeneration, so CR 701.19c does not bar it.
+    Heal
   deriving (Bounded, Enum, Eq, Ord, Show)

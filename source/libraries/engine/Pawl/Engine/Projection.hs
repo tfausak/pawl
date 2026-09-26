@@ -49,6 +49,7 @@ import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
@@ -4515,7 +4516,7 @@ shieldOf oid gs =
   if shieldCounters oid gs == 0
     then []
     else
-      [ ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter,
+      [ ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.RemoveShieldCounter),
         ReplacementEffect.DamageR
           ( DamageR.MkDamageR
               DamagePattern.MkDamagePattern

@@ -3032,6 +3032,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   waterWhipSpec s registry
   unagiSpec s registry
   waterbendingLessonSpec s registry
+  benevolentRiverSpiritSpec s registry
   mindGrindSpec s registry
   flashSpec s registry
 
@@ -6237,7 +6238,7 @@ kataraBoard mountain katara piker others =
 waterWhipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 waterWhipSpec s registry = Spec.describe s "Water Whip" $ do
   Spec.it s "CR 701.67a a spell's additional waterbend {5} is paid by tapping five permanents" $ do
-    (spell, tappable, gs) <- waterWhipBoard s registry 2 False
+    (spell, tappable, gs) <- waterbendSpellBoard s registry "Water Whip" 2 False
     let answer :: Prompt.Prompt r -> r
         answer = choosingNoTargets (waterbending (ManaCost.MkManaCost [blue, blue]) (take 5 tappable))
         resolved = S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop
@@ -6251,8 +6252,8 @@ waterWhipSpec s registry = Spec.describe s "Water Whip" $ do
   -- tappable permanent cannot pay the {1}, and a third Island has to. A pair
   -- varying that Island and nothing else.
   Spec.it s "CR 701.67b a spell's waterbend taps pay its own {5} and not the tax on top of it" $ do
-    (spell, tappable, taxed) <- waterWhipBoard s registry 3 True
-    (short, _, shortBoard) <- waterWhipBoard s registry 2 True
+    (spell, tappable, taxed) <- waterbendSpellBoard s registry "Water Whip" 3 True
+    (short, _, shortBoard) <- waterbendSpellBoard s registry "Water Whip" 2 True
     let answer :: Prompt.Prompt r -> r
         answer = choosingNoTargets (waterbending (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue, blue]) (take 5 tappable))
         resolved = S.runPure answer (S.runPure answer taxed (S.cast S.alice spell)) Stack.resolveTop
@@ -6266,6 +6267,28 @@ waterWhipSpec s registry = Spec.describe s "Water Whip" $ do
   where
     blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
 
+-- Benevolent River Spirit {U}{U} Creature -- Spirit 4/5
+-- (data/cards/benevolent-river-spirit.json): "As an additional cost to cast this
+-- spell, waterbend {5}. / Flying, ward {2} / When this creature enters, scry 2."
+--
+-- Water Whip's cost on a PERMANENT spell, which is where CR 118.8d becomes
+-- observable after the cast: the {5} is paid but is not part of the mana cost,
+-- so the creature that enters has mana value 2 and not 7 (CR 202.3). Same board
+-- as Water Whip's headline, so the {5} can only have been paid by tapping.
+benevolentRiverSpiritSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+benevolentRiverSpiritSpec s registry = Spec.describe s "Benevolent River Spirit" $ do
+  Spec.it s "CR 118.8d a creature cast with its additional waterbend {5} enters with mana value 2" $ do
+    (spell, tappable, gs) <- waterbendSpellBoard s registry "Benevolent River Spirit" 2 False
+    let blue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+        answer :: Prompt.Prompt r -> r
+        answer = waterbending (ManaCost.MkManaCost [blue, blue]) (take 5 tappable)
+        resolved = S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop
+        entered = filter (\oid -> Game.zoneOf oid resolved == Just Zone.Battlefield) (S.namedObjects (CardName.MkCardName (Text.pack "Benevolent River Spirit")) resolved)
+    Spec.assertEqWith s "CR 118.8d the Spirit on the battlefield has its printed mana value 2, not the 7 alice paid" (fmap (\oid -> Filter.manaValue (Projection.viewOfObject oid resolved)) entered) [Just 2]
+    -- The taps, which the assertion above does not see: a Spirit whose {5} went
+    -- unpaid would also have entered with mana value 2.
+    Spec.assertEqWith s "CR 701.67a and seven permanents are tapped -- five for the waterbend cost and both Islands" (S.tappedCount S.alice resolved) 7
+
 -- Every waterbending answer above with CR 601.2c's announcement pinned at zero
 -- targets: alice's own creatures are candidates for "up to two target
 -- creatures", and a returned one would carry its tap out of the count.
@@ -6274,14 +6297,15 @@ choosingNoTargets answer p = case p of
   Prompt.AnnounceTargets _ _ _ slots -> fmap (const 0) slots
   _ -> answer p
 
--- alice holds Water Whip, controls `islands` Islands, three Goblin Pikers and
--- three Crawlspaces, and has two Islands in her library for the draw (CR
+-- alice holds the named card, controls `islands` Islands, three Goblin Pikers
+-- and three Crawlspaces, and has two Islands in her library for a draw (CR
 -- 104.3c); bob controls Thalia, Guardian of Thraben where `taxed`. She has
--- priority in her own precombat main phase, when CR 307.1 lets her cast a
--- sorcery. Returns the spell, the six tappable permanents and that state.
-waterWhipBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> Bool -> m (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-waterWhipBoard s registry islands taxed = do
-  whip <- S.printingOf s registry "Water Whip"
+-- priority in her own precombat main phase with an empty stack, when CR 307.1
+-- lets her cast a sorcery and CR 302.1 a creature. Returns the spell, the six
+-- tappable permanents and that state.
+waterbendSpellBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Int -> Bool -> m (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+waterbendSpellBoard s registry name islands taxed = do
+  card <- S.printingOf s registry name
   island <- S.printingOf s registry "Island"
   piker <- S.printingOf s registry "Goblin Piker"
   crawlspace <- S.printingOf s registry "Crawlspace"
@@ -6290,7 +6314,7 @@ waterWhipBoard s registry islands taxed = do
       gs2 = if taxed then snd (S.addPermanent thalia S.bob gs1) else gs1
       (_, gs3) = S.addLibraryCard island S.alice gs2
       (_, gs4) = S.addLibraryCard island S.alice gs3
-      (spell, gs5) = S.addHandCard whip S.alice gs4
+      (spell, gs5) = S.addHandCard card S.alice gs4
   pure (spell, tappable, gs5 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
 
 -- The Unagi of Kyoshi Island {3}{U}{U} Legendary Creature -- Serpent 5/5
