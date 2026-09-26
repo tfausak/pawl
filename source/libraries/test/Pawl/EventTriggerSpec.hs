@@ -60,7 +60,9 @@ import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 701.9a: "To discard a card, move it from its owner's hand to that player's
@@ -600,6 +602,58 @@ miracleSpec s registry =
       Spec.assertEqWith s "the Wrath was cast off it" (namedIn (S.printingName thunder) Zone.Graveyard S.alice after) 1
       Spec.assertEqWith s "and bob takes 5" (S.lifeOf S.bob after) (fmap (subtract 5) (S.lifeOf S.bob gs))
 
+    -- CR 613.1 names no zone, so Molecule Man's "nonland cards in your hand have
+    -- miracle {0}" reaches the Goblin Piker the moment it is drawn. A pair of
+    -- boards differing only in whether Molecule Man is in play: the Piker has no
+    -- printed miracle, and alice's lone Mountain after Think Twice cannot pay its
+    -- {1}{R}, so a Piker on the battlefield can only have been cast for {0}.
+    Spec.it s "CR 702.94a Molecule Man's granted miracle opens the window on a drawn Goblin Piker" $ do
+      island <- S.printingOf s registry "Island"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      thunder <- S.printingOf s registry "Thunderous Wrath"
+      man <- S.printingOf s registry "Molecule Man"
+      let (without, thinks) = miracleBoard island mountain piker think thunder 1 1
+          withMan = snd (S.addPermanent man S.alice without)
+          name = S.printingName piker
+      case thinks of
+        [thinkId] -> do
+          let granted = resolveCastWith miracleTaken withMan thinkId
+              printed = resolveCastWith miracleTaken without thinkId
+          Spec.assertEqWith s "with Molecule Man the drawn Piker is cast for {0}" (namedIn name Zone.Battlefield S.alice granted) 1
+          Spec.assertEqWith s "without it the Piker stays in alice's hand" (namedIn name Zone.Hand S.alice printed) 1
+          Spec.assertEqWith s "and no miracle reveal was offered" (length (filter isMiracleReveal (S.eventsOf printed))) 0
+        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
+    -- CR 702.94b's "its miracle ability" and CR 607.2h: a Thunderous Wrath under
+    -- Molecule Man has miracle {R} and miracle {0}, and one reveal is made under
+    -- one of them, firing that one's trigger alone. alice declines the {0}
+    -- reveal and takes the {R} one, so the Wrath costs her the Mountain.
+    Spec.it s "CR 702.94b a reveal under one of two miracle abilities fires only its own trigger" $ do
+      island <- S.printingOf s registry "Island"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      thunder <- S.printingOf s registry "Thunderous Wrath"
+      man <- S.printingOf s registry "Molecule Man"
+      let (base, thinks) = miracleBoard island mountain piker think thunder 1 0
+          gs = snd (S.addPermanent man S.alice base)
+          free cost = Cost.Type.mana cost == Just (ManaCost.MkManaCost [])
+          answer :: Prompt.Prompt r -> r
+          answer p = case p of
+            Prompt.OfferedMiracleReveal _ _ _ _ cost -> if free cost then OptionalDecision.Declines else OptionalDecision.Exercises
+            _ -> miracleTaken p
+          isMiracleTrigger event = case event of
+            GameEvent.AbilityTriggered record -> TriggeredAbility.condition (AbilityTriggered.ability record) == TriggerCondition.SelfRevealedForMiracle
+            _ -> False
+      case thinks of
+        [thinkId] -> do
+          let after = resolveCastWith answer gs thinkId
+          Spec.assertEqWith s "revealed for miracle {R}, the Wrath deals bob 5" (S.lifeOf S.bob after) (fmap (subtract 5) (S.lifeOf S.bob gs))
+          Spec.assertEqWith s "and it cost alice her Mountain as well as both Islands" (S.tappedCount S.alice after) 3
+          Spec.assertEqWith s "one reveal fired one miracle trigger" (length (filter isMiracleTrigger (S.eventsOf after))) 1
+        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
+
 -- alice, in her precombat main phase on turn 2 (so CR 103.8a's skipped draw step
 -- is not in play), holding `copies` Think Twice, with two Islands per copy and one
 -- Mountain out -- {R} exactly, which is the miracle cost and nowhere near
@@ -667,7 +721,7 @@ namedIn name zone pid gs = length (filter ((== Just name) . fmap S.nameOf . flip
 -- CR 702.94a's own reveal, told from CR 701.20a's ordinary one by its cause.
 isMiracleReveal :: GameEvent.GameEvent -> Bool
 isMiracleReveal event = case event of
-  GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.ForMiracle _) -> True
+  GameEvent.Revealed (Revealed.MkRevealed _ _ (RevealCause.ForMiracle _) _) -> True
   _ -> False
 
 -- alice is the active player in her postcombat main phase, holding a Zealous
