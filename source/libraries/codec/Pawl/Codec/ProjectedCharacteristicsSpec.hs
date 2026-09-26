@@ -15,6 +15,7 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
@@ -74,6 +75,7 @@ testCharacteristics =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility],
       PC.enchant = [TargetSlot.required Pool.Creatures Nothing],
+      PC.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       -- Pawl.Codec.RuleAbilitiesSpec's own fixture, which is where the twelve
       -- keys inside it are checked; here the case is only that the bundle rides
       -- one key of this record's own object.
@@ -120,6 +122,7 @@ testCharacteristicsJson =
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
+    <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"
     <> "\"ruleAbilities\":"
     <> RuleAbilitiesSpec.testRuleAbilitiesJson
     <> ","
@@ -161,6 +164,7 @@ minimalCharacteristics =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
       PC.enchant = [],
+      PC.castingPermissions = [],
       PC.ruleAbilities = mempty,
       PC.lostAllAbilities = False,
       PC.subtypeWordChanges = [],

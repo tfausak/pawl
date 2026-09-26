@@ -312,6 +312,35 @@ stackSpec s registry = Spec.describe s "Stack" $ do
         let after = snd (Engine.runGamePure S.identityAnswer g4 (do Activate.activateAbility S.alice ewId ewAbility; Stack.resolveTop))
          in Spec.assertEqWith s "Panglacial still in the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 1
       [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
+  -- CR 601.3 / 613.1f: Panglacial Wurm's permission GRANTED by an effect to a
+  -- card that does not print it. Synthetic because no printing grants a casting
+  -- permission to a card in a library (MTGJSON 2026-08-23, text matching
+  -- "searching your library" with "cast", or "in your library have": Panglacial
+  -- Wurm alone prints the permission, and no card grants it). The pair differs
+  -- only in whether Synthetic Glacial Blessing is on the battlefield.
+  Spec.it s "CR 601.3 a granted permission lets a creature card be cast while searching" $ do
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+    forest <- S.printingOf s registry "Forest"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    blessing <- S.printingOf s registry "Synthetic Glacial Blessing"
+    let elvesName = CardName.MkCardName (Text.pack "Llanowar Elves")
+        board granted =
+          let g0 = Setup.emptyGame S.bothPlayers
+              (ewId, g1) = S.addPermanent evolvingWilds S.alice g0
+              g2 = List.foldl' (\g _ -> snd (S.addPermanent forest S.alice g)) g1 [1 .. (7 :: Int)]
+              (_, g3) = S.addLibraryCard elves S.alice g2
+              g4 = if granted then snd (S.addPermanent blessing S.alice g3) else g3
+           in (ewId, g4 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+        search granted =
+          let (ewId, gs) = board granted
+           in case Projection.abilitiesOf ewId gs of
+                ewAbility : _ -> Just (snd (Engine.runGamePure castFirstOption gs (do Activate.activateAbility S.alice ewId ewAbility; Stack.resolveTop; Stack.resolveTop)))
+                [] -> Nothing
+    case (search True, search False) of
+      (Just withGrant, Just without) -> do
+        Spec.assertEqWith s "the granted permission cast Llanowar Elves onto the battlefield" (S.countOnBattlefieldByName elvesName S.alice withGrant) 1
+        Spec.assertEqWith s "without the grant Llanowar Elves stays in the library" (S.countOnBattlefieldByName elvesName S.alice without, S.countByName elvesName S.alice without) (0, 1)
+      _ -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
 
 castSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 castSpec s registry = Spec.describe s "Cast" $ do
