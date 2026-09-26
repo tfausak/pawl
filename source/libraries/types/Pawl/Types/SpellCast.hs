@@ -3,6 +3,7 @@ module Pawl.Types.SpellCast where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 
@@ -61,6 +62,14 @@ data SpellCast = MkSpellCast
     --
     -- Zero has no printing and needs no rejection: an inclusive count starts at
     -- one, so an ordinal of zero matches no cast.
-    ordinal :: Maybe Natural.Natural
+    ordinal :: Maybe Natural.Natural,
+    -- | Zuko, Firebending Master's "whenever you cast a spell DURING COMBAT": the
+    -- phase or step the game must be in as the cast happens (CR 500.1). Nothing
+    -- for a cast at any time.
+    --
+    -- The ordinal above counts casts without regard to it. Scryfall
+    -- o:"spell during combat", 2026-09-25, found Zuko alone, which prints no
+    -- ordinal.
+    phase :: Maybe PhaseSelector.PhaseSelector
   }
   deriving (Eq, Ord, Show)

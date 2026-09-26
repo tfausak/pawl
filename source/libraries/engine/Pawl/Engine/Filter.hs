@@ -2872,6 +2872,7 @@ rewriteKeywordCount pairs n = case n of
   KeywordCount.Tally tally -> KeywordCount.Tally tally {KeywordTally.filter = rewrite pairs (KeywordTally.filter tally)}
   KeywordCount.Fixed _ -> n
   KeywordCount.Power -> n
+  KeywordCount.PlayerCounters _ -> n
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is

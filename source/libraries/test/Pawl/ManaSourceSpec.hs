@@ -66,6 +66,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -1193,6 +1194,75 @@ firebendingStudentSpec s registry =
               Spec.assertEqWith s "CR 702.189a three retained {R}, one per point of the Student's power" (poolOf S.alice blockers) (replicate 3 retainedRed)
               Spec.assertEqWith s "CR 613.4c the counters made the Student a 3/4" (S.powerToughnessOf studentId blockers) (Just (3, 4))
             _ -> Spec.assertFailure s "fixture should give alice a Student and a Piker"
+
+-- CR 702.189a's N restated as a player's counters, and a cast trigger narrowed
+-- to CR 506's combat phase: Zuko, Firebending Master {1}{R} Legendary Creature
+-- -- Ally Human Noble 2/2, "First strike / Firebending X, where X is the number
+-- of experience counters you have. / Whenever you cast a spell during combat,
+-- you get an experience counter." Nothing is omitted, so pawl's Zuko is neither
+-- stricter nor weaker than printed.
+--
+-- alice starts with THREE experience counters, distinct from Zuko's power of
+-- two. Two Blessed Reversals ({1}{W} Instant, no target, so nothing can hit
+-- Zuko) are the pair of casts: one in the declare blockers step, one in the
+-- postcombat main phase, on one timeline, off four Plains.
+zukoFirebendingMasterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+zukoFirebendingMasterSpec s registry =
+  let passing :: Prompt.Prompt r -> r
+      passing = S.aggressiveAnswer
+      withPriority gs = gs {GameState.priority = Just S.alice}
+      experience = S.playerCounterOf PlayerCounterKind.Experience S.alice
+      spent = length . Game.zoneMembers Zone.Graveyard S.alice
+   in Spec.describe s "Zuko, Firebending Master" $ do
+        Spec.it s "CR 702.189a firebending X adds one retained {R} per experience counter" $ do
+          zuko <- S.printingOf s registry "Zuko, Firebending Master"
+          case S.combatBoardOf [zuko] [] of
+            (gs, [_], _) -> do
+              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing (S.addPlayerCounter PlayerCounterKind.Experience 3 S.alice gs)
+              Spec.assertEqWith s "CR 702.189a three retained {R}, one per experience counter" (poolOf S.alice blockers) (replicate 3 retainedRed)
+            _ -> Spec.assertFailure s "fixture should give alice a Zuko"
+        Spec.it s "CR 603.2 a spell cast during combat gives an experience counter, one cast after combat none" $ do
+          zuko <- S.printingOf s registry "Zuko, Firebending Master"
+          plains <- S.printingOf s registry "Plains"
+          reversal <- S.printingOf s registry "Blessed Reversal"
+          case S.combatBoardOf [zuko] [] of
+            (gs, [zukoId], _) -> do
+              let (inCombat, withOne) = S.addHandCard reversal S.alice (S.landsFor plains S.alice 4 (S.addPlayerCounter PlayerCounterKind.Experience 3 S.alice gs))
+                  (afterCombat, staged) = S.addHandCard reversal S.alice withOne
+                  blockers = withPriority (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing staged)
+                  castInCombat = S.runPure (castingOnly inCombat) blockers Engine.runStep
+                  postcombat = withPriority (S.runToStep Phase.PostcombatMain passing castInCombat)
+                  castAfter = S.runPure (castingOnly afterCombat) postcombat Engine.runStep
+              -- THE gameplay assertion: four after the combat cast, and still
+              -- four after the postcombat one.
+              Spec.assertEqWith s "CR 603.2 the combat cast adds one, the postcombat cast none" (experience castInCombat, experience castAfter) (4, 4)
+              Spec.assertEqWith s "and each Reversal was cast and resolved" (spent castInCombat, spent castAfter) (1, 2)
+              Spec.assertBool s (S.onBattlefield zukoId castAfter) "while Zuko is still there to see the second cast"
+              Spec.assertEqWith s "the second cast was in the postcombat main phase" (GameState.phase postcombat) Phase.PostcombatMain
+            _ -> Spec.assertFailure s "fixture should give alice a Zuko"
+
+-- CR 702.189a's N restated as a count of the battlefield: Sun Warriors {2}{R}{W}
+-- Creature -- Ally Human Warrior 3/5, "Firebending X, where X is the number of
+-- creatures you control. / {5}: Create a 1/1 white Ally creature token."
+-- Nothing is omitted, so pawl's Sun Warriors is neither stricter nor weaker
+-- than printed.
+--
+-- alice controls FOUR creatures, distinct from the Warriors' power of three and
+-- from the five a count reaching bob's Piker would make.
+sunWarriorsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+sunWarriorsSpec s registry =
+  let passing :: Prompt.Prompt r -> r
+      passing = S.aggressiveAnswer
+   in Spec.describe s "Sun Warriors" $ do
+        Spec.it s "CR 702.189a firebending X adds one retained {R} per creature its controller controls" $ do
+          sun <- S.printingOf s registry "Sun Warriors"
+          piker <- S.printingOf s registry "Goblin Piker"
+          traveler <- S.printingOf s registry "Doomed Traveler"
+          case S.combatBoardOf [sun, piker, traveler, traveler] [piker] of
+            (gs, [_, _, _, _], [_]) -> do
+              let blockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) passing gs
+              Spec.assertEqWith s "CR 702.189a four retained {R}, one per creature alice controls" (poolOf S.alice blockers) (replicate 4 retainedRed)
+            _ -> Spec.assertFailure s "fixture should give alice four creatures and bob one"
 
 -- CR 106.6: mana that carries a restriction on what it may be spent on. Geosurge
 -- ({R}{R}{R}{R} Sorcery, "Add {R}{R}{R}{R}{R}{R}{R}. Spend this mana only to cast
@@ -2390,6 +2460,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   avatarRokuSpec s registry
   zhaoSpec s registry
   firebendingStudentSpec s registry
+  zukoFirebendingMasterSpec s registry
+  sunWarriorsSpec s registry
   geosurgeSpec s registry
   workshopSpec s registry
   pillarSpec s registry

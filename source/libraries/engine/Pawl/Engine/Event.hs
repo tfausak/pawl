@@ -8519,9 +8519,9 @@ controllerTurnScoped cond = case cond of
   -- StepBegins' arms one more time, and for its reason (CR 603.3a, CR 109.5).
   -- Brineborn Cutthroat's OpponentsTurn is turn-scoped and is not the
   -- CONTROLLER's turn, which is the only thing this classification asks.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.ControllersTurn _ _) -> True
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.EachTurn _ _) -> False
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.OpponentsTurn _ _) -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.ControllersTurn _ _ _) -> True
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.EachTurn _ _ _) -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.OpponentsTurn _ _ _) -> False
   -- The same rule with no TurnScope to read: a spell can be cast on anybody's
   -- turn, so its own cast trigger is not the controller's-turn kind either.
   TriggerCondition.SelfCast -> False
