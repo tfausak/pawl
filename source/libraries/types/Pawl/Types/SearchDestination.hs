@@ -70,4 +70,6 @@ data SearchDestination
     -- nothing, leaving the Aura in the library (CR 303.4i). Putting it into a hand
     -- instead would be this engine printing a sentence the card does not.
     BattlefieldAttached
+  | -- | Grim Reminder's "reveal it", the card staying where it was found (CR 701.20b).
+    Reveal
   deriving (Bounded, Enum, Eq, Ord, Show)

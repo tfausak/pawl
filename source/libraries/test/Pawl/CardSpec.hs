@@ -4981,13 +4981,12 @@ blockPermissionFilters permission =
 --     Filter.Context.slotControllers and one of the callers that fill
 --     Filter.Context.slotNames. CR 110.2's Filter.SameControllerAsBound belongs
 --     here and nowhere else; CR 709.4a's Filter.SameNameAsBound belongs here and
---     in SearchFramed and HandSweepFramed below, the other positions slotNames
---     is filled at and a card writes it in. Their
---     vacuous directions differ: an unfilled
---     slotNames answers False, an unfilled slotControllers answers True. So a
---     misplaced SameNameAsBound admits nothing and a misplaced
---     SameControllerAsBound admits everything, so this tag carries more for the
---     second than for the first.
+--     in SearchFramed, HandSweepFramed and LifeLossAmountFramed below, the
+--     other positions slotNames is filled at and a card writes it in. Their
+--     vacuous directions differ: an unfilled slotNames answers False, an
+--     unfilled slotControllers answers True. So a misplaced SameNameAsBound
+--     admits nothing and a misplaced SameControllerAsBound admits everything,
+--     so this tag carries more for the second than for the first.
 --   * SourceHostFramed -- an EFFECT's Pawl.Types.ObjectRef
 --     (Pawl.Engine.Resolve.Slots.objectRefObjects), which fills
 --     Filter.Context.sourceAttachedTo and, being a resolution's own context,
@@ -5047,6 +5046,11 @@ blockPermissionFilters permission =
 --     Pawl.Engine.Resolve.gateHolds through Resolve.Slots.effectContext, so
 --     CR 205.3m's Filter.SharesCreatureTypeWithBound answers there (Mudbutton
 --     Clanger). It overlays no Filter.Context.sourceAttachedTo.
+--   * LifeLossAmountFramed -- CR 119.3's amount, which the Effect.LoseLife arm
+--     reads per recipient through Resolve.Slots.effectContext, so
+--     Filter.Context.slotNames is filled and CR 709.4a's
+--     Filter.SameNameAsBound answers in its Count filter (Grim Reminder). It
+--     overlays no Filter.Context.sourceAttachedTo.
 --   * Unframed -- everything else.
 --
 -- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
@@ -5197,6 +5201,9 @@ data Framing
   | -- | CR 608.2c's clause "if", evaluated in the resolution's own context. See
     -- the overview above.
     ClauseGateFramed
+  | -- | CR 119.3's per-recipient amount, evaluated in the resolution's own
+    -- context. See the overview above.
+    LifeLossAmountFramed
   -- Bounded and Enum so the framing coverage case below enumerates
   -- [minBound .. maxBound] rather than a hand-kept list: a constructor added
   -- here joins that case with no edit, which is the tripwire a hand-kept list
@@ -5265,6 +5272,8 @@ sweptForSingularSlots framing = case framing of
   HandSweepFramed -> True
   -- SWEPT for MillTallyFramed's reason: gateHolds' context carries the slots.
   ClauseGateFramed -> True
+  -- SWEPT for MillTallyFramed's reason: the LoseLife arm reads effectContext.
+  LifeLossAmountFramed -> True
 
 -- filterSlotsReadSingly against a TAGGED position, and the one funnel every
 -- reader of that walk goes through, so two routes to the same keyword filter
@@ -5511,7 +5520,7 @@ effectFilters effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> frame Unframed (quantityFilters quantity)
     Discard.These ref -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> frame Unframed (quantityFilters quantity)
+  Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> frame LifeLossAmountFramed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> frame Unframed (durationFilters duration) <> frame SourceHostFramed (foldMap objectRefFilters (foldMap Resolve.exchangedObjectRefs [one, other]))
