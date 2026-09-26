@@ -31,7 +31,9 @@
                           "effect": {
                             "type": "DestructionR",
                             "value": {
-                              "type": "Regenerate"
+                              "rewrite": {
+                                "type": "Regenerate"
+                              }
                             }
                           },
                           "origin": {

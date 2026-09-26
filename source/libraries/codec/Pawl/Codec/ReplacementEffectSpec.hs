@@ -22,6 +22,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DieRollR as DieRollR
 import qualified Pawl.Types.DieRollRewrite as DieRollRewrite
@@ -156,13 +157,13 @@ spec s =
             codec
             (ReplacementEffect.DamageR (DamageR.MkDamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whatSource = Filter.And [], DamagePattern.whatRecipient = Nothing, DamagePattern.whoRecipient = Nothing, DamagePattern.whichRecipient = Nothing, DamagePattern.whichSource = Nothing, DamagePattern.boundRecipient = Nothing} (DamageRewrite.Scale (Scaling.Multiply 2)) Seq.empty))
             " {\"type\":\"DamageR\",\"value\":{\"matching\":{},\"rewrite\":{\"type\":\"Scale\",\"value\":{\"type\":\"Multiply\",\"value\":2}}}} "
-        -- CR 614.8: regeneration, DestructionR's sole producer today.
+        -- CR 614.8: regeneration, which names no subject of its own.
         Spec.it s "DestructionR (regenerate)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.DestructionR DestructionRewrite.Regenerate)
-            " {\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}} "
+            (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate))
+            " {\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}} "
         -- CR 122.1d, UntapR's sole producer -- engine-minted, so this is the only
         -- place its wire form is pinned.
         Spec.it s "UntapR (a stun counter's replacement)" $

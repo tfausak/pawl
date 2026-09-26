@@ -12,6 +12,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -32,12 +33,12 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
       codec
       ( PrintedReplacement.MkPrintedReplacement
           { PrintedReplacement.condition = Nothing,
-            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.effect = ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate),
             PrintedReplacement.functionsFrom = Set.empty,
             PrintedReplacement.name = Nothing
           }
       )
-      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
+      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}}} "
   -- Jared Carthalion, True Heir's "while you're the monarch", the case that
   -- writes the key.
   Spec.it s "MkPrintedReplacement, condition written" $
@@ -54,12 +55,12 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
                         (Quantity.Literal 1)
                     )
                 ),
-            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.effect = ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate),
             PrintedReplacement.functionsFrom = Set.empty,
             PrintedReplacement.name = Nothing
           }
       )
-      " {\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"IsMonarch\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}}} "
+      " {\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"IsMonarch\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}},\"effect\":{\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}}} "
   -- Glittering Lion's "shield", the case that writes the OTHER optional key. Its
   -- own case rather than a rider on one above, because 'Fields.defaulted' decodes
   -- a mistyped key as Nothing with no error, and a nameless printed replacement
@@ -70,12 +71,12 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
       codec
       ( PrintedReplacement.MkPrintedReplacement
           { PrintedReplacement.condition = Nothing,
-            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.effect = ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate),
             PrintedReplacement.functionsFrom = Set.empty,
             PrintedReplacement.name = Just (AbilityName.MkAbilityName (Text.pack "shield"))
           }
       )
-      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}},\"name\":\"shield\"} "
+      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}},\"name\":\"shield\"} "
   -- CR 113.6b's zone clause, Nexus of Fate's shape. Optional for the condition's
   -- reason, and the three cases above pin the absent half: an encoder that always
   -- emitted the key would rewrite every card already committed.
@@ -85,10 +86,10 @@ spec s = Spec.describe s "Pawl.Codec.PrintedReplacement" $ do
       codec
       ( PrintedReplacement.MkPrintedReplacement
           { PrintedReplacement.condition = Nothing,
-            PrintedReplacement.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate,
+            PrintedReplacement.effect = ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate),
             PrintedReplacement.functionsFrom = Set.fromList [Zone.Graveyard, Zone.Stack],
             PrintedReplacement.name = Nothing
           }
       )
-      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"type\":\"Regenerate\"}},\"functionsFrom\":[{\"type\":\"Graveyard\"},{\"type\":\"Stack\"}]} "
+      " {\"effect\":{\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}},\"functionsFrom\":[{\"type\":\"Graveyard\"},{\"type\":\"Stack\"}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
