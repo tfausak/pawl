@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.RollDie as RollDie
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SlotName as SlotName
@@ -20,6 +21,7 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
         { RollDie.sides = 20,
           RollDie.count = Quantity.Literal 1,
           RollDie.modifier = Nothing,
+          RollDie.reading = DiceReading.ChooseOne,
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing
         }
@@ -34,6 +36,7 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
         { RollDie.sides = 20,
           RollDie.count = Quantity.Literal 1,
           RollDie.modifier = Just (Quantity.Literal 3),
+          RollDie.reading = DiceReading.ChooseOne,
           RollDie.slot = SlotName.MkSlotName (Text.pack "result"),
           RollDie.other = Nothing
         }
@@ -49,8 +52,24 @@ spec s = Spec.describe s "Pawl.Codec.RollDie" $ do
         { RollDie.sides = 6,
           RollDie.count = Quantity.Literal 2,
           RollDie.modifier = Nothing,
+          RollDie.reading = DiceReading.ChooseOne,
           RollDie.slot = SlotName.MkSlotName (Text.pack "chosen"),
           RollDie.other = Just (SlotName.MkSlotName (Text.pack "other"))
         }
       " {\"count\":{\"type\":\"Literal\",\"value\":2},\"other\":\"other\",\"sides\":6,\"slot\":\"chosen\"} "
+  -- CR 706.4's total, Neverwinter Hydra's wire form: the one reading that is
+  -- not the elided choice, so it is what a dropped field would lose.
+  Spec.it s "X dice read as their total" $
+    Common.assertCodec
+      s
+      RollDie.codec
+      RollDie.MkRollDie
+        { RollDie.sides = 6,
+          RollDie.count = Quantity.InSlot (SlotName.MkSlotName (Text.pack "X")),
+          RollDie.modifier = Nothing,
+          RollDie.reading = DiceReading.Total,
+          RollDie.slot = SlotName.MkSlotName (Text.pack "total"),
+          RollDie.other = Nothing
+        }
+      " {\"count\":{\"type\":\"InSlot\",\"value\":\"X\"},\"reading\":{\"type\":\"Total\"},\"sides\":6,\"slot\":\"total\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s RollDie.codec

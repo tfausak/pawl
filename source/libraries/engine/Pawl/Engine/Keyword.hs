@@ -7094,8 +7094,11 @@ giftEffect something = case something of
   Gift.Card -> Effect.Draw Draw.MkDraw {Draw.player = PlayerRef.ChosenPlayerOfBound Binding.triggerSource, Draw.quantity = Quantity.Literal 1, Draw.slot = Nothing}
   Gift.TappedFish -> giftToken TapState.Tapped fishToken
   Gift.Octopus -> giftToken TapState.Untapped octopusToken
+  Gift.Food -> giftToken TapState.Untapped foodToken
+  Gift.Treasure -> giftToken TapState.Untapped treasureToken
 
--- CR 702.174f's and CR 702.174i's effect: "the chosen player creates a [token]".
+-- CR 702.174d's, 702.174f's, 702.174h's and 702.174i's effect: "the chosen
+-- player creates a [token]".
 -- The creator is the SAME PlayerRef rule 702.174e's draw reads, which is what CR
 -- 111.2 asks for: the chosen player creates the token, so they own and control
 -- it, rather than CR 109.5's "you".
@@ -7630,6 +7633,69 @@ heroToken = creatureToken (Text.pack "Hero Token") (Set.singleton Subtype.Hero) 
 -- rules whose token has no ability of its own.
 creatureToken :: Text.Text -> Set.Set Subtype.Subtype -> Set.Set Color.Color -> Integer -> Integer -> Card
 creatureToken name subtypes colors power toughness =
+  tokenCard name (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) subtypes) colors (Just (power, toughness)) []
+
+-- | CR 111.10b's Food: a colorless Food artifact token with "{2}, {T}, Sacrifice
+-- this token: You gain 3 life."
+foodToken :: Card
+foodToken =
+  predefinedArtifactToken (Text.pack "Food Token") Subtype.Food (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) $
+    Effect.GainLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 3))
+
+-- | CR 111.10a's Treasure: a colorless Treasure artifact token with "{T},
+-- Sacrifice this token: Add one mana of any color."
+treasureToken :: Card
+treasureToken =
+  predefinedArtifactToken (Text.pack "Treasure Token") Subtype.Treasure (Just (ManaCost.MkManaCost [])) $
+    Effect.AddMana
+      ManaAddition.MkManaAddition
+        { ManaAddition.player = PlayerRef.Relative PlayerRelation.You,
+          ManaAddition.production = ManaProduction.AnyColor,
+          ManaAddition.count = Quantity.Literal 1,
+          ManaAddition.retention = ManaRetention.Ordinary,
+          ManaAddition.restriction = Nothing,
+          ManaAddition.rider = Nothing
+        }
+
+-- CR 111.10's shape for the two predefined tokens rule 702.174 promises: a
+-- colorless artifact of one subtype whose one ability costs `mana`, {T} and
+-- sacrificing itself. Colorless is the absence of a colorIndicator, heroToken's
+-- note.
+predefinedArtifactToken :: Text.Text -> Subtype.Subtype -> Maybe ManaCost.ManaCost -> Effect.Effect Card (GrantedAbility.GrantedAbility Card) -> Card
+predefinedArtifactToken name subtype mana effect =
+  tokenCard
+    name
+    (TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Artifact) (Set.singleton subtype))
+    Set.empty
+    Nothing
+    [ ActivatedAbility.MkActivatedAbility
+        { ActivatedAbility.cost = Cost.MkCost {Cost.mana = mana, Cost.components = [CostComponent.TapThis, CostComponent.SacrificeThis]},
+          ActivatedAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          ActivatedAbility.maximumX = [],
+          ActivatedAbility.minimumX = 0,
+          ActivatedAbility.restrictions = [],
+          ActivatedAbility.activator = Activator.Controller,
+          ActivatedAbility.condition = Nothing,
+          ActivatedAbility.name = Nothing,
+          -- Nothing: the token's own printed ability (CR 111.10), not one a
+          -- keyword grants the object it is on.
+          ActivatedAbility.keyword = Nothing
+        }
+    ]
+
+-- A token's card: CR 111.3's characteristics, plus whatever activated
+-- abilities the rule defining it writes out.
+tokenCard ::
+  Text.Text ->
+  TypeLine.TypeLine ->
+  Set.Set Color.Color ->
+  Maybe (Integer, Integer) ->
+  [ActivatedAbility Card (GrantedAbility.GrantedAbility Card)] ->
+  Card
+tokenCard name typeLine colors stats abilities =
   Card.MkCard
     { Card.layout = Layout.Normal,
       Card.faces =
@@ -7637,9 +7703,9 @@ creatureToken name subtypes colors power toughness =
           Face.MkFace
             { Face.name = CardName.MkCardName name,
               Face.manaCost = Nothing,
-              Face.typeLine = TypeLine.MkTypeLine Set.empty (Set.singleton CardType.Creature) subtypes,
-              Face.power = Just (Power.MkPower (Quantity.Literal power)),
-              Face.toughness = Just (Toughness.MkToughness (Quantity.Literal toughness)),
+              Face.typeLine = typeLine,
+              Face.power = fmap (Power.MkPower . Quantity.Literal . fst) stats,
+              Face.toughness = fmap (Toughness.MkToughness . Quantity.Literal . snd) stats,
               Face.loyalty = Nothing,
               Face.defense = Nothing,
               Face.vanguard = Nothing,
@@ -7649,7 +7715,7 @@ creatureToken name subtypes colors power toughness =
               Face.characteristicPT = Nothing,
               Face.staticAbilities = [],
               Face.spell = Face.defaultSpell,
-              Face.activatedAbilities = [],
+              Face.activatedAbilities = abilities,
               Face.replacementEffects = [],
               Face.triggeredAbilities = [],
               Face.delayedAbilities = Map.empty,
