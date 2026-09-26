@@ -53,9 +53,12 @@ data Modification ability
     -- Keyword.Flashback keeps its literal Cost and no reader downstream changes.
     --
     -- FLASHBACK and not a keyword parameter, though rule 702's cost-carrying
-    -- keywords (morph, kicker, bestow, entwine, cycling, equip, foretell) all
-    -- have the same shape: no printing prices any of those at the recipient's
-    -- own mana cost, so a parameter would be a capability no card exercises.
+    -- keywords (morph, kicker, bestow, entwine, cycling, equip) all have the
+    -- same shape: no printing prices any of those at the recipient's own mana
+    -- cost, so a parameter would be a capability no card exercises. Foretell's
+    -- one such grant (Dream Devourer) is GainKeyword of a
+    -- Pawl.Types.ForetellCost reduction instead, since the foretold card keeps
+    -- that cost in exile and settles it per face (CR 712.11b).
     GainFlashbackAtManaCost
   | -- | layer 6, CR 613.1f / CR 702.5a: this object gains an enchant ability --
     -- "becomes an Aura enchantment WITH ENCHANT CREATURE", the clause every

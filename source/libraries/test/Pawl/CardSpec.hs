@@ -173,6 +173,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
+import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
 import qualified Pawl.Types.GameState as GameState
@@ -3029,8 +3030,10 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Plot cost -> costFilters cost
   -- CR 702.168a: the disguise cost, reached the same way as morph's below.
   Keyword.Disguise cost -> costFilters cost
-  -- CR 702.143a: the foretell cost, reached the same way.
-  Keyword.Foretell cost -> costFilters cost
+  -- CR 702.143a: the foretell cost, reached the same way. A cost read off the
+  -- card's own mana cost names no Filter.
+  Keyword.Foretell (ForetellCost.Stated cost) -> costFilters cost
+  Keyword.Foretell (ForetellCost.ManaCostReducedBy _) -> []
   -- CR 702.62a: the suspend cost, reached the same way; its N is a number.
   Keyword.Suspend (Suspend.MkSuspend _ cost) -> costFilters cost
   -- CR 702.139a's condition, which is a Filter rather than a Cost. KeywordFramed

@@ -249,6 +249,7 @@ import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.ForbidActivationSpec
 import qualified Pawl.Codec.ForbidAttackSpec
 import qualified Pawl.Codec.ForbidBlockSpec
+import qualified Pawl.Codec.ForetellCostSpec
 import qualified Pawl.Codec.FromOutsideTheGameSpec
 import qualified Pawl.Codec.FromReferenceSpec
 import qualified Pawl.Codec.GameEventSpec
@@ -948,6 +949,7 @@ spec s registry = do
   Pawl.Codec.FlipCoinSpec.spec s
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
+  Pawl.Codec.ForetellCostSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s
   Pawl.Codec.ForbidActivationSpec.spec s
   Pawl.Codec.ForbidBlockSpec.spec s

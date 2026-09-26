@@ -9,6 +9,7 @@ import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.Emerge as Emerge
 import qualified Pawl.Types.Equip as Equip
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.KeywordCount as KeywordCount
@@ -666,13 +667,13 @@ data Keyword
     -- card type, and Jegantha, the Wellspring's repeated mana symbol (#3261).
     Companion (Filter.Filter Keyword)
   | -- | 702.143a: foretell [cost] -- exile this card from hand face down for {2}
-    -- (CR 116.2h's special action), then cast it later for [cost]. The Cost is
-    -- the CAST's.
+    -- (CR 116.2h's special action), then cast it later for [cost]. The payload
+    -- is the CAST's cost.
     --
     -- CR 702.143d's other producer -- an effect that makes an exiled card
     -- foretold and may give it a foretell cost -- is Effect.MakeForetold, and
     -- needs no keyword at all.
-    Foretell (Cost.Cost Keyword)
+    Foretell (ForetellCost.ForetellCost Keyword)
   | -- | 702.144a: demonstrate -- a cast trigger under which you may copy the
     -- spell, and an opponent you then choose copies it too.
     Demonstrate
