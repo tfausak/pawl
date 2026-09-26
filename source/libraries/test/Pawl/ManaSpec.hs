@@ -295,8 +295,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- it, instead add one mana of any color." pawl carries the sentence as two
   -- gated abilities whose conditions are complements (ActivatedAbility.condition
   -- over Quantity.ObjectCounters), so exactly one exists at a time and "instead"
-  -- falls out of the pair -- see Pawl.Engine.Mana.manaRoutesOfGiven for why a
-  -- single ability with two conditional CLAUSES would offer both at once (#1924).
+  -- falls out of the pair.
   Spec.it s "CR 122.1 a luck counter swaps Gemstone Caverns' {C} for any color" $ do
     caverns <- S.printingOf s registry "Gemstone Caverns"
     let base = Setup.emptyGame S.bothPlayers
@@ -3915,6 +3914,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   drainPowerSpec s registry
   yurlokSpec s registry
   almsEngineSpec s registry
+  confluenceObeliskSpec s registry
   recipientsSpec s registry
 
 -- CR 605.3b's road has no ability object, so a mana addition naming a BINDING
@@ -3974,6 +3974,35 @@ almsEngineSpec s registry = Spec.describe s "Synthetic Alms Engine" $ do
         tapped = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer engineId)
     Spec.assertEqWith s "CR 118.3 the Meekstone is castable only off a {C} of her own, the Engine's being no supply of hers" (fmap offers [board, withOwn]) [0, 1]
     Spec.assertEqWith s "CR 106.4 and the {C} the Engine does make reaches each opponent instead" (fmap (\pid -> poolTypes pid tapped) [S.alice, S.bob, S.carol]) [[], [ManaType.Colorless], [ManaType.Colorless]]
+
+-- CR 608.2c: a mana ability's clause gated by a printed "if" adds its mana only
+-- when the "if" holds on the board. Synthetic Confluence Obelisk ({3} Artifact,
+-- "{T}: Add {C}. If you control a Forest, add {G}. If you control an Island,
+-- add {U}.") is ONE ability with two independent gates: no printing adds mana
+-- from a gated clause without "instead" (MTGJSON dump of 2026-08-23, mana
+-- ability lines matching "Add ... . If ... add", every hit an "instead").
+--
+-- Three boards differing one permanent at a time, bob's Island on all three so
+-- "you control" cannot be read off the battlefield at large.
+confluenceObeliskSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+confluenceObeliskSpec s registry = Spec.describe s "Synthetic Confluence Obelisk" $ do
+  Spec.it s "CR 608.2c each gated clause adds its mana only when its own condition holds" $ do
+    obelisk <- S.printingOf s registry "Synthetic Confluence Obelisk"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    let (obeliskId, g1) = S.addPermanent obelisk S.alice (Setup.emptyGame S.bothPlayers)
+        (_, bare) = S.addPermanent island S.bob g1
+        (_, withForest) = S.addPermanent forest S.alice bare
+        (_, withBoth) = S.addPermanent island S.alice withForest
+        tapped g = List.sort (poolTypes S.alice (S.runPure S.identityAnswer g (Cost.tapForMana S.manaPerformer obeliskId)))
+    Spec.assertEqWith
+      s
+      "CR 608.2c tapping the Obelisk adds {C}, then {G} with a Forest, then {U} too with an Island of alice's own"
+      (fmap tapped [bare, withForest, withBoth])
+      [ [ManaType.Colorless],
+        List.sort [ManaType.Colorless, ManaType.Colored Color.Green],
+        List.sort [ManaType.Colorless, ManaType.Colored Color.Green, ManaType.Colored Color.Blue]
+      ]
 
 -- CR 106.4: "adds that mana" says nothing about whose pool, and CR 106.3's
 -- "instructs a player to add" is the sentence a card fills in. Yurlok of Scorch

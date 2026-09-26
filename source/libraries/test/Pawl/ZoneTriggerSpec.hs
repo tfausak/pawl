@@ -113,6 +113,7 @@ import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -257,12 +258,13 @@ cyclingTriggerSpec s registry =
 -- Corpse Churn mills it and takes it back out in ONE resolution, so the boundary
 -- scan cannot see it at all and CR 603.10's first sentence has to be answered
 -- from CR 608.2h last known information -- Event.eventTriggers'
--- `arrivedInGraveyard`.
+-- `leftGraveyard`.
 --
--- The last case turns that source around and proves its FILTER: Come Back Wrong
+-- The Meren case turns that source around and proves its FILTER: Come Back Wrong
 -- buries a Meren of Clan Nel Toth and returns her in the same resolution, and CR
 -- 113.6k is what keeps her battlefield-only dies trigger from seeing the very
--- death that buried her.
+-- death that buried her. The Bloodghast case after it offers the same source to
+-- an EARLIER event than the card's departure, one that is not its arrival.
 graveyardTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 graveyardTriggerSpec s registry =
   let -- alice: one Island in play (Tome Scour's {U}), Tome Scour in hand, and a
@@ -411,9 +413,10 @@ graveyardTriggerSpec s registry =
         -- The negative, and the pair for the case above: same spell, same mana,
         -- same answerer, same Narcomoeba-ends-in-hand outcome. The ONE difference
         -- is how Narcomoeba got into the graveyard -- here it was already there, so
-        -- there is no arrival event in this batch to name it, and the mill takes a
-        -- Swamp instead. "From your library" still has to do its work.
-        Spec.it s "CR 603.10 a card already in the graveyard that LEAVES it is not a candidate" $ do
+        -- the mill takes a Swamp instead. It is a candidate for that mill, having
+        -- been in the graveyard immediately after it, but "from your library"
+        -- names its own arrival, and there is none in this batch.
+        Spec.it s "CR 603.10 a card already in the graveyard that LEAVES it does not see another card's mill" $ do
           swamp <- S.printingOf s registry "Swamp"
           churn <- S.printingOf s registry "Corpse Churn"
           narcomoeba <- S.printingOf s registry "Narcomoeba"
@@ -433,7 +436,7 @@ graveyardTriggerSpec s registry =
         -- under your control.") aimed at Meren of Clan Nel Toth is the board that
         -- observes it -- one resolution in which a permanent DIES and then LEAVES
         -- its graveyard, with no CR 117.5 boundary between the two, so the
-        -- graveyard incarnation is reachable by nothing but `arrivedInGraveyard`.
+        -- graveyard incarnation is reachable by nothing but `leftGraveyard`.
         --
         -- Meren's "whenever ANOTHER creature you control dies" functions only on
         -- the battlefield (CR 113.6's default), and the death it would see is the
@@ -468,6 +471,55 @@ graveyardTriggerSpec s registry =
           Spec.assertEqWith s "CR 400.7 the permanent that died is gone" (Game.lookupObject merenId resolved) Nothing
           Spec.assertBool s (Set.member merenName (namesIn Zone.Battlefield S.alice resolved)) "a fresh Meren stands on the battlefield: she really did leave the graveyard"
           Spec.assertBool s (not (Set.member merenName (namesIn Zone.Graveyard S.alice resolved))) "with nothing of hers left in it"
+        -- CR 603.10's first sentence for a graveyard card gone by the CR 117.5
+        -- boundary, watching an event that is NOT its own arrival. alice votes
+        -- Redhorn Pass and bob Mines of Moria, so Travel Through Caradhras puts a
+        -- Forest onto the battlefield and then returns Bloodghast to alice's hand
+        -- in one resolution: Bloodghast was in her graveyard immediately after the
+        -- land entered, so its landfall triggers although the card is in her hand
+        -- by the boundary. Its "may" is exercised, so the return finding nothing
+        -- is CR 400.7 at work rather than a declined choice.
+        Spec.it s "CR 603.10 Bloodghast sees a land enter before the same resolution returns it to hand" $ do
+          forest <- S.printingOf s registry "Forest"
+          caradhras <- S.printingOf s registry "Travel Through Caradhras"
+          bloodghast <- S.printingOf s registry "Bloodghast"
+          let base = S.landsInPlay forest 6
+              (_, g1) = S.addGraveyardCard bloodghast S.alice base
+              (_, g2) = S.addLibraryCard forest S.alice g1
+              (g3, spellId) = S.handOne caradhras g2
+              gs = g3 {GameState.priority = Just S.alice}
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseVoteWord _ voter _ choices
+                  | voter == S.alice -> NonEmpty.head choices
+                  | otherwise -> NonEmpty.last choices
+                Prompt.Search _ _ matches cap -> List.genericTake cap matches
+                Prompt.ChooseCardInGraveyard _ _ _ offered -> NonEmpty.head offered
+                Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                _ -> S.identityAnswer p
+              cast = S.runPure answer gs (S.cast S.alice spellId)
+              resolved = S.runPure answer cast Stack.resolveTop
+              placed = S.runPure answer resolved Engine.settleForPriority
+              after = S.runPure answer placed Stack.resolveTop
+              ghastName = CardName.MkCardName $ Text.pack "Bloodghast"
+          Spec.assertEqWith s "CR 603.10 Bloodghast's landfall reached the stack" (length (GameState.stack placed)) 1
+          -- The board the case needs: the land entered, and Bloodghast left the
+          -- graveyard in the same resolution, so no live read of it finds the card.
+          Spec.assertEqWith s "a Forest entered" (length (filter (== CardName.MkCardName (Text.pack "Forest")) (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid resolved)) (Game.zoneMembers Zone.Battlefield S.alice resolved)))) 7
+          Spec.assertBool s (Set.member ghastName (namesIn Zone.Hand S.alice resolved)) "Bloodghast is in alice's hand at the boundary"
+          -- CR 400.7: the ability's "this card" is the graveyard incarnation,
+          -- which no longer exists, so nothing returns.
+          Spec.assertBool s (Set.member ghastName (namesIn Zone.Hand S.alice after)) "and stays there after its trigger resolves"
+          Spec.assertEqWith s "and the ability left the stack" (length (GameState.stack after)) 0
+        -- Bloodghast's second line, a static ability reading "an opponent has 10
+        -- or less life": the greatest negated opponent life total is at least -10.
+        -- alice's own life is the control, since "an opponent" excludes her.
+        Spec.it s "Bloodghast has haste only while an opponent has 10 or less life" $ do
+          bloodghast <- S.printingOf s registry "Bloodghast"
+          let (ghast, gs) = S.addPermanent bloodghast S.alice (Setup.emptyGame S.bothPlayers)
+              withLife alice bob = gs {GameState.players = Map.adjust (\p -> p {Player.life = bob}) S.bob (Map.adjust (\p -> p {Player.life = alice}) S.alice (GameState.players gs))}
+          Spec.assertBool s (Projection.hasKeyword Keyword.Type.Haste ghast (withLife 20 10)) "an opponent at 10: haste"
+          Spec.assertBool s (not (Projection.hasKeyword Keyword.Type.Haste ghast (withLife 5 11))) "an opponent at 11 and alice at 5: no haste"
 
 -- Gaea's Blessing {1}{G} Sorcery, "Target player shuffles up to three target
 -- cards from their graveyard into their library. Draw a card. When this card is

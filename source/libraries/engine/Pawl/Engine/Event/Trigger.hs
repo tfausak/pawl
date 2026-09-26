@@ -1044,24 +1044,18 @@ stepTriggerPlayers gs you cond event ability = case (cond, event) of
 -- has not been read against must be classified rather than defaulted.
 --
 -- The GRAVEYARD half has a hole of the same shape, and last known information
--- fills it the same way: a card the batch put into a graveyard and took back out
--- again is not in the graveyard the boundary scan walks, so `arrivedInGraveyard`
--- offers it to its own arrival event from CR 608.2h. The other direction of that
--- half is narrowed rather than widened: the graveyard the boundary scan walks
--- holds cards the batch put there, and `arrivedLater` withholds each of them from
--- every event of a strictly earlier group, which is the same per-event reading
--- `laterGroups` gives the battlefield.
+-- fills it the same way: a card that left a graveyard before the boundary is not
+-- in the graveyard the boundary scan walks, so `leftGraveyardLater` offers it,
+-- from CR 608.2h, to every event of a strictly earlier group -- `laterGroups`
+-- one zone over. The other direction is narrowed rather than widened: the
+-- graveyard the boundary scan walks holds cards the batch put there, and
+-- `arrivedLater` withholds each of them from every event of a strictly earlier
+-- group.
 --
 -- The battlefield's arrival side is narrowed the same way: a permanent that
 -- ENTERED later in the batch and left again before the boundary is withheld from
 -- the batch's earlier events (`arrivedOnBattlefieldLater`), which is the mirror
 -- of `arrivedLater` one zone over.
---
--- Not reconstructed: a departed graveyard card is offered to no event but its
--- own arrival -- the three conditions zonesTriggeredFrom sends to a graveyard
--- are self-referential arrival conditions whose only matching event IS that
--- arrival, so the only ability that could observe the difference is a CR 113.6m
--- one -- Squee, Goblin Nabob's upkeep, read from a graveyard (#1732).
 --
 -- Events outer, permanents inner (ascending by id): the deterministic canonical
 -- order the CR 603.3b ordering prompt indexes into. Groups do not disturb it --
@@ -1373,7 +1367,7 @@ eventTriggers events gs =
       -- `leftBattlefield` keys a departure: ZoneChange.object is the incarnation
       -- that stood on the battlefield, and ZoneChange.departed names that same
       -- incarnation when it leaves, so the two coincide on exactly the permanent
-      -- this narrowing is about. `arrivedInGraveyard`'s argument one zone over.
+      -- this narrowing is about. `leftGraveyard`'s argument one zone over.
       --
       -- CR 111.3's token and CR 400.11c's conjured card come through too:
       -- recordMintedEntry writes from == to == Battlefield, which fails every
@@ -1418,7 +1412,8 @@ eventTriggers events gs =
       arrivedOnBattlefieldLater = drop 1 (List.scanr (Set.union . arrivalsOnBattlefieldIn) Set.empty groups)
       -- The ids a graveyard arrival in this block minted, keyed by the ARRIVING
       -- incarnation -- ZoneChange.object, the key `inGraveyards` would hold them
-      -- under, `arrivedInGraveyard` below arguing that the two ids coincide.
+      -- under, and the key `leftGraveyard` files the same card's later departure
+      -- under (`leftGraveyard` argues that the two ids coincide).
       arrivalsIn block = Set.fromList (Maybe.mapMaybe (arrivedInGraveyardAt . LoggedEvent.event) (Foldable.toList block))
       arrivedInGraveyardAt event = case movedOf event of
         Just zc | ZoneChange.to zc == Zone.Graveyard -> Just (ZoneChange.object zc)
@@ -1437,11 +1432,33 @@ eventTriggers events gs =
       -- event in the log this scan reads, so it is in no entry here and survives
       -- every subtraction, which is the answer the rule wants. A Set and a right
       -- scan for `laterGroups`' reasons, `drop 1` being the same alignment.
-      --
-      -- `arrivedInGraveyard` is NOT narrowed by this: it is already per event and
-      -- already scoped by the arrival it answers for, so subtracting the arrival
-      -- from its own event would delete the case that source exists for.
       arrivedLater = drop 1 (List.scanr (Set.union . arrivalsIn) Set.empty groups)
+      -- CR 603.10's first sentence on the graveyard's DEPARTURE side, and
+      -- `laterGroups`' graveyard twin: entry i holds every card that left a
+      -- graveyard at a STRICTLY LATER group, recovered from CR 608.2h last known
+      -- information. It was in the graveyard immediately after group i's events,
+      -- so what CR 113.6k and 113.6m let function there is checked against them --
+      -- Bloodghast's landfall seeing a land that entered before the same
+      -- resolution returned it to hand. Strictly later because a card removed by
+      -- this group's own event did not exist immediately after it.
+      --
+      -- Not implemented: CR 603.10a's look-back for a card's own "when this card
+      -- leaves your graveyard", which CR 113.6k makes function from the graveyard
+      -- and which would need the departing card offered to its own group; no
+      -- TriggerCondition spells that self form (#4208).
+      --
+      -- A card that was there before the batch and one the batch put there are
+      -- served alike; the second is narrowed by `arrivedLater` in `graveyardAt`
+      -- below, so it reaches no event before its own arrival. Pawl.ZoneTriggerSpec's
+      -- Travel Through Caradhras case is the proving board. Both boundaries --
+      -- strictly later, and that narrowing -- are regression fences: loosening
+      -- either leaves the suite green, since no graveyard-functioning condition in
+      -- data/cards/ matches the event that removes its card, and no board there
+      -- buries a watcher after the event it would wrongly see.
+      leftGraveyardLater = drop 1 (List.scanr (Map.union . Map.unions . fmap (leftGraveyard . LoggedEvent.event)) Map.empty groups)
+      -- The graveyard each group's events are checked against: the live read,
+      -- plus what departed later, less what arrived later.
+      graveyardAt = List.zipWith (Map.withoutKeys . Map.union inGraveyards) leftGraveyardLater arrivedLater
       -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
       -- board that matters is "the appearance of objects immediately prior to the
       -- event", on which every permanent this same event removed was still
@@ -1596,9 +1613,8 @@ eventTriggers events gs =
       -- sentence governs: an event is checked against the objects that existed
       -- immediately after IT, not against the board at the end of the batch. This
       -- read is the whole graveyard as it stands, so `arrivedLater` below narrows
-      -- it per event group. The card that arrived in a graveyard and is gone again
-      -- by the boundary is the one this read cannot reach; `arrivedInGraveyard`
-      -- below is its source.
+      -- it per event group. A card that has left the graveyard by the boundary is
+      -- the one this read cannot reach; `leftGraveyard` below is its source.
       --
       -- Its `_ -> Nothing` arm is what keeps the two disjoint: `Game.lookupObject`
       -- fails for an id that has ceased, and a ceased id is exactly the one the
@@ -1621,31 +1637,18 @@ eventTriggers events gs =
       inGraveyards =
         Map.fromList
           (concatMap (Maybe.mapMaybe graveyardCandidate . Foldable.toList) (Map.elems (GameState.graveyard gs)))
-      -- CR 603.10's first sentence again, for the card THIS event put into a
-      -- graveyard that is gone by the CR 117.5 boundary: it existed in the
-      -- graveyard immediately after the event, so its ability is checked, and
-      -- CR 608.2h last known information is the only reading of it left. The
-      -- graveyard twin of `leftBattlefield`, and per EVENT for the same reason --
-      -- the arrival is what scopes it. Corpse Churn milling Narcomoeba and
-      -- returning it in one resolution is the proving board, in
-      -- Pawl.TriggerSpec's `graveyardTriggerSpec`.
+      -- A card this event took OUT of a graveyard, recovered from CR 608.2h last
+      -- known information: the graveyard twin of `leftBattlefield`, and what
+      -- `leftGraveyardLater` above offers to the batch's earlier events. Corpse
+      -- Churn milling Narcomoeba and returning it in one resolution is the board
+      -- for a card the batch itself put there, in Pawl.ZoneTriggerSpec's
+      -- `graveyardTriggerSpec`.
       --
-      -- Keyed by `ZoneChange.object`, where `leftBattlefield` keys by
-      -- `ZoneChange.departed` -- the one place the graveyard source inverts the
-      -- battlefield one. The bearer here is the CR 400.7 incarnation that ARRIVED
-      -- in the graveyard, which is the id `matchesTriggerGiven` compares against
-      -- for SelfPutIntoGraveyardFromLibrary and the id `inGraveyards` would have
-      -- offered. It is also the id `lastKnown` files the later departure under,
-      -- the graveyard card being what left; the two ids coincide by construction,
-      -- and that is the hinge of this source.
-      --
-      -- ONLY the destination is gated. Which origins a condition accepts is the
-      -- CONDITION's business -- SelfPutIntoGraveyardFromAnywhere is served from
-      -- the same zone -- which is the posture `leftBattlefield`'s comment argues for.
-      -- That gate is a regression fence rather than a proved behaviour: widening it
-      -- to every non-battlefield destination leaves the suite green, since the key
-      -- below is the ARRIVING id and only a graveyard arrival that has itself since
-      -- departed has a `lastKnown` entry under it.
+      -- Keyed by `ZoneChange.departed`, the graveyard incarnation: the id
+      -- `ZoneChange.object` named when it ARRIVED, which is the id `arrivedLater`
+      -- subtracts, the id `inGraveyards` would have offered, and the one
+      -- `matchesTriggerGiven` compares against for SelfPutIntoGraveyardFromLibrary.
+      -- The two ids coincide by construction, and that is the hinge of this source.
       --
       -- Abilities from the last known projection rather than a printed face: a
       -- ceased id has no face to look up, and `LastKnown` carries none. Identical
@@ -1678,20 +1681,18 @@ eventTriggers events gs =
       -- removing this filter hands her controller an experience counter for her
       -- own death.
       --
-      -- Disjoint from `inGraveyards` by construction, not by Map.unions' bias: an
+      -- Disjoint from `inGraveyards` by construction, not by Map.union's bias: an
       -- id in `lastKnown` is one the same write deleted from GameState.objects,
       -- and CR 400.7 mints a fresh id per move, so `graveyardCandidate` drops it.
-      -- A card that was in a graveyard before this batch is unreachable here too
-      -- -- its arrival event is not in the log this scan reads.
-      arrivedInGraveyard event = case movedOf event of
+      leftGraveyard event = case movedOf event of
         Just zc
-          | ZoneChange.to zc == Zone.Graveyard ->
-              case Map.lookup (ZoneChange.object zc) (GameState.lastKnown gs) of
+          | ZoneChange.from zc == Zone.Graveyard && ZoneChange.to zc /= Zone.Graveyard ->
+              case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
                 Just lk ->
-                  case Maybe.mapMaybe (functionsIn (PC.subtypes (LastKnown.characteristics lk)) (Game.delayedAbilitiesOf (ZoneChange.object zc) gs) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
+                  case Maybe.mapMaybe (functionsIn (PC.subtypes (LastKnown.characteristics lk)) (Game.delayedAbilitiesOf (ZoneChange.departed zc) gs) Zone.Graveyard) (PC.triggeredAbilities (LastKnown.characteristics lk)) of
                     [] -> Map.empty
-                    abilities -> Map.singleton (ZoneChange.object zc) (LastKnown.controller lk, abilities)
+                    abilities -> Map.singleton (ZoneChange.departed zc) (LastKnown.controller lk, abilities)
         _ -> Map.empty
       -- CR 113.6k's third zone, `inGraveyards` one zone over: every card in exile
       -- carrying an ability that functions from there. Rule 702.55c is the
@@ -2057,13 +2058,9 @@ eventTriggers events gs =
       -- one CR 603.10 asks for. `leftBattlefield` and `same` cannot collide with
       -- the sample -- both name a permanent that had already gone when the sample
       -- was taken -- nor with each other, an id departing at exactly one group.
-      -- `inGraveyards` genuinely overlaps `cycledCard` on purpose -- a card
+      -- `graveyard` genuinely overlaps `cycledCard` on purpose -- a card
       -- cycled into a graveyard is honestly a member of both -- and the winner
       -- offers that card's printed abilities unfiltered, a superset either way.
-      -- `arrivedInGraveyard` overlaps nothing: it answers only for an id
-      -- `lastKnown` holds, which is one no longer in GameState.objects and so in
-      -- no player's graveyard and no player's hand, so its position beside
-      -- `inGraveyards` is documentation rather than arbitration.
       -- `spellCast` overlaps nothing: CR 601.2a keeps its object on the stack,
       -- which no other source reads. Neither does `inCommand`: CR 114.1 puts an
       -- emblem into the command zone, and no rule or effect in pawl moves one
@@ -2071,8 +2068,8 @@ eventTriggers events gs =
       -- `inExile`: CR 400.1 makes exile a zone of its own, and an id in it is in
       -- no other. Nor does `revealedInHand`: CR 701.20b leaves the revealed card
       -- in the hand, which no other source reads.
-      candidates onBattlefield event later same arrivedAfter = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, Map.withoutKeys inGraveyards arrivedAfter, arrivedInGraveyard event, inCommand, inExile])
-      scanOne board later same arrivedAfter event = concatMap (forOne board event) (candidates (onBattlefieldOf board) event later same arrivedAfter)
+      candidates onBattlefield event later same graveyard = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, graveyard, inCommand, inExile])
+      scanOne board later same graveyard event = concatMap (forOne board event) (candidates (onBattlefieldOf board) event later same graveyard)
       -- CR 603.2c's FIRST sentence, applied to ONE event group: a batch-scoped
       -- condition's trigger event is the whole group, which occurs once however
       -- many of the group's members matched, where a per-occurrence condition
@@ -2108,8 +2105,8 @@ eventTriggers events gs =
       -- The battlefield reading is per GROUP and so is hoisted out of the block:
       -- every event in one group happened at the same time, so they share it. A
       -- group with no events cannot occur, which `eventGroups` states in the type.
-      scanBlock block later same arrivedAfter = oncePerBatch (concatMap (scanOne (battlefieldAt (LoggedEvent.group (NonEmpty.head block)) gs) later same arrivedAfter . LoggedEvent.event) block)
-   in concat (List.zipWith4 scanBlock groups laterGroups sameGroup arrivedLater)
+      scanBlock block later same graveyard = oncePerBatch (concatMap (scanOne (battlefieldAt (LoggedEvent.group (NonEmpty.head block)) gs) later same graveyard . LoggedEvent.event) block)
+   in concat (List.zipWith4 scanBlock groups laterGroups sameGroup graveyardAt)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
 -- specifies that it moves the object it's on out of a particular zone functions
