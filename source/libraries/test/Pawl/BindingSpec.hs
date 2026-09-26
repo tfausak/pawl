@@ -9,6 +9,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -55,6 +56,7 @@ sampleSnapshot =
       PC.halves = Nothing,
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
+      PC.spell = Face.defaultSpell,
       PC.flipped = Nothing
     }
 

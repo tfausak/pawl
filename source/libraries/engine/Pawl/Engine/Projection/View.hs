@@ -504,11 +504,11 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- CR 115.1 off the OBJECT's bindings, live: CR 601.2c fixed the targets and
       -- CR 115.7 can move them, so nothing here is a stamp. Empty for an id
       -- naming nothing and for everything off the stack.
-      Filter.targets = maybe Set.empty (targetsOfStackObject gs) (Game.lookupObject oid gs),
+      Filter.targets = targetsOfStackObject gs oid,
       -- CR 115.1's targets one indirection along, filled beside them and lazily:
       -- nothing forces this map but Filter.TargetsOnlyOne's and TargetsMatching's
       -- nests.
-      Filter.targetViews = maybe Map.empty (targetViewsOfStackObject peers gs) (Game.lookupObject oid gs),
+      Filter.targetViews = targetViewsOfStackObject peers gs oid,
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: a combat status, not a characteristic (CR 109.3). CR 506.4 takes
@@ -1077,6 +1077,15 @@ stampedSnapshotOf oid gs = do
       Nothing -> fmap (\stamp -> Maybe.fromMaybe stamp (PC.flipped stamp)) stamped
     else stamped
 
+-- CR 707.2 / 608.2: the face a spell on the stack announces against and
+-- resolves, its spell abilities read off its COPIABLE values rather than the
+-- printed card -- so a spell that became a copy of another resolves the copied
+-- text. Equal to Game.faceOf for an object copying nothing, whose copiable
+-- values are seeded from that same face. Pawl.CopySpec's "CR 707.2 a spell that
+-- becomes a copy of a Bolt" proves it.
+spellFaceOf :: ObjectId -> GameState -> Maybe (Face.Face Card.Type.Card)
+spellFaceOf oid gs = fmap (\face -> face {Face.spell = PC.spell (copiableCharacteristics oid gs)}) (Game.faceOf oid gs)
+
 -- CR 612.5: the object whose copiable rules text `oid` carries -- `oid` itself
 -- unless a stored ExchangeTextBoxes effect moved another's text box onto it.
 -- The ability-list readers below ask it first, which is what moves a static
@@ -1342,6 +1351,8 @@ noCharacteristics =
       -- CR 722.2b, for the same reason one line up.
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,
+      -- CR 113.3a: no card, so no spell ability either.
+      PC.spell = Face.defaultSpell,
       -- CR 710.1b, for the same reason again.
       PC.flipped = Nothing
     }
@@ -1504,6 +1515,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               PC.prepare = Game.prepareSpellOf oid gs,
               -- CR 715.2b / 720.2b: the Adventure or Omen half, prepare's reason.
               PC.alternativeSpell = Game.alternativeSpellOf oid gs,
+              -- CR 707.2: rules text, so copiable, for enchant's reason.
+              PC.spell = Face.spell face,
               -- CR 707.3: a copy stamp's alternative reading, which
               -- Pawl.Engine.Event.copiedSnapshot stamps. A printed flip card's
               -- alternative half is its card's, read at Game.resolveFaceFor.
@@ -1770,34 +1783,36 @@ abilitiesFromCharacteristics peers pc oid gs =
 -- behaviour: no board in the suite puts a non-target recipient binding on a
 -- stack object and then asks a target atom of it, nor asks one of a permanent
 -- carrying bindings, so dropping either leaves the suite green.
-targetsOfStackObject :: GameState -> Object.Object -> Set Recipient.Recipient
-targetsOfStackObject gs obj
-  | Object.zone obj /= Zone.Stack = Set.empty
-  | otherwise =
-      let bindings = Object.bindings obj
-          chosen = Binding.modesOf bindings
-          ofModal = Map.keysSet . Modal.modesTargetSlots chosen
-          -- CR 303.4a's enchant slot and CR 702.140a's mutate slot are declared
-          -- unconditionally: both are named by a RULE rather than by the face,
-          -- so a face read cannot see them, and the restriction below drops
-          -- either where the spell never filled it.
-          -- CR 702.47d's spliced slots beside the face's own.
-          ofFace face = Set.insert Card.mutateSlot (Set.insert Card.enchantSlot (Map.keysSet (Map.union (Card.modesTargetSlots chosen face) (Game.splicedTargetSlots obj gs))))
-          declared = case Object.source obj of
-            Source.OfCard _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
-            Source.OfSpellCopy _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
-            -- A cast copy of a card is card-backed the way the two arms above
-            -- are, so its printing's face answers: CR 722.3c's interned one-faced
-            -- prepare spell, or the card CR 707.12 copied.
-            Source.OfCardCopy _ -> maybe Set.empty ofFace (Game.faceOfObject gs obj)
-            Source.OfAbility src -> ofModal (ActivatedAbility.modal (ActivatedAbilitySource.ability src))
-            Source.OfTrigger src -> ofModal (TriggeredAbility.modal (TriggeredAbilitySource.ability src))
-            Source.OfInherentTrigger src -> ofModal (TriggeredAbility.modal (InherentTriggerSource.ability src))
-            Source.OfMeld _ -> Set.empty
-            Source.OfMerge _ -> Set.empty
-            Source.OfToken _ -> Set.empty
-            Source.OfEmblem _ -> Set.empty
-       in Set.unions (Map.elems (Map.restrictKeys (Binding.targetsOf bindings) declared))
+targetsOfStackObject :: GameState -> ObjectId -> Set Recipient.Recipient
+targetsOfStackObject gs oid = maybe Set.empty targetsOf (Game.lookupObject oid gs)
+  where
+    targetsOf obj
+      | Object.zone obj /= Zone.Stack = Set.empty
+      | otherwise =
+          let bindings = Object.bindings obj
+              chosen = Binding.modesOf bindings
+              ofModal = Map.keysSet . Modal.modesTargetSlots chosen
+              -- CR 303.4a's enchant slot and CR 702.140a's mutate slot are declared
+              -- unconditionally: both are named by a RULE rather than by the face,
+              -- so a face read cannot see them, and the restriction below drops
+              -- either where the spell never filled it.
+              -- CR 702.47d's spliced slots beside the face's own.
+              ofFace face = Set.insert Card.mutateSlot (Set.insert Card.enchantSlot (Map.keysSet (Map.union (Card.modesTargetSlots chosen face) (Game.splicedTargetSlots obj gs))))
+              declared = case Object.source obj of
+                Source.OfCard _ -> maybe Set.empty ofFace (spellFaceOf oid gs)
+                Source.OfSpellCopy _ -> maybe Set.empty ofFace (spellFaceOf oid gs)
+                -- A cast copy of a card is card-backed the way the two arms above
+                -- are, so its printing's face answers: CR 722.3c's interned one-faced
+                -- prepare spell, or the card CR 707.12 copied.
+                Source.OfCardCopy _ -> maybe Set.empty ofFace (spellFaceOf oid gs)
+                Source.OfAbility src -> ofModal (ActivatedAbility.modal (ActivatedAbilitySource.ability src))
+                Source.OfTrigger src -> ofModal (TriggeredAbility.modal (TriggeredAbilitySource.ability src))
+                Source.OfInherentTrigger src -> ofModal (TriggeredAbility.modal (InherentTriggerSource.ability src))
+                Source.OfMeld _ -> Set.empty
+                Source.OfMerge _ -> Set.empty
+                Source.OfToken _ -> Set.empty
+                Source.OfEmblem _ -> Set.empty
+           in Set.unions (Map.elems (Map.restrictKeys (Binding.targetsOf bindings) declared))
 
 -- CR 115.1 one indirection along: a VIEW of each thing the stack object above
 -- targets, which is what Filter.TargetsOnlyOne's and TargetsMatching's nests
@@ -1812,10 +1827,10 @@ targetsOfStackObject gs obj
 -- A recipient whose object is gone is DROPPED rather than mapped to a blank
 -- view: CR 608.2b leaves nothing to describe, and Pawl.Engine.Filter answers the
 -- atom False for a missing key.
-targetViewsOfStackObject :: Count.ViewOf -> GameState -> Object.Object -> Map Recipient.Recipient Filter.View
-targetViewsOfStackObject peers gs obj =
+targetViewsOfStackObject :: Count.ViewOf -> GameState -> ObjectId -> Map Recipient.Recipient Filter.View
+targetViewsOfStackObject peers gs oid =
   Map.fromList
-    (Maybe.mapMaybe (\r -> fmap ((,) r) (viewOfRecipient peers gs r)) (Set.toList (targetsOfStackObject gs obj)))
+    (Maybe.mapMaybe (\r -> fmap ((,) r) (viewOfRecipient peers gs r)) (Set.toList (targetsOfStackObject gs oid)))
 
 -- The view one recipient answers, splitting CR 115.1's two kinds of target: a
 -- player is Count.playerView's candidate, and an object one the bounded reader
