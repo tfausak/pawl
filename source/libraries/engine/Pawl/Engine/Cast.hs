@@ -2302,7 +2302,7 @@ playLand offered pid oid mName = do
     State.modify' (\g -> g {GameState.continuousEffects = concatMap riders (filter (`Set.member` GameState.battlefield g) (Foldable.toList moved)) <> GameState.continuousEffects g})
     -- CR 305.1 / 400.7i: the card was played, under its pre-move id and the
     -- permanent's.
-    State.modify' (\g -> g {GameState.playedThisTurn = foldr (`Map.insert` pid) (GameState.playedThisTurn g) (oid Seq.<| moved)})
+    State.modify' (\g -> g {GameState.cardsPlayed = foldr (`Map.insert` pid) (GameState.cardsPlayed g) (oid Seq.<| moved)})
   -- CR 305.2a counts the lands played this turn, so this TALLIES rather than
   -- flagging. CR 305.4: the only tally, an effect that PUTS a land onto the
   -- battlefield not being one.
@@ -2340,8 +2340,8 @@ choosePlayPermission pid oid options = case options of
 -- The floating replacement store is the only captured environment rewritten. A
 -- delayed triggered ability captures one too (Pawl.Types.DelayedTrigger); not
 -- implemented there (#1961). Elkin Lair arms one beside its grant, and cannot
--- observe the gap: its one read of a played card is Quantity.PlayedThisTurnBy,
--- which GameState.playedThisTurn answers for either incarnation.
+-- observe the gap: its one read of a played card is Quantity.PlayedBy,
+-- which GameState.cardsPlayed answers for either incarnation.
 followIntoSpell :: Maybe ExilePlayPermission.ExilePlayPermission -> ObjectId -> ObjectId -> GameState -> GameState
 followIntoSpell permission old new gs = case permission of
   Nothing -> gs
@@ -3306,7 +3306,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g) castFrom (Object.castUsing =<< Game.lookupObject sid g))) g)
                           -- CR 601.2a / 400.7h: the card was played, under the
                           -- id it had before the move and the spell's.
-                          State.modify' (\g -> g {GameState.playedThisTurn = Map.insert sid pid (Map.insert oid pid (GameState.playedThisTurn g))})
+                          State.modify' (\g -> g {GameState.cardsPlayed = Map.insert sid pid (Map.insert oid pid (GameState.cardsPlayed g))})
                           -- CR 722.3c's last sentence: "that permanent loses the
                           -- prepared designation AT THE TIME THE SPELL BECOMES
                           -- CAST (see rule 601.2i)". So it is here, beside rule
