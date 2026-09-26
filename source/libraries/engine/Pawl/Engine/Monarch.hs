@@ -337,10 +337,10 @@ returnExiledForMonarch = do
 -- unmoved -- which makes sentence 3 unreachable.
 --
 -- The write, the CR 725.1 event record and the exile watches are ONE step,
--- because this crowns through `crown` -- for the reason Departure.depart gives
--- for keeping this call inside itself: a crowning that records nothing is a
--- crowning CR 603.2 cannot see, and separating them lets a later caller move the
--- crown silently. A rule rather than an effect moves it here, which changes
+-- because this crowns through `crown` -- for the reason
+-- Departure.departTogether gives for keeping this call inside itself: a
+-- crowning that records nothing is a crowning CR 603.2 cannot see, and
+-- separating them lets a later caller move the crown silently. A rule rather than an effect moves it here, which changes
 -- nothing -- CR 725.2's stolen crown is a rule too and goes the same way.
 --
 -- CR 725.4's third sentence is the ONE arm that writes GameState.monarch

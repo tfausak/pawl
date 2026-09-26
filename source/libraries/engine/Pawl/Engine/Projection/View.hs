@@ -1331,6 +1331,7 @@ noCharacteristics =
       PC.replacementEffects = [],
       PC.triggeredAbilities = [],
       PC.enchant = [],
+      PC.castingPermissions = [],
       -- CR 613.11: no characteristics, so none of the twelve families either.
       PC.ruleAbilities = mempty,
       PC.lostAllAbilities = False,
@@ -1474,6 +1475,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- seed. Read off `face`, so CR 708.2a's face-down substitution leaves
               -- a face-down permanent with none.
               PC.enchant = Face.enchant face,
+              -- CR 601.3: the printed permissions, in the seed for enchant's
+              -- reason, so a granted one is not copiable.
+              PC.castingPermissions = Face.castingPermissions face,
               -- CR 613.11: the twelve families CR 613.11 applies after the layer
               -- system, off `face` for enchant's reason -- and copiable for
               -- enchant's reason too, which is what carries them to a copy and,
@@ -1622,6 +1626,7 @@ withMergedAbilities donor base =
       PC.replacementEffects = PC.replacementEffects base <> PC.replacementEffects donor,
       PC.triggeredAbilities = PC.triggeredAbilities base <> PC.triggeredAbilities donor,
       PC.enchant = PC.enchant base <> PC.enchant donor,
+      PC.castingPermissions = PC.castingPermissions base <> PC.castingPermissions donor,
       -- CR 613.11's twelve families, whose Semigroup is the same concatenation
       -- the eight fields above are written out with; Pawl.Types.RuleAbilities
       -- carries it so a thirteenth family cannot be added and left out here.
@@ -2031,8 +2036,20 @@ objectInRangeGiven grants you oid gs = objectInRangeUnder (\o -> controllerOfGiv
 -- objectInRangeGiven with the controllers supplied: layer 2's running table
 -- inside the fold, the finished fold outside it.
 objectInRangeUnder :: (ObjectId -> Maybe PlayerId.PlayerId) -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
-objectInRangeUnder ctrl you oid gs =
-  let reaches = maybe False (\pid -> Game.inRangeOf you pid gs)
+objectInRangeUnder = objectInRangeBy Game.inRangeOf
+
+-- CR 801.2c: objectInRangeGiven with the seats fixed as this turn began
+-- (Game.wasInRangeOf), so an object whose controller left the game this turn
+-- is judged by the seat they held. Such an object exists only inside CR
+-- 800.4a's fourth clause and CR 800.4c's exile, which is where
+-- Pawl.Engine.Replacement.reaches asks it.
+objectWasInRangeGiven :: [ControlGrant] -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
+objectWasInRangeGiven grants you oid gs = objectInRangeBy Game.wasInRangeOf (\o -> controllerOfGiven grants o gs) you oid gs
+
+-- The two readings above, differing only in which seat check a player gets.
+objectInRangeBy :: (PlayerId.PlayerId -> PlayerId.PlayerId -> GameState -> Bool) -> (ObjectId -> Maybe PlayerId.PlayerId) -> PlayerId.PlayerId -> ObjectId -> GameState -> Bool
+objectInRangeBy seated ctrl you oid gs =
+  let reaches = maybe False (\pid -> seated you pid gs)
    in case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
         Nothing -> True
         Just _ -> reaches (ctrl oid) || reaches (Object.protector =<< Game.lookupObject oid gs)

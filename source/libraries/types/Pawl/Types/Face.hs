@@ -104,8 +104,7 @@ data Face card = MkFace
     -- copy effect acquires, and no such effect can reach a vanguard card: CR
     -- 313.2 keeps it in the command zone, where it is not a permanent and not a
     -- spell, so nothing in the pool copies it. Its readers are pregame or
-    -- per-cleanup and take the printed card the way Face.castingPermissions'
-    -- readers do (Pawl.Engine.Vanguard).
+    -- per-cleanup and take the printed card (Pawl.Engine.Vanguard).
     vanguard :: Maybe Vanguard.Vanguard,
     -- | CR 903.3a: whether this card prints "this card can be your commander",
     -- the deck-construction ability that lets a card CR 903.3 would otherwise
@@ -134,10 +133,10 @@ data Face card = MkFace
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
     -- keyword whose ability functions in a zone where no pool effect changes a
-    -- card's keywords (#1859) -- the carve-out castingPermissions and
-    -- additionalCosts take. A GRAVEYARD is no longer one of those zones: rule
-    -- 702.34a's flashback is read there through the projection, so a granted one
-    -- reaches the cost (Pawl.Engine.Cost.costsFor). Nor is a HAND for FLASH:
+    -- card's keywords (#1859) -- the carve-out additionalCosts takes. A
+    -- GRAVEYARD is no longer one of those zones: rule 702.34a's flashback is read
+    -- there through the projection, so a granted one reaches the cost
+    -- (Pawl.Engine.Cost.costsFor). Nor is a HAND for FLASH:
     -- Pawl.Engine.Cast.instantSpeed reads rule 702.8a's keyword through the
     -- projection, which is what lets Teferi, Mage of Zhalfir grant it to a card
     -- in a hand.
@@ -230,11 +229,9 @@ data Face card = MkFace
     -- nothing in the rules forbids. A flag could not tell the two apart.
     dungeonEntryQuality :: Maybe Subtype.Subtype,
     -- | CR 601.3: this face's PRINTED casting permissions -- zone or condition
-    -- exceptions to normal timing (Panglacial Wurm). Read directly from the card
-    -- and NOT the projection: the permission functions in the library (CR 113.6),
-    -- where this reader takes the printed card (#1859).
-    -- Not a claim about the rules: CR 613.1 names no zone, and CR 122.1b / 613.1f
-    -- reach a card outside the battlefield.
+    -- exceptions to normal timing (Panglacial Wurm). The seed of
+    -- Pawl.Types.ProjectedCharacteristics.castingPermissions, which a layer-6
+    -- grant adds to; Pawl.Engine.Cast reads the projection.
     --
     -- Not the whole list: rule 702.34a gives a card with flashback a
     -- cast-from-your-graveyard permission that is never printed here, minted
@@ -253,9 +250,8 @@ data Face card = MkFace
     -- Pawl.Engine.Cast has to know which half an entry belongs to. ALL of these
     -- must hold for a cast to be legal, where one permission suffices.
     --
-    -- Read directly from the card, the castingPermissions precedent; CR 113.6e is
-    -- the rule that puts such an ability in the hand, where this reader takes the
-    -- printed card (#1859).
+    -- Read directly from the card; CR 113.6e is the rule that puts such an
+    -- ability in the hand, where this reader takes the printed card (#1859).
     --
     -- SELF-scoped and printed-only, which is the whole difference between this and
     -- the other producer CR 601.3's "rule or effect" names. A prohibition aimed at
@@ -284,10 +280,10 @@ data Face card = MkFace
     enchant :: [TargetSlot.TargetSlot],
     -- | CR 113.6g: a can't-be-countered ability functions on the stack (Rending
     -- Volley). Read straight off the card by Event.counter rather than through the
-    -- projection -- the castingPermissions precedent: this reader takes the
-    -- printed card while the object is on the stack (#1859). CR 613 itself does
-    -- reach the stack, and so does pawl's projection; this is a fact about ONE
-    -- reader, not about the rules and not about the fold.
+    -- projection: this reader takes the printed card while the object is on the
+    -- stack (#1859). CR 613 itself does reach the stack, and so does pawl's
+    -- projection; this is a fact about ONE reader, not about the rules and not
+    -- about the fold.
     --
     -- CR 113.6g's SELF-referential clause only. A permanent's static ability
     -- about OTHER objects being uncounterable (Spider-Punk) rides
@@ -295,9 +291,9 @@ data Face card = MkFace
     -- carriers cannot be merged.
     counterability :: Counterability.Counterability,
     -- | CR 118.8: this face's printed additional costs, paid at the same time as
-    -- the spell's mana cost (Village Rites). Read directly from the card, the
-    -- castingPermissions precedent: a cost is consulted while the object is in
-    -- hand, where this reader takes the printed card (#1859), or the copy stamp's
+    -- the spell's mana cost (Village Rites). Read directly from the card: a cost
+    -- is consulted while the object is in hand, where this reader takes the
+    -- printed card (#1859), or the copy stamp's
     -- values where it carries one (Game.castingFaceOf). CR 118.8d: this does not
     -- change the card's mana cost, so 'manaCost' above and every reader of mana
     -- value is unaffected.
@@ -573,9 +569,8 @@ data Face card = MkFace
     -- | CR 103.5b: this face's "any time you could mulligan" actions, in printed
     -- order, each one a Pawl.Types.HandAction -- its effects in written order,
     -- and the clause gating whether it may be taken (Serum Powder writes none).
-    -- Read directly from the card, the castingPermissions precedent: the ability
-    -- functions in the HAND (CR 113.6), where this reader takes the printed card
-    -- (#1859).
+    -- Read directly from the card: the ability functions in the HAND (CR 113.6),
+    -- where this reader takes the printed card (#1859).
     --
     -- A LIST OF ACTIONS and not one action's effects: nothing in CR 103 caps how
     -- many such actions a face may grant, and two are two separate offers a
@@ -605,9 +600,9 @@ data Face card = MkFace
     -- | CR 116.2: the special actions this face's printed text grants -- CR
     -- 116.2e's "you may discard this card any time you could cast an instant"
     -- (Circling Vultures). WHERE it is read from is the reader's question and
-    -- differs per row. CR 116.2e's is read directly from the card, the
-    -- castingPermissions precedent: the ability functions in the HAND (CR
-    -- 113.6), where Pawl.Engine.Action.discardableCards takes the printed card
+    -- differs per row. CR 116.2e's is read directly from the card: the ability
+    -- functions in the HAND (CR 113.6), where
+    -- Pawl.Engine.Action.discardableCards takes the printed card
     -- (#1859). CR 116.2d's is read off the copiable snapshot
     -- (Pawl.Engine.Projection.View.specialActionsOf), since a permanent that is
     -- a copy grants what it copied (CR 707.2a).

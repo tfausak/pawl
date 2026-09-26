@@ -8,6 +8,7 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
@@ -212,6 +213,10 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- GRANTED one is not, which falls out of where each is written rather than
     -- being enforced here -- the posture activatedAbilities takes.
     enchant :: [TargetSlot.TargetSlot],
+    -- | CR 601.3 / 613.1f: the permissions this object has to be cast from where
+    -- the rules would refuse. Seeded from Face.castingPermissions, added to by
+    -- Modification.GainCastingPermission, emptied by LoseAllAbilities.
+    castingPermissions :: [CastingPermission.CastingPermission],
     -- | CR 613.11: the ability families that affect game rules rather than
     -- objects -- combat, attack, block, untap, entry, sacrifice, counter,
     -- crew, attach and activation restrictions, requirements, costs and

@@ -49,43 +49,52 @@ import qualified Pawl.Types.Zone as Zone
 
 -- Mark a player as having left, with the reason they left, and perform
 -- everything the rules attach to that moment.
+depart :: Departure -> PlayerId -> Game ()
+depart reason pid = departTogether reason [pid]
+
+-- Mark a SET of players as having left at once -- CR 104.3b's players losing in
+-- one state-based action check, or CR 104.3e's effect naming several -- and
+-- perform everything the rules attach to that moment.
 --
 -- MONADIC, and only the fourth clause needs it to be: CR 800.4a's exile is a
 -- zone change like any other, so it goes through the zone-change funnel (CR
 -- 400.7, CR 613.7d, CR 603.6c) rather than editing the zone maps. The other
 -- three clauses stay pure functions on the state, composed here in the rule's
--- order.
+-- order. continuesAfterDeparture reads GameState.turnOrder, which the flip
+-- does not touch.
+--
+-- The status flip sits between the pure clauses and the exile. The first
+-- clause files CR 608.2h's last known information from the board as the player
+-- left, so it runs before; the fourth clause's exile happens after they have
+-- left, so CR 800.4h hands a CR 616.1 choice inside it to the next player
+-- (Replacement.chooserOf), and CR 800.4b/800.4d's gates refuse anything a
+-- replacement there would give them. EVERY player in the set is flipped before
+-- ANY exile runs, so that choice also skips a seat leaving in the same event.
+-- Pawl.DepartureSpec's "a replacement choice inside the departure's exile goes
+-- to the next player" and "... skips a seat leaving in the same event" prove
+-- both placements.
 --
 -- CR 725.4 belongs INSIDE this function, not after it: the active player becomes
--- the monarch at the same time the player leaves. Both doors -- leaveGame (CR
--- 104.3a) and Pawl.Engine.Sba's fold (CR 704.5) -- get it by construction rather
--- than by remembering to call it.
-depart :: Departure -> PlayerId -> Game ()
-depart reason pid = do
-  -- CR 800.4a's own ordering is load-bearing, so the clauses run in the rule's
-  -- order. continuesAfterDeparture reads GameState.turnOrder, which the flip
-  -- does not touch.
-  --
-  -- The status flip sits between the pure clauses and the exile. The first
-  -- clause files CR 608.2h's last known information from the board as the
-  -- player left, so it runs before; the fourth clause's exile happens after
-  -- they have left, so CR 800.4h hands a CR 616.1 choice inside it to the next
-  -- player (Replacement.chooserOf), and CR 800.4b/800.4d's gates refuse
-  -- anything a replacement there would give them. Pawl.DepartureSpec's "a
-  -- replacement choice inside the departure's exile goes to the next player"
-  -- proves the placement. Monarch.reassignOnDeparture also needs the flip done.
+-- the monarch at the same time the player leaves. Every door -- leaveGame (CR
+-- 104.3a) and Pawl.Engine.Sba's check (CR 704.5) -- gets it by construction
+-- rather than by remembering to call it. Monarch.reassignOnDeparture needs the
+-- flip done.
+departTogether :: Departure -> [PlayerId] -> Game ()
+departTogether reason pids = do
   continues <- State.gets continuesAfterDeparture
-  Monad.when continues $
-    State.modify' (nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid)
   let lose p = p {Player.status = Status.Departed reason}
-  -- CR 801.2c: the seat keeps counting toward range of influence until the
-  -- next turn begins.
-  State.modify' (\gs -> gs {GameState.players = Map.adjust lose pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)})
-  Monad.when continues $ remainingControlledExiled pid
-  Monarch.reassignOnDeparture pid
-  -- CR 726.4, the same clause one rule over and for the same reason: the active
-  -- player takes the initiative at the same time its holder leaves.
-  Initiative.reassignOnDeparture pid
+      -- CR 801.2c: the seat keeps counting toward range of influence until the
+      -- next turn begins.
+      leave pid gs = gs {GameState.players = Map.adjust lose pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)}
+      -- CR 800.4a's first three clauses, in the rule's order.
+      clauses pid = if continues then nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid else id
+  Monad.forM_ pids (\pid -> State.modify' (leave pid . clauses pid))
+  Monad.when continues (Monad.mapM_ remainingControlledExiled pids)
+  Monad.forM_ pids $ \pid -> do
+    Monarch.reassignOnDeparture pid
+    -- CR 726.4, the same clause one rule over and for the same reason: the
+    -- active player takes the initiative at the same time its holder leaves.
+    Initiative.reassignOnDeparture pid
 
 -- CR 800.4: a multiplayer game can continue after players leave, and CR 800.1
 -- makes "multiplayer" mean a game that BEGINS with more than two players.
@@ -691,13 +700,13 @@ leaveGame :: Departure -> PlayerId -> Game ()
 leaveGame reason pid = leaveGameTogether reason [pid]
 
 -- The same door for a SET of players leaving at once, which is what CR 104.3e's
--- effect can name ("each player loses the game"). One departure at a time in the
--- order given -- CR 800.4a's clauses are observable, so who goes first matters --
--- and then ONE CR 104.2a settle over the whole set, which is what makes CR
+-- effect can name ("each player loses the game"). departTogether in the order
+-- given -- CR 800.4a's clauses are observable, so who goes first matters -- and
+-- then ONE CR 104.2a settle over the whole set, which is what makes CR
 -- 104.4a's "if all the players remaining in a game lose simultaneously, the game
 -- is a draw" reachable: settling seat by seat would instead hand the
 -- second-to-last departure's survivor the win.
 leaveGameTogether :: Departure -> [PlayerId] -> Game ()
 leaveGameTogether reason pids = do
-  Monad.mapM_ (depart reason) pids
+  departTogether reason pids
   State.modify' (\departed -> departed {GameState.result = GameState.result departed <|> outcomeAfterLeaving pids departed})

@@ -9,6 +9,7 @@ import qualified Pawl.Codec.AlternativeCost as AlternativeCost
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Codec.Color as Color
@@ -64,6 +65,7 @@ codec = Fields.object $ do
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec Card.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))) PC.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec (GrantedAbility.codec Card.codec))) PC.triggeredAbilities
   enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) PC.enchant
+  castingPermissions <- Fields.defaulted "castingPermissions" [] (Common.list CastingPermission.codec) PC.castingPermissions
   ruleAbilities <- Fields.defaulted "ruleAbilities" mempty RuleAbilities.codec PC.ruleAbilities
   lostAllAbilities <- Fields.defaulted "lostAllAbilities" False Common.boolean PC.lostAllAbilities
   subtypeWordChanges <- Fields.defaulted "subtypeWordChanges" [] (Common.list ChangeSubtypeWord.codec) PC.subtypeWordChanges
@@ -101,6 +103,7 @@ codec = Fields.object $ do
         PC.replacementEffects = replacementEffects,
         PC.triggeredAbilities = triggeredAbilities,
         PC.enchant = enchant,
+        PC.castingPermissions = castingPermissions,
         PC.ruleAbilities = ruleAbilities,
         PC.lostAllAbilities = lostAllAbilities,
         PC.subtypeWordChanges = subtypeWordChanges,

@@ -23,12 +23,10 @@ import qualified Pawl.Types.Quantity as Quantity
 -- printed on, and it carries a Quantity where that one carries a literal amount.
 --
 -- Read straight off the card, or its copy stamp (Pawl.Engine.Game.castingFaceOf),
--- by Pawl.Engine.Cost.selfReductions and NOT
--- through the projection -- Pawl.Types.Face.castingPermissions' precedent, for
--- its reason: the ability is consulted while the object is in a hand or on the
--- stack, where this reader takes the printed card (#1859). CR
--- 113.6d is the rule that makes an ability modifying what its own object costs
--- to cast function on the stack.
+-- by Pawl.Engine.Cost.selfReductions and NOT through the projection: the
+-- ability is consulted while the object is in a hand or on the stack, where
+-- this reader takes the printed card (#1859). CR 113.6d is the rule that makes
+-- an ability modifying what its own object costs to cast function on the stack.
 data CostReduction = MkCostReduction
   { -- | What ONE of the things counted takes off -- Thrasta's {3}.
     --

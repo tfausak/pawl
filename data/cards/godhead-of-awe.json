@@ -1,0 +1,161 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "White"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        },
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "White"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        },
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "White"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        },
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "White"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        },
+        {
+          "type": "Hybrid",
+          "value": {
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "White"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Blue"
+              }
+            }
+          }
+        }
+      ],
+      "name": "Godhead of Awe",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "SetBasePowerToughness",
+              "value": {
+                "power": {
+                  "type": "Literal",
+                  "value": 1
+                },
+                "toughness": {
+                  "type": "Literal",
+                  "value": 1
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Avatar"
+          },
+          {
+            "type": "Spirit"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

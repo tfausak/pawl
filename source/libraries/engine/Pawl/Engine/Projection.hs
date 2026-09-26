@@ -113,6 +113,7 @@ layer m = case m of
   -- types.
   Modification.GainEnchant _ -> Layer.Ability
   Modification.LoseEnchant _ -> Layer.Ability
+  Modification.GainCastingPermission _ -> Layer.Ability
   Modification.GainAbility _ -> Layer.Ability
   Modification.GainAbilitiesOfSource _ -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
@@ -226,6 +227,9 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         -- other instances stay.
         Modification.LoseEnchant slot ->
           pc {PC.enchant = filter (/= slot) (PC.enchant pc)}
+        -- CR 613.1f layer 6 / CR 601.3: an APPEND beside the printed ones.
+        Modification.GainCastingPermission permission ->
+          pc {PC.castingPermissions = PC.castingPermissions pc <> [permission]}
         -- CR 613.1f layer 6: one whole quoted ability. Appended to the card's own
         -- printed abilities, which is what makes it the RECEIVER's (CR 113.7, CR
         -- 602.2, CR 603.3a, CR 303.4e) and lets two grants stack in CR 613.7
@@ -272,7 +276,10 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
               -- it with the rest. Unproven: Humility reaches only creatures and
               -- nothing in the pool wipes a noncreature permanent's abilities, so
               -- dropping this line leaves the suite green.
-              PC.enchant = []
+              PC.enchant = [],
+              -- CR 601.3's permission is an ability too. Unproven: nothing in
+              -- the pool wipes the abilities of a card in a library.
+              PC.castingPermissions = []
             }
         -- CR 613.1f layer 6, the wipe above narrowed to one name: every ability
         -- the card gave this name goes, and every other ability stays. A Licid
@@ -564,6 +571,7 @@ cardTypesAfter m types = case m of
   Modification.GainFlashbackAtManaCost -> types
   Modification.GainEnchant _ -> types
   Modification.LoseEnchant _ -> types
+  Modification.GainCastingPermission _ -> types
   Modification.GainAbility _ -> types
   Modification.GainAbilitiesOfSource _ -> types
   Modification.LoseAllAbilities -> types
@@ -644,6 +652,7 @@ exchangeTextBoxFrom from pc =
       PC.triggeredAbilities = PC.triggeredAbilities from,
       PC.replacementEffects = PC.replacementEffects from,
       PC.enchant = PC.enchant from,
+      PC.castingPermissions = PC.castingPermissions from,
       -- CR 604.3: a characteristic-defining ability is printed in the text box,
       -- so it moves with it. A regression fence rather than a proved behaviour:
       -- the one producer's test board uses two literal power/toughness boxes.
@@ -686,7 +695,9 @@ setLandSubtypeTo types s pc
           -- CR 305.7's strip reaches an enchant ability for CR 613.1f's reason
           -- above. Unproven for the same reason: no board in the pool sets the
           -- land subtype of a permanent that has one.
-          PC.enchant = []
+          PC.enchant = [],
+          -- CR 601.3's permission is an ability too; unproven for the same reason.
+          PC.castingPermissions = []
         }
 
 -- CR 613.4b: layer 7b establishes base P/T, so an object with no printed P/T
@@ -1190,6 +1201,7 @@ freezeQuantities gs announcedOn source context m =
         Modification.GainFlashbackAtManaCost -> Just m
         Modification.GainEnchant _ -> Just m
         Modification.LoseEnchant _ -> Just m
+        Modification.GainCastingPermission _ -> Just m
         -- The granted ability's own quantities are NOT frozen: CR 611.2d fixes a
         -- variable in this effect, not in a quoted ability's own future one.
         Modification.GainAbility _ -> Just m
@@ -1239,6 +1251,7 @@ quantitiesOf m = case m of
   -- gives above, whose keyword can nest one too.
   Modification.GainEnchant _ -> []
   Modification.LoseEnchant _ -> []
+  Modification.GainCastingPermission _ -> []
   -- The layer fold evaluates nothing inside a quoted ability.
   Modification.GainAbility _ -> []
   Modification.GainAbilitiesOfSource _ -> []
@@ -1285,6 +1298,7 @@ referenceQuery m = case m of
   Modification.GainFlashbackAtManaCost -> Nothing
   Modification.GainEnchant _ -> Nothing
   Modification.LoseEnchant _ -> Nothing
+  Modification.GainCastingPermission _ -> Nothing
   Modification.GainAbility _ -> Nothing
   Modification.GainAbilitiesOfSource _ -> Nothing
   Modification.LoseAllAbilities -> Nothing
@@ -1339,6 +1353,7 @@ setsLandSubtype m = case m of
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
   Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
   -- A control op, not a type change.
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
@@ -1442,16 +1457,67 @@ setLandSubtypeEffectsGiven functioning gs =
 -- outside the fold use liveAfterLayers. The layer-2 control fold asks NEITHER
 -- gate -- see controlGrants.
 --
--- Not implemented: a layer-4 ability whose OWN effect would take its source out
--- of the setter's affected set makes the setter depend on it (CR 613.8a), so it
--- applies first and keeps its text; base cannot see that, and it is stripped
--- (#1489).
-liveGiven :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
-liveGiven setEffs oid gs =
+-- The one exception is a layer-4 effect that takes the permanent OUT of the
+-- setter's set: CR 613.8a makes the setter depend on it (escapes). Pawl.ProjectionSpec's
+-- Rootpath Purifier and Synthetic Primeval Claim cases prove both limbs.
+liveGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
+liveGiven functioning setEffs oid gs =
   not
     ( hasLandType (baseCharacteristics oid gs)
-        && any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs)
+        && any (\(src, aff) -> affectsBase src oid aff gs && not (escapes src aff)) (appliedSetEffects setEffs gs)
     )
+  where
+    -- CR 613.8a/613.8b: the other layer-4 effects that apply before this setter.
+    -- One the setter would strip (a rules-text ability of a land it reaches)
+    -- depends on it too, and that loop falls back to timestamps; any other the
+    -- setter merely waits for. Applied to `oid`, do they move it out of reach?
+    escapes src aff =
+      let stamp = fmap Object.timestamp (Game.lookupObject src gs)
+          strippedBy c = affectsBase src (gSource c) aff gs && hasLandType (baseCharacteristics (gSource c) gs)
+          before (c, printed) = not (printed && strippedBy c) || maybe True (gTimestamp c <) stamp
+       in case fmap fst (filter before (typeChangersGiven functioning gs)) of
+            [] -> False
+            first -> not (affectsGiven (baseView gs) src oid aff (projectWith (<= Layer.Type) first oid gs) gs)
+
+-- Every layer-4 part of an effect that sets no land's subtype, for liveGiven's CR
+-- 613.8a question. Walked as setLandSubtypeEffectsGiven walks the setters: stored
+-- effects, then each permanent's printed and granted static abilities, under the
+-- same CR 604.2 and CR 612 reads. The flag marks a PRINTED ability, the one kind
+-- CR 305.7 can strip.
+typeChangersGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [(Gathered, Bool)]
+typeChangersGiven functioning gs =
+  let part src ts aff m =
+        MkGathered
+          { gEffect = Nothing,
+            gSource = src,
+            gAffected = aff,
+            gLayer = Layer.Type,
+            gLowest = Layer.Type,
+            gTimestamp = ts,
+            gModification = m
+          }
+      typeParts = filter ((== Layer.Type) . layer) . NonEmpty.toList
+      keeps sa = not (any setsLandSubtype (StaticAbility.modifications sa)) && functionsFromZone Zone.Battlefield sa
+      fromStored eff =
+        let m = ContinuousEffect.modification eff
+         in [(part (ContinuousEffect.source eff) (ContinuousEffect.timestamp eff) (ContinuousEffect.affected eff) m, False) | layer m == Layer.Type, not (setsLandSubtype m)]
+      fromPerm permId = case Game.lookupObject permId gs of
+        Nothing -> []
+        Just obj ->
+          let changes = textChangesAffecting permId gs
+              ts = staticTimestampOf permId obj gs
+              printedOf sa =
+                let parts = staticParts changes sa
+                 in if keeps sa && staticLives (functioning permId) changes (minimum (fmap layer parts)) sa
+                      then [(part permId ts (rewriteAffected changes (StaticAbility.affected sa)) m, True) | m <- typeParts parts]
+                      else []
+              grantedOf (grantTs, sa) =
+                let parts = staticParts [] sa
+                 in if keeps sa && staticLives (functioning permId) [] (minimum (fmap layer parts)) sa
+                      then [(part permId (max (Object.timestamp obj) grantTs) (StaticAbility.affected sa) m, False) | m <- typeParts parts]
+                      else []
+           in concatMap printedOf (staticAbilitiesOf permId gs) <> concatMap grantedOf (grantedStaticAbilitiesOf permId gs)
+   in concatMap fromStored (GameState.continuousEffects gs) <> concatMap fromPerm (abilitySources gs)
 
 -- CR 305.7's subject: only a LAND loses its rules text to a subtype set. CR 205.3d
 -- is what makes that a precondition rather than a description of every board a
@@ -2060,7 +2126,7 @@ permanentParts stripped functioning setEffs setStripped gs permId = case Game.lo
      in printedParts printed permObj <> grantedParts
   where
     printedParts printed permObj =
-      if null setEffs || liveGiven setEffs permId gs
+      if null setEffs || liveGiven functioning setEffs permId gs
         then
           -- CR 612: rewrite each static ability's subtype words by the text
           -- changes the text box THIS source carries has taken, before its
@@ -2266,6 +2332,7 @@ removesAbilities m = case m of
   -- FALSE for LoseKeyword's reason: it takes one enchant instance out of the
   -- projected list and leaves every other ability, so nothing is gated.
   Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
   -- The other direction of CR 613.1f: a grant is not a removal, so timestamp
   -- order alone decides whether a granted ability survives Humility. Proven
   -- through the FOLD by Pawl.ActivateSpec's "Presence of Gond" pair; this arm's
@@ -3324,6 +3391,9 @@ modificationWrites m = case m of
   -- leaves the suite green.
   Modification.GainEnchant _ -> Set.singleton Keywords
   Modification.LoseEnchant _ -> Set.singleton Keywords
+  -- Writes ProjectedCharacteristics.castingPermissions, which no Filter atom
+  -- reads, so no Aspect names it.
+  Modification.GainCastingPermission _ -> Set.empty
   -- Writes ProjectedCharacteristics.activatedAbilities or .triggeredAbilities,
   -- which Aspect has no finer grain for than Keywords -- the same answer
   -- LoseNamedAbility gives below, this being the same write in the other
@@ -3425,6 +3495,7 @@ modificationReads m = case m of
   -- Carries no Quantity of its own; its Filter is read where the slot is matched.
   Modification.GainEnchant _ -> Set.empty
   Modification.LoseEnchant _ -> Set.empty
+  Modification.GainCastingPermission _ -> Set.empty
   -- A quoted ability's quantities are read at ITS resolution.
   Modification.GainAbility _ -> Set.empty
   Modification.GainAbilitiesOfSource _ -> Set.empty
@@ -5035,6 +5106,7 @@ grantsKeywordWhere p m = case m of
   Modification.GainEnchant _ -> False
   -- Takes CR 702.5a's enchant away, and hands out nothing.
   Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
   -- Hands out an ability, which is a keyword grant only when it is a static
   -- one whose own modifications grant one.
   Modification.GainAbility g -> grantedStaticWrites (grantsKeywordWhere p) g
@@ -5113,6 +5185,7 @@ grantsMintingType m = case m of
   Modification.GainFlashbackAtManaCost -> False
   Modification.GainEnchant _ -> False
   Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
   -- A granted static ability's own parts, grantsKeywordWhere's reason.
   Modification.GainAbility g -> grantedStaticWrites grantsMintingType g
   Modification.GainAbilitiesOfSource _ -> False

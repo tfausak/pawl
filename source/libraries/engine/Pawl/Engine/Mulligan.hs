@@ -94,9 +94,9 @@ openingHands perform seated = do
 -- not an identity test: this asks whether the card declares an action, never
 -- which card it is.
 --
--- Read straight off the face (Game.faceOf) and never through the projection --
--- the Face.castingPermissions precedent: these abilities function in the HAND
--- (CR 113.6), where this reader takes the printed card (#1859).
+-- Read straight off the face (Game.faceOf) and never through the projection:
+-- these abilities function in the HAND (CR 113.6), where this reader takes the
+-- printed card (#1859).
 actionsFor :: (Face.Face Card.Card -> [HandAction.HandAction Card.Card]) -> PlayerId -> GameState.GameState -> [((ObjectId, HandActionIndex.HandActionIndex), HandAction.HandAction Card.Card)]
 actionsFor field pid gs =
   let withActions oid = case Game.faceOf oid gs of
