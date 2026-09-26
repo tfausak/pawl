@@ -2971,7 +2971,7 @@ rewriteComponent pairs component = case component of
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
-  CostComponent.RemovePlusOneCountersFromThis _ -> component
+  CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
   CostComponent.BlightX -> component
