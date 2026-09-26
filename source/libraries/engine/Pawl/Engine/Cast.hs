@@ -1687,8 +1687,9 @@ couldBeginToCast pid oid name gs =
    in cardGatesOk pid oid name proposed && any allowed candidates
 
 -- The facings a face may be cast in (CR 702.37d, 702.168c): face up always,
--- and face down once per ability that allows it. Every road offering a cast asks
--- this, so none of them decides a card's facing for its player.
+-- and face down once per ability that allows it. castableSpells and
+-- castableWhileSearching both offer every one, so neither decides a card's
+-- facing for its player.
 castFacings :: Face.Face Card.Type.Card -> [Facing.Facing]
 castFacings face =
   Facing.FaceUp
@@ -1881,10 +1882,8 @@ permissionsOf oid face gs =
 -- The prohibition is NOT omitted, and that is the point: CR 601.3 is one sentence
 -- with two halves, and the Panglacial permission excepts only the timing one, so
 -- a Rule of Law still stops a cast from the library, and so does a Null Chamber
--- that named the Wurm. CR 205.4e's restriction rides along for the same reason,
--- and THAT one is unobservable in this pool -- every card holding the permission
--- is a creature and none is a legendary sorcery -- and is written anyway,
--- because the alternative is a cast the rules forbid.
+-- that named the Wurm. CR 205.4e's restriction rides along for the same reason;
+-- a regression fence, since no test casts a legendary sorcery while searching.
 --
 -- Those three conjuncts, and the affordability and target-fillability beside
 -- them, are `castableWhenOffered` below -- shared with CR 608.2g's other
@@ -1894,8 +1893,8 @@ permissionsOf oid face gs =
 -- a "Cast this spell only during the declare attackers step" IS about timing, so
 -- the ruling's "except for timing" could be read to lift it. pawl takes the
 -- narrower reading -- the ruling excepts the RULES' own timing window (CR 302.1 /
--- 307.1), not a prohibition the card prints on itself. Unobservable: no card
--- holding the permission prints a restriction alongside it.
+-- 307.1), not a prohibition the card prints on itself. A regression fence: no
+-- test casts such a card while searching.
 --
 -- ONE ENTRY PER CASTABLE HALF, exactly as castableSpells offers a hand's split
 -- card twice: CR 709.3's "A player chooses which half of a split card they are
