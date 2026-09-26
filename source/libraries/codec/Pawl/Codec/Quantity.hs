@@ -120,7 +120,7 @@ codec =
       -- and the answer comes off the log rather than off that object.
       Arm.nullary "WasBlockedThisTurn" Quantity.WasBlockedThisTurn,
       Arm.payload "ControlGainedSinceLastUpkeep" PlayerRef.codec Quantity.ControlGainedSinceLastUpkeep (\x -> case x of Quantity.ControlGainedSinceLastUpkeep y -> Just y; _ -> Nothing),
-      Arm.payload "PlayedThisTurnBy" PlayerRef.codec Quantity.PlayedThisTurnBy (\x -> case x of Quantity.PlayedThisTurnBy y -> Just y; _ -> Nothing),
+      Arm.payload "PlayedBy" PlayerRef.codec Quantity.PlayedBy (\x -> case x of Quantity.PlayedBy y -> Just y; _ -> Nothing),
       Arm.nullary "ClassLevel" Quantity.ClassLevel,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
       -- comes from the combat record rather than from anything the card names.
@@ -249,7 +249,7 @@ tagOf x = case x of
   Quantity.WasBlocking {} -> "WasBlocking"
   Quantity.WasBlockedThisTurn {} -> "WasBlockedThisTurn"
   Quantity.ControlGainedSinceLastUpkeep {} -> "ControlGainedSinceLastUpkeep"
-  Quantity.PlayedThisTurnBy {} -> "PlayedThisTurnBy"
+  Quantity.PlayedBy {} -> "PlayedBy"
   Quantity.ClassLevel {} -> "ClassLevel"
   Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
   Quantity.AttackersDeclaredThisTurn {} -> "AttackersDeclaredThisTurn"

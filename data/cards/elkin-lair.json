@@ -27,7 +27,7 @@
                 "type": "AgainstSlot",
                 "value": {
                   "quantity": {
-                    "type": "PlayedThisTurnBy",
+                    "type": "PlayedBy",
                     "value": {
                       "type": "InSlot",
                       "value": "thatPlayer"
