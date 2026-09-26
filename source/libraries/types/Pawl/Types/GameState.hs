@@ -343,7 +343,7 @@ data GameState = MkGameState
     -- (Pawl.Types.TriggerLimit's OncePerGame), spent here: every triggering of an
     -- ability carrying that rider, as the same record CR 603.3b's log carries.
     -- A stored set rather than the log, because `events` is cleared at the turn
-    -- handoff and this record must outlive it; Pawl.Engine.Engine.withinTriggerLimit
+    -- handoff and this record must outlive it; Pawl.Engine.Event.withinTriggerLimit
     -- derives its key from these exactly as it does from the log.
     triggeredThisGame :: Set.Set AbilityTriggered.AbilityTriggered,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be

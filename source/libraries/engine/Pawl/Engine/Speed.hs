@@ -159,7 +159,7 @@ increaseAbility =
       TriggeredAbility.intervening = Just belowMaxSpeed,
       -- CR 702.179d's own "this ability triggers only once each turn", stated in
       -- the data because the rule states it, and enforced from there like every
-      -- other rider: Engine.withinTriggerLimit reads the CR 603.3b log, which
+      -- other rider: Event.withinTriggerLimit reads the CR 603.3b log, which
       -- records a sourceless trigger under its controller.
       TriggeredAbility.limit = TriggerLimit.OncePerTurn
     }
@@ -186,7 +186,7 @@ belowMaxSpeed =
 -- life" is the reason: a whole batch of simultaneous losses is a SINGLE
 -- occurrence, which is why this scans the batch rather than mapping over it. The separate per-turn limit,
 -- "this ability triggers only once each turn", is NOT enforced here --
--- `increaseAbility` prints the rider and Engine.withinTriggerLimit spends it off
+-- `increaseAbility` prints the rider and Event.withinTriggerLimit spends it off
 -- the CR 603.3b log, as it does for an ability a card bears.
 --
 -- Only an ACTIVE player's ability can fire, which is CR 702.179d's "during your

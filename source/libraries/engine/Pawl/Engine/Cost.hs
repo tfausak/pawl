@@ -4974,7 +4974,7 @@ tapForManaWith perform inFlight oid = do
 -- order-independent, which every AddMana into a pool is (#3724).
 --
 -- Not implemented: the printed "triggers only once" riders
--- (Pawl.Types.TriggerLimit), which Engine.withinTriggerLimit spends for a trigger
+-- (Pawl.Types.TriggerLimit), which Event.withinTriggerLimit spends for a trigger
 -- that reaches the stack (#3724).
 applyManaTriggers :: ManaAbilityPerformer.ManaAbilityPerformer -> [GameEvent.GameEvent] -> Game ()
 applyManaTriggers perform events = do
