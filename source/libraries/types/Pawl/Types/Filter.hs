@@ -239,9 +239,9 @@ data Filter keyword
     -- VACUOUSLY TRUE where the slot names no object, alone among these atoms: CR
     -- 601.2c's offer is made before either target is chosen, so
     -- Pawl.Engine.Target.legalSetsGiven widens and selectionLegal's joint check
-    -- narrows, exactly as CR 608.2b will at resolution. Pawl.CardSpec's "CR 110.2
-    -- no card asks SameControllerAsBound outside a mode's target slot" is what
-    -- keeps the atom out of the positions with no joint check behind them.
+    -- narrows, exactly as CR 608.2b will at resolution. Pawl.FilterPositionLintSpec's
+    -- "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot or
+    -- an attach destination" keeps the atom to the positions that fill it.
     SameControllerAsBound SlotName.SlotName
   | -- | CR 110.2 with CR 303.4b: the candidate has the same controller as the
     -- permanent the object this slot holds is ATTACHED TO -- Simic Guildmage's

@@ -27,6 +27,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
@@ -883,6 +884,7 @@ rewriteEffect pairs effect = case effect of
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot filter_) -> Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot (Filter.rewrite pairs filter_))
   -- No Filter to rewrite: both fields are slot names.
   Effect.AttachBound {} -> effect
+  Effect.AttachAll (AttachAll.MkAttachAll ref destination) -> Effect.AttachAll (AttachAll.MkAttachAll (rewriteObjectRef pairs ref) (Filter.rewrite pairs destination))
   Effect.PlaySubgame _ -> effect
   Effect.ChoosePlayer _ -> effect
   Effect.ChoosePlayerAtRandom _ -> effect

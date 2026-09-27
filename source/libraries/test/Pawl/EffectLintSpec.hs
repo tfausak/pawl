@@ -45,6 +45,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -372,6 +373,7 @@ ownQuantities effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
+  Effect.AttachAll {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
@@ -1261,6 +1263,9 @@ effectObjectRefs effect =
         Effect.AttachTarget {} -> []
         Effect.AttachTargetToEach {} -> []
         Effect.AttachBound {} -> []
+        -- The movers' gather is turnPermanentsOver's, shared through
+        -- Resolve.permanentsGathered.
+        Effect.AttachAll (AttachAll.MkAttachAll ref _) -> [(AsksTransformGather, ref)]
         Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> read_ (fmap DamagePart.ref (Foldable.toList parts))
         Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
         Effect.ChangeText {} -> []

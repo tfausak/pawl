@@ -11,7 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (AttachDestination, ClauseGateFramed, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (AttachDestination, ClauseGateFramed, EntryAttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
@@ -346,6 +346,7 @@ hostFramed framing = case framing of
   ReplacementRowFramed -> True
   Unframed -> False
   AttachDestination -> False
+  EntryAttachDestination -> False
   InTargetSlot -> False
   SearchFramed -> False
   OutsideTheGameFramed -> False
@@ -377,7 +378,7 @@ hostFramed framing = case framing of
 -- Synthetic Aura Diffusion and Grifter's Blade legitimately have one of each.
 canHostSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canHostSubjectCounts card =
-  let total wanted = sum (fmap (\(_, f) -> canHostSubjects f) (filter (\(framing, _) -> (framing == AttachDestination) == wanted) (cardFilters card)))
+  let total wanted = sum (fmap (\(_, f) -> canHostSubjects f) (filter (\(framing, _) -> elem framing [AttachDestination, EntryAttachDestination] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- Every occurrence of one atom's codec tag in an ENCODED face. The completeness
@@ -576,7 +577,7 @@ hostOfSubjectCardTypeTag = Text.pack "HostOfSubjectHasCardType"
 -- resolving attach has a subject with a host.
 hostOfSubjectCardTypeCounts :: Face.Face Card.Type.Card -> (Int, Int)
 hostOfSubjectCardTypeCounts card =
-  let total wanted = sum (fmap (\(_, f) -> filterAtoms hostOfSubjectCardTypeTag f) (filter (\(framing, _) -> (framing == AttachDestination) == wanted) (cardFilters card)))
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms hostOfSubjectCardTypeTag f) (filter (\(framing, _) -> elem framing [AttachDestination, EntryAttachDestination] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- Filter.HostOfSubjectHasCardType is answerable only where an attach frames the
@@ -822,7 +823,7 @@ sameControllerAsHostOfBoundTag = Text.pack "SameControllerAsHostOfBound"
 -- this atom in (Simic Guildmage). The second number is the offence.
 sameControllerAsHostOfBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sameControllerAsHostOfBoundCounts card =
-  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameControllerAsHostOfBoundTag f) (filter (\(framing, _) -> elem framing [AttachDestination, SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed] == wanted) (cardFilters card)))
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameControllerAsHostOfBoundTag f) (filter (\(framing, _) -> elem framing [AttachDestination, EntryAttachDestination, SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- The atom outside those positions, or the traversal and the codec disagreeing
@@ -837,17 +838,19 @@ sameControllerAsBoundTag :: Text.Text
 sameControllerAsBoundTag = Text.pack "SameControllerAsBound"
 
 -- How many CR 110.2 shared-controller atoms this card carries inside a MODE's
--- target slot filter, and how many anywhere else. The second number is the
--- offence; the first is what Bioshift legitimately has one of.
+-- target slot filter or an attach effect's destination, and how many anywhere
+-- else. The second number is the offence; the first is what Bioshift and Glamer
+-- Spinners legitimately have one of.
 sameControllerAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sameControllerAsBoundCounts card =
-  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameControllerAsBoundTag f) (filter (\(framing, _) -> (framing == InTargetSlot) == wanted) (cardFilters card)))
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms sameControllerAsBoundTag f) (filter (\(framing, _) -> elem framing [InTargetSlot, AttachDestination] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- CR 110.2's shared-controller comparison is answerable only where
--- Filter.Context.slotControllers is filled, and Pawl.Engine.Target.slotContext --
--- the one site that matches a MODE's target slot Filter -- is the one site that
--- fills it. This is sameNameAsBoundOffends' sweep one characteristic over, and
+-- Filter.Context.slotControllers is filled: Pawl.Engine.Target.slotContext, the
+-- one site that matches a MODE's target slot Filter, and
+-- Pawl.Engine.Resolve.Slots.effectContext, which an attach effect's destination
+-- is matched against. EntryAttachDestination's bare Context is not one. This is sameNameAsBoundOffends' sweep one characteristic over, and
 -- the one place the two differ is what makes it load-bearing rather than tidy:
 -- that atom is a silent False outside its position and this one is a silent TRUE,
 -- so an atom in a Count filter, an affected set or a search filter would ADMIT
@@ -1094,11 +1097,19 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Grifter's Blade's atom is framed by its CR 614.1c entry choice"
       (canHostSubjectCounts (S.combinedFace blade))
       (1, 0)
+    -- The fifth, a GROUP attach's destination: Glamer Spinners' receiver "must
+    -- be able to be enchanted by all the Auras" (its 2008-05-01 ruling).
+    spinners <- S.printingOf s registry "Glamer Spinners"
     Spec.assertEqWith
       s
-      "and those four cards are the whole of data/cards' authorship of it"
+      "Glamer Spinners' atom is framed by its group attach"
+      (canHostSubjectCounts (S.combinedFace spinners))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those five cards are the whole of data/cards' authorship of it"
       (sum (fmap (uncurry (+) . canHostSubjectCounts . S.combinedFace) ps))
-      4
+      5
     -- The traversal reaches a Filter position no effect, target slot or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
     -- card. Its absence would not show up in the sweep above, because Ash Barrens
@@ -1396,9 +1407,9 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 110.2's Filter.SameControllerAsBound is CR 709.4a's atom one characteristic
   -- over, in the same position and with the STAKES reversed: it is vacuously TRUE
   -- where Filter.Context.slotControllers has no key for its slot, so an atom
-  -- outside a mode's target slot admits every candidate the card meant to exclude
-  -- rather than none. See sameControllerAsBoundOffends.
-  Spec.it s "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot" $ do
+  -- outside the positions filling it admits every candidate the card meant to
+  -- exclude rather than none. See sameControllerAsBoundOffends.
+  Spec.it s "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot or an attach destination" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace sameControllerAsBoundOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only in a target slot's filter" (fmap (S.nameOf . Printing.card) offenders) []
@@ -1418,11 +1429,19 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Simic Guildmage's is in its first ability's second target slot"
       (sameControllerAsBoundCounts (S.combinedFace guildmageAtom))
       (1, 0)
+    -- The attach destination's accepting read: Glamer Spinners' "another
+    -- permanent with the same controller" as its target.
+    spinners <- S.printingOf s registry "Glamer Spinners"
     Spec.assertEqWith
       s
-      "and those two are the pool's whole authorship of it"
+      "Glamer Spinners' is in its attach destination"
+      (sameControllerAsBoundCounts (S.combinedFace spinners))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those three are the pool's whole authorship of it"
       (sum (fmap (uncurry (+) . sameControllerAsBoundCounts . S.combinedFace) ps))
-      2
+      3
     -- The REJECTING direction, hand-built for the reason every sibling lint's is:
     -- a card that offends must not be loadable, so no file can carry one. Buried
     -- under all three combinators, so an implementation reading only the top of a
@@ -2146,6 +2165,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       (fmap (\framing -> (framing, framedSlotsReadSingly (framing, atom))) [minBound .. maxBound])
       [ (Unframed, [bound]),
         (AttachDestination, [bound]),
+        (EntryAttachDestination, [bound]),
         (InTargetSlot, [bound]),
         (SourceHostFramed, [bound]),
         (StandingHostFramed, [bound]),
