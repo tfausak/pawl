@@ -367,6 +367,7 @@ import qualified Pawl.Codec.OptionalitySpec
 import qualified Pawl.Codec.OrElseSpec
 import qualified Pawl.Codec.OutsideDestinationSpec
 import qualified Pawl.Codec.OutsideObjectSpec
+import qualified Pawl.Codec.OwnedZoneSpec
 import qualified Pawl.Codec.PaidExpirySpec
 import qualified Pawl.Codec.PairingSpec
 import qualified Pawl.Codec.PartnerTextSpec
@@ -816,6 +817,7 @@ spec s registry = do
   Pawl.Codec.CardArrivedInSpec.spec s
   Pawl.Codec.CardLeavesZoneSpec.spec s
   Pawl.Codec.CardPutIntoGraveyardSpec.spec s
+  Pawl.Codec.OwnedZoneSpec.spec s
   Pawl.Codec.CardsPutIntoZoneSpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s

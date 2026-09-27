@@ -86,6 +86,7 @@ import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.OwnedZone as OwnedZone
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
@@ -481,6 +482,7 @@ looksBack condition = case condition of
   -- group-mates that died beside it (CR 603.10a's own Example).
   TriggerCondition.PermanentsDie _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> True
+  TriggerCondition.SelfPutFromBattlefieldInto _ -> True
   TriggerCondition.PermanentLeavesTheBattlefield _ -> True
   -- CR 603.10a twice over: this is a leaves-the-battlefield ability, and it is
   -- also an ability that triggers when an object all players can see is put
@@ -769,6 +771,7 @@ batchScoped condition = case condition of
   TriggerCondition.PermanentsDie _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
+  TriggerCondition.SelfPutFromBattlefieldInto _ -> False
   -- Per-permanent too: Justice, Vance Astrovik's "whenever another nonland
   -- permanent you control is returned" is CR 603.2c's second sentence.
   TriggerCondition.PermanentReturnedToHand _ -> False
@@ -2336,6 +2339,8 @@ conditionPutsSelfInto condition zone = case condition of
   -- leaves-the-battlefield condition can never be met. No printing writes it;
   -- the printed shape is "dies".
   TriggerCondition.SelfLeavesTheBattlefield -> False
+  -- The narrowing does name one: the object is put in that zone and no other.
+  TriggerCondition.SelfPutFromBattlefieldInto destination -> zone == OwnedZone.zone destination
   -- CR 701.9a: discarding puts the object in the graveyard.
   TriggerCondition.SelfDiscarded -> zone == Zone.Graveyard
   -- CR 702.29c: cycling discards the object, same destination.
@@ -2720,6 +2725,7 @@ zonesTriggeredFrom cond =
         -- the destination may be a hand or library, and an ability found in a GRAVEYARD
         -- could not be what fired for a permanent that went somewhere else.
         TriggerCondition.SelfLeavesTheBattlefield -> battlefield
+        TriggerCondition.SelfPutFromBattlefieldInto _ -> battlefield
         -- The same answer once more, and here it is the ONLY one CR 113.6k could give:
         -- the bearer is a bystander that never left the battlefield at all.
         TriggerCondition.PermanentLeavesTheBattlefield _ -> battlefield
@@ -3002,6 +3008,7 @@ stateTriggers gs
             TriggerCondition.PermanentDies _ -> False
             TriggerCondition.PermanentsDie _ -> False
             TriggerCondition.SelfLeavesTheBattlefield -> False
+            TriggerCondition.SelfPutFromBattlefieldInto _ -> False
             TriggerCondition.PermanentLeavesTheBattlefield _ -> False
             TriggerCondition.PermanentReturnedToHand _ -> False
             TriggerCondition.PermanentsReturnedToHand _ -> False

@@ -8456,6 +8456,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentDies _ -> False
   TriggerCondition.PermanentsDie _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
+  TriggerCondition.SelfPutFromBattlefieldInto _ -> False
   TriggerCondition.PermanentLeavesTheBattlefield _ -> False
   TriggerCondition.PermanentReturnedToHand _ -> False
   TriggerCondition.PermanentsReturnedToHand _ -> False

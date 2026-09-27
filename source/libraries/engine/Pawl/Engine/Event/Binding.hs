@@ -47,6 +47,7 @@ import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
 import Pawl.Types.PlayerId (PlayerId)
@@ -284,7 +285,11 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved m)
     | not (Game.isHiddenZone (ZoneChange.to (Moved.change m))) ->
         setBecameArrivals m Map.empty
-  -- The bystander reading of that same arm. CR 400.7e's arrival is guarded the
+  -- The same rule and guard for the arm above narrowed to one destination.
+  (TriggerCondition.SelfPutFromBattlefieldInto _, GameEvent.Moved m)
+    | not (Game.isHiddenZone (ZoneChange.to (Moved.change m))) ->
+        setBecameArrivals m Map.empty
+  -- The bystander reading of SelfLeavesTheBattlefield. CR 400.7e's arrival is guarded the
   -- same way and for the same rule -- and unlike the self-scoped arm this one
   -- binds a second slot the guard does not reach.
   (TriggerCondition.PermanentLeavesTheBattlefield _, GameEvent.Moved m) ->
@@ -1461,6 +1466,11 @@ eventBindingSlots cond = case cond of
   -- card lint unions in, and the rule's own answer for a hidden destination is
   -- that the ability finds nothing.
   TriggerCondition.SelfLeavesTheBattlefield -> Set.empty
+  -- SelfDies' guarantee wherever the one destination is public (CR 400.2),
+  -- and nothing for a hidden one, the arm above's reason.
+  TriggerCondition.SelfPutFromBattlefieldInto destination
+    | Game.isHiddenZone (OwnedZone.zone destination) -> Set.empty
+    | otherwise -> Set.singleton Binding.became
   -- CR 400.7e's `became` is withheld for the arm above's reason and for a second
   -- one: this condition's other event (CR 603.6c's leaving-the-game form)
   -- reaches no zone, so even a public destination is not guaranteed by a match.
