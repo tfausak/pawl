@@ -1241,6 +1241,7 @@ rewriteGrantedAbility pairs granted = case granted of
   -- (Pawl.Engine.Resolve.Effect.expandGrant) and stored, where no rewrite runs.
   GrantedAbility.Rules rules -> GrantedAbility.Rules rules
   GrantedAbility.Replacement r -> GrantedAbility.Replacement (rewritePrintedReplacement pairs r)
+  GrantedAbility.Player p -> GrantedAbility.Player (rewritePlayerStaticAbility pairs p)
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
 -- just the payload: the CR 603.8 condition is where the word usually is, and CR

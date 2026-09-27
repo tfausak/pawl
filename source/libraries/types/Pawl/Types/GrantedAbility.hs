@@ -2,6 +2,7 @@ module Pawl.Types.GrantedAbility where
 
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -39,4 +40,7 @@ data GrantedAbility card
     Rules RuleAbilities.RuleAbilities
   | -- | CR 113.3d / 614.1a: a static ability whose effect is a replacement effect.
     Replacement (PrintedReplacement.PrintedReplacement card (GrantedAbility card) (Effect.Effect card (GrantedAbility card)))
+  | -- | CR 113.3d / 613.10: a static ability that affects players, Nerd Rage's
+    -- "You have no maximum hand size".
+    Player PlayerStaticAbility.PlayerStaticAbility
   deriving (Eq, Ord, Show)
