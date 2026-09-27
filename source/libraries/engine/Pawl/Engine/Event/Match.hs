@@ -42,6 +42,7 @@ import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.Combat as Combat
@@ -6426,6 +6427,112 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- firing once for the batch is `batchScoped` plus eventTriggers' dedup, never
   -- this arm.
   TriggerCondition.CardsLeaveZone p -> matchesTriggerGiven bindings board gs bearer you (TriggerCondition.CardLeavesZone p) event
+  -- CR 603.2c's batch reading of a card put INTO a zone (Dutiful Knowledge
+  -- Seeker's "one or more cards are put into a library from anywhere"), once for
+  -- the batch by `batchScoped`. "From anywhere" is still from ANOTHER zone:
+  -- reordering a library puts no card into one (Wan Shi Tong, All-Knowing's
+  -- ruling), so a move that stays in the destination is declined.
+  --
+  -- CR 603.10a's look-back reaches the move only when the object was one all
+  -- players could see, which CR 400.2 decides by the zone it LEFT. So a bearer
+  -- absent from the board -- offered for its own departure in this event group
+  -- by `leftBattlefield` or `sameGroup` -- sees a public-origin move alone, while
+  -- a bearer standing on the battlefield sees every move, a hand's included, by
+  -- CR 603.10's first sentence.
+  --
+  -- The Filter reads the card as it last existed in the zone it left (CR 608.2h),
+  -- the appearance "immediately prior to the event" the look-back asks for; a
+  -- card in a hidden zone reads the same on either side of the move.
+  TriggerCondition.CardsPutIntoZone (CardsPutIntoZone.MkCardsPutIntoZone f origins destination) ->
+    let admits zc =
+          ZoneChange.to zc == destination
+            && ZoneChange.from zc /= destination
+            && (Set.null origins || Set.member (ZoneChange.from zc) origins)
+            && (Map.member bearer board || not (Game.isHiddenZone (ZoneChange.from zc)))
+            && let departed = ZoneChange.departed zc
+                in case Projection.viewWithLastKnown departed gs departed of
+                     Nothing -> False
+                     Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+     in case event of
+          GameEvent.Moved (Moved.MkMoved zc _ _ _ _) -> admits zc
+          GameEvent.CardArrived zc -> admits zc
+          GameEvent.DamageDealt _ -> False
+          GameEvent.StepBegan {} -> False
+          GameEvent.SpellCast {} -> False
+          GameEvent.DamagePrevented {} -> False
+          GameEvent.BecameMonarch _ -> False
+          GameEvent.TookInitiative _ -> False
+          GameEvent.Discarded {} -> False
+          GameEvent.Drew {} -> False
+          GameEvent.Revealed {} -> False
+          GameEvent.AttackerDeclared {} -> False
+          GameEvent.BecameBlocking {} -> False
+          GameEvent.BlocksDeclared {} -> False
+          GameEvent.AttackerBlocked {} -> False
+          GameEvent.AttackerUnblocked _ -> False
+          GameEvent.SpellCountered _ -> False
+          GameEvent.AbilityCountered _ -> False
+          GameEvent.HalfUnlocked {} -> False
+          GameEvent.TurnedFaceUp _ -> False
+          GameEvent.TurnedFaceDown _ -> False
+          GameEvent.Transformed {} -> False
+          GameEvent.BecameDesignated {} -> False
+          GameEvent.Evolved _ -> False
+          GameEvent.Mutated _ -> False
+          GameEvent.Mentored {} -> False
+          GameEvent.Exploited {} -> False
+          GameEvent.Trained _ -> False
+          GameEvent.BecameCrewed _ -> False
+          GameEvent.Convoked _ -> False
+          GameEvent.Saddled _ -> False
+          GameEvent.Crewed _ -> False
+          GameEvent.PermanentSacrificed {} -> False
+          GameEvent.AbilityTriggered {} -> False
+          GameEvent.LoyaltyAbilityActivated _ -> False
+          GameEvent.LifeLost {} -> False
+          GameEvent.LifeGained {} -> False
+          GameEvent.CountersPut {} -> False
+          GameEvent.CountersRemoved {} -> False
+          GameEvent.ControlChanged {} -> False
+          GameEvent.VentureMarkerEntered {} -> False
+          GameEvent.BecameTarget {} -> False
+          GameEvent.BecameAttached {} -> False
+          GameEvent.BecameUnattached {} -> False
+          GameEvent.LeftTheGame _ -> False
+          GameEvent.Milled {} -> False
+          GameEvent.Scried _ -> False
+          GameEvent.DungeonCompleted _ -> False
+          GameEvent.Surveiled _ -> False
+          GameEvent.DiceRolled _ -> False
+          GameEvent.DieResultSettled _ -> False
+          GameEvent.RolledToVisit _ -> False
+          GameEvent.ClassLevelSet _ -> False
+          GameEvent.Plotted _ -> False
+          GameEvent.Explored _ -> False
+          GameEvent.Connived _ -> False
+          GameEvent.Exerted _ -> False
+          GameEvent.BecameAttacked _ -> False
+          GameEvent.AttackersDeclared _ -> False
+          GameEvent.BecameTapped _ -> False
+          GameEvent.BecameUntapped _ -> False
+          GameEvent.TappedForMana _ -> False
+          GameEvent.ManaAdded _ -> False
+          GameEvent.ManaAbilityResolved _ -> False
+          GameEvent.CoinFlipped {} -> False
+          GameEvent.RingTempted _ -> False
+          GameEvent.Blighted _ -> False
+          GameEvent.Foraged _ -> False
+          GameEvent.Foretold _ -> False
+          GameEvent.CollectedEvidence _ -> False
+          GameEvent.GaveGift _ -> False
+          GameEvent.AttractionOpened _ -> False
+          GameEvent.PrizeClaimed _ -> False
+          GameEvent.Earthbent _ -> False
+          GameEvent.Waterbent _ -> False
+          GameEvent.Airbent _ -> False
+          GameEvent.Firebent _ -> False
+          GameEvent.ActivatedAbilityResolved _ -> False
+          GameEvent.TriggeredAbilityResolved _ -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the

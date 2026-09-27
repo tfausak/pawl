@@ -219,6 +219,8 @@ library codec
     Pawl.Codec.CardPutIntoGraveyard
     Pawl.Codec.CardPutIntoGraveyardSpec
     Pawl.Codec.CardSpec
+    Pawl.Codec.CardsPutIntoZone
+    Pawl.Codec.CardsPutIntoZoneSpec
     Pawl.Codec.CardType
     Pawl.Codec.CardTypeSpec
     Pawl.Codec.CastFrom
@@ -1748,6 +1750,7 @@ library types
     Pawl.Types.CardLeavesZone
     Pawl.Types.CardName
     Pawl.Types.CardPutIntoGraveyard
+    Pawl.Types.CardsPutIntoZone
     Pawl.Types.CardType
     Pawl.Types.CarryOver
     Pawl.Types.CastFrom

@@ -48,6 +48,7 @@ import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -495,6 +496,15 @@ looksBack condition = case condition of
   -- The batch reading is in the same family, PermanentsDie's reason: CR 603.10a
   -- names the family without counting its members.
   TriggerCondition.CardsLeaveZone p -> CardLeavesZone.from p == Zone.Graveyard
+  -- CR 603.10a's fourth family, "put into a hand or library", which are CR
+  -- 400.2's two hidden zones. The rule narrows it to an object all players could
+  -- see; matchesTriggerGiven's arm asks that of each move, since it is a fact
+  -- about the event rather than the condition.
+  --
+  -- A regression fence: `leftBattlefield` already offers a bearer its own move,
+  -- so the answer only decides a bearer that left for another zone while a
+  -- visible card entered a library in the same group, and no board builds that.
+  TriggerCondition.CardsPutIntoZone p -> Game.isHiddenZone (CardsPutIntoZone.to p)
   -- The same third family read off the card itself, and the one it is
   -- load-bearing for: by CR 113.6k the bearer IS the departing card, so only the
   -- look-back finds it at all.
@@ -777,6 +787,9 @@ batchScoped condition = case condition of
   -- Pawl.LeavesTriggerSpec's "CR 603.2c two cards leaving alice's graveyard at
   -- once put ONE counter on the Mascot".
   TriggerCondition.CardsLeaveZone {} -> True
+  -- The arrival side of the same reading: Dutiful Knowledge Seeker's "one or
+  -- more cards are put into a library" names the whole group once.
+  TriggerCondition.CardsPutIntoZone {} -> True
   -- One card, one departure.
   TriggerCondition.SelfLeavesGraveyard -> False
   TriggerCondition.AttachedCreatureDies -> False
@@ -2717,6 +2730,9 @@ zonesTriggeredFrom cond =
         TriggerCondition.CardLeavesZone {} -> battlefield
         -- The batch reading watches the same graveyard from the same zone.
         TriggerCondition.CardsLeaveZone {} -> battlefield
+        -- CR 113.6's default: Dutiful Knowledge Seeker watches libraries from the
+        -- battlefield, and its own move there is found by CR 603.10a's look-back.
+        TriggerCondition.CardsPutIntoZone {} -> battlefield
         -- CR 113.6k: a card leaving a graveyard is in one until it leaves, so the
         -- graveyard is the one zone this can trigger from. eventTriggers'
         -- `leftGraveyardSame` is what serves it, the departure being its own event.
@@ -2987,6 +3003,7 @@ stateTriggers gs
             TriggerCondition.PermanentsReturnedToHand _ -> False
             TriggerCondition.CardLeavesZone {} -> False
             TriggerCondition.CardsLeaveZone {} -> False
+            TriggerCondition.CardsPutIntoZone {} -> False
             TriggerCondition.SelfLeavesGraveyard -> False
             TriggerCondition.HauntedCreatureDies -> False
             TriggerCondition.SpellOrAbilityCounters _ -> False

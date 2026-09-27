@@ -8423,6 +8423,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.ControllersTurn _ _) -> True
   TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.EachTurn _ _) -> False
   TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone _ TurnScope.OpponentsTurn _ _) -> False
+  -- Dutiful Knowledge Seeker's arrival names no turn.
+  TriggerCondition.CardsPutIntoZone {} -> False
   TriggerCondition.SelfLeavesGraveyard -> False
   -- Rule 702.55b names no turn.
   TriggerCondition.HauntedCreatureDies -> False

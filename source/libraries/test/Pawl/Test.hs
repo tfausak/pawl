@@ -91,6 +91,7 @@ import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardPutIntoGraveyardSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
+import qualified Pawl.Codec.CardsPutIntoZoneSpec
 import qualified Pawl.Codec.CastFromSpec
 import qualified Pawl.Codec.CastFromZoneSpec
 import qualified Pawl.Codec.CastObligationSpec
@@ -806,6 +807,7 @@ spec s registry = do
   Pawl.Codec.CardArrivedInSpec.spec s
   Pawl.Codec.CardLeavesZoneSpec.spec s
   Pawl.Codec.CardPutIntoGraveyardSpec.spec s
+  Pawl.Codec.CardsPutIntoZoneSpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s

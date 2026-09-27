@@ -4,6 +4,7 @@ import qualified Pawl.Codec.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Codec.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardPutIntoGraveyard as CardPutIntoGraveyard
+import qualified Pawl.Codec.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.ControllerBecomesTarget as ControllerBecomesTarget
@@ -105,6 +106,7 @@ codec =
           Arm.payload "PermanentsReturnedToHand" filterCodec TriggerCondition.PermanentsReturnedToHand (\x -> case x of TriggerCondition.PermanentsReturnedToHand y -> Just y; _ -> Nothing),
           Arm.payload "CardLeavesZone" CardLeavesZone.codec TriggerCondition.CardLeavesZone (\x -> case x of TriggerCondition.CardLeavesZone y -> Just y; _ -> Nothing),
           Arm.payload "CardsLeaveZone" CardLeavesZone.codec TriggerCondition.CardsLeaveZone (\x -> case x of TriggerCondition.CardsLeaveZone y -> Just y; _ -> Nothing),
+          Arm.payload "CardsPutIntoZone" CardsPutIntoZone.codec TriggerCondition.CardsPutIntoZone (\x -> case x of TriggerCondition.CardsPutIntoZone y -> Just y; _ -> Nothing),
           Arm.nullary "AttachedCreatureDies" TriggerCondition.AttachedCreatureDies,
           Arm.nullary "AttachedCreatureBecomesTapped" TriggerCondition.AttachedCreatureBecomesTapped,
           Arm.payload "PermanentsBecomeTapped" filterCodec TriggerCondition.PermanentsBecomeTapped (\x -> case x of TriggerCondition.PermanentsBecomeTapped y -> Just y; _ -> Nothing),
@@ -256,6 +258,7 @@ tagOf x = case x of
   TriggerCondition.PermanentsReturnedToHand {} -> "PermanentsReturnedToHand"
   TriggerCondition.CardLeavesZone {} -> "CardLeavesZone"
   TriggerCondition.CardsLeaveZone {} -> "CardsLeaveZone"
+  TriggerCondition.CardsPutIntoZone {} -> "CardsPutIntoZone"
   TriggerCondition.AttachedCreatureDies {} -> "AttachedCreatureDies"
   TriggerCondition.AttachedCreatureBecomesTapped {} -> "AttachedCreatureBecomesTapped"
   TriggerCondition.PermanentsBecomeTapped {} -> "PermanentsBecomeTapped"

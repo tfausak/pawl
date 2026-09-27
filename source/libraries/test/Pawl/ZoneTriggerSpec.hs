@@ -51,6 +51,7 @@ import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -2572,6 +2573,9 @@ representativeEvents cond =
         -- delegates to the singular's, so the two match alike. It binds the
         -- event's share of CR 603.2c's "that many".
         TriggerCondition.CardsLeaveZone p -> one (moved (CardLeavesZone.from p) (Maybe.fromMaybe Zone.Battlefield (CardLeavesZone.to p)))
+        -- The arrival side, pinned on the destination the condition names. Empty:
+        -- it binds nothing.
+        TriggerCondition.CardsPutIntoZone p -> one (moved Zone.Graveyard (CardsPutIntoZone.to p))
         -- The self form out of the same zone. Empty: it binds nothing.
         TriggerCondition.SelfLeavesGraveyard -> one (moved Zone.Graveyard Zone.Battlefield)
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
@@ -2971,6 +2975,7 @@ everyTriggerCondition =
     TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Graveyard Nothing),
     TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Graveyard Nothing),
     TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Exile Nothing),
+    TriggerCondition.CardsPutIntoZone (CardsPutIntoZone.MkCardsPutIntoZone Filter.Type.IsSource Set.empty Zone.Library),
     TriggerCondition.SelfLeavesGraveyard,
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
