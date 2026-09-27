@@ -1,21 +1,16 @@
 module Pawl.Types.RemovePlusOneCounters where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.Filter as Filter
 
 -- | The payload of Pawl.Types.CostComponent's RemovePlusOneCounters arm: CR
--- 118.1's removal as a cost aimed at ANOTHER permanent, spent by taking this
--- many +1\/+1 counters off ONE permanent the payer chooses out of the ones the
--- Filter admits. Zameck Guildmage's "Remove a +1\/+1 counter from a creature you
--- control" is the printing.
+-- 118.1's removal as a cost aimed at permanents OTHER than the one the cost is
+-- on, spent by taking this many +1\/+1 counters off the permanents the Filter
+-- admits -- off one the payer chooses (Zameck Guildmage), or divided among
+-- several as the payer pays (Novijen Sages), per the spread.
 --
--- The count is COUNTERS, where Pawl.Types.TapPermanents' is objects: this
--- component names one permanent and says how many counters come off it.
---
--- A cost that spreads the removal over SEVERAL permanents -- Novijen Sages'
--- "Remove two +1\/+1 counters from among creatures you control" -- is a
--- different shape, the payer dividing the count as they pay, and is not
--- implemented (#3813).
+-- The count is COUNTERS, where Pawl.Types.TapPermanents' is objects.
 --
 -- The counter KIND is not a field: the printed cost states the +1\/+1 counter,
 -- so there is no second kind for a card to spell. Pawl.Types.CostComponent's
@@ -26,6 +21,7 @@ import qualified Pawl.Types.Filter as Filter
 -- Pawl.Types.CostComponent is.
 data RemovePlusOneCounters keyword = MkRemovePlusOneCounters
   { count :: Natural.Natural,
-    whichPermanent :: Filter.Filter keyword
+    whichPermanent :: Filter.Filter keyword,
+    spread :: CounterSpread.CounterSpread
   }
   deriving (Eq, Ord, Show)

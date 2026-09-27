@@ -2959,7 +2959,8 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileCardFromHand criterion -> CostComponent.ExileCardFromHand (rewrite pairs criterion)
   CostComponent.RevealCardFromHand criterion -> CostComponent.RevealCardFromHand (rewrite pairs criterion)
   CostComponent.Behold criterion -> CostComponent.Behold (rewrite pairs criterion)
-  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion) -> CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n (rewrite pairs criterion))
+  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion spread) -> CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n (rewrite pairs criterion) spread)
+  CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemovePlusOneCountersX (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component

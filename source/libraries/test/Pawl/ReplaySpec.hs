@@ -1615,6 +1615,18 @@ combatReplaySpec s =
           -- Discriminating: fails if ChooseBehold reuses ChoseBlight rather than
           -- getting its own ObjectId-shaped constructor.
           Spec.assertEqWith s "and a blight transcript does not decode as one" (Replay.decode p (Response.ChoseBlight inHand)) Nothing
+        -- CR 601.2h: how a paying player divided a counter removal is a decision,
+        -- so it has to survive a transcript like any other.
+        Spec.it s "ChooseCounterRemovalAmong round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 11
+              b = ObjectId.MkObjectId 13
+              p = Prompt.ChooseCounterRemovalAmong decider S.alice oid 2 (Map.fromList [(a, 2), (b, 1)])
+              split = Map.fromList [(a, 1 :: Natural.Natural), (b, 1)]
+          Spec.assertEqWith s "a split round trips" (Replay.decode p (Replay.encode p split)) (Just split)
+          -- Discriminating: a decode answering the default division would pass
+          -- one leg by accident.
+          Spec.assertEqWith s "both off one round trips" (Replay.decode p (Replay.encode p (Map.singleton a 2))) (Just (Map.singleton a 2))
+          Spec.assertEqWith s "and a one-permanent removal transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemoval a)) Nothing
         -- CR 701.61a: which half of forage the forager took is a decision, so it
         -- has to survive a transcript like any other.
         Spec.it s "ChooseForage round-trips through the transcript" $ do
