@@ -3011,6 +3011,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   melokuSpec s registry
   barkhideTrollSpec s registry
   zameckGuildmageCostSpec s registry
+  novijenSagesSpec s registry
+  retributionSpec s registry
   millikinSpec s registry
   brittleEffigySpec s registry
   exiledReliquarySpec s registry
@@ -4561,6 +4563,185 @@ recordingCounterRemovals wanted p = case p of
   Prompt.ChooseCounterRemoval _ _ _ candidates -> do
     State.modify' (<> [List.sort (NonEmpty.toList candidates)])
     pure (if List.elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates)
+  _ -> pure (S.identityAnswer p)
+
+-- Novijen Sages {4}{U}{U} Creature -- Human Advisor Mutant 0/0 (Oracle text
+-- checked against Scryfall 2026-09-26): "Graft 4 ... {1}, Remove two +1/+1
+-- counters from among creatures you control: Draw a card."
+--
+-- The producer for CounterSpread.FromAmong, CR 118.1's counter removal DIVIDED
+-- among the permanents the criterion admits, the payer choosing the division as
+-- they pay (CR 601.2h). Zameck Guildmage's group above is the one-permanent form.
+--
+-- THE BOARD: alice controls the Sages, an Island for its {1}, a Goblin Piker and
+-- a Hill Giant, each of the three carrying the counter count given. bob's own
+-- Hill Giant carries three counters on every board, so a pool read without "you
+-- control" would find the counters anyway. alice's library holds two cards.
+novijenSagesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+novijenSagesSpec s registry =
+  Spec.describe s "Novijen Sages" $ do
+    -- The gameplay-level assertions come FIRST: where the two counters came off,
+    -- then the draw. The prompt record is a proxy after them.
+    Spec.it s "CR 601.2h the payer divides the two counters among creatures, one off each of two" $ do
+      (sagesId, pikerId, giantId, board) <- sagesBoard s registry [3, 1, 2]
+      sages <- S.printingOf s registry "Novijen Sages"
+      let answer = Map.fromList [(pikerId, 1), (giantId, 1)]
+          ((_, paid), asked) = State.runState (Engine.runGame (recordingSpreadRemovals answer) board (Activate.activateAbility S.alice sagesId (theAbility sages))) []
+          after = S.runPure S.identityAnswer paid Stack.resolveTop
+      Spec.assertEqWith s "CR 122.1 one counter came off the Piker" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 0
+      Spec.assertEqWith s "and one off the Giant, which kept its other" (S.counterOf CounterKind.PlusOnePlusOne giantId after) 1
+      Spec.assertEqWith s "and the Sages, given none of the two, kept all three" (S.counterOf CounterKind.PlusOnePlusOne sagesId after) 3
+      Spec.assertEqWith s "CR 121.1 and the ability that cost paid for drew a card" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+      Spec.assertEqWith s "and the payer was asked once, over every counter-bearing creature they control" asked [(2, Map.fromList [(sagesId, 3), (pikerId, 1), (giantId, 2)])]
+    -- A division that does not add up is refused, not repaired (CR 601.2h's "partial
+    -- payments are not allowed"): the same board and the same prompt, answered with
+    -- one counter where the cost names two.
+    Spec.it s "CR 601.2h a division short of the count pays nothing" $ do
+      (sagesId, pikerId, giantId, board) <- sagesBoard s registry [3, 1, 2]
+      sages <- S.printingOf s registry "Novijen Sages"
+      let ((_, paid), asked) = State.runState (Engine.runGame (recordingSpreadRemovals (Map.singleton pikerId 1)) board (Activate.activateAbility S.alice sagesId (theAbility sages))) []
+      Spec.assertEqWith s "no counter came off the Piker" (S.counterOf CounterKind.PlusOnePlusOne pikerId paid) 1
+      Spec.assertEqWith s "nor off the Giant" (S.counterOf CounterKind.PlusOnePlusOne giantId paid) 2
+      Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack paid)) 0
+      Spec.assertEqWith s "the payer was asked" (length asked) 1
+    -- The elision: the creatures carry exactly the two counters between them, so
+    -- CR 118.3 leaves one division and performing it decides nothing.
+    Spec.it s "CR 118.3 counters exactly covering the count are one division, so nothing is asked" $ do
+      (sagesId, pikerId, giantId, board) <- sagesBoard s registry [1, 0, 1]
+      sages <- S.printingOf s registry "Novijen Sages"
+      let ((_, paid), asked) = State.runState (Engine.runGame (recordingSpreadRemovals Map.empty) board (Activate.activateAbility S.alice sagesId (theAbility sages))) []
+      Spec.assertEqWith s "the Sages' one counter came off" (S.counterOf CounterKind.PlusOnePlusOne sagesId paid) 0
+      Spec.assertEqWith s "and the Giant's" (S.counterOf CounterKind.PlusOnePlusOne giantId paid) 0
+      Spec.assertEqWith s "the Piker had none to lose" (S.counterOf CounterKind.PlusOnePlusOne pikerId paid) 0
+      Spec.assertEqWith s "the activation completed" (length (GameState.stack paid)) 1
+      Spec.assertEqWith s "and the payer was asked nothing" asked []
+    -- CR 118.3 / 602.2b over the pair of boards differing in one counter: two
+    -- creatures with ONE counter each pay a removal of two spread among them, where
+    -- the one-permanent form would refuse it; one counter in all does not.
+    Spec.it s "CR 118.3 the count is read against the counters the creatures carry between them" $ do
+      sages <- S.printingOf s registry "Novijen Sages"
+      (sagesId, _, _, spread) <- sagesBoard s registry [1, 1, 0]
+      (shortId, _, _, short) <- sagesBoard s registry [1, 0, 0]
+      let offers oid gs = length (filter (isActivateOfAbility oid (theAbility sages)) (Action.legalActions S.alice gs))
+      Spec.assertEqWith s "CR 602.2b offered with one counter on each of two creatures" (offers sagesId spread) 1
+      Spec.assertEqWith s "and not offered with one counter in all" (offers shortId short) 0
+
+-- The board novijenSagesSpec's cases share, described above it. The counts are
+-- the Sages', the Piker's and the Giant's, in that order.
+sagesBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [Natural.Natural] -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+sagesBoard s registry counts = do
+  sages <- S.printingOf s registry "Novijen Sages"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  island <- S.printingOf s registry "Island"
+  let lands = S.landsFor island S.alice 1 (Setup.emptyGame S.bothPlayers)
+      (sagesId, withSages) = S.addPermanent sages S.alice lands
+      (pikerId, withPiker) = S.addPermanent piker S.alice withSages
+      (giantId, withGiant) = S.addPermanent giant S.alice withPiker
+      (bobsGiantId, withBobs) = S.addPermanent giant S.bob withGiant
+      (_, stocked) = S.addLibraryCard island S.alice (snd (S.addLibraryCard island S.alice withBobs))
+      opposed = S.addCounter CounterKind.PlusOnePlusOne 3 bobsGiantId stocked
+      counted = case counts of
+        [onSages, onPiker, onGiant] -> S.addCounter CounterKind.PlusOnePlusOne onGiant giantId (S.addCounter CounterKind.PlusOnePlusOne onPiker pikerId (S.addCounter CounterKind.PlusOnePlusOne onSages sagesId opposed))
+        _ -> opposed
+  pure
+    ( sagesId,
+      pikerId,
+      giantId,
+      counted
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- Answers Prompt.ChooseCounterRemovalAmong with the division given, recording
+-- each prompt's count and offer. PINNED rather than searching for a legal
+-- division, so a payment that ignored the answer cannot come back green.
+recordingSpreadRemovals :: Map.Map ObjectId.ObjectId Natural.Natural -> Prompt.Prompt r -> State.State [(Natural.Natural, Map.Map ObjectId.ObjectId Natural.Natural)] r
+recordingSpreadRemovals answer p = case p of
+  Prompt.ChooseCounterRemovalAmong _ _ _ total offered -> do
+    State.modify' (<> [(total, offered)])
+    pure answer
+  _ -> pure (S.identityAnswer p)
+
+-- Retribution of the Ancients {B} Enchantment (Oracle text checked against
+-- Scryfall 2026-09-26): "{B}, Remove X +1/+1 counters from among creatures you
+-- control: Target creature gets -X/-X until end of turn."
+--
+-- The producer for CostComponent.RemovePlusOneCountersX, Novijen Sages' removal
+-- with CR 107.3a's X as its count, announced at CR 601.2b and divided at CR
+-- 601.2h.
+--
+-- THE BOARD: alice controls the Retribution over a Swamp, a Goblin Piker with
+-- one counter and a Hill Giant with two; bob's Hill Giant, the target, carries
+-- four, which a pool read without "you control" would count.
+retributionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+retributionSpec s registry =
+  Spec.describe s "Retribution of the Ancients" $ do
+    -- The gameplay-level assertions come FIRST: which creature paid, then the
+    -- -X/-X the announcement bought. The prompt record is a proxy after them.
+    Spec.it s "CR 107.3a/601.2h the announced X is divided among creatures and the target gets -X/-X" $ do
+      (retributionId, pikerId, giantId, bobsGiantId, board) <- retributionBoard s registry
+      retribution <- S.printingOf s registry "Retribution of the Ancients"
+      let answer = Map.fromList [(pikerId, 1), (giantId, 1)]
+          act = do Activate.activateAbility S.alice retributionId (theAbility retribution); Stack.resolveTop
+          (after, asked) = State.runState (fmap snd (Engine.runGame (retributionAnswers 2 bobsGiantId answer) board act)) []
+      Spec.assertEqWith s "CR 122.1 the Piker's one counter came off" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 0
+      Spec.assertEqWith s "and one of the Giant's two, as the payer divided them" (S.counterOf CounterKind.PlusOnePlusOne giantId after) 1
+      Spec.assertEqWith s "CR 613.4c bob's 3/3 Giant with four counters, at -2/-2, is 5/5" (Projection.toughnessOf bobsGiantId after) (Just 5)
+      Spec.assertEqWith s "and the payer was asked to divide X = 2 over alice's two creatures" asked [(2, Map.fromList [(pikerId, 1), (giantId, 2)])]
+    -- CR 601.2b via 602.2b: the X offered is bounded by the counters alice's
+    -- creatures carry between them -- three, not bob's four and not seven.
+    Spec.it s "CR 118.3 the ChooseX bound is the counters the creatures carry between them" $ do
+      (retributionId, _, _, _, board) <- retributionBoard s registry
+      retribution <- S.printingOf s registry "Retribution of the Ancients"
+      let bounds = State.execState (Engine.runGame recordXBound board (Activate.activateAbility S.alice retributionId (theAbility retribution))) []
+      Spec.assertEqWith s "X is bounded at three" bounds [3]
+
+-- The board retributionSpec's cases share, described above it. Answers the
+-- Retribution, the Piker, alice's Giant and bob's Giant.
+retributionBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+retributionBoard s registry = do
+  retribution <- S.printingOf s registry "Retribution of the Ancients"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  swamp <- S.printingOf s registry "Swamp"
+  let lands = S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers)
+      (retributionId, withRetribution) = S.addPermanent retribution S.alice lands
+      (pikerId, withPiker) = S.addPermanent piker S.alice withRetribution
+      (giantId, withGiant) = S.addPermanent giant S.alice withPiker
+      (bobsGiantId, withBobs) = S.addPermanent giant S.bob withGiant
+      counted =
+        S.addCounter CounterKind.PlusOnePlusOne 4 bobsGiantId (S.addCounter CounterKind.PlusOnePlusOne 2 giantId (S.addCounter CounterKind.PlusOnePlusOne 1 pikerId withBobs))
+  pure
+    ( retributionId,
+      pikerId,
+      giantId,
+      bobsGiantId,
+      counted
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- Announces X, aims the target at the creature named by FILTERING the offered
+-- set, and answers Prompt.ChooseCounterRemovalAmong with the division given,
+-- recording each such prompt's count and offer.
+retributionAnswers :: Natural.Natural -> ObjectId.ObjectId -> Map.Map ObjectId.ObjectId Natural.Natural -> Prompt.Prompt r -> State.State [(Natural.Natural, Map.Map ObjectId.ObjectId Natural.Natural)] r
+retributionAnswers x target answer p = case p of
+  Prompt.ChooseX {} -> pure x
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (Set.filter ((== Just target) . Recipient.objectOf) . snd) sets)
+  _ -> recordingSpreadRemovals answer p
+
+-- Records the bound Prompt.ChooseX carries and announces 0, which refuses nothing
+-- the record needs.
+recordXBound :: Prompt.Prompt r -> State.State [Natural.Natural] r
+recordXBound p = case p of
+  Prompt.ChooseX _ _ _ _ bound -> do
+    State.modify' (<> [bound])
+    pure 0
   _ -> pure (S.identityAnswer p)
 
 -- Millikin {2} Artifact Creature -- Construct 0/1, "{T}, Mill a card: Add {C}"

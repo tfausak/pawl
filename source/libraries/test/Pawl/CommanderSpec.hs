@@ -98,6 +98,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
@@ -686,6 +687,37 @@ backgroundSpec s registry = Spec.describe s "Choose a Background" $ do
     Spec.assertBool s (Set.member Subtype.Type.Bear (Projection.subtypesOf designatedId designated)) "in addition to the Bear he is printed as (CR 205.1b)"
     Spec.assertEqWith s "negative leg: the same enchantment leaves an undesignated Wilson at his printed 2/2" (S.powerToughnessOf refusedId refused) (Just (2, 2))
     Spec.assertBool s (not (Set.member Subtype.Type.Giant (Projection.subtypesOf refusedId refused))) "and no Giant"
+  -- CR 613.1f / 113.7: Master Chef ({2}{G} Legendary Enchantment -- Background)
+  -- gives commander creatures you own "This creature enters with an additional
+  -- +1/+1 counter on it" and "Other creatures you control enter with an
+  -- additional +1/+1 counter on them" -- quoted REPLACEMENT abilities a live
+  -- static ability grants, so they are the receiver's, and its "you" is Wilson's
+  -- controller. Wilson is named alone and the Chef merely played, so nothing
+  -- in the command zone grants anything; naming Akiri instead is the negative
+  -- leg, where Wilson is no commander and receives nothing.
+  Spec.it s "CR 613.1f Master Chef's quoted replacements belong to the commander it grants them to" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    wilson <- S.printingOf s registry "Wilson, Refined Grizzly"
+    chef <- S.printingOf s registry "Master Chef"
+    akiri <- S.printingOf s registry "Akiri, Line-Slinger"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let counters = S.counterOf CounterKind.PlusOnePlusOne
+        resolve printing gs =
+          let (oid, staged) = S.spellOnStack printing S.alice gs
+           in (oid, S.runPure S.identityAnswer staged (Stack.resolveTop >> Engine.settleForPriority))
+        arrival printing gs =
+          let (_, after) = resolve printing gs
+           in case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield gs)) of
+                [oid] -> Just (counters oid after)
+                _ -> Nothing
+        withChef pair = snd (S.addPermanent chef S.alice (partnerBoard mountain plains 6 pair))
+        withWilson pair = snd (S.addPermanent wilson S.alice (withChef pair))
+    -- CR 614.12: the Chef's effect already exists and would apply to Wilson on
+    -- the battlefield, so his own granted row modifies how he enters.
+    Spec.assertEqWith s "CR 614.12 the commander enters with its own counter" (arrival wilson (withChef [wilson])) (Just 1)
+    Spec.assertEqWith s "another creature alice controls enters with the commander's counter" (arrival elves (withWilson [wilson])) (Just 1)
+    Spec.assertEqWith s "negative leg: beside an undesignated Wilson it enters with none" (arrival elves (withWilson [akiri])) (Just 0)
 
 doctorsCompanionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 doctorsCompanionSpec s registry = Spec.describe s "Doctor's companion" $ do

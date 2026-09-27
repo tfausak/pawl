@@ -2221,6 +2221,63 @@ paragonBoard forest buried held paragon =
               }
         }
 
+-- CR 701.8a: `oid` is destroyed, and the board settles.
+destroyedAndSettled :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+destroyedAndSettled oid gs =
+  let killed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [oid])
+   in S.runPure S.identityAnswer killed Engine.settleForPriority
+
+-- The Eighth Doctor {4}{W}{U} Legendary Creature -- Time Lord Doctor 4/4: "When
+-- The Eighth Doctor enters, mill three cards. / Once during each of your turns,
+-- you may play a historic land or cast a historic permanent spell from your
+-- graveyard. If you do, it gains 'If this permanent would leave the
+-- battlefield, exile it instead of putting it anywhere else.'"
+--
+-- Serra Paragon's shape with a quoted REPLACEMENT ability: a static ability
+-- granting one, which the layer fold appends to the receiver's own (CR 613.1f,
+-- 113.7). Ornithopter is the historic permanent, cast from the graveyard and
+-- from the hand on the same board.
+eighthDoctorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+eighthDoctorSpec s registry =
+  let board doctor = do
+        forest <- S.printingOf s registry "Forest"
+        thopter <- S.printingOf s registry "Ornithopter"
+        pure (paragonBoard forest thopter thopter doctor)
+      -- The Ornithopter cast by `wanted`, destroyed once it has resolved.
+      castAndDestroyed wanted gs =
+        let cast = S.runPure (takeFirst [S.isCastOf wanted]) gs Engine.priorityLoop
+         in case arrivedBetween gs cast of
+              [permanent] -> Just (destroyedAndSettled permanent cast)
+              _ -> Nothing
+   in Spec.describe s "EighthDoctor" $ do
+        Spec.it s "CR 613.1f The Eighth Doctor's quoted replacement exiles the permanent it was granted to" $ do
+          b <- board . Just =<< S.printingOf s registry "The Eighth Doctor"
+          let gs = pbState b
+          case (castAndDestroyed (pbBuried b) gs, castAndDestroyed (pbHeld b) gs) of
+            (Just fromGrave, Just fromHand) -> do
+              Spec.assertEqWith s "the Ornithopter cast from the graveyard was exiled as it was destroyed" (namesIn Zone.Exile S.alice fromGrave) ["Ornithopter"]
+              Spec.assertEqWith s "while the one cast from the hand went to the graveyard" (namesIn Zone.Exile S.alice fromHand) []
+              Spec.assertBool s (elem "Ornithopter" (namesIn Zone.Graveyard S.alice fromHand)) "and is in alice's graveyard"
+            _ -> Spec.assertFailure s "expected both Ornithopters to resolve"
+
+        -- THE PROJECTION TRIPWIRE: a Clone of The Eighth Doctor grants the same
+        -- quoted ability, read off its copiable values rather than the printed
+        -- Clone.
+        Spec.it s "CR 707.2 a Clone of The Eighth Doctor grants the quoted replacement" $ do
+          doctor <- S.printingOf s registry "The Eighth Doctor"
+          clone <- S.printingOf s registry "Clone"
+          b0 <- board Nothing
+          let withBobs = snd (S.addPermanent doctor S.bob (pbState b0))
+              (_, staged) = S.spellOnStack clone S.alice withBobs
+              copying p = case p of
+                Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
+                _ -> S.identityAnswer p
+              copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
+              ready = copied {GameState.priority = Just S.alice, GameState.passed = Set.empty}
+          case castAndDestroyed (pbBuried b0) ready of
+            Just after -> Spec.assertEqWith s "the Ornithopter was exiled as it was destroyed" (namesIn Zone.Exile S.alice after) ["Ornithopter"]
+            Nothing -> Spec.assertFailure s "expected the Ornithopter to arrive under the Clone's permission"
+
 -- Serra Paragon {2}{W}{W} Creature -- Angel 3/4: "Flying / Once during each of
 -- your turns, you may play a land from your graveyard or cast a permanent spell
 -- with mana value 3 or less from your graveyard. If you do, it gains 'When this
@@ -2570,6 +2627,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   futureSightSpec s registry
   johannSpec s registry
   serraParagonSpec s registry
+  eighthDoctorSpec s registry
   thundermaneSpec s registry
   voidWinnowerSpec s registry
   spiderPunkSpec s registry

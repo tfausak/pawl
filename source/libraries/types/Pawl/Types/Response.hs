@@ -221,6 +221,9 @@ data Response
     -- arbitrary Filter over the battlefield, which can coincide with any of the
     -- object choices above.
     ChoseCounterRemoval ObjectId.ObjectId
+  | -- | CR 118.1 as a cost / CR 601.2h: how many +1\/+1 counters a paying
+    -- player chose to take off each permanent, where the cost divides them.
+    ChoseCounterRemovalAmong (Map.Map ObjectId.ObjectId Natural.Natural)
   | -- | CR 701.38a: the choice one player voted for.
     --
     -- Its own constructor for ChoseBolster's reason: a vote's candidates are an
