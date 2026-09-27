@@ -1178,6 +1178,10 @@ clauseIsInert bound legal clause =
 -- opponent gating that opponent's own edict. The seats the branch SELECTS are
 -- bound under Binding.gatePlayers, which is how the clause's own instructions
 -- say "they", and the clause happens when the branch selected anybody.
+-- "Unless ANY player pays" (PayBranch.IfNonePaid) is the one branch read over
+-- the whole table: Rhystic Tutor's search happens only if every offered player
+-- declined. Proved by Pawl.ResolveSpec's "CR 118.12a bob alone pays, so alice
+-- does not search".
 --
 -- A gate whose reference names NOBODY therefore selects nobody and its clause is
 -- skipped, where a single-payer gate used to take the IfNotPaid branch and run
@@ -1218,16 +1222,19 @@ payGateAdmits resolving source controller idx cIdx legal announced answers claus
       Nothing -> do
         recorded <- payGatePaid resolving source controller idx cIdx legal announced gate
         pure (recorded, Map.insert offerAt recorded answers)
-    let selected = Map.keysSet (Map.filter (branchTaken (PayGate.branch gate)) asked)
+    let selected = branchSelects (PayGate.branch gate) asked
     State.modify' (bindPlayersSlot resolving Binding.gatePlayers selected)
     pure (not (Set.null selected), answers2)
 
--- Which branch of CR 118.12 a payment outcome selects, off the classification a
--- card states -- never off what the payment DID.
-branchTaken :: PayBranch.PayBranch -> Bool -> Bool
-branchTaken branch wasPaid = case branch of
-  PayBranch.IfPaid -> wasPaid
-  PayBranch.IfNotPaid -> not wasPaid
+-- Which players a CR 118.12 branch selects from the offer's answers, off the
+-- classification a card states -- never off what the payment DID. IfPaid and
+-- IfNotPaid are per player; IfNonePaid is one answer for the table, selecting
+-- every offered player when none paid and nobody when any did.
+branchSelects :: PayBranch.PayBranch -> Map.Map PlayerId Bool -> Set PlayerId
+branchSelects branch asked = case branch of
+  PayBranch.IfPaid -> Map.keysSet (Map.filter id asked)
+  PayBranch.IfNotPaid -> Map.keysSet (Map.filter not asked)
+  PayBranch.IfNonePaid -> if or asked then Set.empty else Map.keysSet asked
 
 -- The offer itself: who was offered this gate's cost, and which of them paid?
 -- CR 118.12's MANDATORY limb is not offered, and that is the rule rather than an
