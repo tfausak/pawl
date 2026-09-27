@@ -2133,14 +2133,32 @@ inRangeSeated seated you candidate gs =
   candidate == you || case RangeOfInfluence.rangeOf (GameSettings.rangeOfInfluence (GameState.settings gs)) you of
     Nothing -> True
     Just range ->
-      let playing = stillPlaying gs
-          seats = filter (\pid -> List.elem pid playing || Set.member pid (GameState.departedThisTurn gs)) (GameState.turnOrder gs)
+      let seats = seatsThisTurn gs
        in case (List.elemIndex you seats, List.elemIndex candidate seats) of
             (Just mine, Just theirs)
-              | List.elem you playing && seated ->
+              | List.elem you (stillPlaying gs) && seated ->
                   let apart = abs (mine - theirs)
                    in toInteger (min apart (length seats - apart)) <= toInteger range
             _ -> False
+
+-- CR 801.2c: the seats as this turn began -- the players still in the game and
+-- those who left during it, in seating order.
+seatsThisTurn :: GameState -> [PlayerId]
+seatsThisTurn gs =
+  let playing = stillPlaying gs
+   in filter (\pid -> List.elem pid playing || Set.member pid (GameState.departedThisTurn gs)) (GameState.turnOrder gs)
+
+-- CR 809.3c: the players seated immediately next to @you@, either side, over
+-- seatsThisTurn -- the Emperor variant always uses CR 801's option, whose CR
+-- 801.2c closes an emptied seat as the next turn begins. A departed neighbour
+-- is still named; a caller filters with stillPlaying. Nobody for a player not
+-- seated.
+neighbours :: PlayerId -> GameState -> [PlayerId]
+neighbours you gs = case List.break (== you) (seatsThisTurn gs) of
+  (before, _ : after) ->
+    let others = after <> before
+     in Set.toList (Set.fromList (Maybe.maybeToList (Maybe.listToMaybe others) <> Maybe.maybeToList (Maybe.listToMaybe (reverse others))))
+  (_, []) -> []
 
 -- CR 801.10 / 801.5a: the players still in the game within @you@'s range -- the
 -- table a spell or ability of theirs reaches, and the one a choice they make

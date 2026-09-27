@@ -319,17 +319,18 @@ riderSlots riders =
         Nothing -> Map.empty
    in joinSlots [attacked, blocked, maybe Map.empty oneSlot (EntryRiders.attachedTo riders)]
 
--- The slots a PlayerRef reads. EachPlayerExcept, EachOpponentExcept, InSlot,
--- ControllerOfBound, OwnerOfBound, ChosenPlayerOfBound and Attacking name one
--- at arity One and EachInSlot names one at arity Many; the rest name none, and
+-- The slots a PlayerRef reads. InSlot, ControllerOfBound, OwnerOfBound,
+-- ChosenPlayerOfBound and Attacking name one at arity One, and EachInSlot,
+-- EachPlayerExcept and EachOpponentExcept one at arity Many; the rest name none, and
 -- the arms below carry the reason for each arity that is not self-evident.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
-  -- The excluded seat is one player, so one slot read singly.
-  PlayerRef.EachPlayerExcept slot -> Map.singleton slot SlotArity.One
-  -- CR 702.116a's excluded seat is one player too.
-  PlayerRef.EachOpponentExcept slot -> Map.singleton slot SlotArity.One
+  -- Every player the slot names is excluded -- CR 104.2c's winning team is
+  -- several.
+  PlayerRef.EachPlayerExcept slot -> Map.singleton slot SlotArity.Many
+  -- CR 702.116a's excluded seat, read the same way.
+  PlayerRef.EachOpponentExcept slot -> Map.singleton slot SlotArity.Many
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
   -- Read at arity MANY, which is the whole of what parts it from the arm above.
@@ -2443,16 +2444,17 @@ playerRefPlayers legal controller gs ref =
         -- onto the Opponent set, so a departed seat stays out.
         PlayerRef.Relative PlayerRelation.AnyPlayer -> everyone
         PlayerRef.EachPlayer -> everyone
-        -- EachPlayer minus the seat the slot names. A slot that is unfilled, illegal,
-        -- names several, or names an object excludes NOBODY.
+        -- EachPlayer minus every player the slot names -- CR 104.2c's winning
+        -- team is several. A slot that is unfilled, illegal, or names only
+        -- objects excludes NOBODY.
         PlayerRef.EachPlayerExcept slot ->
-          let excluded = legalOne slot legal >>= Recipient.playerOf
-           in filter (\pid -> Just pid /= excluded) everyone
+          let excluded = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+           in filter (`notElem` excluded) everyone
         -- CR 702.116a's "each opponent other than defending player": the arm above
-        -- narrowed by CR 102.2 / 102.3, off the same read and with the same collapse.
+        -- narrowed by CR 102.2 / 102.3, off the same read.
         PlayerRef.EachOpponentExcept slot ->
-          let excluded = legalOne slot legal >>= Recipient.playerOf
-           in filter (\pid -> Just pid /= excluded && PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller pid) everyone
+          let excluded = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+           in filter (\pid -> notElem pid excluded && PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent controller pid) everyone
         -- The baked seat, unreachable from card data. Not filtered against the roster:
         -- it names one specific player who arrived from elsewhere.
         PlayerRef.Specific pid -> [pid]
