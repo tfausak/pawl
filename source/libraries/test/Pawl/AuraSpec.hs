@@ -60,7 +60,9 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -87,6 +89,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -97,6 +100,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -1318,6 +1322,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   auraTokenSpec s registry
   animateDeadSpec s registry
   groupAttachSpec s registry
+  groupAttachCardsSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -4764,3 +4769,153 @@ groupAttachSpec s registry =
           Spec.assertEqWith s "both Equipment are on the Piker" (hostOf split after, hostOf worn after) (Just carrier, Just carrier)
           Spec.assertEqWith s "which is 2/1 + 2/+0 + 2/+1" (S.powerToughnessOf carrier after) (Just (6, 2))
           Spec.assertEqWith s "and Beatrix is a plain 4/4" (S.powerToughnessOf general after) (Just (4, 4))
+
+-- Effect.AttachAll's printed producers past the five above: a TARGET group
+-- (Armory Automaton, Thorin), a destination read off the trigger's event
+-- (Super-Soldier Serum), and a gated clause (Battlefield Improvisation). Oracle
+-- text re-fetched from Scryfall 2026-09-27 for all four.
+groupAttachCardsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+groupAttachCardsSpec s registry =
+  let settle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      settle answer gs = S.runPure answer gs Engine.settleForPriority
+      hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
+      slot = SlotName.MkSlotName . Text.pack
+   in Spec.describe s "AttachAll producers" $ do
+        -- Armory Automaton {3} 2/2: "Whenever this creature enters or attacks,
+        -- you may attach any number of target Equipment to it. (Control of the
+        -- Equipment doesn't change.)" Alice targets her Bonesplitter (on her
+        -- Piker) and bob's Barbed Batterfist (on his Giant), and not her Dunedain
+        -- Blade. The declining leg differs in the one answer.
+        Spec.it s "CR 701.3a Armory Automaton takes the Equipment it targeted, bob's among them" $ do
+          automaton <- S.printingOf s registry "Armory Automaton"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          blade <- S.printingOf s registry "Dúnedain Blade"
+          batterfist <- S.printingOf s registry "Barbed Batterfist"
+          let (carrier, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+              (bobs, g2) = S.addPermanent giant S.bob g1
+              (split, g3) = S.addPermanent bonesplitter S.alice g2
+              (left, g4) = S.addPermanent blade S.alice g3
+              (bobsGear, g5) = S.addPermanent batterfist S.bob g4
+              (construct, entered) = S.entersWithTrigger automaton S.alice (S.attach bobsGear bobs (S.attach split carrier g5))
+              run decision =
+                let answer :: Prompt.Prompt r -> r
+                    answer p = case p of
+                      Prompt.AnnounceTargets {} -> fmap (const 2) (S.identityAnswer p)
+                      Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((/= Just left) . Recipient.objectOf) . snd) sets
+                      Prompt.ChooseOptional {} -> decision
+                      _ -> S.identityAnswer p
+                 in S.runPure answer (settle answer entered) Stack.resolveTop
+              taken = run OptionalDecision.Exercises
+              declined = run OptionalDecision.Declines
+          Spec.assertEqWith s "Bonesplitter and bob's Batterfist are on the Automaton" (hostOf split taken, hostOf bobsGear taken) (Just construct, Just construct)
+          Spec.assertEqWith s "declining moves neither" (hostOf split declined, hostOf bobsGear declined) (Just carrier, Just bobs)
+          Spec.assertEqWith s "the untargeted Blade stays unattached" (hostOf left taken) Nothing
+          Spec.assertEqWith s "the Automaton is 2/2 + 2/+0 + 1/-1" (S.powerToughnessOf construct taken) (Just (5, 1))
+          Spec.assertEqWith s "bob still controls his Batterfist" (Projection.controllerOf bobsGear taken) (Just S.bob)
+        -- Thorin, Mountain-king {3}{R} 3/4 trample: "When Thorin enters, attach
+        -- any number of target Equipment you control to target creature you
+        -- control. When one or more Equipment become attached to that creature
+        -- this way, that creature deals damage equal to its power to up to one
+        -- target creature." Alice's Hill Giant is the destination; bob's Hill
+        -- Giant the victim, its damage read before CR 704.5g can clear it. The
+        -- empty leg differs only in how many Equipment are targeted.
+        Spec.it s "CR 603.12 Thorin's Equipment go to its target, which then deals damage equal to its power" $ do
+          thorin <- S.printingOf s registry "Thorin, Mountain-king"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          blade <- S.printingOf s registry "Dúnedain Blade"
+          let (carrier, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+              (hitter, g2) = S.addPermanent giant S.alice g1
+              (victim, g3) = S.addPermanent giant S.bob g2
+              (split, g4) = S.addPermanent bonesplitter S.alice g3
+              (left, g5) = S.addPermanent blade S.alice g4
+              (_, entered) = S.entersWithTrigger thorin S.alice (S.attach split carrier g5)
+              run gear =
+                let wanted name oid
+                      | name == slot "equipment" = maybe False (`elem` gear) oid
+                      | name == slot "creature" = oid == Just hitter
+                      | otherwise = oid == Just victim
+                    answer :: Prompt.Prompt r -> r
+                    answer p = case p of
+                      Prompt.AnnounceTargets {} -> Map.mapWithKey (\name n -> if name == slot "equipment" then List.genericLength gear else n) (S.identityAnswer p)
+                      Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey (\name (_, offered) -> Set.filter (wanted name . Recipient.objectOf) offered) sets
+                      _ -> S.identityAnswer p
+                    moved = S.runPure answer (settle answer entered) Stack.resolveTop
+                    reflexive = settle answer moved
+                 in (moved, reflexive, S.runPure answer reflexive Stack.resolveTop)
+              (attached, _, struck) = run [split, left]
+              (_, unarmed, unstruck) = run []
+          Spec.assertEqWith s "bob's Giant took 3 + 2 + 2 from alice's" (S.damageOf victim struck) (Just 7)
+          Spec.assertEqWith s "with no Equipment targeted, nothing attaches and no reflexive is created" (length (GameState.stack unarmed), S.damageOf victim unstruck) (0, Just 0)
+          Spec.assertEqWith s "both Equipment are on alice's Giant" (hostOf split attached, hostOf left attached) (Just hitter, Just hitter)
+          Spec.assertEqWith s "and it is 3/3 + 2/+0 + 2/+1" (S.powerToughnessOf hitter attached) (Just (7, 4))
+        -- Super-Soldier Serum {1}{W} Aura: "Enchanted creature gets +2/+2, has
+        -- first strike and vigilance, and is a legendary Soldier in addition to
+        -- its other types. Whenever enchanted creature attacks or blocks, attach
+        -- any number of target Equipment you control to it." The blocking half is
+        -- TriggerCondition.CreatureBlocks. The other leg differs in the one
+        -- blocker: alice's unenchanted Piker, which carries the Bonesplitter.
+        Spec.it s "CR 509.3a Super-Soldier Serum's creature blocks and takes alice's Equipment" $ do
+          serum <- S.printingOf s registry "Super-Soldier Serum"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          blade <- S.printingOf s registry "Dúnedain Blade"
+          batterfist <- S.printingOf s registry "Barbed Batterfist"
+          let (soldier, g1) = S.addPermanent giant S.alice (Setup.emptyGame S.bothPlayers)
+              (other, g2) = S.addPermanent piker S.alice g1
+              (split, g3) = S.addPermanent bonesplitter S.alice g2
+              (left, g4) = S.addPermanent blade S.alice g3
+              (bobsGear, g5) = S.addPermanent batterfist S.bob g4
+              (aura, g6) = S.addPermanent serum S.alice g5
+              board = S.attach aura soldier (S.attach split other g6)
+              blocks blocker = settle S.identityAnswer (S.withEvents [GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker 1)] board)
+              after = S.runPure S.identityAnswer (blocks soldier) Stack.resolveTop
+              bystander = blocks other
+          Spec.assertEqWith s "both of alice's Equipment are on the enchanted Giant" (hostOf split after, hostOf left after) (Just soldier, Just soldier)
+          Spec.assertEqWith s "the Piker blocking triggers nothing" (length (GameState.stack bystander), hostOf split bystander) (0, Just other)
+          Spec.assertEqWith s "bob's Batterfist was never offered" (hostOf bobsGear after) Nothing
+          Spec.assertEqWith s "the Giant is 3/3 + 2/+2 + 2/+0 + 2/+1" (S.powerToughnessOf soldier after) (Just (9, 6))
+          Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike soldier board && Projection.hasKeyword Keyword.Vigilance soldier board) "the Serum grants first strike and vigilance"
+          Spec.assertEqWith s "and makes it a legendary Giant Soldier" (PC.supertypes (Projection.project soldier board), Set.isSubsetOf (Set.fromList [Subtype.Giant, Subtype.Soldier]) (PC.subtypes (Projection.project soldier board))) (Set.singleton Supertype.Legendary, True)
+        -- Battlefield Improvisation {1}{W} instant: "Target creature gets +2/+2
+        -- until end of turn. If that creature is attacking, you may attach any
+        -- number of Equipment you control to it." Alice picks the Bonesplitter
+        -- and not the Blade. The other leg differs only in whether her Giant is
+        -- attacking.
+        Spec.it s "CR 608.2c Battlefield Improvisation attaches the chosen Equipment only to an attacking target" $ do
+          plains <- S.printingOf s registry "Plains"
+          improvisation <- S.printingOf s registry "Battlefield Improvisation"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          blade <- S.printingOf s registry "Dúnedain Blade"
+          let g0 = S.landsFor plains S.alice 2 (Setup.emptyGame S.bothPlayers)
+              (hitter, g1) = S.addPermanent giant S.alice g0
+              (carrier, g2) = S.addPermanent piker S.alice g1
+              (split, g3) = S.addPermanent bonesplitter S.alice g2
+              (left, g4) = S.addPermanent blade S.alice g3
+              (g5, spell) = S.handOne improvisation (S.attach split carrier g4)
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just hitter) . Recipient.objectOf) . snd) sets
+                Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered -> Set.fromList (filter (/= left) offered)
+                _ -> S.identityAnswer p
+              run attacking =
+                let combat = GameState.combat g5
+                    board =
+                      g5
+                        { GameState.priority = Just S.alice,
+                          GameState.combat = if attacking then combat {Combat.Type.attackers = Map.singleton hitter (AttackTarget.OfPlayer S.bob)} else combat
+                        }
+                 in S.runPure answer (S.runPure answer board (S.cast S.alice spell)) Stack.resolveTop
+              charging = run True
+              standing = run False
+          Spec.assertEqWith s "the Bonesplitter moved to the attacking Giant" (hostOf split charging, hostOf left charging) (Just hitter, Nothing)
+          Spec.assertEqWith s "a Giant not attacking takes nothing" (hostOf split standing) (Just carrier)
+          Spec.assertEqWith s "the attacker is 3/3 + 2/+2 + 2/+0" (S.powerToughnessOf hitter charging) (Just (7, 5))
+          Spec.assertEqWith s "the other still got +2/+2" (S.powerToughnessOf hitter standing) (Just (5, 5))

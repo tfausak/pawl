@@ -76,6 +76,7 @@ codec =
           Arm.nullary "SelfAttacksWhileSaddled" TriggerCondition.SelfAttacksWhileSaddled,
           Arm.payload "SelfAttacksWhile" Condition.codec TriggerCondition.SelfAttacksWhile (\x -> case x of TriggerCondition.SelfAttacksWhile y -> Just y; _ -> Nothing),
           Arm.nullary "SelfBlocks" TriggerCondition.SelfBlocks,
+          Arm.payload "CreatureBlocks" filterCodec TriggerCondition.CreatureBlocks (\x -> case x of TriggerCondition.CreatureBlocks y -> Just y; _ -> Nothing),
           Arm.payload "SelfBlocksCreature" filterCodec TriggerCondition.SelfBlocksCreature (\x -> case x of TriggerCondition.SelfBlocksCreature y -> Just y; _ -> Nothing),
           Arm.payload "SelfBlocksAtLeast" Common.natural TriggerCondition.SelfBlocksAtLeast (\x -> case x of TriggerCondition.SelfBlocksAtLeast y -> Just y; _ -> Nothing),
           Arm.payload "SelfBlocksOneOrMore" filterCodec TriggerCondition.SelfBlocksOneOrMore (\x -> case x of TriggerCondition.SelfBlocksOneOrMore y -> Just y; _ -> Nothing),
@@ -228,6 +229,7 @@ tagOf x = case x of
   TriggerCondition.SelfAttacksWhileSaddled {} -> "SelfAttacksWhileSaddled"
   TriggerCondition.SelfAttacksWhile {} -> "SelfAttacksWhile"
   TriggerCondition.SelfBlocks {} -> "SelfBlocks"
+  TriggerCondition.CreatureBlocks {} -> "CreatureBlocks"
   TriggerCondition.SelfBlocksCreature {} -> "SelfBlocksCreature"
   TriggerCondition.SelfBlocksAtLeast {} -> "SelfBlocksAtLeast"
   TriggerCondition.SelfBlocksOneOrMore {} -> "SelfBlocksOneOrMore"

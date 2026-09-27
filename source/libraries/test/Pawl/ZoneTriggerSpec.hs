@@ -2464,6 +2464,7 @@ representativeEvents cond =
         -- The GROUPED blocking event, which is CR 509.3a's arity: one per blocking
         -- creature, whatever it was declared against.
         TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
+        TriggerCondition.CreatureBlocks _ -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
         -- The same event with the count read, which is all CR 509.3e adds.
         TriggerCondition.SelfBlocksAtLeast _ -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 2))
         -- The same grouped event once more, with the count IGNORED: CR 509.3e's
@@ -2956,6 +2957,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacksWhileSaddled,
     TriggerCondition.SelfAttacksWhile (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfBlocks,
+    TriggerCondition.CreatureBlocks (Filter.Type.And []),
     TriggerCondition.SelfBlocksAtLeast 2,
     TriggerCondition.SelfBlocksCreature (Filter.Type.And []),
     TriggerCondition.SelfBecomesBlocked,

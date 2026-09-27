@@ -1023,6 +1023,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfAttacksWhile condition -> conditionCounts condition
   TriggerCondition.SelfBlocks -> []
+  TriggerCondition.CreatureBlocks _ -> []
   -- CR 509.3b names the attacker without counting anything, and its Filter holds
   -- no Count for PermanentEnters' reason.
   TriggerCondition.SelfBlocksCreature _ -> []
@@ -4114,6 +4115,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 509.3b names a quality the attacker blocked must have, so this one DOES
   -- carry a Filter -- Netcaster Spider's "with flying".
   TriggerCondition.SelfBlocksCreature f -> unframed [f]
+  TriggerCondition.CreatureBlocks f -> unframed [f]
   TriggerCondition.SelfBlocksAtLeast _ -> []
   -- CR 509.3e's filtered form names a quality the attackers blocked must have,
   -- so this one DOES carry a Filter.
@@ -4296,6 +4298,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfAttacksWhile _ -> []
   TriggerCondition.SelfBlocks -> []
+  TriggerCondition.CreatureBlocks _ -> []
   TriggerCondition.SelfBlocksCreature _ -> []
   TriggerCondition.SelfBlocksAtLeast _ -> []
   TriggerCondition.SelfBlocksOneOrMore _ -> []

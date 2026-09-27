@@ -1755,6 +1755,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfAttacksWhileSaddled -> condition
   TriggerCondition.SelfAttacksWhile c -> TriggerCondition.SelfAttacksWhile (rewriteCondition pairs c)
   TriggerCondition.SelfBlocks -> condition
+  TriggerCondition.CreatureBlocks f -> TriggerCondition.CreatureBlocks (Filter.rewrite pairs f)
   TriggerCondition.SelfBlocksCreature f -> TriggerCondition.SelfBlocksCreature (Filter.rewrite pairs f)
   TriggerCondition.SelfBlocksAtLeast _ -> condition
   TriggerCondition.SelfBlocksOneOrMore f -> TriggerCondition.SelfBlocksOneOrMore (Filter.rewrite pairs f)

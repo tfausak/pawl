@@ -3395,6 +3395,92 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.TriggeredAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
+  -- CR 509.3a read by a bystander: SelfBlocks' event, with the Filter over the
+  -- blocker. CreatureAttacks' reading of the Filter's source: "enchanted
+  -- creature" is HasAttached IsSource (Super-Soldier Serum).
+  TriggerCondition.CreatureBlocks f -> case event of
+    GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker _) ->
+      case Projection.viewWithLastKnown blocker gs blocker of
+        Nothing -> False
+        Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    GameEvent.TriggeredAbilityResolved _ -> False
+    GameEvent.CardArrived _ -> False
   -- CR 509.3b: the PAIRWISE event, which is that rule's "once for each attacking
   -- creature the creature with the ability blocks" -- and the difference from
   -- SelfBlocks above, together with the attacker eventBindings stamps under
