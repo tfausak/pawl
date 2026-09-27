@@ -69,6 +69,7 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
@@ -88,6 +89,7 @@ import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
@@ -591,6 +593,7 @@ objectRefPositions =
         ("modify-target", Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Flying) (plantedRef "mt")), [plantedRef "mt"]),
         ("restart-game", Effect.RestartGame (Just (plantedRef "rg")), [plantedRef "rg"]),
         ("destroy", Effect.Destroy (Destroy.MkDestroy (plantedRef "de") Regenerability.Regenerable Nothing Nothing Nothing), [plantedRef "de"]),
+        ("attach-all", Effect.AttachAll (AttachAll.MkAttachAll (plantedRef "aa") Filter.Type.IsSource), [plantedRef "aa"]),
         ("move-to-zone", Effect.MoveToZone (MoveToZone.MkMoveToZone (plantedRef "mz") Zone.Exile plainRiders Nothing Nothing LibraryPlacement.OwnerChooses Nothing), [plantedRef "mz"]),
         ("reveal", Effect.Reveal (Reveal.MkReveal (plantedRef "rv") Nothing), [plantedRef "rv"]),
         ("look-at", Effect.LookAt (LookAt.MkLookAt (plantedRef "la") (SlotName.MkSlotName (Text.pack "seen"))), [plantedRef "la"]),
@@ -782,6 +785,7 @@ restrictionConditions restriction = case restriction of
   ActivationRestriction.OnlyOnce -> []
   ActivationRestriction.OnlyOnceEachTurn -> []
   ActivationRestriction.DuringDieRoll -> []
+  ActivationRestriction.InstantSpeed -> []
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
@@ -972,6 +976,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- a Count.
   TriggerCondition.CardLeavesZone {} -> []
   TriggerCondition.CardsLeaveZone {} -> []
+  TriggerCondition.CardsPutIntoZone {} -> []
   TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
@@ -1334,6 +1339,7 @@ ownCounts effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
+  Effect.AttachAll {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
@@ -1527,7 +1533,7 @@ spellCostsOf face =
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
 -- every clause. A READER of X rather than a declarer: Clash of Wills' "unless its
 -- controller pays {X}" spends the value its own {X}{U} announced (CR 107.3a),
--- which is what Pawl.Engine.Resolve.announcedXOn substitutes in.
+-- which is what Pawl.Engine.Resolve.Effect.announcedXOn substitutes in.
 payGateCostsOf :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Cost.Type.Cost Keyword.Keyword]
 payGateCostsOf =
   fmap PayGate.cost
@@ -1737,6 +1743,7 @@ effectNestedEffects effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
+  Effect.AttachAll {} -> []
   Effect.PlaySubgame {} -> []
   Effect.ChoosePlayer {} -> []
   Effect.ChoosePlayerAtRandom {} -> []
@@ -2250,6 +2257,7 @@ effectReplacements effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
+  Effect.AttachAll {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
@@ -2316,7 +2324,7 @@ modeBranchesOffend mode =
 -- mana cost (Pawl.Types.CostBasis) and a mana part of its own beside it?
 --
 -- The two are one field's worth of answer at the payment
--- (Pawl.Engine.Resolve.describedCost overwrites Cost.mana with the derived
+-- (Pawl.Engine.Resolve.Effect.describedCost overwrites Cost.mana with the derived
 -- amount), so a card writing both states mana nothing pays -- silently, which is
 -- why this is a lint. A card whose cost really is described states
 -- `mana: null`, which is the unpayable cost CR 118.6's first sentence describes
@@ -2723,6 +2731,7 @@ effectMintedFaces effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
+  Effect.AttachAll {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
@@ -2928,7 +2937,7 @@ withCountersFilters w =
 -- same reason riderFilters is one -- the two halves of a gate must not be swept
 -- apart.
 --
--- The COST half is Unframed, an announced cost's framing: Pawl.Engine.Resolve.payGatePaidBy
+-- The COST half is Unframed, an announced cost's framing: Pawl.Engine.Resolve.Effect.payGatePaidBy
 -- measures and pays it with the resolving object's slots (Cost.canPayReading,
 -- Cost.payReading), the map Cost.announcedSlots hands an announced cost, so
 -- Filter.IsBound there reads them -- Calim, Djinn Emperor's "two other cards
@@ -4038,6 +4047,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- The batch reading carries the same record, swept the same way for
   -- PermanentsReturnedToHand's reason.
   TriggerCondition.CardsLeaveZone payload -> unframed [CardLeavesZone.filter payload]
+  -- The arrival side carries its Filter the same way: Dutiful Knowledge Seeker's
+  -- "cards" is that Filter.
+  TriggerCondition.CardsPutIntoZone payload -> unframed [CardsPutIntoZone.filter payload]
   TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
@@ -4306,6 +4318,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentsReturnedToHand _ -> []
   TriggerCondition.CardLeavesZone {} -> []
   TriggerCondition.CardsLeaveZone {} -> []
+  TriggerCondition.CardsPutIntoZone {} -> []
   TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
@@ -4762,7 +4775,8 @@ entryOptionFilters option = concatMap keywordFilters (Set.toList (EntryOption.ke
 -- The as-enters host choice is the seventh axis and the one that IS framed:
 -- Grifter's Blade's "a creature you control it could be attached to" is
 -- evaluated by Pawl.Engine.Attach.hostsFor, the same function the two attach
--- opcodes' destinations go through, so it is AttachDestination.
+-- opcodes' destinations go through, so it is framed as one, apart from them
+-- only in its Context (EntryAttachDestination).
 entryRewriteFilters :: EntryRewrite.EntryRewrite (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> unframed [f]
@@ -4776,7 +4790,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- against a view whose `canHostSubject` is filled in -- the same position
   -- Effect.AttachTarget's destination is, so the same Framing. The one arm of
   -- this walk that is framed.
-  EntryRewrite.EntersAttachedTo f -> [(AttachDestination, f)]
+  EntryRewrite.EntersAttachedTo f -> [(EntryAttachDestination, f)]
   -- CR 707.5's eligible set -- Clone's "any creature", Copy Enchantment's "any
   -- enchantment" -- is a criterion over permanents on the battlefield, so it
   -- belongs in this walk. So do CR 707.9's exceptions beside it, which reach a
@@ -5013,16 +5027,20 @@ blockPermissionFilters permission =
 -- soundness question. Most name ONE position; CR 303.4b's names several, which
 -- is why this is a tag on the position rather than a Bool.
 --
---   * AttachDestination -- the destination of Effect.AttachTarget or
---     Effect.AttachTargetToEach, and EntryRewrite.EntersAttachedTo's host
---     choice, the positions evaluated against a view whose `canHostSubject` is
---     filled in (Pawl.Engine.Attach.hostsFor). CR 701.3a's atom belongs here and
---     nowhere else.
+--   * AttachDestination -- the destination of Effect.AttachTarget,
+--     Effect.AttachTargetToEach or Effect.AttachAll, the positions evaluated
+--     against a view whose `canHostSubject` is filled in
+--     (Pawl.Engine.Attach.hostsFor, groupHostsFor) and a Context built by
+--     Pawl.Engine.Resolve.Slots.effectContext. CR 701.3a's atom belongs here
+--     and in EntryAttachDestination, and nowhere else.
+--   * EntryAttachDestination -- EntryRewrite.EntersAttachedTo's host choice:
+--     AttachDestination's view, but a bare Filter.contextFor with no
+--     resolution's slots behind it, so CR 110.2's slot atoms are unfilled.
 --   * InTargetSlot -- a MODE's target slot filter, the one position matched by
---     Pawl.Engine.Target.admittedGiven, which is the one site that fills
+--     Pawl.Engine.Target.admittedGiven, one of the two sites that fill
 --     Filter.Context.slotControllers and one of the callers that fill
 --     Filter.Context.slotNames. CR 110.2's Filter.SameControllerAsBound belongs
---     here and nowhere else; CR 709.4a's Filter.SameNameAsBound belongs here and
+--     here and in AttachDestination, the other; CR 709.4a's Filter.SameNameAsBound belongs here and
 --     in SearchFramed, HandSweepFramed and LifeLossAmountFramed below, the
 --     other positions slotNames is filled at and a card writes it in. Their
 --     vacuous directions differ: an unfilled slotNames answers False, an
@@ -5109,6 +5127,7 @@ blockPermissionFilters permission =
 data Framing
   = Unframed
   | AttachDestination
+  | EntryAttachDestination
   | InTargetSlot
   | SourceHostFramed
   | -- | CR 604.2's, CR 603.4's and a printed player ability's own Filters: the
@@ -5186,7 +5205,7 @@ data Framing
     -- merely by this engine: a special action uses no stack (CR 116.1), and a
     -- declaration announces no target. The ignore cost was tagged first, see
     -- #2883; the toll and the price last, see #2927. CR 118.12's gate cost was
-    -- here too (#2881) until Pawl.Engine.Resolve.payGatePaidBy handed it the
+    -- here too (#2881) until Pawl.Engine.Resolve.Effect.payGatePaidBy handed it the
     -- resolving object's slots.
     --
     -- NOT the costs an announcement pays -- CR 601.2f's additional cost, CR
@@ -5287,6 +5306,7 @@ sweptForSingularSlots framing = case framing of
   KeywordFramed -> False
   Unframed -> True
   AttachDestination -> True
+  EntryAttachDestination -> True
   InTargetSlot -> True
   SourceHostFramed -> True
   -- SWEPT, as these positions were under SourceHostFramed before #3320 split them
@@ -5725,6 +5745,9 @@ effectFilters effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachAsThoughCreature _ -> []
   Effect.AttachBound {} -> []
+  -- The movers' ref is swept as Destroy's is; the destination is AttachTarget's
+  -- position, matched by Pawl.Engine.Attach.groupHostsFor.
+  Effect.AttachAll (AttachAll.MkAttachAll ref destination) -> frame SourceHostFramed (objectRefFilters ref) <> [(AttachDestination, destination)]
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
@@ -6685,7 +6708,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- A CR 118.12 COST reads X the same way and by the same rule, and it is not an
   -- effect, so Card.allEffects cannot see it: Clash of Wills' only reader of the
   -- X it announces is the "pays {X}" its clause offers at resolution
-  -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.announcedXOn).
+  -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.Effect.announcedXOn).
   --
   -- A TARGET SLOT counting the announced X is the fourth such reader, and a
   -- slot whose CR 202.3 computed bound names it the fifth (both

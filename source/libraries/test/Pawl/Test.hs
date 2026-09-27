@@ -56,6 +56,7 @@ import qualified Pawl.Codec.AimedAtSpec
 import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
 import qualified Pawl.Codec.AsCopySpec
+import qualified Pawl.Codec.AttachAllSpec
 import qualified Pawl.Codec.AttachBoundSpec
 import qualified Pawl.Codec.AttachRestrictionSpec
 import qualified Pawl.Codec.AttachTargetSpec
@@ -91,6 +92,7 @@ import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardPutIntoGraveyardSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
+import qualified Pawl.Codec.CardsPutIntoZoneSpec
 import qualified Pawl.Codec.CastFromSpec
 import qualified Pawl.Codec.CastFromZoneSpec
 import qualified Pawl.Codec.CastObligationSpec
@@ -774,6 +776,7 @@ spec s registry = do
   Pawl.Codec.AlternativeCostSpec.spec s
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
   Pawl.Codec.AsCopySpec.spec s
+  Pawl.Codec.AttachAllSpec.spec s
   Pawl.Codec.AttachBoundSpec.spec s
   Pawl.Codec.AttachRestrictionSpec.spec s
   Pawl.Codec.AttachTargetSpec.spec s
@@ -807,6 +810,7 @@ spec s registry = do
   Pawl.Codec.CardArrivedInSpec.spec s
   Pawl.Codec.CardLeavesZoneSpec.spec s
   Pawl.Codec.CardPutIntoGraveyardSpec.spec s
+  Pawl.Codec.CardsPutIntoZoneSpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s

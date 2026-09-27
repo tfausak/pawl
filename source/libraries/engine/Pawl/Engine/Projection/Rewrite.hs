@@ -27,6 +27,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
@@ -42,6 +43,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -883,6 +885,7 @@ rewriteEffect pairs effect = case effect of
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot filter_) -> Effect.AttachTargetToEach (AttachTarget.MkAttachTarget slot (Filter.rewrite pairs filter_))
   -- No Filter to rewrite: both fields are slot names.
   Effect.AttachBound {} -> effect
+  Effect.AttachAll (AttachAll.MkAttachAll ref destination) -> Effect.AttachAll (AttachAll.MkAttachAll (rewriteObjectRef pairs ref) (Filter.rewrite pairs destination))
   Effect.PlaySubgame _ -> effect
   Effect.ChoosePlayer _ -> effect
   Effect.ChoosePlayerAtRandom _ -> effect
@@ -1693,6 +1696,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- every turn.
   TriggerCondition.CardLeavesZone p -> TriggerCondition.CardLeavesZone p {CardLeavesZone.filter = Filter.rewrite pairs (CardLeavesZone.filter p)}
   TriggerCondition.CardsLeaveZone p -> TriggerCondition.CardsLeaveZone p {CardLeavesZone.filter = Filter.rewrite pairs (CardLeavesZone.filter p)}
+  TriggerCondition.CardsPutIntoZone p -> TriggerCondition.CardsPutIntoZone p {CardsPutIntoZone.filter = Filter.rewrite pairs (CardsPutIntoZone.filter p)}
   TriggerCondition.SelfLeavesGraveyard -> condition
   -- The Filter is rewritten and the counter kind is not: CR 612.1's pairs swap
   -- SUBTYPE words, and a counter kind names none.
@@ -1879,6 +1883,7 @@ rewriteRestriction pairs restriction = case restriction of
   ActivationRestriction.OnlyOnce -> restriction
   ActivationRestriction.OnlyOnceEachTurn -> restriction
   ActivationRestriction.DuringDieRoll -> restriction
+  ActivationRestriction.InstantSpeed -> restriction
 
 -- CR 612.1 through a Duration, which Pawl.Types.Duration holds as the card
 -- prints it: a CR 611.2b "for as long as ..." clause is rules text like any

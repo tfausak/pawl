@@ -291,6 +291,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.AttachTarget {} -> Nothing
   Effect.AttachTargetToEach {} -> Nothing
   Effect.AttachBound {} -> Nothing
+  Effect.AttachAll {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.ChoosePlayer _ -> Nothing
   Effect.ChoosePlayerAtRandom _ -> Nothing

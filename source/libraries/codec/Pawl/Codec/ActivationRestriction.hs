@@ -9,8 +9,7 @@ import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 
 -- | Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a
 -- window, CR 102.1's DuringTurn a scope and CR 602.5's OnlyIf a condition;
--- SorcerySpeed, AttackedThisStep, AfterBlockersDeclared, BeforeCombatDamage and
--- OnlyOnce and OnlyOnceEachTurn still render as bare tags.
+-- the other arms still render as bare tags.
 --
 -- There is no tag for "no rider": CR 602.2's default is the EMPTY LIST on the
 -- ability, which Pawl.Codec.ActivatedAbility writes by omitting the key.
@@ -27,7 +26,8 @@ codec =
       Arm.payload "OnlyIf" Condition.codec ActivationRestriction.OnlyIf (\x -> case x of ActivationRestriction.OnlyIf y -> Just y; _ -> Nothing),
       Arm.nullary "OnlyOnce" ActivationRestriction.OnlyOnce,
       Arm.nullary "OnlyOnceEachTurn" ActivationRestriction.OnlyOnceEachTurn,
-      Arm.nullary "DuringDieRoll" ActivationRestriction.DuringDieRoll
+      Arm.nullary "DuringDieRoll" ActivationRestriction.DuringDieRoll,
+      Arm.nullary "InstantSpeed" ActivationRestriction.InstantSpeed
     ]
 
 tagOf :: ActivationRestriction.ActivationRestriction -> String
@@ -42,3 +42,4 @@ tagOf x = case x of
   ActivationRestriction.OnlyOnce {} -> "OnlyOnce"
   ActivationRestriction.OnlyOnceEachTurn {} -> "OnlyOnceEachTurn"
   ActivationRestriction.DuringDieRoll {} -> "DuringDieRoll"
+  ActivationRestriction.InstantSpeed {} -> "InstantSpeed"

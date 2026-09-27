@@ -68,7 +68,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Recruit as Recruit
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
+import Pawl.Engine.Resolve.Slots (battlefieldMatching, boundSlots, conditionSlots, effectContext, effectObjectRefs, effectPlayerRefs, effectSlotObjects, effectViewOf, graveyardCardsOf, handCardsOf, legalMany, legalOne, libraryCardsOf, matchingFromAmong, objectRefObjects, playerRefPlayers, replacementRowSlots, slotBindings, slotGroup, zoneScopePlayers)
 import qualified Pawl.Engine.Restamp as Restamp
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Room as Room
@@ -102,6 +102,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
@@ -130,6 +131,8 @@ import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.Clause as Clause
+import Pawl.Types.ClauseIndex (ClauseIndex)
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.CoinFace as CoinFace
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
 import qualified Pawl.Types.CoinReading as CoinReading
@@ -147,6 +150,7 @@ import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostBasis as CostBasis
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterCause as CounterCause
@@ -240,6 +244,7 @@ import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modal as Modal.Type
+import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
@@ -257,7 +262,11 @@ import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PayBranch as PayBranch
+import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
@@ -627,7 +636,7 @@ apnapPlayersOf ref legal controller gs =
 --
 -- CR 800.4f is the same situation for a COST and the opposite answer -- the cost
 -- is not paid, and nobody is asked in the departed player's place -- which is
--- why it lives at Pawl.Engine.Resolve.payGatePaidBy and not here.
+-- why it lives in payGatePaidBy and not here.
 --
 -- Pawl.DepartureSpec's "CR 800.4g a departed player's choice is made by another
 -- opponent" is what proves the reassignment.
@@ -686,6 +695,61 @@ askedChooser source controller legal ref = do
                   pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
     _ -> pure Nothing
 
+-- CR 701.3a for several movers going to one destination together. CR 613.7m:
+-- they take CR 701.3c's stamps in APNAP order, each seat choosing its own, asked
+-- before the fold that mints them, as turnPermanentsOver asks -- and only of the
+-- movers the move will restamp, since Event.attach refuses the rest (CR 701.3b).
+-- No board observes the order (gap #4214).
+attachTogether :: [ObjectId] -> Recipient -> Game ()
+attachTogether movers recipient = do
+  gs <- State.get
+  let restamped mover = case Attach.attachmentFor mover recipient gs of
+        Just attachment -> fmap Object.attachedTo (Game.lookupObject mover gs) /= Just (Just attachment)
+        Nothing -> False
+  ordered <- Restamp.order (filter restamped movers)
+  Foldable.for_ (ordered <> filter (not . restamped) movers) $ \mover ->
+    Event.attach mover recipient
+
+-- The permanents an ObjectRef names, for an instruction that acts on them
+-- together: the one ref that is a CR 608.2d question rather than a read has to
+-- be answered in the Game monad, and every other is objectRefObjects' pure
+-- sweep. Shared by turnPermanentsOver and Effect.AttachAll.
+permanentsGathered ::
+  Map.Map SlotName (Set Recipient) ->
+  ObjectId ->
+  PlayerId ->
+  ObjectId ->
+  ObjectRef.ObjectRef ->
+  Game [ObjectId]
+permanentsGathered legal resolving controller source ref = case ref of
+  -- CR 608.2d: "any number of Human Werewolves you control" is a choice made
+  -- while the effect is applied, so it is asked HERE. The candidates are
+  -- EachMatching's sweep of the same Filter, read live off the board before the
+  -- instruction acts (CR 608.2c) -- which for Tovolar is a board CR 702.145c has
+  -- already turned him over on, so his own back face is no longer a Human
+  -- Werewolf to offer.
+  --
+  -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
+  -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
+  -- ONE, unlike the counted choices: "any number" leaves two distinguishable
+  -- answers there.
+  --
+  -- FILTERED, not trusted (#222): an answer naming a permanent that was never
+  -- offered would otherwise be acted on. Filtering rather than taking the
+  -- answer also keeps CR 608.2f's APNAP order, which the candidate list
+  -- already carries and a Set does not.
+  ObjectRef.AnyNumberMatching filter_ -> do
+    gs <- State.get
+    let candidates = battlefieldMatching legal resolving controller source gs filter_
+    if null candidates
+      then pure []
+      else do
+        answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
+        pure (filter (`Set.member` answer) candidates)
+  _ -> do
+    gs <- State.get
+    pure (objectRefObjects legal resolving controller source gs ref)
+
 -- CR 701.27a and CR 701.28a: turn each named permanent over. ONE function for
 -- both opcodes, which is CR 701.28a said as code -- "this follows rules
 -- 701.27a-f, 712.9-10, and 712.18", so a convert cannot pick up a gate a
@@ -698,36 +762,8 @@ turnPermanentsOver ::
   ObjectRef.ObjectRef ->
   Game ()
 turnPermanentsOver legal resolving controller source ref = do
-  -- WHICH permanents turn over, gathered BEFORE the turn: the one ref here that
-  -- is a CR 608.2d question rather than a read has to be answered in the Game
-  -- monad, and every other is objectRefObjects' pure sweep.
-  victims <- case ref of
-    -- CR 608.2d: "any number of Human Werewolves you control" is a choice made
-    -- while the effect is applied, so it is asked HERE. The candidates are
-    -- EachMatching's sweep of the same Filter, read live off the pre-turn board
-    -- (CR 608.2c) -- which for Tovolar is a board CR 702.145c has already turned
-    -- him over on, so his own back face is no longer a Human Werewolf to offer.
-    --
-    -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
-    -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
-    -- ONE, unlike the counted choices: "any number" leaves two distinguishable
-    -- answers there.
-    --
-    -- FILTERED, not trusted (#222): an answer naming a permanent that was never
-    -- offered would otherwise turn it over. Filtering rather than taking the
-    -- answer also keeps CR 608.2f's APNAP order, which the candidate list
-    -- already carries and a Set does not.
-    ObjectRef.AnyNumberMatching filter_ -> do
-      gs <- State.get
-      let candidates = battlefieldMatching legal resolving controller source gs filter_
-      if null candidates
-        then pure []
-        else do
-          answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
-          pure (filter (`Set.member` answer) candidates)
-    _ -> do
-      gs <- State.get
-      pure (objectRefObjects legal resolving controller source gs ref)
+  -- WHICH permanents turn over, gathered BEFORE the turn (CR 608.2f).
+  victims <- permanentsGathered legal resolving controller source ref
   -- CR 613.7m: which of the swept victims will ACTUALLY take a stamp, ordered by
   -- their controllers. Asked BEFORE the write and off the pre-turn board, the
   -- gather's own reason (CR 608.2f), and `turnsOver` below is the whole
@@ -2832,6 +2868,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.AttachTarget {} -> False
   Effect.AttachTargetToEach {} -> False
   Effect.AttachBound {} -> False
+  Effect.AttachAll {} -> False
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> choosesFromNothing ref
   Effect.Draw {} -> False
   -- CR 701.17b: "a player can't mill a number of cards greater than the number
@@ -7790,20 +7827,34 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case legalOne destination legal of
       Just recipient -> do
         gs <- State.get
-        -- CR 613.7m: movers becoming attached together take CR 701.3c's stamps
-        -- in APNAP order, each seat choosing its own, asked before the fold that
-        -- mints them, as turnPermanentsOver asks -- and only of the movers the
-        -- move will restamp, since Event.attach refuses the rest (CR 701.3b).
-        -- No board observes the order (gap #4214).
-        let movers = objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)
-            restamped mover = case Attach.attachmentFor mover recipient gs of
-              Just attachment -> fmap Object.attachedTo (Game.lookupObject mover gs) /= Just (Just attachment)
-              Nothing -> False
-        ordered <- Restamp.order (filter restamped movers)
-        Foldable.for_ (ordered <> filter (not . restamped) movers) $ \mover ->
-          Event.attach mover recipient
+        attachTogether (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)) recipient
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
       Nothing -> pure ()
+  -- CR 701.3a with the mover a GROUP and one destination chosen now: Glamer
+  -- Spinners' "attach all Auras enchanting target permanent to another
+  -- permanent with the same controller", Balan's "all Equipment you control".
+  --
+  -- The movers are gathered FIRST, since the destination's
+  -- Filter.CanHostSubject is asked of all of them (Attach.groupHostsFor). The
+  -- destination is the resolving controller's to choose (CR 608.2d), through
+  -- Prompt.ChoosePermanent's posture -- no one mover is THE subject a
+  -- Prompt.ChooseAttachment would name -- and asked even when nothing moves,
+  -- since the instruction still makes the choice. None admitted: nothing moves
+  -- (CR 609.3). A mover that cannot go there stays put (CR 701.3b, CR 303.4j),
+  -- which Event.attach applies.
+  Effect.AttachAll (AttachAll.MkAttachAll ref filter_) -> do
+    movers <- permanentsGathered legal resolving controller source ref
+    gs <- State.get
+    destination <- case Attach.groupHostsFor (effectContext gs controller source legal (slotBindings resolving gs)) movers filter_ gs of
+      [] -> pure Nothing
+      [only] -> pure (Just only)
+      first : second : more -> do
+        let offered = first NonEmpty.:| (second : more)
+        answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
+        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    -- Proposed as a bare ToObject; Event.attach re-tags it per mover, as
+    -- AttachTarget's arm says.
+    Foldable.for_ destination (attachTogether movers . Recipient.ToObject)
   Effect.ExileUntilMonarch slot ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
@@ -9758,8 +9809,23 @@ performManaAbility :: ManaAbilityPerformer.ManaAbilityPerformer
 performManaAbility =
   ManaAbilityPerformer.MkManaAbilityPerformer
     { ManaAbilityPerformer.effects = performManaAbilityEffects,
-      ManaAbilityPerformer.triggered = performTriggeredManaAbility
+      ManaAbilityPerformer.triggered = performTriggeredManaAbility,
+      ManaAbilityPerformer.payGate = performManaPayGate
     }
+
+-- CR 118.12 on a mana ability's clause, which CR 605.3b gives no stack object:
+-- the SOURCE stands in for the resolving one, performManaAbilityEffects'
+-- posture. Offered and answered as Pawl.Engine.Resolve.payGateAdmits offers a
+-- resolving clause's gate, and reusing an answer already recorded for the
+-- ordinal a sharing clause names. The seats selected are not bound under
+-- Binding.gatePlayers: there is no ability object to bind them on, and no mana
+-- ability prints a "they" (MTGJSON's dump of 2026-08-23: Rhystic Cave is the one
+-- mana ability with a resolution cost).
+performManaPayGate :: ObjectId -> PlayerId -> ClauseIndex.ClauseIndex -> PayGate.PayGate -> Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool) -> Game (Bool, Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId Bool))
+performManaPayGate source controller cIdx gate answers = do
+  let offerAt = Maybe.fromMaybe cIdx (PayGate.offeredAt gate)
+  asked <- maybe (payGatePaid source source controller (ModeIndex.MkModeIndex 0) cIdx Map.empty Nothing gate) pure (Map.lookup offerAt answers)
+  pure (not (Set.null (branchSelects (PayGate.branch gate) asked)), Map.insert offerAt asked answers)
 
 -- CR 605.4a: apply one triggered mana ability where it stands. CR 605.1b's
 -- classification and CR 603.4's intervening "if" are already spent by
@@ -10527,3 +10593,224 @@ installControl legal resolving controller source recipient duration ref gs =
                   { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
                     GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
                   }
+
+-- CR 608.2d: the seats a branch's own questions are offered to. A clause naming
+-- no sibling keeps every seat its reference named; one that names a sibling
+-- keeps only the seats that announced it, in the APNAP order the caller already
+-- imposed.
+announcedOnly :: Maybe (Set PlayerId) -> [PlayerId] -> [PlayerId]
+announcedOnly = maybe id (\winners -> filter (`Set.member` winners))
+
+-- Which players a CR 118.12 branch selects from the offer's answers, off the
+-- classification a card states -- never off what the payment DID. IfPaid and
+-- IfNotPaid are per player; IfNonePaid is one answer for the table, selecting
+-- every offered player when none paid and nobody when any did.
+branchSelects :: PayBranch.PayBranch -> Map.Map PlayerId Bool -> Set PlayerId
+branchSelects branch asked = case branch of
+  PayBranch.IfPaid -> Map.keysSet (Map.filter id asked)
+  PayBranch.IfNotPaid -> Map.keysSet (Map.filter not asked)
+  PayBranch.IfNonePaid -> if or asked then Set.empty else Map.keysSet asked
+
+-- The offer itself: who was offered this gate's cost, and which of them paid?
+-- CR 118.12's MANDATORY limb is not offered, and that is the rule rather than an
+-- elision -- it asks whether the player "started to pay", so a mandatory cost the
+-- payer can afford leaves nothing to choose, and CR 118.3 is asked first so an
+-- unpayable one takes the "can't" branch with no prompt either.
+--
+-- Narrowed by `announcedOnly` to the seats that announced this branch of a CR
+-- 608.2d pair, where the clause is one: the offer belongs to the players who
+-- took it, so Worms of the Earth's sacrifice is offered to nobody who announced
+-- its damage instead.
+--
+-- CR 101.4's APNAP order over the players the reference names, which is what
+-- `apnapPlayersOf` imposes: rule 101.4b lets a later payer answer knowing what an
+-- earlier one did. The board is re-read for each of them (payGatePaidBy's own
+-- State.get) rather than measured once, so a cost that changes the board -- CR
+-- 118.12's own "sacrifice this enchantment" -- is affordable to the next payer
+-- against the board it left. Each payer spends only their own resources, so the
+-- sequencing is not observable as an ordering of the ACTIONS.
+--
+-- A player the reference names who has LEFT the game stays in this list and is
+-- answered False by payGatePaidBy, CR 800.4f.
+payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
+payGatePaid resolving source controller idx cIdx legal announced gate = do
+  gs <- State.get
+  Monad.foldM
+    ( \acc payer -> do
+        paid <- payGatePaidBy resolving source controller idx cIdx legal payer gate
+        pure (Map.insert payer paid acc)
+    )
+    Map.empty
+    (announcedOnly announced (apnapPlayersOf (PayGate.payer gate) legal controller gs))
+
+-- One player's answer to one gate. The cost is the PRINTED one with CR 107.3's X
+-- resolved (`announcedXOn`) and then multiplied by the gate's "for each"
+-- (PayGate.perEach), and that pair of rewrites is what every reader below
+-- sees -- CR 118.3's affordability test, the prompt the payer is shown, and the
+-- payment itself -- so none of them can disagree about what is owed.
+--
+-- The multiplier is read HERE rather than once for the whole gate, which is the
+-- posture payGatePaid's own comment states: rule 101.4b lets an earlier payer's
+-- answer move the board, and CR 118.12's cost is measured against the board each
+-- payer faces.
+--
+-- Measured against the RESOLUTION, not against the payer: the context is the
+-- resolving controller's (`effectContext`, never Filter.contextFor), so
+-- Rakshasa's Disdain's "for each card in your graveyard" counts the
+-- graveyard of the player who cast it while the payer is the targeted spell's
+-- controller. The quantity is evaluated against the ability's SOURCE through
+-- `effectViewOf`, so CR 113.7a's last known record answers for a source that has
+-- already left, with the announcement id CR 601.2b stamped on the RESOLVING
+-- object -- Resolve.Slots' TopOfLibrary depth is the same pair. An unevaluable
+-- or negative count is zero copies (CR 107.1b). Whether such an ability should
+-- be offering anything at all is its own text's business: rule 702.24a's
+-- intervening "if" is what stops it (CR 603.4), proved at
+-- Pawl.KeywordTriggerSpec's "a Unicorn murdered in response".
+--
+-- CR 800.4f, asked BEFORE CR 118.3 and before the offer: a payer who has left
+-- the game does not pay, and is not asked whether to. That is an answer of False
+-- and not a removal from payGatePaid's map, because CR 118.12a's rewriting makes
+-- "unless" mean "if they don't, [do something]" and an unpaid cost is exactly
+-- what selects that limb -- rule 702.21a's ward counters the spell.
+--
+-- It cannot ride the CR 118.3 test beneath it. A departed player keeps their
+-- CR 102.1 row, so an affordability question asked of their life total or their
+-- last known board can still answer yes. Ward is the reachable case: rule
+-- 702.21a targets nothing, so CR 608.2b never empties Binding.targetingObject
+-- and the trigger resolves after the targeter has gone, with
+-- PlayerRef.ControllerOfBound naming them through CR 608.2h.
+-- Pawl.DepartureSpec's "CR 800.4f a departed player is not offered a ward cost,
+-- and does not pay it" proves this arm.
+--
+-- CR 800.4g is the same situation for a choice that is NOT a payment, and the
+-- opposite answer: the controller of the object picks another player to make it,
+-- which Pawl.Engine.Resolve.Effect.askedChooser does. Not here -- a cost is the
+-- whole of what this function asks about.
+payGatePaidBy :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
+payGatePaidBy resolving source controller idx cIdx legal payer gate = do
+  gs <- State.get
+  let multiplier = case PayGate.perEach gate of
+        Nothing -> 1
+        Just quantity ->
+          let viewOf = effectViewOf source legal gs
+              context = effectContext gs controller source legal (slotBindings resolving gs)
+           in maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf context gs resolving source quantity)
+      cost = Cost.repeated multiplier (Cost.substituteX (announcedXOn resolving gs) (describedCost resolving controller source legal gs gate))
+      -- effectContext's slot map, so a component's criterion reads what every
+      -- other filter of this resolution reads -- CR 608.2b's legal targets, the
+      -- reserved cost slots among them (Binding.discardedCard), and the groups.
+      -- Pawl.ConjureSpec's Calim's Breath cases prove it.
+      slots = Binding.withGroups (effectSlotObjects legal) (Binding.groupsOf (slotBindings resolving gs))
+  if notElem payer (Game.stillPlaying gs) || not (Cost.canPayReading slots PaymentSubject.ForNeither payer source cost gs)
+    then pure False
+    else do
+      decision <- case PayGate.obligation gate of
+        PayObligation.Mandatory -> pure PaymentDecision.Pays
+        PayObligation.Optional -> Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
+      case decision of
+        PaymentDecision.Declines -> pure False
+        PaymentDecision.Pays -> do
+          -- CR 118.13b: a symbol payable in multiple ways is announced by the
+          -- PAYER "immediately before they pay that cost" -- after CR 118.12's
+          -- "may" above, since what is announced is how to pay a cost already
+          -- chosen, and before the mana window Cost.pay opens.
+          --
+          -- CR 601.2f's totalling is `pure`, which is the identity in the list
+          -- applicative `Cost.announce` measures through: pawl gathers cost
+          -- adjustments for a SPELL (Cast.castSpell) and for an ACTIVATION
+          -- (Activate.activateAbility) and nowhere else, and `Cost.pay` below
+          -- applies none of its own, so the announced cost IS the cost that will
+          -- be paid. A card that reduced a CR 118.12 cost would be the one to
+          -- refute that, and `data/cards/` prints none. That also keeps the offer
+          -- exactly as permissive as `Cost.canPay` above, which enumerates the
+          -- same CR 601.2b nonhybrid equivalents through Mana.resolutions --
+          -- so no route Mana.announce offers is one the gate refused, and its
+          -- no-payable-route fallback stays unreachable from here. CR 701.67a's
+          -- taps are folded into the totalling for the same reason, Activate's
+          -- `substitutedManas` posture: the gate weighs them too.
+          -- Discarded, Activate's reason: rule 702.150a asks about a spell's own
+          -- cost, not about a cost paid during a resolution (CR 118.13b).
+          (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced payer source (Cost.substitutedManas (Cost.waterbendSubstitutions (Cost.Type.components cost) slots payer source gs) pure) cost
+          -- DuringResolution: rule 118.12's cost is paid as the spell or ability
+          -- resolves, which is CR 609.1's effect, so a blight paid here is CR
+          -- 614.16's subject where Soul Immolation's additional cost is not.
+          -- CR 733.1's reversal base: rule 118.12's payment IS the whole of
+          -- the action that can fail, so the state it begins in is where a
+          -- failure returns to and the CR 605.3a window is the payer's to keep
+          -- (Cost.pay). Taken after the announcement above, which writes no
+          -- state of its own.
+          began <- State.get
+          outcome <- Cost.payReading slots performManaAbility began PaymentMoment.DuringResolution PaymentSubject.ForNeither ManaSpending.AsProduced payer source announced
+          -- Not implemented: the slots this payment bound are dropped, so a
+          -- CR 118.12 cost that sacrifices a permanent cannot be read by a
+          -- later clause of the same resolution (#1872).
+          pure (case outcome of Payment.Paid _ -> True; Payment.Unpaid -> False)
+
+-- CR 118.6: the gate's cost with its mana part DESCRIBED rather than printed --
+-- Flash's "unless you pay its mana cost reduced by {2}", where the mana part is
+-- the mana cost of the creature its first clause put onto the battlefield, less
+-- the {2} (CR 118.7). The gate's own cost unchanged when it describes nothing,
+-- which is every other gate in the pool.
+--
+-- Settled HERE, as the gate is offered, because there is no earlier moment: CR
+-- 118.12 puts the payment at resolution, and the object the basis names is one
+-- an earlier clause of this same resolution bound (CR 608.2c). Ahead of
+-- `substituteX` in the caller, so an {X} in the derived mana cost is
+-- substituted by the same announcement a stated one's is -- CR 107.3h fixes
+-- that value at 0 for every object but a spell on the stack, and a basis names
+-- a PERMANENT on every printing of this family.
+--
+-- Through the PROJECTION (`effectViewOf`), never the printed card: CR 706.2
+-- makes a mana cost a copiable value, so a permanent that is a copy of another
+-- card owes the copied cost, and a permanent whose mana cost a CR 613 effect
+-- changed owes the changed one.
+--
+-- Nothing where the slot names no object or several, and Nothing where the
+-- object has no mana cost (CR 202.1b) -- CR 118.6's own second sentence, "an
+-- ability can also have an unpayable cost if its cost is based on the mana cost
+-- of an object with no mana cost", which Cost.canPay then refuses. A slot
+-- naming several names no one cost, which is why Pawl.Engine.Resolve.Slots.modeSlots
+-- reports the read at SlotArity.One.
+--
+-- The stated COMPONENTS survive: what a basis supplies is the mana part alone,
+-- and a card stating both pays both. None in the pool does.
+describedCost :: ObjectId -> PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> GameState -> PayGate.PayGate -> Cost.Type.Cost Keyword.Type.Keyword
+describedCost resolving controller source legal gs gate = case PayGate.basis gate of
+  Nothing -> PayGate.cost gate
+  Just basis ->
+    let -- The gate's own `legal` is the START-of-resolution targets (CR 608.2b,
+        -- payGateAdmits' caller), which is not where a slot an EARLIER CLAUSE
+        -- defined lives: CR 400.7j's binding is written to the resolving object
+        -- as that clause runs, and Flash's "it" is one of those. Both halves,
+        -- the validated targets winning where a card names a slot that is both.
+        bound = Map.union legal (Binding.targetsOf (slotBindings resolving gs))
+        described = case objectRefObjects bound resolving controller source gs (ObjectRef.InSlot (CostBasis.slot basis)) of
+          [oid] -> Filter.manaCost =<< effectViewOf source bound gs oid
+          _ -> Nothing
+     in (PayGate.cost gate) {Cost.Type.mana = fmap (Cost.reducedManaCost (CostBasis.reducedBy basis)) described}
+
+-- CR 118.4 / CR 107.3a: the value of X in a cost paid during resolution. NOT a
+-- choice the payer makes -- CR 107.3a fixes it at the value the object's own
+-- controller announced at CR 601.2b, and CR 107.3i gives every instance of X on
+-- that object that one value -- so Clash of Wills' "unless its controller pays
+-- {X}" charges the X its caster paid for, and nobody is prompted here.
+--
+-- Read off the object CR 601.2b announced ON: the SPELL (Cast.castSpell stamps
+-- the new incarnation) or the ABILITY (Activate.activateAbility stamps the
+-- ability object), which is `resolving` in both cases and never `source` --
+-- Quantity.evaluateFor's InSlot arm says the same about the same binding.
+--
+-- Zero when nothing was announced. A face whose gate prints {X} always declares
+-- an {X} of its own (Pawl.CardSpec's "every printing that reads X declares X"),
+-- so this is a totality guard for a CARD-authored gate. A gate MINTED by a
+-- keyword resolves on a triggered ability that announced nothing, and reads 0
+-- here.
+--
+-- CR 702.21b's ward {X} is the value this reader is NOT: determined as the
+-- ability resolves rather than announced, it rides PayGate.perEach instead
+-- (Pawl.Types.Ward.perEach, Pawl.Engine.Keyword.ward).
+announcedXOn :: ObjectId -> GameState -> Natural
+announcedXOn oid gs =
+  Maybe.fromMaybe
+    0
+    (Game.lookupObject oid gs >>= Binding.amountOf Binding.variableX . Object.bindings)
