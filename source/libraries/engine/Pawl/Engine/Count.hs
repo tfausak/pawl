@@ -64,7 +64,7 @@ type ViewOf = ObjectId -> Maybe Filter.View
 -- Reads a per-member quantity off one candidate. INJECTED for the same
 -- module-cycle reason ViewOf is: Pawl.Engine.Quantity imports this module and
 -- ties the knot at its own Count arm. Only Aggregation.Greatest and
--- Aggregation.Total read it; the other two ignore it.
+-- Aggregation.Total read it; the others ignore it.
 --
 -- BOTH the candidate's object and its view, because an InHistory candidate has
 -- only the second: its view is a CR 608.2h snapshot of a past event, so a
@@ -494,6 +494,8 @@ aggregate :: QuantityOf quantity -> Aggregation.Aggregation quantity -> [(Maybe 
 aggregate quantityOf aggregation members = case aggregation of
   Aggregation.Members -> Just (toInteger (length members))
   Aggregation.DistinctCardTypes -> Just (toInteger (Set.size (Set.unions (fmap (Filter.cardTypes . snd) members))))
+  -- CR 105.2c: a colorless member adds nothing.
+  Aggregation.DistinctColors -> Just (toInteger (Set.size (Set.unions (fmap (Filter.colors . snd) members))))
   -- Undeterminable in both directions. A member whose quantity cannot be
   -- determined makes the whole maximum undeterminable rather than being dropped, which
   -- would report the maximum of a set the card never named; and an EMPTY

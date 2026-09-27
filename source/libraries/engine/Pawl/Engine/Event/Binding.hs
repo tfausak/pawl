@@ -8,6 +8,7 @@ import Control.Applicative ((<|>))
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
@@ -58,6 +59,7 @@ import qualified Pawl.Types.TappedForMana as TappedForMana
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
@@ -949,6 +951,12 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- admits a zone change only.
   (TriggerCondition.CardsLeaveZone p, GameEvent.Moved m) ->
     Binding.setEventAmount (Natural.length (admittedDepartures gs bearer you p m)) Map.empty
+  -- The card a hand received, under Binding.handArrival rather than CR 400.7e's
+  -- `became`, which a hidden destination withholds (CR 400.2). Kithkin
+  -- Brinefarer, Volatile Rift and Veteran Ghoulcaller read it.
+  (TriggerCondition.CardLeavesZone _, GameEvent.Moved m)
+    | ZoneChange.to (Moved.change m) == Zone.Hand ->
+        Binding.setHandArrival (ZoneChange.object (Moved.change m)) Map.empty
   -- CR 603.1b's multi-condition ability, bound as the UNION of what its branches
   -- stamp off this one event -- the only answer that fills a slot two branches
   -- name. Case of the Pilfered Proof's "whenever a Detective you control enters
@@ -1473,13 +1481,13 @@ eventBindingSlots cond = case cond of
   -- event family over: Tameshi, Reality Architect's payload names none of the
   -- batch.
   TriggerCondition.PermanentsReturnedToHand _ -> Set.empty
-  -- Nothing either, and not for the batch arm's reason: Kishla Skimmer's payload
-  -- draws a card and names neither the card that left nor what it became, so no
-  -- slot is earned. eventBindings has no arm for this condition, which the empty
-  -- floor pins -- and a FLOOR is what it would have to clear: this condition
-  -- admits every destination, and CR 400.2 makes a hand and a library hidden, so
-  -- CR 400.7e withholds `became` for some of the moves it matches.
-  TriggerCondition.CardLeavesZone {} -> Set.empty
+  -- CR 400.7e's `became` is never bound: this condition admits hidden
+  -- destinations (CR 400.2), and Kishla Skimmer's payload names no card anyway.
+  -- Binding.handArrival is guaranteed when the condition pins the destination to
+  -- a hand; Kithkin Brinefarer's "that card" reads it.
+  TriggerCondition.CardLeavesZone p
+    | CardLeavesZone.to p == Just Zone.Hand -> Set.singleton Binding.handArrival
+    | otherwise -> Set.empty
   -- The self form, empty for the same floor: the destination may be hidden. The
   -- bearer is the card that left, which the source slot already names.
   TriggerCondition.SelfLeavesGraveyard -> Set.empty
@@ -1833,14 +1841,14 @@ eventBindingSlots cond = case cond of
 -- PRESCRIBES, not the silent no-op the lint exists to catch. Every other reader
 -- wants the floor, a slot bound sometimes being no guarantee at all.
 --
--- Four arms and no more, which is a fact about eventBindings above rather than
--- a convenience. Two of them are CR 400.7e's public-zone proviso, the only guard
--- there that turns on the EVENT's own shape and that a match does not already
--- settle, standing on exactly the two conditions CR 603.6c admits every
--- destination for. The third is PermanentSacrificed, where CR 400.7e's new
--- object is not on the event at all and the arrival table may not carry it --
--- see that arm. The fourth is CR 603.1b's AnyOf, where what parts the ceiling
--- from the floor is the BRANCHES disagreeing rather than any one event's shape.
+-- Five arms and no more, which is a fact about eventBindings above rather than
+-- a convenience. Two of them are CR 400.7e's public-zone proviso, standing on
+-- the two conditions CR 603.6c admits every destination for. The third is
+-- PermanentSacrificed, where CR 400.7e's new object is not on the event at all
+-- and the arrival table may not carry it -- see that arm. The fourth is CR
+-- 603.1b's AnyOf, where what parts the ceiling from the floor is the BRANCHES
+-- disagreeing rather than any one event's shape. The fifth is CardLeavesZone
+-- with no destination, whose Binding.handArrival turns on the event's `to`.
 -- The other two conditional arms turn on GAME STATE instead --
 -- AttachedCreatureDies on CR 400.7f's arrival and PermanentReturnedToHand on CR
 -- 608.2h's record -- and the floor claims both outright, each for the reasons
@@ -1874,6 +1882,10 @@ eventBindingSlotsSometimes cond = case cond of
   -- and delayedPending scans no batch at all. data/cards/prowling-geistcatcher.json
   -- is the reader.
   TriggerCondition.PermanentSacrificed {} -> Set.singleton Binding.became
+  -- Binding.handArrival, bound when the move a destination-free condition
+  -- matched reached a hand. Nothing in data/cards/ names it under one.
+  TriggerCondition.CardLeavesZone p
+    | Maybe.isNothing (CardLeavesZone.to p) -> Set.singleton Binding.handArrival
   -- CR 603.1b's branches disagreeing with each other, which is a fourth way for a
   -- slot to be bound for some of a condition's events and not all: eventBindings
   -- stamps whatever the MATCHED branch does, while the floor above intersects.

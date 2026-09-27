@@ -240,21 +240,27 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         -- only which list the ability joins -- nothing here reads what the
         -- ability does.
         --
-        -- An object-affecting STATIC ability joins none: its effect is gathered
-        -- before this fold runs, which is permanentParts' reading of a stored
-        -- grant through Pawl.Engine.Projection.View.grantedStaticAbilitiesOf.
-        -- Nor does a RULE ability, which CR 613.11 applies after the layers: the
-        -- gatherers read a stored grant of one through grantedRuleAbilities. A
-        -- PLAYER ability, applied after the layers too (CR 613.10), is recorded
-        -- here whoever grants it. Not implemented: an object-affecting static or
-        -- a rule ability granted by another static ability rather than by a
-        -- resolution, whose recipients only this fold knows (#1942).
+        -- An object-affecting STATIC ability a resolution granted joins none:
+        -- its set is fixed (CR 611.2c), so its effect is gathered before this
+        -- fold runs, which is permanentParts' reading of a stored grant through
+        -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf. One another
+        -- static ability grants is RECORDED, since only this fold knows who it
+        -- reaches; withStaticGrants reads the record back to gather its effect.
+        -- A RULE ability, which CR 613.11 applies after the layers, joins none:
+        -- the gatherers read a stored grant of one through grantedRuleAbilities.
+        -- A PLAYER ability, applied after the layers too (CR 613.10), is
+        -- recorded here whoever grants it.
+        --
+        -- Not implemented: a rule ability another static ability grants, whose
+        -- recipients only this fold knows (#1942).
         Modification.GainAbility g -> case g of
           GrantedAbility.Activated a ->
             pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
           GrantedAbility.Triggered t ->
             pc {PC.triggeredAbilities = PC.triggeredAbilities pc <> [t]}
-          GrantedAbility.Static _ -> pc
+          GrantedAbility.Static sa -> case affected of
+            Affected.TheseObjects _ -> pc
+            _ -> pc {PC.grantedStaticAbilities = PC.grantedStaticAbilities pc <> [(stamp, sa)]}
           GrantedAbility.Rules _ -> pc
           -- CR 614.1 / 113.7: replacementsOf reads this list off the finished
           -- projection, so the row is the receiver's and its IsSource is the
@@ -286,6 +292,10 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               -- fold knows; the copiable ones are gated outside it
               -- (abilityRemoval).
               PC.grantedPlayerAbilities = [],
+              -- The same for a granted static ability: only an EARLIER grant is
+              -- gone. Unproven: no card in data/cards/ grants a static ability
+              -- to a permanent an ability wipe reaches.
+              PC.grantedStaticAbilities = [],
               -- CR 305.6's intrinsic mana ability has no list here to empty, so
               -- the removal is recorded instead and read back by
               -- Pawl.Engine.Subtype.intrinsicManaAbilityOf.
@@ -1786,16 +1796,16 @@ anyConditional gs =
       -- the copy's, which Pawl.ClassSpec's "CR 604.2 a copy's own as-long-as
       -- clause is still gated once the original is exiled" proves.
       -- The granted list too, which permanentParts gathers beside the copiable one.
-      conditionalPermanent oid = any (Maybe.isJust . StaticAbility.condition) (staticAbilitiesOf oid gs <> fmap snd (grantedStaticAbilitiesOf oid gs))
+      conditionalPermanent oid = any carriesCondition (staticAbilitiesOf oid gs <> fmap snd (grantedStaticAbilitiesOf oid gs))
       conditional oid = case Game.faceOf oid gs of
         Nothing -> False
-        Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
+        Just face -> any carriesCondition (Face.staticAbilities face)
       conditionalStating zone oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj | not (mayStateZone gs zone obj) -> False
         Just obj -> case Game.faceOfObject gs obj of
           Nothing -> False
-          Just face -> any (\sa -> Maybe.isJust (StaticAbility.condition sa) && statesZone zone sa) (Face.staticAbilities face)
+          Just face -> any (\sa -> carriesCondition sa && statesZone zone sa) (Face.staticAbilities face)
    in any conditionalPermanent (Set.toList (GameState.battlefield gs))
         || any conditional (Set.toList (GameState.command gs))
         || any conditional (GameState.stack gs)
@@ -1812,6 +1822,17 @@ anyConditional gs =
         || anyZoneCard GameState.hand (conditionalStating Zone.Hand) gs
         || anyZoneCard GameState.library (conditionalStating Zone.Library) gs
         || any (conditionalStating Zone.Exile) (Set.toList (GameState.exile gs))
+
+-- CR 604.2: does this static ability carry an "as long as" clause, or grant a
+-- static ability that does? The granted one is gathered too (withStaticGrants),
+-- so its clause needs the gate as much as a printed one. Sedge Sliver's "This
+-- creature gets +1/+1 as long as you control a Swamp" is the grant.
+carriesCondition :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility card) -> Bool
+carriesCondition sa =
+  let grantsConditional m = case m of
+        Modification.GainAbility (GrantedAbility.Static inner) -> carriesCondition inner
+        _ -> False
+   in Maybe.isJust (StaticAbility.condition sa) || any grantsConditional (StaticAbility.modifications sa)
 
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
@@ -2065,7 +2086,78 @@ gatherGiven stripped functioning seed gs =
       bestows = bestowGathered gs
       castGrants = castGrantGathered gs
       encodings = encodedGathered gs
-   in stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants <> encodings
+   in withStaticGrants functioning gs (stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants <> encodings)
+
+-- CR 613.1f / 113.7: `base` with the effects of the static abilities that other
+-- static abilities grant appended -- Rune of Flight's "Equipped creature has
+-- flying" on the Equipment it enchants. Only the layer fold knows who such a
+-- grant reaches, so the fold records each one on the receiver
+-- (PC.grantedStaticAbilities) and this reads the record back off each
+-- candidate's projection through layer 6, where every grant has applied.
+--
+-- The granted ability is the RECEIVER's (CR 113.7): its source, and so its "this
+-- creature", its "equipped creature" and its "you" (CR 109.5), is the object it
+-- was granted to. CR 613.7a: its effect takes the receiver's timestamp or the
+-- grant's, whichever is later, and follows the receiver's own abilities in the
+-- list, which keeps the relative order the rule asks for when the receiver gets
+-- a new timestamp. CR 612.3: no text change reaches it. CR 613.1f's removal is
+-- the fold's own: a later removal empties the record (applyModification's
+-- LoseAllAbilities arm), so nothing is stripped here.
+--
+-- A granted ability's effect can reach layers 1-6 and so move who a grant
+-- reaches, or what the fold records, so the read is repeated against the
+-- widened list until it settles. When nothing granted applies before layer 7,
+-- the first read is already exact and the list is returned after one round.
+-- The re-read is a regression fence rather than a proved behaviour: no card in
+-- data/cards/ grants an ability whose effect moves a grant, so returning after
+-- the first round leaves the suite green. A cycle that never settles stops
+-- after staticGrantRounds.
+--
+-- Pawl.ProjectionSpec's StaticGrantedStatic group proves the grant and its
+-- timestamp through Rune of Flight and Armed with Proof, and the receiver's
+-- "you" through Sedge Sliver.
+withStaticGrants :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered] -> [Gathered]
+withStaticGrants functioning gs base =
+  if any grantsStatic base then settle staticGrantRounds (receivedGiven base) else base
+  where
+    -- A stored grant's set is fixed (CR 611.2c), and permanentParts has
+    -- already gathered its effect through View.grantedStaticAbilitiesOf.
+    grantsStatic c = case (gModification c, gAffected c) of
+      (_, Affected.TheseObjects _) -> False
+      (Modification.GainAbility (GrantedAbility.Static _), _) -> True
+      _ -> False
+    receivedGiven cands =
+      let forObject = projectWith (<= Layer.Ability) cands
+          -- CR 113.6: a permanent's static ability functions only on the
+          -- battlefield unless it states otherwise, and every such grant in
+          -- data/cards/ reaches permanents, so the battlefield bounds the
+          -- candidates.
+          reachable = Set.intersection (GameState.battlefield gs) (foldMap (\c -> candidatesFor (gAffected c) gs) (filter grantsStatic cands))
+       in Map.filter (not . null) (Map.fromSet (\oid -> PC.grantedStaticAbilities (forObject oid gs)) reachable)
+    partsOf received = concatMap (uncurry partsFor) (Map.toList received)
+    -- Indexed after the printed and the stored-grant lists permanentParts
+    -- indexes, so CR 613.6's decision memo key names one ability.
+    partsFor oid abilities = case Game.lookupObject oid gs of
+      Nothing -> []
+      Just obj ->
+        let offset = List.genericLength (staticAbilitiesOf oid gs) + List.genericLength (grantedStaticAbilitiesOf oid gs) :: Natural
+            one n (stamp, sa) =
+              if functionsFromZone Zone.Battlefield sa
+                then gatherStatic (functioning oid) oid (max (Object.timestamp obj) stamp) [] (const False) n sa
+                else []
+         in concat (zipWith one [offset ..] abilities)
+    settle rounds received =
+      let granted = partsOf received
+          cands = base <> granted
+       in if rounds <= (0 :: Natural) || all (\c -> gLayer c > Layer.Ability) granted
+            then cands
+            else
+              let received' = receivedGiven cands
+               in if received' == received then cands else settle (rounds - 1) received'
+
+-- withStaticGrants' bound on re-reading who a static grant reaches.
+staticGrantRounds :: Natural
+staticGrantRounds = 8
 
 -- CR 113.6b's stated set, without the empty-set default that
 -- functionsFromZone folds in: does this ability SAY it functions from `zone`?
@@ -3686,6 +3778,7 @@ aggregationReads :: Aggregation.Aggregation Quantity.Type.Quantity -> Set Aspect
 aggregationReads a = case a of
   Aggregation.Members -> Set.empty
   Aggregation.DistinctCardTypes -> Set.singleton Types
+  Aggregation.DistinctColors -> Set.singleton Colors
   Aggregation.Greatest q -> quantityReads q
   Aggregation.Total q -> quantityReads q
 

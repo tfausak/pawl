@@ -4340,6 +4340,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   supertypeSpec s registry
   exchangeTextBoxSpec s registry
   textChangeDependencySpec s registry
+  staticGrantSpec s registry
 
 -- CR 612.5's two sides, pinned by id out of the offered set rather than
 -- hand-built, so CR 608.2b's re-read at resolution still finds what was named.
@@ -6055,3 +6056,118 @@ spellAndScatter s registry printing = do
       (scatterId, base4) = S.addHandCard scatter S.bob base3
       (base5, spellId) = S.handOne printing base4
    in pure (scatterId, S.runPure S.identityAnswer base5 (S.cast S.alice spellId))
+
+-- CR 613.1f / 613.7a / 113.7: a quoted static ability granted by another static
+-- ability, whose recipients only the layer fold knows. Rune of Flight on
+-- Starforged Sword is CR 613.7a's own example with the Sword standing in for
+-- Colossus Hammer: "Equipped creature gets +3/+3 and loses flying". Goblin
+-- Piker prints no flying, so the only flying on it is the Rune's, and it
+-- survives only when the granted ability applies AFTER the Sword's removal.
+staticGrantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+staticGrantSpec s registry = Spec.describe s "StaticGrantedStatic" $ do
+  let -- CR 613.7e: an Equipment gets a new timestamp each time it becomes
+      -- attached. S.attach does not stamp, so the fixture does.
+      restamp oid gs =
+        let (ts, stamped) = Game.freshTimestamp gs
+         in stamped {GameState.objects = Map.adjust (\o -> o {Object.timestamp = ts}) oid (GameState.objects stamped)}
+      -- Sword, Piker, then Rune, each a later timestamp than the last.
+      runeOnSword = do
+        piker <- S.printingOf s registry "Goblin Piker"
+        mountain <- S.printingOf s registry "Mountain"
+        sword <- S.printingOf s registry "Starforged Sword"
+        rune <- S.printingOf s registry "Rune of Flight"
+        let (swordId, withSword) = S.addPermanent sword S.alice (S.landsInPlay mountain 1)
+            (pikerId, withPiker) = S.addPermanent piker S.alice withSword
+            (runeId, withRune) = S.addPermanent rune S.alice withPiker
+        pure (pikerId, swordId, runeId, withRune)
+
+  Spec.it s "CR 613.7a Rune of Flight's granted ability outlasts the older Sword's loses-flying" $ do
+    (pikerId, swordId, runeId, gs0) <- runeOnSword
+    let gs = S.attach runeId swordId (S.attach swordId pikerId gs0)
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "the equipped Piker flies"
+    Spec.assertEqWith s "and still gets the Sword's +3/+3" (Projection.powerOf pikerId gs, Projection.toughnessOf pikerId gs) (Just 5, Just 4)
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying swordId gs)) "the Sword is no creature, so the Rune's first ability gives it nothing"
+
+  Spec.it s "CR 613.7a the granted ability keeps its place after the Sword it is on is restamped" $ do
+    (pikerId, swordId, runeId, gs0) <- runeOnSword
+    let gs = restamp swordId (S.attach swordId pikerId (S.attach runeId swordId gs0))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "the Piker still flies: the Sword's abilities moved together"
+
+  -- The Rune's grant takes ITS timestamp when that is the later one: a second
+  -- Sword stamped between the first and the Rune removes flying after the
+  -- first Sword's own abilities and before the Rune's grant.
+  Spec.it s "CR 613.7a the granted ability takes the grant's later timestamp" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    sword <- S.printingOf s registry "Starforged Sword"
+    rune <- S.printingOf s registry "Rune of Flight"
+    let (swordId, withSword) = S.addPermanent sword S.alice (S.landsInPlay mountain 1)
+        (pikerId, withPiker) = S.addPermanent piker S.alice withSword
+        (laterSwordId, withLater) = S.addPermanent sword S.alice withPiker
+        (runeId, withRune) = S.addPermanent rune S.alice withLater
+        gs = S.attach runeId swordId (S.attach laterSwordId pikerId (S.attach swordId pikerId withRune))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId gs) "the Piker flies"
+    Spec.assertEqWith s "under both Swords" (Projection.powerOf pikerId gs, Projection.toughnessOf pikerId gs) (Just 8, Just 7)
+
+  Spec.it s "CR 113.7 the Rune on an unattached Sword gives no creature flying" $ do
+    (pikerId, swordId, runeId, gs0) <- runeOnSword
+    let gs = S.attach runeId swordId gs0
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying pikerId gs)) "the Piker does not fly"
+
+  -- CR 113.7 / 109.5: the quoted "you" is the controller of the creature that
+  -- HAS the ability. Bob controls the Swamp and alice the Slivers that grant, so
+  -- a "you" read off the grantor pumps nobody. The Clone copies Sedge Sliver,
+  -- so bob's Sliver holds two grants (CR 707.2).
+  Spec.it s "CR 113.7 Sedge Sliver's granted pump reads the receiver's controller, and a Clone grants it again" $ do
+    sedge <- S.printingOf s registry "Sedge Sliver"
+    clone <- S.printingOf s registry "Clone"
+    venser <- S.printingOf s registry "Venser's Sliver"
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    let (sedgeId, withSedge) = S.addPermanent sedge S.alice (S.landsInPlay island 1)
+        (venserId, withVenser) = S.addPermanent venser S.bob withSedge
+        withSwamp = S.landsFor swamp S.bob 1 withVenser
+        (_, staged) = S.spellOnStack clone S.alice withSwamp
+        copying :: Prompt.Prompt r -> r
+        copying p = case p of
+          Prompt.ChooseCopyTarget _ _ _ legal -> List.find (== sedgeId) legal
+          _ -> S.identityAnswer p
+        gs = snd (Engine.runGamePure copying staged Stack.resolveTop)
+        alicesOthers = filter (\o -> o /= sedgeId && Projection.controllerOf o gs == Just S.alice && Projection.isCreatureOf o gs) (Set.toList (GameState.battlefield gs))
+    Spec.assertEqWith s "bob's Sliver gets +1/+1 from each Sedge" (Projection.powerOf venserId gs, Projection.toughnessOf venserId gs) (Just 5, Just 5)
+    Spec.assertEqWith s "alice controls no Swamp, so her Sedge gets nothing" (Projection.powerOf sedgeId gs, Projection.toughnessOf sedgeId gs) (Just 2, Just 2)
+    case alicesOthers of
+      [cloneId] -> do
+        Spec.assertBool s (Set.member Subtype.Type.Sliver (Projection.subtypesOf cloneId gs)) "the Clone copied Sedge Sliver"
+        Spec.assertEqWith s "and gets nothing either" (Projection.powerOf cloneId gs, Projection.toughnessOf cloneId gs) (Just 2, Just 2)
+      other -> Spec.assertFailure s ("expected alice to control exactly one other creature, got " <> show (length other))
+    Spec.assertEqWith s "bob's Sliver has one regeneration ability per Sedge" (length (Projection.abilitiesOf venserId gs)) 2
+
+  -- CR 613.1d / 613.1f: Armed with Proof makes each Clue alice controls an
+  -- Equipment and grants it "Equipped creature gets +2/+0" and equip {2}. Whole
+  -- card: cast from hand, its enters trigger investigates twice, and one Clue's
+  -- granted equip is activated onto the Piker. The quoted "equipped creature" is
+  -- the CLUE's (CR 113.7), so the unattached second Clue pumps nothing.
+  Spec.it s "CR 613.1f a Clue Armed with Proof equips the Piker for +2/+0" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    armed <- S.printingOf s registry "Armed with Proof"
+    let (pikerId, withPiker) = S.addPermanent piker S.alice (S.landsInPlay plains 5)
+        (withArmed, armedId) = S.handOne armed withPiker
+        aim :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+        aim oid p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((==) (Just oid) . Recipient.objectOf) . snd) sets
+          _ -> S.identityAnswer p
+        settle gs =
+          let placed = S.runPure S.identityAnswer gs Engine.settleForPriority
+           in if null (GameState.stack placed) then placed else settle (S.runPure S.identityAnswer placed Stack.resolveTop)
+        ready = settle (S.runPure S.identityAnswer withArmed (S.cast S.alice armedId))
+    case S.tokensOf ready of
+      [clueId, otherClueId] -> case filter (Maybe.isJust . ActivatedAbility.keyword) (Projection.abilitiesOf clueId ready) of
+        [equip] -> do
+          let equipped = S.runPure (aim pikerId) ready (Activate.activateAbility S.alice clueId equip >> Stack.resolveTop)
+          Spec.assertEqWith s "the equipped Piker gets +2/+0" (S.powerToughnessOf pikerId equipped) (Just (4, 1))
+          Spec.assertBool s ((Game.lookupObject clueId equipped >>= Object.attachedTo >>= Recipient.objectOf) == Just pikerId) "the Clue really is attached to the Piker"
+          Spec.assertBool s (Set.member Subtype.Type.Equipment (Projection.subtypesOf otherClueId equipped)) "the other Clue is an Equipment too"
+        other -> Spec.assertFailure s ("expected the Clue to hold one granted equip ability, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected two Clues, got " <> show (length other))

@@ -21,6 +21,7 @@ codec quantityCodec =
     tagOf
     [ Arm.nullary "Members" Aggregation.Members,
       Arm.nullary "DistinctCardTypes" Aggregation.DistinctCardTypes,
+      Arm.nullary "DistinctColors" Aggregation.DistinctColors,
       Arm.payload "Greatest" quantityCodec Aggregation.Greatest (\x -> case x of Aggregation.Greatest y -> Just y; _ -> Nothing),
       Arm.payload "Total" quantityCodec Aggregation.Total (\x -> case x of Aggregation.Total y -> Just y; _ -> Nothing)
     ]
@@ -29,5 +30,6 @@ tagOf :: Aggregation.Aggregation q -> String
 tagOf x = case x of
   Aggregation.Members {} -> "Members"
   Aggregation.DistinctCardTypes {} -> "DistinctCardTypes"
+  Aggregation.DistinctColors {} -> "DistinctColors"
   Aggregation.Greatest {} -> "Greatest"
   Aggregation.Total {} -> "Total"
