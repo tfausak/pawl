@@ -336,6 +336,7 @@ import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.Ward as Ward
+import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -2978,6 +2979,12 @@ payGateFilters gate =
 -- KeywordFramed out through every quoting position rather than inheriting the
 -- promise of whichever one quoted it -- `frame` below fills in only the
 -- positions still Unframed.
+-- counterKindFilters over the kind a removal names, where it names one.
+whichCountersFilters :: WhichCounters.WhichCounters Keyword.Keyword -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+whichCountersFilters which = case which of
+  WhichCounters.OfKind kind -> counterKindFilters kind
+  WhichCounters.OfAnyKind -> []
+
 counterKindFilters :: CounterKind.CounterKind Keyword.Keyword -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 counterKindFilters kind = case kind of
   CounterKind.Keyword keyword -> keywordFilters keyword
@@ -5689,7 +5696,7 @@ effectFilters effect = case effect of
   -- slot beside them is a bare SlotName and carries no Filter.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _ _) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity)
   -- RemoveCounters' two unframed positions, and MoveCounters' `from`.
-  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from kind _) -> frame Unframed (counterKindFilters kind <> foldMap quantityFilters (RemovalCount.quantityOf count)) <> frame SourceHostFramed (objectRefFilters from)
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from which _) -> frame Unframed (whichCountersFilters which <> foldMap quantityFilters (RemovalCount.quantityOf count)) <> frame SourceHostFramed (objectRefFilters from)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []

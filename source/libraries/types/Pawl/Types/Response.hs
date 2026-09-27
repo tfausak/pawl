@@ -233,8 +233,8 @@ data Response
     -- cap. Its own constructor: an answer below the count is legal here and not
     -- to ChooseCounterRemovalAmong.
     ChoseCounterRemovalUpTo (Map.Map ObjectId.ObjectId Natural.Natural)
-  | -- | CR 118.1 as a cost / CR 122.1: the division by permanent AND kind a
-    -- paying player chose where the cost names no kind.
+  | -- | CR 122.1: the division by permanent AND kind a paying or resolving
+    -- player chose where the removal names no kind.
     ChoseMixedCounterRemoval (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))
   | -- | CR 701.38a: the choice one player voted for.
     --

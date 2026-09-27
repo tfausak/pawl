@@ -390,7 +390,7 @@ data Effect card ability
   | -- | CR 122: remove this many counters of this kind from the slot's target
     -- permanent; asking for more than are present removes what is there.
     RemoveCounters RemoveCounters.RemoveCounters
-  | -- | CR 608.2d: remove counters of one kind from among the permanents an
+  | -- | CR 608.2d: remove counters of one kind, or any, from among the permanents an
     -- ObjectRef names, the resolving controller dividing them.
     RemoveCountersAmong RemoveCountersAmong.RemoveCountersAmong
   | -- | CR 122.5: move counters from the permanents an ObjectRef names onto the

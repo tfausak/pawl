@@ -77,7 +77,10 @@
                             }
                           },
                           "kind": {
-                            "type": "PlusOnePlusOne"
+                            "type": "OfKind",
+                            "value": {
+                              "type": "PlusOnePlusOne"
+                            }
                           },
                           "tally": "removed"
                         }

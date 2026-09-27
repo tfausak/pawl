@@ -241,10 +241,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Nightmare"
+            "type": "Beast"
           },
           {
-            "type": "Beast"
+            "type": "Nightmare"
           }
         ],
         "supertypes": [

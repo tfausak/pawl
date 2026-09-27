@@ -699,10 +699,11 @@ data Prompt r where
   -- | CR 608.2d: ChooseCounterRemovalAmong where the Natural is a cap, so none
   -- is an answer (Sensational Spider-Man). Never elided.
   ChooseCounterRemovalUpTo :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Map.Map ObjectId.ObjectId Natural.Natural -> Prompt (Map.Map ObjectId.ObjectId Natural.Natural)
-  -- | CR 118.1 as a cost / CR 122.1 / CR 601.2h: how many counters of EACH kind
-  -- come off each permanent, where the cost names no kind (Tayam, Luminous
-  -- Enigma); the Map is what each candidate carries, and the CounterSpread how
-  -- the Natural binds the answer. Elided where only one division exists.
+  -- | CR 122.1 / CR 601.2h: how many counters of EACH kind come off each
+  -- permanent, where a cost names no kind (Tayam, Luminous Enigma), or an effect
+  -- does not (Eventide's Shadow, CR 608.2d); the Map is what each candidate
+  -- carries, and the CounterSpread how the Natural binds the answer. Elided
+  -- where only one division exists.
   ChooseMixedCounterRemoval :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CounterSpread.CounterSpread -> Natural.Natural -> Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural) -> Prompt (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))
   -- | CR 701.3a: where an effect moving an attached permanent puts it, the
   -- current host excluded (CR 701.3b); the offer is the card's text, so CR

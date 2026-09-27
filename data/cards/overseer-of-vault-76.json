@@ -215,8 +215,11 @@
                             }
                           },
                           "kind": {
-                            "type": "Named",
-                            "value": "quest"
+                            "type": "OfKind",
+                            "value": {
+                              "type": "Named",
+                              "value": "quest"
+                            }
                           }
                         }
                       }
