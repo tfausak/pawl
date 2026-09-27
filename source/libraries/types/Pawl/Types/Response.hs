@@ -222,12 +222,17 @@ data Response
     -- object choices above.
     ChoseCounterRemoval ObjectId.ObjectId
   | -- | CR 118.1 as a cost / CR 601.2h: how many counters of one kind a paying
-    -- player chose to take off each permanent, where the cost divides them.
+    -- player chose to take off each permanent, where the cost divides them; or
+    -- a resolving player, where an effect does (CR 608.2d).
     ChoseCounterRemovalAmong (Map.Map ObjectId.ObjectId Natural.Natural)
   | -- | CR 118.1 as a cost / CR 601.2h: the division a paying player chose where
     -- the count is a floor. Its own constructor: an answer above the count is
     -- legal here and not to ChooseCounterRemovalAmong.
     ChoseCounterRemovalAtLeast (Map.Map ObjectId.ObjectId Natural.Natural)
+  | -- | CR 608.2d: the division a resolving player chose where the count is a
+    -- cap. Its own constructor: an answer below the count is legal here and not
+    -- to ChooseCounterRemovalAmong.
+    ChoseCounterRemovalUpTo (Map.Map ObjectId.ObjectId Natural.Natural)
   | -- | CR 118.1 as a cost / CR 122.1: the division by permanent AND kind a
     -- paying player chose where the cost names no kind.
     ChoseMixedCounterRemoval (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))

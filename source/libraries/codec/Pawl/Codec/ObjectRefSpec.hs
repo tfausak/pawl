@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
@@ -427,6 +428,13 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature))
       " {\"type\":\"SourceAndChosenPermanent\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 303.4b / 608.2h: a slot and a Filter under their own tag.
+  Spec.it s "AttachedToBound" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound (SlotName.MkSlotName (Text.pack "target")) (Filter.HasSubtype Subtype.Equipment)))
+      " {\"type\":\"AttachedToBound\",\"value\":{\"slot\":\"target\",\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Equipment\"}}}} "
   -- Guards against a decoder that read every payload as one arm. The arms are
   -- all objects, so only the tag separates them, and a duplicated tag would
   -- collapse two of these. The two graveyard arms are the pair it really
@@ -440,7 +448,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "every arm carries a distinct tag" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a random card in a graveyard, a random card in a library, a chosen subset of the battlefield, one chosen permanent and the source with one chosen permanent all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, your own hand sweep, a scoped hand sweep, your own library sweep, the linked exile sweep, the stack's spells, the stack's abilities, the whole stack, the player sweep, the opponent sweep, the chosen player, an indirection to a seat, a library's top cards, a walk of a library, a graveyard's top card, a chosen graveyard card, a chosen card in hand, a chosen card from among a group, every card from among a group, a random card in hand, a random card in a graveyard, a random card in a library, a chosen subset of the battlefield, one chosen permanent, the source with one chosen permanent and what is attached to a bound object all encode differently"
       ( Set.size
           ( Set.fromList
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -469,11 +477,12 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You))),
-                Codec.encode ObjectRef.codec (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature))
+                Codec.encode ObjectRef.codec (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature)),
+                Codec.encode ObjectRef.codec (ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature)))
               ]
           )
       )
-      27
+      28
   -- A tag the decoder does not know is an error rather than a silent slot. The
   -- tag has to be one no arm will ever claim -- @EachOpponent@ stood here until
   -- that became a real arm, and the case then failed rather than going quiet,

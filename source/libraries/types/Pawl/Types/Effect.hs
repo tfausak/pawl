@@ -74,6 +74,7 @@ import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
@@ -389,6 +390,9 @@ data Effect card ability
   | -- | CR 122: remove this many counters of this kind from the slot's target
     -- permanent; asking for more than are present removes what is there.
     RemoveCounters RemoveCounters.RemoveCounters
+  | -- | CR 608.2d: remove counters of one kind from among the permanents an
+    -- ObjectRef names, the resolving controller dividing them.
+    RemoveCountersAmong RemoveCountersAmong.RemoveCountersAmong
   | -- | CR 122.5: move counters from the permanents an ObjectRef names onto the
     -- one a slot does, atomically -- the rule's four impossibilities are checked
     -- before either half runs.

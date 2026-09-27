@@ -150,6 +150,8 @@ library codec
     Pawl.Codec.AttachAllSpec
     Pawl.Codec.AttachBound
     Pawl.Codec.AttachBoundSpec
+    Pawl.Codec.AttachedToBound
+    Pawl.Codec.AttachedToBoundSpec
     Pawl.Codec.AttachRestriction
     Pawl.Codec.AttachRestrictionSpec
     Pawl.Codec.AttachTarget
@@ -911,7 +913,9 @@ library codec
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.Reinforce
     Pawl.Codec.ReinforceSpec
+    Pawl.Codec.RemovalCount
     Pawl.Codec.RemoveCounters
+    Pawl.Codec.RemoveCountersAmong
     Pawl.Codec.RemoveCountersSpec
     Pawl.Codec.Replace
     Pawl.Codec.ReplacementEffect
@@ -1634,6 +1638,7 @@ library test
     Pawl.RangeOfInfluenceSpec
     Pawl.RecruitSpec
     Pawl.RegistrySpec
+    Pawl.RemoveCounterSpec
     Pawl.ReplacementSpec
     Pawl.ReplaySpec
     Pawl.ResolveSpec
@@ -1717,6 +1722,7 @@ library types
     Pawl.Types.Asked
     Pawl.Types.AttachAll
     Pawl.Types.AttachBound
+    Pawl.Types.AttachedToBound
     Pawl.Types.AttachRestriction
     Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
@@ -2150,7 +2156,9 @@ library types
     Pawl.Types.ReduceSpellCost
     Pawl.Types.Regenerability
     Pawl.Types.Reinforce
+    Pawl.Types.RemovalCount
     Pawl.Types.RemoveCounters
+    Pawl.Types.RemoveCountersAmong
     Pawl.Types.Replace
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate

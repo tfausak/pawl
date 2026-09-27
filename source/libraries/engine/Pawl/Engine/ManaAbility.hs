@@ -382,6 +382,7 @@ manaProduced effect = case effect of
   Effect.PutCounters {} -> Nothing
   Effect.PutCountersFrom {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
+  Effect.RemoveCountersAmong {} -> Nothing
   Effect.MoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing
@@ -635,6 +636,7 @@ movesLibraryCard effect = case effect of
   Effect.PutCounters {} -> False
   Effect.PutCountersFrom {} -> False
   Effect.RemoveCounters {} -> False
+  Effect.RemoveCountersAmong {} -> False
   Effect.MoveCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.RemovePlayerCounters {} -> False
@@ -784,3 +786,5 @@ refReachesLibrary ref = case ref of
   -- The battlefield once more, the arm above's answer: naming the source
   -- alongside the match adds no zone, the source being a permanent too.
   ObjectRef.SourceAndChosenPermanent _ -> False
+  -- The battlefield again: what is attached to a permanent is a permanent.
+  ObjectRef.AttachedToBound _ -> False

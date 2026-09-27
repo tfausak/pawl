@@ -89,6 +89,7 @@ encode p answer = case p of
   Prompt.ChooseCounterRemoval {} -> Response.ChoseCounterRemoval answer
   Prompt.ChooseCounterRemovalAmong {} -> Response.ChoseCounterRemovalAmong answer
   Prompt.ChooseCounterRemovalAtLeast {} -> Response.ChoseCounterRemovalAtLeast answer
+  Prompt.ChooseCounterRemovalUpTo {} -> Response.ChoseCounterRemovalUpTo answer
   Prompt.ChooseMixedCounterRemoval {} -> Response.ChoseMixedCounterRemoval answer
   Prompt.ChooseVote {} -> Response.ChoseVote answer
   Prompt.ChooseVoteWord {} -> Response.ChoseVoteWord answer
@@ -330,6 +331,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCounterRemovalAtLeast {} -> case response of
     Response.ChoseCounterRemovalAtLeast division -> Just division
+    _ -> Nothing
+  Prompt.ChooseCounterRemovalUpTo {} -> case response of
+    Response.ChoseCounterRemovalUpTo division -> Just division
     _ -> Nothing
   Prompt.ChooseMixedCounterRemoval {} -> case response of
     Response.ChoseMixedCounterRemoval division -> Just division
@@ -817,6 +821,8 @@ defaultAnswer p = case p of
   Prompt.ChooseCounterRemovalAmong _ _ _ total offered -> Cost.fillInOrder total offered
   -- The same, at the floor: the fewest counters the cost allows.
   Prompt.ChooseCounterRemovalAtLeast _ _ _ least offered -> Cost.fillInOrder least offered
+  -- Under a cap, removing nothing is an answer.
+  Prompt.ChooseCounterRemovalUpTo {} -> Map.empty
   -- The same by permanent and kind, off the first permanent alone under a
   -- spread FromOne, whose offer holds only permanents carrying the count.
   Prompt.ChooseMixedCounterRemoval _ _ _ spread owed offered -> Cost.fillMixedInOrder spread owed offered

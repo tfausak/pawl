@@ -72,6 +72,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -277,7 +278,9 @@ import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Reinforce as Reinforce
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -1024,6 +1027,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfAttacksWhile condition -> conditionCounts condition
   TriggerCondition.SelfBlocks -> []
+  TriggerCondition.CreatureBlocks _ -> []
   -- CR 509.3b names the attacker without counting anything, and its Filter holds
   -- no Count for PermanentEnters' reason.
   TriggerCondition.SelfBlocksCreature _ -> []
@@ -1284,6 +1288,7 @@ ownCounts effect = case effect of
   -- alone kept compiling (#2729).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantityCounts (MovedKinds.quantityOf kinds)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> quantityCounts quantity
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> foldMap quantityCounts (RemovalCount.quantityOf count)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.PayAnyEnergy _ -> []
@@ -1703,6 +1708,7 @@ effectNestedEffects effect = case effect of
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
@@ -2205,6 +2211,7 @@ effectReplacements effect = case effect of
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
@@ -2680,6 +2687,7 @@ effectMintedFaces effect = case effect of
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
@@ -3724,6 +3732,8 @@ objectRefFilters ref = case ref of
   -- counterpart may be picked and nothing about the source, so it is framed the
   -- same way.
   ObjectRef.SourceAndChosenPermanent f -> unframed [f]
+  -- Rhuk's "all Equipment attached to that creature".
+  ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound _ f) -> unframed [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4116,6 +4126,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 509.3b names a quality the attacker blocked must have, so this one DOES
   -- carry a Filter -- Netcaster Spider's "with flying".
   TriggerCondition.SelfBlocksCreature f -> unframed [f]
+  TriggerCondition.CreatureBlocks f -> unframed [f]
   TriggerCondition.SelfBlocksAtLeast _ -> []
   -- CR 509.3e's filtered form names a quality the attackers blocked must have,
   -- so this one DOES carry a Filter.
@@ -4298,6 +4309,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfAttacksWhile _ -> []
   TriggerCondition.SelfBlocks -> []
+  TriggerCondition.CreatureBlocks _ -> []
   TriggerCondition.SelfBlocksCreature _ -> []
   TriggerCondition.SelfBlocksAtLeast _ -> []
   TriggerCondition.SelfBlocksOneOrMore _ -> []
@@ -5676,6 +5688,8 @@ effectFilters effect = case effect of
   -- The count and CR 122.1b's kind, PutCounters' two unframed positions: the
   -- slot beside them is a bare SlotName and carries no Filter.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _ _) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity)
+  -- RemoveCounters' two unframed positions, and MoveCounters' `from`.
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from kind _) -> frame Unframed (counterKindFilters kind <> foldMap quantityFilters (RemovalCount.quantityOf count)) <> frame SourceHostFramed (objectRefFilters from)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []

@@ -99,13 +99,15 @@ data LastKnown = MkLastKnown
     -- example of what is not one), and not recoverable from anything above, so
     -- it sits beside the projection for `controller`'s reason.
     --
-    -- CR 603.10a's look-back for TriggerCondition.AttachedCreatureDies, its one
-    -- reader, and off the HOST rather than the bearer because that is the only
+    -- CR 603.10a's look-back for TriggerCondition.AttachedCreatureDies, and CR
+    -- 608.2h's for Pawl.Types.ObjectRef's AttachedToBound, its two readers --
+    -- off the HOST rather than the bearer because that is the only
     -- side the answer survives on: the SBA batch that kills the host buries an
     -- Aura (CR 704.5m) and clears an Equipment's link (CR 704.5n) before CR
     -- 117.5 places any trigger, and the Equipment, still standing, files no
     -- record of its own. Proved by Pawl.ZoneTriggerSpec's Skullclamp and
-    -- ScreamsFromWithin groups.
+    -- ScreamsFromWithin groups, and by Pawl.AuraSpec's Rhuk, Hexgold Nabber and
+    -- Fumble cases.
     --
     -- Empty for everything nothing was attached to, which is most objects.
     attached :: !(Set.Set ObjectId.ObjectId),

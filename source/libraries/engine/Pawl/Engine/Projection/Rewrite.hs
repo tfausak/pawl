@@ -30,6 +30,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -165,7 +166,9 @@ import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.Replace as Replace
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -756,6 +759,10 @@ rewriteEffect pairs effect = case effect of
         { RemoveCounters.kind = Filter.rewriteCounterKind pairs (RemoveCounters.kind x),
           RemoveCounters.quantity = rewriteQuantity pairs (RemoveCounters.quantity x)
         }
+  -- The count, the ObjectRef and the kind, each the descent its siblings
+  -- make.
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from kind tally) ->
+    Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong (rewriteRemovalCount pairs count) (rewriteObjectRef pairs from) (Filter.rewriteCounterKind pairs kind) tally)
   -- The destination and the kind: CR 122.8 names no count, and its third
   -- sentence lets the card settle which kinds cross, so that kind is printed
   -- text PutCounters' case above reaches the same way.
@@ -1019,6 +1026,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p f c) -> ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p (Filter.rewrite pairs f) (rewriteQuantity pairs c))
   ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
   ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f w) -> ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.rewrite pairs f) w)
+  ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot f) -> ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot (Filter.rewrite pairs f))
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)
 
 -- CR 612.1 through CR 707.10d's description of the copies' candidates, which is
@@ -1755,6 +1763,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfAttacksWhileSaddled -> condition
   TriggerCondition.SelfAttacksWhile c -> TriggerCondition.SelfAttacksWhile (rewriteCondition pairs c)
   TriggerCondition.SelfBlocks -> condition
+  TriggerCondition.CreatureBlocks f -> TriggerCondition.CreatureBlocks (Filter.rewrite pairs f)
   TriggerCondition.SelfBlocksCreature f -> TriggerCondition.SelfBlocksCreature (Filter.rewrite pairs f)
   TriggerCondition.SelfBlocksAtLeast _ -> condition
   TriggerCondition.SelfBlocksOneOrMore f -> TriggerCondition.SelfBlocksOneOrMore (Filter.rewrite pairs f)
@@ -1934,6 +1943,13 @@ rewriteMovedKinds pairs kinds = case kinds of
   MovedKinds.AnyNumberOfKind kind -> MovedKinds.AnyNumberOfKind (Filter.rewriteCounterKind pairs kind)
   MovedKinds.EachAbsentKind -> kinds
   MovedKinds.UpToOneChosen -> kinds
+
+-- CR 612.1 through a RemovalCount: the count's Quantity, where it writes one.
+rewriteRemovalCount :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> RemovalCount.RemovalCount -> RemovalCount.RemovalCount
+rewriteRemovalCount pairs count = case count of
+  RemovalCount.Exactly quantity -> RemovalCount.Exactly (rewriteQuantity pairs quantity)
+  RemovalCount.UpTo quantity -> RemovalCount.UpTo (rewriteQuantity pairs quantity)
+  RemovalCount.AnyNumber -> count
 
 -- CR 612.1 through a Quantity: a Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity. Every remaining arm is a leaf.

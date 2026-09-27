@@ -60,6 +60,7 @@ import qualified Pawl.Codec.AttachAllSpec
 import qualified Pawl.Codec.AttachBoundSpec
 import qualified Pawl.Codec.AttachRestrictionSpec
 import qualified Pawl.Codec.AttachTargetSpec
+import qualified Pawl.Codec.AttachedToBoundSpec
 import qualified Pawl.Codec.AttackCostSpec
 import qualified Pawl.Codec.AttackLimitUnlessSpec
 import qualified Pawl.Codec.AttackOptionSpec
@@ -650,6 +651,7 @@ import qualified Pawl.RangeOfInfluenceSpec
 import qualified Pawl.RecruitSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
+import qualified Pawl.RemoveCounterSpec
 import qualified Pawl.ReplacementSpec
 import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec
@@ -778,6 +780,7 @@ spec s registry = do
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
   Pawl.Codec.AsCopySpec.spec s
   Pawl.Codec.AttachAllSpec.spec s
+  Pawl.Codec.AttachedToBoundSpec.spec s
   Pawl.Codec.AttachBoundSpec.spec s
   Pawl.Codec.AttachRestrictionSpec.spec s
   Pawl.Codec.AttachTargetSpec.spec s
@@ -1399,6 +1402,7 @@ spec s registry = do
   Pawl.ReplaySpec.spec s registry
   Pawl.MoveCounterSpec.spec s registry
   Pawl.PutCounterSpec.spec s registry
+  Pawl.RemoveCounterSpec.spec s registry
   Pawl.ResolveSpec.spec s registry
   Pawl.RestampSpec.spec s registry
   Pawl.ReversalSpec.spec s registry

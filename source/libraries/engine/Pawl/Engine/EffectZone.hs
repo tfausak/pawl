@@ -122,6 +122,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
     ObjectRef.AnyNumberMatching _ -> Nothing
     ObjectRef.ChosenPermanent _ -> Nothing
     ObjectRef.SourceAndChosenPermanent _ -> Nothing
+    ObjectRef.AttachedToBound _ -> Nothing
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.Fight {} -> Nothing
   Effect.ModifyTarget {} -> Nothing
@@ -214,6 +215,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.PutCounters {} -> Nothing
   Effect.PutCountersFrom {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
+  Effect.RemoveCountersAmong {} -> Nothing
   Effect.MoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing

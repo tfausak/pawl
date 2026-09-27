@@ -34,6 +34,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -120,6 +121,7 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
@@ -164,7 +166,9 @@ import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -472,6 +476,9 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- The arm above's answer, for its reason: neither the source nor the
   -- candidates come out of a slot.
   ObjectRef.SourceAndChosenPermanent _ -> Map.empty
+  -- The host is read out of the slot, and the Filter over what is attached to
+  -- it may name slots of its own.
+  ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot filter_) -> joinTwo (Map.singleton slot SlotArity.Many) (filterSlotsOf filter_)
 
 -- The Quantities an ObjectRef carries: the two library walks' counts.
 -- Exhaustive, no wildcard, and every payload destructured positionally rather
@@ -528,6 +535,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
+  ObjectRef.AttachedToBound _ -> []
 
 -- Every PlayerRef nested in one ObjectRef -- effectPlayerRefs' other half, and
 -- the seat a per-player walk counts against. objectRefSlots takes its player
@@ -586,6 +594,7 @@ objectRefPlayerRefs ref = case ref of
   -- No chooser to report: the arm below names the source alongside ONE permanent,
   -- and CR 608.2c's resolving controller is the only seat that picks it.
   ObjectRef.SourceAndChosenPermanent _ -> []
+  ObjectRef.AttachedToBound _ -> []
 
 -- The refs a CR 707.10 answer names: rule 707.10d's candidates, and nothing for
 -- the other two, neither of which describes anything.
@@ -697,6 +706,7 @@ effectObjectRefs effect = case effect of
   Effect.Counter (Counter.MkCounter ref _ _) -> [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> [ref]
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong _ from _ _) -> [from]
   -- CR 122.5's two sides, either of which may name a group.
   Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> [from, to]
   -- CR 122.8's taker; the giver is a slot.
@@ -892,6 +902,7 @@ effectPlayerRefs effect = case effect of
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong {} -> []
   Effect.MoveCounters {} -> []
   Effect.PutCountersFrom {} -> []
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
@@ -1235,6 +1246,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- destination is an ObjectRef and may sweep.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> oneSlot from
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot _) -> insertOne slot (quantitySlots quantity)
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> foldMap quantitySlots (RemovalCount.quantityOf count)
   -- CR 122.5's pair: BOTH sides are ObjectRefs, joined at slotsOf's head with
   -- every other ref, so neither is read here. The count reads
   -- slots of its own -- Black Panther, Wakandan King's "all +1/+1 counters" is a
@@ -1861,6 +1873,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- No Quantity at all: CR 122.8 names neither a kind nor a count.
   Effect.PutCountersFrom {} -> True
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> all Quantity.slotsAreExhaustive (RemovalCount.quantityOf count)
   -- The count the moved kinds may write. CR 122.5's GIVER carries the other one,
   -- through the ObjectRef it became when the first side was widened to a group,
   -- and it is effectObjectRefs' above -- an arm reading the kinds alone kept
@@ -2100,6 +2113,7 @@ readsX =
         Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
         Effect.PutCountersFrom {} -> False
         Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> Quantity.readsX quantity
+        Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> any Quantity.readsX (RemovalCount.quantityOf count)
         Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
         Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
         Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
@@ -2336,6 +2350,7 @@ boundSlots effect = case effect of
   -- CR 122.1: how many counters the removal actually took off, where the card
   -- reads it back -- Destroy's count slot one opcode over.
   Effect.RemoveCounters removeCounters -> foldMap Set.singleton (RemoveCounters.tally removeCounters)
+  Effect.RemoveCountersAmong removeCounters -> foldMap Set.singleton (RemoveCountersAmong.tally removeCounters)
   -- How many counters CR 122.5 ACTUALLY moved, for a "that much life".
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ mSlot _) -> foldMap Set.singleton mSlot
   Effect.GainPlayerCounters {} -> Set.empty
@@ -2626,6 +2641,19 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- sweep answers nothing for it -- the source half included, which no reader may
   -- take without the counterpart the one instruction names alongside it.
   ObjectRef.SourceAndChosenPermanent _ -> []
+  -- CR 303.4b read off each object the slot holds: what is attached to it now,
+  -- or -- once it has left -- CR 608.2h's record of what was attached as it left,
+  -- still on the battlefield. CR 704.5n has unattached an Equipment from a
+  -- creature that died before its dies trigger resolves (Rhuk, Hexgold Nabber),
+  -- and Fumble asks in the same resolution that bounced the host. Through
+  -- battlefieldMatching, so the Filter and the APNAP order are EachMatching's.
+  ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot filter_) ->
+    let hosts = objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot)
+        attachedTo host
+          | Set.member host (GameState.battlefield gs) = Game.attachments host gs
+          | otherwise = maybe Set.empty LastKnown.attached (Projection.lastKnownOf host gs)
+        attached = foldMap attachedTo hosts
+     in filter (`Set.member` attached) (battlefieldMatching legal resolving controller source gs filter_)
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
   -- graveyards is zoneScopePlayers below -- either the perspective's own
