@@ -9340,9 +9340,9 @@ bindEarthbentLand resolving land gs =
 -- The RULE abilities (CR 613.11) travel as one GainAbility carrying the whole
 -- bundle, gathered from the new host beside its own
 -- (Pawl.Engine.Projection.grantedRuleAbilities); Chomping Kavu's is the one in
--- the pool. A REPLACEMENT effect travels as its own GainAbility, gathered into
--- the new host's projected list; unproven, since no printing with backup prints
--- one, nor a player static ability or a special action, which have no arm
+-- the pool. A REPLACEMENT effect and a PLAYER ability each travel as their own
+-- GainAbility, gathered into the new host's projected lists; unproven, since no
+-- printing with backup prints either, nor a special action, which has no arm
 -- (Scryfall `keyword:backup`, 2026-09-24).
 expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
 expandGrant resolving source gs modification = case modification of
@@ -9359,6 +9359,7 @@ expandGrant resolving source gs modification = case modification of
           <> fmap (Modification.GainAbility . GrantedAbility.Static) (PC.staticAbilities pc)
           <> [Modification.GainAbility (GrantedAbility.Rules (PC.ruleAbilities pc)) | PC.ruleAbilities pc /= mempty]
           <> fmap (Modification.GainAbility . GrantedAbility.Replacement) (PC.replacementEffects pc)
+          <> fmap (Modification.GainAbility . GrantedAbility.Player) (PC.playerAbilities pc)
   _ -> [modification]
 
 -- The no-subgame executor (the ability path and every direct caller): a

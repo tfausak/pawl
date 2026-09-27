@@ -588,6 +588,18 @@ beheldObject = SlotName.MkSlotName (Text.pack "thatBeheldObject")
 collectedEvidence :: SlotName
 collectedEvidence = SlotName.MkSlotName (Text.pack "thatCollectedEvidence")
 
+-- CR 118.1 / 601.2h: the reserved slot under which a
+-- CostComponent.RemovePlusOneCounters payment binds HOW MANY counters it took
+-- off -- Ooze Flux's "the number of +1\/+1 counters removed this way", which
+-- the payer settles while paying (CounterSpread.FromAmongAtLeast), so it can be
+-- read off nothing but the payment. An amount and nothing else, folded onto the
+-- ability by Pawl.Engine.Activate as every payment's slots are.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as the slots above.
+removedCounters :: SlotName
+removedCounters = SlotName.MkSlotName (Text.pack "thatManyCountersRemoved")
+
 -- CR 400.7d: the part of a spell's binding environment the permanent it
 -- becomes keeps -- "information about the spell ... including what costs were
 -- paid to cast that spell". Pawl.Engine.Event.changeZoneAttaching writes it
@@ -1212,14 +1224,37 @@ setUnattachedHost oid = Map.insert unattachedHost (toObject oid)
 -- evidence was collected" after a collection of two cards is Vitu-Ghazi
 -- Inspector's. Such a slot is the one kind that fills BOTH fields; they name the
 -- same objects, so no reader can see them disagree.
-setPaid :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName Binding
-setPaid paid =
-  let bind recipients =
-        let oids = Maybe.mapMaybe Recipient.objectOf (Set.toAscList recipients)
-         in if length oids >= 2
-              then (toRecipients recipients) {Binding.objects = Just (Seq.fromList oids)}
-              else toRecipients recipients
-   in Map.union (fmap bind paid)
+setPaid :: Map SlotName Binding -> Map SlotName Binding -> Map SlotName Binding
+setPaid = Map.union
+
+-- The objects one cost component took, bound under a reserved slot in setPaid's
+-- shape.
+paidObjects :: SlotName -> Set Recipient -> Map SlotName Binding
+paidObjects slot recipients = Map.singleton slot (paidRecipients recipients)
+
+-- setPaid's shape for a payment's objects: the recipients, and the same objects
+-- as a group once there are two.
+paidRecipients :: Set Recipient -> Binding
+paidRecipients recipients =
+  let oids = Maybe.mapMaybe Recipient.objectOf (Set.toAscList recipients)
+   in if length oids >= 2
+        then (toRecipients recipients) {Binding.objects = Just (Seq.fromList oids)}
+        else toRecipients recipients
+
+-- The slots two components of one cost bound, in one map. Recipients are
+-- UNIONED per slot rather than left-biased: Jarad, Golgari Lich Lord's
+-- "Sacrifice a Swamp and a Forest" is two Sacrifice components writing one
+-- reserved name, and what that names is the pair -- which onlyOne then declines
+-- to read as a single object, rather than silently answering with whichever
+-- component was paid first. Amounts are SUMMED for the same reason.
+mergePaid :: Map SlotName Binding -> Map SlotName Binding -> Map SlotName Binding
+mergePaid =
+  let recipientsOf b = Maybe.fromMaybe Set.empty (Binding.targets b)
+      merge a b =
+        (paidRecipients (Set.union (recipientsOf a) (recipientsOf b)))
+          { Binding.amount = ((+) <$> Binding.amount a <*> Binding.amount b) <|> Binding.amount a <|> Binding.amount b
+          }
+   in Map.unionWith merge
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

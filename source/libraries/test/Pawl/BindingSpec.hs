@@ -37,6 +37,7 @@ sampleSnapshot =
       PC.subtypes = Set.empty,
       PC.staticAbilities = [],
       PC.playerAbilities = [],
+      PC.grantedPlayerAbilities = [],
       PC.specialActions = [],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],

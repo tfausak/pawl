@@ -1330,6 +1330,7 @@ noCharacteristics =
       PC.subtypes = Set.empty,
       PC.staticAbilities = [],
       PC.playerAbilities = [],
+      PC.grantedPlayerAbilities = [],
       -- CR 116.2: no characteristics, so no printed permission either.
       PC.specialActions = [],
       PC.activatedAbilities = [],
@@ -1466,6 +1467,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- instead of on the copier's printed face (CR 707.2a).
               PC.staticAbilities = Face.staticAbilities face,
               PC.playerAbilities = Face.playerAbilities face,
+              -- Layer 6 writes this; the seed grants nothing.
+              PC.grantedPlayerAbilities = [],
               -- CR 116.2, in the seed for the same reason and read by
               -- specialActionsOf below: CR 707.2a copies the abilities a face's
               -- rules text derives, and CR 116.2d's permission is one of them.

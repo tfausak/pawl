@@ -180,6 +180,8 @@ layer m = case m of
 -- computed by the caller over the whole unit before any of it is applied
 -- (cardTypesAfter). Every correspondence question below asks it rather than the
 -- fold's running value.
+-- `stamp` is that effect's CR 613.7 timestamp, which a granted player ability
+-- carries out of the fold (CR 613.7a).
 -- `affected` is CR 611.2c's frozen set for the effect this modification is a
 -- part of, which CR 612.5's exchange reads to find the object on the other
 -- side; every other arm ignores it.
@@ -187,8 +189,8 @@ layer m = case m of
 -- moment this effect applies: layer 3 run over the partner as far as the effects
 -- strictly ahead of this one (CR 613.7). Lazy, and only the exchange arm forces
 -- it. Every other arm ignores it.
-applyModification :: (ObjectId -> ProjectedCharacteristics) -> Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Set CardType.CardType -> Affected.Affected -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
-applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
+applyModification :: (ObjectId -> ProjectedCharacteristics) -> Count.ViewOf -> ObjectId -> Timestamp -> GameState -> ObjectId -> Set CardType.CardType -> Affected.Affected -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
   let context = Filter.contextFor (Game.teams gs) (controllerOf src gs) (Just src)
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
@@ -238,13 +240,15 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
         -- only which list the ability joins -- nothing here reads what the
         -- ability does.
         --
-        -- A STATIC ability joins none: its effect is gathered before this fold
-        -- runs, which is permanentParts' reading of a stored grant through
-        -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf. Nor does a RULE
-        -- ability, which CR 613.11 applies after the layers: the gatherers read
-        -- a stored grant of one through grantedRuleAbilities. Not implemented:
-        -- a static or rule ability granted by another static ability rather
-        -- than by a resolution, whose recipients only this fold knows (#1942).
+        -- An object-affecting STATIC ability joins none: its effect is gathered
+        -- before this fold runs, which is permanentParts' reading of a stored
+        -- grant through Pawl.Engine.Projection.View.grantedStaticAbilitiesOf.
+        -- Nor does a RULE ability, which CR 613.11 applies after the layers: the
+        -- gatherers read a stored grant of one through grantedRuleAbilities. A
+        -- PLAYER ability, applied after the layers too (CR 613.10), is recorded
+        -- here whoever grants it. Not implemented: an object-affecting static or
+        -- a rule ability granted by another static ability rather than by a
+        -- resolution, whose recipients only this fold knows (#1942).
         Modification.GainAbility g -> case g of
           GrantedAbility.Activated a ->
             pc {PC.activatedAbilities = PC.activatedAbilities pc <> [a]}
@@ -258,6 +262,12 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
           -- quoted replacement exiles the permanent it was granted to" proves it.
           GrantedAbility.Replacement r ->
             pc {PC.replacementEffects = PC.replacementEffects pc <> [r]}
+          -- CR 613.10: a player ability applies after the layers, so the fold
+          -- only records it; Pawl.Engine.PlayerEffect reads it off the finished
+          -- projection with the receiver as its source (CR 113.7).
+          -- Pawl.PlayerEffectSpec's NerdRage group proves it.
+          GrantedAbility.Player p ->
+            pc {PC.grantedPlayerAbilities = PC.grantedPlayerAbilities pc <> [(stamp, p)]}
         -- CR 702.165a's grant never reaches a STORED effect: Resolve.Effect's
         -- expandGrant turns it into the ordinary GainKeyword and GainAbility arms
         -- above as the ability resolves, so nothing with this modification is ever
@@ -272,6 +282,10 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
               PC.activatedAbilities = [],
               PC.replacementEffects = [],
               PC.triggeredAbilities = [],
+              -- A GRANTED player ability goes in CR 613.7 order, which only the
+              -- fold knows; the copiable ones are gated outside it
+              -- (abilityRemoval).
+              PC.grantedPlayerAbilities = [],
               -- CR 305.6's intrinsic mana ability has no list here to empty, so
               -- the removal is recorded instead and read back by
               -- Pawl.Engine.Subtype.intrinsicManaAbilityOf.
@@ -2772,7 +2786,10 @@ bestowedView oid gs =
       -- CR 702.103a's grants hold no ExchangeTextBoxes, so the partner reader is
       -- never forced here; the copiable seed is what applyModification's own
       -- caller would hand it for an effect with no layer-3 predecessor.
-      bestowed = List.foldl' (flip (applyModification (`copiableCharacteristics` gs) (fullView gs) oid gs oid unitTypes (Affected.TheseObjects (Set.singleton oid)))) pc Keyword.bestowModifications
+      -- The object's own timestamp stands in for the grant's: no bestow part
+      -- grants a player ability, the one arm that reads it.
+      stamp = maybe (MkTimestamp 0) Object.timestamp (Game.lookupObject oid gs)
+      bestowed = List.foldl' (flip (applyModification (`copiableCharacteristics` gs) (fullView gs) oid stamp gs oid unitTypes (Affected.TheseObjects (Set.singleton oid)))) pc Keyword.bestowModifications
    in viewOfCharacteristics (fullView gs) oid bestowed (controllerOf oid gs) (countersOf oid gs) gs
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, emitted as a layer-6
@@ -3965,7 +3982,7 @@ projectDecidingFrom seedOf admits cands =
                         -- 613.8b a later Hack on one Kird Ape moves with the
                         -- exchange" proves it.
                         textBoxOf other = Maybe.fromMaybe (textBoxAt (gTimestamp (NonEmpty.head cs)) gs other) (boxes other)
-                     in List.foldl' (\p c -> applyModification textBoxOf viewOf (gSource c) gs o unitTypes (gAffected c) (gModification c) p) pc parts
+                     in List.foldl' (\p c -> applyModification textBoxOf viewOf (gSource c) (gTimestamp c) gs o unitTypes (gAffected c) (gModification c) p) pc parts
                   -- A gathered effect's parts at this layer, as CR 613.8's ordering
                   -- asks about them. The head part answers for the unit's affected
                   -- set and its timestamp (CR 613.6, CR 613.7a).
@@ -5110,6 +5127,8 @@ grantedStaticWrites p g = case g of
   -- CR 613.11: a rule ability writes no Modification.
   GrantedAbility.Rules _ -> False
   GrantedAbility.Replacement _ -> False
+  -- CR 613.10: nor does a player ability.
+  GrantedAbility.Player _ -> False
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands
@@ -5251,15 +5270,36 @@ grantsMintingType m = case m of
 
 -- CR 614.1 / 613.1f: does this modification hand its affected objects a quoted
 -- replacement ability? replacementsAffecting's grantor disjunct for a GRANTED
--- row, grantsMintingType's shape and exhaustive for grantsKeywordWhere's reason.
--- GainAbilitiesOfSource never reaches a stored effect (Resolve.Effect's
--- expandGrant turns it into GainAbility arms first).
+-- row.
 grantsReplacement :: Modification -> Bool
-grantsReplacement m = case m of
-  Modification.GainAbility g -> case g of
-    GrantedAbility.Replacement _ -> True
-    -- A granted static ability's own parts, grantsKeywordWhere's reason.
-    _ -> grantedStaticWrites grantsReplacement g
+grantsReplacement = grantsAbilityWhere (\g -> case g of GrantedAbility.Replacement _ -> True; _ -> False)
+
+-- CR 613.10 / 613.1f: does this modification hand its affected objects a quoted
+-- player ability? grantsPlayerAbilityAnywhere's grantor question.
+grantsPlayerAbility :: Modification -> Bool
+grantsPlayerAbility = grantsAbilityWhere (\g -> case g of GrantedAbility.Player _ -> True; _ -> False)
+
+-- CR 613.10: can any permanent hold a GRANTED player ability right now? The
+-- short-circuit in front of Pawl.Engine.PlayerEffect's read of
+-- ProjectedCharacteristics.grantedPlayerAbilities, which costs a whole-board
+-- projection. Asked of the grantors -- battlefield static abilities, stored
+-- effects and static abilities in other zones -- for replacementsAffecting's
+-- reason: who a static ability reaches is not known without that projection.
+grantsPlayerAbilityAnywhere :: GameState -> Bool
+grantsPlayerAbilityAnywhere gs =
+  any (any (any grantsPlayerAbility . StaticAbility.modifications) . (`staticAbilitiesOf` gs)) (Set.toList (GameState.battlefield gs))
+    || storedWrites grantsPlayerAbility gs
+    || elsewhereGrants grantsPlayerAbility gs
+
+-- Does this modification hand its affected objects a quoted ability `p` holds
+-- of? grantsMintingType's shape, and exhaustive for grantsKeywordWhere's
+-- reason. GainAbilitiesOfSource never reaches a stored effect (Resolve.Effect's
+-- expandGrant turns it into GainAbility arms first).
+grantsAbilityWhere :: (GrantedAbility.GrantedAbility Card.Type.Card -> Bool) -> Modification -> Bool
+grantsAbilityWhere p m = case m of
+  -- A granted static ability's own parts count too, grantsKeywordWhere's
+  -- reason.
+  Modification.GainAbility g -> p g || grantedStaticWrites (grantsAbilityWhere p) g
   Modification.AddSubtype _ -> False
   Modification.ChangeSubtypeWord _ -> False
   Modification.AddCardType _ -> False
