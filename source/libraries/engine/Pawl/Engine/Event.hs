@@ -117,6 +117,7 @@ import qualified Pawl.Types.DrawRewrite as DrawRewrite
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect.Type
+import qualified Pawl.Types.EnteringTogether as EnteringTogether
 import qualified Pawl.Types.EntersWith as EntersWith
 import qualified Pawl.Types.EntryFlip as EntryFlip
 import qualified Pawl.Types.EntryR as EntryR
@@ -332,6 +333,38 @@ simultaneously body = do
   result <- body
   State.modify' closeEventGroup
   pure result
+
+-- CR 613.7m over CR 608.2f's action: run `body` so that everything it puts onto
+-- the battlefield is one batch, settled by Restamp.settle once it ends rather
+-- than per instruction or per iteration, and only then are its tokens' CR 111.2
+-- entry events recorded, so they describe the order chosen. A caller that is
+-- also one event opens this INSIDE its `simultaneously`, which keeps those
+-- events in the group.
+--
+-- The OUTERMOST bracket wins, `simultaneously`'s posture: an inner one runs its
+-- body and leaves the batch to the outer.
+--
+-- The start stamp is the board's before the body, which reassigns nothing
+-- extra: an arrival is a new object (CR 400.7), so every stamp it carries was
+-- minted as or after it entered.
+--
+-- Pawl.RestampSpec's Mirror Match board proves the order. Holding back the entry
+-- events is a regression fence: a CR 603.6a match reads the entrant live
+-- (Pawl.Engine.Event.Match), so recording them before the order leaves the suite
+-- green.
+together :: Game a -> Game a
+together body = do
+  before <- State.get
+  case GameState.enteringTogether before of
+    Just _ -> body
+    Nothing -> do
+      State.put before {GameState.enteringTogether = Just EnteringTogether.empty}
+      result <- body
+      batch <- State.gets (Maybe.fromMaybe EnteringTogether.empty . GameState.enteringTogether)
+      State.modify' (\g -> g {GameState.enteringTogether = Nothing})
+      Restamp.settle (GameState.nextTimestamp before) (Foldable.toList (EnteringTogether.arrivals batch))
+      Monad.mapM_ recordMintedEntry (EnteringTogether.minted batch)
+      pure result
 
 -- `simultaneously` for a body that is a pure function of the board rather than a
 -- Game action. CR 800.4a's FIRST clause is the caller: leaving the game is not a
@@ -7379,8 +7412,12 @@ createTokens controller card copy n tapped entering attached = do
               Restamp.settle (GameState.nextTimestamp unminted) ids
               -- No prior incarnation to snapshot, so a token's last known information
               -- IS what it is now (CR 111.3). Recorded after every entry loop, so the
-              -- events describe settled objects.
-              Monad.mapM_ recordMintedEntry ids
+              -- events describe settled objects -- and so, inside a CR 608.2f
+              -- action, only once `together` has settled its whole batch.
+              deferred <- State.gets GameState.enteringTogether
+              case deferred of
+                Just batch -> State.modify' (\g -> g {GameState.enteringTogether = Just batch {EnteringTogether.minted = EnteringTogether.minted batch <> Seq.fromList ids}})
+                Nothing -> Monad.mapM_ recordMintedEntry ids
               pure ids
 
 -- Nothing departed, so `departed` is the arrival's own id. Harmless rather than a
