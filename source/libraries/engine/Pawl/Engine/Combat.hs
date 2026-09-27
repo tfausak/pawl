@@ -1117,15 +1117,15 @@ pairAllowed candidates attackers blocker attacker gs =
   -- takes no player, where blockCeilingGiven and legalBlockDeclaration hand over
   -- the one declaring blocks. Nothing in the pool gates a pairwise blocking
   -- restriction, so the two readings are indistinguishable today.
-  pairAllowedGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantBeBlockedBy (CombatRestriction.defendingSeat gs) candidates attackers gs) candidates attackers blocker attacker gs
+  pairAllowedGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.barredBlocks (CombatRestriction.defendingSeat gs) candidates attackers gs) candidates attackers blocker attacker gs
 
 -- pairAllowed against a pre-projected board: this is asked once per (blocker,
 -- attacker) PAIR, so each evasion read would otherwise be a fresh gather in a
 -- doubly nested loop. An EMPTY pcs is a cache miss the projection recovers
 -- from, but an empty grant list is a wrong answer.
 --
--- `barred` is CR 509.1b's PAIRWISE restrictions stated on the attacker (CR
--- 701.54c), decided for every pair by CombatRestriction.cantBeBlockedBy. An EMPTY
+-- `barred` is CR 509.1b's PAIRWISE restrictions, stated on either side of the
+-- pair, decided for every pair by CombatRestriction.barredBlocks. An EMPTY
 -- set is a board stating no such restriction rather than a cache miss.
 pairAllowedGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set (ObjectId, ObjectId) -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
 pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs =
@@ -1365,7 +1365,7 @@ blockScopeGiven grants pcs pid gs =
   let side = sideOf pid gs
       attackers = concatMap (`attackersOn` gs) side
       seats = fmap (\p -> (p, legalBlockersGiven grants pcs p gs)) side
-      barred = Set.unions (fmap (\(p, mine) -> CombatRestriction.cantBeBlockedBy (Just p) mine attackers gs) seats)
+      barred = Set.unions (fmap (\(p, mine) -> CombatRestriction.barredBlocks (Just p) mine attackers gs) seats)
       limit = case Maybe.mapMaybe (\p -> CombatRestriction.blockLimit (Just p) gs) side of
         [] -> Nothing
         bounds -> Just (minimum bounds)

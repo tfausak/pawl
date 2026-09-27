@@ -40,6 +40,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
+import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
@@ -1140,7 +1141,8 @@ rewriteRuleAbilities pairs abilities =
         }
 
 -- One CR 508.1c / 509.1b restriction under CR 612.1: its subject, its gate and
--- the blockers it describes, as Pawl.Engine.CombatRestriction rewrites them.
+-- the other side of the pair it describes, as Pawl.Engine.CombatRestriction
+-- rewrites them.
 -- Exhaustive, so a new arm has to say where its words are.
 rewriteCombatRestriction :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CombatRestriction.CombatRestriction -> CombatRestriction.CombatRestriction
 rewriteCombatRestriction pairs restriction =
@@ -1157,6 +1159,13 @@ rewriteCombatRestriction pairs restriction =
               { CantBeBlockedBy.affected = rewriteAffected pairs (CantBeBlockedBy.affected x),
                 CantBeBlockedBy.blockers = Filter.rewrite pairs (CantBeBlockedBy.blockers x),
                 CantBeBlockedBy.unless = unlessOf (CantBeBlockedBy.unless x)
+              }
+        CombatRestriction.CantBlockCreatures x ->
+          CombatRestriction.CantBlockCreatures
+            x
+              { CantBlockCreatures.affected = rewriteAffected pairs (CantBlockCreatures.affected x),
+                CantBlockCreatures.attackers = Filter.rewrite pairs (CantBlockCreatures.attackers x),
+                CantBlockCreatures.unless = unlessOf (CantBlockCreatures.unless x)
               }
         CombatRestriction.CantAttackPlayer x -> CombatRestriction.CantAttackPlayer x {CantAttackPlayer.affected = rewriteAffected pairs (CantAttackPlayer.affected x), CantAttackPlayer.unless = unlessOf (CantAttackPlayer.unless x)}
         CombatRestriction.CantAttackMoreThan x -> CombatRestriction.CantAttackMoreThan x {AttackLimitUnless.unless = unlessOf (AttackLimitUnless.unless x)}

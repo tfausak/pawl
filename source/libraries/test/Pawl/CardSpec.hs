@@ -85,6 +85,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
+import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
@@ -1556,6 +1557,7 @@ combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ condition _) -> foldMap conditionCounts condition
   -- The blocker Filter beside the gate holds no Count either.
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ condition _) -> foldMap conditionCounts condition
+  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures _ _ condition _) -> foldMap conditionCounts condition
   -- The PlayerScope and the CR 506.3 kinds beside the gate hold no Count either.
   CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ condition _) -> foldMap conditionCounts condition
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ condition _) -> foldMap conditionCounts condition
@@ -5011,6 +5013,7 @@ combatRestrictionFilters restriction = case restriction of
   -- Three positions on the PAIRWISE arm: the attackers restricted, the blockers
   -- barred from them, and the gate.
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy affected blockers condition _) -> unframed (affectedFilters affected <> [blockers]) <> foldMap conditionFilters condition
+  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures affected attackers condition _) -> unframed (affectedFilters affected <> [attackers]) <> foldMap conditionFilters condition
   -- Two on the attacking one: the creatures restricted and the gate. The
   -- players they may not attack are a PlayerScope and the announcements barred
   -- at those seats are CR 506.3 kinds, both card data with no Filter in them --

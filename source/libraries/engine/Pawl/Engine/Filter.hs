@@ -968,8 +968,8 @@ data Context = MkContext
     -- state and cannot project -- so the caller that has the board supplies it:
     -- Pawl.Engine.Target.admittedGiven for a target slot,
     -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's trigger condition, and
-    -- Pawl.Engine.CombatRestriction.cantBeBlockedBy for CR 701.54c's blocking
-    -- restriction.
+    -- Pawl.Engine.CombatRestriction.cantBeBlockedBy and cantBlockCreatures for
+    -- CR 509.1b's pairwise restrictions (CR 701.54c, Spitfire Handler).
     --
     -- LAZY, and load-bearingly so: filling it costs a projection of the source,
     -- and no filter that omits the atom ever forces it. That is the posture

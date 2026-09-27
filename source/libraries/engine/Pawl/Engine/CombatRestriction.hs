@@ -52,6 +52,7 @@ import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -340,6 +341,7 @@ attacking cr = case cr of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless a _ _) -> Just a
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantBlockCreatures {} -> Nothing
   CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -353,6 +355,7 @@ blocking cr = case cr of
   -- see it: answering Just would take the Ring-bearer off CR 509.1a's candidate
   -- list, which is the opposite of what CR 701.54c says.
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantBlockCreatures {} -> Nothing
   CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -363,6 +366,7 @@ attackingAlone cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantBlockCreatures {} -> Nothing
   CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless a _ _) -> Just a
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -377,6 +381,20 @@ blockedBy cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy a f _ _) -> Just (a, f)
+  CombatRestriction.CantBlockCreatures {} -> Nothing
+  CombatRestriction.CantAttackPlayer {} -> Nothing
+  CombatRestriction.CantAttackAlone {} -> Nothing
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
+
+-- `blockedBy`'s mirror: the blockers restricted and the attackers they may not
+-- block.
+blocksNot :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, Filter.Type.Filter Keyword.Type.Keyword)
+blocksNot cr = case cr of
+  CombatRestriction.CantAttack {} -> Nothing
+  CombatRestriction.CantBlock {} -> Nothing
+  CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures a f _ _) -> Just (a, f)
   CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -393,6 +411,7 @@ attackingPlayer cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantBlockCreatures {} -> Nothing
   CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer a scope kinds _ _) -> Just (a, scope, kinds)
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -410,6 +429,7 @@ attackingMoreThan cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantBlockCreatures {} -> Nothing
   CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless n scope _) -> Just (n, scope)
@@ -420,6 +440,7 @@ blockingMoreThan cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
   CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
+  CombatRestriction.CantBlockCreatures {} -> Nothing
   CombatRestriction.CantAttackPlayer {} -> Nothing
   CombatRestriction.CantAttackAlone {} -> Nothing
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -437,6 +458,7 @@ gate cr = case cr of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ c _) -> c
   CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ c _) -> c
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ c _) -> c
+  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures _ _ c _) -> c
   CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ c _) -> c
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ c _) -> c
   CombatRestriction.CantAttackMoreThan (AttackLimitUnless.MkAttackLimitUnless _ _ c) -> c
@@ -458,6 +480,7 @@ nameOf cr = case cr of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ _ n) -> n
   CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ _ n) -> n
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ _ n) -> n
+  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures _ _ _ n) -> n
   CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer _ _ _ _ n) -> n
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ _ n) -> n
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -830,7 +853,7 @@ namedSubjects source name gs =
         _ -> []
    in concatMap fromRestriction (inForce (defendingSeat gs) gs)
 
--- The union of the five subject-naming selectors above -- what CR 116.2d's offer
+-- The union of the six subject-naming selectors above -- what CR 116.2d's offer
 -- reads, where each declaration's reader takes one of them. The two BOUNDING
 -- arms name no creature, `nameOf`'s reason for refusing them a name at all.
 subjectOf :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
@@ -838,6 +861,7 @@ subjectOf cr = case cr of
   CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless a _ _) -> Just a
   CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless a _ _) -> Just a
   CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy a _ _ _) -> Just a
+  CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures a _ _ _) -> Just a
   CombatRestriction.CantAttackPlayer (CantAttackPlayer.MkCantAttackPlayer a _ _ _ _) -> Just a
   CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless a _ _) -> Just a
   CombatRestriction.CantAttackMoreThan {} -> Nothing
@@ -847,7 +871,7 @@ subjectOf cr = case cr of
 -- force right now forbids. CR 701.54c's "can't be blocked by creatures with
 -- greater power" is the rulebook's producer; Questing Beast's "can't be blocked
 -- by creatures with power 2 or less" and Relic Runner's "can't be blocked if
--- you've cast a historic spell this turn" are the printed ones.
+-- you've cast a historic spell this turn" are among the printed ones.
 --
 -- A set of PAIRS, where the three questions above answer with a set of creatures,
 -- and the shape is forced by the rule rather than chosen: the restriction is
@@ -923,6 +947,40 @@ cantBeBlockedBy defending blockers attackers gs =
               -- than a proven behaviour.
               unignored attacker = not (IgnoredAbility.ignoredForSubject attacker source (nameOf restriction) gs)
            in concatMap barred (filter (\attacker -> named source subject attacker && unignored attacker) attackers)
+   in Set.fromList (concatMap fromRestriction (inForce defending gs))
+
+-- CR 509.1b's pairwise restrictions from BOTH sides: every (blocker, attacker)
+-- pair `cantBeBlockedBy` or `cantBlockCreatures` forbids. What
+-- Pawl.Engine.Combat reads.
+barredBlocks :: Maybe PlayerId -> [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
+barredBlocks defending blockers attackers gs =
+  Set.union (cantBeBlockedBy defending blockers attackers gs) (cantBlockCreatures defending blockers attackers gs)
+
+-- CR 509.1b: which (blocker, attacker) pairs a restriction written from the
+-- BLOCKER's side forbids -- Brassclaw Orcs' "can't block creatures with power 2
+-- or greater", the Spirit token's "can't block ... non-Spirit creatures".
+-- `cantBeBlockedBy`'s walk with the sides swapped: the affected set names
+-- BLOCKERS, and the Filter is matched against each attacker in the blocker's
+-- context, so Spitfire Handler's "greater than this creature's power" compares
+-- against the blocker. Both read off the projection (CR 613), at the moment the
+-- declaration is checked.
+cantBlockCreatures :: Maybe PlayerId -> [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
+cantBlockCreatures defending blockers attackers gs =
+  let pcs = Projection.projectAll gs
+      grants = Projection.controlGrants gs
+      named source affected creature = Projection.affectsOn pcs grants source creature affected gs
+      fromRestriction (source, changes, restriction) = case blocksNot restriction of
+        Nothing -> []
+        Just (affected, criterion) ->
+          let subject = if null changes then affected else Projection.rewriteAffected changes affected
+              wanted = if null changes then criterion else Filter.rewrite changes criterion
+              context blocker = Filter.contextComparingPower (Game.teams gs) (Projection.controllerOf blocker gs) blocker (Projection.powerOf blocker gs)
+              matched blocker attacker = Filter.matches (context blocker) (Projection.viewOfObject attacker gs) wanted
+              barred blocker = fmap (\attacker -> (blocker, attacker)) (filter (matched blocker) attackers)
+              -- CR 116.2d, `cantBeBlockedBy`'s filter with the BLOCKERS as the
+              -- subject; a regression fence for its reason.
+              unignored blocker = not (IgnoredAbility.ignoredForSubject blocker source (nameOf restriction) gs)
+           in concatMap barred (filter (\blocker -> named source subject blocker && unignored blocker) blockers)
    in Set.fromList (concatMap fromRestriction (inForce defending gs))
 
 -- CR 508.1c through CR 802.3a: which (creature, player, kind) rows an effect in

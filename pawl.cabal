@@ -211,6 +211,8 @@ library codec
     Pawl.Codec.CantBeBlockedBySpec
     Pawl.Codec.CantBeRegenerated
     Pawl.Codec.CantBeRegeneratedSpec
+    Pawl.Codec.CantBlockCreatures
+    Pawl.Codec.CantBlockCreaturesSpec
     Pawl.Codec.CantSearchLibraries
     Pawl.Codec.CantSearchLibrariesSpec
     Pawl.Codec.Card
@@ -1757,6 +1759,7 @@ library types
     Pawl.Types.CantAttackPlayer
     Pawl.Types.CantBeBlockedBy
     Pawl.Types.CantBeRegenerated
+    Pawl.Types.CantBlockCreatures
     Pawl.Types.CantSearchLibraries
     Pawl.Types.Card
     Pawl.Types.CardArrivedIn
