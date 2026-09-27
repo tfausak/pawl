@@ -6565,12 +6565,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- copy. Transcantation's ruling makes the prompt the spell's only road back
     -- to a target.
     --
-    -- Its "the spell won't resolve" when none is chosen is met only up to what a
-    -- board can observe: the spell resolves and its targeted text does nothing.
-    -- Pawl.Engine.Resolve's CR 608.2b check counts chosen targets, and a slot's
-    -- printed count cannot stand in for an announcement (awaken's slot is
-    -- declared unawakened too). The two part only under a trigger on a spell
-    -- resolving, which the engine has none of.
+    -- Not implemented: the ruling's "the spell won't resolve" when none is
+    -- chosen (CR 608.2b). The spell resolves and its targeted text does
+    -- nothing (#4235).
     Monad.forM_ (if newTargets then fmap snd (copiedOriginal before) else Nothing) $ \mOriginalOf ->
       Monad.forM_ (filter (Maybe.isJust . onStackIn before) (objectRefObjects legal resolving controller source before subjectRef)) $ \spell -> do
         g <- State.get
