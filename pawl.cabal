@@ -321,6 +321,8 @@ library codec
     Pawl.Codec.ConvokingSpec
     Pawl.Codec.CopyException
     Pawl.Codec.CopyExceptionSpec
+    Pawl.Codec.CopyOriginal
+    Pawl.Codec.CopyOriginalSpec
     Pawl.Codec.CopyStackObject
     Pawl.Codec.CopyStackObjectSpec
     Pawl.Codec.CopyTargets
@@ -1796,6 +1798,7 @@ library types
     Pawl.Types.ControlSides
     Pawl.Types.Convoking
     Pawl.Types.CopyException
+    Pawl.Types.CopyOriginal
     Pawl.Types.CopyStackObject
     Pawl.Types.CopyTargets
     Pawl.Types.Cost

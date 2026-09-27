@@ -47,6 +47,7 @@ import qualified Pawl.Types.ConjureDestination as ConjureDestination
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Count as Count
@@ -870,8 +871,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))) (ObjectRef.EachMatching Filter.IsSource) Nothing []))
-      " {\"type\":\"BecomeCopy\",\"value\":{\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}}} "
+      (Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (CopyOriginal.OfObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became")))) (ObjectRef.EachMatching Filter.IsSource) Nothing [] False))
+      " {\"type\":\"BecomeCopy\",\"value\":{\"original\":{\"type\":\"OfObject\",\"value\":{\"type\":\"InSlot\",\"value\":\"became\"}},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}}} "
   Spec.it s "Replace" $
     Common.assertJsonCodec
       s

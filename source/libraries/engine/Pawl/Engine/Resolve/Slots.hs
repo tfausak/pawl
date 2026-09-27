@@ -58,6 +58,7 @@ import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.CostBasis as CostBasis
@@ -674,7 +675,9 @@ effectObjectRefs effect = case effect of
   -- Both sides: CR 707.2's copiable values come off one and go onto the other.
   -- The exceptions beside them read no slot: CR 707.9a's "this ability" is the
   -- resolving object's own, and neither of CR 707.9b's arms names an object.
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _ _) -> [original, subject]
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _ _ _) -> case original of
+    CopyOriginal.OfObject ref -> [ref, subject]
+    CopyOriginal.Named _ -> [subject]
   -- BOTH refs: CR 707.10d's candidates are named by a ref of their own, and a
   -- slot it reads is as much a read of this effect's as the copied object's.
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _ _ _) -> ref : copyTargetsRefs targets
@@ -1169,7 +1172,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> joinSlots [quantitySlots quantity, joinSlots (fmap quantitySlots (riderQuantities riders)), riderSlots riders]
   -- The DURATION reads slots, ModifyTarget's arm above; the two refs are
   -- effectObjectRefs' half.
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _) -> foldMap durationSlots duration
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _ _) -> foldMap durationSlots duration
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> quantitySlots quantity
   -- The Duration and Condition each carry Quantities; a Quantity.InSlot is a read.
   -- The ROW's own Filters and Quantities are READS too (replacementRowReads):
@@ -1827,7 +1830,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- say not at all.
   Effect.Conjure conjure -> all Quantity.slotsAreExhaustive (conjureQuantities conjure)
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> all Quantity.slotsAreExhaustive (quantity : riderQuantities riders)
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _) -> all durationSlotsAreExhaustive duration
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _ _) -> all durationSlotsAreExhaustive duration
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   -- The ReplacementEffect's own reads are replacementRowReads', and slotsOf
   -- reports them through replacementRowSlots: its Filters name no target slot, and
