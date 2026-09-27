@@ -19,6 +19,12 @@ spec s = Spec.describe s "Pawl.Codec.Onset" $ do
       Onset.codec
       Onset.FromYourNextTurn
       " {\"type\":\"FromYourNextTurn\"} "
+  Spec.it s "FromThatExtraTurn" $
+    Common.assertCodec
+      s
+      Onset.codec
+      Onset.FromThatExtraTurn
+      " {\"type\":\"FromThatExtraTurn\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

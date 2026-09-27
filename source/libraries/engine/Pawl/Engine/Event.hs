@@ -126,6 +126,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
@@ -8511,36 +8512,47 @@ controllerTurnScoped cond = case cond of
 -- for CR 702.109a's, CR 702.152a's and CR 702.185a's spell, and by
 -- Pawl.Engine.Combat for CR 702.154a's reflexive ability at rule 508.1g.
 armDelayed :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> ObjectId -> PlayerId -> Map.Map SlotName.SlotName Binding.Type.Binding -> Onset -> Maybe Expiry.Type.Expiry -> GameState -> GameState
-armDelayed ability source controller captured onset expiry gs =
-  let -- CR 603.7a's creation moment, from the same counter every other moment
-      -- comes from, so CR 701.27f can compare it against Object.turnedOverAt.
-      -- Minted here rather than reusing the resolving object's stamp: one
-      -- resolution can arm several entries, and each is created as its own
-      -- opcode runs.
-      (createdAt, gs1) = Game.freshTimestamp gs
-      entry =
-        DelayedTrigger.MkDelayedTrigger
-          { DelayedTrigger.ability = ability,
-            DelayedTrigger.source = source,
-            DelayedTrigger.controller = controller,
-            DelayedTrigger.bindings = captured,
-            DelayedTrigger.window = armOnset onset,
-            DelayedTrigger.expiry = expiry,
-            DelayedTrigger.createdAt = createdAt
-          }
-   in gs1 {GameState.delayedTriggers = GameState.delayedTriggers gs1 Seq.|> entry}
+armDelayed ability source controller captured onset expiry gs = case armOnset source controller gs onset of
+  -- "That turn" names no turn this resolution created, so the ability could
+  -- never fire (CR 603.7a).
+  Nothing -> gs
+  Just window ->
+    let -- CR 603.7a's creation moment, from the same counter every other moment
+        -- comes from, so CR 701.27f can compare it against Object.turnedOverAt.
+        -- Minted here rather than reusing the resolving object's stamp: one
+        -- resolution can arm several entries, and each is created as its own
+        -- opcode runs.
+        (createdAt, gs1) = Game.freshTimestamp gs
+        entry =
+          DelayedTrigger.MkDelayedTrigger
+            { DelayedTrigger.ability = ability,
+              DelayedTrigger.source = source,
+              DelayedTrigger.controller = controller,
+              DelayedTrigger.bindings = captured,
+              DelayedTrigger.window = window,
+              DelayedTrigger.expiry = expiry,
+              DelayedTrigger.createdAt = createdAt
+            }
+     in gs1 {GameState.delayedTriggers = GameState.delayedTriggers gs1 Seq.|> entry}
 
 -- CR 603.7a: the printed Onset as the game first stores it. The delayed-trigger
--- twin of Expiry.arm, deliberately blind to the board -- unlike a duration, an
--- onset has nothing to bake in when the ability is created, "your next turn" being
--- a boundary that has not happened yet. settleOnsets supplies the number.
-armOnset :: Onset -> TurnWindow
-armOnset onset = case onset of
-  Onset.Immediately -> TurnWindow.AnyTurn
-  Onset.FromYourNextTurn -> TurnWindow.ControllersNextTurn
+-- twin of Expiry.arm. "Your next turn" is a boundary that has not happened yet,
+-- so settleOnsets supplies its number later.
+--
+-- CR 500.7: "that turn" is the extra turn this resolution just created for the
+-- controller, the most recently created entry from this source that the
+-- controller takes. Nothing when there is none, as when the controller named
+-- by the extra-turn clause was not the one taking it.
+armOnset :: ObjectId -> PlayerId -> GameState -> Onset -> Maybe TurnWindow
+armOnset source controller gs onset = case onset of
+  Onset.Immediately -> Just TurnWindow.AnyTurn
+  Onset.FromYourNextTurn -> Just TurnWindow.ControllersNextTurn
+  Onset.FromThatExtraTurn ->
+    let created turn = ExtraTurn.source turn == source && Turn.sharesTurn gs controller (ExtraTurn.taker turn)
+     in fmap (TurnWindow.OnExtraTurn . ExtraTurn.createdAt) (List.find created (GameState.extraTurns gs))
 
 -- CR 603.7a: a turn has BEGUN, so settle every delayed entry waiting for one and
--- drop every entry whose turn is now over. Engine.beginTurnOf calls this once the
+-- drop every entry whose turn is now over. Engine.beginTurn calls this once the
 -- new turn's number and active player are in place, and only for a turn that
 -- actually begins -- CR 614.10a read on the turn axis, so CR 800.4k's turn a
 -- departed seat never begins is walked past without settling anything.
@@ -8566,8 +8578,12 @@ armOnset onset = case onset of
 -- triggering still ends them in delayedPending. An entry with a stated duration is
 -- dropped here too, and rightly: a duration keeps an ability armed for its event's
 -- next occurrence, not for a turn its printed text never named.
-settleOnsets :: GameState -> GameState
-settleOnsets gs =
+--
+-- `begun` is the ExtraTurn.createdAt of the extra turn beginning, if this is
+-- one: an entry waiting for THAT turn settles here, and one waiting for an extra
+-- turn no longer pending is dropped, CR 800.4k having spent it unbegun.
+settleOnsets :: Maybe Timestamp.Timestamp -> GameState -> GameState
+settleOnsets begun gs =
   let settled entry = case DelayedTrigger.window entry of
         -- The turn that is beginning IS the one the printed phrase named exactly
         -- when it belongs to the entry's controller (CR 603.7d-f).
@@ -8576,12 +8592,19 @@ settleOnsets gs =
               entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
         -- Anyone else's turn, including an intervening opponent's: still waiting.
         TurnWindow.ControllersNextTurn -> entry
+        -- CR 500.7: the extra turn the entry names, and no other, including
+        -- another extra turn created after it and so taken first.
+        TurnWindow.OnExtraTurn stamp
+          | Just stamp == begun ->
+              entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
+        TurnWindow.OnExtraTurn _ -> entry
         TurnWindow.AnyTurn -> entry
         -- Already settled, and this is a later turn -- `live` is what ends it.
         TurnWindow.OnTurn _ -> entry
       live entry = case DelayedTrigger.window entry of
         TurnWindow.AnyTurn -> True
         TurnWindow.ControllersNextTurn -> True
+        TurnWindow.OnExtraTurn stamp -> any ((== stamp) . ExtraTurn.createdAt) (GameState.extraTurns gs)
         TurnWindow.OnTurn n -> n >= GameState.turnNumber gs
    in gs {GameState.delayedTriggers = Seq.filter live (fmap settled (GameState.delayedTriggers gs))}
 

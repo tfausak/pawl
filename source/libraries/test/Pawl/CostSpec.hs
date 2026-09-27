@@ -3013,6 +3013,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   zameckGuildmageCostSpec s registry
   novijenSagesSpec s registry
   retributionSpec s registry
+  oozeFluxSpec s registry
   millikinSpec s registry
   brittleEffigySpec s registry
   exiledReliquarySpec s registry
@@ -4742,6 +4743,115 @@ recordXBound p = case p of
   Prompt.ChooseX _ _ _ _ bound -> do
     State.modify' (<> [bound])
     pure 0
+  _ -> pure (S.identityAnswer p)
+
+-- Ooze Flux {3}{G} Enchantment (Oracle text checked against Scryfall
+-- 2026-09-27): "{1}{G}, Remove one or more +1/+1 counters from among creatures
+-- you control: Create an X/X green Ooze creature token, where X is the number of
+-- +1/+1 counters removed this way."
+--
+-- The producer for CounterSpread.FromAmongAtLeast and Binding.removedCounters:
+-- the payer settles HOW MANY while paying (CR 601.2h), and the token reads the
+-- number the payment bound.
+--
+-- THE BOARD: alice controls the Flux over two Forests, a Goblin Piker and a Hill
+-- Giant carrying the counter counts given; bob's Hill Giant carries three on
+-- every board. alice's library holds two cards.
+oozeFluxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+oozeFluxSpec s registry =
+  Spec.describe s "Ooze Flux" $ do
+    -- The gameplay-level assertions come FIRST: the token's size, then where the
+    -- counters came off. The prompt record is a proxy after them.
+    Spec.it s "CR 601.2h the payer chooses how many counters come off, and the token is that big" $ do
+      (fluxId, pikerId, giantId, board) <- oozeFluxBoard s registry [1, 2]
+      flux <- S.printingOf s registry "Ooze Flux"
+      let answer = Map.singleton giantId 2
+          act = do Activate.activateAbility S.alice fluxId (theAbility flux); Stack.resolveTop
+          (after, asked) = State.runState (fmap snd (Engine.runGame (recordingAtLeastRemovals answer) board act)) []
+          oozes = newPermanents board after
+      Spec.assertEqWith s "CR 111.3 the Ooze is 2/2, the two counters removed" (fmap (`Projection.powerOf` after) oozes, fmap (`Projection.toughnessOf` after) oozes) ([Just 2], [Just 2])
+      Spec.assertEqWith s "CR 122.1 both came off the Giant" (S.counterOf CounterKind.PlusOnePlusOne giantId after) 0
+      Spec.assertEqWith s "and the Piker kept its one" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
+      Spec.assertEqWith s "the payer was asked once, with a floor of one, over alice's two creatures" asked [(1, Map.fromList [(pikerId, 1), (giantId, 2)])]
+    -- One candidate is still a choice, the count being the payer's.
+    Spec.it s "CR 601.2h one candidate still asks how many" $ do
+      (fluxId, _, giantId, board) <- oozeFluxBoard s registry [0, 2]
+      flux <- S.printingOf s registry "Ooze Flux"
+      let act = do Activate.activateAbility S.alice fluxId (theAbility flux); Stack.resolveTop
+          (after, asked) = State.runState (fmap snd (Engine.runGame (recordingAtLeastRemovals (Map.singleton giantId 2)) board act)) []
+          oozes = newPermanents board after
+      Spec.assertEqWith s "CR 111.3 the Ooze is 2/2" (fmap (`Projection.powerOf` after) oozes) [Just 2]
+      Spec.assertEqWith s "the payer was asked" (length asked) 1
+    -- The elision: the creatures carry exactly the floor, so one counter comes off
+    -- and there is nothing to ask.
+    Spec.it s "CR 118.3 counters exactly at the floor are one answer, so nothing is asked" $ do
+      (fluxId, pikerId, _, board) <- oozeFluxBoard s registry [1, 0]
+      flux <- S.printingOf s registry "Ooze Flux"
+      let act = do Activate.activateAbility S.alice fluxId (theAbility flux); Stack.resolveTop
+          (after, asked) = State.runState (fmap snd (Engine.runGame (recordingAtLeastRemovals Map.empty) board act)) []
+          oozes = newPermanents board after
+      Spec.assertEqWith s "CR 111.3 the Ooze is 1/1" (fmap (`Projection.powerOf` after) oozes) [Just 1]
+      Spec.assertEqWith s "the Piker's counter came off" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 0
+      Spec.assertEqWith s "and the payer was asked nothing" asked []
+    -- A division taking more than a creature carries is refused, not repaired.
+    Spec.it s "CR 118.3 an answer past what a creature carries pays nothing" $ do
+      (fluxId, pikerId, giantId, board) <- oozeFluxBoard s registry [1, 2]
+      flux <- S.printingOf s registry "Ooze Flux"
+      let ((_, paid), _) = State.runState (Engine.runGame (recordingAtLeastRemovals (Map.singleton giantId 3)) board (Activate.activateAbility S.alice fluxId (theAbility flux))) []
+      Spec.assertEqWith s "the Giant kept both" (S.counterOf CounterKind.PlusOnePlusOne giantId paid) 2
+      Spec.assertEqWith s "and the Piker its one" (S.counterOf CounterKind.PlusOnePlusOne pikerId paid) 1
+      Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack paid)) 0
+    -- CR 118.3 / 602.2b: "one or more" is unpayable with none -- the pair differs
+    -- in the Piker's one counter.
+    Spec.it s "CR 118.3 with no counter on alice's creatures the ability is not offered" $ do
+      flux <- S.printingOf s registry "Ooze Flux"
+      (fluxId, _, _, one) <- oozeFluxBoard s registry [1, 0]
+      (bareId, _, _, none) <- oozeFluxBoard s registry [0, 0]
+      let offers oid gs = length (filter (isActivateOfAbility oid (theAbility flux)) (Action.legalActions S.alice gs))
+      Spec.assertEqWith s "CR 602.2b offered with one counter" (offers fluxId one) 1
+      Spec.assertEqWith s "and not with none" (offers bareId none) 0
+
+-- The board oozeFluxSpec's cases share, described above it. The counts are the
+-- Piker's and the Giant's.
+oozeFluxBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [Natural.Natural] -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+oozeFluxBoard s registry counts = do
+  flux <- S.printingOf s registry "Ooze Flux"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  forest <- S.printingOf s registry "Forest"
+  let lands = S.landsFor forest S.alice 2 (Setup.emptyGame S.bothPlayers)
+      (fluxId, withFlux) = S.addPermanent flux S.alice lands
+      (pikerId, withPiker) = S.addPermanent piker S.alice withFlux
+      (giantId, withGiant) = S.addPermanent giant S.alice withPiker
+      (bobsGiantId, withBobs) = S.addPermanent giant S.bob withGiant
+      (_, stocked) = S.addLibraryCard forest S.alice (snd (S.addLibraryCard forest S.alice withBobs))
+      opposed = S.addCounter CounterKind.PlusOnePlusOne 3 bobsGiantId stocked
+      counted = case counts of
+        [onPiker, onGiant] -> S.addCounter CounterKind.PlusOnePlusOne onGiant giantId (S.addCounter CounterKind.PlusOnePlusOne onPiker pikerId opposed)
+        _ -> opposed
+  pure
+    ( fluxId,
+      pikerId,
+      giantId,
+      counted
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- The permanents alice controls after a run that she did not before it: the
+-- tokens it made.
+newPermanents :: GameState.GameState -> GameState.GameState -> [ObjectId.ObjectId]
+newPermanents before after = filter (`notElem` Game.zoneMembers Zone.Battlefield S.alice before) (Game.zoneMembers Zone.Battlefield S.alice after)
+
+-- Answers Prompt.ChooseCounterRemovalAtLeast with the division given, recording
+-- each prompt's floor and offer. PINNED, recordingSpreadRemovals' posture.
+recordingAtLeastRemovals :: Map.Map ObjectId.ObjectId Natural.Natural -> Prompt.Prompt r -> State.State [(Natural.Natural, Map.Map ObjectId.ObjectId Natural.Natural)] r
+recordingAtLeastRemovals answer p = case p of
+  Prompt.ChooseCounterRemovalAtLeast _ _ _ least offered -> do
+    State.modify' (<> [(least, offered)])
+    pure answer
   _ -> pure (S.identityAnswer p)
 
 -- Millikin {2} Artifact Creature -- Construct 0/1, "{T}, Mill a card: Add {C}"

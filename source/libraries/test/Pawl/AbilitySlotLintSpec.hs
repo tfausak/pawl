@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, sacrificesAsCost, spellCostsOf, triggerConditionSlots)
+import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -331,7 +331,11 @@ activatedAbilityOffends ability =
         if discardsSelfAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.discardedCard
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded]) (ActivatedAbility.modal ability)
+      removed =
+        if removesCountersAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.removedCounters
+          else Set.empty
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded, removed]) (ActivatedAbility.modal ability)
 
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent
@@ -414,6 +418,9 @@ discardsSelfAsCost =
 -- arms with the onset but scopes with EachTurn has printed an "each" the window
 -- would silently narrow to the controller's turn, so its text would mean
 -- something the card does not say. That is what this rejects.
+--
+-- Onset.FromThatExtraTurn is held to the same pairing: "that turn" is an extra
+-- turn the controller takes (Final Fortune), so its step is theirs.
 --
 -- A dangling name (an onset naming an ability the card does not declare) is
 -- ALSO an offence here, and deliberately not silently accepted: the neighbouring

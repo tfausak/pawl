@@ -1627,6 +1627,16 @@ combatReplaySpec s =
           -- one leg by accident.
           Spec.assertEqWith s "both off one round trips" (Replay.decode p (Replay.encode p (Map.singleton a 2))) (Just (Map.singleton a 2))
           Spec.assertEqWith s "and a one-permanent removal transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemoval a)) Nothing
+        -- CR 601.2h again, where the payer also chose how many.
+        Spec.it s "ChooseCounterRemovalAtLeast round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 11
+              b = ObjectId.MkObjectId 13
+              p = Prompt.ChooseCounterRemovalAtLeast decider S.alice oid 1 (Map.fromList [(a, 2), (b, 1)])
+              most = Map.fromList [(a, 2 :: Natural.Natural), (b, 1)]
+          Spec.assertEqWith s "taking every counter round trips" (Replay.decode p (Replay.encode p most)) (Just most)
+          Spec.assertEqWith s "taking one round trips" (Replay.decode p (Replay.encode p (Map.singleton b 1))) (Just (Map.singleton b 1))
+          -- Discriminating: fails if the two division prompts share a response.
+          Spec.assertEqWith s "and a fixed-count division transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemovalAmong most)) Nothing
         -- CR 701.61a: which half of forage the forager took is a decision, so it
         -- has to survive a transcript like any other.
         Spec.it s "ChooseForage round-trips through the transcript" $ do
