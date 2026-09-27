@@ -85,6 +85,7 @@ import qualified Pawl.Codec.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.RedirectDamage as RedirectDamage
 import qualified Pawl.Codec.RemoveCounters as RemoveCounters
+import qualified Pawl.Codec.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Codec.Replace as Replace
 import qualified Pawl.Codec.RequireAttack as RequireAttack
 import qualified Pawl.Codec.RequireBlock as RequireBlock
@@ -199,6 +200,7 @@ codec cardCodec abilityCodec =
           Arm.payload "MoveCounters" MoveCounters.codec Effect.MoveCounters (\x -> case x of Effect.MoveCounters y -> Just y; _ -> Nothing),
           Arm.payload "PutCountersFrom" PutCountersFrom.codec Effect.PutCountersFrom (\x -> case x of Effect.PutCountersFrom y -> Just y; _ -> Nothing),
           Arm.payload "RemoveCounters" RemoveCounters.codec Effect.RemoveCounters (\x -> case x of Effect.RemoveCounters y -> Just y; _ -> Nothing),
+          Arm.payload "RemoveCountersAmong" RemoveCountersAmong.codec Effect.RemoveCountersAmong (\x -> case x of Effect.RemoveCountersAmong y -> Just y; _ -> Nothing),
           Arm.payload "GainPlayerCounters" PlayerCounters.codec Effect.GainPlayerCounters (\x -> case x of Effect.GainPlayerCounters y -> Just y; _ -> Nothing),
           Arm.payload "RemovePlayerCounters" PlayerCounters.codec Effect.RemovePlayerCounters (\x -> case x of Effect.RemovePlayerCounters y -> Just y; _ -> Nothing),
           Arm.payload "PayAnyEnergy" SlotName.codec Effect.PayAnyEnergy (\x -> case x of Effect.PayAnyEnergy y -> Just y; _ -> Nothing),
@@ -353,6 +355,7 @@ tagOf x = case x of
   Effect.MoveCounters {} -> "MoveCounters"
   Effect.PutCountersFrom {} -> "PutCountersFrom"
   Effect.RemoveCounters {} -> "RemoveCounters"
+  Effect.RemoveCountersAmong {} -> "RemoveCountersAmong"
   Effect.GainPlayerCounters {} -> "GainPlayerCounters"
   Effect.RemovePlayerCounters {} -> "RemovePlayerCounters"
   Effect.PayAnyEnergy {} -> "PayAnyEnergy"

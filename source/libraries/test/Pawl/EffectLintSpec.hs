@@ -159,7 +159,9 @@ import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -319,6 +321,7 @@ ownQuantities effect = case effect of
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> Maybe.maybeToList (MovedKinds.quantityOf kinds)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> [quantity]
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> Maybe.maybeToList (RemovalCount.quantityOf count)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
   Effect.PayAnyEnergy _ -> []
@@ -1375,6 +1378,7 @@ effectObjectRefs effect =
         -- rather than of the ref (Prompt.ChooseDistributedMovedCounters).
         Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> read_ [from, to]
         Effect.RemoveCounters {} -> []
+        Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong _ from _ _) -> read_ [from]
         Effect.GainPlayerCounters {} -> []
         Effect.RemovePlayerCounters {} -> []
         Effect.PayAnyEnergy {} -> []

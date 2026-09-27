@@ -89,6 +89,7 @@ encode p answer = case p of
   Prompt.ChooseCounterRemoval {} -> Response.ChoseCounterRemoval answer
   Prompt.ChooseCounterRemovalAmong {} -> Response.ChoseCounterRemovalAmong answer
   Prompt.ChooseCounterRemovalAtLeast {} -> Response.ChoseCounterRemovalAtLeast answer
+  Prompt.ChooseCounterRemovalUpTo {} -> Response.ChoseCounterRemovalUpTo answer
   Prompt.ChooseVote {} -> Response.ChoseVote answer
   Prompt.ChooseVoteWord {} -> Response.ChoseVoteWord answer
   Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
@@ -329,6 +330,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCounterRemovalAtLeast {} -> case response of
     Response.ChoseCounterRemovalAtLeast division -> Just division
+    _ -> Nothing
+  Prompt.ChooseCounterRemovalUpTo {} -> case response of
+    Response.ChoseCounterRemovalUpTo division -> Just division
     _ -> Nothing
   Prompt.ChooseVote {} -> case response of
     Response.ChoseVote oid -> Just oid
@@ -813,6 +817,8 @@ defaultAnswer p = case p of
   Prompt.ChooseCounterRemovalAmong _ _ _ total offered -> Cost.fillInOrder total offered
   -- The same, at the floor: the fewest counters the cost allows.
   Prompt.ChooseCounterRemovalAtLeast _ _ _ least offered -> Cost.fillInOrder least offered
+  -- Under a cap, removing nothing is an answer.
+  Prompt.ChooseCounterRemovalUpTo {} -> Map.empty
   -- CR 701.38a: the prompt is only raised with two or more listed choices, and
   -- every one of them is a legal vote.
   Prompt.ChooseVote _ _ _ candidates -> NonEmpty.head candidates
