@@ -12,7 +12,4 @@ data CounterSpread
   | -- | Ooze Flux: "Remove one or more +1\/+1 counters from among creatures you
     -- control", the count a floor and how many the payer's own.
     FromAmongAtLeast
-  | -- | The count a cap and none an answer: Pawl.Types.RemovalCount's UpTo, as
-    -- the mixed-kind division prompt reads it. No printed cost states it.
-    FromAmongAtMost
   deriving (Bounded, Enum, Eq, Ord, Show)

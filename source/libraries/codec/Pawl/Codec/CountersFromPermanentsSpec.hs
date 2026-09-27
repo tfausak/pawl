@@ -1,5 +1,7 @@
 module Pawl.Codec.CountersFromPermanentsSpec where
 
+import qualified Data.Either as Either
+import qualified Data.Text as Text
 import qualified Pawl.Codec.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -50,4 +52,9 @@ spec s = Spec.describe s "Pawl.Codec.CountersFromPermanents" $ do
           }
       )
       " {\"count\":3,\"kind\":{\"type\":\"OfAnyKind\"},\"whichPermanent\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"spread\":{\"type\":\"FromAmong\"}} "
+  Spec.it s "rejects counters of any kind at a floor" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Codec.decode codec =<< Common.parse (Text.pack "{\"count\":1,\"kind\":{\"type\":\"OfAnyKind\"},\"whichPermanent\":{\"type\":\"IsSource\"},\"spread\":{\"type\":\"FromAmongAtLeast\"}}")))
+      "expected a decode failure"
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

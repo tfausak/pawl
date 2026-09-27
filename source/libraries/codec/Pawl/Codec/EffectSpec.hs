@@ -1,5 +1,6 @@
 module Pawl.Codec.EffectSpec where
 
+import qualified Data.Either as Either
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -8,6 +9,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.RemoveCountersAmong as RemoveCountersAmong.Codec
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -1256,6 +1258,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (among RemovalCount.AnyNumber Nothing)
       " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"AnyNumber\"},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfKind\",\"value\":{\"type\":\"Stun\"}}}} "
+  -- Counters of any kind only in any number: Eventide's Shadow's form is
+  -- accepted, a stated count over any kind is not.
+  Spec.it s "RemoveCountersAmong of any kind" $ do
+    let decoded json = Codec.decode RemoveCountersAmong.Codec.codec =<< Common.parse (Text.pack json)
+    Spec.assertBool s (Either.isRight (decoded "{\"count\":{\"type\":\"AnyNumber\"},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfAnyKind\"}}")) "expected any number of any kind to decode"
+    Spec.assertBool s (Either.isLeft (decoded "{\"count\":{\"type\":\"UpTo\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfAnyKind\"}}")) "expected up to three of any kind to fail"
+    Spec.assertBool s (Either.isLeft (decoded "{\"count\":{\"type\":\"Exactly\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfAnyKind\"}}")) "expected exactly three of any kind to fail"
   -- Every PlayerRef shape the opcode accepts: the self-scoped one, and the slot
   -- read CR 702.70a needs.
   Spec.it s "GainPlayerCounters" $ do

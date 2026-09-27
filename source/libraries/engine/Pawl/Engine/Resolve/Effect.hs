@@ -8222,28 +8222,22 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Monad.forM_ (Map.toList (Map.filter (> 0) division)) (\(permanent, taken) -> Event.removeCounters permanent kind taken)
         pure (sum division)
       -- CR 122.1: with no kind named, the division is by kind as well
-      -- (Eventide's Shadow), through the cost side's mixed prompt at the spread
-      -- the count reads as.
-      WhichCounters.OfAnyKind -> do
-        let offered = removableAmong gs which permanents
-            (spread, owed) = case count of
-              RemovalCount.Exactly quantity -> (CounterSpread.FromAmong, asked quantity)
-              RemovalCount.UpTo quantity -> (CounterSpread.FromAmongAtMost, asked quantity)
-              RemovalCount.AnyNumber -> (CounterSpread.FromAmongAtLeast, 0)
-            -- The least the card allows: CR 609.3's everything under an exact
-            -- count, none otherwise.
-            least = Cost.fillMixedInOrder spread owed offered
-        division <-
-          if spread == CounterSpread.FromAmong && sum (fmap sum offered) <= owed
-            then pure least
-            else case Cost.onlyMixedDivision spread owed offered of
-              Just only -> pure only
-              Nothing -> do
-                answer <- Game.choose (Prompt.ChooseMixedCounterRemoval decider controller source spread owed offered)
-                pure (if Cost.dividesMixedRemoval spread owed offered answer then answer else least)
-        let flat = Cost.flattenMixed division
-        Monad.forM_ (Map.toList flat) (\((permanent, kind), taken) -> Event.removeCounters permanent kind taken)
-        pure (sum flat)
+      -- (Eventide's Shadow), through the cost side's mixed prompt at a floor of
+      -- zero. Only "any number" reaches here: Pawl.Codec.RemoveCountersAmong
+      -- rejects any kind at a stated count, which no printing writes.
+      WhichCounters.OfAnyKind -> case count of
+        RemovalCount.AnyNumber -> do
+          let offered = removableAmong gs which permanents
+          division <- case Cost.onlyMixedDivision CounterSpread.FromAmongAtLeast 0 offered of
+            Just only -> pure only
+            Nothing -> do
+              answer <- Game.choose (Prompt.ChooseMixedCounterRemoval decider controller source CounterSpread.FromAmongAtLeast 0 offered)
+              pure (if Cost.dividesMixedRemoval CounterSpread.FromAmongAtLeast 0 offered answer then answer else Map.empty)
+          let flat = Cost.flattenMixed division
+          Monad.forM_ (Map.toList flat) (\((permanent, kind), taken) -> Event.removeCounters permanent kind taken)
+          pure (sum flat)
+        RemovalCount.Exactly _ -> pure 0
+        RemovalCount.UpTo _ -> pure 0
     -- Bound even where nothing came off, Effect.RemoveCounters' posture.
     Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot resolving source tally removed)
   Effect.MoveCounters (MoveCounters.MkMoveCounters fromRef kinds mSlot toRef) -> do
@@ -10166,13 +10160,13 @@ bindPlayerSlot holder slot players gs =
         then gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
         else gs {GameState.detachedBindings = Map.insertWith Map.union holder (Map.singleton slot binding) (GameState.detachedBindings gs)}
 
--- The objects a RemoveCountersAmong names that carry the kind, with how many
--- each carries: Pawl.Engine.Cost.spreadRemovalCandidates' shape.
 -- The counters of the kinds a removal reaches on each of these permanents, by
 -- kind, the ones carrying none dropped.
 removableAmong :: GameState -> WhichCounters.WhichCounters Keyword.Type.Keyword -> [ObjectId] -> Map.Map ObjectId (Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural)
 removableAmong gs which candidates = Map.filter (not . Map.null) (Map.fromList [(candidate, Cost.removableCounters which candidate gs) | candidate <- candidates])
 
+-- The objects a RemoveCountersAmong names that carry the kind, with how many
+-- each carries: Pawl.Engine.Cost.spreadRemovalCandidates' shape.
 carrying :: GameState -> CounterKind.CounterKind Keyword.Type.Keyword -> [ObjectId] -> Map.Map ObjectId Natural
 carrying gs kind candidates = Map.filter (> 0) (Map.fromList [(candidate, Cost.countersOn kind candidate gs) | candidate <- candidates])
 
