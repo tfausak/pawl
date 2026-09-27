@@ -392,6 +392,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfBlocks
       " {\"type\":\"SelfBlocks\"} "
+  -- CR 509.3a read by a bystander, with a Filter over the blocker.
+  Spec.it s "CreatureBlocks" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.CreatureBlocks (Filter.HasAttached Filter.IsSource))
+      " {\"type\":\"CreatureBlocks\",\"value\":{\"type\":\"HasAttached\",\"value\":{\"type\":\"IsSource\"}}} "
   -- CR 509.3b, which carries a Filter over the ATTACKER the bearer blocked --
   -- Netcaster Spider's "a creature with flying". The attacker is also a BINDING,
   -- and that is a separate thing the payload reads rather than an encoding of it.

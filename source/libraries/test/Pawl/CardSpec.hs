@@ -72,6 +72,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachRestriction as AttachRestriction
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -1026,6 +1027,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfAttacksWhile condition -> conditionCounts condition
   TriggerCondition.SelfBlocks -> []
+  TriggerCondition.CreatureBlocks _ -> []
   -- CR 509.3b names the attacker without counting anything, and its Filter holds
   -- no Count for PermanentEnters' reason.
   TriggerCondition.SelfBlocksCreature _ -> []
@@ -3730,6 +3732,8 @@ objectRefFilters ref = case ref of
   -- counterpart may be picked and nothing about the source, so it is framed the
   -- same way.
   ObjectRef.SourceAndChosenPermanent f -> unframed [f]
+  -- Rhuk's "all Equipment attached to that creature".
+  ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound _ f) -> unframed [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4122,6 +4126,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 509.3b names a quality the attacker blocked must have, so this one DOES
   -- carry a Filter -- Netcaster Spider's "with flying".
   TriggerCondition.SelfBlocksCreature f -> unframed [f]
+  TriggerCondition.CreatureBlocks f -> unframed [f]
   TriggerCondition.SelfBlocksAtLeast _ -> []
   -- CR 509.3e's filtered form names a quality the attackers blocked must have,
   -- so this one DOES carry a Filter.
@@ -4304,6 +4309,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacksWhileSaddled -> []
   TriggerCondition.SelfAttacksWhile _ -> []
   TriggerCondition.SelfBlocks -> []
+  TriggerCondition.CreatureBlocks _ -> []
   TriggerCondition.SelfBlocksCreature _ -> []
   TriggerCondition.SelfBlocksAtLeast _ -> []
   TriggerCondition.SelfBlocksOneOrMore _ -> []

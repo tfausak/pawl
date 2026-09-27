@@ -786,3 +786,5 @@ refReachesLibrary ref = case ref of
   -- The battlefield once more, the arm above's answer: naming the source
   -- alongside the match adds no zone, the source being a permanent too.
   ObjectRef.SourceAndChosenPermanent _ -> False
+  -- The battlefield again: what is attached to a permanent is a permanent.
+  ObjectRef.AttachedToBound _ -> False

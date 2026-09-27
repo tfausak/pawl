@@ -1012,6 +1012,8 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- reaches the Game monad can ask the chooser.
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
+  -- A read, so the sweep answers it.
+  ObjectRef.AttachedToBound _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
 
 -- The order for a per-object batch -- CR 608.2f's, and CR 701.44d's, which say
 -- the same thing about the PRIMARY key: APNAP first, reading a player recipient
@@ -4888,6 +4890,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 counterpart <- chosenPermanent filter_ (PlayerRef.Relative PlayerRelation.You)
                 gs <- State.get
                 pure (counterpart <> battlefieldMatching legal resolving controller source gs Filter.Type.IsSource)
+              -- Swept once from the PRE-MOVE state, EachMatching's reason.
+              ObjectRef.AttachedToBound _ -> do
+                gs <- State.get
+                pure (objectRefObjects legal resolving controller source gs ref)
             arrivals <- settleArrivals zone placement targets
             -- The batch's own board, read after CR 401.4's arrangement asks (which
             -- move nothing) and before any member does.
