@@ -40,6 +40,7 @@ import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Transformed as Transformed
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -628,12 +629,13 @@ data GameEvent
     -- (Pawl.Engine.Resolve.Effect.copyOnStackOf), so the two are one key here,
     -- which is rule 707.10b's third sentence holding by construction.
     --
-    -- Not implemented: a TRIGGERED ability's resolutions, which nothing records
-    -- and nothing can read -- CR 602.2a's Pawl.Engine.Binding.thisAbility is the
-    -- only slot naming an ability's own object and no borne trigger carries it
-    -- (#3815). CR 605.3b's mana ability never reaches this loop at all.
+    -- CR 605.3b's mana ability never reaches this loop at all.
     --
     -- Distinct from ManaAbilityResolved above, which CR 605.3b's off-stack
     -- resolution writes and which names the PERMANENT rather than the ability.
     ActivatedAbilityResolved ActivatedAbilitySource.ActivatedAbilitySource
+  | -- | CR 608.2n: a TRIGGERED ability resolved, keyed as the activated twin
+    -- above is. Two firings of one CR 603.7 delayed ability share the entry's
+    -- createdAt, so they are one key too.
+    TriggeredAbilityResolved TriggeredAbilitySource.TriggeredAbilitySource
   deriving (Eq, Ord, Show)

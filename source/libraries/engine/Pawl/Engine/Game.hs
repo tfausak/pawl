@@ -2387,6 +2387,7 @@ castOf event = case event of
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
+  GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- CR 601.2i: how many spells each player has cast this turn, off the whole log,
@@ -2402,13 +2403,14 @@ castsPerPlayer gs =
     (+)
     (fmap (\cast -> (SpellWasCast.player cast, 1)) (Maybe.mapMaybe (castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
 
--- CR 608.2n: the ACTIVATED ABILITY an event describes RESOLVING, if it describes
--- one -- the source object and the ability, which is the pair CR 707.10b counts
--- by. castOf above's shape and placement, and its fold's twin:
--- Pawl.Engine.Quantity's TimesResolvedThisTurn arm counts the entries this
--- returns against the Source of the ability being asked about.
-activatedAbilityResolved :: GameEvent -> Maybe ActivatedAbilitySource.ActivatedAbilitySource
-activatedAbilityResolved event = case event of
+-- CR 608.2n: the ABILITY an event describes RESOLVING, if it describes one, as
+-- the Source its object on the stack carried -- the source object and the
+-- ability, which is the pair CR 707.10b counts by. castOf above's shape and
+-- placement, and its fold's twin: Pawl.Engine.Quantity's TimesResolvedThisTurn
+-- arm counts the entries this returns against the Source of the ability being
+-- asked about.
+abilityResolved :: GameEvent -> Maybe Source.Source
+abilityResolved event = case event of
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
@@ -2485,7 +2487,8 @@ activatedAbilityResolved event = case event of
   GameEvent.Waterbent _ -> Nothing
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
-  GameEvent.ActivatedAbilityResolved activated -> Just activated
+  GameEvent.ActivatedAbilityResolved activated -> Just (Source.OfAbility activated)
+  GameEvent.TriggeredAbilityResolved triggered -> Just (Source.OfTrigger triggered)
   GameEvent.CardArrived _ -> Nothing
 
 -- The discarding player an event describes, if it is a discard (CR 701.9a).
@@ -2582,6 +2585,7 @@ discardOf event = case event of
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
+  GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The permanent an event describes ENTERING THE BATTLEFIELD, if it is one. CR
@@ -2707,6 +2711,7 @@ movedChange event = case event of
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
+  GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The RECIPIENT an event describes damage being dealt to, if it describes one --
@@ -2822,6 +2827,7 @@ damageDealt event = case event of
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
+  GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- The PLAYER an event describes being dealt damage, if it describes one. CR
@@ -3101,6 +3107,7 @@ lifeGainOf event = case event of
   GameEvent.Airbent _ -> Nothing
   GameEvent.Firebent _ -> Nothing
   GameEvent.ActivatedAbilityResolved _ -> Nothing
+  GameEvent.TriggeredAbilityResolved _ -> Nothing
   GameEvent.CardArrived _ -> Nothing
 
 -- CR 119.3 / 608.2i: how much life this player has gained this turn. The log fold
