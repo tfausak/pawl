@@ -50,6 +50,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.Convoking as Convoking
 import qualified Pawl.Types.CounterChange as CounterChange
@@ -3482,3 +3483,168 @@ interveningHolds gs pending =
         gs
         oid
         cond
+
+-- CR 801.16: the players a triggered ability's placement names as in a loop
+-- beside its controller -- the controllers of the continuous effects without
+-- which it would not have triggered. The candidates are the effects applying
+-- to its source or to an object its event bound (Projection.effectSourcesOn):
+-- frank's Life and Limb making each Saproling a land for alice's Sporemound,
+-- frank's Necrosynthesis granting alice's Sporemound the ability itself. Each
+-- is asked whether the trigger still fires with that source gone
+-- (`firesWithout`); frank's Thelonite Hermit, which only makes each Saproling
+-- bigger, is not named. Pawl.RangeOfInfluenceSpec's six-seat CR 801.16 loop
+-- proves all three.
+--
+-- An effect sourced by the trigger's source or by a bound object is named
+-- without the question: removing it would remove an object of the event
+-- itself.
+loopShapers :: PendingTrigger -> GameState -> [PlayerId]
+loopShapers pending gs =
+  let bearer = case PendingTrigger.source pending of
+        TriggerSource.OfObject oid -> [oid]
+        TriggerSource.Sourceless -> []
+      subjects = bearer <> concatMap Set.toList (Map.elems (Binding.slotObjects (PendingTrigger.bindings pending)))
+      shaper src = case Projection.controllerWithLastKnown src gs of
+        Just pid
+          | pid /= PendingTrigger.controller pending && (List.elem src subjects || not (firesWithout src pending gs)) -> Just pid
+        _ -> Nothing
+   in ListUtils.nubOrd (Maybe.mapMaybe shaper (Projection.effectSourcesOn subjects gs))
+
+-- Would this pending trigger still have fired with `src`'s continuous effects
+-- gone -- `src` off the battlefield and out of the command zone, and every
+-- stored effect it is the source of dropped? The trigger's own event is
+-- scanned again (`eventTriggers`) against that board, with the event's
+-- snapshot re-read there (`resnapshot`), and must yield the same ability of the
+-- same source under the same controller, its CR 603.4 "if" still holding.
+--
+-- Answers False -- the effect counts -- wherever the question cannot be put: a
+-- delayed, reflexive or state trigger, which has no event scan to repeat, and
+-- a snapshot `resnapshot` cannot re-read.
+--
+-- The CR 603.4 check is a regression fence rather than a proved behaviour:
+-- dropping it leaves Pawl.RangeOfInfluenceSpec green, no ability in its loop
+-- having an "if".
+firesWithout :: ObjectId -> PendingTrigger -> GameState -> Bool
+firesWithout src pending gs =
+  case (PendingTrigger.firedBy pending, PendingTrigger.createdAt pending, PendingTrigger.source pending) of
+    (Just event, Nothing, TriggerSource.OfObject _) ->
+      let without =
+            gs
+              { GameState.battlefield = Set.delete src (GameState.battlefield gs),
+                GameState.command = Set.delete src (GameState.command gs),
+                GameState.continuousEffects = filter ((/= src) . ContinuousEffect.source) (GameState.continuousEffects gs),
+                GameState.battlefieldWhenTriggered = Map.empty
+              }
+          same p =
+            PendingTrigger.source p == PendingTrigger.source pending
+              && PendingTrigger.controller p == PendingTrigger.controller pending
+              && PendingTrigger.ability p == PendingTrigger.ability pending
+              && interveningHolds without p
+       in case resnapshot gs without event of
+            Nothing -> False
+            Just event' -> any same (eventTriggers [LoggedEvent.MkLoggedEvent (GameState.nextEventGroup gs) event'] without)
+    _ -> False
+
+-- An event as it would have been recorded on the board `without`: each
+-- characteristics snapshot is re-read there, off the object it describes --
+-- for a move, the incarnation that LEFT (Pawl.Types.Moved). The snapshot is
+-- kept where that object is gone, as a moved one usually is, or reads the same
+-- on both boards; it is replaced where the object still reads as the snapshot
+-- on `gs`; and one that has changed since the event and that `without` reads
+-- differently cannot be re-read, and answers Nothing.
+--
+-- Giving up is observed (Pawl.RangeOfInfluenceSpec's Thelonite Hermit board,
+-- a token minted where it stands, reddens when the re-read answers Nothing);
+-- WHICH snapshot the re-read hands on is not, since a CR 603.6a entry is
+-- matched against the board rather than the snapshot, and keeping the old one
+-- leaves that spec green.
+--
+-- A TOTAL case, participants' reason: a new event carrying a snapshot must be
+-- read here rather than silently kept.
+resnapshot :: GameState -> GameState -> GameEvent -> Maybe GameEvent
+resnapshot gs without event =
+  let reread oid pc =
+        let before = Projection.project oid gs
+            after = Projection.project oid without
+         in if not (Map.member oid (GameState.objects gs)) || before == after
+              then Just pc
+              else if before == pc then Just after else Nothing
+   in case event of
+        GameEvent.Moved m -> fmap (\pc -> GameEvent.Moved m {Moved.characteristics = pc}) (reread (ZoneChange.departed (Moved.change m)) (Moved.characteristics m))
+        GameEvent.SpellCast c -> fmap (\pc -> GameEvent.SpellCast c {SpellWasCast.characteristics = pc}) (reread (SpellWasCast.spell c) (SpellWasCast.characteristics c))
+        GameEvent.Revealed r -> fmap (\pc -> GameEvent.Revealed r {Revealed.characteristics = pc}) (reread (Revealed.card r) (Revealed.characteristics r))
+        GameEvent.Transformed t -> fmap (\pc -> GameEvent.Transformed t {Transformed.characteristics = pc}) (reread (Transformed.object t) (Transformed.characteristics t))
+        GameEvent.CardArrived {} -> Just event
+        GameEvent.DamageDealt {} -> Just event
+        GameEvent.DamagePrevented {} -> Just event
+        GameEvent.StepBegan {} -> Just event
+        GameEvent.BecameMonarch {} -> Just event
+        GameEvent.TookInitiative {} -> Just event
+        GameEvent.Discarded {} -> Just event
+        GameEvent.Milled {} -> Just event
+        GameEvent.Drew {} -> Just event
+        GameEvent.AttackerDeclared {} -> Just event
+        GameEvent.BecameAttacked {} -> Just event
+        GameEvent.AttackersDeclared {} -> Just event
+        GameEvent.BecameBlocking {} -> Just event
+        GameEvent.AttackerBlocked {} -> Just event
+        GameEvent.AttackerUnblocked {} -> Just event
+        GameEvent.BlocksDeclared {} -> Just event
+        GameEvent.SpellCountered {} -> Just event
+        GameEvent.AbilityCountered {} -> Just event
+        GameEvent.LifeLost {} -> Just event
+        GameEvent.LifeGained {} -> Just event
+        GameEvent.LoyaltyAbilityActivated {} -> Just event
+        GameEvent.CountersPut {} -> Just event
+        GameEvent.CountersRemoved {} -> Just event
+        GameEvent.HalfUnlocked {} -> Just event
+        GameEvent.TurnedFaceUp {} -> Just event
+        GameEvent.TurnedFaceDown {} -> Just event
+        GameEvent.BecameDesignated {} -> Just event
+        GameEvent.Evolved {} -> Just event
+        GameEvent.Mutated {} -> Just event
+        GameEvent.Mentored {} -> Just event
+        GameEvent.Exploited {} -> Just event
+        GameEvent.Trained {} -> Just event
+        GameEvent.BecameCrewed {} -> Just event
+        GameEvent.Convoked {} -> Just event
+        GameEvent.Crewed {} -> Just event
+        GameEvent.Saddled {} -> Just event
+        GameEvent.PermanentSacrificed {} -> Just event
+        GameEvent.AbilityTriggered {} -> Just event
+        GameEvent.ControlChanged {} -> Just event
+        GameEvent.VentureMarkerEntered {} -> Just event
+        GameEvent.BecameTarget {} -> Just event
+        GameEvent.BecameAttached {} -> Just event
+        GameEvent.BecameUnattached {} -> Just event
+        GameEvent.LeftTheGame {} -> Just event
+        GameEvent.Scried {} -> Just event
+        GameEvent.DungeonCompleted {} -> Just event
+        GameEvent.Surveiled {} -> Just event
+        GameEvent.DiceRolled {} -> Just event
+        GameEvent.DieResultSettled {} -> Just event
+        GameEvent.RolledToVisit {} -> Just event
+        GameEvent.ClassLevelSet {} -> Just event
+        GameEvent.Plotted {} -> Just event
+        GameEvent.Explored {} -> Just event
+        GameEvent.Connived {} -> Just event
+        GameEvent.Exerted {} -> Just event
+        GameEvent.BecameTapped {} -> Just event
+        GameEvent.BecameUntapped {} -> Just event
+        GameEvent.TappedForMana {} -> Just event
+        GameEvent.ManaAdded {} -> Just event
+        GameEvent.ManaAbilityResolved {} -> Just event
+        GameEvent.CoinFlipped {} -> Just event
+        GameEvent.RingTempted {} -> Just event
+        GameEvent.Blighted {} -> Just event
+        GameEvent.Foraged {} -> Just event
+        GameEvent.Foretold {} -> Just event
+        GameEvent.CollectedEvidence {} -> Just event
+        GameEvent.GaveGift {} -> Just event
+        GameEvent.AttractionOpened {} -> Just event
+        GameEvent.PrizeClaimed {} -> Just event
+        GameEvent.Earthbent {} -> Just event
+        GameEvent.Waterbent {} -> Just event
+        GameEvent.Airbent {} -> Just event
+        GameEvent.Firebent {} -> Just event
+        GameEvent.ActivatedAbilityResolved {} -> Just event

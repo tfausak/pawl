@@ -659,7 +659,10 @@ spec s registry = Spec.describe s "Range of influence" $ do
     limb <- S.printingOf s registry "Life and Limb"
     sporemound <- S.printingOf s registry "Sporemound"
     forest <- S.printingOf s registry "Forest"
-    let loopedWith limbOwner flashOwner ranged = resolveAll (ranged (loopBoard flash limb sporemound forest limbOwner flashOwner))
+    hermit <- S.printingOf s registry "Thelonite Hermit"
+    necrosynthesis <- S.printingOf s registry "Necrosynthesis"
+    let loopedBeside extra limbOwner flashOwner ranged = resolveAll (ranged (loopBoard flash limb sporemound forest extra limbOwner flashOwner))
+        loopedWith = loopedBeside (\_ gs -> gs)
         looped = loopedWith S.alice
         limited = looped S.bob (S.withRange 1)
     Spec.assertEqWith s "CR 801.16 at range 1 dave and erin are still playing" (Game.stillPlaying limited) [S.dave, erin]
@@ -672,6 +675,18 @@ spec s registry = Spec.describe s "Range of influence" $ do
     -- loop, but his static ability is what makes each Saproling a land for
     -- Sporemound to see, so his neighbour erin draws too.
     Spec.assertEqWith s "CR 801.16 with frank's Life and Limb only dave is still playing" (Game.stillPlaying (loopedWith frank S.bob (S.withRange 1))) [S.dave]
+    -- The first board with frank's face-up Thelonite Hermit ("All Saprolings
+    -- get +1/+1."): each Saproling is a 2/2 that Aether Flash still buries, and
+    -- without the Hermit Sporemound and Aether Flash would trigger just the
+    -- same, so the Hermit is in no loop and erin plays on.
+    let withHermit _ gs = snd (S.addPermanent hermit frank gs)
+    Spec.assertEqWith s "CR 801.16 with frank's Thelonite Hermit dave and erin are still playing" (Game.stillPlaying (loopedBeside withHermit S.alice S.bob (S.withRange 1))) [S.dave, erin]
+    -- The first board with frank's Necrosynthesis on alice's Sporemound: its
+    -- granted "Whenever another creature dies" triggers as each Saproling is
+    -- buried, an ability of alice's that exists only through frank's Aura, so
+    -- his neighbour erin draws too.
+    let withNecrosynthesis sporemoundId gs = let (auraId, g) = S.addPermanent necrosynthesis frank gs in S.attach auraId sporemoundId g
+    Spec.assertEqWith s "CR 801.16 with frank's Necrosynthesis on Sporemound only dave is still playing" (Game.stillPlaying (loopedBeside withNecrosynthesis S.alice S.bob (S.withRange 1))) [S.dave]
     Spec.assertEqWith s "CR 104.4b at an unlimited range the game is a draw" (GameState.result (looped S.bob id)) (Just Result.Drawn)
 
   -- CR 801.16's "involved in that loop", at the guard itself: carol's stamp
@@ -690,14 +705,14 @@ spec s registry = Spec.describe s "Range of influence" $ do
   where
     -- Pawl.GameSpec's loopBoard at six seats: alice, active, in her precombat
     -- main phase, with Sporemound and a tapped Forest entering, `limbOwner`'s
-    -- Life and Limb and `flashOwner`'s Aether Flash. Seeded ten events short of
-    -- the limit.
-    loopBoard flash limb sporemound forest limbOwner flashOwner =
+    -- Life and Limb, `flashOwner`'s Aether Flash, and whatever `extra` adds
+    -- given Sporemound's id. Seeded ten events short of the limit.
+    loopBoard flash limb sporemound forest extra limbOwner flashOwner =
       let base = Setup.emptyGame (S.alice NonEmpty.:| [S.bob, S.carol, S.dave, erin, frank])
           (_, gs1) = S.addPermanent flash flashOwner base
           (_, gs2) = S.addPermanent limb limbOwner gs1
-          (_, gs3) = S.addPermanent sporemound S.alice gs2
-          (forestId, gs4) = S.entersWithTrigger forest S.alice gs3
+          (sporemoundId, gs3) = S.addPermanent sporemound S.alice gs2
+          (forestId, gs4) = S.entersWithTrigger forest S.alice (extra sporemoundId gs3)
           seeded =
             gs4
               { GameState.phase = Phase.PrecombatMain,

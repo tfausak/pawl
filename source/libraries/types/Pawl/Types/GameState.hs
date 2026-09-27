@@ -288,7 +288,7 @@ data GameState = MkGameState
     -- nextTimestamp is Pawl.Engine.Engine.checkMandatoryLoop's heuristic.
     lastChoice :: Timestamp.Timestamp,
     -- | CR 801.16: for each player, nextTimestamp as a triggered ability of
-    -- theirs, or one an effect of theirs applied to, was last put on the stack
+    -- theirs, or one an effect of theirs made trigger, was last put on the stack
     -- (Pawl.Engine.Game.involve).
     -- Pawl.Engine.Engine.checkMandatoryLoop reads the recent ones as the loop's
     -- players.

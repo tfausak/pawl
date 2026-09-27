@@ -6,6 +6,7 @@
 module Pawl.Engine.Projection where
 
 import qualified Data.Bifunctor as Bifunctor
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -742,19 +743,15 @@ data Gathered = MkGathered
     gModification :: Modification
   }
 
--- CR 801.16: the players controlling a source of a continuous effect that
--- applies to one of these objects -- whose static ability, say, makes an
--- entering Saproling a land another object's ability watches for. Read against
--- each object's whole projection; an object no longer on the board contributes
--- nothing.
---
--- Not implemented: whether the trigger would still have fired without the
--- effect, so an effect that only touches the object counts too (#4152).
-effectControllersOn :: [ObjectId] -> GameState -> [PlayerId.PlayerId]
-effectControllersOn oids gs =
+-- CR 801.16: the sources of the continuous effects applying to any of these
+-- objects, each once -- the candidates Pawl.Engine.Event.Trigger.loopShapers
+-- asks about. Read against each object's whole projection; an object no longer
+-- in the game contributes nothing.
+effectSourcesOn :: [ObjectId] -> GameState -> [ObjectId]
+effectSourcesOn oids gs =
   let cands = gather gs
       applies oid c = affects (gSource c) oid (gAffected c) (project oid gs) gs
-   in Maybe.mapMaybe (`controllerWithLastKnown` gs) [gSource c | oid <- oids, Maybe.isJust (Map.lookup oid (GameState.objects gs)), c <- cands, applies oid c]
+   in ListUtils.nubOrd [gSource c | oid <- oids, Maybe.isJust (Map.lookup oid (GameState.objects gs)), c <- cands, applies oid c]
 
 -- CR 611.2c / 613: does the effect from `source` apply to `oid`, given the
 -- PARTIAL projection built by the layers below this one? CR 109.5: an
