@@ -63,6 +63,7 @@ import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
@@ -297,7 +298,7 @@ ownQuantities effect = case effect of
       ConjureCards.Duplicate {} -> []
       ConjureCards.Reference from -> Maybe.maybeToList (FromReference.amount from)
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _ riders _ _) -> quantity : Resolve.riderQuantities riders
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _) -> foldMap durationQuantities duration
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy _ _ duration _ _) -> foldMap durationQuantities duration
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject _ _ quantity _ _) -> [quantity]
   Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationQuantities duration <> foldMap conditionQuantities condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
@@ -1346,7 +1347,7 @@ effectObjectRefs effect =
           -- A reference pick names no object at all.
           ConjureCards.Reference {} -> []
         Effect.CreateCopy (CreateCopy.MkCreateCopy _ ref _ _ _) -> read_ [ref]
-        Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _ _) -> read_ [original, subject]
+        Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject _ _ _) -> read_ (case original of CopyOriginal.OfObject ref -> [ref, subject]; CopyOriginal.Named _ -> [subject])
         Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets _ _ _) -> read_ (ref : copyTargetsRefs targets)
         Effect.Replace {} -> []
         Effect.SkipNextPhase {} -> []

@@ -1418,6 +1418,18 @@ countingByGiven pcs perspective source gs =
     . Maybe.fromMaybe 0
     . Quantity.evaluate (Projection.fullView gs) (slotContext pcs perspective False Map.empty source Nothing gs) gs source
 
+-- CR 601.2c: the number of targets a slot's own text fixes ("in some cases, the
+-- number of targets will be defined by the spell's text"), for a slot that
+-- requires at least one. Nothing for a range, an X and zero, whose number is an
+-- announcement.
+--
+-- What CR 707.10c's re-choice offers a spell that became a copy of a card and so
+-- announced nothing (CR 707.2: "it stops having any targets").
+fixedCount :: TargetSlot -> Maybe Natural
+fixedCount slot = case TargetSlot.count slot of
+  SlotCount.Printed (TargetCount.MkTargetCount n (Just m)) | n == m && n > 0 -> Just n
+  _ -> Nothing
+
 -- CR 601.2c: the range of numbers this slot may be answered with on this board
 -- -- the printed count, narrowed by how many legal recipients there actually
 -- are. A caster cannot announce more targets than they can then choose legally,

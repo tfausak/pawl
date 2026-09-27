@@ -88,8 +88,11 @@
                                             }
                                           ],
                                           "original": {
-                                            "type": "InSlot",
-                                            "value": "copied"
+                                            "type": "OfObject",
+                                            "value": {
+                                              "type": "InSlot",
+                                              "value": "copied"
+                                            }
                                           },
                                           "subject": {
                                             "type": "EachMatching",
