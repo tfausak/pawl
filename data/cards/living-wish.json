@@ -26,6 +26,7 @@
                   {
                     "type": "FromOutsideTheGame",
                     "value": {
+                      "count": 1,
                       "destination": {
                         "type": "Hand"
                       },
@@ -46,7 +47,8 @@
                           }
                         ]
                       },
-                      "reveal": true
+                      "reveal": true,
+                      "upTo": false
                     }
                   }
                 ],

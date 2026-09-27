@@ -25,12 +25,14 @@ spec s = Spec.describe s "Pawl.Codec.DrawRewrite" $ do
       DrawRewrite.codec
       ( DrawRewrite.FromOutsideTheGame
           FromOutsideTheGame.MkFromOutsideTheGame
-            { FromOutsideTheGame.destination = OutsideDestination.Hand,
+            { FromOutsideTheGame.count = 1,
+              FromOutsideTheGame.upTo = False,
+              FromOutsideTheGame.destination = OutsideDestination.Hand,
               FromOutsideTheGame.filter = Filter.And [],
               FromOutsideTheGame.reveal = False
             }
       )
-      " {\"type\":\"FromOutsideTheGame\",\"value\":{\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false}} "
+      " {\"type\":\"FromOutsideTheGame\",\"value\":{\"count\":1,\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false,\"upTo\":false}} "
   -- CR 702.52a: Darkblast's dredge 3.
   Spec.it s "Dredge" $
     Common.assertCodec

@@ -20,6 +20,8 @@ data OutsideDestination
     -- 'Pawl.Types.LibraryPosition.LibraryPosition' field, this type\'s "one arm
     -- per sentence" -- Scryfall @o:"outside the game"@, 2026-09-16, no printing
     -- names the bottom, and the only other non-hand destination printed is
-    -- Research\'s shuffle, which names no end at all.
+    -- Research\'s shuffle, the arm below.
     LibraryTop
+  | -- | Research\'s "shuffle ... into your library", even with nothing brought (CR 701.24a, 701.24d).
+    LibraryShuffled
   deriving (Bounded, Enum, Eq, Ord, Show)

@@ -1752,7 +1752,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             (ModeSelection.ChooseExactly 1)
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.combinedFace piker
-        wished = base {Face.spell = spellOf [Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame OutsideDestination.Hand buried True)]}
+        wished = base {Face.spell = spellOf [Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand buried True)]}
     Spec.assertEqWith s "a planted atom in a wish's filter is an offence" (isBoundCounts wished) (1, 0)
     Spec.assertBool s (isBoundOffends wished) "and the lint says so"
     -- And the pair that differs in exactly one thing: the same face carrying the

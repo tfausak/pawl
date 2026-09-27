@@ -186,10 +186,13 @@
                         }
                       }
                     ],
-                    "ifTaken": [
-                      0,
-                      1
-                    ]
+                    "ifTaken": {
+                      "type": "AnyTaken",
+                      "value": [
+                        0,
+                        1
+                      ]
+                    }
                   }
                 ]
               }
