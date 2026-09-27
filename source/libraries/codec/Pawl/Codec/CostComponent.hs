@@ -58,6 +58,7 @@ codec keywordCodec =
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveCountersFromThis" (CountersFromThis.codec keywordCodec) CostComponent.RemoveCountersFromThis (\x -> case x of CostComponent.RemoveCountersFromThis y -> Just y; _ -> Nothing),
       Arm.payload "RemovePlusOneCounters" (RemovePlusOneCounters.codec keywordCodec) CostComponent.RemovePlusOneCounters (\x -> case x of CostComponent.RemovePlusOneCounters y -> Just y; _ -> Nothing),
+      Arm.payload "RemovePlusOneCountersX" (Filter.codec keywordCodec) CostComponent.RemovePlusOneCountersX (\x -> case x of CostComponent.RemovePlusOneCountersX y -> Just y; _ -> Nothing),
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis (\x -> case x of CostComponent.PutPlusOneCountersOnThis y -> Just y; _ -> Nothing),
       Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "BlightX" CostComponent.BlightX,
@@ -99,6 +100,7 @@ tagOf x = case x of
   CostComponent.RemoveLoyaltyFromThis {} -> "RemoveLoyaltyFromThis"
   CostComponent.RemoveCountersFromThis {} -> "RemoveCountersFromThis"
   CostComponent.RemovePlusOneCounters {} -> "RemovePlusOneCounters"
+  CostComponent.RemovePlusOneCountersX {} -> "RemovePlusOneCountersX"
   CostComponent.PutPlusOneCountersOnThis {} -> "PutPlusOneCountersOnThis"
   CostComponent.Blight {} -> "Blight"
   CostComponent.BlightX {} -> "BlightX"

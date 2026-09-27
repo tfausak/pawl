@@ -80,6 +80,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -1374,6 +1375,7 @@ substituteXInComponent x component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> component
   CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.RemovePlusOneCounters {} -> component
+  CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters x criterion CounterSpread.FromAmong)
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component
   CostComponent.Forage -> component
@@ -1446,6 +1448,7 @@ componentHasVariable component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemovePlusOneCounters {} -> False
+  CostComponent.RemovePlusOneCountersX _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> True
@@ -1543,6 +1546,9 @@ componentDemandGrowsWithX component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemovePlusOneCounters {} -> False
+  -- CR 118.3 measures the announced count against the +1\/+1 counters the
+  -- criterion admits between them, so a big enough X refuses.
+  CostComponent.RemovePlusOneCountersX _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.Forage -> False
@@ -1840,6 +1846,7 @@ loyaltyAmountOf component = case component of
   -- another permanent: CR 606.4's loyalty symbol is what makes a loyalty
   -- ability, and this is a +1\/+1 counter.
   CostComponent.RemovePlusOneCounters {} -> Nothing
+  CostComponent.RemovePlusOneCountersX _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   CostComponent.Blight _ -> Nothing
   CostComponent.BlightX -> Nothing
@@ -1962,6 +1969,7 @@ zoneOfComponent component = case component of
   -- Nothing for the arm above's reason and one more: the counters come off
   -- ANOTHER permanent, which CR 113.6m does not ask about either way.
   CostComponent.RemovePlusOneCounters {} -> Nothing
+  CostComponent.RemovePlusOneCountersX _ -> Nothing
   -- CR 122.6 puts counters on a permanent already where it is, so nothing moves
   -- out of any zone.
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
@@ -2046,6 +2054,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemovePlusOneCounters {} -> False
+  CostComponent.RemovePlusOneCountersX _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -2289,8 +2298,8 @@ returnCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> 
 returnCandidates = tapCandidates
 
 -- The permanents this player may take `n` +1\/+1 counters off to pay a
--- RemovePlusOneCounters component on `oid`: `tapCandidates`' pool narrowed to the
--- ones CR 118.3 leaves payable, since a permanent carrying fewer than `n`
+-- RemovePlusOneCounters component spread FromOne on `oid`: `tapCandidates`'
+-- pool narrowed to the ones CR 118.3 leaves payable, since a permanent carrying fewer than `n`
 -- counters cannot have `n` removed. The narrowing is HERE rather than at the
 -- prompt so that the gate and the payment ask one question, canPayComponent's
 -- posture for every other choosing component.
@@ -2302,6 +2311,36 @@ returnCandidates = tapCandidates
 counterRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Natural -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 counterRemovalCandidates slots pid oid n criterion gs =
   filter (\candidate -> countersOn CounterKind.PlusOnePlusOne candidate gs >= n) (tapCandidates slots pid oid criterion gs)
+
+-- `counterRemovalCandidates` for a removal spread FROM AMONG the permanents
+-- (CounterSpread.FromAmong): every admitted permanent carrying at least one
+-- +1\/+1 counter, with how many it carries, since CR 118.3 now asks of the
+-- total rather than of any one permanent.
+spreadRemovalCandidates :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Map.Map ObjectId Natural
+spreadRemovalCandidates slots pid oid criterion gs =
+  Map.filter (> 0) (Map.fromList [(candidate, countersOn CounterKind.PlusOnePlusOne candidate gs) | candidate <- tapCandidates slots pid oid criterion gs])
+
+-- The division of `owed` counters that takes them off the candidates in
+-- ascending order, emptying each before the next. It is the ONLY division where
+-- there is one candidate or the candidates carry exactly `owed` between them,
+-- which is where payComponent elides the prompt, and Pawl.Engine.Replay's
+-- default answer otherwise.
+fillInOrder :: Natural -> Map.Map ObjectId Natural -> Map.Map ObjectId Natural
+fillInOrder owed offered = Map.fromList (go owed (Map.toAscList offered))
+  where
+    go left candidates = case candidates of
+      [] -> []
+      (candidate, carried) : rest
+        | left == 0 -> []
+        | otherwise -> (candidate, min left carried) : go (left - min left carried) rest
+
+-- Is this division of `owed` counters one the offer allows? Every permanent it
+-- names offered and carrying at least what it gives, and the whole adding up to
+-- `owed` exactly -- CR 601.2h's "partial payments are not allowed".
+dividesRemoval :: Natural -> Map.Map ObjectId Natural -> Map.Map ObjectId Natural -> Bool
+dividesRemoval owed offered division =
+  sum division == owed
+    && and (Map.mapWithKey (\candidate taken -> taken <= Map.findWithDefault 0 candidate offered) division)
 
 -- The power a candidate contributes to CR 702.122a's total. Zero for a permanent
 -- with no power at all, which after CR 208.3 is every noncreature one.
@@ -2517,6 +2556,7 @@ claimOf slots pid oid component gs =
         -- object, which are markers rather than objects, so no pool shrinks --
         -- the Blight arm below's shape.
         CostComponent.RemovePlusOneCounters {} -> Nothing
+        CostComponent.RemovePlusOneCountersX _ -> Nothing
         CostComponent.PutPlusOneCountersOnThis _ -> Nothing
         -- Nothing, though this one DOES pick an object out of a pool: CR 701.68a takes
         -- nothing out of a zone. Two blights in one cost may choose the same creature,
@@ -2928,6 +2968,8 @@ uncountedCeiling component = case component of
   -- nine counters pays Zameck Guildmage's cost nine times -- and the header's
   -- safe direction (#2173).
   CostComponent.RemovePlusOneCounters {} -> Just 1
+  -- Zero, PayLifeX's answer above and for its reason.
+  CostComponent.RemovePlusOneCountersX _ -> Just 0
   -- 1, and NOT folded into `counterCeiling`: this component PUTS counters on, so
   -- it spends none of the resource that ceiling divides. An understatement --
   -- repeating it is bounded by whatever else the cost spends, not by the
@@ -3153,6 +3195,7 @@ lifeOwedByComponent component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.RemoveCountersFromThis _ -> 0
   CostComponent.RemovePlusOneCounters {} -> 0
+  CostComponent.RemovePlusOneCountersX _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
@@ -3191,6 +3234,7 @@ countersOwedByComponent component = case component of
   -- takes its counters off ANOTHER permanent, so `counterCeiling`'s division of
   -- `oid`'s counters has nothing to learn from it.
   CostComponent.RemovePlusOneCounters {} -> []
+  CostComponent.RemovePlusOneCountersX _ -> []
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayLifeX -> []
@@ -3284,6 +3328,8 @@ canPayComponent slots pid oid component gs = case component of
   -- PayLifeX's arm above and for its reason. Unreachable from the activation
   -- path, which substitutes before it measures or pays.
   CostComponent.PayEnergyX -> False
+  -- CR 601.2b again, PayEnergyX's arm above and for its reason.
+  CostComponent.RemovePlusOneCountersX _ -> False
   -- CR 701.21a: this player must control at least `n` matching permanents. This
   -- component ALONE, PayLife's caveat -- two Sacrifice components of one cost can
   -- each find the same permanent here, and `jointlyPayable` asks them together.
@@ -3438,11 +3484,16 @@ canPayComponent slots pid oid component gs = case component of
   -- cannot pay a cost that removes two, and asking the two questions separately
   -- would offer it.
   --
+  -- Spread FROM AMONG several permanents, the count is read against the
+  -- counters the admitted permanents carry BETWEEN them: two creatures with one
+  -- counter each pay Novijen Sages' two.
+  --
   -- This component ALONE, Sacrifice's caveat -- but `claimOf` states no claim
   -- for it, CR 122.1's counter being a marker, so `jointlyPayable` has nothing
   -- to add and two such components of one cost can each see the same permanent.
-  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion) ->
-    not (null (counterRemovalCandidates slots pid oid n criterion gs))
+  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion spread) -> case spread of
+    CounterSpread.FromOne -> not (null (counterRemovalCandidates slots pid oid n criterion gs))
+    CounterSpread.FromAmong -> sum (spreadRemovalCandidates slots pid oid criterion gs) >= n
   -- CR 701.63a puts the counters on "that permanent", so the only thing that can
   -- make this unpayable is the permanent no longer being there. Deliberately NOT
   -- gated on control, unlike the loyalty arms above: rule 701.63a fixes the payer
@@ -3534,6 +3585,7 @@ criteriaOf component = case component of
   CostComponent.ExileMaterials materials -> [ExileMaterials.whichObjects materials]
   CostComponent.ExileTopFromGraveyard criterion -> [criterion]
   CostComponent.RemovePlusOneCounters remove -> [RemovePlusOneCounters.whichPermanent remove]
+  CostComponent.RemovePlusOneCountersX criterion -> [criterion]
   -- No criterion: rule 701.59a describes the cards by a TOTAL and by nothing else,
   -- so this belongs with the amount-carrying arms below.
   CostComponent.CollectEvidence _ -> []
@@ -4256,6 +4308,7 @@ paidInSecondPass component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemovePlusOneCounters {} -> False
+  CostComponent.RemovePlusOneCountersX _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
@@ -4386,6 +4439,9 @@ orderSensitive component = case component of
   -- than proven behaviour -- Zameck Guildmage's cost's other part is mana, which
   -- is not a component at all, so `orderObservable` is False either way.
   CostComponent.RemovePlusOneCounters {} -> True
+  -- True, the substituted component's answer; unreachable before the
+  -- announcement substitutes it.
+  CostComponent.RemovePlusOneCountersX _ -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
   CostComponent.Blight _ -> True
@@ -5220,6 +5276,8 @@ payComponent moment slots pid oid component = case component of
   -- Unpayable, `canPayComponent`'s answer and for its reason -- PayLifeX's arm
   -- above, verbatim.
   CostComponent.PayEnergyX -> pure Payment.Unpaid
+  -- Unpayable, PayEnergyX's arm above and for its reason.
+  CostComponent.RemovePlusOneCountersX _ -> pure Payment.Unpaid
   -- CR 701.17a: the top `n` cards of the PAYING player's own library (CR 400.3),
   -- moved to their graveyard. `canPayComponent` above has already refused a cost
   -- milling more than the library holds (CR 701.17b); a MillCountR row resizing
@@ -5612,21 +5670,40 @@ payComponent moment slots pid oid component = case component of
   --
   -- Binds NO slot: no printing of this cost goes on to name what it took the
   -- counters off.
-  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion) -> do
+  --
+  -- Spread FROM AMONG several permanents, the payer divides the count instead,
+  -- and the prompt is elided where `fillInOrder`'s division is the only one: a
+  -- single candidate, or candidates carrying exactly the count between them.
+  -- Pawl.CostSpec's Novijen Sages group proves the division.
+  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion spread) -> do
     gs <- State.get
-    let candidates = counterRemovalCandidates slots pid oid n criterion gs
-        decider = Decide.deciderFor pid gs
-    case candidates of
-      -- CR 118.3's board, which canPayComponent has already refused, so reaching
-      -- it means the counters left between the check and the payment.
-      [] -> pure Payment.Unpaid
-      first : rest -> do
-        chosen <- case rest of
-          [] -> pure first
-          second : more -> Game.choose (Prompt.ChooseCounterRemoval decider pid oid (first NonEmpty.:| (second : more)))
-        if List.elem chosen candidates
+    let decider = Decide.deciderFor pid gs
+    case spread of
+      CounterSpread.FromOne -> case counterRemovalCandidates slots pid oid n criterion gs of
+        -- CR 118.3's board, which canPayComponent has already refused, so reaching
+        -- it means the counters left between the check and the payment.
+        [] -> pure Payment.Unpaid
+        candidates@(first : rest) -> do
+          chosen <- case rest of
+            [] -> pure first
+            second : more -> Game.choose (Prompt.ChooseCounterRemoval decider pid oid (first NonEmpty.:| (second : more)))
+          if List.elem chosen candidates
+            then do
+              Event.removeCounters chosen CounterKind.PlusOnePlusOne n
+              pure bindsNothing
+            else pure Payment.Unpaid
+      CounterSpread.FromAmong -> do
+        let offered = spreadRemovalCandidates slots pid oid criterion gs
+            carried = sum offered
+        division <-
+          if Map.size offered <= 1 || carried == n
+            then pure (fillInOrder n offered)
+            else Game.choose (Prompt.ChooseCounterRemovalAmong decider pid oid n offered)
+        -- CR 118.3's board again where `carried` falls short, which the division
+        -- then cannot add up to.
+        if dividesRemoval n offered division
           then do
-            Event.removeCounters chosen CounterKind.PlusOnePlusOne n
+            Monad.forM_ (Map.toList (Map.filter (> 0) division)) (\(chosen, taken) -> Event.removeCounters chosen CounterKind.PlusOnePlusOne taken)
             pure bindsNothing
           else pure Payment.Unpaid
   -- CR 122.6's placement, through the Event.putCounters funnel -- the same call
