@@ -1327,20 +1327,11 @@ eligible predicate source pid gs =
 bringInto :: FromOutsideTheGame.FromOutsideTheGame -> ObjectId -> PlayerId -> Game ()
 bringInto payload source pid = do
   gs0 <- State.get
-  let predicate = FromOutsideTheGame.filter payload
-      arrival = FromOutsideTheGame.destination payload
-      -- CR 701.20a is a keyword action of its own, so a card that does not print
-      -- it moves the card and shows nobody anything.
-      showIt oid = Monad.when (FromOutsideTheGame.reveal payload) (reveal RevealCause.Ordinary pid oid)
-      offered = eligible predicate source pid gs0
-      pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs0))
-      copiesOf card = case card of
-        OutsideCard.InPool printingId -> Map.findWithDefault 0 printingId pool
-        OutsideCard.InAnotherGame _ -> 1
-      available = Map.fromList (fmap (\card -> (card, copiesOf card)) offered)
+  let arrival = FromOutsideTheGame.destination payload
+      available = outsideOffer (FromOutsideTheGame.filter payload) source pid gs0
       atMost = min (FromOutsideTheGame.count payload) (sum (Map.elems available))
       atLeast = if FromOutsideTheGame.upTo payload then 0 else atMost
-  chosen <- case NonEmpty.nonEmpty offered of
+  chosen <- case NonEmpty.nonEmpty (Map.keys available) of
     Nothing -> pure []
     Just candidates
       | atLeast == atMost && (atMost == 0 || atMost == sum (Map.elems available) || Map.size available == 1) ->
@@ -1348,21 +1339,42 @@ bringInto payload source pid = do
       | otherwise -> do
           answer <- Game.choose (Prompt.ChooseFromOutsideTheGame (Decide.deciderFor pid gs0) pid candidates atLeast atMost)
           pure (settleOutside available atLeast atMost answer)
-  -- Against the LIVE state and not gs0, Pawl.Engine.Dungeon.enter's care:
-  -- Game.choose above wrote the answer into the transcript, and minting off
-  -- the state from before the prompt would drop that.
-  Monad.forM_ chosen $ \card -> case card of
-    OutsideCard.InPool printingId -> do
-      oid <- State.state (bringIn arrival pid printingId)
-      showIt oid
-    OutsideCard.InAnotherGame outerId -> do
-      gs1 <- State.get
-      case bringInFrom arrival pid outerId gs1 of
-        (Nothing, _) -> pure ()
-        (Just oid, gs2) -> do
-          State.put gs2
-          showIt oid
+  _ <- bringChosen arrival (FromOutsideTheGame.reveal payload) pid chosen
   Monad.when (arrivalShuffles arrival) (shuffleLibrary pid)
+
+-- CR 400.11c: what `eligible` admits, with how many copies of each the player
+-- holds -- one for a card in a game on hold. `bringInto` and a search reaching
+-- outside the game (CR 701.23j) both offer this, so the two cannot disagree
+-- about what is out there.
+outsideOffer :: Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> PlayerId -> GameState.GameState -> Map OutsideCard.OutsideCard Natural
+outsideOffer predicate source pid gs =
+  let pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs))
+      copiesOf card = case card of
+        OutsideCard.InPool printingId -> Map.findWithDefault 0 printingId pool
+        OutsideCard.InAnotherGame _ -> 1
+   in Map.fromList (fmap (\card -> (card, copiesOf card)) (eligible predicate source pid gs))
+
+-- CR 400.11b: bring the chosen cards in where the destination says, showing each
+-- (CR 701.20a) where `reveal` says the instruction prints one, and answer the
+-- incarnations minted. Against the LIVE state, Pawl.Engine.Dungeon.enter's care:
+-- the prompt that chose them wrote its answer into the transcript, and minting
+-- off the state from before it would drop that.
+bringChosen :: OutsideDestination.OutsideDestination -> Bool -> PlayerId -> [OutsideCard.OutsideCard] -> Game [ObjectId]
+bringChosen arrival revealIt pid chosen = fmap concat . Monad.forM chosen $ \card -> case card of
+  OutsideCard.InPool printingId -> do
+    oid <- State.state (bringIn arrival pid printingId)
+    showIt oid
+    pure [oid]
+  OutsideCard.InAnotherGame outerId -> do
+    gs1 <- State.get
+    case bringInFrom arrival pid outerId gs1 of
+      (Nothing, _) -> pure []
+      (Just oid, gs2) -> do
+        State.put gs2
+        showIt oid
+        pure [oid]
+  where
+    showIt oid = Monad.when revealIt (reveal RevealCause.Ordinary pid oid)
 
 -- CR 400.11c: the cards an answer to Prompt.ChooseFromOutsideTheGame brings in,
 -- FILTERED against what was offered. A name the offer did not hold, or one past
@@ -8424,6 +8436,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfAttacksWhileSaddled -> False
   TriggerCondition.SelfAttacksWhile _ -> False
   TriggerCondition.SelfBlocks -> False
+  TriggerCondition.CreatureBlocks _ -> False
   TriggerCondition.SelfBlocksCreature _ -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
   TriggerCondition.SelfBlocksOneOrMore _ -> False

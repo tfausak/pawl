@@ -150,6 +150,8 @@ library codec
     Pawl.Codec.AttachAllSpec
     Pawl.Codec.AttachBound
     Pawl.Codec.AttachBoundSpec
+    Pawl.Codec.AttachedToBound
+    Pawl.Codec.AttachedToBoundSpec
     Pawl.Codec.AttachRestriction
     Pawl.Codec.AttachRestrictionSpec
     Pawl.Codec.AttachTarget
@@ -1718,6 +1720,7 @@ library types
     Pawl.Types.Asked
     Pawl.Types.AttachAll
     Pawl.Types.AttachBound
+    Pawl.Types.AttachedToBound
     Pawl.Types.AttachRestriction
     Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
@@ -2190,6 +2193,7 @@ library types
     Pawl.Types.Scope
     Pawl.Types.Search
     Pawl.Types.SearchDestination
+    Pawl.Types.SearchPlace
     Pawl.Types.SelfCountersReached
     Pawl.Types.SetBasePowerToughness
     Pawl.Types.SetClassLevel
