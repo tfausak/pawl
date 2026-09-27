@@ -275,6 +275,7 @@ import qualified Pawl.Codec.HalfUnlockedSpec
 import qualified Pawl.Codec.HalvedSpec
 import qualified Pawl.Codec.HandActionSpec
 import qualified Pawl.Codec.HybridSpec
+import qualified Pawl.Codec.IfTakenSpec
 import qualified Pawl.Codec.IgnoredAbilitySpec
 import qualified Pawl.Codec.ImpendingSpec
 import qualified Pawl.Codec.InZoneSpec
@@ -1075,6 +1076,7 @@ spec s registry = do
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
   Pawl.Codec.OrElseSpec.spec s
+  Pawl.Codec.IfTakenSpec.spec s
   Pawl.Codec.OutsideDestinationSpec.spec s
   Pawl.Codec.OutsideObjectSpec.spec s
   Pawl.Codec.PaidExpirySpec.spec s

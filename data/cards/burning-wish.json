@@ -26,6 +26,7 @@
                   {
                     "type": "FromOutsideTheGame",
                     "value": {
+                      "count": 1,
                       "destination": {
                         "type": "Hand"
                       },
@@ -35,7 +36,8 @@
                           "type": "Sorcery"
                         }
                       },
-                      "reveal": true
+                      "reveal": true,
+                      "upTo": false
                     }
                   }
                 ],
