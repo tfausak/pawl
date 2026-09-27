@@ -8078,12 +8078,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- than leaving the clause unanswered.
             Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot source tally (min before (Integer.toNaturalSaturating n)))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
-      -- CR 608.2d: the resolving controller divides the removal among the
-      -- permanents the ObjectRef names that carry the kind, through the cost side's
-      -- division prompts (Pawl.Engine.Cost's RemovePlusOneCounters arm). An answer
-      -- that does not add up is not repaired into another choice: it takes the least
-      -- the card allows.
   Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count fromRef kind mTally) -> do
+    -- CR 608.2d: the resolving controller divides the removal among the
+    -- permanents the ObjectRef names that carry the kind, through the cost
+    -- side's division prompts (Pawl.Engine.Cost's RemovePlusOneCounters arm). An
+    -- answer that does not add up is not repaired into another choice: it takes
+    -- the least the card allows.
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
