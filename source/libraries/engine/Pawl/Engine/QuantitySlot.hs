@@ -45,13 +45,14 @@ import qualified Pawl.Types.Times as Times
 -- nobody rewrote. Reading a slot name and renaming one must agree about where a
 -- quantity is, which is the whole reason this is a traversal.
 --
--- Aggregation.Greatest and Aggregation.Total each carry a quantity; the other
--- two aggregate the matched set alone, and neither the Scope nor the Filter
+-- Aggregation.Greatest and Aggregation.Total each carry a quantity; the
+-- others aggregate the matched set alone, and neither the Scope nor the Filter
 -- holds one.
 overCount :: (Applicative f) => (quantity -> f quantity) -> Count.Type.Count quantity -> f (Count.Type.Count quantity)
 overCount f count = case Count.Type.aggregation count of
   Aggregation.Members -> pure count
   Aggregation.DistinctCardTypes -> pure count
+  Aggregation.DistinctColors -> pure count
   Aggregation.Greatest quantity -> fmap (\q -> count {Count.Type.aggregation = Aggregation.Greatest q}) (f quantity)
   Aggregation.Total quantity -> fmap (\q -> count {Count.Type.aggregation = Aggregation.Total q}) (f quantity)
 

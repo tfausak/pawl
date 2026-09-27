@@ -39,9 +39,12 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -89,6 +92,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
+import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Ward as Ward
 import qualified Pawl.Types.Zone as Zone
@@ -818,6 +822,101 @@ dutifulKnowledgeSeekerSpec s registry =
           Spec.assertBool s (cardId `notElem` Game.zoneMembers Zone.Graveyard S.bob after) "bob's card left his graveyard"
           Spec.assertEqWith s "for his library" (length (Game.zoneMembers Zone.Library S.bob after)) 1
           Spec.assertEqWith s "the Seeker states exactly one activated ability" (length abilities) 1
+
+-- Binding.handArrival, the card a hand received, which CR 400.7e withholds from
+-- `became` (CR 400.2) and which digital effects reach anyway. Kithkin Brinefarer
+-- {1}{G}{W} Creature -- Bard Kithkin Warrior 3/3, "Whenever a Kithkin card is
+-- put into your hand from your library, conjure a duplicate of that card into
+-- your hand. / Whenever you attack, Kithkin creature cards in your hand
+-- perpetually get +1/+1."; Volatile Rift {R/G}{R/G} Enchantment, "Vivid --
+-- Whenever a creature card is put into your hand from your library, it
+-- perpetually gets +X/+0, where X is the number of colors among permanents you
+-- control."; Veteran Ghoulcaller {1}{B} Creature -- Human Rogue 2/2, "Menace /
+-- Whenever a card in your graveyard is put into your hand, conjure a duplicate
+-- of that card into your hand." (data/cards/; Oracle text checked against
+-- Scryfall 2026-09-27.) Nothing of any card is omitted.
+handArrivalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+handArrivalSpec s registry =
+  let resolveWholeStack gs =
+        if null (GameState.stack gs)
+          then gs
+          else resolveWholeStack (S.runPure S.identityAnswer gs Stack.resolveTop)
+      settleAfter move gs =
+        let moved = S.runPure S.identityAnswer gs move
+            settled = S.runPure S.identityAnswer moved Engine.settleForPriority
+         in (settled, resolveWholeStack settled)
+      handNames pid gs = List.sort [S.nameOf card | oid <- Game.zoneMembers Zone.Hand pid gs, Just card <- [Game.cardOf oid gs]]
+      named name gs = [oid | oid <- Game.zoneMembers Zone.Hand S.alice gs, fmap S.nameOf (Game.cardOf oid gs) == Just name]
+      -- alice's Brinefarer, and `drawn` alone in her library.
+      brinefarerDraws drawn = do
+        brinefarer <- S.printingOf s registry "Kithkin Brinefarer"
+        forest <- S.printingOf s registry "Forest"
+        card <- S.printingOf s registry drawn
+        let (_, withBrinefarer) = S.addPermanent brinefarer S.alice (S.landsInPlay forest 1)
+            (_, gs) = S.addLibraryCard card S.alice withBrinefarer
+        pure (S.printingName card, settleAfter (Event.drawCard S.alice) gs)
+   in Spec.describe s "Hand arrival" $ do
+        -- The proving case: "that card" names the drawn card in alice's hand.
+        Spec.it s "Kithkin Brinefarer conjures a duplicate of the Kithkin card alice draws" $ do
+          (name, (settled, after)) <- brinefarerDraws "Burrenton Forge-Tender"
+          Spec.assertEqWith s "alice holds the drawn Forge-Tender and its duplicate" (handNames S.alice after) [name, name]
+          Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack settled)) 1
+        -- "A Kithkin card", one difference from the case above.
+        Spec.it s "Kithkin Brinefarer conjures nothing for a Goblin" $ do
+          (name, (settled, after)) <- brinefarerDraws "Goblin Piker"
+          Spec.assertEqWith s "alice holds the drawn Piker alone" (handNames S.alice after) [name]
+          Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+        -- The slot, and CR 400.7e's `became` withheld beside it.
+        Spec.it s "CR 400.7e a library-to-hand move binds handArrival and not became" $ do
+          (_, (settled, _)) <- brinefarerDraws "Burrenton Forge-Tender"
+          let arrived = Game.zoneMembers Zone.Hand S.alice settled
+              condition = TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone (Filter.Type.And []) TurnScope.EachTurn Zone.Library (Just Zone.Hand))
+              bindingsOf = Event.eventBindings settled Nothing Map.empty (ObjectId.MkObjectId 0) S.alice condition
+              drew = [bindingsOf event | event@(GameEvent.Moved m) <- fmap LoggedEvent.event (Foldable.toList (GameState.events settled)), ZoneChange.to (Moved.change m) == Zone.Hand]
+          Spec.assertEqWith s "the arrival is the card in alice's hand" drew (fmap (Map.singleton Binding.handArrival . Binding.toObject) arrived)
+        -- The second ability: the Kithkin creature card in hand grows, the Goblin
+        -- does not.
+        Spec.it s "Kithkin Brinefarer's attack trigger perpetually pumps the Kithkin creature cards in alice's hand" $ do
+          brinefarer <- S.printingOf s registry "Kithkin Brinefarer"
+          tender <- S.printingOf s registry "Burrenton Forge-Tender"
+          piker <- S.printingOf s registry "Goblin Piker"
+          case S.combatBoardOf [brinefarer] [] of
+            (board, [brinefarerId], []) -> do
+              let (tenderId, withTender) = S.addHandCard tender S.alice board
+                  (pikerId, gs) = S.addHandCard piker S.alice withTender
+                  after = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+              Spec.assertEqWith s "the Forge-Tender in hand is a 2/2" (S.powerToughnessOf tenderId after) (Just (2, 2))
+              Spec.assertEqWith s "the Piker in hand is still a 2/1" (S.powerToughnessOf pikerId after) (Just (2, 1))
+              Spec.assertBool s (Map.member brinefarerId (Combat.Type.attackers (GameState.combat after))) "the Brinefarer attacked"
+            _ -> Spec.assertBool s False "the combat board holds the Brinefarer"
+        -- X counts COLORS, not permanents: the Rift (red and green), a white
+        -- Forge-Tender, a red Piker and a colorless Forest are four permanents in
+        -- three colors.
+        Spec.it s "Volatile Rift gives the drawn creature card +3/+0 for three colors among four permanents" $ do
+          rift <- S.printingOf s registry "Volatile Rift"
+          tender <- S.printingOf s registry "Burrenton Forge-Tender"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          forest <- S.printingOf s registry "Forest"
+          let (_, g1) = S.addPermanent rift S.alice (S.landsInPlay forest 1)
+              (tenderId, g2) = S.addPermanent tender S.alice g1
+              (_, g3) = S.addPermanent piker S.alice g2
+              (_, gs) = S.addLibraryCard giant S.alice g3
+              (_, after) = settleAfter (Event.drawCard S.alice) gs
+              drawnPT = fmap (`S.powerToughnessOf` after) (named (S.printingName giant) after)
+          Spec.assertEqWith s "the Hill Giant in hand is a 6/3" drawnPT [Just (6, 3)]
+          -- Perpetual: X was fixed as the ability resolved.
+          let (_, lost) = settleAfter (Event.changeZone tenderId Zone.Graveyard) after
+          Spec.assertEqWith s "and stays a 6/3 after a color leaves" (fmap (`S.powerToughnessOf` lost) (named (S.printingName giant) lost)) [Just (6, 3)]
+        Spec.it s "Veteran Ghoulcaller conjures a duplicate of the card returned from alice's graveyard" $ do
+          ghoulcaller <- S.printingOf s registry "Veteran Ghoulcaller"
+          giant <- S.printingOf s registry "Hill Giant"
+          swamp <- S.printingOf s registry "Swamp"
+          let (_, withGhoulcaller) = S.addPermanent ghoulcaller S.alice (S.landsInPlay swamp 1)
+              (giantId, gs) = S.addGraveyardCard giant S.alice withGhoulcaller
+              (settled, after) = settleAfter (Event.changeZone giantId Zone.Hand) gs
+          Spec.assertEqWith s "alice holds the Giant and its duplicate" (handNames S.alice after) [S.printingName giant, S.printingName giant]
+          Spec.assertEqWith s "one trigger reached the stack" (length (GameState.stack settled)) 1
 
 -- What PermanentReturnedToHand's bindings are FOR -- Warped Devotion {2}{B}
 -- Enchantment, "Whenever a permanent is returned to a player's hand, that
@@ -4376,6 +4475,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   spiritMascotSpec s registry
   rakshasaVizierSpec s registry
   dutifulKnowledgeSeekerSpec s registry
+  handArrivalSpec s registry
   warpedDevotionSpec s registry
   becameSlotSpec s registry
   persistentRoachesSpec s registry
