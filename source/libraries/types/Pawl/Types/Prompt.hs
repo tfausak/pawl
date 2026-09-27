@@ -509,7 +509,9 @@ data Prompt r where
   -- | CR 401.2: which end of a library a card arrives at where the effect
   -- leaves it open; the owner is asked (CR 400.3), in APNAP order. Never
   -- elided; a stated end (Pawl.Types.LibraryPlacement.Stated) is not asked.
-  ChooseLibraryEnd :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt LibraryPosition.LibraryPosition
+  -- The Natural is how many cards stay above the upper option, which a Top
+  -- answer picks: 0 for the top itself, 1 for "second from the top".
+  ChooseLibraryEnd :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt LibraryPosition.LibraryPosition
   -- | CR 401.4: the owner arranges two or more cards arriving at one end of a
   -- library at once; the answer permutes the indices, reading from that end
   -- inward.

@@ -837,6 +837,77 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "carol's graveyard holds her own rats" (namesIn Zone.Graveyard S.carol after) [Just (S.printingName rats)]
     Spec.assertEqWith s "CR 101.4: asked in turn order from the active player" asked [S.alice, S.bob, S.carol]
 
+-- CR 401.7's "Nth from the top": Temporal Cleansing leaves the depth or the
+-- bottom to the OWNER, Oust states the depth, and Unexpectedly Absent reads it
+-- off X. Every board aims at a creature bob OWNS and alice CONTROLS, so the
+-- owner and the controller are different seats.
+libraryDepthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+libraryDepthSpec s registry = Spec.describe s "LibraryDepth" $ do
+  let -- bob's Goblin Piker under alice's control, bob's library seeded with
+      -- the given names (the LAST is the top), and the spell in alice's hand
+      -- over three Islands and three Plains.
+      depthBoard spellName libraryNames = do
+        island <- S.printingOf s registry "Island"
+        plains <- S.printingOf s registry "Plains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        spell <- S.printingOf s registry spellName
+        seeded <- traverse (S.printingOf s registry) libraryNames
+        let (pikerId, g1) = S.addPermanent piker S.bob (S.landsFor plains S.alice 3 (S.landsInPlay island 3))
+            g2 = S.giveControl pikerId S.alice g1
+            (libraryIds, g3) = List.foldl' (\(ids, g) p -> let (oid, g') = S.addLibraryCard p S.bob g in (oid : ids, g')) ([], g2) seeded
+            (gs, spellId) = S.handOne spell g3
+        pure (gs, spellId, pikerId, libraryIds)
+      -- Cast and resolve, recording every ChooseLibraryEnd as (who, how many
+      -- above the upper option) and answering it with `end`.
+      castAt :: ObjectId.ObjectId -> Natural -> LibraryPosition.LibraryPosition -> GameState.GameState -> ObjectId.ObjectId -> (GameState.GameState, [(PlayerId.PlayerId, Natural)])
+      castAt pikerId x end gs spellId =
+        let answerer :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, Natural)] r
+            answerer p = case p of
+              -- Filtered from the offer: a Permanents pool offers no ToCreature.
+              Prompt.ChooseTargets _ _ _ sets -> pure (fmap (Set.filter ((== Just pikerId) . Recipient.objectOf) . snd) sets)
+              Prompt.ChooseX {} -> pure x
+              Prompt.ChooseLibraryEnd _ pid _ above -> do
+                State.modify (<> [(pid, above)])
+                pure end
+              _ -> pure (S.identityAnswer p)
+         in State.runState
+              ( fmap snd . Engine.runGame answerer gs $ do
+                  S.cast S.alice spellId
+                  Stack.resolveTop
+              )
+              []
+      named = Just . CardName.MkCardName . Text.pack
+  Spec.it s "CR 401.7 Temporal Cleansing: the OWNER picks second from the top, and it lands under the top card" $ do
+    (gs, spellId, pikerId, _) <- depthBoard "Temporal Cleansing" ["Lightning Bolt", "Unsummon", "Griptide"]
+    let (after, asked) = castAt pikerId 0 LibraryPosition.Top gs spellId
+    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Griptide", "Goblin Piker", "Unsummon", "Lightning Bolt"])
+    Spec.assertEqWith s "the owner was asked, offered one card above the upper option" asked [(S.bob, 1)]
+  Spec.it s "CR 401.7 Temporal Cleansing: the owner picks the bottom instead" $ do
+    (gs, spellId, pikerId, _) <- depthBoard "Temporal Cleansing" ["Lightning Bolt", "Unsummon", "Griptide"]
+    let (after, _) = castAt pikerId 0 LibraryPosition.Bottom gs spellId
+    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Griptide", "Unsummon", "Lightning Bolt", "Goblin Piker"])
+  Spec.it s "CR 401.7 Oust: second from the top, and its CONTROLLER gains 3 life" $ do
+    (gs, spellId, pikerId, _) <- depthBoard "Oust" ["Lightning Bolt", "Unsummon", "Griptide"]
+    let (after, asked) = castAt pikerId 0 LibraryPosition.Bottom gs spellId
+    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Griptide", "Goblin Piker", "Unsummon", "Lightning Bolt"])
+    Spec.assertEqWith s "a stated depth asks nobody" asked []
+    Spec.assertEqWith s "alice, its controller, gains 3" (S.lifeOf S.alice after) (Just 23)
+    Spec.assertEqWith s "bob, its owner, does not" (S.lifeOf S.bob after) (Just 20)
+  -- The rule's own case: "fewer than N cards" puts it on the bottom, which with
+  -- one card is also directly beneath the top card (Oust's ruling).
+  Spec.it s "CR 401.7 Oust into a one-card library puts the creature on the bottom" $ do
+    (gs, spellId, pikerId, _) <- depthBoard "Oust" ["Lightning Bolt"]
+    let (after, _) = castAt pikerId 0 LibraryPosition.Top gs spellId
+    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Lightning Bolt", "Goblin Piker"])
+  Spec.it s "CR 401.7 Unexpectedly Absent with X = 2 puts it just beneath the top two cards" $ do
+    (gs, spellId, pikerId, _) <- depthBoard "Unexpectedly Absent" ["Lightning Bolt", "Unsummon", "Griptide"]
+    let (after, _) = castAt pikerId 2 LibraryPosition.Top gs spellId
+    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Griptide", "Unsummon", "Goblin Piker", "Lightning Bolt"])
+  Spec.it s "CR 401.7 Unexpectedly Absent with X = 0 puts it on top" $ do
+    (gs, spellId, pikerId, _) <- depthBoard "Unexpectedly Absent" ["Lightning Bolt", "Unsummon", "Griptide"]
+    let (after, _) = castAt pikerId 0 LibraryPosition.Bottom gs spellId
+    Spec.assertEqWith s "bob's library, top first" (namesIn Zone.Library S.bob after) (fmap named ["Goblin Piker", "Griptide", "Unsummon", "Lightning Bolt"])
+
 -- Griptide is "Put target creature on top of its owner's library", the pool's
 -- producer for a library arrival that is NOT the bottom (#989). Everything the
 -- group asserts is one card's worth of rules: CR 400.3 picks the library (its
@@ -996,7 +1067,7 @@ castSpouts end arrangement board spell =
   let attacking = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.manaPerformer S.alice)
       answerer :: Prompt.Prompt r -> State.State SpoutsLog r
       answerer p = case p of
-        Prompt.ChooseLibraryEnd _ pid oid -> do
+        Prompt.ChooseLibraryEnd _ pid oid _ -> do
           State.modify (\(ends, arrs) -> (ends <> [(pid, oid)], arrs))
           pure (end pid)
         Prompt.ArrangeLibraryArrivals _ pid position oids -> do
@@ -2964,6 +3035,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   nextUpkeepSpec s registry
   ghoulraiserSpec s registry
   libraryPositionSpec s registry
+  libraryDepthSpec s registry
   aetherspoutsSpec s registry
   drawCardSpec s registry
   loseLifeSpec s registry
