@@ -5,6 +5,7 @@ import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -186,9 +187,11 @@ data Effect card ability
     -- attachment's controller picks.
     AttachTargetToEach AttachTarget.AttachTarget
   | -- | CR 701.3a, the third arrangement: a bound object moves, to a targeted
-    -- destination (Sigarda's Aid) -- the only attach opcode whose destination is
-    -- chosen at CR 603.3d.
+    -- destination chosen at CR 603.3d (Sigarda's Aid).
     AttachBound AttachBound.AttachBound
+  | -- | CR 701.3a: every object the ObjectRef names moves to one permanent
+    -- chosen as this resolves (Glamer Spinners, Balan, Wandering Knight).
+    AttachAll AttachAll.AttachAll
   | -- | CR 400.7: move the objects the ObjectRef names to a zone through the
     -- changeZone funnel; the destination, the entry riders, the binding for CR
     -- 400.7j's new incarnations, CR 113.6m's stated origin zone and CR 401.2's

@@ -1317,6 +1317,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   equipmentTokenSpec s registry
   auraTokenSpec s registry
   animateDeadSpec s registry
+  groupAttachSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -4570,3 +4571,196 @@ animateDeadSpec s registry = Spec.describe s "Animate Dead" $ do
       "bob's Piker is on the battlefield under alice's control, Animate Dead on it"
       (fmap (\creature -> (Projection.controllerOf creature returned, enchantedBy creature)) (named pikerName Zone.Battlefield S.bob returned))
       [(Just S.alice, [Just animateName])]
+
+-- Effect.AttachAll: every permanent an ObjectRef names moves to ONE destination
+-- chosen as the effect resolves (CR 701.3a). Oracle text re-fetched from
+-- Scryfall 2026-09-27 for all five cards.
+--
+-- Glamer Spinners {4}{W/U} 2/4: "When this creature enters, attach all Auras
+-- enchanting target permanent to another permanent with the same controller."
+-- Its 2008-05-01 rulings: the receiver "can't be the targeted permanent, it must
+-- have the same controller as the targeted permanent, and it must be able to be
+-- enchanted by all the Auras ... If you can't choose a permanent that meets all
+-- those criteria, the Auras won't move."
+--
+-- THE BOARD, in ObjectId order, since the offer is ascending and the answerer
+-- takes it by index. Alice's Goblin Piker first: an unfilled
+-- Filter.Context.slotControllers makes Filter.SameControllerAsBound vacuously
+-- TRUE and would offer it. Bob's Island next, which no Aura here can enchant.
+-- Then bob's Apostle of Purifying Light, protection from black (CR 702.16c): it
+-- could host Pacifism but not Unholy Strength, so a per-Aura reading of the
+-- ruling offers it and the "all" reading does not. Then the target, bob's
+-- Foriysian Brigade ("another"). Only then bob's Hill Giant and Berserkers of
+-- Blood Ridge, the two receivers the ruling admits -- two, so the choice is
+-- really asked.
+groupAttachSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+groupAttachSpec s registry =
+  let -- Targets FILTERED out of the offer, never built; the destination by INDEX.
+      spinnersAnswer :: ObjectId.ObjectId -> (NonEmpty.NonEmpty ObjectId.ObjectId -> ObjectId.ObjectId) -> Prompt.Prompt r -> r
+      spinnersAnswer victim choose p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just victim) . Recipient.objectOf) . snd) sets
+        Prompt.ChoosePermanent _ _ _ offered -> choose offered
+        _ -> S.identityAnswer p
+      settle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      settle answer gs = S.runPure answer gs Engine.settleForPriority
+      hostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf
+      spinnersBoard withReceivers = do
+        island <- S.printingOf s registry "Island"
+        spinners <- S.printingOf s registry "Glamer Spinners"
+        piker <- S.printingOf s registry "Goblin Piker"
+        apostle <- S.printingOf s registry "Apostle of Purifying Light"
+        brigade <- S.printingOf s registry "Foriysian Brigade"
+        giant <- S.printingOf s registry "Hill Giant"
+        berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+        unholy <- S.printingOf s registry "Unholy Strength"
+        pacifism <- S.printingOf s registry "Pacifism"
+        let (decoy, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+            g2 = S.landsFor island S.bob 1 g1
+            (warded, g3) = S.addPermanent apostle S.bob g2
+            (victim, g4) = S.addPermanent brigade S.bob g3
+            (receivers, g5) =
+              if withReceivers
+                then
+                  let (a, h1) = S.addPermanent giant S.bob g4
+                      (b, h2) = S.addPermanent berserkers S.bob h1
+                   in ([a, b], h2)
+                else ([], g4)
+            (strength, g6) = S.addPermanent unholy S.alice g5
+            (pacified, g7) = S.addPermanent pacifism S.alice g6
+            (_, entered) = S.entersWithTrigger spinners S.alice (S.attach pacified victim (S.attach strength victim g7))
+        pure (decoy, warded, victim, receivers, strength, pacified, entered)
+   in Spec.describe s "AttachAll" $ do
+        Spec.it s "CR 701.3a Glamer Spinners moves every Aura to one receiver that can host them all" $ do
+          (decoy, warded, victim, receivers, strength, pacified, entered) <- spinnersBoard True
+          case receivers of
+            [giant, berserkers] -> do
+              let run choose =
+                    let answer :: Prompt.Prompt r -> r
+                        answer = spinnersAnswer victim choose
+                     in S.runPure answer (settle answer entered) Stack.resolveTop
+                  taking = run NonEmpty.head
+                  takingLast = run NonEmpty.last
+              -- THE gameplay-level assertion, ahead of every proxy: both Auras
+              -- are on the FIRST receiver offered. A vacuous same-controller
+              -- atom would offer alice's Piker first, a per-Aura host test the
+              -- warded Apostle, a missing "another" the Brigade itself.
+              Spec.assertEqWith s "both Auras went to bob's Hill Giant" (hostOf strength taking, hostOf pacified taking) (Just giant, Just giant)
+              Spec.assertEqWith s "and in the other leg both to his Berserkers" (hostOf strength takingLast, hostOf pacified takingLast) (Just berserkers, Just berserkers)
+              Spec.assertEqWith s "the Giant is 3/3 + 2/+1" (S.powerToughnessOf giant taking) (Just (5, 4))
+              Spec.assertEqWith s "the Brigade is a plain 2/4 again" (S.powerToughnessOf victim taking) (Just (2, 4))
+              Spec.assertEqWith s "alice's Piker and bob's Apostle carry nothing" (S.powerToughnessOf decoy taking, S.powerToughnessOf warded taking) (Just (2, 1), Just (2, 1))
+            _ -> Spec.assertFailure s "the fixture wanted two receivers"
+        -- The same board less the two receivers, the one difference: the warded
+        -- Apostle could take Pacifism alone, and the ruling says neither moves.
+        Spec.it s "CR 701.3a with no receiver able to host every Aura, none moves" $ do
+          (_, warded, victim, _, strength, pacified, entered) <- spinnersBoard False
+          let answer :: Prompt.Prompt r -> r
+              answer = spinnersAnswer victim NonEmpty.head
+              after = S.runPure answer (settle answer entered) Stack.resolveTop
+          Spec.assertEqWith s "both Auras stay on the Brigade" (hostOf strength after, hostOf pacified after) (Just victim, Just victim)
+          Spec.assertEqWith s "the Apostle took nothing" (S.powerToughnessOf warded after) (Just (2, 1))
+          Spec.assertEqWith s "and the trigger did resolve" (length (GameState.stack after)) 0
+        -- Balan, Wandering Knight {2}{W}{W} 3/3 first strike: "Balan has double
+        -- strike as long as two or more Equipment are attached to it. {1}{W}:
+        -- Attach all Equipment you control to Balan." Flayer Husk is already on
+        -- Balan, so a destination test that excluded any mover's current host
+        -- (Attach.hostsFor's CR 701.3b exclusion, taken per group) would offer
+        -- nothing and move nothing. Bob's Barbed Batterfist is not alice's.
+        Spec.it s "CR 701.3a Balan gathers every Equipment alice controls, including one already on it" $ do
+          plains <- S.printingOf s registry "Plains"
+          balan <- S.printingOf s registry "Balan, Wandering Knight"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          blade <- S.printingOf s registry "Dúnedain Blade"
+          husk <- S.printingOf s registry "Flayer Husk"
+          batterfist <- S.printingOf s registry "Barbed Batterfist"
+          let g0 = S.landsFor plains S.alice 2 (Setup.emptyGame S.bothPlayers)
+              (knight, g1) = S.addPermanent balan S.alice g0
+              (carrier, g2) = S.addPermanent piker S.alice g1
+              (bobs, g3) = S.addPermanent giant S.bob g2
+              (split, g4) = S.addPermanent bonesplitter S.alice g3
+              (loose, g5) = S.addPermanent blade S.alice g4
+              (worn, g6) = S.addPermanent husk S.alice g5
+              (bobsGear, g7) = S.addPermanent batterfist S.bob g6
+              board = (S.attach bobsGear bobs (S.attach worn knight (S.attach split carrier g7))) {GameState.priority = Just S.alice}
+          case Face.activatedAbilities (S.combinedFace balan) of
+            [ability] -> do
+              let activated = S.runPure S.identityAnswer board (Activate.activateAbility S.alice knight ability)
+                  after = S.runPure S.identityAnswer activated Stack.resolveTop
+              Spec.assertEqWith s "all three of alice's Equipment are on Balan" (fmap (`hostOf` after) [split, loose, worn]) [Just knight, Just knight, Just knight]
+              Spec.assertEqWith s "bob's stays on his Giant" (hostOf bobsGear after) (Just bobs)
+              Spec.assertEqWith s "Balan is 3/3 + 2/+0 + 2/+1 + 1/+1" (S.powerToughnessOf knight after) (Just (8, 5))
+              Spec.assertBool s (Projection.hasKeyword Keyword.DoubleStrike knight after) "with two or more attached, Balan has double strike"
+              Spec.assertBool s (not (Projection.hasKeyword Keyword.DoubleStrike knight board)) "where one attached gave him none"
+              Spec.assertEqWith s "the Piker is a plain 2/1" (S.powerToughnessOf carrier after) (Just (2, 1))
+            _ -> Spec.assertFailure s "Balan should print one activated ability"
+        -- Vulshok Battlemaster {4}{R} 2/2 haste: "When this creature enters,
+        -- attach all Equipment on the battlefield to it. (Control of the
+        -- Equipment doesn't change.)" Bob's Batterfist on bob's Giant comes too,
+        -- and stays bob's (CR 301.5d).
+        Spec.it s "CR 301.5d Vulshok Battlemaster takes every Equipment, and bob keeps control of his" $ do
+          battlemaster <- S.printingOf s registry "Vulshok Battlemaster"
+          giant <- S.printingOf s registry "Hill Giant"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          batterfist <- S.printingOf s registry "Barbed Batterfist"
+          let (bobs, g1) = S.addPermanent giant S.bob (Setup.emptyGame S.bothPlayers)
+              (split, g2) = S.addPermanent bonesplitter S.alice g1
+              (bobsGear, g3) = S.addPermanent batterfist S.bob g2
+              (master, entered) = S.entersWithTrigger battlemaster S.alice (S.attach bobsGear bobs g3)
+              after = S.runPure S.identityAnswer (settle S.identityAnswer entered) Stack.resolveTop
+          Spec.assertEqWith s "both Equipment are on the Battlemaster" (hostOf split after, hostOf bobsGear after) (Just master, Just master)
+          Spec.assertEqWith s "which is 2/2 + 2/+0 + 1/-1" (S.powerToughnessOf master after) (Just (5, 1))
+          Spec.assertEqWith s "bob still controls his Batterfist" (Projection.controllerOf bobsGear after) (Just S.bob)
+          Spec.assertEqWith s "and his Giant is a plain 3/3" (S.powerToughnessOf bobs after) (Just (3, 3))
+        -- Heavenly Blademaster {5}{W} 3/6: "When this creature enters, you may
+        -- attach any number of Auras and Equipment you control to it. Other
+        -- creatures you control get +1/+1 for each Aura and Equipment attached to
+        -- this creature." Alice takes everything offered but Dunedain Blade, so
+        -- bob's Batterfist would move were it ever offered.
+        Spec.it s "CR 608.2d Heavenly Blademaster takes the Auras and Equipment alice chooses" $ do
+          blademaster <- S.printingOf s registry "Heavenly Blademaster"
+          piker <- S.printingOf s registry "Goblin Piker"
+          unholy <- S.printingOf s registry "Unholy Strength"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          blade <- S.printingOf s registry "Dúnedain Blade"
+          batterfist <- S.printingOf s registry "Barbed Batterfist"
+          let (carrier, g1) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+              (strength, g2) = S.addPermanent unholy S.alice g1
+              (split, g3) = S.addPermanent bonesplitter S.alice g2
+              (left, g4) = S.addPermanent blade S.alice g3
+              (bobsGear, g5) = S.addPermanent batterfist S.bob g4
+              (angel, entered) = S.entersWithTrigger blademaster S.alice (S.attach strength carrier g5)
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered -> Set.fromList (filter (/= left) offered)
+                _ -> S.identityAnswer p
+              after = S.runPure answer (settle answer entered) Stack.resolveTop
+          Spec.assertEqWith s "Unholy Strength and Bonesplitter are on the Blademaster" (hostOf strength after, hostOf split after) (Just angel, Just angel)
+          Spec.assertEqWith s "the Blade alice left stays unattached" (hostOf left after) Nothing
+          Spec.assertEqWith s "bob's Batterfist was never offered" (hostOf bobsGear after) Nothing
+          Spec.assertEqWith s "the Blademaster is 3/6 + 2/+1 + 2/+0" (S.powerToughnessOf angel after) (Just (7, 7))
+          Spec.assertEqWith s "and the Piker gets +2/+2 for the two" (S.powerToughnessOf carrier after) (Just (4, 3))
+        -- Beatrix, Loyal General {4}{W}{W} 4/4 vigilance: "At the beginning of
+        -- combat on your turn, you may attach any number of Equipment you
+        -- control to target creature you control." The destination is the
+        -- TARGET, read through Filter.IsBound; Dunedain Blade starts on Beatrix.
+        Spec.it s "CR 701.3a Beatrix attaches the chosen Equipment to her target" $ do
+          beatrix <- S.printingOf s registry "Beatrix, Loyal General"
+          piker <- S.printingOf s registry "Goblin Piker"
+          bonesplitter <- S.printingOf s registry "Bonesplitter"
+          blade <- S.printingOf s registry "Dúnedain Blade"
+          let (general, g1) = S.addPermanent beatrix S.alice (Setup.emptyGame S.bothPlayers)
+              (carrier, g2) = S.addPermanent piker S.alice g1
+              (split, g3) = S.addPermanent bonesplitter S.alice g2
+              (worn, g4) = S.addPermanent blade S.alice g3
+              staged = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.BeginningOfCombat) S.alice)] (S.attach worn general g4)
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just carrier) . Recipient.objectOf) . snd) sets
+                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered -> Set.fromList offered
+                _ -> S.identityAnswer p
+              after = S.runPure answer (settle answer staged) Stack.resolveTop
+          Spec.assertEqWith s "both Equipment are on the Piker" (hostOf split after, hostOf worn after) (Just carrier, Just carrier)
+          Spec.assertEqWith s "which is 2/1 + 2/+0 + 2/+1" (S.powerToughnessOf carrier after) (Just (6, 2))
+          Spec.assertEqWith s "and Beatrix is a plain 4/4" (S.powerToughnessOf general after) (Just (4, 4))
