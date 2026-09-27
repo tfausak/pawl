@@ -74,6 +74,7 @@ import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -802,3 +803,17 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
             }
       )
       " {\"type\":\"ActivatedAbilityResolved\",\"value\":{\"source\":6,\"ability\":{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]},\"modal\":{\"modes\":[{}]}}}} "
+  -- CR 608.2n, the triggered twin: the record Source's OfTrigger arm carries,
+  -- createdAt included when present.
+  Spec.it s "TriggeredAbilityResolved" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      ( GameEvent.TriggeredAbilityResolved
+          TriggeredAbilitySource.MkTriggeredAbilitySource
+            { TriggeredAbilitySource.source = ObjectId.MkObjectId 7,
+              TriggeredAbilitySource.ability = TriggeredAbilitySourceSpec.ability,
+              TriggeredAbilitySource.createdAt = Just (Timestamp.MkTimestamp 4)
+            }
+      )
+      " {\"type\":\"TriggeredAbilityResolved\",\"value\":{\"source\":7,\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"createdAt\":4}} "

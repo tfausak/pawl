@@ -1847,9 +1847,9 @@ sourceObjectOf src = case src of
 -- Player recipients drop out, the rule's classes all being objects.
 --
 -- TWO SLOTS ARE DROPPED, by NAME rather than by comparing ids. Binding.thisAbility
--- holds the activated ability's OWN id (CR 602.2a), which pawl stamps so a card can
--- read the activation's own record -- the mana that paid for it, and how many times
--- it has resolved this turn -- not because any printed text names the ability as
+-- holds the ability's OWN id (CR 602.2a, 603.3), which pawl stamps so a card can
+-- read the ability's own record -- the mana that paid for an activation, and how
+-- many times it has resolved this turn -- not because any printed text names the ability as
 -- another object. Counting it would undo CR 609.7a's second class, which admits "a
 -- spell on the stack" and deliberately stops short of an ability.
 --
@@ -6713,14 +6713,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- original's id there as it went on the stack -- and not a
                 -- decision CR 707.10 copies. Pawl.CopySpec's Forsworn Paladin case
                 -- proves the aim moved, and its Stifle case that it answers once
-                -- the original has left the stack.
-                --
-                -- Not implemented: the same slot on a copy of a TRIGGERED ability,
-                -- which no borne trigger carries to begin with (#3815).
+                -- the original has left the stack. A triggered ability's copy is
+                -- re-stamped the same way, Pawl.Engine.Engine.placeBorne having
+                -- written the original's id there.
                 stampSelf = case kind of
                   StackObjectKind.Spell -> Binding.setTriggerSource copyId
                   StackObjectKind.ActivatedAbility -> Binding.setThisAbility copyId
-                  StackObjectKind.TriggeredAbility -> id
+                  StackObjectKind.TriggeredAbility -> Binding.setThisAbility copyId
                 copy =
                   obj
                     { Object.source = copySource,

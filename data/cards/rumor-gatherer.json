@@ -1,0 +1,198 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Rumor Gatherer",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PermanentEnters",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "condition": {
+                      "type": "Any",
+                      "value": [
+                        {
+                          "type": "Compares",
+                          "value": {
+                            "comparison": {
+                              "type": "AtMost"
+                            },
+                            "measured": {
+                              "type": "AgainstSlot",
+                              "value": {
+                                "quantity": {
+                                  "type": "TimesResolvedThisTurn"
+                                },
+                                "slot": "thisAbility"
+                              }
+                            },
+                            "threshold": {
+                              "type": "Literal",
+                              "value": 1
+                            }
+                          }
+                        },
+                        {
+                          "type": "Compares",
+                          "value": {
+                            "comparison": {
+                              "type": "AtLeast"
+                            },
+                            "measured": {
+                              "type": "AgainstSlot",
+                              "value": {
+                                "quantity": {
+                                  "type": "TimesResolvedThisTurn"
+                                },
+                                "slot": "thisAbility"
+                              }
+                            },
+                            "threshold": {
+                              "type": "Literal",
+                              "value": 3
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "effects": [
+                      {
+                        "type": "Scry",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "condition": {
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "Exactly"
+                        },
+                        "measured": {
+                          "type": "AgainstSlot",
+                          "value": {
+                            "quantity": {
+                              "type": "TimesResolvedThisTurn"
+                            },
+                            "slot": "thisAbility"
+                          }
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 2
+                        }
+                      }
+                    },
+                    "effects": [
+                      {
+                        "type": "Draw",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elf"
+          },
+          {
+            "type": "Wizard"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
