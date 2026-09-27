@@ -544,8 +544,10 @@ playersFor viewOf context gs ref =
       everyone = maybe (Game.stillPlaying gs) (`Game.reachableBy` gs) (Filter.perspective context)
    in case ref of
         PlayerRef.EachPlayer -> Just everyone
-        -- EachPlayer minus the seat the slot names, read through slotPlayers below
-        -- as InSlot reads it. DEFINED rather than Nothing where
+        -- EachPlayer minus every player the slot names (CR 104.2c's winning team
+        -- is several), read through slotPlayers below -- Resolve.Slots'
+        -- playerRefPlayers' reading, kept in step with it; no count in
+        -- data/cards/ reads a slot naming several. DEFINED rather than Nothing where
         -- that read comes up empty -- a slot naming nobody excludes nobody, which
         -- is the type's stated reading and the opposite of InSlot's collapse. A
         -- reference with no source at all is still unanswerable, since without one
@@ -559,10 +561,8 @@ playersFor viewOf context gs ref =
           case Filter.source context >>= \src -> Game.lookupObject src gs of
             Nothing -> Nothing
             Just _ ->
-              let excluded = case slotPlayers context gs name of
-                    Just [pid] -> Just pid
-                    _ -> Nothing
-               in Just (filter (\pid -> Just pid /= excluded) everyone)
+              let excluded = Maybe.fromMaybe [] (slotPlayers context gs name)
+               in Just (filter (`notElem` excluded) everyone)
         -- CR 702.116a's "each opponent other than defending player": the arm
         -- above narrowed by CR 102.2 / 102.3, which needs the perspective, so an
         -- unframed evaluation is unanswerable here as it is under Relative.
@@ -571,10 +571,8 @@ playersFor viewOf context gs ref =
             Nothing -> Nothing
             Just _ -> do
               you <- Filter.perspective context
-              let excluded = case slotPlayers context gs name of
-                    Just [pid] -> Just pid
-                    _ -> Nothing
-              Just (filter (\pid -> Just pid /= excluded && PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent you pid) everyone)
+              let excluded = Maybe.fromMaybe [] (slotPlayers context gs name)
+              Just (filter (\pid -> notElem pid excluded && PlayerRelation.holds (Game.teams gs) PlayerRelation.Opponent you pid) everyone)
         PlayerRef.Relative relation -> do
           you <- Filter.perspective context
           case relation of

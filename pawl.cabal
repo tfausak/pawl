@@ -473,6 +473,8 @@ library codec
     Pawl.Codec.EffectSpec
     Pawl.Codec.Emerge
     Pawl.Codec.EmergeSpec
+    Pawl.Codec.Emperors
+    Pawl.Codec.EmperorsSpec
     Pawl.Codec.EndingStep
     Pawl.Codec.EndingStepSpec
     Pawl.Codec.EndTurnSignal
@@ -1184,6 +1186,7 @@ library engine
     Pawl.Engine.Dungeon
     Pawl.Engine.Earthbend
     Pawl.Engine.EffectZone
+    Pawl.Engine.Emperor
     Pawl.Engine.EndEffect
     Pawl.Engine.Engine
     Pawl.Engine.EntryRestriction
@@ -1568,6 +1571,7 @@ library test
     Pawl.DungeonSpec
     Pawl.EarthbendSpec
     Pawl.EffectLintSpec
+    Pawl.EmperorSpec
     Pawl.EngineSpec
     Pawl.EntryReplacementSpec
     Pawl.EntryRestrictionSpec
@@ -1885,6 +1889,7 @@ library types
     Pawl.Types.Earthbend
     Pawl.Types.Effect
     Pawl.Types.Emerge
+    Pawl.Types.Emperors
     Pawl.Types.EndingStep
     Pawl.Types.EndTurnSignal
     Pawl.Types.EnteringTogether
