@@ -267,7 +267,7 @@ ownQuantities effect = case effect of
   Effect.Sacrifice _ -> []
   -- The entry riders' counts, which Resolve.slotsOf reads and ownCounts does
   -- not: CR 122.6's per-kind number is a Quantity like any other.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> Resolve.riderQuantities riders
+  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ placement _) -> Resolve.riderQuantities riders <> Resolve.placementQuantities placement
   Effect.Draw (Draw.MkDraw _ quantity _) -> [quantity]
   Effect.Mill (Mill.MkMill _ quantity _ _) -> [quantity]
   Effect.Reveal {} -> []
@@ -2348,11 +2348,17 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no MoveToZone leaves the end to an owner off a library" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ LibraryPlacement.OwnerChooses _) -> zone /= Zone.Library
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone _ _ _ placement _) -> ownerPicks placement && zone /= Zone.Library
           _ -> False
         asks effect = case effect of
-          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ _ _ LibraryPlacement.OwnerChooses _) -> True
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ _ _ placement _) -> ownerPicks placement
           _ -> False
+        ownerPicks placement = case placement of
+          LibraryPlacement.OwnerChooses -> True
+          LibraryPlacement.BeneathOrBottom _ -> True
+          LibraryPlacement.Stated _ -> False
+          LibraryPlacement.RandomOrder _ -> False
+          LibraryPlacement.Beneath _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no owner-chosen end in the pool this
     -- would pass whatever a card said. Aetherspouts is the card that prints one.

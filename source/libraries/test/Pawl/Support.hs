@@ -2696,7 +2696,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseKicker decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ReturnCommander decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCommandZoneOfferFirst decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseLibraryEnd decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseLibraryEnd decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ArrangeLibraryArrivals decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ArrangeLibraryCards decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseModes decider _ _ _ _ -> Just (Decider.unwrap decider)

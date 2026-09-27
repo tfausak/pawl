@@ -906,23 +906,35 @@ handChoosers legal controller gs player =
 -- in REVERSE of the arranged order -- one rule for both ends. A move the CR
 -- 616.1 loop cancels (CR 614.6) simply does not arrive, and the rest keep their
 -- owner's relative order.
-settleArrivals :: Zone.Zone -> LibraryPlacement.LibraryPlacement -> [ObjectId] -> Game [(ObjectId, LibraryPosition.LibraryPosition)]
-settleArrivals zone placement targets =
-  let settleEnd oid = do
+--
+-- Each arrival comes back with the number of cards to leave ABOVE it, nonzero
+-- only at the top: LibraryPlacement.Beneath's depth, read through `depthOf`
+-- once for the whole batch (CR 608.2h). moveOne arrives it on top and sinks it
+-- that far, so a depth group arranged from the top inward lands in that order.
+settleArrivals :: (Quantity.Type.Quantity -> Natural) -> Zone.Zone -> LibraryPlacement.LibraryPlacement -> [ObjectId] -> Game [(ObjectId, (LibraryPosition.LibraryPosition, Natural))]
+settleArrivals depthOf zone placement targets =
+  let upperOrBottom above owner oid gs = do
+        position <- Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor owner gs) owner oid above)
+        pure $ case position of
+          LibraryPosition.Top -> (LibraryPosition.Top, above)
+          LibraryPosition.Bottom -> (LibraryPosition.Bottom, 0)
+      settleEnd oid = do
         gs <- State.get
         case fmap Object.owner (Game.lookupObject oid gs) of
           -- Already gone (CR 603.7c). moveOne is a no-op, so nobody to ask.
-          Nothing -> pure ((Nothing, LibraryPosition.defaultValue), oid)
+          Nothing -> pure ((Nothing, (LibraryPosition.defaultValue, 0)), oid)
           Just owner -> do
-            position <- case placement of
-              LibraryPlacement.Stated stated -> pure stated
-              LibraryPlacement.RandomOrder stated -> pure stated
-              LibraryPlacement.OwnerChooses ->
-                Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor owner gs) owner oid)
-            pure ((Just owner, position), oid)
+            spot <- case placement of
+              LibraryPlacement.Stated stated -> pure (stated, 0)
+              LibraryPlacement.RandomOrder stated -> pure (stated, 0)
+              LibraryPlacement.OwnerChooses -> upperOrBottom 0 owner oid gs
+              LibraryPlacement.Beneath quantity -> pure (LibraryPosition.Top, depthOf quantity)
+              LibraryPlacement.BeneathOrBottom quantity -> upperOrBottom (depthOf quantity) owner oid gs
+            pure ((Just owner, spot), oid)
       arrange settled key = do
         let batch = fmap snd (filter (\(k, _) -> k == key) settled)
-            (mOwner, position) = key
+            (mOwner, spot) = key
+            position = fst spot
         case (mOwner, batch) of
           (Just owner, _ : _ : _) -> do
             ordered <- case placement of
@@ -939,16 +951,16 @@ settleArrivals zone placement targets =
                 gs <- State.get
                 answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
                 pure (Game.permute batch answer)
-            pure (fmap (\oid -> (oid, position)) (reverse ordered))
+            pure (fmap (\oid -> (oid, spot)) (reverse ordered))
           -- One card is one order, which is CR 401.4's own "two or more".
-          _ -> pure (fmap (\oid -> (oid, position)) batch)
+          _ -> pure (fmap (\oid -> (oid, spot)) batch)
    in case zone of
         Zone.Library -> do
           settled <- Monad.mapM settleEnd targets
           fmap concat (Monad.mapM (arrange settled) (ListUtils.nubOrd (fmap fst settled)))
         -- No other destination has ends, so nothing to settle and the funnel ignores
         -- the position it is handed.
-        _ -> pure (fmap (\oid -> (oid, LibraryPosition.defaultValue)) targets)
+        _ -> pure (fmap (\oid -> (oid, (LibraryPosition.defaultValue, 0))) targets)
 
 -- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names
 -- as RECIPIENTS. It exists because CR 115.4's "any target" includes a player and
@@ -4541,11 +4553,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- member of a batch entering the battlefield. A card whose ZoneChangeR
         -- watched the battlefield and could match a member of such a batch would
         -- separate them.
-        moveOne mAttack mBlocked frozen before (sofar, acc) (target, position) = do
+        moveOne mAttack mBlocked frozen before (sofar, acc) (target, (position, above)) = do
           mNew <- Event.changeZoneEnteringIn (Just before) sofar target zone position frozen (Just controller)
           -- CR 614.6: the move was cancelled, or the id was already gone (CR
           -- 603.7c). Nothing entered, so there is nothing to bind.
           Monad.forM_ mNew $ \newId -> do
+            -- CR 401.7: LibraryPlacement.Beneath's depth, where the arrival
+            -- landed in a library (CR 400.3's owner's); Game.sinkInLibrary's
+            -- clamp is the rule's "fewer than N cards".
+            Monad.when (above > 0) $ do
+              landedIn <- State.gets (Game.lookupObject newId)
+              Monad.forM_ landedIn $ \obj ->
+                Monad.when (Object.zone obj == Zone.Library) $
+                  State.modify' (Game.sinkInLibrary (Natural.toIntSaturating above) (Object.owner obj) newId)
             -- CR 508.4, via Pawl.Engine.Combat -- which is also what keeps this
             -- from looking like a declaration, so CR 508.3a's attack triggers see
             -- nothing. CR 506.3b refuses a controller who is not the active
@@ -4896,7 +4916,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               ObjectRef.AttachedToBound _ -> do
                 gs <- State.get
                 pure (objectRefObjects legal resolving controller source gs ref)
-            arrivals <- settleArrivals zone placement targets
+            -- CR 608.2h: a depth's amount is read once, off the pre-move board.
+            depthBoard <- State.get
+            let depthOf quantity =
+                  maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor (effectViewOf source legal depthBoard) (chooseContext depthBoard) depthBoard resolving source quantity)
+            arrivals <- settleArrivals depthOf zone placement targets
             -- The batch's own board, read after CR 401.4's arrangement asks (which
             -- move nothing) and before any member does.
             before <- State.get

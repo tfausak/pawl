@@ -1,6 +1,7 @@
 module Pawl.Types.LibraryPlacement where
 
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Quantity as Quantity
 
 -- | How a move settles CR 401.2's end, and who settles CR 401.4's order: the
 -- card states the end, or the object's OWNER picks it. Griptide's "on top of its
@@ -33,6 +34,13 @@ data LibraryPlacement
     -- arriving cards are randomised, the library they join keeps its order, and
     -- nothing that triggers on a library being shuffled sees this.
     RandomOrder LibraryPosition.LibraryPosition
+  | -- | CR 401.7: just beneath this many cards from the top, or the bottom of
+    -- a library holding fewer. Oust's "second from the top" is 1, Unexpectedly
+    -- Absent's "just beneath the top X cards" is X.
+    Beneath Quantity.Quantity
+  | -- | CR 401.7 with the end left to the owner: 'Beneath' this many, or the
+    -- bottom. Temporal Cleansing's "second from the top or on the bottom" is 1.
+    BeneathOrBottom Quantity.Quantity
   deriving (Eq, Ord, Show)
 
 -- | What a move that says nothing about an end uses, which is

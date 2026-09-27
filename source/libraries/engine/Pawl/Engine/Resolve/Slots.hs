@@ -122,6 +122,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
@@ -271,6 +272,16 @@ quantitySlots quantity =
 -- `_` -- so the reads are spelled out here and each walker goes through this.
 riderQuantities :: EntryRiders.EntryRiders Quantity.Type.Quantity ability -> [Quantity.Type.Quantity]
 riderQuantities = Map.elems . EntryRiders.counters
+
+-- The Quantity a MoveToZone's placement carries, CR 401.7's depth: Unexpectedly
+-- Absent's X. The walkers read it beside riderQuantities.
+placementQuantities :: LibraryPlacement.LibraryPlacement -> [Quantity.Type.Quantity]
+placementQuantities placement = case placement of
+  LibraryPlacement.Stated _ -> []
+  LibraryPlacement.OwnerChooses -> []
+  LibraryPlacement.RandomOrder _ -> []
+  LibraryPlacement.Beneath quantity -> [quantity]
+  LibraryPlacement.BeneathOrBottom quantity -> [quantity]
 
 -- The Quantities an Effect.Create's TOKEN CARD carries that the CREATING effect
 -- evaluates rather than the token: the printed power and toughness of every
@@ -1135,7 +1146,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- SlotArity.Many, unlike the arm above: CR 601.2c gives this one instance of
   -- the word "target" exactly two recipients and resolution reads both.
   Effect.SwitchBlockers slot -> Map.singleton slot SlotArity.Many
-  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> joinTwo (joinSlots (fmap quantitySlots (riderQuantities riders))) (riderSlots riders)
+  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ placement _) -> joinTwo (joinSlots (fmap quantitySlots (riderQuantities riders <> placementQuantities placement))) (riderSlots riders)
   -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
   Effect.Draw (Draw.MkDraw _ quantity _) -> quantitySlots quantity
   -- The tally's slot and CR 701.17c's are DEFINITIONS, not reads: see boundSlots
@@ -1808,7 +1819,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.SwitchBlockers _ -> True
   -- The entry rider nests a Quantity of its own, CR 122.6's count per kind; the
   -- ref's is effectObjectRefs' above.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> all Quantity.slotsAreExhaustive (riderQuantities riders)
+  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ placement _) -> all Quantity.slotsAreExhaustive (riderQuantities riders <> placementQuantities placement)
   Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.Reveal {} -> True
@@ -2065,7 +2076,7 @@ readsX =
         Effect.SwitchBlockers _ -> False
         -- The entry rider is a nested position of its own, CR 122.6's count per
         -- kind, and no ObjectRef holds it.
-        Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _ _) -> any Quantity.readsX (riderQuantities riders)
+        Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ placement _) -> any Quantity.readsX (riderQuantities riders <> placementQuantities placement)
         Effect.Draw (Draw.MkDraw _ quantity _) -> Quantity.readsX quantity
         Effect.Mill (Mill.MkMill _ quantity _ _) -> Quantity.readsX quantity
         Effect.Reveal {} -> False
