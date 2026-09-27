@@ -183,10 +183,6 @@ data EntryRewrite ability effect
     -- and not only the stack's, which is what lets Pawl.MeldSpec's "CR 701.27g a
     -- melded permanent that entered with its back face up is still not one" reach
     -- it from exile.
-    --
-    -- Not implemented: CR 712.13a's second sentence, where a back face that is an
-    -- instant or sorcery face sends the spell to its owner's graveyard instead of
-    -- the battlefield (#1547).
     EntersTransformed
   | -- | CR 614.1c / Monstrous War-Leech: "As [this permanent] enters, [do
     -- something]" -- the one arm that RUNS effects, in printed order, deferred onto
