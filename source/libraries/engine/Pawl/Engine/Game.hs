@@ -605,8 +605,8 @@ insertIntoZone zone position pid oid gs = case zone of
 
 -- Move a card already in a library to this many cards down from its top, 0
 -- being the top; a depth past the bottom lands on the bottom (Seq.insertAt's
--- clamp). The one placement insertIntoZone's two ends cannot say:
--- Pawl.Types.LibraryDepth's.
+-- clamp, which is CR 401.7). The placement insertIntoZone's two ends cannot
+-- say: Pawl.Types.LibraryDepth's and Pawl.Types.LibraryPlacement.Beneath's.
 sinkInLibrary :: Int -> PlayerId -> ObjectId -> GameState -> GameState
 sinkInLibrary depth pid oid gs = gs {GameState.library = Map.adjust (Seq.insertAt depth oid . Seq.filter (/= oid)) pid (GameState.library gs)}
 

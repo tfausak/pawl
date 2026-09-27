@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Quantity as Quantity
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LibraryPlacement" $ do
@@ -39,6 +40,18 @@ spec s = Spec.describe s "Pawl.Codec.LibraryPlacement" $ do
       LibraryPlacement.codec
       (LibraryPlacement.RandomOrder LibraryPosition.Bottom)
       " {\"type\":\"RandomOrder\",\"value\":{\"type\":\"Bottom\"}} "
+  Spec.it s "Beneath" $
+    Common.assertCodec
+      s
+      LibraryPlacement.codec
+      (LibraryPlacement.Beneath (Quantity.Literal 1))
+      " {\"type\":\"Beneath\",\"value\":{\"type\":\"Literal\",\"value\":1}} "
+  Spec.it s "BeneathOrBottom" $
+    Common.assertCodec
+      s
+      LibraryPlacement.codec
+      (LibraryPlacement.BeneathOrBottom (Quantity.Literal 1))
+      " {\"type\":\"BeneathOrBottom\",\"value\":{\"type\":\"Literal\",\"value\":1}} "
   -- A bare position is no longer a placement, which is what keeps the schema's
   -- oneOf honest. It no longer has to tell a placement from a zone --- moveTail
   -- is gone (#1305) and the placement is a named key.

@@ -5566,7 +5566,7 @@ effectFilters effect = case effect of
   -- -- a keys-only sweep would leave the counts unlinted. Swept for the reason
   -- canHostSubjects sweeps the same shape -- the lint is about the positions a
   -- card author can write, not about which of them the pool has used.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _ _) -> frame SourceHostFramed (objectRefFilters ref) <> frame Unframed (riderFilters riders)
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ placement _) -> frame SourceHostFramed (objectRefFilters ref) <> frame Unframed (riderFilters riders <> concatMap quantityFilters (Resolve.placementQuantities placement))
   Effect.Draw (Draw.MkDraw _ quantity _) -> frame Unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these, and Predict's chosen name

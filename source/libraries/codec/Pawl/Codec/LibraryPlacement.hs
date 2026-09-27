@@ -1,6 +1,7 @@
 module Pawl.Codec.LibraryPlacement where
 
 import qualified Pawl.Codec.LibraryPosition as LibraryPosition
+import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -22,7 +23,9 @@ codec =
     tagOf
     [ Arm.payload "Stated" LibraryPosition.codec LibraryPlacement.Stated (\x -> case x of LibraryPlacement.Stated y -> Just y; _ -> Nothing),
       Arm.nullary "OwnerChooses" LibraryPlacement.OwnerChooses,
-      Arm.payload "RandomOrder" LibraryPosition.codec LibraryPlacement.RandomOrder (\x -> case x of LibraryPlacement.RandomOrder y -> Just y; _ -> Nothing)
+      Arm.payload "RandomOrder" LibraryPosition.codec LibraryPlacement.RandomOrder (\x -> case x of LibraryPlacement.RandomOrder y -> Just y; _ -> Nothing),
+      Arm.payload "Beneath" Quantity.codec LibraryPlacement.Beneath (\x -> case x of LibraryPlacement.Beneath y -> Just y; _ -> Nothing),
+      Arm.payload "BeneathOrBottom" Quantity.codec LibraryPlacement.BeneathOrBottom (\x -> case x of LibraryPlacement.BeneathOrBottom y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: LibraryPlacement.LibraryPlacement -> String
@@ -30,3 +33,5 @@ tagOf x = case x of
   LibraryPlacement.Stated {} -> "Stated"
   LibraryPlacement.OwnerChooses {} -> "OwnerChooses"
   LibraryPlacement.RandomOrder {} -> "RandomOrder"
+  LibraryPlacement.Beneath {} -> "Beneath"
+  LibraryPlacement.BeneathOrBottom {} -> "BeneathOrBottom"

@@ -119,6 +119,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
+import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
@@ -597,7 +598,9 @@ rewriteEffect pairs effect = case effect of
   -- The riders' counter AMOUNTS are Quantities and take rewriteQuantity's
   -- descent, PutCounters' case below; their KEYS take rewriteEntryRiders' own,
   -- which is what Pawl.CounterspellSpec's Synthetic Warded Homecoming proves.
-  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position duration) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone (rewriteEntryRiders pairs riders) mSlot mOrigin position duration)
+  -- CR 401.7's depth is a Quantity too, whose Count may name a subtype (Quarry
+  -- Colossus' "the number of Plains you control").
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin placement duration) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone (rewriteEntryRiders pairs riders) mSlot mOrigin (rewritePlacement pairs placement) duration)
   Effect.Draw x -> Effect.Draw x {Draw.quantity = rewriteQuantity pairs (Draw.quantity x)}
   Effect.Mill (Mill.MkMill ref quantity mTally mSlot) ->
     Effect.Mill (Mill.MkMill ref (rewriteQuantity pairs quantity) (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally) mSlot)
@@ -1950,6 +1953,14 @@ rewriteRemovalCount pairs count = case count of
 
 -- CR 612.1 through a Quantity: a Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity. Every remaining arm is a leaf.
+rewritePlacement :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> LibraryPlacement.LibraryPlacement -> LibraryPlacement.LibraryPlacement
+rewritePlacement pairs placement = case placement of
+  LibraryPlacement.Stated _ -> placement
+  LibraryPlacement.OwnerChooses -> placement
+  LibraryPlacement.RandomOrder _ -> placement
+  LibraryPlacement.Beneath quantity -> LibraryPlacement.Beneath (rewriteQuantity pairs quantity)
+  LibraryPlacement.BeneathOrBottom quantity -> LibraryPlacement.BeneathOrBottom (rewriteQuantity pairs quantity)
+
 rewriteQuantity :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Quantity.Type.Quantity -> Quantity.Type.Quantity
 rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Count c ->
