@@ -10073,6 +10073,9 @@ putFound searcher subject destination cardId = case destination of
   SearchDestination.Reveal -> do
     Event.reveal RevealCause.Ordinary searcher cardId
     pure [cardId]
+  -- Rhystic Tutor's "put that card into your hand": the move alone, with no
+  -- reveal, CR 701.23e.
+  SearchDestination.Hand -> Foldable.toList <$> Event.changeZoneReturning cardId Zone.Hand
 
 -- CR 303.4's entry-attached move, shared by putFound's two attaching arms so the
 -- sentence they have in common is written once.
