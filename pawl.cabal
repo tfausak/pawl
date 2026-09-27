@@ -146,6 +146,8 @@ library codec
     Pawl.Codec.ArmDelayedTriggerSpec
     Pawl.Codec.AsCopy
     Pawl.Codec.AsCopySpec
+    Pawl.Codec.AttachAll
+    Pawl.Codec.AttachAllSpec
     Pawl.Codec.AttachBound
     Pawl.Codec.AttachBoundSpec
     Pawl.Codec.AttachRestriction
@@ -1714,6 +1716,7 @@ library types
     Pawl.Types.ArmDelayedTrigger
     Pawl.Types.AsCopy
     Pawl.Types.Asked
+    Pawl.Types.AttachAll
     Pawl.Types.AttachBound
     Pawl.Types.AttachRestriction
     Pawl.Types.AttachTarget

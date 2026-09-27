@@ -102,6 +102,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
@@ -696,6 +697,61 @@ askedChooser source controller legal ref = do
                   pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
     _ -> pure Nothing
 
+-- CR 701.3a for several movers going to one destination together. CR 613.7m:
+-- they take CR 701.3c's stamps in APNAP order, each seat choosing its own, asked
+-- before the fold that mints them, as turnPermanentsOver asks -- and only of the
+-- movers the move will restamp, since Event.attach refuses the rest (CR 701.3b).
+-- No board observes the order (gap #4214).
+attachTogether :: [ObjectId] -> Recipient -> Game ()
+attachTogether movers recipient = do
+  gs <- State.get
+  let restamped mover = case Attach.attachmentFor mover recipient gs of
+        Just attachment -> fmap Object.attachedTo (Game.lookupObject mover gs) /= Just (Just attachment)
+        Nothing -> False
+  ordered <- Restamp.order (filter restamped movers)
+  Foldable.for_ (ordered <> filter (not . restamped) movers) $ \mover ->
+    Event.attach mover recipient
+
+-- The permanents an ObjectRef names, for an instruction that acts on them
+-- together: the one ref that is a CR 608.2d question rather than a read has to
+-- be answered in the Game monad, and every other is objectRefObjects' pure
+-- sweep. Shared by turnPermanentsOver and Effect.AttachAll.
+permanentsGathered ::
+  Map.Map SlotName (Set Recipient) ->
+  ObjectId ->
+  PlayerId ->
+  ObjectId ->
+  ObjectRef.ObjectRef ->
+  Game [ObjectId]
+permanentsGathered legal resolving controller source ref = case ref of
+  -- CR 608.2d: "any number of Human Werewolves you control" is a choice made
+  -- while the effect is applied, so it is asked HERE. The candidates are
+  -- EachMatching's sweep of the same Filter, read live off the board before the
+  -- instruction acts (CR 608.2c) -- which for Tovolar is a board CR 702.145c has
+  -- already turned him over on, so his own back face is no longer a Human
+  -- Werewolf to offer.
+  --
+  -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
+  -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
+  -- ONE, unlike the counted choices: "any number" leaves two distinguishable
+  -- answers there.
+  --
+  -- FILTERED, not trusted (#222): an answer naming a permanent that was never
+  -- offered would otherwise be acted on. Filtering rather than taking the
+  -- answer also keeps CR 608.2f's APNAP order, which the candidate list
+  -- already carries and a Set does not.
+  ObjectRef.AnyNumberMatching filter_ -> do
+    gs <- State.get
+    let candidates = battlefieldMatching legal resolving controller source gs filter_
+    if null candidates
+      then pure []
+      else do
+        answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
+        pure (filter (`Set.member` answer) candidates)
+  _ -> do
+    gs <- State.get
+    pure (objectRefObjects legal resolving controller source gs ref)
+
 -- CR 701.27a and CR 701.28a: turn each named permanent over. ONE function for
 -- both opcodes, which is CR 701.28a said as code -- "this follows rules
 -- 701.27a-f, 712.9-10, and 712.18", so a convert cannot pick up a gate a
@@ -708,36 +764,8 @@ turnPermanentsOver ::
   ObjectRef.ObjectRef ->
   Game ()
 turnPermanentsOver legal resolving controller source ref = do
-  -- WHICH permanents turn over, gathered BEFORE the turn: the one ref here that
-  -- is a CR 608.2d question rather than a read has to be answered in the Game
-  -- monad, and every other is objectRefObjects' pure sweep.
-  victims <- case ref of
-    -- CR 608.2d: "any number of Human Werewolves you control" is a choice made
-    -- while the effect is applied, so it is asked HERE. The candidates are
-    -- EachMatching's sweep of the same Filter, read live off the pre-turn board
-    -- (CR 608.2c) -- which for Tovolar is a board CR 702.145c has already turned
-    -- him over on, so his own back face is no longer a Human Werewolf to offer.
-    --
-    -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
-    -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
-    -- ONE, unlike the counted choices: "any number" leaves two distinguishable
-    -- answers there.
-    --
-    -- FILTERED, not trusted (#222): an answer naming a permanent that was never
-    -- offered would otherwise turn it over. Filtering rather than taking the
-    -- answer also keeps CR 608.2f's APNAP order, which the candidate list
-    -- already carries and a Set does not.
-    ObjectRef.AnyNumberMatching filter_ -> do
-      gs <- State.get
-      let candidates = battlefieldMatching legal resolving controller source gs filter_
-      if null candidates
-        then pure []
-        else do
-          answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
-          pure (filter (`Set.member` answer) candidates)
-    _ -> do
-      gs <- State.get
-      pure (objectRefObjects legal resolving controller source gs ref)
+  -- WHICH permanents turn over, gathered BEFORE the turn (CR 608.2f).
+  victims <- permanentsGathered legal resolving controller source ref
   -- CR 613.7m: which of the swept victims will ACTUALLY take a stamp, ordered by
   -- their controllers. Asked BEFORE the write and off the pre-turn board, the
   -- gather's own reason (CR 608.2f), and `turnsOver` below is the whole
@@ -2842,6 +2870,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.AttachTarget {} -> False
   Effect.AttachTargetToEach {} -> False
   Effect.AttachBound {} -> False
+  Effect.AttachAll {} -> False
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> choosesFromNothing ref
   Effect.Draw {} -> False
   -- CR 701.17b: "a player can't mill a number of cards greater than the number
@@ -7808,20 +7837,34 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case legalOne destination legal of
       Just recipient -> do
         gs <- State.get
-        -- CR 613.7m: movers becoming attached together take CR 701.3c's stamps
-        -- in APNAP order, each seat choosing its own, asked before the fold that
-        -- mints them, as turnPermanentsOver asks -- and only of the movers the
-        -- move will restamp, since Event.attach refuses the rest (CR 701.3b).
-        -- No board observes the order (gap #4214).
-        let movers = objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)
-            restamped mover = case Attach.attachmentFor mover recipient gs of
-              Just attachment -> fmap Object.attachedTo (Game.lookupObject mover gs) /= Just (Just attachment)
-              Nothing -> False
-        ordered <- Restamp.order (filter restamped movers)
-        Foldable.for_ (ordered <> filter (not . restamped) movers) $ \mover ->
-          Event.attach mover recipient
+        attachTogether (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot subject)) recipient
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
       Nothing -> pure ()
+  -- CR 701.3a with the mover a GROUP and one destination chosen now: Glamer
+  -- Spinners' "attach all Auras enchanting target permanent to another
+  -- permanent with the same controller", Balan's "all Equipment you control".
+  --
+  -- The movers are gathered FIRST, since the destination's
+  -- Filter.CanHostSubject is asked of all of them (Attach.groupHostsFor). The
+  -- destination is the resolving controller's to choose (CR 608.2d), through
+  -- Prompt.ChoosePermanent's posture -- no one mover is THE subject a
+  -- Prompt.ChooseAttachment would name -- and asked even when nothing moves,
+  -- since the instruction still makes the choice. None admitted: nothing moves
+  -- (CR 609.3). A mover that cannot go there stays put (CR 701.3b, CR 303.4j),
+  -- which Event.attach applies.
+  Effect.AttachAll (AttachAll.MkAttachAll ref filter_) -> do
+    movers <- permanentsGathered legal resolving controller source ref
+    gs <- State.get
+    destination <- case Attach.groupHostsFor (effectContext gs controller source legal (slotBindings resolving gs)) movers filter_ gs of
+      [] -> pure Nothing
+      [only] -> pure (Just only)
+      first : second : more -> do
+        let offered = first NonEmpty.:| (second : more)
+        answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
+        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    -- Proposed as a bare ToObject; Event.attach re-tags it per mover, as
+    -- AttachTarget's arm says.
+    Foldable.for_ destination (attachTogether movers . Recipient.ToObject)
   Effect.ExileUntilMonarch slot ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of

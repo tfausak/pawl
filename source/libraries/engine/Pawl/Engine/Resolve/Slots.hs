@@ -31,6 +31,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.AsCopy as AsCopy
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackTarget as AttackTarget
@@ -636,6 +637,7 @@ effectObjectRefs effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
+  Effect.AttachAll (AttachAll.MkAttachAll ref _) -> [ref]
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [ref]
   Effect.Draw {} -> []
   Effect.Mill {} -> []
@@ -851,6 +853,7 @@ effectPlayerRefs effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
+  Effect.AttachAll {} -> []
   Effect.MoveToZone {} -> []
   Effect.Draw (Draw.MkDraw ref _ _) -> [ref]
   Effect.Mill (Mill.MkMill ref _ _ _) -> [ref]
@@ -1333,6 +1336,9 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- Both are read rather than bound, so both belong here; CardSpec's
   -- declared-equals-read lint subtracts the reserved `became` from this side.
   Effect.AttachBound (AttachBound.MkAttachBound subject destination) -> joinSlots [oneSlot subject, oneSlot destination]
+  -- The movers are effectObjectRefs' half; the destination FILTER is a read like
+  -- Search's (Glamer Spinners' "with the same controller" as its target).
+  Effect.AttachAll (AttachAll.MkAttachAll _ destination) -> filterSlotsOf destination
   -- CR 729.1/729.1b: the slot is a DEFINITION (the subgame's winner), not a read.
   Effect.PlaySubgame _ -> Map.empty
   -- A DEFINITION too: chosen as this effect is applied (CR 608.2d), never read.
@@ -1941,6 +1947,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.AttachTarget (AttachTarget.MkAttachTarget _ _) -> True
   Effect.AttachTargetToEach (AttachTarget.MkAttachTarget _ _) -> True
   Effect.AttachBound (AttachBound.MkAttachBound _ _) -> True
+  Effect.AttachAll (AttachAll.MkAttachAll _ _) -> True
   -- CR 729.1b: a DEFINITION, and the subgame reads no binding of the outer game.
   Effect.PlaySubgame _ -> True
   -- PlaySubgame's answer: a definition reads no slot.
@@ -2155,6 +2162,7 @@ readsX =
         Effect.AttachTarget {} -> False
         Effect.AttachTargetToEach {} -> False
         Effect.AttachBound {} -> False
+        Effect.AttachAll {} -> False
         Effect.PlaySubgame _ -> False
         Effect.ChoosePlayer _ -> False
         Effect.ChoosePlayerAtRandom _ -> False
@@ -2394,6 +2402,7 @@ boundSlots effect = case effect of
   Effect.AttachTarget {} -> Set.empty
   Effect.AttachTargetToEach {} -> Set.empty
   Effect.AttachBound {} -> Set.empty
+  Effect.AttachAll {} -> Set.empty
   Effect.TakeExtraTurn {} -> Set.empty
   Effect.ShuffleIntoLibrary {} -> Set.empty
   Effect.Shuffle {} -> Set.empty
@@ -2991,6 +3000,15 @@ effectContext gs controller source legal bindings =
           -- creature" is a reference the spell already made rather than a target
           -- CR 608.2b re-checks.
           Filter.slotNames = fmap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs)) objects,
+          -- CR 110.2's controllers off the same objects and the same reader,
+          -- for the atom comparing a candidate's against them
+          -- (Filter.SameControllerAsBound) -- Glamer Spinners' "another
+          -- permanent with the same controller" as its target, asked at the
+          -- attach destination. A slot CR 608.2b emptied has no key, where the
+          -- atom widens; the destination's Filter.IsBound conjunct then has
+          -- nothing to exclude either, but a lone target that went illegal has
+          -- already fizzled the ability (CR 608.2b).
+          Filter.slotControllers = fmap (foldMap (foldMap (maybe Set.empty Set.singleton . Filter.controller) . Projection.viewWithLastKnownAnywhere gs)) objects,
           -- CR 110.2 asked of what those objects are ATTACHED TO (CR 303.4b),
           -- for the one atom that compares a candidate's controller against it
           -- (Filter.SameControllerAsHostOfBound) -- Simic Guildmage's "another

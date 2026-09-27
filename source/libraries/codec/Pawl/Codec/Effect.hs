@@ -17,6 +17,7 @@ import qualified Pawl.Codec.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Codec.AffectPlayers as AffectPlayers
 import qualified Pawl.Codec.Amass as Amass
 import qualified Pawl.Codec.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Codec.AttachAll as AttachAll
 import qualified Pawl.Codec.AttachBound as AttachBound
 import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.BecomeCopy as BecomeCopy
@@ -252,6 +253,7 @@ codec cardCodec abilityCodec =
           Arm.payload "AttachTarget" AttachTarget.codec Effect.AttachTarget (\x -> case x of Effect.AttachTarget y -> Just y; _ -> Nothing),
           Arm.payload "AttachTargetToEach" AttachTarget.codec Effect.AttachTargetToEach (\x -> case x of Effect.AttachTargetToEach y -> Just y; _ -> Nothing),
           Arm.payload "AttachBound" AttachBound.codec Effect.AttachBound (\x -> case x of Effect.AttachBound y -> Just y; _ -> Nothing),
+          Arm.payload "AttachAll" AttachAll.codec Effect.AttachAll (\x -> case x of Effect.AttachAll y -> Just y; _ -> Nothing),
           Arm.payload "PlaySubgame" SlotName.codec Effect.PlaySubgame (\x -> case x of Effect.PlaySubgame y -> Just y; _ -> Nothing),
           Arm.payload "ChoosePlayer" ChoosePlayer.codec Effect.ChoosePlayer (\x -> case x of Effect.ChoosePlayer y -> Just y; _ -> Nothing),
           Arm.payload "ChoosePlayerAtRandom" ChoosePlayerAtRandom.codec Effect.ChoosePlayerAtRandom (\x -> case x of Effect.ChoosePlayerAtRandom y -> Just y; _ -> Nothing),
@@ -407,6 +409,7 @@ tagOf x = case x of
   Effect.AttachTarget {} -> "AttachTarget"
   Effect.AttachTargetToEach {} -> "AttachTargetToEach"
   Effect.AttachBound {} -> "AttachBound"
+  Effect.AttachAll {} -> "AttachAll"
   Effect.PlaySubgame {} -> "PlaySubgame"
   Effect.ChoosePlayer {} -> "ChoosePlayer"
   Effect.ChoosePlayerAtRandom {} -> "ChoosePlayerAtRandom"

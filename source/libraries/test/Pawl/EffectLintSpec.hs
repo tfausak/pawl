@@ -45,6 +45,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -375,6 +376,7 @@ ownQuantities effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.AttachTargetToEach {} -> []
   Effect.AttachBound {} -> []
+  Effect.AttachAll {} -> []
   Effect.PlaySubgame _ -> []
   Effect.ChoosePlayer _ -> []
   Effect.ChoosePlayerAtRandom _ -> []
@@ -1135,10 +1137,10 @@ data Asks
     -- the random arm (Hymn to Tourach) through randomCardsInHand. Every other
     -- arm falls through to the pure sweep.
     AsksDiscardArm
-  | -- | Pawl.Engine.Resolve's turnPermanentsOver gather, shared by Effect.Transform
-    -- and Effect.Convert. It asks the any-number arm and nothing else: the four
-    -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and CR
-    -- 701.27a turns over PERMANENTS.
+  | -- | Pawl.Engine.Resolve's permanentsGathered, shared by Effect.Transform,
+    -- Effect.Convert and Effect.AttachAll. It asks the any-number arm and
+    -- nothing else: the four card-shaped chosen arms name cards in a graveyard,
+    -- a hand or a group, and both instructions act on PERMANENTS.
     AsksTransformGather
   | -- | Pawl.Engine.Resolve's Effect.LookAt arm. It asks the hand chooser --
     -- Word of Command's "look at target opponent's hand and choose a card from
@@ -1264,6 +1266,9 @@ effectObjectRefs effect =
         Effect.AttachTarget {} -> []
         Effect.AttachTargetToEach {} -> []
         Effect.AttachBound {} -> []
+        -- The movers' gather is turnPermanentsOver's, shared through
+        -- Resolve.permanentsGathered.
+        Effect.AttachAll (AttachAll.MkAttachAll ref _) -> [(AsksTransformGather, ref)]
         Effect.DealDamage (DealDamage.MkDealDamage parts _ _) -> read_ (fmap DamagePart.ref (Foldable.toList parts))
         Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ _ ref) -> read_ [ref]
         Effect.ChangeText {} -> []

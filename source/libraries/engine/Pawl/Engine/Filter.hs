@@ -1190,14 +1190,16 @@ data Context = MkContext
     -- CR 110.2: the CONTROLLERS of the objects the surrounding announcement's
     -- slots hold, for the one atom that compares a candidate's against them
     -- (SameControllerAsBound, Bioshift). `slotNames` above in every respect --
-    -- supplied by the one caller that matches a target slot's Filter
-    -- (Pawl.Engine.Target.slotContext), separate from `slotObjects` because an id
+    -- supplied by the caller that matches a target slot's Filter
+    -- (Pawl.Engine.Target.slotContext) and by a resolution's
+    -- (Pawl.Engine.Resolve.Slots.effectContext, Glamer Spinners' attach
+    -- destination), separate from `slotObjects` because an id
     -- is not a controller until a board has been asked, lazy so that a filter
     -- omitting the atom never forces the projection, and read through CR 608.2h's
     -- last-known reader so a bound object that has left is still answerable.
     --
     -- What keeps a card out of the positions this is empty in is Pawl.CardSpec's
-    -- "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot",
+    -- "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot or an attach destination",
     -- slotNames' sweep with more riding on it: that atom is a silent False
     -- elsewhere and this one a silent True.
     --
@@ -1572,8 +1574,9 @@ data Context = MkContext
 -- arm in `matches` reads a slot with no key as a relation with only one party and
 -- ADMITS every candidate. Nothing narrows an offer written against that empty
 -- map; what keeps a card out of the positions it is empty in is Pawl.CardSpec's
--- "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot"
--- alone, Pawl.Engine.Target.slotContext being the only filler. An atom added
+-- "CR 110.2 no card asks SameControllerAsBound outside a mode's target slot or an attach destination"
+-- alone, Pawl.Engine.Target.slotContext and Pawl.Engine.Resolve.Slots.effectContext
+-- being the only fillers. An atom added
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context

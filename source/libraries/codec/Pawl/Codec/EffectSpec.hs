@@ -20,6 +20,7 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -445,6 +446,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AttachBound (AttachBound.MkAttachBound (SlotName.MkSlotName (Text.pack "became")) (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"AttachBound\",\"value\":{\"subject\":\"became\",\"destination\":\"target\"}} "
+  -- CR 701.3a with the mover a GROUP: an ObjectRef and one destination Filter.
+  Spec.it s "AttachAll" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.AttachAll (AttachAll.MkAttachAll (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Filter.IsSource))
+      " {\"type\":\"AttachAll\",\"value\":{\"subjects\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}},\"destination\":{\"type\":\"IsSource\"}}} "
   -- MoveToZone's payload is the ObjectRef and the destination zone, then four
   -- independently elided extras -- the EntryRiders, the bound slot, CR 113.6m's
   -- origin zone and CR 401.2's library position -- so it is told apart by JSON
