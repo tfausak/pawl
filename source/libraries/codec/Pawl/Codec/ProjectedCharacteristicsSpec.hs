@@ -41,6 +41,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Timestamp as Timestamp
 
 -- | `name` and `cardTypes` are the only required keys; every other field is
 -- omitted when it is at its default. One populated fixture, with every
@@ -73,6 +74,7 @@ testCharacteristics =
       PC.subtypes = Set.singleton Subtype.Human,
       PC.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))],
       PC.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.EachPlayer, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.CantCastMoreThan 1}],
+      PC.grantedPlayerAbilities = [(Timestamp.MkTimestamp 3, PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.NoMaximumHandSize})],
       PC.specialActions = [SpecialAction.DiscardThisAnyTime],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
@@ -123,6 +125,7 @@ testCharacteristicsJson =
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]}],"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"EachPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}}],"
+    <> "\"grantedPlayerAbilities\":[{\"key\":3,\"value\":{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"NoMaximumHandSize\"}}}],"
     <> "\"specialActions\":[{\"type\":\"DiscardThisAnyTime\"}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
@@ -165,6 +168,7 @@ minimalCharacteristics =
       PC.subtypes = Set.empty,
       PC.staticAbilities = [],
       PC.playerAbilities = [],
+      PC.grantedPlayerAbilities = [],
       PC.specialActions = [],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],

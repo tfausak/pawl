@@ -841,17 +841,14 @@ resolveModesWith runSubgame stackId srcId modes = do
 -- An ability CR 608.2b removed never resolved and is not filed.
 --
 -- A CLASSIFICATION off the object's Source and never which ability it is: an
--- activated ability is filed, and rule 707.10b's copy of one carries the same
--- ActivatedAbilitySource (Resolve.Effect.copyOnStackOf), so the copy and the
--- original are one key.
---
--- Not implemented: a TRIGGERED ability's resolutions, which this arm leaves
--- unrecorded because nothing can read them back -- CR 602.2a's
--- Binding.thisAbility is the only slot naming an ability's own object and no
--- borne trigger carries it (#3815).
+-- activated or an object-borne triggered ability is filed, and rule 707.10b's
+-- copy of one carries the same Source (Resolve.Effect.copyOnStackOf), so the
+-- copy and the original are one key. Rumor Gatherer's and Omnath, Locus of
+-- Creation's landfall read the triggered arm (Pawl.ConditionSpec).
 recordAbilityResolution :: Object.Object -> Game ()
 recordAbilityResolution obj = case Object.source obj of
   Source.OfAbility activated -> State.modify' (Event.recordEvent (GameEvent.ActivatedAbilityResolved activated))
+  Source.OfTrigger triggered -> State.modify' (Event.recordEvent (GameEvent.TriggeredAbilityResolved triggered))
   _ -> pure ()
 
 -- CR 608.2c: does this clause's printed "If you do" hold? A clause naming no
@@ -1181,6 +1178,10 @@ clauseIsInert bound legal clause =
 -- opponent gating that opponent's own edict. The seats the branch SELECTS are
 -- bound under Binding.gatePlayers, which is how the clause's own instructions
 -- say "they", and the clause happens when the branch selected anybody.
+-- "Unless ANY player pays" (PayBranch.IfNonePaid) is the one branch read over
+-- the whole table: Rhystic Tutor's search happens only if every offered player
+-- declined. Proved by Pawl.ResolveSpec's "CR 118.12a bob alone pays, so alice
+-- does not search".
 --
 -- A gate whose reference names NOBODY therefore selects nobody and its clause is
 -- skipped, where a single-payer gate used to take the IfNotPaid branch and run
@@ -1221,16 +1222,19 @@ payGateAdmits resolving source controller idx cIdx legal announced answers claus
       Nothing -> do
         recorded <- payGatePaid resolving source controller idx cIdx legal announced gate
         pure (recorded, Map.insert offerAt recorded answers)
-    let selected = Map.keysSet (Map.filter (branchTaken (PayGate.branch gate)) asked)
+    let selected = branchSelects (PayGate.branch gate) asked
     State.modify' (bindPlayersSlot resolving Binding.gatePlayers selected)
     pure (not (Set.null selected), answers2)
 
--- Which branch of CR 118.12 a payment outcome selects, off the classification a
--- card states -- never off what the payment DID.
-branchTaken :: PayBranch.PayBranch -> Bool -> Bool
-branchTaken branch wasPaid = case branch of
-  PayBranch.IfPaid -> wasPaid
-  PayBranch.IfNotPaid -> not wasPaid
+-- Which players a CR 118.12 branch selects from the offer's answers, off the
+-- classification a card states -- never off what the payment DID. IfPaid and
+-- IfNotPaid are per player; IfNonePaid is one answer for the table, selecting
+-- every offered player when none paid and nobody when any did.
+branchSelects :: PayBranch.PayBranch -> Map.Map PlayerId Bool -> Set PlayerId
+branchSelects branch asked = case branch of
+  PayBranch.IfPaid -> Map.keysSet (Map.filter id asked)
+  PayBranch.IfNotPaid -> Map.keysSet (Map.filter not asked)
+  PayBranch.IfNonePaid -> if or asked then Set.empty else Map.keysSet asked
 
 -- The offer itself: who was offered this gate's cost, and which of them paid?
 -- CR 118.12's MANDATORY limb is not offered, and that is the rule rather than an

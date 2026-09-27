@@ -155,9 +155,10 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- didn't pay" opcode.
 --
 -- Which players are in it depends on Pawl.Types.PayBranch: the IfNotPaid branch
--- gets the offered players who did not pay, the IfPaid branch the ones who did.
--- One slot for both, because the printed word is the same word and which branch
--- a clause is is a fact about the CLAUSE.
+-- gets the offered players who did not pay, the IfPaid branch the ones who did,
+-- and the IfNonePaid branch every offered player, when none paid.
+-- One slot for all three, because the printed word is the same word and which
+-- branch a clause is is a fact about the CLAUSE.
 --
 -- SEVERAL players, which is the whole point and what parts it from
 -- `triggerPlayer`: CR 118.12a's rewriting is per player, so a gate whose payer
@@ -788,12 +789,13 @@ airbentObjects = SlotName.MkSlotName (Text.pack "thoseAirbentObjects")
 castSpell :: SlotName
 castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 
--- CR 602.2a: the reserved slot under which an ACTIVATED ABILITY'S OWN STACK
+-- CR 602.2a / 603.3: the reserved slot under which an ABILITY'S OWN STACK
 -- OBJECT is bound -- the printed "this ability" in Forsworn Paladin's "if mana
 -- from a Treasure was spent to activate this ability" and in Ashling the
--- Pilgrim's "if this is the third time this ability has resolved this turn".
--- Stamped by Pawl.Engine.Activate as the ability is put on the stack, alongside
--- `triggerSource` and `you`.
+-- Pilgrim's and Rumor Gatherer's "if this is the ... time this ability has
+-- resolved this turn". Stamped by Pawl.Engine.Activate and, for a triggered
+-- ability, Pawl.Engine.Engine.placeBorne as the ability is put on the stack,
+-- alongside `triggerSource` and `you`.
 --
 -- Distinct from `triggerSource` (CR 113.7), which names the ability's SOURCE:
 -- rule 602.2a creates the ability as an object that is not the source, and the
@@ -805,8 +807,8 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 -- targetSlots may name it" rule and Pawl.CardSpec's binding sweep apply here
 -- too.
 --
--- Bound for an ACTIVATED ability only. A triggered ability has no activation to
--- ask about, and CR 605.3b's mana ability never reaches the stack.
+-- Bound for an activated or object-borne triggered ability. CR 605.3b's mana
+-- ability never reaches the stack.
 --
 -- NOT a CR 609.7a referent, and Pawl.Engine.Resolve.Effect.referentsOfBindings drops it
 -- by name for every carrier that reads a binding environment: this slot exists so
@@ -1152,7 +1154,7 @@ setDepartedPermanent oid = Map.insert departedPermanent (toObject oid)
 setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setCastSpell oid = Map.insert castSpell (toObject oid)
 
--- Bind an object under the reserved thisAbility slot (CR 602.2a).
+-- Bind an object under the reserved thisAbility slot (CR 602.2a, 603.3).
 setThisAbility :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setThisAbility oid = Map.insert thisAbility (toObject oid)
 

@@ -53,7 +53,6 @@ import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
 import Pawl.Types.SlotName (SlotName)
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Times as Times
@@ -804,14 +803,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.SpellsCastThisTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (Game.castsPerPlayer gs)))
           _ -> Nothing
-        -- CR 608.2n / 608.2i: how many times the ACTIVATED ABILITY this evaluation is
-        -- aimed at has resolved this turn, folded off the turn-scoped log.
+        -- CR 608.2n / 608.2i: how many times the ability this evaluation is aimed at
+        -- has resolved this turn, activated or triggered, folded off the turn-scoped
+        -- log.
         --
         -- Keyed on the object's SOURCE and not on its id, which is the whole of CR
         -- 707.10b's third sentence: a copy of an ability carries the original's
-        -- ActivatedAbilitySource (Resolve.Effect.copyOnStackOf), so the two resolutions
-        -- land on one key. Keying on the id would file them apart, and CR 400.7 would
-        -- file two activations of one permanent apart as well.
+        -- Source (Resolve.Effect.copyOnStackOf), so the two resolutions land on one
+        -- key. Keying on the id would file them apart, and CR 400.7 would file two
+        -- activations or firings of one permanent's ability apart as well.
         --
         -- The LIVE object first, which is the ordinary read: rule 608.2n ceases the
         -- ability at the END of its resolution, so it is still on the stack while its own
@@ -823,8 +823,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- Always a number where the aim has a source, never Nothing: an ability that has
         -- resolved no times is 0, which is an answered question. Nothing only where the
         -- evaluation is aimed at no object at all, or at an id naming nothing --
-        -- EnteredThisTurn's posture. An object that is not an activated ability reads 0,
-        -- no other Source being a key in this log.
+        -- EnteredThisTurn's posture. An object that is not an ability reads 0, no other
+        -- Source being a key in this log.
         --
         -- A COPY of the ability answers off its OWN id, CR 707.10's last sentence making
         -- it an ability of its own: Resolve.Effect's CopyStackObject arm re-stamps CR
@@ -834,8 +834,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         Quantity.TimesResolvedThisTurn -> do
           oid <- mOid
           obj <- Game.lookupObject oid gs <|> Map.lookup oid (GameState.stackArchive gs)
-          let resolved = Maybe.mapMaybe (Game.activatedAbilityResolved . LoggedEvent.event) (Foldable.toList (GameState.events gs))
-          pure (toInteger (length (filter (\a -> Source.OfAbility a == Object.source obj) resolved)))
+          let resolved = Maybe.mapMaybe (Game.abilityResolved . LoggedEvent.event) (Foldable.toList (GameState.events gs))
+          pure (toInteger (length (filter (== Object.source obj) resolved)))
         -- CR 702.40a: how many spells were cast this turn before the object this
         -- evaluation is aimed at. Keyed on that object's OWN cast in the log, so a
         -- spell cast after it -- in response to the storm trigger -- is not

@@ -1847,9 +1847,9 @@ sourceObjectOf src = case src of
 -- Player recipients drop out, the rule's classes all being objects.
 --
 -- TWO SLOTS ARE DROPPED, by NAME rather than by comparing ids. Binding.thisAbility
--- holds the activated ability's OWN id (CR 602.2a), which pawl stamps so a card can
--- read the activation's own record -- the mana that paid for it, and how many times
--- it has resolved this turn -- not because any printed text names the ability as
+-- holds the ability's OWN id (CR 602.2a, 603.3), which pawl stamps so a card can
+-- read the ability's own record -- the mana that paid for an activation, and how
+-- many times it has resolved this turn -- not because any printed text names the ability as
 -- another object. Counting it would undo CR 609.7a's second class, which admits "a
 -- spell on the stack" and deliberately stops short of an ability.
 --
@@ -6713,14 +6713,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 -- original's id there as it went on the stack -- and not a
                 -- decision CR 707.10 copies. Pawl.CopySpec's Forsworn Paladin case
                 -- proves the aim moved, and its Stifle case that it answers once
-                -- the original has left the stack.
-                --
-                -- Not implemented: the same slot on a copy of a TRIGGERED ability,
-                -- which no borne trigger carries to begin with (#3815).
+                -- the original has left the stack. A triggered ability's copy is
+                -- re-stamped the same way, Pawl.Engine.Engine.placeBorne having
+                -- written the original's id there.
                 stampSelf = case kind of
                   StackObjectKind.Spell -> Binding.setTriggerSource copyId
                   StackObjectKind.ActivatedAbility -> Binding.setThisAbility copyId
-                  StackObjectKind.TriggeredAbility -> id
+                  StackObjectKind.TriggeredAbility -> Binding.setThisAbility copyId
                 copy =
                   obj
                     { Object.source = copySource,
@@ -9341,9 +9340,9 @@ bindEarthbentLand resolving land gs =
 -- The RULE abilities (CR 613.11) travel as one GainAbility carrying the whole
 -- bundle, gathered from the new host beside its own
 -- (Pawl.Engine.Projection.grantedRuleAbilities); Chomping Kavu's is the one in
--- the pool. A REPLACEMENT effect travels as its own GainAbility, gathered into
--- the new host's projected list; unproven, since no printing with backup prints
--- one, nor a player static ability or a special action, which have no arm
+-- the pool. A REPLACEMENT effect and a PLAYER ability each travel as their own
+-- GainAbility, gathered into the new host's projected lists; unproven, since no
+-- printing with backup prints either, nor a special action, which has no arm
 -- (Scryfall `keyword:backup`, 2026-09-24).
 expandGrant :: ObjectId -> ObjectId -> GameState -> Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card) -> [Modification.Modification (GrantedAbility.GrantedAbility Card.Type.Card)]
 expandGrant resolving source gs modification = case modification of
@@ -9360,6 +9359,7 @@ expandGrant resolving source gs modification = case modification of
           <> fmap (Modification.GainAbility . GrantedAbility.Static) (PC.staticAbilities pc)
           <> [Modification.GainAbility (GrantedAbility.Rules (PC.ruleAbilities pc)) | PC.ruleAbilities pc /= mempty]
           <> fmap (Modification.GainAbility . GrantedAbility.Replacement) (PC.replacementEffects pc)
+          <> fmap (Modification.GainAbility . GrantedAbility.Player) (PC.playerAbilities pc)
   _ -> [modification]
 
 -- The no-subgame executor (the ability path and every direct caller): a
@@ -10073,6 +10073,9 @@ putFound searcher subject destination cardId = case destination of
   SearchDestination.Reveal -> do
     Event.reveal RevealCause.Ordinary searcher cardId
     pure [cardId]
+  -- Rhystic Tutor's "put that card into your hand": the move alone, with no
+  -- reveal, CR 701.23e.
+  SearchDestination.Hand -> Foldable.toList <$> Event.changeZoneReturning cardId Zone.Hand
 
 -- CR 303.4's entry-attached move, shared by putFound's two attaching arms so the
 -- sentence they have in common is written once.

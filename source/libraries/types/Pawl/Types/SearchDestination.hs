@@ -25,9 +25,8 @@ data SearchDestination
     -- CR 702.29e's typecycling also says.
     --
     -- The reveal is named in the constructor because CR 701.23e makes it part of
-    -- the card's own instruction. A search-to-hand that stays private (Demonic
-    -- Tutor) is a DIFFERENT sentence and gets its own arm, not this one with a
-    -- flag.
+    -- the card's own instruction. A search-to-hand that stays private is a
+    -- DIFFERENT sentence and gets its own arm, Hand, not this one with a flag.
     RevealThenHand
   | -- | Hoarding Dragon's "exile it". No reveal: CR 701.23e leaves a found card
     -- unrevealed unless the card says otherwise, and this sentence does not --
@@ -72,4 +71,6 @@ data SearchDestination
     BattlefieldAttached
   | -- | Grim Reminder's "reveal it", the card staying where it was found (CR 701.20b).
     Reveal
+  | -- | Rhystic Tutor's "put that card into your hand", unrevealed (CR 701.23e).
+    Hand
   deriving (Bounded, Enum, Eq, Ord, Show)

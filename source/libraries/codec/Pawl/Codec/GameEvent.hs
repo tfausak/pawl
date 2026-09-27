@@ -46,6 +46,7 @@ import qualified Pawl.Codec.SpellWasCast as SpellWasCast
 import qualified Pawl.Codec.StepBegan as StepBegan
 import qualified Pawl.Codec.TappedForMana as TappedForMana
 import qualified Pawl.Codec.Transformed as Transformed
+import qualified Pawl.Codec.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Codec.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Codec.ZoneChange as ZoneChange
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -147,7 +148,8 @@ codec =
       -- CR 608.2n. The source object and the ability, which is the pair CR
       -- 707.10b counts by, so the payload is the same record Pawl.Types.Source's
       -- own OfAbility arm carries.
-      Arm.payload "ActivatedAbilityResolved" ActivatedAbilitySource.codec GameEvent.ActivatedAbilityResolved (\x -> case x of GameEvent.ActivatedAbilityResolved y -> Just y; _ -> Nothing)
+      Arm.payload "ActivatedAbilityResolved" ActivatedAbilitySource.codec GameEvent.ActivatedAbilityResolved (\x -> case x of GameEvent.ActivatedAbilityResolved y -> Just y; _ -> Nothing),
+      Arm.payload "TriggeredAbilityResolved" TriggeredAbilitySource.codec GameEvent.TriggeredAbilityResolved (\x -> case x of GameEvent.TriggeredAbilityResolved y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: GameEvent.GameEvent -> String
@@ -230,3 +232,4 @@ tagOf x = case x of
   GameEvent.Airbent {} -> "Airbent"
   GameEvent.Firebent {} -> "Firebent"
   GameEvent.ActivatedAbilityResolved {} -> "ActivatedAbilityResolved"
+  GameEvent.TriggeredAbilityResolved {} -> "TriggeredAbilityResolved"
