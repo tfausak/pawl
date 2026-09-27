@@ -6,6 +6,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -22,13 +23,14 @@ spec s = Spec.describe s "Pawl.Codec.BecomeCopy" $ do
       s
       (BecomeCopy.codec Common.text)
       ( BecomeCopy.MkBecomeCopy
-          { BecomeCopy.original = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became")),
+          { BecomeCopy.original = CopyOriginal.OfObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))),
             BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource,
             BecomeCopy.duration = Nothing,
-            BecomeCopy.exceptions = []
+            BecomeCopy.exceptions = [],
+            BecomeCopy.newTargets = False
           }
       )
-      " {\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
+      " {\"original\":{\"type\":\"OfObject\",\"value\":{\"type\":\"InSlot\",\"value\":\"became\"}},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
   -- The Shapeshifter's own third key. Written out because it is DEFAULTED: an
   -- absent `exceptions` decodes to the empty list above, so only a case that
   -- states one proves the key is read at all (CR 707.9a).
@@ -37,13 +39,14 @@ spec s = Spec.describe s "Pawl.Codec.BecomeCopy" $ do
       s
       (BecomeCopy.codec Common.text)
       ( BecomeCopy.MkBecomeCopy
-          { BecomeCopy.original = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became")),
+          { BecomeCopy.original = CopyOriginal.OfObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))),
             BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource,
             BecomeCopy.duration = Nothing,
-            BecomeCopy.exceptions = [CopyException.GainThisAbility]
+            BecomeCopy.exceptions = [CopyException.GainThisAbility],
+            BecomeCopy.newTargets = False
           }
       )
-      " {\"exceptions\":[{\"type\":\"GainThisAbility\"}],\"original\":{\"type\":\"InSlot\",\"value\":\"became\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
+      " {\"exceptions\":[{\"type\":\"GainThisAbility\"}],\"original\":{\"type\":\"OfObject\",\"value\":{\"type\":\"InSlot\",\"value\":\"became\"}},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
   -- Mirrorweave's fourth key, written out for the exceptions case's reason: an
   -- absent `duration` decodes to Nothing above, which is the STAMPED road (CR
   -- 707.3), so only a case that states one proves the key is read.
@@ -52,11 +55,12 @@ spec s = Spec.describe s "Pawl.Codec.BecomeCopy" $ do
       s
       (BecomeCopy.codec Common.text)
       ( BecomeCopy.MkBecomeCopy
-          { BecomeCopy.original = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "copied")),
+          { BecomeCopy.original = CopyOriginal.OfObject (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "copied"))),
             BecomeCopy.subject = ObjectRef.EachMatching Filter.IsSource,
             BecomeCopy.duration = Just Duration.UntilEndOfTurn,
-            BecomeCopy.exceptions = []
+            BecomeCopy.exceptions = [],
+            BecomeCopy.newTargets = False
           }
       )
-      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"original\":{\"type\":\"InSlot\",\"value\":\"copied\"},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
+      " {\"duration\":{\"type\":\"UntilEndOfTurn\"},\"original\":{\"type\":\"OfObject\",\"value\":{\"type\":\"InSlot\",\"value\":\"copied\"}},\"subject\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s (BecomeCopy.codec Common.text)

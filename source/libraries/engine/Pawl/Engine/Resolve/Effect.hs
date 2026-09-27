@@ -143,6 +143,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
 import qualified Pawl.Types.ControlSides as ControlSides
+import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Cost as Cost.Type
@@ -2589,7 +2590,8 @@ copyForEachTargets controller resolving source legal original candidateRef = do
 -- with what the copy already targets, which is the rule's two halves: a changed
 -- target must be legal, an unchanged one need not be. The count is what the
 -- original announced, CR 707.10 having copied the decision and CR 707.10c
--- offering no chance to change it.
+-- offering no chance to change it -- or, for a spell that announced nothing
+-- (`unannounced`), the count its text fixes.
 --
 -- Not raised when no slot can be answered any other way -- the offered set is
 -- exactly what is already chosen -- because then the options are
@@ -2615,14 +2617,20 @@ copyForEachTargets controller resolving source legal original candidateRef = do
 -- particular choice restores exactly that state. CR 733.2's redo has no analogue
 -- inside a resolution: nobody holds priority, and a pure prompt-to-answer
 -- decider re-asked would loop on a stubborn answer.
-chooseNewTargetsFor :: PlayerId -> ObjectId -> Game ()
-chooseNewTargetsFor controller copyId = do
+chooseNewTargetsFor :: Bool -> PlayerId -> ObjectId -> Game ()
+chooseNewTargetsFor unannounced controller copyId = do
   gs <- State.get
   Monad.forM_ (Game.lookupObject copyId gs) $ \copy -> do
     let slots = stackTargetSlots copy copyId gs
         -- TARGET slots only, which targetsOnStack is: the reserved slots are
         -- not targets and are not CR 707.10c's to change.
         current = targetsOnStack copyId gs
+        -- `unannounced`: the object became a copy of a card and so announced
+        -- nothing (CR 707.2, "it stops having any targets"). Each slot whose
+        -- text fixes its count is offered that many (Target.fixedCount), and
+        -- leaving it empty is leaving it unchanged. Never for a copy CR 707.10
+        -- made, whose empty slot is a count its original announced.
+        blank = if unannounced then Map.withoutKeys (Map.mapMaybe Target.fixedCount slots) (Map.keysSet current) else Map.empty
         -- CR 608.2b's own derivation, made against the CURRENT board: this is
         -- a fresh choice of targets rather than a re-check of the old one, so
         -- it reads what the board can supply now.
@@ -2654,17 +2662,18 @@ chooseNewTargetsFor controller copyId = do
         -- the pile it sits in, exactly as at CR 601.2c. The targets already
         -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
         -- one stand even when it is now illegal.
-        offer slot recipients = (Natural.length recipients, Set.union recipients (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh)))
-        asked = Map.mapWithKey offer current
+        offer slot (n, recipients) = (n, Set.union recipients (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh)))
+        asked = Map.mapWithKey offer (Map.union (fmap (\recipients -> (Natural.length recipients, recipients)) current) (fmap (\n -> (n, Set.empty)) blank))
+        held = Map.union current (Set.empty <$ blank)
         -- Every slot answerable only one way means the options are
         -- indistinguishable, and CR 707.10c's offer is elided.
         settled slot = Set.isSubsetOf (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh))
-    Monad.unless (and (Map.elems (Map.mapWithKey settled current))) $ do
+    Monad.unless (and (Map.elems (Map.mapWithKey settled held))) $ do
       answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor controller gs) controller copyId asked)
-      let admits (n, offered) picked = Natural.length picked == n && Set.isSubsetOf picked offered
+      let admits slot (n, offered) picked = picked == Map.findWithDefault Set.empty slot current || (Natural.length picked == n && Set.isSubsetOf picked offered)
           wellFormed =
             Map.keysSet answer == Map.keysSet asked
-              && and (Map.elems (Map.intersectionWith admits asked answer))
+              && and (Map.elems (Map.intersectionWith id (Map.mapWithKey admits asked) answer))
       Monad.when wellFormed $ do
         -- CR 406.4's draw, run on the ANSWER: a pile the player named becomes
         -- the card randomness picked out of it before any target is recorded.
@@ -2682,24 +2691,27 @@ chooseNewTargetsFor controller copyId = do
         -- counters it, where the rule leaves it resolving on its old target.
         let stands slot picked = Set.isSubsetOf picked (Set.union (Map.findWithDefault Set.empty slot current) (Map.findWithDefault Set.empty slot fresh))
         Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
-          let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients drawn) (Object.bindings o)}
+          let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients (Map.filter (not . Set.null) drawn)) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
 -- CR 707.2: a spell on the stack that becomes a copy acquires the original's
 -- "choices made when casting or activating it (mode, targets, the value of X,
 -- whether it was kicked ...)", replacing its own -- and has none when the
 -- original is not on the stack, as Transcantation's ruling reads it ("it stops
--- having any targets"). That half is a REGRESSION FENCE: Synthetic Mimicry's
--- original is always a spell, and Transcantation waits on #4221.
+-- having any targets"), which Pawl.CopySpec's Transcantation cases prove.
 -- CopyStackObject's arm carries the same decisions by copying the
 -- whole object (CR 707.10); here the object stays, so the decisions are named:
 -- every binding but the reserved ones that are the subject's own (its
 -- controller, itself, its copy stamp), and the cast records rule 707.2 lists.
 -- Pawl.CopySpec's "CR 707.2 a spell that becomes a copy of a Bolt" proves it.
-acquireChoices :: Maybe Object.Object -> Object.Object -> Object.Object
-acquireChoices mOriginal subject =
+acquireChoices :: Modal.Type.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Maybe Object.Object -> Object.Object -> Object.Object
+acquireChoices copiedSpell mOriginal subject =
   let own = Set.fromList [Binding.you, Binding.triggerSource, Binding.copySource, Binding.flippedMergeSource, Binding.turnedMergeSource]
-      decisions = maybe Map.empty (\o -> Map.withoutKeys (Object.bindings o) own) mOriginal
+      -- CR 700.2: a spell that is not modal has no mode to choose, so the copy
+      -- of one from off the stack still resolves its text: the one selection
+      -- the copied text forces (Modal.forcedSelection), where there is one.
+      forced = Modal.forcedSelection (Set.fromList (fmap ModeIndex.MkModeIndex (take (Seq.length (Modal.Type.modes copiedSpell)) [0 ..]))) (Modal.Type.selection copiedSpell)
+      decisions = maybe (maybe Map.empty (Binding.fromChoices Map.empty Nothing) forced) (\o -> Map.withoutKeys (Object.bindings o) own) mOriginal
    in subject
         { Object.bindings = Map.union (Map.restrictKeys (Object.bindings subject) own) decisions,
           Object.announcedX = mOriginal >>= Object.announcedX,
@@ -6460,7 +6472,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 pure made
       _ -> pure []
     bindMinted resolving mSlot minted
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy originalRef subjectRef duration exceptions) ->
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subjectRef duration exceptions newTargets) -> do
+    -- CR 108.1: a NAMED original is the card the Oracle reference gives the
+    -- name, looked up before the board below is read.
+    named <- case original of
+      CopyOriginal.Named name -> Game.lookUpCard name
+      CopyOriginal.OfObject _ -> pure Nothing
+    let onStackIn g oid = List.find ((== Zone.Stack) . Object.zone) (Game.lookupObject oid g)
+        -- The copiable values, and the original's stack incarnation whose
+        -- choices CR 707.2 hands on. A named card's are read off a
+        -- counterfactual board holding it (Event.mintOutside), which is
+        -- thrown away with the read; it is on no stack, so it hands on none.
+        copiedOriginal gs = case original of
+          CopyOriginal.OfObject ref -> case objectRefObjects legal resolving controller source gs ref of
+            [oid] -> Just (Event.copiedSnapshotWithLastKnown oid gs, onStackIn gs oid)
+            _ -> Nothing
+          CopyOriginal.Named _ -> fmap (\printingId -> let (oid, board) = Event.mintOutside controller printingId gs in (Event.copiedSnapshot oid board, Nothing)) named
+    before <- State.get
     State.modify' $ \gs ->
       -- CR 707.1: each named subject becomes a copy of the named original, in
       -- whatever zone it already sits -- CR 707.4's "while remaining on the
@@ -6485,10 +6513,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       -- Pawl.Types.Source, so the ability is read where CR 602.2a and CR 603.3
       -- already carry it rather than being looked back up on a source that may
       -- have left (CR 113.7a).
-      case objectRefObjects legal resolving controller source gs originalRef of
-        [original] ->
-          let copied = Event.copiedSnapshotWithLastKnown original gs
-              -- PER SUBJECT, because CR 707.9c's retained original value is the
+      case copiedOriginal gs of
+        Just (copied, mOriginal) ->
+          let -- PER SUBJECT, because CR 707.9c's retained original value is the
               -- subject's own (Vesuvan Doppelganger's "it doesn't copy that
               -- creature's color"), and CR 707.4's road names a set. Read off
               -- the pre-effect `gs` like everything else here (CR 608.2f), so a
@@ -6501,11 +6528,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- the original's "choices made when casting or activating it" --
               -- none when the original is not on the stack. Off the pre-effect
               -- `gs` for the reason above.
-              acquire g = foldr acquireOne g (filter (Maybe.isJust . onStack) subjects)
+              acquire g = foldr acquireOne g (filter (Maybe.isJust . onStackIn gs) subjects)
               acquireOne subject g =
-                let g1 = g {GameState.objects = Map.adjust (acquireChoices (onStack original)) subject (GameState.objects g)}
+                let g1 = g {GameState.objects = Map.adjust (acquireChoices (PC.spell (snapshotFor subject)) mOriginal) subject (GameState.objects g)}
                  in maybe g1 (\o -> rearmStackExile subject (snapshotFor subject) o g1) (Game.lookupObject subject g1)
-              onStack oid = List.find ((== Zone.Stack) . Object.zone) (Game.lookupObject oid gs)
            in case duration of
                 -- CR 707.3: the card states no ending, so the copiable values go
                 -- onto the subject itself (Binding.setCopy) and nothing has to
@@ -6533,7 +6559,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                             }
                         rows = fmap row . Map.toList . Map.fromListWith Set.union $ fmap (\subject -> (snapshotFor subject, Set.singleton subject)) subjects
                      in acquire gs1 {GameState.copyEffects = rows <> GameState.copyEffects gs1}
-        _ -> gs
+        Nothing -> gs
+    -- CR 707.10c's "its controller may choose new targets for it": each subject
+    -- on the stack, asked of that spell's controller (CR 405.4), once it is the
+    -- copy. Transcantation's ruling makes the prompt the spell's only road back
+    -- to a target.
+    --
+    -- Not implemented: the ruling's "the spell won't resolve" when none is
+    -- chosen (CR 608.2b). The spell resolves and its targeted text does
+    -- nothing (#4235).
+    Monad.forM_ (if newTargets then fmap snd (copiedOriginal before) else Nothing) $ \mOriginalOf ->
+      Monad.forM_ (filter (Maybe.isJust . onStackIn before) (objectRefObjects legal resolving controller source before subjectRef)) $ \spell -> do
+        g <- State.get
+        Monad.forM_ (Game.lookupObject spell g) $ \obj ->
+          chooseNewTargetsFor (Maybe.isNothing mOriginalOf) (Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf spell g)) spell
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity copierRef exceptions) -> do
     gs <- State.get
     -- CR 707.10: `quantity` copies of each named object, each put onto the stack.
@@ -6739,7 +6778,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- CR 707.10c's chooser is the COPY's controller and not the copying
             -- effect's: Meletis Charlatan's "that player may choose new targets
             -- for the copy". Proved by Pawl.CopySpec's Charlatan group.
-            Monad.when (targets == CopyTargets.ChosenByController) (chooseNewTargetsFor copier copyId)
+            Monad.when (targets == CopyTargets.ChosenByController) (chooseNewTargetsFor False copier copyId)
             -- CR 115.1: "these targets are declared as part of the process of
             -- putting the spell or ability on the stack", and CR 707.10c puts the
             -- copy on the stack once its controller has decided what its targets

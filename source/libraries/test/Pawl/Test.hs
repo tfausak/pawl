@@ -88,6 +88,7 @@ import qualified Pawl.Codec.CantSearchLibrariesSpec
 import qualified Pawl.Codec.CardArrivedInSpec
 import qualified Pawl.Codec.CardLeavesZoneSpec
 import qualified Pawl.Codec.CardNameSpec
+import qualified Pawl.Codec.CardPutIntoGraveyardSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
 import qualified Pawl.Codec.CastFromSpec
@@ -138,6 +139,7 @@ import qualified Pawl.Codec.ControllerBecomesTargetSpec
 import qualified Pawl.Codec.ControllerRelationSpec
 import qualified Pawl.Codec.ConvokingSpec
 import qualified Pawl.Codec.CopyExceptionSpec
+import qualified Pawl.Codec.CopyOriginalSpec
 import qualified Pawl.Codec.CopyStackObjectSpec
 import qualified Pawl.Codec.CopyTargetsSpec
 import qualified Pawl.Codec.CostBasisSpec
@@ -798,6 +800,7 @@ spec s registry = do
   Pawl.Codec.CantSearchLibrariesSpec.spec s
   Pawl.Codec.CardArrivedInSpec.spec s
   Pawl.Codec.CardLeavesZoneSpec.spec s
+  Pawl.Codec.CardPutIntoGraveyardSpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
@@ -862,6 +865,7 @@ spec s registry = do
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CopyStackObjectSpec.spec s
+  Pawl.Codec.CopyOriginalSpec.spec s
   Pawl.Codec.CopyTargetsSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
   Pawl.Codec.ConjureCardsSpec.spec s

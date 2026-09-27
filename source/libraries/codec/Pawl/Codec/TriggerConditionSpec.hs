@@ -1,5 +1,6 @@
 module Pawl.Codec.TriggerConditionSpec where
 
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.JsonCodec.Common as Common
@@ -7,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
@@ -498,8 +500,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.CardPutIntoGraveyard (Filter.Not Filter.IsSource))
-      " {\"type\":\"CardPutIntoGraveyard\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}} "
+      (TriggerCondition.CardPutIntoGraveyard (CardPutIntoGraveyard.MkCardPutIntoGraveyard (Filter.Not Filter.IsSource) Set.empty))
+      " {\"type\":\"CardPutIntoGraveyard\",\"value\":{\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"IsSource\"}}}} "
   -- The same written form read by a bystander, which carries a Filter where
   -- SelfDies above carries nothing -- so it is a separate tag, and "another"
   -- lives inside that Filter.

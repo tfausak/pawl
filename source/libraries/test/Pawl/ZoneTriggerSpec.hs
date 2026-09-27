@@ -49,6 +49,7 @@ import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
@@ -476,6 +477,42 @@ graveyardTriggerSpec s registry =
           let after = churnReturning pikerId gs spellId
           Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Goblin Piker") (namesIn Zone.Hand S.alice after)) "the Piker left the graveyard for the hand"
           Spec.assertEqWith s "and alice has no Zombie token" (zombieTapStates after) []
+        -- Oglor, Devoted Assistant whole card. Her upkeep look puts the Goblin
+        -- Piker from the library into the graveyard, her second trigger grants
+        -- it "When this card leaves your graveyard, create a tapped 2/2 black
+        -- Zombie creature token" perpetually, and Corpse Churn returns it to
+        -- hand, so the granted ability sees its own departure (CR 603.10a). A
+        -- Hill Giant put into the graveyard from the battlefield first is the
+        -- origin control: "from your library or hand" does not admit it.
+        Spec.it s "CR 603.10a Oglor's perpetual grant fires as the milled card leaves the graveyard" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          churn <- S.printingOf s registry "Corpse Churn"
+          oglor <- S.printingOf s registry "Oglor, Devoted Assistant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          let upkeep = Phase.Beginning BeginningStep.Upkeep
+              (_, g1) = S.addPermanent oglor S.alice (S.landsInPlay swamp 2)
+              (giantId, g2) = S.addPermanent giant S.alice g1
+              g3 = iterate (snd . S.addLibraryCard swamp S.alice) g2 !! 3
+              (pikerId, g4) = S.addLibraryCard piker S.alice g3
+              (_, g5) = S.addLibraryCard swamp S.alice g4
+              (g6, spellId) = S.handOne churn g5
+              lookedAt :: Prompt.Prompt r -> r
+              lookedAt p = case p of
+                Prompt.ChooseCardFromAmong _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== pikerId) (NonEmpty.toList offered))
+                _ -> S.identityAnswer p
+              drain gs =
+                let placed = S.runPure lookedAt gs Engine.settleForPriority
+                 in if null (GameState.stack placed) then placed else drain (S.runPure lookedAt placed Stack.resolveTop)
+              (buried, died) = S.runPureWith S.identityAnswer g6 (Event.changeZoneReturning giantId Zone.Graveyard)
+              giantCard = Maybe.fromMaybe giantId (Seq.lookup 0 buried)
+              upkept = drain (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) ((drain died) {GameState.phase = upkeep}))
+              ready = upkept {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+              pikerCard = Maybe.fromMaybe pikerId (List.find (\oid -> fmap Face.name (Game.faceOf oid ready) == Just (S.printingName piker)) (Game.zoneMembers Zone.Graveyard S.alice ready))
+              after = drain (churnReturning pikerCard ready spellId)
+          Spec.assertEqWith s "CR 603.10a alice has one tapped Zombie token" (zombieTapStates after) [TapState.Tapped]
+          Spec.assertBool s (Set.member (S.printingName piker) (namesIn Zone.Hand S.alice after)) "the Piker the upkeep look buried left the graveyard for the hand"
+          Spec.assertEqWith s "the Hill Giant, put there from the battlefield, gained no ability" (length (Projection.triggeredAbilitiesOf giantCard after)) 0
         -- The FILTER on that source, which is CR 113.6k itself: a departed
         -- graveyard card is offered only the abilities that function in a
         -- graveyard. Come Back Wrong ("Destroy target creature. If a creature
@@ -2863,7 +2900,7 @@ everyTriggerCondition :: [TriggerCondition.TriggerCondition]
 everyTriggerCondition =
   [ TriggerCondition.SelfEnters,
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
-    TriggerCondition.CardPutIntoGraveyard Filter.Type.IsSource,
+    TriggerCondition.CardPutIntoGraveyard (CardPutIntoGraveyard.MkCardPutIntoGraveyard Filter.Type.IsSource Set.empty),
     TriggerCondition.PermanentDies Filter.Type.IsSource,
     TriggerCondition.PermanentsDie Filter.Type.IsSource,
     TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.EachTurn),

@@ -41,6 +41,7 @@ import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.ConjureCards as ConjureCards
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
 import qualified Pawl.Types.Count as Count.Type
@@ -643,8 +645,13 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref riders slot exceptions) -> Effect.CreateCopy (CreateCopy.MkCreateCopy (rewriteQuantity pairs quantity) (rewriteObjectRef pairs ref) (rewriteEntryRiders pairs riders) slot (fmap (rewriteCopyException pairs) exceptions))
   -- The exceptions ride this opcode too, and take the same walk AsCopy's do
   -- (rewriteEntryRewrite below).
-  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject duration exceptions) ->
-    Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (rewriteObjectRef pairs original) (rewriteObjectRef pairs subject) (fmap (rewriteDuration pairs) duration) (fmap (rewriteCopyException pairs) exceptions))
+  -- A NAMED original is left alone: CR 612.2 keeps a card name out of a text
+  -- change's reach.
+  Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original subject duration exceptions newTargets) ->
+    let original' = case original of
+          CopyOriginal.OfObject ref -> CopyOriginal.OfObject (rewriteObjectRef pairs ref)
+          CopyOriginal.Named name -> CopyOriginal.Named name
+     in Effect.BecomeCopy (BecomeCopy.MkBecomeCopy original' (rewriteObjectRef pairs subject) (fmap (rewriteDuration pairs) duration) (fmap (rewriteCopyException pairs) exceptions) newTargets)
   -- BOTH refs, CreateCopy's reason: CR 707.2 keeps a text change out of the
   -- copiable values, so what the copy becomes is not rewritten, but CR 707.10d's
   -- description of the candidates ("each other creature you control") is card
@@ -1674,7 +1681,7 @@ rewriteTriggerCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Tri
 rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
   TriggerCondition.PermanentEnters f -> TriggerCondition.PermanentEnters (Filter.rewrite pairs f)
-  TriggerCondition.CardPutIntoGraveyard f -> TriggerCondition.CardPutIntoGraveyard (Filter.rewrite pairs f)
+  TriggerCondition.CardPutIntoGraveyard p -> TriggerCondition.CardPutIntoGraveyard p {CardPutIntoGraveyard.filter = Filter.rewrite pairs (CardPutIntoGraveyard.filter p)}
   TriggerCondition.PermanentDies f -> TriggerCondition.PermanentDies (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDie f -> TriggerCondition.PermanentsDie (Filter.rewrite pairs f)
   TriggerCondition.PermanentLeavesTheBattlefield f -> TriggerCondition.PermanentLeavesTheBattlefield (Filter.rewrite pairs f)

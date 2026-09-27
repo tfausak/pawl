@@ -216,6 +216,8 @@ library codec
     Pawl.Codec.CardLeavesZoneSpec
     Pawl.Codec.CardName
     Pawl.Codec.CardNameSpec
+    Pawl.Codec.CardPutIntoGraveyard
+    Pawl.Codec.CardPutIntoGraveyardSpec
     Pawl.Codec.CardSpec
     Pawl.Codec.CardType
     Pawl.Codec.CardTypeSpec
@@ -319,6 +321,8 @@ library codec
     Pawl.Codec.ConvokingSpec
     Pawl.Codec.CopyException
     Pawl.Codec.CopyExceptionSpec
+    Pawl.Codec.CopyOriginal
+    Pawl.Codec.CopyOriginalSpec
     Pawl.Codec.CopyStackObject
     Pawl.Codec.CopyStackObjectSpec
     Pawl.Codec.CopyTargets
@@ -1735,6 +1739,7 @@ library types
     Pawl.Types.CardArrivedIn
     Pawl.Types.CardLeavesZone
     Pawl.Types.CardName
+    Pawl.Types.CardPutIntoGraveyard
     Pawl.Types.CardType
     Pawl.Types.CarryOver
     Pawl.Types.CastFrom
@@ -1793,6 +1798,7 @@ library types
     Pawl.Types.ControlSides
     Pawl.Types.Convoking
     Pawl.Types.CopyException
+    Pawl.Types.CopyOriginal
     Pawl.Types.CopyStackObject
     Pawl.Types.CopyTargets
     Pawl.Types.Cost

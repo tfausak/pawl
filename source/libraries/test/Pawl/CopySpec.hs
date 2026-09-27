@@ -2341,6 +2341,14 @@ aimMimicry subjectId originalId p = case p of
       asked
   _ -> S.identityAnswer p
 
+-- Transcantation's resolution: CR 108.1's lookup answered with `bolt`'s card,
+-- and CR 707.10c's re-choice answered by `retarget` over the offered slots.
+transcantationAnswer :: Printing.Printing -> (Set.Set Recipient.Recipient -> Set.Set Recipient.Recipient) -> Prompt.Prompt r -> r
+transcantationAnswer bolt retarget p = case p of
+  Prompt.LookUpCard _ -> Just (Printing.card bolt)
+  Prompt.ChooseTargets _ _ _ asked -> fmap (retarget . snd) asked
+  _ -> S.identityAnswer p
+
 copySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- CR 707.1 / 707.2: a spell ON THE STACK becomes a copy of another. alice
@@ -2421,6 +2429,49 @@ copySpellSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "nothing of alice's was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
         Spec.assertEqWith s "bob took the Bolt's 3 and the copy's 3" (S.lifeOf S.bob after) (Just 14)
       _ -> Spec.assertFailure s "the spells never reached the stack"
+  -- Transcantation (CMB2 playtest) {1}{R} Instant: "Target instant or sorcery
+  -- spell becomes a copy of Lightning Bolt. Its controller may choose new targets
+  -- for it." The original is a card NAME (CR 108.1), so the spell acquires no
+  -- choices (CR 707.2), and the Bolt text's target comes only from CR 707.10c's
+  -- re-choice, which offers the one target the text fixes.
+  Spec.it s "CR 707.2 / 707.10c Transcantation's Bolt resolves at the target its controller chooses anew" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    transcantation <- S.printingOf s registry "Transcantation"
+    let lands = S.landsFor island S.alice 2 (S.landsFor mountain S.alice 2 S.threePlayerGame)
+        (withThink, thinkId) = S.handOne thinkTwice lands
+        (transcantationId, withTranscantation) = S.addHandCard transcantation S.alice withThink
+        -- Stocked, so the mutant's draw is a card in hand rather than CR 704.5b.
+        board = snd (S.addLibraryCard island S.alice (snd (S.addLibraryCard island S.alice withTranscantation)))
+        cast1 = snd (Engine.runGamePure S.identityAnswer board (S.cast S.alice thinkId))
+    case topOfStack cast1 of
+      Just thinkSpell -> do
+        let cast2 = snd (Engine.runGamePure (aimedAtObject thinkSpell) cast1 (S.cast S.alice transcantationId))
+            atCarol = Set.filter (== Recipient.ToPlayer S.carol)
+            -- Transcantation, then the Bolt that was Think Twice.
+            after = resolveOne S.identityAnswer (resolveOne (transcantationAnswer bolt atCarol) cast2)
+        Spec.assertEqWith s "carol took the Bolt's 3 at the target chosen anew" (S.lifeOf S.carol after) (Just 17)
+        Spec.assertEqWith s "and alice drew nothing: Think Twice's text never resolved" (S.handSize S.alice after) 0
+      Nothing -> Spec.assertFailure s "Think Twice never reached the stack"
+  -- The ruling's other half: "If the spell's controller doesn't change the
+  -- spell's target so it has one, the spell won't resolve." The subject is a Bolt
+  -- already aimed at bob, so a spell that kept its own target (CR 707.2's choices
+  -- not dropped) would still hit him.
+  Spec.it s "CR 707.2 Transcantation's Bolt left without a new target hits nobody" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    transcantation <- S.printingOf s registry "Transcantation"
+    let (withBolt, boltId) = S.handOne bolt (S.landsFor mountain S.alice 3 S.threePlayerGame)
+        (transcantationId, board) = S.addHandCard transcantation S.alice withBolt
+        cast1 = snd (Engine.runGamePure (pinTarget (Recipient.ToPlayer S.bob)) board (S.cast S.alice boltId))
+    case topOfStack cast1 of
+      Just boltSpell -> do
+        let cast2 = snd (Engine.runGamePure (aimedAtObject boltSpell) cast1 (S.cast S.alice transcantationId))
+            after = resolveOne S.identityAnswer (resolveOne (transcantationAnswer bolt (const Set.empty)) cast2)
+        Spec.assertEqWith s "bob, the Bolt's old target, and carol are both untouched" (fmap (`S.lifeOf` after) [S.bob, S.carol]) [Just 20, Just 20]
+      Nothing -> Spec.assertFailure s "the Bolt never reached the stack"
   -- CR 707.10 end to end: the copy exists, carries the original's decisions (CR
   -- 707.10's "all decisions made for it" -- here the Bolt's target), resolves as
   -- a spell of its own, and then does NOT reach a graveyard.
