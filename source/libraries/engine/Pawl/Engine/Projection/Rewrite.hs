@@ -42,6 +42,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -1693,6 +1694,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- every turn.
   TriggerCondition.CardLeavesZone p -> TriggerCondition.CardLeavesZone p {CardLeavesZone.filter = Filter.rewrite pairs (CardLeavesZone.filter p)}
   TriggerCondition.CardsLeaveZone p -> TriggerCondition.CardsLeaveZone p {CardLeavesZone.filter = Filter.rewrite pairs (CardLeavesZone.filter p)}
+  TriggerCondition.CardsPutIntoZone p -> TriggerCondition.CardsPutIntoZone p {CardsPutIntoZone.filter = Filter.rewrite pairs (CardsPutIntoZone.filter p)}
   TriggerCondition.SelfLeavesGraveyard -> condition
   -- The Filter is rewritten and the counter kind is not: CR 612.1's pairs swap
   -- SUBTYPE words, and a counter kind names none.
