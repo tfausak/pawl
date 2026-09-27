@@ -153,6 +153,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
@@ -2203,6 +2204,63 @@ zhaoHandOfNine plains reliquaryTower zhao kinds =
 reliquaryCleanup :: GameState.GameState -> GameState.GameState
 reliquaryCleanup gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
 
+-- Nerd Rage {2}{U} Enchantment -- Aura: "Enchant creature / When this Aura
+-- enters, draw two cards. / Enchanted creature has 'You have no maximum hand
+-- size' and 'Whenever this creature attacks, if you have ten or more cards in
+-- hand, it gets +10/+10 until end of turn.'"
+--
+-- CR 613.1f / 113.7: a player ability a STATIC ability grants is the
+-- receiver's, so its "you" is the enchanted creature's controller. alice's
+-- Nerd Rage enchants bob's Llanowar Elves, and each player holds nine cards: the
+-- two players tell the receiver's controller from the Aura's.
+nerdRageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nerdRageSpec s registry =
+  Spec.describe s "NerdRage" $ do
+    -- `before` and `after` are put onto alice's battlefield with timestamps
+    -- earlier and later than the Aura's.
+    let boardWith before after = do
+          plains <- S.printingOf s registry "Plains"
+          elves <- S.printingOf s registry "Llanowar Elves"
+          rage <- S.printingOf s registry "Nerd Rage"
+          let put g printing = snd (S.addPermanent printing S.alice g)
+              (elvesId, g1) = S.addPermanent elves S.bob (reliquaryHandOfNine plains before)
+              (rageId, g2) = S.addPermanent rage S.alice g1
+              add g _ = snd (S.addHandCard plains S.bob g)
+          pure (elvesId, List.foldl' put (List.foldl' add (S.attach rageId elvesId g2) [1 .. 9 :: Int]) after)
+        board = boardWith [] []
+    Spec.it s "CR 113.7 Nerd Rage's quoted ability lifts the enchanted creature's controller's maximum" $ do
+      (_, gs) <- board
+      let bobsCleanup = reliquaryCleanup gs {GameState.activePlayer = S.bob}
+      Spec.assertEqWith s "bob keeps all nine cards at his cleanup" (S.handSize S.bob bobsCleanup) 9
+      Spec.assertEqWith s "bob has no maximum hand size" (PlayerEffect.maximumHandSize S.bob gs) Nothing
+      Spec.assertEqWith s "alice, who controls the Aura but not the creature, still discards to seven" (S.handSize S.alice (reliquaryCleanup gs)) 7
+
+    -- CR 613.1f / 613.7: Humility removes the Elves' abilities in layer 6, and
+    -- timestamp order decides whether the grant lands before or after that.
+    -- Only a removal LATER than the Aura takes the quoted ability.
+    Spec.it s "CR 613.7 a later Humility takes the granted ability, an earlier one does not" $ do
+      humility <- S.printingOf s registry "Humility"
+      (_, later) <- boardWith [] [humility]
+      (_, earlier) <- boardWith [humility] []
+      Spec.assertEqWith s "Humility after the Aura: bob discards to seven" (S.handSize S.bob (reliquaryCleanup later {GameState.activePlayer = S.bob})) 7
+      Spec.assertEqWith s "Humility before the Aura: bob keeps all nine" (S.handSize S.bob (reliquaryCleanup earlier {GameState.activePlayer = S.bob})) 9
+
+    -- CR 707.2: a grant is not a copiable value, so alice's Clone of the
+    -- enchanted Elves gives her nothing.
+    Spec.it s "CR 707.2 a Clone of the enchanted creature copies no quoted ability" $ do
+      (elvesId, gs) <- board
+      clone <- S.printingOf s registry "Clone"
+      let (_, staged) = S.spellOnStack clone S.alice gs
+          copying :: Prompt.Prompt r -> r
+          copying p = case p of
+            Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
+            _ -> S.identityAnswer p
+          copied = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
+          elvesNames = PC.names (Projection.project elvesId gs)
+          alicesElves = [oid | oid <- Set.toList (GameState.battlefield copied), Projection.controllerOf oid copied == Just S.alice, PC.names (Projection.project oid copied) == elvesNames]
+      Spec.assertEqWith s "alice still discards to seven" (S.handSize S.alice (reliquaryCleanup copied)) 7
+      Spec.assertEqWith s "and her Clone really is a copy of the Elves" (length alicesElves) 1
+
 -- Reliquary Tower, a Land: "You have no maximum hand size. / {T}: Add {C}."
 reliquaryTowerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 reliquaryTowerSpec s registry =
@@ -3079,6 +3137,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   hybridDiscountSpec s registry
   mixedReductionSpec s registry
   textChangedEdgewalkerSpec s registry
+  nerdRageSpec s registry
   reliquaryTowerSpec s registry
   theTenRingsSpec s registry
   minamoScrollkeeperSpec s registry

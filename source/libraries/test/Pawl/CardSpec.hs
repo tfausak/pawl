@@ -856,6 +856,7 @@ modificationCounts modification = case modification of
     GrantedAbility.Static ability -> staticAbilityCounts ability
     GrantedAbility.Rules rules -> ruleAbilitiesCounts rules
     GrantedAbility.Replacement ability -> concatMap conditionCounts (Maybe.maybeToList (PrintedReplacement.condition ability))
+    GrantedAbility.Player ability -> concatMap conditionCounts (Maybe.maybeToList (PlayerStaticAbility.condition ability))
   -- Rule 702.165a's grant names the source, and the keywords it carries are
   -- minted from the card's Backup keyword, swept there.
   Modification.GainAbilitiesOfSource _ -> []
@@ -5849,6 +5850,16 @@ grantedReplacements card =
     )
     (grantedModifications card)
 
+-- The PLAYER kind of the same grant (CR 613.10), swept for the same reason.
+grantedPlayerAbilities :: Face.Face Card.Type.Card -> [PlayerStaticAbility.PlayerStaticAbility]
+grantedPlayerAbilities card =
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.Player ability) -> Just ability
+        _ -> Nothing
+    )
+    (grantedModifications card)
+
 -- CR 708.2: a face-down listing's quoted abilities, as the grant they amount to.
 listedGrants :: FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Type.Card) -> [Projection.Modification]
 listedGrants = fmap Modification.GainAbility . FaceDownCharacteristics.abilities
@@ -6100,6 +6111,10 @@ cardFilters card =
     <> concatMap staticAbilityFilters (grantedStaticAbilities card)
     <> concatMap ruleAbilitiesFilters (grantedRuleAbilities card)
     <> concatMap printedReplacementFilters (grantedReplacements card)
+    -- A granted player ability is its RECEIVER's, so it is framed against the
+    -- permanent holding it, exactly as a printed one above is.
+    <> concatMap (frame StandingHostFramed . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (grantedPlayerAbilities card)
+    <> concatMap (standingHosted . playerEffectFilters . PlayerStaticAbility.effect) (grantedPlayerAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)

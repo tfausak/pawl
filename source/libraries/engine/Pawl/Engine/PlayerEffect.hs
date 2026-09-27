@@ -26,6 +26,7 @@
 -- reach a restriction a resolution stores.
 module Pawl.Engine.PlayerEffect where
 
+import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Functor.Const as Functor
 import qualified Data.Functor.Identity as Functor
@@ -240,6 +241,49 @@ printedRows gs =
       -- has a player ability forces it -- so the ordinary board pays nothing for
       -- the CR 604.2 question below.
       removed = Projection.abilityRemoval gs
+      -- One permanent's rows, each ability stamped and read through `changes`,
+      -- CR 612.1's word swap over the text it is printed in -- none for a
+      -- granted one (CR 612.3).
+      rowsOf changes oid controller stamped =
+        let readAs = if null changes then id else Projection.rewritePlayerEffect changes
+            -- CR 604.2's "as long as" clause, the same gate
+            -- Projection.gatherStatic applies to the object-facing
+            -- carrier, and asked here for the player-facing one.
+            --
+            -- The VIEW is the FINISHED projection, not a bounded one:
+            -- CR 613.10 and CR 613.11 apply a player effect after the
+            -- seven layers have run, so there is no layer to bound
+            -- against -- the answer Projection.abilitiesGiven takes for
+            -- CR 702.178a's max speed gate, and for that same reason.
+            --
+            -- The PERSPECTIVE is the permanent's controller and the
+            -- source is the permanent, so CR 109.5's "you" inside the
+            -- clause is the Class controller rather than the taxed
+            -- player -- which is the whole content of "during YOUR
+            -- turn". The taxed player is PlayerRef.Candidate instead,
+            -- substituted per affected player (Condition.forCandidate):
+            -- Angelic Arbiter's "each opponent who cast a spell this
+            -- turn" asks each opponent about themselves. The same player
+            -- is the Context's recipient, so Ethersworn Canonist's "each
+            -- player who has cast a nonartifact spell" counts their own
+            -- casts through Filter.ControlledByRecipient.
+            --
+            -- The clause takes the same CR 612.1 word swap the effect
+            -- beside it does, since one ability's two halves cannot
+            -- disagree about what a word means.
+            lives ability pid = case PlayerStaticAbility.condition ability of
+              Nothing -> True
+              Just c ->
+                Condition.holds
+                  (Projection.fullView gs)
+                  ((Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) {Filter.recipient = Just pid})
+                  gs
+                  oid
+                  (Condition.forCandidate pid (if null changes then c else Projection.rewriteCondition changes c))
+            reaches ability pid =
+              applies pid controller gs (AffectedPlayers.Scoped (PlayerStaticAbility.scope ability))
+                && lives ability pid
+         in fmap (\(stamp, ability) -> (stamp, Just oid, PlayerStaticAbility.name ability, reaches ability, readAs (PlayerStaticAbility.effect ability))) stamped
       fromPermanent oid = case playerAbilitiesOf oid gs of
         -- The overwhelming majority of permanents: no ability, so no
         -- controller projection and no CR 305.7 check is paid for.
@@ -287,48 +331,30 @@ printedRows gs =
                 -- permanent that prints no player ability, so the fold runs
                 -- once per ability-bearing permanent instead of once per
                 -- permanent on the battlefield.
-                let changes = Projection.textChangesAffecting oid gs
-                    readAs = if null changes then id else Projection.rewritePlayerEffect changes
-                    -- CR 604.2's "as long as" clause, the same gate
-                    -- Projection.gatherStatic applies to the object-facing
-                    -- carrier, and asked here for the player-facing one.
-                    --
-                    -- The VIEW is the FINISHED projection, not a bounded one:
-                    -- CR 613.10 and CR 613.11 apply a player effect after the
-                    -- seven layers have run, so there is no layer to bound
-                    -- against -- the answer Projection.abilitiesGiven takes for
-                    -- CR 702.178a's max speed gate, and for that same reason.
-                    --
-                    -- The PERSPECTIVE is the permanent's controller and the
-                    -- source is the permanent, so CR 109.5's "you" inside the
-                    -- clause is the Class controller rather than the taxed
-                    -- player -- which is the whole content of "during YOUR
-                    -- turn". The taxed player is PlayerRef.Candidate instead,
-                    -- substituted per affected player (Condition.forCandidate):
-                    -- Angelic Arbiter's "each opponent who cast a spell this
-                    -- turn" asks each opponent about themselves. The same player
-                    -- is the Context's recipient, so Ethersworn Canonist's "each
-                    -- player who has cast a nonartifact spell" counts their own
-                    -- casts through Filter.ControlledByRecipient.
-                    --
-                    -- The clause takes the same CR 612.1 word swap the effect
-                    -- beside it does, since one ability's two halves cannot
-                    -- disagree about what a word means.
-                    lives ability pid = case PlayerStaticAbility.condition ability of
-                      Nothing -> True
-                      Just c ->
-                        Condition.holds
-                          (Projection.fullView gs)
-                          ((Filter.contextFor (Game.teams gs) (Just controller) (Just oid)) {Filter.recipient = Just pid})
-                          gs
-                          oid
-                          (Condition.forCandidate pid (if null changes then c else Projection.rewriteCondition changes c))
-                    reaches ability pid =
-                      applies pid controller gs (AffectedPlayers.Scoped (PlayerStaticAbility.scope ability))
-                        && lives ability pid
-                 in fmap (\ability -> (Projection.staticTimestampOf oid object gs, Just oid, PlayerStaticAbility.name ability, reaches ability, readAs (PlayerStaticAbility.effect ability))) abilities
+                rowsOf (Projection.textChangesAffecting oid gs) oid controller (fmap ((,) (Projection.staticTimestampOf oid object gs)) abilities)
               else []
-   in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+      -- CR 613.1f / 613.10: the player abilities layer 6 GRANTED a permanent
+      -- (Nerd Rage's "You have no maximum hand size"), read off the finished
+      -- projection because only the fold knows who a static ability's grant
+      -- reaches. The ability is the RECEIVER's (CR 113.7), so its "you" is the
+      -- receiver's controller, and its timestamp is the later of the
+      -- receiver's and the granting effect's (CR 613.7a) -- the receiver's own,
+      -- since a text-box exchange leaves a grant where it is (CR 612.3).
+      -- None of the printed gates above applies: the
+      -- fold's own removal already took any grant a later removal reaches (CR
+      -- 613.7), CR 305.7 strips only a land's rules text, and CR 612.3 keeps a
+      -- text change out of a granted ability. One whole-board projection, and
+      -- only on a board where something grants a player ability.
+      -- Pawl.PlayerEffectSpec's NerdRage group proves it.
+      pcs = Projection.projectAll gs
+      grantedFrom oid = case PC.grantedPlayerAbilities (Projection.projectGiven pcs oid gs) of
+        [] -> []
+        abilities -> case (Game.lookupObject oid gs, Projection.controllerOf oid gs) of
+          (Just object, Just controller) -> rowsOf [] oid controller (fmap (Bifunctor.first (max (Object.timestamp object))) abilities)
+          _ -> []
+      onBattlefield = Set.toList (GameState.battlefield gs)
+   in concatMap fromPermanent onBattlefield
+        <> (if Projection.grantsPlayerAbilityAnywhere gs then concatMap grantedFrom onBattlefield else [])
 
 -- CR 116.2d's WHO: is `pid` a player whose game the permanent `oid` is changing
 -- right now? That is the rule's own reading of who may take the special action
