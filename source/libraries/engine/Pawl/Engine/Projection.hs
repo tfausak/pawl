@@ -5,6 +5,7 @@
 -- the same Projection alias.
 module Pawl.Engine.Projection where
 
+import qualified Control.Applicative as Applicative
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.List as List
@@ -58,6 +59,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.FullText as FullText
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -156,6 +158,7 @@ layer m = case m of
   -- green, since nothing else in this unit reads the layer directly.
   Modification.ExchangeTextBoxes -> Layer.Text
   Modification.AddNamesMatching _ -> Layer.Text
+  Modification.HasFullText _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
   Modification.SetControllerToSource -> Layer.Control
   Modification.SetColor _ -> Layer.Color
@@ -493,6 +496,20 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
         Modification.ExchangeTextBoxes -> case exchangePartner oid affected of
           Nothing -> pc
           Just other -> exchangeTextBoxFrom (textBoxOf other) pc
+        -- CR 612.6: the top card of the named graveyard's full text replaces
+        -- this object's, and the extra text the card writes beside it lands in
+        -- the same step, so it is text (CR 612.3) rather than a layer-6 grant.
+        -- The card's copiable values are what is read (CR 707.2), so a later
+        -- layer-3 effect on this object applies over the substituted text.
+        -- The gate on WHICH card is on top -- "as long as ... is a creature card"
+        -- -- is the static ability's condition, not this arm's; a graveyard that
+        -- is empty or names no one player leaves the object as it was.
+        Modification.HasFullText ft -> case Count.playersFor viewOf context gs (FullText.graveyard ft) of
+          Just [pid]
+            | Just top <- Game.topOfGraveyard pid gs ->
+                let withText p g = applyModification textBoxOf viewOf src stamp gs oid unitTypes affected (Modification.GainAbility g) p
+                 in List.foldl' withText (fullTextFrom (copiableCharacteristics top gs) pc) (FullText.alsoHas ft)
+          _ -> pc
         -- CR 612.7: every name in the Oracle card reference whose card face
         -- matches, in addition to the object's own. Each name is judged off the
         -- printed characteristics Card.referenceViews pairs it with, so a
@@ -623,6 +640,9 @@ cardTypesAfter m types = case m of
   -- CR 612.1 / 612.5: the text box moves and the type line does not.
   Modification.ExchangeTextBoxes -> types
   Modification.AddNamesMatching _ -> types
+  -- CR 612.6 does write the type line, but off a card this function cannot
+  -- see; nothing else in the one producer's effect grants a subtype.
+  Modification.HasFullText _ -> types
   Modification.AddSupertype _ -> types
   Modification.RemoveSupertype _ -> types
   Modification.SetColor _ -> types
@@ -690,6 +710,34 @@ exchangeTextBoxFrom from pc =
       PC.playerAbilities = PC.playerAbilities from,
       PC.specialActions = PC.specialActions from,
       PC.ruleAbilities = PC.ruleAbilities from
+    }
+
+-- CR 612.6: `from`'s full text over `pc` -- its text box as exchangeTextBoxFrom
+-- moves one, plus the name, mana cost, colour, type line and power, toughness,
+-- loyalty and defense boxes. A mana cost the card does not have is kept, per the
+-- card's ruling that an undefined characteristic is not acquired.
+--
+-- Not implemented: the static abilities, player abilities, special actions and
+-- rule-affecting abilities of the card whose full text an object has, which are
+-- gathered off the object's own copiable values rather than this fold (#4307).
+fullTextFrom :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
+fullTextFrom from pc =
+  (exchangeTextBoxFrom from pc)
+    { PC.names = PC.names from,
+      PC.manaCost = PC.manaCost from Applicative.<|> PC.manaCost pc,
+      PC.manaValue = maybe (PC.manaValue pc) (const (PC.manaValue from)) (PC.manaCost from),
+      PC.colors = PC.colors from,
+      PC.supertypes = PC.supertypes from,
+      PC.cardTypes = PC.cardTypes from,
+      PC.subtypes = PC.subtypes from,
+      PC.power = PC.power from,
+      PC.toughness = PC.toughness from,
+      PC.loyalty = PC.loyalty from,
+      PC.defense = PC.defense from,
+      PC.staticAbilities = PC.staticAbilities pc,
+      PC.playerAbilities = PC.playerAbilities pc,
+      PC.specialActions = PC.specialActions pc,
+      PC.ruleAbilities = PC.ruleAbilities pc
     }
 
 -- CR 305.7's strip, shared by both modifications that set a land's subtype. It
@@ -1258,6 +1306,8 @@ freezeQuantities gs announcedOn source context m =
         Modification.ExchangeTextBoxes -> Just m
         -- The filter is judged against card faces, not quantities.
         Modification.AddNamesMatching _ -> Just m
+        -- The extra text's own quantities are its own, GainAbility's reason.
+        Modification.HasFullText _ -> Just m
         -- No quantity to freeze: two bare markers.
         Modification.AssignCombatDamageWithToughness -> Just m
         Modification.GrantsStationToughness -> Just m
@@ -1306,6 +1356,7 @@ quantitiesOf m = case m of
   Modification.SwitchPowerToughness -> []
   Modification.ExchangeTextBoxes -> []
   Modification.AddNamesMatching _ -> []
+  Modification.HasFullText _ -> []
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
 
@@ -1316,6 +1367,7 @@ quantitiesOf m = case m of
 referenceQuery :: Modification.Modification ability -> Maybe (Filter.Type.Filter Keyword)
 referenceQuery m = case m of
   Modification.AddNamesMatching f -> Just f
+  Modification.HasFullText _ -> Nothing
   Modification.SetBasePowerToughness _ -> Nothing
   Modification.ModifyPowerToughness _ -> Nothing
   Modification.GainKeyword _ -> Nothing
@@ -1412,6 +1464,7 @@ setsLandSubtype m = case m of
   Modification.SwitchPowerToughness -> False
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  Modification.HasFullText _ -> False
   Modification.AssignCombatDamageWithToughness -> False
   Modification.SetColor _ -> False
   Modification.AddColor _ -> False
@@ -2493,6 +2546,11 @@ removesAbilities m = case m of
   -- at layer 3, so CR 613.1f's strip is not what it is.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  -- FALSE, ExchangeTextBoxes' posture: the abilities a static ability
+  -- generates are gathered off the copiable values, which CR 612.6 leaves
+  -- alone, so the full-text ability keeps generating the effect that
+  -- replaced its text (CR 613.6).
+  Modification.HasFullText _ -> False
   -- CR 613.11 rules-modifying marker rather than a layer-6 ability change.
   Modification.AssignCombatDamageWithToughness -> False
   -- A grant, GainKeyword's answer above: not a removal.
@@ -3586,6 +3644,9 @@ modificationWrites m = case m of
   -- Writes PC.names, which no Aspect covers: dependency is within a layer (CR
   -- 613.8a), and no layer-3 effect's affected set reads a name.
   Modification.AddNamesMatching _ -> Set.empty
+  -- CR 612.6 writes the whole card: its type line, colour, keywords and
+  -- power. Not Controller, which is layer 2's.
+  Modification.HasFullText _ -> Set.fromList [Types, Subtypes, Supertypes, Colors, Keywords, PowerA]
   Modification.AddCardType _ -> Set.singleton Types
   -- CR 205.1a's set writes BOTH: the card types it replaces, and the subtypes it
   -- strips along with the types that carried them.
@@ -3657,6 +3718,8 @@ modificationReads m = case m of
   Modification.ExchangeTextBoxes -> Set.singleton Keywords
   -- Its filter is put to card faces outside the fold, never to this object.
   Modification.AddNamesMatching _ -> Set.empty
+  -- Reads a graveyard card's copiable values, never this object.
+  Modification.HasFullText _ -> Set.empty
   -- Carries no Quantity: two bare markers.
   Modification.AssignCombatDamageWithToughness -> Set.empty
   Modification.GrantsStationToughness -> Set.empty
@@ -5289,6 +5352,9 @@ grantsKeywordWhere p m = case m of
   -- be answered here.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  -- CR 612.6 copies whatever keywords the top card prints, ExchangeTextBoxes'
+  -- answer; its extra text is whole abilities, never a keyword.
+  Modification.HasFullText _ -> False
   -- Neither marker hands out a Keyword, whatever the station one's name says.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
@@ -5359,6 +5425,9 @@ grantsMintingType m = case m of
   -- CR 612.1: the exchange leaves the type line alone.
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  -- Writes whatever type line the top card prints, which this function cannot
+  -- see; True, since a wrong True costs only a projection.
+  Modification.HasFullText _ -> True
   -- Neither marker writes a card type or subtype.
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
@@ -5429,6 +5498,8 @@ grantsAbilityWhere p m = case m of
   Modification.SwitchPowerToughness -> False
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
+  -- The extra text is the one quoted ability this arm hands out.
+  Modification.HasFullText ft -> any (\g -> p g || grantedStaticWrites (grantsAbilityWhere p) g) (FullText.alsoHas ft)
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
 

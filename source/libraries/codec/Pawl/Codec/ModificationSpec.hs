@@ -19,6 +19,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.FullText as FullText
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -28,6 +29,8 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
@@ -292,6 +295,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       codec
       (Modification.AddNamesMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not (Filter.HasSupertype Supertype.Legendary)]))
       " {\"type\":\"AddNamesMatching\",\"value\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"HasSupertype\",\"value\":{\"type\":\"Legendary\"}}}]}} "
+  -- layer 3, CR 612.6: Volrath's Shapeshifter's "full text of that card",
+  -- here with no text of its own beside it.
+  Spec.it s "HasFullText carries its graveyard and extra text" $
+    Common.assertCodec
+      s
+      codec
+      (Modification.HasFullText (FullText.MkFullText (PlayerRef.Relative PlayerRelation.You) []))
+      " {\"type\":\"HasFullText\",\"value\":{\"graveyard\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"alsoHas\":[]}} "
   -- layer 7d, CR 613.4d: switches power and toughness. Payload-free.
   Spec.it s "SwitchPowerToughness" $
     Common.assertCodec
