@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -149,8 +150,15 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters 1 (Filter.HasCardType CardType.Creature)))
+      (CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters 1 (Filter.HasCardType CardType.Creature) CounterSpread.FromOne))
       " {\"type\":\"RemovePlusOneCounters\",\"value\":{\"count\":1,\"whichPermanent\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+  -- Its X form, Retribution of the Ancients'.
+  Spec.it s "RemovePlusOneCountersX" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.RemovePlusOneCountersX (Filter.HasCardType CardType.Creature))
+      " {\"type\":\"RemovePlusOneCountersX\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
   -- CR 118.12's counter-placing cost, CR 701.63a's endure.
   Spec.it s "PutPlusOneCountersOnThis" $
     Common.assertCodec

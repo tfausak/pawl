@@ -158,6 +158,7 @@ import qualified Pawl.Codec.CounterPlacementSpec
 import qualified Pawl.Codec.CounterRSpec
 import qualified Pawl.Codec.CounterRestrictionSpec
 import qualified Pawl.Codec.CounterSpec
+import qualified Pawl.Codec.CounterSpreadSpec
 import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
@@ -865,6 +866,7 @@ spec s registry = do
   Pawl.Codec.CounterPatternSpec.spec s
   Pawl.Codec.CounterRSpec.spec s
   Pawl.Codec.CounterSpec.spec s
+  Pawl.Codec.CounterSpreadSpec.spec s
   Pawl.Codec.CounterSubjectSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s

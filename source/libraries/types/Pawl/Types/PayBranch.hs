@@ -36,4 +36,8 @@ data PayBranch
     -- nobody selects nobody and its clause is skipped -- see
     -- Pawl.Engine.Resolve.payGateAdmits.
     IfNotPaid
+  | -- | The instructions run once when NO offered player paid -- CR 118.12a's
+    -- rewriting of Rhystic Tutor's "unless any player pays {2}". Every named
+    -- player is still offered the cost in CR 101.4's APNAP order.
+    IfNonePaid
   deriving (Bounded, Enum, Eq, Ord, Show)
