@@ -4994,6 +4994,19 @@ rhysticSpec s registry =
       activateShade payer = do
         (shadeId, gs, ability) <- shadeBoard
         pure (shadeId, fmap (\a -> S.runPure (paysFor payer) gs (Activate.activateAbility S.alice shadeId a >> Stack.resolveTop)) ability)
+      -- bob: a Goblin Piker on the stack. alice: two Swamps and Dash Hopes,
+      -- cast at the Piker, with its CR 601.2i cast trigger settled on top.
+      dashBoard = do
+        swamp <- S.printingOf s registry "Swamp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        dash <- S.printingOf s registry "Dash Hopes"
+        let (_, withPiker) = S.spellOnStack piker S.bob (S.landsFor swamp S.alice 2 S.threePlayerGame)
+            (gs, dashId) = S.handOne dash withPiker
+            onStack = S.runPure S.identityAnswer gs (S.cast S.alice dashId >> Engine.settleForPriority)
+        pure onStack
+      -- By NAME: casting made Dash Hopes a new object on the stack (CR 400.7).
+      stackNames gs = List.sort (fmap (`S.soleFaceName` gs) (GameState.stack gs))
+      named = CardName.MkCardName . Text.pack
    in Spec.describe s "CR 118.12a unless any player pays" $ do
         Spec.it s "CR 118.12a bob alone pays, so alice does not search" $ do
           (pikerId, onStack) <- tutorBoard
@@ -5028,6 +5041,21 @@ rhysticSpec s registry =
         Spec.it s "CR 118.12a nobody pays, so Nakaya Shade is 2/2" $ do
           (shadeId, after) <- activateShade Nothing
           Spec.assertEqWith s "CR 118.12a: the Shade is 2/2" (fmap (S.powerToughnessOf shadeId) after) (Just (Just (2, 2)))
+        -- The positive "if a player does" over the whole table: Dash Hopes'
+        -- cast trigger offers 5 life to every player, and bob's payment alone
+        -- counters it (CR 118.12, IfPaid over PlayerRef.EachPlayer).
+        Spec.it s "CR 118.12 bob pays 5 life, so Dash Hopes is countered and the Piker is not" $ do
+          onStack <- dashBoard
+          let after = S.runPure (paysFor (Just S.bob)) onStack Stack.resolveTop
+          Spec.assertEqWith s "setup: the trigger is on top of Dash Hopes and the Piker" (length (GameState.stack onStack)) 3
+          Spec.assertEqWith s "CR 118.12: Dash Hopes left the stack and the Piker did not" (stackNames after) [named "Goblin Piker"]
+          Spec.assertEqWith s "into alice's graveyard" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Graveyard S.alice after)) [named "Dash Hopes"]
+          Spec.assertEqWith s "bob paid the 5 life" (S.lifeOf S.bob after) (Just 15)
+        Spec.it s "CR 118.12 nobody pays, so Dash Hopes stays on the stack" $ do
+          onStack <- dashBoard
+          let after = S.runPure (paysFor Nothing) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 118.12: Dash Hopes and the Piker are both still on the stack" (stackNames after) [named "Dash Hopes", named "Goblin Piker"]
+          Spec.assertEqWith s "nobody paid life" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
