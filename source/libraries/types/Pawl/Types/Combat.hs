@@ -268,6 +268,13 @@ data Combat = MkCombat
     -- derivation each already makes: the record is what makes the answer stick
     -- between samples, the derivation is what answers within one.
     attackingNothing :: Set.Set ObjectId.ObjectId,
+    -- | CR 508.5's second sentence: for each creature removed from combat this
+    -- combat, the defending player it was attacking before it was removed.
+    -- Written by Pawl.Engine.Game.removeFromCombat and ceaseAttacking (and CR
+    -- 800.4a's Pawl.Engine.Departure.objectsLeaveWith), read by
+    -- Pawl.Engine.Defender.defendingPlayerOf. Pawl.RemoveCounterSpec's bounced
+    -- Sensational Spider-Man proves it.
+    removedDefending :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | Who is defending the combat phase in progress, in APNAP order (CR
     -- 101.4) -- the order CR 802.4 has them declare blockers in and CR 802.5
     -- has them assign combat damage in. Empty where no beginning-of-combat

@@ -125,6 +125,17 @@ playerOfAttacker controllerOf attacker gs =
   (\target -> defenderOfAttack controllerOf attacker target gs)
     =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
 
+-- CR 508.5 whole: playerOfAttacker while the creature is attacking, and once it
+-- has been removed from combat, the player it was attacking before that
+-- (Combat.removedDefending) -- for a reference made by an ability of that
+-- creature, which can outlive the attack (Sensational Spider-Man's trigger,
+-- provoke). The combat callers keep playerOfAttacker: each asks about a
+-- creature still attacking.
+defendingPlayerOf :: (ObjectId -> GameState -> Maybe PlayerId) -> ObjectId -> GameState -> Maybe PlayerId
+defendingPlayerOf controllerOf attacker gs =
+  playerOfAttacker controllerOf attacker gs
+    Applicative.<|> Map.lookup attacker (Combat.removedDefending (GameState.combat gs))
+
 -- playerOfAttacker with the target already in hand, for a caller walking
 -- Combat.attackers' own entries (Pawl.Engine.Damage).
 defenderOfAttack :: (ObjectId -> GameState -> Maybe PlayerId) -> ObjectId -> AttackTarget.AttackTarget -> GameState -> Maybe PlayerId

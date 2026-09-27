@@ -304,7 +304,9 @@ import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
@@ -2949,6 +2951,14 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
     Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n | n > 0 -> maybe False ((== 0) . Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject target gs)
       _ -> False
+  -- CR 608.2d: "remove three" is not an option where fewer are there. "Up to"
+  -- and "any number" always are, none being an answer.
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count fromRef kind _) -> case count of
+    RemovalCount.Exactly quantity -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Just n | n > 0 -> toInteger (sum (carrying gs kind (objectRefObjects legal resolving controller source gs fromRef))) < n
+      _ -> False
+    RemovalCount.UpTo _ -> False
+    RemovalCount.AnyNumber -> False
   -- CR 122.5: every pair the move names fails one of the rule's
   -- impossibilities, so no counter can cross. The pair guard and the movable
   -- kinds are the executing arm's own (movablePair, movableCounters), and
@@ -4062,7 +4072,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case RollDie.reading rollDie of
       -- CR 706.4's total: every result read at once, so there is nothing to
       -- choose, and the total of no dice is zero rather than unbound.
-      DiceReading.Total -> State.modify' (bindAmountSlot source (RollDie.slot rollDie) (sum results))
+      DiceReading.Total -> State.modify' (bindAmountSlot resolving source (RollDie.slot rollDie) (sum results))
       DiceReading.ChooseOne -> Foldable.for_ (NonEmpty.nonEmpty results) $ \offered -> do
         gs <- State.get
         -- CR 706.4: WHICH result the instruction uses, where it threw more than
@@ -4078,7 +4088,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             else do
               answer <- Game.choose (Prompt.ChooseDieResult (Decide.deciderFor controller gs) controller resolving offered)
               pure (if answer < List.genericLength results then answer else 0)
-        State.modify' (bindAmountSlot source (RollDie.slot rollDie) (Replacement.at results index (NonEmpty.head offered)))
+        State.modify' (bindAmountSlot resolving source (RollDie.slot rollDie) (Replacement.at results index (NonEmpty.head offered)))
         -- CR 706.4's "the other result", off the same throw rather than re-derived
         -- from the count, FlipCoin's `misses` below and for its reason. Only a
         -- two-die instruction has an "other": at any other count what is left is
@@ -4087,7 +4097,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- this can answer for.
         Foldable.for_ (RollDie.other rollDie) $ \other ->
           case fmap snd (filter (\(i, _) -> i /= index) (zip [0 ..] results)) of
-            [rest] -> State.modify' (bindAmountSlot source other rest)
+            [rest] -> State.modify' (bindAmountSlot resolving source other rest)
             _ -> pure ()
     Monad.unless (null results) (recordRoll controller throwers results)
   -- CR 706.2b's reroll, thrown by the ability Goblin Bookie activates inside
@@ -4203,7 +4213,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Bound AFTER every coin, since CR 705.2 asks how many of the flips matched
     -- and one instruction's flips are all of them.
     tally <- Foldable.foldlM flipOnce (0 :: Natural) [1 .. coins]
-    State.modify' (bindAmountSlot source (FlipCoin.slot flipCoin) tally)
+    State.modify' (bindAmountSlot resolving source (FlipCoin.slot flipCoin) tally)
     -- The flips that did NOT match, off the same coins. WHICH sentence of CR
     -- 705.2 that is depends on the reading: for a win/lose flip it is
     -- "otherwise, the player loses the flip", and for one that cares only about
@@ -4213,7 +4223,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- count. Pawl.CoinSpec's Mutalith Vortex Beast group proves a lost flip
     -- reaches the loser and a won one does not.
     Foldable.for_ (FlipCoin.misses flipCoin) $ \misses ->
-      State.modify' (bindAmountSlot source misses (coins - tally))
+      State.modify' (bindAmountSlot resolving source misses (coins - tally))
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of
@@ -4261,7 +4271,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- even when nothing was destroyed: zero is an answer, where an unbound slot
     -- would make the rider's quantity unevaluable instead.
     Monad.forM_ mSlot $ \slot ->
-      State.modify' (bindAmountSlot source slot (Natural.length destroyed))
+      State.modify' (bindAmountSlot resolving source slot (Natural.length destroyed))
     -- The other reading of the same printed phrase: the CARDS "put into a
     -- graveyard this way", for Come Back Wrong's "return it to the battlefield"
     -- to name. Bound onto `resolving` and as a GROUP, which is where and how
@@ -5421,7 +5431,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       let tallyContext = effectContext gs2 controller source legal (slotBindings resolving gs2)
           viewOfMilled = Projection.viewsOf gs
           counted oid = Filter.matches tallyContext (viewOfMilled oid) (MillTally.filter tally)
-      State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
+      State.modify' (bindAmountSlot resolving source (MillTally.slot tally) (Natural.length (filter counted milled)))
   -- CR 701.20a: show the named cards to every player. CR 701.20b keeps them where
   -- they are, so the GameEvent.Revealed the funnel appends IS the whole effect.
   --
@@ -5587,7 +5597,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Teeth's "if you win" against its "otherwise").
   Effect.Clash slot -> do
     won <- clash source controller
-    State.modify' (bindAmountSlot source slot won)
+    State.modify' (bindAmountSlot resolving source slot won)
   Effect.Explore ref -> do
     gs <- State.get
     -- CR 608.2c: the set is swept as this instruction is reached; an illegal slot
@@ -5774,7 +5784,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- effect of this resolution reads it as Quantity.InSlot. The SETTLED total,
     -- summed after CR 614.1's replacements had their say, so an opponent whose
     -- loss was stopped contributes nothing.
-    Monad.forM_ mTally $ \slot -> State.modify' (bindAmountSlot source slot lost)
+    Monad.forM_ mTally $ \slot -> State.modify' (bindAmountSlot resolving source slot lost)
   -- CR 119.3's other half, LoseLife's mirror but for the sign. The `n > 0` guard
   -- is CR 119.9: a gain of 0 is no life gain event to trigger on.
   --
@@ -6193,7 +6203,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Rule 701.38a's tie-break is arithmetic and not an outcome of its own,
         -- which is why no tie is recorded anywhere.
         Foldable.for_ voteWords $ \word ->
-          State.modify' (bindAmountSlot source word (Natural.length (filter (== word) ballots)))
+          State.modify' (bindAmountSlot resolving source word (Natural.length (filter (== word) ballots)))
   Effect.Create (Create.MkCreate quantity card entry mSlot creator) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -7920,7 +7930,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- CR 701.6a's "countered this way" is what the funnel COUNTERED, never what
     -- the sweep named. Bound onto this effect's SOURCE, and bound even at zero.
     Monad.forM_ mSlot $ \slot ->
-      State.modify' (bindAmountSlot source slot (Natural.length countered))
+      State.modify' (bindAmountSlot resolving source slot (Natural.length countered))
     -- CR 113.7: the PERMANENTS whose abilities the funnel countered, for Green
     -- Slime's "if a permanent's ability is countered this way, destroy that
     -- permanent". The funnel's answer walked to its sources, never the sweep's;
@@ -8117,8 +8127,44 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- Bound even where nothing came off, which is the answer "that much"
             -- wants: Ashling the Pilgrim with no counters deals 0 damage rather
             -- than leaving the clause unanswered.
-            Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot source tally (min before (Integer.toNaturalSaturating n)))
+            Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot resolving source tally (min before (Integer.toNaturalSaturating n)))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count fromRef kind mTally) -> do
+    -- CR 608.2d: the resolving controller divides the removal among the
+    -- permanents the ObjectRef names that carry the kind, through the cost
+    -- side's division prompts (Pawl.Engine.Cost's RemovePlusOneCounters arm). An
+    -- answer that does not add up is not repaired into another choice: it takes
+    -- the least the card allows.
+    gs <- State.get
+    let viewOf = effectViewOf source legal gs
+        context = effectContext gs controller source legal (slotBindings resolving gs)
+        offered = carrying gs kind (objectRefObjects legal resolving controller source gs fromRef)
+        decider = Decide.deciderFor controller gs
+        asked quantity = case Quantity.evaluateFor viewOf context gs resolving source quantity of
+          Just n | n > 0 -> Integer.toNaturalSaturating n
+          _ -> 0
+    division <- case count of
+      RemovalCount.Exactly quantity
+        -- CR 609.3 where fewer are there than the card names, which a "may"
+        -- never reaches (effectIsImpossible); elided where the division is the
+        -- only one.
+        | sum offered <= asked quantity || Map.size offered == 1 -> pure (Cost.fillInOrder (asked quantity) offered)
+        | otherwise -> do
+            answer <- Game.choose (Prompt.ChooseCounterRemovalAmong decider controller source (asked quantity) offered)
+            pure (if Cost.dividesRemoval (asked quantity) offered answer then answer else Cost.fillInOrder (asked quantity) offered)
+      RemovalCount.UpTo quantity
+        | asked quantity == 0 || Map.null offered -> pure Map.empty
+        | otherwise -> do
+            answer <- Game.choose (Prompt.ChooseCounterRemovalUpTo decider controller source (asked quantity) offered)
+            pure (if sum answer <= asked quantity && Cost.withinOffer offered answer then answer else Map.empty)
+      RemovalCount.AnyNumber
+        | Map.null offered -> pure Map.empty
+        | otherwise -> do
+            answer <- Game.choose (Prompt.ChooseCounterRemovalAtLeast decider controller source 0 offered)
+            pure (if Cost.withinOffer offered answer then answer else Map.empty)
+    Monad.forM_ (Map.toList (Map.filter (> 0) division)) (\(permanent, taken) -> Event.removeCounters permanent kind taken)
+    -- Bound even where nothing came off, Effect.RemoveCounters' posture.
+    Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot resolving source tally (sum division))
   Effect.MoveCounters (MoveCounters.MkMoveCounters fromRef kinds mSlot toRef) -> do
     -- CR 122.5: move counters off one permanent and onto a second. WHICH kinds
     -- cross is the card's call when it names one (Explorer's Cache's "move a
@@ -8619,7 +8665,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- as Quantity.InSlot -- Destroy's `slot` above in every respect, bound onto
     -- this effect's SOURCE and bound even when nothing moved, since zero is an
     -- answer where an unbound slot would leave the rider's gate unevaluable.
-    Monad.forM_ mSlot $ \slot -> State.modify' (bindAmountSlot source slot moved)
+    Monad.forM_ mSlot $ \slot -> State.modify' (bindAmountSlot resolving source slot moved)
   -- CR 701.34a: choose any number of permanents and/or players that have a
   -- counter, then give each one more of every kind it already has. "That have
   -- a counter" is the candidate filter, and "any number" is why a lone
@@ -8938,7 +8984,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Bound onto this effect's SOURCE even when nothing was paid, Effect.Destroy's
     -- count for its reason: zero is an answer, where an unbound slot would leave a
     -- later clause's quantity unevaluable instead.
-    State.modify' (bindAmountSlot source slot paid)
+    State.modify' (bindAmountSlot resolving source slot paid)
   -- CR 701.26a: turn each named permanent sideways. The victims are enumerated
   -- ONCE (CR 608.2f) and off the board as it stands before any of them is tapped,
   -- so an illegal slot (CR 608.2b), a player recipient and a set that matched
@@ -10039,18 +10085,28 @@ bindPlayerSlot holder slot players gs =
         then gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
         else gs {GameState.detachedBindings = Map.insertWith Map.union holder (Map.singleton slot binding) (GameState.detachedBindings gs)}
 
+-- The objects a RemoveCountersAmong names that carry the kind, with how many
+-- each carries: Pawl.Engine.Cost.spreadRemovalCandidates' shape.
+carrying :: GameState -> CounterKind.CounterKind Keyword.Type.Keyword -> [ObjectId] -> Map.Map ObjectId Natural
+carrying gs kind candidates = Map.filter (> 0) (Map.fromList [(candidate, Cost.countersOn kind candidate gs) | candidate <- candidates])
+
 -- CR 701.8b: bind how many permanents a destruction actually destroyed into
 -- `slot` on `holder`, readable as Quantity.InSlot. Binds a NUMBER, which rides
 -- the binding field CR 601.2b's chosen X rides. Left behind after the resolution,
 -- harmless and unreadable: only an effect naming this slot can see it, and a
 -- second sweep overwrites the value before reading it.
 --
--- `holder` is the effect's `source`, NOT `resolving`, because an amount is read
--- back by Quantity.evaluateFor aimed at `source` (CR 608.2h) while an object
--- binding is read back by ArmDelayedTrigger off the stack object.
-bindAmountSlot :: ObjectId -> SlotName -> Natural -> GameState -> GameState
-bindAmountSlot holder slot n gs =
+-- The holder is the effect's `source`, NOT `resolving`, because an amount is
+-- read back by Quantity.evaluateFor aimed at `source` (CR 608.2h) while an
+-- object binding is read back by ArmDelayedTrigger off the stack object. Where
+-- the source has LEFT (CR 400.7) -- Sensational Spider-Man bounced with its
+-- trigger on the stack -- the amount goes on `resolving`, the object
+-- Quantity.InSlot falls back to, since CR 113.7a resolves the ability anyway.
+-- Pawl.RemoveCounterSpec's bounced Spider-Man proves it.
+bindAmountSlot :: ObjectId -> ObjectId -> SlotName -> Natural -> GameState -> GameState
+bindAmountSlot resolving source slot n gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}
+      holder = if Map.member source (GameState.objects gs) then source else resolving
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- CR 119.5 / 701.12c: move a player's life total by a delta. A DOWNWARD delta is

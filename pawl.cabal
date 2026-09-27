@@ -909,7 +909,9 @@ library codec
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.Reinforce
     Pawl.Codec.ReinforceSpec
+    Pawl.Codec.RemovalCount
     Pawl.Codec.RemoveCounters
+    Pawl.Codec.RemoveCountersAmong
     Pawl.Codec.RemoveCountersSpec
     Pawl.Codec.RemovePlusOneCounters
     Pawl.Codec.RemovePlusOneCountersSpec
@@ -1632,6 +1634,7 @@ library test
     Pawl.RangeOfInfluenceSpec
     Pawl.RecruitSpec
     Pawl.RegistrySpec
+    Pawl.RemoveCounterSpec
     Pawl.ReplacementSpec
     Pawl.ReplaySpec
     Pawl.ResolveSpec
@@ -2147,7 +2150,9 @@ library types
     Pawl.Types.ReduceSpellCost
     Pawl.Types.Regenerability
     Pawl.Types.Reinforce
+    Pawl.Types.RemovalCount
     Pawl.Types.RemoveCounters
+    Pawl.Types.RemoveCountersAmong
     Pawl.Types.RemovePlusOneCounters
     Pawl.Types.Replace
     Pawl.Types.ReplacementBucket
