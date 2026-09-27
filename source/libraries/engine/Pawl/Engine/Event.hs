@@ -3206,9 +3206,9 @@ apply batch candidate event =
       -- runEntry finishes before the Moved event is recorded, so no trigger scan
       -- and no state-based action can see the interim front face.
       --
-      -- Unguarded against an instant or sorcery back face: on the stack road
-      -- changeZoneAttaching reads the face this writes and unmakes the entry
-      -- (CR 712.13a, showsInstantBackFace).
+      -- Unguarded against an instant or sorcery back face: changeZoneAttaching
+      -- reads the face this writes and unmakes the entry (CR 712.13a, 304.4,
+      -- 307.4; showsInstantBackFace).
       EntryRewrite.EntersTransformed -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -4114,7 +4114,7 @@ runEntry batch oid = do
   designateProtector oid
   State.modify' (\gs -> gs {GameState.enteringBeside = before, GameState.enteringSubjects = beforeSubjects})
 
--- CR 712.13a: is this entered object showing its card's back face, and is that
+-- CR 712.13a / 304.4 / 307.4: is this entered object showing its back face, and is that
 -- face an instant or sorcery? Reads Game.cardOf, the card the EntersTransformed
 -- arm read to write the face: the rule asks about "the card that represents that
 -- spell", and for a copy (CR 707.10g) the copied card, whose back face a copy
@@ -6118,21 +6118,22 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 runEntry batch newId
               -- CR 712.13a: a resolving double-faced spell that entered
               -- transformed onto an instant or sorcery back face "doesn't enter
-              -- the battlefield, and is instead put into its owner's graveyard".
+              -- the battlefield, and is instead put into its owner's graveyard";
+              -- from any other zone, CR 304.4 / 307.4 leave it where it was.
               -- Asked AFTER the entry loop, because CR 616.1d's EntersTransformed
               -- rewrite is what decides the face; nothing has observed the
               -- permanent yet (no Moved event), so the entry is unmade back to
-              -- `unentered`, CR 111.5's rollback shape in createTokens, and the
-              -- spell takes the ordinary stack-to-graveyard move -- the
-              -- EntryRestriction branch above does the same. That move runs CR
-              -- 616.1 again, so a graveyard replacement still applies to it.
-              -- Pawl.DaytimeSpec's Dusklit Conjurer cases prove it, the Double
-              -- Major one for the rule's copy clause.
+              -- `unentered`, CR 111.5's rollback shape in createTokens. A spell
+              -- then takes the ordinary stack-to-graveyard move, as the
+              -- EntryRestriction branch above does; that move runs CR 616.1 again,
+              -- so a graveyard replacement would apply to it, which no case
+              -- proves. Pawl.DaytimeSpec's Dusklit Conjurer cases prove the rest,
+              -- Double Major for the rule's copy clause and Exhume for CR 304.4.
               instantFace <- State.gets (showsInstantBackFace newId)
-              if fromZone == Zone.Stack && dest == Zone.Battlefield && instantFace
+              if dest == Zone.Battlefield && instantFace
                 then do
                   State.put unentered
-                  changeZoneReturning oid Zone.Graveyard
+                  if fromZone == Zone.Stack then changeZoneReturning oid Zone.Graveyard else pure Seq.empty
                 else do
                   -- CR 709.5h: an ability that triggers on a door opening fires "regardless
                   -- of whether it was given that designation while entering the

@@ -64,6 +64,7 @@ import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
@@ -327,6 +328,23 @@ entrySpec s registry = Spec.describe s "EntersTransformed" $ do
         Spec.assertEqWith s "neither the copy nor the original is on the battlefield" (conjurerFaces after) []
         Spec.assertEqWith s "the card is in alice's graveyard" (cardsIn Zone.Graveyard conjurer after) 1
         Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+  -- Off the stack road CR 712.13a is silent and CR 304.4 answers: Exhume puts
+  -- the card onto the battlefield at night, daybound makes it an instant as it
+  -- enters, and an instant that would enter remains in its previous zone.
+  Spec.it s "CR 304.4 put onto the battlefield at night, that card stays in the graveyard" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    swamp <- S.printingOf s registry "Swamp"
+    conjurer <- S.printingOf s registry "Synthetic Dusklit Conjurer"
+    exhume <- S.printingOf s registry "Exhume"
+    let (_, withTovolar) = S.addPermanent tovolar S.alice (S.landsInPlay swamp 2)
+        (buriedId, withBuried) = S.addGraveyardCard conjurer S.alice withTovolar
+        (withExhume, exhumeId) = S.handOne exhume withBuried
+        board = untapStep (afterCasting 0 (settle withExhume))
+        after = resolveSettled (S.runPure S.castAnswer board (S.cast S.alice exhumeId))
+    Spec.assertEqWith s "it is night when Exhume resolves" (GameState.daytime board) (Just Daytime.Night)
+    Spec.assertEqWith s "neither face is on the battlefield" (conjurerFaces after) []
+    Spec.assertEqWith s "the same object is still in alice's graveyard (CR 400.7)" (fmap Object.zone (Game.lookupObject buriedId after)) (Just Zone.Graveyard)
+    Spec.assertEqWith s "and Exhume resolved" (GameState.stack after) []
 
 conjurerFront :: CardName.CardName
 conjurerFront = CardName.MkCardName (Text.pack "Synthetic Dusklit Conjurer")
