@@ -85,6 +85,7 @@ import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.Sacrifice as Sacrifice
+import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
@@ -1713,17 +1714,19 @@ combatReplaySpec s =
         -- CR 701.23: which zones a multi-zone search's searcher took is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseSearchZones round-trips through the transcript" $ do
-          let offered = Set.fromList [Zone.Library, Zone.Graveyard]
+          let offered = Set.fromList [SearchPlace.InZone Zone.Library, SearchPlace.InZone Zone.Graveyard]
               p = Prompt.ChooseSearchZones decider S.alice offered
-          Spec.assertEqWith s "taking the graveyard half alone round trips" (Replay.decode p (Replay.encode p (Set.singleton Zone.Graveyard))) (Just (Set.singleton Zone.Graveyard))
+          Spec.assertEqWith s "taking the graveyard half alone round trips" (Replay.decode p (Replay.encode p (Set.singleton (SearchPlace.InZone Zone.Graveyard)))) (Just (Set.singleton (SearchPlace.InZone Zone.Graveyard)))
           -- Discriminating: a decode that ignored the response and answered the
           -- whole offer would pass a leg naming both zones by accident.
-          Spec.assertEqWith s "taking the library half alone round trips" (Replay.decode p (Replay.encode p (Set.singleton Zone.Library))) (Just (Set.singleton Zone.Library))
+          Spec.assertEqWith s "taking the library half alone round trips" (Replay.decode p (Replay.encode p (Set.singleton (SearchPlace.InZone Zone.Library)))) (Just (Set.singleton (SearchPlace.InZone Zone.Library)))
+          -- CR 701.23j: outside the game is a place the answer can name too.
+          Spec.assertEqWith s "taking outside the game alone round trips" (Replay.decode p (Replay.encode p (Set.singleton SearchPlace.OutsideTheGame))) (Just (Set.singleton SearchPlace.OutsideTheGame))
         Spec.it s "a search's zones do not decode as the cards it found" $ do
           -- Discriminating: fails if ChooseSearchZones shares Searched's
           -- constructor. The two are answers to the SAME search, one after the
           -- other, which is exactly the pair a transcript could replay crossed.
-          let p = Prompt.ChooseSearchZones decider S.alice (Set.fromList [Zone.Library, Zone.Graveyard])
+          let p = Prompt.ChooseSearchZones decider S.alice (Set.fromList [SearchPlace.InZone Zone.Library, SearchPlace.InZone Zone.Graveyard])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.Searched [ObjectId.MkObjectId 7])) Nothing
         Spec.it s "a short search-zone transcript takes every zone the card named" $
           -- Every named zone at once is always legal -- the printed "and/or"
@@ -1732,8 +1735,8 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "the whole offer"
-            (Replay.defaultAnswer (Prompt.ChooseSearchZones decider S.alice (Set.fromList [Zone.Library, Zone.Graveyard])))
-            (Set.fromList [Zone.Library, Zone.Graveyard])
+            (Replay.defaultAnswer (Prompt.ChooseSearchZones decider S.alice (Set.fromList [SearchPlace.InZone Zone.Library, SearchPlace.InZone Zone.Graveyard])))
+            (Set.fromList [SearchPlace.InZone Zone.Library, SearchPlace.InZone Zone.Graveyard])
         -- CR 107.14: how much {E} a player paid mid-resolution is a decision, so
         -- it has to survive a transcript like any other.
         Spec.it s "ChoosePaidEnergy round-trips through the transcript" $ do

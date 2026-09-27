@@ -29,6 +29,7 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
           { Search.searcher = PlayerRef.Relative PlayerRelation.You,
             Search.owner = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player")),
             Search.zones = Set.fromList [Zone.Library, Zone.Graveyard],
+            Search.outsideTheGame = True,
             Search.quantity = Just (Quantity.Literal 1),
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = True,
@@ -37,13 +38,13 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
             Search.slot = Just (SlotName.MkSlotName (Text.pack "found"))
           }
       )
-      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"player\"},\"zones\":[{\"type\":\"Library\"},{\"type\":\"Graveyard\"}],\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"upTo\":true,\"destination\":{\"type\":\"BattlefieldTapped\"},\"slot\":\"found\"} "
+      " {\"searcher\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"owner\":{\"type\":\"InSlot\",\"value\":\"player\"},\"zones\":[{\"type\":\"Library\"},{\"type\":\"Graveyard\"}],\"outsideTheGame\":true,\"quantity\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}},\"upTo\":true,\"destination\":{\"type\":\"BattlefieldTapped\"},\"slot\":\"found\"} "
   -- The other reading of the same count: no "upTo" key means the quantity is a
   -- quota. Paired with the case above so each key's absence is asserted, not
   -- just its presence -- a required key would have made every card file
   -- rewrite. "zones" is the same shape: absent means the library alone, which is
   -- what every card file written before Delivery Moogle says.
-  Spec.it s "an absent upTo and an absent zones take their defaults and are not written back" $
+  Spec.it s "an absent upTo, zones and outsideTheGame take their defaults and are not written back" $
     Common.assertCodec
       s
       Search.codec
@@ -51,6 +52,7 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
           { Search.searcher = PlayerRef.Relative PlayerRelation.You,
             Search.owner = PlayerRef.Relative PlayerRelation.You,
             Search.zones = Set.singleton Zone.Library,
+            Search.outsideTheGame = False,
             Search.quantity = Just (Quantity.Literal 1),
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = False,
@@ -72,6 +74,7 @@ spec s = Spec.describe s "Pawl.Codec.Search" $ do
           { Search.searcher = PlayerRef.Relative PlayerRelation.You,
             Search.owner = PlayerRef.Relative PlayerRelation.You,
             Search.zones = Set.singleton Zone.Library,
+            Search.outsideTheGame = False,
             Search.quantity = Nothing,
             Search.filter = Filter.HasCardType CardType.Land,
             Search.upTo = False,

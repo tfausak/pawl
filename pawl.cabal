@@ -2195,6 +2195,7 @@ library types
     Pawl.Types.Scope
     Pawl.Types.Search
     Pawl.Types.SearchDestination
+    Pawl.Types.SearchPlace
     Pawl.Types.SelfCountersReached
     Pawl.Types.SetBasePowerToughness
     Pawl.Types.SetClassLevel
