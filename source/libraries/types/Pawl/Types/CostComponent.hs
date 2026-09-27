@@ -1,13 +1,13 @@
 module Pawl.Types.CostComponent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
@@ -85,13 +85,13 @@ data CostComponent keyword
   | -- | CR 118.1 as a cost / Barkhide Troll, Hickory Woodlot: remove this many
     -- counters of one kind from the permanent the cost is on.
     RemoveCountersFromThis (CountersFromThis.CountersFromThis keyword)
-  | -- | CR 118.1 as a cost / Zameck Guildmage, Novijen Sages: remove this many
-    -- +1\/+1 counters from permanents matching the Filter, chosen by the payer.
-    RemovePlusOneCounters (RemovePlusOneCounters.RemovePlusOneCounters keyword)
+  | -- | CR 118.1 as a cost / Zameck Guildmage, Tayam, Luminous Enigma: remove
+    -- this many counters from permanents matching the Filter, chosen by the payer.
+    RemoveCounters (CountersFromPermanents.CountersFromPermanents keyword)
   | -- | CR 107.3a / 602.2b / Retribution of the Ancients: X as a count of
     -- +1\/+1 counters removed from among permanents matching the Filter,
     -- announced by the activator and rewritten by Pawl.Engine.Cost.substituteX
-    -- to a RemovePlusOneCounters spread FromAmong.
+    -- to a RemoveCounters of that kind spread FromAmong.
     RemovePlusOneCountersX (Filter.Filter keyword)
   | -- | CR 118.12's counter-placing cost / CR 701.63a's endure, Fortress
     -- Kin-Guard: put this many +1\/+1 counters on the permanent the cost is on,

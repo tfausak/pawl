@@ -599,7 +599,7 @@ collectedEvidence :: SlotName
 collectedEvidence = SlotName.MkSlotName (Text.pack "thatCollectedEvidence")
 
 -- CR 118.1 / 601.2h: the reserved slot under which a
--- CostComponent.RemovePlusOneCounters payment binds HOW MANY counters it took
+-- CostComponent.RemoveCounters payment binds HOW MANY counters it took
 -- off -- Ooze Flux's "the number of +1\/+1 counters removed this way", which
 -- the payer settles while paying (CounterSpread.FromAmongAtLeast), so it can be
 -- read off nothing but the payment. An amount and nothing else, folded onto the

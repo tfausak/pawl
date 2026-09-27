@@ -89,6 +89,7 @@ encode p answer = case p of
   Prompt.ChooseCounterRemoval {} -> Response.ChoseCounterRemoval answer
   Prompt.ChooseCounterRemovalAmong {} -> Response.ChoseCounterRemovalAmong answer
   Prompt.ChooseCounterRemovalAtLeast {} -> Response.ChoseCounterRemovalAtLeast answer
+  Prompt.ChooseMixedCounterRemoval {} -> Response.ChoseMixedCounterRemoval answer
   Prompt.ChooseVote {} -> Response.ChoseVote answer
   Prompt.ChooseVoteWord {} -> Response.ChoseVoteWord answer
   Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
@@ -329,6 +330,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCounterRemovalAtLeast {} -> case response of
     Response.ChoseCounterRemovalAtLeast division -> Just division
+    _ -> Nothing
+  Prompt.ChooseMixedCounterRemoval {} -> case response of
+    Response.ChoseMixedCounterRemoval division -> Just division
     _ -> Nothing
   Prompt.ChooseVote {} -> case response of
     Response.ChoseVote oid -> Just oid
@@ -805,7 +809,7 @@ defaultAnswer p = case p of
   -- payer's hand and battlefield, and every one of them is a legal choice.
   Prompt.ChooseBehold _ _ _ candidates -> NonEmpty.head candidates
   -- CR 118.1 as a cost: the prompt is only raised with two or more permanents
-  -- carrying enough +1\/+1 counters, and every one of them is a legal choice.
+  -- carrying enough counters, and every one of them is a legal choice.
   Prompt.ChooseCounterRemoval _ _ _ candidates -> NonEmpty.head candidates
   -- CR 118.1 as a cost again, where no division is removing nothing: the
   -- counters come off the candidates in ascending order, each emptied before the
@@ -813,6 +817,9 @@ defaultAnswer p = case p of
   Prompt.ChooseCounterRemovalAmong _ _ _ total offered -> Cost.fillInOrder total offered
   -- The same, at the floor: the fewest counters the cost allows.
   Prompt.ChooseCounterRemovalAtLeast _ _ _ least offered -> Cost.fillInOrder least offered
+  -- The same by permanent and kind, off the first permanent alone under a
+  -- spread FromOne, whose offer holds only permanents carrying the count.
+  Prompt.ChooseMixedCounterRemoval _ _ _ spread owed offered -> Cost.fillMixedInOrder spread owed offered
   -- CR 701.38a: the prompt is only raised with two or more listed choices, and
   -- every one of them is a legal vote.
   Prompt.ChooseVote _ _ _ candidates -> NonEmpty.head candidates

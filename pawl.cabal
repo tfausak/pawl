@@ -365,6 +365,8 @@ library codec
     Pawl.Codec.CounterRestriction
     Pawl.Codec.CounterRestrictionSpec
     Pawl.Codec.CounterRSpec
+    Pawl.Codec.CountersFromPermanents
+    Pawl.Codec.CountersFromPermanentsSpec
     Pawl.Codec.CountersFromThis
     Pawl.Codec.CountersFromThisSpec
     Pawl.Codec.CounterSpec
@@ -911,8 +913,6 @@ library codec
     Pawl.Codec.ReinforceSpec
     Pawl.Codec.RemoveCounters
     Pawl.Codec.RemoveCountersSpec
-    Pawl.Codec.RemovePlusOneCounters
-    Pawl.Codec.RemovePlusOneCountersSpec
     Pawl.Codec.Replace
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.ReplacementEffectSpec
@@ -1107,6 +1107,8 @@ library codec
     Pawl.Codec.VoteSpec
     Pawl.Codec.Ward
     Pawl.Codec.WardSpec
+    Pawl.Codec.WhichCounters
+    Pawl.Codec.WhichCountersSpec
     Pawl.Codec.While
     Pawl.Codec.WhileSpec
     Pawl.Codec.WithCounters
@@ -1838,6 +1840,7 @@ library types
     Pawl.Types.CounterPlacement
     Pawl.Types.CounterR
     Pawl.Types.CounterRestriction
+    Pawl.Types.CountersFromPermanents
     Pawl.Types.CountersFromThis
     Pawl.Types.CounterSpread
     Pawl.Types.CounterSubject
@@ -2148,7 +2151,6 @@ library types
     Pawl.Types.Regenerability
     Pawl.Types.Reinforce
     Pawl.Types.RemoveCounters
-    Pawl.Types.RemovePlusOneCounters
     Pawl.Types.Replace
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate
@@ -2257,6 +2259,7 @@ library types
     Pawl.Types.VoteChoices
     Pawl.Types.VoteObjects
     Pawl.Types.Ward
+    Pawl.Types.WhichCounters
     Pawl.Types.While
     Pawl.Types.WithCounters
     Pawl.Types.Zone
