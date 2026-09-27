@@ -948,7 +948,7 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
     Binding.setEventAmount (Natural.length (admittedDepartures gs bearer you p m)) Map.empty
   -- The card a hand received, under Binding.handArrival rather than CR 400.7e's
   -- `became`, which a hidden destination withholds (CR 400.2). Kithkin
-  -- Brinefarer and Veteran Ghoulcaller read it.
+  -- Brinefarer, Volatile Rift and Veteran Ghoulcaller read it.
   (TriggerCondition.CardLeavesZone _, GameEvent.Moved m)
     | ZoneChange.to (Moved.change m) == Zone.Hand ->
         Binding.setHandArrival (ZoneChange.object (Moved.change m)) Map.empty
