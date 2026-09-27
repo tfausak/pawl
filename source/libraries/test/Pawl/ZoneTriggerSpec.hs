@@ -2567,8 +2567,11 @@ representativeEvents cond =
         -- The zone read on the DEPARTURE side instead: every destination the
         -- condition admits has the same floor, so one event out of the zone it
         -- names says as much as a list would -- SelfPutIntoGraveyardFromAnywhere's
-        -- reasoning pointed the other way. Empty: this condition binds nothing.
-        TriggerCondition.CardLeavesZone p -> one (moved (CardLeavesZone.from p) (Maybe.fromMaybe Zone.Battlefield (CardLeavesZone.to p)))
+        -- reasoning pointed the other way. Empty, except Binding.handArrival for a
+        -- move reaching a hand, which a destination-free condition also admits.
+        TriggerCondition.CardLeavesZone p -> case CardLeavesZone.to p of
+          Just to -> one (moved (CardLeavesZone.from p) to)
+          Nothing -> noTable (moved (CardLeavesZone.from p) Zone.Battlefield) NonEmpty.:| [noTable (moved (CardLeavesZone.from p) Zone.Hand)]
         -- The same one event, PermanentsReturnedToHand's reason: the batch arm
         -- delegates to the singular's, so the two match alike. It binds the
         -- event's share of CR 603.2c's "that many".
@@ -2973,6 +2976,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentReturnedToHand Filter.Type.IsSource,
     TriggerCondition.PermanentsReturnedToHand Filter.Type.IsSource,
     TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Graveyard Nothing),
+    TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Library (Just Zone.Hand)),
     TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Graveyard Nothing),
     TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Exile Nothing),
     TriggerCondition.CardsPutIntoZone (CardsPutIntoZone.MkCardsPutIntoZone Filter.Type.IsSource Set.empty Zone.Library),

@@ -300,6 +300,16 @@ facingPlayers = SlotName.MkSlotName (Text.pack "thoseFacing")
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
+-- The card a zone change put into a HAND, the arrival CR 400.7e withholds from
+-- `became` because a hand is hidden (CR 400.2). Bound for the digital effects
+-- that reach it anyway -- Kithkin Brinefarer's "conjure a duplicate of that
+-- card", Volatile Rift's "it perpetually gets +X/+0" -- so the paper rule on
+-- `became` stands unchanged. Stamped by Pawl.Engine.Event.Binding.eventBindings
+-- for TriggerCondition.CardLeavesZone; reserved and not a target, `became`'s
+-- posture.
+handArrival :: SlotName
+handArrival = SlotName.MkSlotName (Text.pack "handArrival")
+
 -- CR 603.2: the reserved slot under which the AMOUNT an event trigger's event
 -- names is bound -- the printed words "that much". Stamped by
 -- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered, so the payload
@@ -1130,6 +1140,10 @@ setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 -- Bind an object under the reserved became slot (CR 400.7e).
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
+
+-- Bind an object under the reserved handArrival slot.
+setHandArrival :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setHandArrival oid = Map.insert handArrival (toObject oid)
 
 -- Bind an object under the reserved preventedDamageSource slot (CR 615.13).
 setPreventedDamageSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding

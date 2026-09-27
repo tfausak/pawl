@@ -3778,6 +3778,7 @@ aggregationReads :: Aggregation.Aggregation Quantity.Type.Quantity -> Set Aspect
 aggregationReads a = case a of
   Aggregation.Members -> Set.empty
   Aggregation.DistinctCardTypes -> Set.singleton Types
+  Aggregation.DistinctColors -> Set.singleton Colors
   Aggregation.Greatest q -> quantityReads q
   Aggregation.Total q -> quantityReads q
 
