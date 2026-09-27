@@ -64,6 +64,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
+import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -2338,9 +2339,17 @@ fillInOrder owed offered = Map.fromList (go owed (Map.toAscList offered))
 -- names offered and carrying at least what it gives, and the whole adding up to
 -- `owed` exactly -- CR 601.2h's "partial payments are not allowed".
 dividesRemoval :: Natural -> Map.Map ObjectId Natural -> Map.Map ObjectId Natural -> Bool
-dividesRemoval owed offered division =
-  sum division == owed
-    && and (Map.mapWithKey (\candidate taken -> taken <= Map.findWithDefault 0 candidate offered) division)
+dividesRemoval owed offered division = sum division == owed && withinOffer offered division
+
+-- `dividesRemoval` for a count the payer chooses (CounterSpread.FromAmongAtLeast):
+-- the whole reaching `least` rather than equalling it.
+dividesRemovalAtLeast :: Natural -> Map.Map ObjectId Natural -> Map.Map ObjectId Natural -> Bool
+dividesRemovalAtLeast least offered division = sum division >= least && withinOffer offered division
+
+-- Every permanent a division names is offered and carries at least what the
+-- division takes off it.
+withinOffer :: Map.Map ObjectId Natural -> Map.Map ObjectId Natural -> Bool
+withinOffer offered = and . Map.mapWithKey (\candidate taken -> taken <= Map.findWithDefault 0 candidate offered)
 
 -- The power a candidate contributes to CR 702.122a's total. Zero for a permanent
 -- with no power at all, which after CR 208.3 is every noncreature one.
@@ -3494,6 +3503,7 @@ canPayComponent slots pid oid component gs = case component of
   CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion spread) -> case spread of
     CounterSpread.FromOne -> not (null (counterRemovalCandidates slots pid oid n criterion gs))
     CounterSpread.FromAmong -> sum (spreadRemovalCandidates slots pid oid criterion gs) >= n
+    CounterSpread.FromAmongAtLeast -> sum (spreadRemovalCandidates slots pid oid criterion gs) >= n
   -- CR 701.63a puts the counters on "that permanent", so the only thing that can
   -- make this unpayable is the permanent no longer being there. Deliberately NOT
   -- gated on control, unlike the loyalty arms above: rule 701.63a fixes the payer
@@ -3971,14 +3981,14 @@ payReading slots perform began moment subject spending pid oid cost = fmap fst (
 -- Nothing in `data/cards/` observes it, which is why no issue is filed: no
 -- printing there that states convoke, delve or improvise carries a cost
 -- component at all (checked 2026-09-13), and one that did would refute this.
-paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
+paySubstituting :: ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName Binding.Type.Binding)
 paySubstituting perform began earlier moment subject announced spending pid oid substituting cost = do
   slots <- State.gets (announcedSlots announced)
   paySubstitutingReading slots perform began earlier moment subject announced spending pid oid substituting cost
 
 -- `paySubstituting` with the slot map its component criteria read handed in
 -- rather than read off `announced` (`payReading`).
-paySubstitutingReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
+paySubstitutingReading :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> ManaAbilityPerformer.ManaAbilityPerformer -> GameState -> [ManaWindow.ManaWindow] -> PaymentMoment.PaymentMoment -> PaymentSubject.PaymentSubject -> Maybe ObjectId -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, [CostComponent.CostComponent Keyword.Type.Keyword])) -> Cost Keyword.Type.Keyword -> Game (Payment.Payment, Map.Map SlotName.SlotName Binding.Type.Binding)
 paySubstitutingReading slots perform began earlier moment subject announced spending pid oid substituting cost =
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action, and
@@ -4340,16 +4350,12 @@ payInOrder moment slots pid oid components = case components of
       Payment.Unpaid -> pure Payment.Unpaid
       Payment.Paid bound -> fmap (mergeBound bound) (payInOrder moment slots pid oid rest)
 
--- The slots two components of one cost bound, in one map. Set-UNIONED per slot
--- rather than left-biased: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a
--- Forest" is two Sacrifice components writing one reserved name, and what that
--- names is the pair -- which Pawl.Engine.Binding.onlyOne then declines to read as
--- a single object, rather than silently answering with whichever component was
--- paid first.
-mergeBound :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Payment.Payment -> Payment.Payment
+-- The slots two components of one cost bound, in one map: see
+-- Pawl.Engine.Binding.mergePaid.
+mergeBound :: Map.Map SlotName.SlotName Binding.Type.Binding -> Payment.Payment -> Payment.Payment
 mergeBound bound outcome = case outcome of
   Payment.Unpaid -> Payment.Unpaid
-  Payment.Paid rest -> Payment.Paid (Map.unionWith Set.union bound rest)
+  Payment.Paid rest -> Payment.Paid (Binding.mergePaid bound rest)
 
 -- A component that bound no slot.
 bindsNothing :: Payment.Payment
@@ -4366,7 +4372,7 @@ bindsNothing = Payment.Paid Map.empty
 bindExiled :: Seq.Seq ObjectId -> Payment.Payment
 bindExiled arrived = case Foldable.toList arrived of
   [] -> bindsNothing
-  ids -> Payment.Paid (Map.singleton Binding.exiledCard (Set.fromList (fmap Recipient.ToObject ids)))
+  ids -> Payment.Paid (Binding.paidObjects Binding.exiledCard (Set.fromList (fmap Recipient.ToObject ids)))
 
 -- CR 601.2h: can this cost's payer tell one order from another? Two conditions,
 -- and the prompt above is asked only when both hold.
@@ -5327,7 +5333,7 @@ payComponent moment slots pid oid component = case component of
         -- Bound under the id it had on the battlefield, which is the id
         -- Event.changeZone files its last known information under -- the graveyard
         -- incarnation is a different object (CR 400.7) and carries none of it.
-        pure (Payment.Paid (Map.singleton Binding.sacrificedPermanent (Set.map Recipient.ToObject chosen)))
+        pure (Payment.Paid (Binding.paidObjects Binding.sacrificedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 702.122a: the payer chooses WHICH permanents to tap and HOW MANY, so this
   -- is a prompt, and unlike Sacrifice above it is NEVER elided -- whether the
@@ -5362,7 +5368,7 @@ payComponent moment slots pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && totalPower >= toInteger n
       then do
         Event.simultaneously (Monad.mapM_ tapObject (Set.toAscList chosen))
-        pure (Payment.Paid (Map.singleton Binding.tappedForTotalPower (Set.map Recipient.ToObject chosen)))
+        pure (Payment.Paid (Binding.paidObjects Binding.tappedForTotalPower (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- The payer chooses WHICH permanents to tap, so this is a prompt. Sacrifice's
   -- posture rather than TapForTotalPower's: the count is exact, so as many
@@ -5391,7 +5397,7 @@ payComponent moment slots pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Event.simultaneously (Monad.mapM_ tapObject (Set.toAscList chosen))
-        pure (Payment.Paid (Map.singleton Binding.tappedPermanent (Set.map Recipient.ToObject chosen)))
+        pure (Payment.Paid (Binding.paidObjects Binding.tappedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 118.1 as a cost: the payer chooses WHICH permanents go back, so this is a
   -- prompt. TapPermanents' posture above -- the count is exact, so as many
@@ -5418,7 +5424,7 @@ payComponent moment slots pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Event.simultaneously (Monad.mapM_ (\returned -> Event.changeZone returned Zone.Hand) (Set.toAscList chosen))
-        pure (Payment.Paid (Map.singleton Binding.returnedPermanent (Set.map Recipient.ToObject chosen)))
+        pure (Payment.Paid (Binding.paidObjects Binding.returnedPermanent (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
   -- Elided only when forced -- as many MATCHING cards in hand as the count, which
@@ -5474,7 +5480,7 @@ payComponent moment slots pid oid component = case component of
     let findable = Seq.filter (\a -> maybe False (not . Game.isHiddenZone . Object.zone) (Game.lookupObject a gs)) arrived
     pure $ case Foldable.toList findable of
       [] -> bindsNothing
-      ids -> Payment.Paid (Map.singleton Binding.discardedCard (Set.fromList (fmap Recipient.ToObject ids)))
+      ids -> Payment.Paid (Binding.paidObjects Binding.discardedCard (Set.fromList (fmap Recipient.ToObject ids)))
   -- CR 118.12's hand-to-battlefield cost. The candidates are re-read HERE rather
   -- than carried from `canPayComponent`'s check: CR 118.12 pays as the ability
   -- resolves, and an earlier component of the same cost may have emptied the
@@ -5559,7 +5565,7 @@ payComponent moment slots pid oid component = case component of
             answer <- Game.choose (Prompt.ChooseCardInHand decider pid oid (first NonEmpty.:| (second : more)))
             pure (if List.elem answer held then answer else first)
         Event.reveal RevealCause.Ordinary pid chosen
-        pure (Payment.Paid (Map.singleton Binding.revealedCard (Set.singleton (Recipient.ToObject chosen))))
+        pure (Payment.Paid (Binding.paidObjects Binding.revealedCard (Set.singleton (Recipient.ToObject chosen))))
   -- CR 701.4a's two-zone choice: ONE object out of the payer's hand and the
   -- permanents they control taken together, revealed where it came out of the
   -- hand and merely chosen where it is a permanent. The candidates are re-read
@@ -5588,7 +5594,7 @@ payComponent moment slots pid oid component = case component of
             answer <- Game.choose (Prompt.ChooseBehold decider pid oid (first NonEmpty.:| (second : more)))
             pure (if List.elem answer candidates then answer else first)
         Monad.when (fmap Object.zone (Game.lookupObject chosen gs) == Just Zone.Hand) (Event.reveal RevealCause.Ordinary pid chosen)
-        pure (Payment.Paid (Map.singleton Binding.beheldObject (Set.singleton (Recipient.ToObject chosen))))
+        pure (Payment.Paid (Binding.paidObjects Binding.beheldObject (Set.singleton (Recipient.ToObject chosen))))
   -- CR 107.14: paying energy removes that many energy counters from the player.
   -- Natural subtraction is PARTIAL, so `left` is guarded; canPayComponent
   -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.
@@ -5668,16 +5674,24 @@ payComponent moment slots pid oid component = case component of
   -- unreachable through this door, `counterRemovalCandidates` having refused
   -- every permanent short of `n`.
   --
-  -- Binds NO slot: no printing of this cost goes on to name what it took the
-  -- counters off.
+  -- Binds HOW MANY it removed under Binding.removedCounters, and not what it
+  -- took them off: no printing of this cost goes on to name the permanents.
   --
   -- Spread FROM AMONG several permanents, the payer divides the count instead,
   -- and the prompt is elided where `fillInOrder`'s division is the only one: a
   -- single candidate, or candidates carrying exactly the count between them.
   -- Pawl.CostSpec's Novijen Sages group proves the division.
+  --
+  -- With the count a FLOOR (FromAmongAtLeast), the payer also settles how many,
+  -- so the prompt stands even over one candidate and is elided only where the
+  -- candidates carry exactly the floor. Pawl.CostSpec's Ooze Flux group proves it.
   CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion spread) -> do
     gs <- State.get
     let decider = Decide.deciderFor pid gs
+        removed taken = Payment.Paid (Map.singleton Binding.removedCounters (Binding.toAmount taken))
+        removeDivision division = do
+          Monad.forM_ (Map.toList (Map.filter (> 0) division)) (\(chosen, taken) -> Event.removeCounters chosen CounterKind.PlusOnePlusOne taken)
+          pure (removed (sum division))
     case spread of
       CounterSpread.FromOne -> case counterRemovalCandidates slots pid oid n criterion gs of
         -- CR 118.3's board, which canPayComponent has already refused, so reaching
@@ -5690,7 +5704,7 @@ payComponent moment slots pid oid component = case component of
           if List.elem chosen candidates
             then do
               Event.removeCounters chosen CounterKind.PlusOnePlusOne n
-              pure bindsNothing
+              pure (removed n)
             else pure Payment.Unpaid
       CounterSpread.FromAmong -> do
         let offered = spreadRemovalCandidates slots pid oid criterion gs
@@ -5702,9 +5716,18 @@ payComponent moment slots pid oid component = case component of
         -- CR 118.3's board again where `carried` falls short, which the division
         -- then cannot add up to.
         if dividesRemoval n offered division
-          then do
-            Monad.forM_ (Map.toList (Map.filter (> 0) division)) (\(chosen, taken) -> Event.removeCounters chosen CounterKind.PlusOnePlusOne taken)
-            pure bindsNothing
+          then removeDivision division
+          else pure Payment.Unpaid
+      CounterSpread.FromAmongAtLeast -> do
+        let offered = spreadRemovalCandidates slots pid oid criterion gs
+        division <-
+          if sum offered == n
+            then pure offered
+            else Game.choose (Prompt.ChooseCounterRemovalAtLeast decider pid oid n offered)
+        -- CR 118.3's board where the candidates fall short of the floor, which
+        -- no division then reaches.
+        if dividesRemovalAtLeast n offered division
+          then removeDivision division
           else pure Payment.Unpaid
   -- CR 122.6's placement, through the Event.putCounters funnel -- the same call
   -- AddLoyaltyToThis above makes, and the difference is WHEN the cost is paid,
@@ -5917,7 +5940,7 @@ payComponent moment slots pid oid component = case component of
         Event.simultaneously (Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen))
         -- CR 701.59a's "whenever you collect evidence" reads this.
         State.modify' (Event.recordEvent (GameEvent.CollectedEvidence pid))
-        pure (Payment.Paid (Map.singleton Binding.collectedEvidence (Set.map Recipient.ToObject chosen)))
+        pure (Payment.Paid (Binding.paidObjects Binding.collectedEvidence (Set.map Recipient.ToObject chosen)))
       else pure Payment.Unpaid
   -- CR 406.2 with no prompt: CR 404.2's order determines the card. Unpaid where
   -- the graveyard holds no matching card, agreeing with canPayComponent above.
