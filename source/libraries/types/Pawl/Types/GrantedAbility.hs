@@ -29,9 +29,6 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- ActivatedAbility, TriggeredAbility, StaticAbility -- stays parametric so that
 -- none of them has to import this one, which is the cycle the variable exists
 -- to open.
---
--- Not implemented: a REPLACEMENT ability granted by a continuous effect or a
--- copy exception; only a face-down listing reads the Replacement arm (#1942).
 data GrantedAbility card
   = Activated (ActivatedAbility.ActivatedAbility card (GrantedAbility card))
   | Triggered (TriggeredAbility.TriggeredAbility card (GrantedAbility card))

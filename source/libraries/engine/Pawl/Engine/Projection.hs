@@ -251,9 +251,12 @@ applyModification textBoxOf viewOf src gs oid unitTypes affected m pc =
             pc {PC.triggeredAbilities = PC.triggeredAbilities pc <> [t]}
           GrantedAbility.Static _ -> pc
           GrantedAbility.Rules _ -> pc
-          -- Not implemented: a replacement ability granted by a continuous
-          -- effect (#1942).
-          GrantedAbility.Replacement _ -> pc
+          -- CR 614.1 / 113.7: replacementsOf reads this list off the finished
+          -- projection, so the row is the receiver's and its IsSource is the
+          -- receiver. Pawl.CastPermissionSpec's "CR 613.1f The Eighth Doctor's
+          -- quoted replacement exiles the permanent it was granted to" proves it.
+          GrantedAbility.Replacement r ->
+            pc {PC.replacementEffects = PC.replacementEffects pc <> [r]}
         -- CR 702.165a's grant never reaches a STORED effect: Resolve.Effect's
         -- expandGrant turns it into the ordinary GainKeyword and GainAbility arms
         -- above as the ability resolves, so nothing with this modification is ever
@@ -4806,9 +4809,10 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid castUsing pc =
 -- `EntryR AsCopy` on a card that is itself a base card with one, CR 122.1c's
 -- shield counters, CR 122.1h's finality counters, a minting keyword printed on,
 -- copied by, or granted by a face, one of the three TYPES the rules mint an entry
--- replacement from printed on or copied by a face (copiableMintsType), or a
--- static ability writing one of those three (grantsMintingType). Every disjunct
--- but the last is copy-aware -- through copiableReplacementsOf,
+-- replacement from printed on or copied by a face (copiableMintsType), a
+-- static ability writing one of those three (grantsMintingType), or a static
+-- ability granting a quoted replacement ability outright (grantsReplacement).
+-- The disjuncts that read a face are copy-aware -- through copiableReplacementsOf,
 -- copiableMintsType, anyCopiableKeyword and staticAbilitiesOf -- so a copy
 -- answers off the text it copied rather than the copier's (CR 707.2), which is
 -- what Pawl.CopySpec's copiedAbilitySpec proves a disjunct at a time.
@@ -4820,7 +4824,7 @@ intrinsicReplacementsOf announcedX phyrexianLifePaid castUsing pc =
 -- Corpsejack Menace case is what proves it; before #3371 the merge WAS an
 -- uncovered route, and this enumeration was false.
 --
--- The two grantor disjuncts are asked of the BATTLEFIELD, which is not where
+-- The three grantor disjuncts are asked of the BATTLEFIELD, which is not where
 -- every grant comes from, so the gate mirrors the REST of gatherGiven's arms
 -- beside them: storedWrites is its `stored` arm (CR 611.2a) and elsewhereGrants
 -- its emblem, stack, graveyard, hand and library arms (CR 114.4, CR 113.6).
@@ -4867,6 +4871,10 @@ replacementsAffecting gs =
           -- exists to skip, so any board holding a granting ability is gathered
           -- whole.
           || any (any grantsMintingType . StaticAbility.modifications) (staticAbilitiesOf oid gs)
+          -- A QUOTED replacement ability a static ability grants (CR 613.1f),
+          -- asked of the grantor for the two disjuncts' reason above.
+          -- Pawl.CommanderSpec's Master Chef case proves it.
+          || any (any grantsReplacement . StaticAbility.modifications) (staticAbilitiesOf oid gs)
       -- ONE whole-board projection for the whole walk rather than one gather per
       -- permanent -- see #435 -- and a THUNK: the short-circuit below is what decides
       -- whether any of it is forced, so a board carrying no replacement effect
@@ -4874,11 +4882,12 @@ replacementsAffecting gs =
       -- and replacementsOfGiven are pure functions of the same GameState.
       pcs = projectAll gs
       forOne zone oid = fmap (\(provenance, re) -> (oid, provenance, re)) (replacementsOfGiven pcs zone oid gs)
-      -- The grantors standing where `baseHas` cannot see them, asked BOTH of
-      -- baseHas's grantor disjuncts again: a stored effect and an off-battlefield
-      -- static ability write the same two modifications a permanent's static
-      -- ability does.
-      mints m = grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m
+      -- The grantors standing where `baseHas` cannot see them, asked all three
+      -- of baseHas's grantor disjuncts again: a stored effect and an
+      -- off-battlefield static ability write the same modifications a
+      -- permanent's static ability does. Pawl.ZoneReplacementSpec's Can't Stay
+      -- Away case proves the grantsReplacement limb.
+      mints m = grantsKeywordWhere Keyword.mintsReplacement m || grantsMintingType m || grantsReplacement m
       elsewhereHas = storedWrites mints gs || elsewhereGrants mints gs
       -- CR 604.2's second limb: a static ability's replacement effect stays
       -- active while the object with the ability remains "in the appropriate
@@ -5240,6 +5249,54 @@ grantsMintingType m = case m of
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
   -- Neither marker writes a card type or subtype.
+  Modification.AssignCombatDamageWithToughness -> False
+  Modification.GrantsStationToughness -> False
+
+-- CR 614.1 / 613.1f: does this modification hand its affected objects a quoted
+-- replacement ability? replacementsAffecting's grantor disjunct for a GRANTED
+-- row, grantsMintingType's shape and exhaustive for grantsKeywordWhere's reason.
+-- GainAbilitiesOfSource never reaches a stored effect (Resolve.Effect's
+-- expandGrant turns it into GainAbility arms first).
+grantsReplacement :: Modification -> Bool
+grantsReplacement m = case m of
+  Modification.GainAbility g -> case g of
+    GrantedAbility.Replacement _ -> True
+    -- A granted static ability's own parts, grantsKeywordWhere's reason.
+    _ -> grantedStaticWrites grantsReplacement g
+  Modification.AddSubtype _ -> False
+  Modification.ChangeSubtypeWord _ -> False
+  Modification.AddCardType _ -> False
+  Modification.SetCardType _ -> False
+  Modification.LoseCardType _ -> False
+  Modification.GainKeyword _ -> False
+  Modification.GainFlashbackAtManaCost -> False
+  Modification.GainEnchant _ -> False
+  Modification.LoseEnchant _ -> False
+  Modification.GainCastingPermission _ -> False
+  Modification.GainAbilitiesOfSource _ -> False
+  Modification.LoseAllAbilities -> False
+  Modification.LoseNamedAbility _ -> False
+  Modification.LoseKeyword _ -> False
+  Modification.LoseKeywordFamily _ -> False
+  Modification.SetBasePowerToughness {} -> False
+  Modification.ModifyPowerToughness {} -> False
+  Modification.SetLandSubtype _ -> False
+  Modification.SetLandSubtypeToChosen -> False
+  Modification.AddLandSubtype _ -> False
+  Modification.SetCreatureSubtype _ -> False
+  Modification.AddCreatureSubtype _ -> False
+  Modification.AddEveryCreatureSubtype -> False
+  Modification.LoseEveryCreatureSubtype -> False
+  Modification.AddSupertype _ -> False
+  Modification.RemoveSupertype _ -> False
+  Modification.SetController _ -> False
+  Modification.SetControllerToSource -> False
+  Modification.SetColor _ -> False
+  Modification.AddColor _ -> False
+  Modification.AddChosenColor -> False
+  Modification.SwitchPowerToughness -> False
+  Modification.ExchangeTextBoxes -> False
+  Modification.AddNamesMatching _ -> False
   Modification.AssignCombatDamageWithToughness -> False
   Modification.GrantsStationToughness -> False
 
