@@ -55,6 +55,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -1197,6 +1198,79 @@ turnScopedSkipSpec s registry = Spec.describe s "TurnScopedSkip" $ do
     Spec.assertEqWith s "Savor's is turn 3, and alice's" (GameState.turnNumber atSavorTurn, GameState.activePlayer atSavorTurn) (3, S.alice)
     Spec.assertEqWith s "but Savor's own turn did NOT untap" (tapStateOf piker afterSavorTurn) tapped
 
+-- alice in her precombat main phase holding Final Fortune and Time Warp, with
+-- exactly {R}{R} and {3}{U}{U} to cast them, both libraries stocked for the
+-- turns these run.
+fortuneBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId, ObjectId)
+fortuneBoard island mountain fortune warp piker =
+  let (fortuneId, withFortune) = S.addHandCard fortune S.alice (S.landsFor mountain S.alice 2 (S.landsInPlay island 5))
+      (warpId, withWarp) = S.addHandCard warp S.alice withFortune
+      stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
+   in ( (stock (stock withWarp S.alice) S.bob)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        fortuneId,
+        warpId
+      )
+
+-- CR 603.7a / 500.7: a delayed ability armed for "that turn", the extra turn
+-- the same spell created, through Final Fortune ({R}{R} Instant, "Take an extra
+-- turn after this one. At the beginning of that turn's end step, you lose the
+-- game.") and Chance for Glory, which adds indestructible to the same text.
+thatTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+thatTurnSpec s registry = Spec.describe s "ThatExtraTurn" $ do
+  let boardOf = do
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        fortune <- S.printingOf s registry "Final Fortune"
+        warp <- S.printingOf s registry "Time Warp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (fortuneBoard island mountain fortune warp piker)
+  Spec.it s "CR 603.7a whole card: Final Fortune's controller loses at its extra turn's end step" $ do
+    (gs, fortune, _) <- boardOf
+    let resolved = castAndResolve fortune gs
+        atExtra = runTurns 1 resolved
+        afterExtra = runTurns 1 atExtra
+    Spec.assertBool s (S.alice `elem` Game.stillPlaying atExtra) "alice survives the turn she cast it in"
+    Spec.assertEqWith s "the extra turn is turn 2, and alice's" (GameState.turnNumber atExtra, GameState.activePlayer atExtra) (2, S.alice)
+    Spec.assertEqWith s "alice lost during it" (Game.stillPlaying afterExtra) [S.bob]
+    Spec.assertEqWith s "at its end step" (GameState.phase afterExtra) (Phase.Ending EndingStep.EndStep)
+  -- THE PROVING CASE. Final Fortune creates extra turn A; Time Warp, cast
+  -- after it in the same turn, creates extra turn B, which CR 500.7 takes
+  -- first. "That turn" is A: a "your next turn" reading would settle on B
+  -- and lose one turn early.
+  Spec.it s "CR 500.7 the loss waits for Final Fortune's own extra turn, not a later-created one" $ do
+    (gs, fortune, warp) <- boardOf
+    let resolved = castAndResolveWith (aimPlayer S.alice) warp (castAndResolve fortune gs)
+        atWarpTurn = runTurns 1 resolved
+        atFortuneTurn = runTurns 1 atWarpTurn
+        afterFortuneTurn = runTurns 1 atFortuneTurn
+    Spec.assertEqWith s "Time Warp's turn is turn 2, and alice's" (GameState.turnNumber atWarpTurn, GameState.activePlayer atWarpTurn) (2, S.alice)
+    Spec.assertBool s (S.alice `elem` Game.stillPlaying atFortuneTurn) "alice survives Time Warp's turn, end step and all"
+    Spec.assertEqWith s "Final Fortune's is turn 3, and alice's" (GameState.turnNumber atFortuneTurn, GameState.activePlayer atFortuneTurn) (3, S.alice)
+    Spec.assertEqWith s "and alice loses at its end step" (Game.stillPlaying afterFortuneTurn) [S.bob]
+  Spec.it s "CR 611.2a whole card: Chance for Glory's indestructible outlasts the turn" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    glory <- S.printingOf s registry "Chance for Glory"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let lands = S.landsFor island S.alice 1 (S.landsFor plains S.alice 1 (S.landsInPlay mountain 1))
+        (pikerId, withPiker) = S.addPermanent piker S.alice lands
+        (bobPiker, withBob) = S.addPermanent piker S.bob withPiker
+        (gloryId, withGlory) = S.addHandCard glory S.alice withBob
+        stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
+        gs = (stock (stock withGlory S.alice) S.bob) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        resolved = castAndResolve gloryId gs
+        atExtra = runTurns 1 resolved
+        afterExtra = runTurns 1 atExtra
+    Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible pikerId atExtra) "alice's creature is still indestructible on the extra turn"
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible bobPiker atExtra)) "bob's is not"
+    Spec.assertEqWith s "the extra turn is alice's" (GameState.activePlayer atExtra) S.alice
+    Spec.assertEqWith s "and alice loses at its end step" (Game.stillPlaying afterExtra) [S.bob]
+
 -- Casts the first castable spell offered and passes otherwise, deferring every
 -- other prompt to S.identityAnswer. This is the CR 724.1f discriminator: under a
 -- correct implementation alice never gets a priority window with an empty stack
@@ -1686,6 +1760,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   extraTurnSpec s registry
   repeatedExtraTurnSpec s registry
   turnScopedSkipSpec s registry
+  thatTurnSpec s registry
   endTurnSpec s registry
   endCombatPhaseSpec s registry
   skippedEndOfCombatSpec s registry

@@ -3146,6 +3146,7 @@ delayedArmed gs entry = case DelayedTrigger.window entry of
   -- The named turn has not begun, so no occurrence counts -- including one
   -- in the turn that armed the ability, which is why the onset exists.
   TurnWindow.ControllersNextTurn -> False
+  TurnWindow.OnExtraTurn _ -> False
   -- EQUALITY, not a floor: CR 603.7a is a claim about ONE named turn, so the
   -- window has an upper end and not merely a lower one.
   TurnWindow.OnTurn n -> n == GameState.turnNumber gs

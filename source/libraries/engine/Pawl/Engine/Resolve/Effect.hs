@@ -9284,9 +9284,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- APNAP order. Whether the rounds nest inside the APNAP walk or around it is
     -- observable only for an effect giving SEVERAL players SEVERAL turns each,
     -- which no card in data/cards/ prints; Ral Zarek names one player.
-    let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = TakeExtraTurn.skips takeExtraTurn}
-        pushRound ts = List.foldl' (\acc pid -> entry pid : acc) ts takers
-    State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts _ -> pushRound ts) (GameState.extraTurns g) [1 .. turns]})
+    --
+    -- Each turn is stamped as it is created, the identity Onset.FromThatExtraTurn
+    -- names it by.
+    let push g pid =
+          let (stamp, g1) = Game.freshTimestamp g
+              entry = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = TakeExtraTurn.skips takeExtraTurn, ExtraTurn.createdAt = stamp}
+           in g1 {GameState.extraTurns = entry : GameState.extraTurns g1}
+        pushRound g = List.foldl' push g takers
+    State.modify' (\g -> List.foldl' (\acc _ -> pushRound acc) g [1 .. turns])
 
 -- CR 603.7c: stamp the land an earthbend animated onto the resolving object, so
 -- the environment the arming opcode captures next carries it. Pawl.Engine.Earthbend's

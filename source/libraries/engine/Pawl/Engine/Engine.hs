@@ -1534,7 +1534,7 @@ takeNextTurn gs = case GameState.extraTurns gs of
           -- being as it begins, and only on this branch -- the CR 800.4k entry
           -- the `else` spends belongs to a turn that never begins. Nothing of
           -- this turn has started yet, so CR 614.10 is not yet in the way.
-            Replacement.installTurnSkips entry (beginTurnOf pid anchored)
+            Replacement.installTurnSkips entry (beginTurn (Just (ExtraTurn.createdAt entry)) pid anchored)
           else -- CR 702.26n, as on walkToNextTurn's skip branch below: this
           -- entry is a turn `pid` would have begun, so a row keyed to them is
           -- rescheduled here too. No board reaches it, an extra turn for a
@@ -1582,7 +1582,13 @@ dropAtTurnOfTeam pid gs =
 -- The turn actually begins for `pid`, split out so the CR 800.4k seat walk has
 -- exactly one place to land.
 beginTurnOf :: PlayerId -> GameState -> GameState
-beginTurnOf pid gs =
+beginTurnOf = beginTurn Nothing
+
+-- beginTurnOf, naming the extra turn beginning by its ExtraTurn.createdAt when
+-- this is one, so Event.settleOnsets can settle a delayed ability armed for
+-- "that turn" (CR 500.7).
+beginTurn :: Maybe Timestamp.Timestamp -> PlayerId -> GameState -> GameState
+beginTurn extra pid gs =
   let -- CR 601.2i / 608.2i: how many spells each player cast during the turn that
       -- is ending, taken here because the log it is folded from is cleared by the
       -- record update below. `gs` still holds the OUTGOING active player.
@@ -1606,6 +1612,7 @@ beginTurnOf pid gs =
       -- retired. Applied to the UPDATED state, both answers being read off this
       -- turn's number and active player.
       Event.settleOnsets
+        extra
         gs
           { GameState.activePlayer = pid,
             GameState.turnNumber = GameState.turnNumber gs + 1,
