@@ -1618,6 +1618,102 @@ animalMagnetismSpec s registry =
             (List.sort (namesIn Zone.Graveyard S.alice after))
             (List.delete (named "Bird Maiden") allBuried)
 
+-- Search.differentNames and an opponent's split of the find.
+--
+-- Gifts Ungiven {3}{U} Instant, "Search your library for up to four cards with
+-- different names and reveal them. Target opponent chooses two of those cards.
+-- Put the chosen cards into your graveyard and the rest into your hand. Then
+-- shuffle." Intuition {2}{U} Instant, "Search your library for three cards and
+-- reveal them. Target opponent chooses one. Put that card into your hand and the
+-- rest into your graveyard. Then shuffle." (both checked against
+-- api.scryfall.com, 2026-09-27). Both cards are transcribed whole.
+--
+-- Alice's search answer names two Murders; the answerer replies by seat, alice
+-- taking index 0 and bob index 1, so which cards reach the graveyard names both
+-- the find and the seat that split it.
+giftsUngivenSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+giftsUngivenSpec s registry =
+  let -- alice: four Islands for the mana, `stock` into her library BOTTOM FIRST,
+      -- the spell in hand. Returns the library's ids in `stock`'s order.
+      board island spell lands stock =
+        let mana = S.landsFor island S.alice lands S.threePlayerGame
+            step (ids, g) printing = let (oid, g') = S.addLibraryCard printing S.alice g in (ids <> [oid], g')
+            (libraryIds, withStock) = List.foldl' step ([], mana) stock
+            (withSpell, spellId) = S.handOne spell withStock
+         in (libraryIds, spellId, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      nth n offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop n (NonEmpty.toList offered)))
+      answering :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering find p = case p of
+        Prompt.Search {} -> find
+        Prompt.ChooseCardFromAmong _ asked _ offered
+          | asked == S.alice -> nth 0 offered
+          | otherwise -> nth 1 offered
+        _ -> S.identityAnswer p
+      cast find spellId gs =
+        let announced = S.runPure (answering find) gs (S.cast S.alice spellId)
+         in S.runPure (answering find) announced Stack.resolveTop
+      printings = do
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        murder <- S.printingOf s registry "Murder"
+        giant <- S.printingOf s registry "Hill Giant"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (island, [swamp, murder, murder, giant, maiden, piker])
+   in Spec.describe s "GiftsUngiven" $ do
+        -- The headline. Alice names five cards, both Murders among them; the
+        -- second Murder is dropped, so the four found are Murder, Hill Giant,
+        -- Bird Maiden and Goblin Piker. Bob's index-1 picks are Hill Giant, then
+        -- Bird Maiden from the three left.
+        Spec.it s "CR 201.2b the find holds one card of a name, and the opponent's two go to the graveyard" $ do
+          (island, stock) <- printings
+          gifts <- S.printingOf s registry "Gifts Ungiven"
+          let (ids, spellId, gs) = board island gifts 4 stock
+              find = case ids of
+                [_, murder1, murder2, giant, maiden, piker] -> [murder1, murder2, giant, maiden, piker]
+                _ -> []
+              after = cast find spellId gs
+          Spec.assertEqWith
+            s
+            "bob's two picks and the spell are alice's graveyard"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.sort [named "Bird Maiden", named "Gifts Ungiven", named "Hill Giant"])
+          Spec.assertEqWith s "the other two found are her hand" (List.sort (namesIn Zone.Hand S.alice after)) (List.sort [named "Goblin Piker", named "Murder"])
+          Spec.assertEqWith s "and the second Murder was never found" (List.sort (namesIn Zone.Library S.alice after)) (List.sort [named "Murder", named "Swamp"])
+        -- The card's ruling: two or fewer found, and the opponent chooses them
+        -- all (CR 609.3), so nothing reaches the hand.
+        Spec.it s "CR 609.3 two found are both chosen, and the hand gets none" $ do
+          (island, stock) <- printings
+          gifts <- S.printingOf s registry "Gifts Ungiven"
+          let (ids, spellId, gs) = board island gifts 4 stock
+              find = case ids of
+                [_, _, _, giant, maiden, _] -> [giant, maiden]
+                _ -> []
+              after = cast find spellId gs
+          Spec.assertEqWith
+            s
+            "both found cards and the spell are alice's graveyard"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.sort [named "Bird Maiden", named "Gifts Ungiven", named "Hill Giant"])
+          Spec.assertEqWith s "and her hand is empty" (namesIn Zone.Hand S.alice after) []
+        -- Intuition: the opponent's one pick goes to the HAND and the rest to the
+        -- graveyard, Gifts' destinations swapped.
+        Spec.it s "CR 608.2c Intuition's opponent picks the card alice keeps" $ do
+          (island, stock) <- printings
+          intuition <- S.printingOf s registry "Intuition"
+          let (ids, spellId, gs) = board island intuition 3 stock
+              find = case ids of
+                [_, _, _, giant, maiden, piker] -> [giant, maiden, piker]
+                _ -> []
+              after = cast find spellId gs
+          Spec.assertEqWith s "bob's index-1 pick is alice's hand" (namesIn Zone.Hand S.alice after) [named "Bird Maiden"]
+          Spec.assertEqWith
+            s
+            "and the other two found are her graveyard"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.sort [named "Goblin Piker", named "Hill Giant", named "Intuition"])
+
 -- ObjectRef.TopOfLibraryUntil: a prefix of a library whose LENGTH is what a
 -- Filter decides, where ObjectRef.TopOfLibrary's is what a Quantity counts.
 --
@@ -2277,6 +2373,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   communeWithTheGodsSpec s registry
   ancestralMemoriesSpec s registry
   animalMagnetismSpec s registry
+  giftsUngivenSpec s registry
   treasureHuntSpec s registry
   mulchSpec s registry
   openTheWaySpec s registry
