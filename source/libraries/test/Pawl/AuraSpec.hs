@@ -4820,7 +4820,7 @@ groupAttachCardsSpec s registry =
         -- control. When one or more Equipment become attached to that creature
         -- this way, that creature deals damage equal to its power to up to one
         -- target creature." Alice's Hill Giant is the destination; bob's Hill
-        -- Giant the victim, its damage read before CR 704.5g can clear it. The
+        -- Giant the victim, its damage read before CR 704.5g can destroy it. The
         -- empty leg differs only in how many Equipment are targeted.
         Spec.it s "CR 603.12 Thorin's Equipment go to its target, which then deals damage equal to its power" $ do
           thorin <- S.printingOf s registry "Thorin, Mountain-king"
@@ -4923,7 +4923,7 @@ groupAttachCardsSpec s registry =
         -- Rhuk, Hexgold Nabber {2}{R} 2/2 trample haste: "Whenever an equipped
         -- creature you control other than Rhuk attacks or dies, you may attach
         -- all Equipment attached to that creature to Rhuk." Alice's Piker wears
-        -- Bonesplitter and Flayer Husk and takes lethal damage: CR 704.5f buries
+        -- Bonesplitter and Flayer Husk and takes lethal damage: CR 704.5g destroys
         -- it and CR 704.5n unattaches both Equipment before the trigger resolves,
         -- so only ObjectRef.AttachedToBound's CR 608.2h read still finds them.
         -- Bob's Batterfist on bob's Giant is never "attached to that creature".
