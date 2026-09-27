@@ -1,7 +1,8 @@
 module Pawl.Types.AttackOption where
 
 -- | CR 806.2b: which attack option a game uses -- "exactly one of the attack
--- left, attack right, and attack multiple players options must be used".
+-- left, attack right, and attack multiple players options must be used" --
+-- or CR 809.3c's, which the Emperor variant uses instead.
 --
 -- ONE sum and not three Bools, because that rule makes them mutually exclusive:
 -- three flags would spell seven states of which four are no game at all. The
@@ -13,10 +14,6 @@ module Pawl.Types.AttackOption where
 --
 -- Leftward and Rightward rather than Left and Right so that no use site has to
 -- disambiguate them from Prelude's Either.
---
--- Not implemented: CR 809.3c's adjacent-seat restriction, which is neither of
--- these -- either neighbour, chosen -- and arrives with the Emperor variant
--- (#2851).
 data AttackOption
   = -- | CR 802.1: every one of the attacking player's opponents is a defending
     -- player, so CR 507.1 chooses nobody.
@@ -26,4 +23,8 @@ data AttackOption
     Leftward
   | -- | CR 803.1b: the same, to the right.
     Rightward
+  | -- | CR 809.3c: only an opponent seated immediately next to the attacking
+    -- player, on either side, and CR 507.1 chooses between two. The Emperor
+    -- variant's option.
+    Adjacent
   deriving (Bounded, Enum, Eq, Ord, Show)

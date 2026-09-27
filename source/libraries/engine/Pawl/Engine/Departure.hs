@@ -19,6 +19,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Emperor as Emperor
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Initiative as Initiative
@@ -45,6 +46,7 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Zone as Zone
 
 -- Mark a player as having left, with the reason they left, and perform
@@ -79,16 +81,22 @@ depart reason pid = departTogether reason [pid]
 -- 104.3a) and Pawl.Engine.Sba's check (CR 704.5) -- gets it by construction
 -- rather than by remembering to call it. Monarch.reassignOnDeparture needs the
 -- flip done.
+--
+-- CR 809.5b / 809.5c: a departing emperor's team leaves in the same event
+-- (Emperor.fallsWith), after the players named.
 departTogether :: Departure -> [PlayerId] -> Game ()
-departTogether reason pids = do
+departTogether reason named = do
   continues <- State.gets continuesAfterDeparture
-  let lose p = p {Player.status = Status.Departed reason}
+  before <- State.get
+  let departing = fmap (\pid -> (reason, pid)) named <> Emperor.fallsWith reason named before
+      pids = fmap snd departing
+      lose why p = p {Player.status = Status.Departed why}
       -- CR 801.2c: the seat keeps counting toward range of influence until the
       -- next turn begins.
-      leave pid gs = gs {GameState.players = Map.adjust lose pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)}
+      leave why pid gs = gs {GameState.players = Map.adjust (lose why) pid (GameState.players gs), GameState.departedThisTurn = Set.insert pid (GameState.departedThisTurn gs)}
       -- CR 800.4a's first three clauses, in the rule's order.
       clauses pid = if continues then nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid else id
-  Monad.forM_ pids (\pid -> State.modify' (leave pid . clauses pid))
+  Monad.forM_ departing (\(why, pid) -> State.modify' (leave why pid . clauses pid))
   Monad.when continues (Monad.mapM_ remainingControlledExiled pids)
   Monad.forM_ pids $ \pid -> do
     Monarch.reassignOnDeparture pid
@@ -684,11 +692,19 @@ exileOrphanedByEndedControl = do
 -- `Game.stillPlaying gs`. `leaving` is who just left, and is needed only to tell
 -- "nobody is playing because they all left at once" (a draw) from "nobody was
 -- playing to begin with" (no result at all).
+--
+-- CR 104.2c: survivors all on one team are that team winning, however many
+-- they are. CR 104.4d's draw is the empty case. CR 809.5a is this too: an
+-- emperor wins only when every opponent has left, CR 104.2b's effect being the
+-- opponents losing (Pawl.Engine.Resolve.Effect's WinGame arm).
 outcomeAfterLeaving :: [PlayerId] -> GameState -> Maybe Result
 outcomeAfterLeaving leaving gs = case Game.stillPlaying gs of
-  [winner] -> Just (Result.Won winner)
   [] -> if null leaving then Nothing else Just Result.Drawn
-  _ -> Nothing
+  survivors@(first : rest) -> case Teams.teamOf (Game.teams gs) first of
+    Just team | all (\pid -> Teams.teamOf (Game.teams gs) pid == Just team) rest -> Just (Result.TeamWon team)
+    _ -> case survivors of
+      [winner] -> Just (Result.Won winner)
+      _ -> Nothing
 
 -- CR 104.3a: leave the game IMMEDIATELY, and settle CR 104.2a right now rather
 -- than at the next state-based action check -- which is the whole distinction
