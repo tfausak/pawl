@@ -122,7 +122,9 @@ import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -2034,6 +2036,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           [ ("EntryRiders' kinds", holds (riderFilters riders)),
             ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
             ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot Nothing)))),
+            ("Effect.RemoveCountersAmong' kind", holds (effectFilters (Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong (RemovalCount.Exactly one) anywhere kind Nothing)))),
             ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing anywhere)))),
             ("Effect.PutCountersFrom' kind", holds (effectFilters (Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom slot (Just kind) anywhere)))),
             ("Quantity.ObjectCounters' kind", holds (quantityFilters (Quantity.Type.ObjectCounters kind))),
@@ -2307,18 +2310,20 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- CR 508.5's atom is answerable only where the CONTEXT supplies a defending
   -- player, and exactly two callers fill Filter.Context.defendingPlayer:
-  -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.39a's provoke) and
-  -- Pawl.Engine.CombatRestriction.inForce for a CR 508.1c gate (Armored Galleon).
-  -- It is Nothing everywhere else, so the atom in any OTHER position -- a
-  -- static ability's affected set, a search filter, a triggered ability's
-  -- condition -- would be a silent False. This is the lint that keeps that true,
-  -- narrowed from "no card writes it" the moment the Galleon arrived: what it
-  -- sweeps now is the atom OUTSIDE a combat restriction, by re-encoding each face
-  -- with its restrictions dropped.
-  Spec.it s "CR 508.5 no card writes ControlledByDefendingPlayer outside a combat restriction" $ do
+  -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.39a's provoke,
+  -- Sensational Spider-Man) and Pawl.Engine.CombatRestriction.inForce for a CR
+  -- 508.1c gate (Armored Galleon). It is Nothing everywhere else, so the atom in
+  -- any OTHER position -- a static ability's affected set, a search filter, a
+  -- triggered ability's condition -- would be a silent False. This is the lint
+  -- that keeps that true: what it sweeps is the atom outside a combat
+  -- restriction, by re-encoding each face with its restrictions dropped, and
+  -- outside a mode's target slot, by subtracting what cardFilters finds there.
+  Spec.it s "CR 508.5 no card writes ControlledByDefendingPlayer outside a combat restriction or a target slot" $ do
     ps <- S.allPrintings s
-    let atoms c = jsonAtoms (Text.pack "ControlledByDefendingPlayer") (Codec.encode (Face.Codec.codec Card.codec) c)
-        elsewhere c = atoms (c {Face.combatRestrictions = []})
+    let tag = Text.pack "ControlledByDefendingPlayer"
+        atoms c = jsonAtoms tag (Codec.encode (Face.Codec.codec Card.codec) c)
+        inSlots c = sum [filterAtoms tag f | (InTargetSlot, f) <- cardFilters c]
+        elsewhere c = atoms (c {Face.combatRestrictions = []}) - inSlots c
         offenders = filter (anyFace ((/= 0) . elsewhere) . Printing.card) ps
     Spec.assertEqWith s "the atom is the engine's alone outside a gate" (fmap (S.nameOf . Printing.card) offenders) []
     -- Three legs of anti-vacuity, because the narrowing above could hide a real
@@ -2331,8 +2336,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "the Galleon's gate carries the atom" (atoms (S.combinedFace galleon)) 1
     Spec.assertEqWith s "and nothing outside it does" (elsewhere (S.combinedFace galleon)) 0
     -- Two: the same counter over a hand-built face carrying the atom in a target
-    -- slot finds it, the sibling sweep's leg -- so a card smuggling it into a
-    -- position the engine cannot answer is still caught.
+    -- slot finds it, and `elsewhere` does not -- the position Sensational
+    -- Spider-Man writes it in.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ControlledByDefendingPlayer]]
         targetSlot = TargetSlot.required Pool.Creatures (Just buried)
@@ -2344,9 +2349,11 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
-    -- Three: and `elsewhere` sees it too, which is what says dropping the
-    -- restrictions did not drop the rest of the face with them.
-    Spec.assertEqWith s "and outside a combat restriction it is still seen" (elsewhere planted) 1
+    Spec.assertEqWith s "and in a target slot it is accepted" (elsewhere planted) 0
+    -- Three: the same atom in a counter restriction's affected set is an
+    -- offence, which is what says neither subtraction drops the rest of the face.
+    let affected = (S.combinedFace piker) {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching buried) Nothing]}
+    Spec.assertEqWith s "and outside both positions it is still seen" (elsewhere affected) 1
   -- CR 603.2's baked half is in Modification.SetController's position rather
   -- than CR 702.39a's: a PlayerId that only a resolution can know, round-tripped
   -- by a total codec, so nothing but this keeps card JSON from naming a seat

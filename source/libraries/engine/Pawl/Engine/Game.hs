@@ -434,7 +434,7 @@ removeFromCombat :: ObjectId -> GameState -> GameState
 removeFromCombat oid gs =
   let c = GameState.combat gs
       c1 =
-        c
+        (recordDefending oid c)
           { Combat.attackers = Map.delete oid (Combat.attackers c),
             Combat.blockers = fmap (Set.delete oid) (Map.delete oid (Combat.blockers c)),
             Combat.joinedUnder = Map.delete oid (Combat.joinedUnder c),
@@ -483,8 +483,20 @@ removeFromCombat oid gs =
 -- is a different question and survives -- the declaration happened.
 ceaseAttacking :: ObjectId -> GameState -> GameState
 ceaseAttacking oid gs =
-  let c = GameState.combat gs
+  let c = recordDefending oid (GameState.combat gs)
    in gs {GameState.combat = c {Combat.attackers = Map.delete oid (Combat.attackers c)}}
+
+-- CR 508.5's second sentence, written as an attacker leaves combat: the player
+-- it was attacking, or the one CR 802.2a seated for its planeswalker or battle
+-- (Combat.attackedUnder). A no-op for a creature that is not attacking, so a
+-- second removal keeps the first answer.
+recordDefending :: ObjectId -> Combat.Combat -> Combat.Combat
+recordDefending oid c =
+  let defending = case Map.lookup oid (Combat.attackers c) of
+        Just (AttackTarget.OfPlayer pid) -> Just pid
+        Just _ -> Map.lookup oid (Combat.attackedUnder c)
+        Nothing -> Nothing
+   in maybe c (\pid -> c {Combat.removedDefending = Map.insert oid pid (Combat.removedDefending c)}) defending
 
 -- CR 508.1k: is this creature attacking? A key lookup in Combat.attackers, which
 -- the declaration keys by ATTACKER -- the line isBlocking below is careful not to

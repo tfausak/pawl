@@ -277,7 +277,9 @@ import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Reinforce as Reinforce
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -1286,6 +1288,7 @@ ownCounts effect = case effect of
   -- alone kept compiling (#2729).
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> foldMap quantityCounts (MovedKinds.quantityOf kinds)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> quantityCounts quantity
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> foldMap quantityCounts (RemovalCount.quantityOf count)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.PayAnyEnergy _ -> []
@@ -1705,6 +1708,7 @@ effectNestedEffects effect = case effect of
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
@@ -2207,6 +2211,7 @@ effectReplacements effect = case effect of
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
@@ -2682,6 +2687,7 @@ effectMintedFaces effect = case effect of
   Effect.PutCountersFrom {} -> []
   Effect.MoveCounters {} -> []
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
@@ -5682,6 +5688,8 @@ effectFilters effect = case effect of
   -- The count and CR 122.1b's kind, PutCounters' two unframed positions: the
   -- slot beside them is a bare SlotName and carries no Filter.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _ _) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity)
+  -- RemoveCounters' two unframed positions, and MoveCounters' `from`.
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from kind _) -> frame Unframed (counterKindFilters kind <> foldMap quantityFilters (RemovalCount.quantityOf count)) <> frame SourceHostFramed (objectRefFilters from)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []

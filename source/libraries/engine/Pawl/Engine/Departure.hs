@@ -228,7 +228,7 @@ objectsLeaveWith pid gs =
       leave :: GameState -> ObjectId -> GameState
       leave g oid =
         let g1 = Game.removeFromZones pid oid g
-            combat = GameState.combat g1
+            combat = Game.recordDefending oid (GameState.combat g1)
          in g1
               { GameState.objects = Map.delete oid (GameState.objects g1),
                 GameState.combat =

@@ -215,6 +215,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.PutCounters {} -> Nothing
   Effect.PutCountersFrom {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
+  Effect.RemoveCountersAmong {} -> Nothing
   Effect.MoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing
