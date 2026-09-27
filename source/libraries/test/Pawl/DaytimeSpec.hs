@@ -13,7 +13,8 @@
 -- Pawl.Engine.Keyword.mintedReplacementsFor and applied by Pawl.Engine.Event's
 -- arm. NOT CR 712.13a, which governs a resolving double-faced spell and is the
 -- stack road alone -- the case citations below are on that road and say so. See
--- entrySpec, whose fixture is Infestation Expert // Infested Werewolf.
+-- entrySpec, whose fixture is Infestation Expert // Infested Werewolf, and the
+-- synthetic Dusklit Conjurer for an instant back face (CR 712.13a, 304.4).
 --
 -- Also CR 702.145b's third static ability and CR 702.145e's second -- "this
 -- permanent can't transform except due to its daybound/nightbound ability" --
