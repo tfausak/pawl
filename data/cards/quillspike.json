@@ -8,15 +8,12 @@
               {
                 "type": "RemoveCounters",
                 "value": {
-                  "count": 2,
+                  "count": 1,
                   "kind": {
                     "type": "OfKind",
                     "value": {
-                      "type": "PlusOnePlusOne"
+                      "type": "MinusOneMinusOne"
                     }
-                  },
-                  "spread": {
-                    "type": "FromAmong"
                   },
                   "whichPermanent": {
                     "type": "And",
@@ -40,15 +37,19 @@
             ],
             "mana": [
               {
-                "type": "Generic",
-                "value": 2
-              },
-              {
-                "type": "OfType",
+                "type": "Hybrid",
                 "value": {
-                  "type": "Colored",
-                  "value": {
-                    "type": "White"
+                  "left": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Black"
+                    }
+                  },
+                  "right": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Green"
+                    }
                   }
                 }
               }
@@ -61,81 +62,74 @@
                   {
                     "effects": [
                       {
-                        "type": "Destroy",
+                        "type": "ModifyTarget",
                         "value": {
+                          "duration": {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "modification": {
+                            "type": "ModifyPowerToughness",
+                            "value": {
+                              "power": {
+                                "type": "Literal",
+                                "value": 3
+                              },
+                              "toughness": {
+                                "type": "Literal",
+                                "value": 3
+                              }
+                            }
+                          },
                           "ref": {
                             "type": "InSlot",
-                            "value": "target"
-                          },
-                          "regenerability": {
-                            "type": "Regenerable"
+                            "value": "self"
                           }
                         }
                       }
                     ]
                   }
-                ],
-                "targetSlots": {
-                  "target": {
-                    "filter": {
-                      "type": "Or",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Artifact"
-                          }
-                        },
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Enchantment"
-                          }
-                        }
-                      ]
-                    },
-                    "pool": {
-                      "type": "Permanents"
-                    }
-                  }
-                }
+                ]
               }
             ]
           }
         }
       ],
-      "keywords": [
-        {
-          "type": "Training"
-        }
-      ],
       "manaCost": [
         {
-          "type": "OfType",
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "Hybrid",
           "value": {
-            "type": "Colored",
-            "value": {
-              "type": "White"
+            "left": {
+              "type": "Colored",
+              "value": {
+                "type": "Black"
+              }
+            },
+            "right": {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
             }
           }
         }
       ],
-      "name": "Hopeful Initiate",
+      "name": "Quillspike",
       "power": {
         "type": "Literal",
         "value": 1
       },
       "toughness": {
         "type": "Literal",
-        "value": 2
+        "value": 1
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Human"
-          },
-          {
-            "type": "Warlock"
+            "type": "Beast"
           }
         ],
         "types": [

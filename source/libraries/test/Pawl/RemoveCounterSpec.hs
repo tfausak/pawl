@@ -2,9 +2,9 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Resolve's Effect.RemoveCountersAmong arm -- CR 608.2d's
--- removal of counters of one kind from among several permanents, the resolving
--- controller dividing them -- through its three producers, one per
--- Pawl.Types.RemovalCount arm.
+-- removal of counters from among several permanents, the resolving controller
+-- dividing them -- through one producer per Pawl.Types.RemovalCount arm, and
+-- Eventide's Shadow for counters of any kind.
 module Pawl.RemoveCounterSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -25,6 +25,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
+import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
@@ -41,6 +42,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   lizrogSpec s registry
   spiderManSpec s registry
   overseerSpec s registry
+  eventidesShadowSpec s registry
 
 -- One CR 608.2d division prompt as the answerer below records it: which of the
 -- three, its count, and its offer.
@@ -286,3 +288,87 @@ overseerBoard s registry onOverseer onForest = do
           GameState.remaining = S.phasesAfter beginning
         }
     )
+
+-- Eventide's Shadow {4}{B} Sorcery (Oracle text checked against Scryfall
+-- 2026-09-27): "Remove any number of counters from among permanents on the
+-- battlefield. You draw cards and lose life equal to the number of counters
+-- removed this way."
+--
+-- WhichCounters.OfAnyKind as an effect: the division is by kind as well as by
+-- permanent (CR 122.1), and the tally both later instructions read.
+--
+-- THE BOARD: alice holds the Shadow over five Swamps and controls a Goblin Piker
+-- carrying a +1/+1 and a vigilance counter; bob's Hill Giant carries two +1/+1
+-- counters and a stun counter. alice's library holds five cards.
+eventidesShadowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+eventidesShadowSpec s registry =
+  let run answer board shadowId = State.runState (fmap snd (Engine.runGame (recordingMixed answer) board (S.cast S.alice shadowId >> Stack.resolveTop))) []
+   in Spec.describe s "Eventide's Shadow" $ do
+        -- The gameplay assertions first, the prompt record a proxy after them.
+        Spec.it s "CR 122.1 / 608.2d alice removes counters of several kinds from among every permanent, then draws and loses that many" $ do
+          (shadowId, pikerId, giantId, board) <- shadowBoard s registry
+          let answer = Map.fromList [(pikerId, Map.singleton vigilance 1), (giantId, Map.fromList [(CounterKind.Stun, 1), (plusOne, 1)])]
+              (after, asked) = run answer board shadowId
+          Spec.assertEqWith s "CR 122.1 the Piker's vigilance counter came off" (S.counterOf vigilance pikerId after) 0
+          Spec.assertEqWith s "and its +1/+1 counter stayed" (S.counterOf plusOne pikerId after) 1
+          Spec.assertEqWith s "the Giant's stun counter came off" (S.counterOf CounterKind.Stun giantId after) 0
+          Spec.assertEqWith s "and one of its two +1/+1 counters" (S.counterOf plusOne giantId after) 1
+          Spec.assertEqWith s "CR 121.1 alice drew the three removed" (length (Game.zoneMembers Zone.Hand S.alice after)) 3
+          Spec.assertEqWith s "CR 119.3 and lost three life" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "alice was asked once, from zero, over every permanent by kind" asked [(CounterSpread.FromAmongAtLeast, 0, Map.fromList [(pikerId, Map.fromList [(plusOne, 1), (vigilance, 1)]), (giantId, Map.fromList [(plusOne, 2), (CounterKind.Stun, 1)])])]
+        -- None is an answer to "any number", and the tally is then zero.
+        Spec.it s "CR 608.2d removing none draws nothing and loses nothing" $ do
+          (shadowId, pikerId, giantId, board) <- shadowBoard s registry
+          let (after, _) = run Map.empty board shadowId
+          Spec.assertEqWith s "every counter stayed" (S.counterOf vigilance pikerId after, S.counterOf CounterKind.Stun giantId after, S.counterOf plusOne giantId after) (1, 1, 2)
+          Spec.assertEqWith s "alice drew nothing" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+          Spec.assertEqWith s "and lost nothing" (S.lifeOf S.alice after) (Just 20)
+        -- A division naming a kind a permanent does not carry is refused, not
+        -- repaired into another one.
+        Spec.it s "CR 608.2d an answer naming a kind the permanent lacks removes nothing" $ do
+          (shadowId, pikerId, _, board) <- shadowBoard s registry
+          let (after, _) = run (Map.singleton pikerId (Map.singleton CounterKind.Stun 1)) board shadowId
+          Spec.assertEqWith s "the Piker kept both" (S.counterOf vigilance pikerId after, S.counterOf plusOne pikerId after) (1, 1)
+          Spec.assertEqWith s "and alice drew nothing" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+
+vigilance :: CounterKind.CounterKind Keyword.Keyword
+vigilance = CounterKind.Keyword Keyword.Vigilance
+
+-- The board eventidesShadowSpec's cases share, described above it.
+shadowBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+shadowBoard s registry = do
+  shadow <- S.printingOf s registry "Eventide's Shadow"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  swamp <- S.printingOf s registry "Swamp"
+  let lands = S.landsFor swamp S.alice 5 (Setup.emptyGame S.bothPlayers)
+      (shadowId, withShadow) = S.addHandCard shadow S.alice lands
+      (pikerId, withPiker) = S.addPermanent piker S.alice withShadow
+      (giantId, withGiant) = S.addPermanent giant S.bob withPiker
+      stocked = foldr (\_ g -> snd (S.addLibraryCard swamp S.alice g)) withGiant [1 .. (5 :: Int)]
+      counted =
+        S.addCounter plusOne 1 pikerId
+          . S.addCounter vigilance 1 pikerId
+          . S.addCounter plusOne 2 giantId
+          . S.addCounter CounterKind.Stun 1 giantId
+          $ stocked
+  pure
+    ( shadowId,
+      pikerId,
+      giantId,
+      counted
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- Answers Prompt.ChooseMixedCounterRemoval with the division given, recording
+-- each prompt's spread, count and offer, and everything else identically.
+-- PINNED, `recording`'s posture.
+recordingMixed :: Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural) -> Prompt.Prompt r -> State.State [(CounterSpread.CounterSpread, Natural, Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural))] r
+recordingMixed answer p = case p of
+  Prompt.ChooseMixedCounterRemoval _ _ _ spread owed offered -> do
+    State.modify' (<> [(spread, owed, offered)])
+    pure answer
+  _ -> pure (S.identityAnswer p)

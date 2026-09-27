@@ -1,12 +1,12 @@
 module Pawl.Codec.CostComponent where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Codec.CountersFromThis as CountersFromThis
 import qualified Pawl.Codec.DiscardCards as DiscardCards
 import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Codec.ExileMaterials as ExileMaterials
 import qualified Pawl.Codec.Filter as Filter
-import qualified Pawl.Codec.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Codec.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Codec.Sacrifice as Sacrifice
 import qualified Pawl.Codec.TapForTotalPower as TapForTotalPower
@@ -57,7 +57,7 @@ codec keywordCodec =
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveCountersFromThis" (CountersFromThis.codec keywordCodec) CostComponent.RemoveCountersFromThis (\x -> case x of CostComponent.RemoveCountersFromThis y -> Just y; _ -> Nothing),
-      Arm.payload "RemovePlusOneCounters" (RemovePlusOneCounters.codec keywordCodec) CostComponent.RemovePlusOneCounters (\x -> case x of CostComponent.RemovePlusOneCounters y -> Just y; _ -> Nothing),
+      Arm.payload "RemoveCounters" (CountersFromPermanents.codec keywordCodec) CostComponent.RemoveCounters (\x -> case x of CostComponent.RemoveCounters y -> Just y; _ -> Nothing),
       Arm.payload "RemovePlusOneCountersX" (Filter.codec keywordCodec) CostComponent.RemovePlusOneCountersX (\x -> case x of CostComponent.RemovePlusOneCountersX y -> Just y; _ -> Nothing),
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis (\x -> case x of CostComponent.PutPlusOneCountersOnThis y -> Just y; _ -> Nothing),
       Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
@@ -99,7 +99,7 @@ tagOf x = case x of
   CostComponent.AddLoyaltyToThis {} -> "AddLoyaltyToThis"
   CostComponent.RemoveLoyaltyFromThis {} -> "RemoveLoyaltyFromThis"
   CostComponent.RemoveCountersFromThis {} -> "RemoveCountersFromThis"
-  CostComponent.RemovePlusOneCounters {} -> "RemovePlusOneCounters"
+  CostComponent.RemoveCounters {} -> "RemoveCounters"
   CostComponent.RemovePlusOneCountersX {} -> "RemovePlusOneCountersX"
   CostComponent.PutPlusOneCountersOnThis {} -> "PutPlusOneCountersOnThis"
   CostComponent.Blight {} -> "Blight"

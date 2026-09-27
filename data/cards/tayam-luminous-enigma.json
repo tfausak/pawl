@@ -1,0 +1,263 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveCounters",
+                "value": {
+                  "count": 3,
+                  "kind": {
+                    "type": "OfAnyKind"
+                  },
+                  "spread": {
+                    "type": "FromAmong"
+                  },
+                  "whichPermanent": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 3
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Mill",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 3
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "ChosenCardInGraveyard",
+                            "value": {
+                              "chooser": {
+                                "type": "TheController"
+                              },
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "Or",
+                                    "value": [
+                                      {
+                                        "type": "HasCardType",
+                                        "value": {
+                                          "type": "Artifact"
+                                        }
+                                      },
+                                      {
+                                        "type": "HasCardType",
+                                        "value": {
+                                          "type": "Battle"
+                                        }
+                                      },
+                                      {
+                                        "type": "HasCardType",
+                                        "value": {
+                                          "type": "Creature"
+                                        }
+                                      },
+                                      {
+                                        "type": "HasCardType",
+                                        "value": {
+                                          "type": "Enchantment"
+                                        }
+                                      },
+                                      {
+                                        "type": "HasCardType",
+                                        "value": {
+                                          "type": "Land"
+                                        }
+                                      },
+                                      {
+                                        "type": "HasCardType",
+                                        "value": {
+                                          "type": "Planeswalker"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "ManaValueAtMost",
+                                    "value": 3
+                                  }
+                                ]
+                              },
+                              "players": {
+                                "type": "Scoped",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            }
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Tayam, Luminous Enigma",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Not",
+                    "value": {
+                      "type": "IsSource"
+                    }
+                  }
+                ]
+              },
+              "rewrite": {
+                "type": "WithCounters",
+                "value": [
+                  {
+                    "count": {
+                      "type": "Literal",
+                      "value": 1
+                    },
+                    "kind": {
+                      "type": "Keyword",
+                      "value": {
+                        "type": "Vigilance"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Beast"
+          },
+          {
+            "type": "Nightmare"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

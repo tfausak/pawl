@@ -165,6 +165,7 @@ import qualified Pawl.Codec.CounterSpreadSpec
 import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
+import qualified Pawl.Codec.CountersFromPermanentsSpec
 import qualified Pawl.Codec.CountersFromThisSpec
 import qualified Pawl.Codec.CraftSpec
 import qualified Pawl.Codec.CreateCopySpec
@@ -430,7 +431,6 @@ import qualified Pawl.Codec.ReduceSpellCostSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReinforceSpec
 import qualified Pawl.Codec.RemoveCountersSpec
-import qualified Pawl.Codec.RemovePlusOneCountersSpec
 import qualified Pawl.Codec.ReplaceSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
@@ -527,6 +527,7 @@ import qualified Pawl.Codec.VanguardSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
 import qualified Pawl.Codec.VoteSpec
 import qualified Pawl.Codec.WardSpec
+import qualified Pawl.Codec.WhichCountersSpec
 import qualified Pawl.Codec.WhileSpec
 import qualified Pawl.Codec.WithCountersSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
@@ -875,6 +876,7 @@ spec s registry = do
   Pawl.Codec.CounterRSpec.spec s
   Pawl.Codec.CounterSpec.spec s
   Pawl.Codec.CounterSpreadSpec.spec s
+  Pawl.Codec.CountersFromPermanentsSpec.spec s
   Pawl.Codec.CounterSubjectSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
@@ -1152,7 +1154,6 @@ spec s registry = do
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ReinforceSpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
-  Pawl.Codec.RemovePlusOneCountersSpec.spec s
   Pawl.Codec.CountersFromThisSpec.spec s
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
@@ -1249,6 +1250,7 @@ spec s registry = do
   Pawl.Codec.VentureMarkerEnteredSpec.spec s
   Pawl.Codec.VoteSpec.spec s
   Pawl.Codec.WardSpec.spec s
+  Pawl.Codec.WhichCountersSpec.spec s
   Pawl.Codec.WhileSpec.spec s
   Pawl.Codec.WithCountersSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s

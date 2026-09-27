@@ -1,5 +1,6 @@
 module Pawl.Codec.EffectSpec where
 
+import qualified Data.Either as Either
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
@@ -8,6 +9,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.RemoveCountersAmong as RemoveCountersAmong.Codec
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -179,6 +181,7 @@ import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
+import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZonePair as ZonePair
 
@@ -1237,25 +1240,32 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       " {\"type\":\"RemoveCounters\",\"value\":{\"kind\":{\"type\":\"MinusOneMinusOne\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"slot\":\"target\"}} "
   -- Each RemovalCount arm, and the tally written only where it is bound.
   Spec.it s "RemoveCountersAmong" $ do
-    let among count tally = Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count (ObjectRef.EachMatching Filter.IsSource) CounterKind.Stun tally)
+    let among count tally = Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count (ObjectRef.EachMatching Filter.IsSource) (WhichCounters.OfKind CounterKind.Stun) tally)
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (among (RemovalCount.Exactly (Quantity.Literal 3)) Nothing)
-      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"Exactly\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"Stun\"}}} "
+      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"Exactly\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfKind\",\"value\":{\"type\":\"Stun\"}}}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (among (RemovalCount.UpTo (Quantity.Literal 3)) (Just (SlotName.MkSlotName (Text.pack "removed"))))
-      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"UpTo\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"Stun\"},\"tally\":\"removed\"}} "
+      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"UpTo\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfKind\",\"value\":{\"type\":\"Stun\"}},\"tally\":\"removed\"}} "
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (among RemovalCount.AnyNumber Nothing)
-      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"AnyNumber\"},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"Stun\"}}} "
+      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"AnyNumber\"},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfKind\",\"value\":{\"type\":\"Stun\"}}}} "
+  -- Counters of any kind only in any number: Eventide's Shadow's form is
+  -- accepted, a stated count over any kind is not.
+  Spec.it s "RemoveCountersAmong of any kind" $ do
+    let decoded json = Codec.decode RemoveCountersAmong.Codec.codec =<< Common.parse (Text.pack json)
+    Spec.assertBool s (Either.isRight (decoded "{\"count\":{\"type\":\"AnyNumber\"},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfAnyKind\"}}")) "expected any number of any kind to decode"
+    Spec.assertBool s (Either.isLeft (decoded "{\"count\":{\"type\":\"UpTo\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfAnyKind\"}}")) "expected up to three of any kind to fail"
+    Spec.assertBool s (Either.isLeft (decoded "{\"count\":{\"type\":\"Exactly\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"OfAnyKind\"}}")) "expected exactly three of any kind to fail"
   -- Every PlayerRef shape the opcode accepts: the self-scoped one, and the slot
   -- read CR 702.70a needs.
   Spec.it s "GainPlayerCounters" $ do

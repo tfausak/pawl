@@ -14,6 +14,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designation as Designation
@@ -40,7 +41,6 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Reinforce as Reinforce
-import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
@@ -52,6 +52,7 @@ import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Ward as Ward
+import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.Zone as Zone
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
@@ -2928,6 +2929,12 @@ rewriteKeywordCount pairs n = case n of
 rewriteCost :: [(Subtype.Subtype, Subtype.Subtype)] -> Cost.Cost Keyword.Type.Keyword -> Cost.Cost Keyword.Type.Keyword
 rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (Cost.components cost)}
 
+-- rewriteCounterKind over the kind a counter removal names, where it names one.
+rewriteWhichCounters :: [(Subtype.Subtype, Subtype.Subtype)] -> WhichCounters.WhichCounters Keyword.Type.Keyword -> WhichCounters.WhichCounters Keyword.Type.Keyword
+rewriteWhichCounters pairs which = case which of
+  WhichCounters.OfKind kind -> WhichCounters.OfKind (rewriteCounterKind pairs kind)
+  WhichCounters.OfAnyKind -> which
+
 -- rewriteCost's per-component half. The components that carry a Filter are the
 -- ones that descend; the rest name a number, or the object the cost is on, and
 -- CR 612.2 finds no word in them to swap.
@@ -2937,7 +2944,7 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- (CR 118.12). The TapForTotalPower, TapPermanents, DiscardCards,
 -- ExileCardsFromGraveyard, ExileTopFromGraveyard, ReturnPermanents,
 -- ExileCardFromHand, RevealCardFromHand, Behold, ExileMaterials,
--- RemovePlusOneCounters and
+-- RemoveCounters and
 -- PutCardFromHandOntoBattlefield arms
 -- are a regression
 -- fence: no printing pairs any of them with a basic land type, so no test can
@@ -2962,7 +2969,7 @@ rewriteComponent pairs component = case component of
   CostComponent.ExileCardFromHand criterion -> CostComponent.ExileCardFromHand (rewrite pairs criterion)
   CostComponent.RevealCardFromHand criterion -> CostComponent.RevealCardFromHand (rewrite pairs criterion)
   CostComponent.Behold criterion -> CostComponent.Behold (rewrite pairs criterion)
-  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n criterion spread) -> CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters n (rewrite pairs criterion) spread)
+  CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n which criterion spread) -> CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents n (rewriteWhichCounters pairs which) (rewrite pairs criterion) spread)
   CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemovePlusOneCountersX (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component

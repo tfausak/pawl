@@ -59,6 +59,7 @@ import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -3014,6 +3015,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   novijenSagesSpec s registry
   retributionSpec s registry
   oozeFluxSpec s registry
+  tayamSpec s registry
+  soulDivinerSpec s registry
+  quillspikeSpec s registry
   millikinSpec s registry
   brittleEffigySpec s registry
   exiledReliquarySpec s registry
@@ -4444,7 +4448,7 @@ barkhideTrollSpec s registry =
 -- enters with an additional +1/+1 counter on it. / {G}{U}, Remove a +1/+1
 -- counter from a creature you control: Draw a card."
 --
--- The producer for CostComponent.RemovePlusOneCounters, CR 118.1's counter
+-- The producer for CostComponent.RemoveCounters, CR 118.1's counter
 -- removal aimed at a permanent the PAYER CHOOSES rather than at the object the
 -- cost is on (Barkhide Troll's, above). The first ability is
 -- Pawl.EntryReplacementSpec's; only the second is read here.
@@ -4853,6 +4857,210 @@ recordingAtLeastRemovals answer p = case p of
     State.modify' (<> [(least, offered)])
     pure answer
   _ -> pure (S.identityAnswer p)
+
+-- Tayam, Luminous Enigma {1}{W}{B}{G} Legendary Creature -- Nightmare Beast 3/3
+-- (Oracle text checked against Scryfall 2026-09-27): "Each other creature you
+-- control enters with an additional vigilance counter on it. / {3}, Remove three
+-- counters from among creatures you control: Mill three cards, then return a
+-- permanent card with mana value 3 or less from your graveyard to the
+-- battlefield."
+--
+-- The producer for WhichCounters.OfAnyKind spread FromAmong: CR 122.1 makes
+-- counters of different names different things, so the payer divides the three
+-- by kind as well as by creature (CR 601.2h).
+--
+-- THE BOARD: alice controls Tayam over three Swamps, a Goblin Piker carrying the
+-- vigilance and +1/+1 counts given and a Hill Giant carrying the +1/+1 count
+-- given. bob's Hill Giant carries three +1/+1 counters and a vigilance counter on
+-- every board, which a pool read without "you control" would count. alice's
+-- graveyard holds a Goblin Piker (mana value 2) and a Hill Giant (mana value 4);
+-- her library five Divinations, which mill as nonpermanent cards.
+tayamSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tayamSpec s registry =
+  Spec.describe s "Tayam, Luminous Enigma" $ do
+    -- The gameplay-level assertions come FIRST: which counter of which kind came
+    -- off which creature. The prompt record is a proxy after them.
+    Spec.it s "CR 122.1 / 601.2h the payer divides the three counters by creature and by kind" $ do
+      (tayamId, pikerId, giantId, board) <- tayamBoard s registry (1, 1, 2)
+      tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
+      let answer = Map.fromList [(pikerId, Map.singleton vigilance 1), (giantId, Map.singleton CounterKind.PlusOnePlusOne 2)]
+          act = do Activate.activateAbility S.alice tayamId (theAbility tayam); Stack.resolveTop
+          (after, asked) = State.runState (fmap snd (Engine.runGame (recordingMixedRemovals answer) board act)) []
+          returned = newPermanents board after
+      Spec.assertEqWith s "CR 122.1 the vigilance counter came off the Piker" (S.counterOf vigilance pikerId after) 0
+      Spec.assertEqWith s "and the Piker kept its +1/+1 counter, a different kind" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
+      Spec.assertEqWith s "and both of the Giant's came off" (S.counterOf CounterKind.PlusOnePlusOne giantId after) 0
+      -- What the cost paid for: the graveyard's one permanent card of mana value
+      -- 3 or less, which Tayam's first ability then marks on its way in.
+      Spec.assertEqWith s "CR 701.17a / 400.7 the graveyard's Goblin Piker returned" (fmap (`S.soleFaceName` after) returned) [pikerName]
+      Spec.assertEqWith s "CR 614.1c and entered with an additional vigilance counter" (fmap (\oid -> S.counterOf vigilance oid after) returned) [1]
+      Spec.assertEqWith s "the payer was asked once, over alice's creatures by kind" asked [(CounterSpread.FromAmong, 3, Map.fromList [(pikerId, Map.fromList [(vigilance, 1), (CounterKind.PlusOnePlusOne, 1)]), (giantId, Map.singleton CounterKind.PlusOnePlusOne 2)])]
+    -- A division taking a kind a creature does not carry is refused, not
+    -- repaired: the same board, the Piker's three counters answered as +1/+1.
+    Spec.it s "CR 118.3 an answer naming a kind the creature lacks pays nothing" $ do
+      (tayamId, pikerId, giantId, board) <- tayamBoard s registry (1, 1, 2)
+      tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
+      let answer = Map.fromList [(pikerId, Map.singleton CounterKind.PlusOnePlusOne 2), (giantId, Map.singleton CounterKind.PlusOnePlusOne 1)]
+          ((_, paid), _) = State.runState (Engine.runGame (recordingMixedRemovals answer) board (Activate.activateAbility S.alice tayamId (theAbility tayam))) []
+      Spec.assertEqWith s "the Piker kept its vigilance counter" (S.counterOf vigilance pikerId paid) 1
+      Spec.assertEqWith s "and its +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId paid) 1
+      Spec.assertEqWith s "and the Giant both of its own" (S.counterOf CounterKind.PlusOnePlusOne giantId paid) 2
+      Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack paid)) 0
+    -- The elision: alice's creatures carry exactly three counters between them,
+    -- so CR 118.3 leaves one division.
+    Spec.it s "CR 118.3 counters exactly covering the count are one division, so nothing is asked" $ do
+      (tayamId, pikerId, giantId, board) <- tayamBoard s registry (1, 1, 1)
+      tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
+      let ((_, paid), asked) = State.runState (Engine.runGame (recordingMixedRemovals Map.empty) board (Activate.activateAbility S.alice tayamId (theAbility tayam))) []
+      Spec.assertEqWith s "the Piker's vigilance counter came off" (S.counterOf vigilance pikerId paid) 0
+      Spec.assertEqWith s "and its +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId paid) 0
+      Spec.assertEqWith s "and the Giant's" (S.counterOf CounterKind.PlusOnePlusOne giantId paid) 0
+      Spec.assertEqWith s "the activation completed" (length (GameState.stack paid)) 1
+      Spec.assertEqWith s "and the payer was asked nothing" asked []
+    -- CR 118.3 / 602.2b over a pair of boards differing in the Piker's one
+    -- vigilance counter: with it, three counters of two kinds pay the cost that a
+    -- +1/+1-only reading would refuse at two.
+    Spec.it s "CR 118.3 counters of every kind count toward the three" $ do
+      tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
+      (tayamId, _, _, mixed) <- tayamBoard s registry (1, 0, 2)
+      (shortId, _, _, short) <- tayamBoard s registry (0, 0, 2)
+      let offers oid gs = length (filter (isActivateOfAbility oid (theAbility tayam)) (Action.legalActions S.alice gs))
+      Spec.assertEqWith s "CR 602.2b offered with a vigilance counter and two +1/+1 counters" (offers tayamId mixed) 1
+      Spec.assertEqWith s "and not offered with the two +1/+1 counters alone" (offers shortId short) 0
+  where
+    pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+
+-- CR 122.1b's vigilance counter.
+vigilance :: CounterKind.CounterKind Keyword.Keyword
+vigilance = CounterKind.Keyword Keyword.Vigilance
+
+-- The board tayamSpec's cases share, described above it. The counts are the
+-- Piker's vigilance and +1/+1 counters and the Giant's +1/+1 counters.
+tayamBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> (Natural.Natural, Natural.Natural, Natural.Natural) -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+tayamBoard s registry (pikerVigilance, pikerPlusOne, giantPlusOne) = do
+  tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  swamp <- S.printingOf s registry "Swamp"
+  divination <- S.printingOf s registry "Divination"
+  let lands = S.landsFor swamp S.alice 3 (Setup.emptyGame S.bothPlayers)
+      (tayamId, withTayam) = S.addPermanent tayam S.alice lands
+      (pikerId, withPiker) = S.addPermanent piker S.alice withTayam
+      (giantId, withGiant) = S.addPermanent giant S.alice withPiker
+      (bobsGiantId, withBobs) = S.addPermanent giant S.bob withGiant
+      buried = snd (S.addGraveyardCard giant S.alice (snd (S.addGraveyardCard piker S.alice withBobs)))
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard divination S.alice g)) buried [1 .. (5 :: Int)]
+      opposed = S.addCounter vigilance 1 bobsGiantId (S.addCounter CounterKind.PlusOnePlusOne 3 bobsGiantId stocked)
+      counted =
+        S.addCounter CounterKind.PlusOnePlusOne giantPlusOne giantId
+          . S.addCounter CounterKind.PlusOnePlusOne pikerPlusOne pikerId
+          . S.addCounter vigilance pikerVigilance pikerId
+          $ opposed
+  pure
+    ( tayamId,
+      pikerId,
+      giantId,
+      counted
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- Answers Prompt.ChooseMixedCounterRemoval with the division given, recording
+-- each prompt's spread, count and offer. PINNED, recordingSpreadRemovals'
+-- posture.
+recordingMixedRemovals :: Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural) -> Prompt.Prompt r -> State.State [(CounterSpread.CounterSpread, Natural.Natural, Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))] r
+recordingMixedRemovals answer p = case p of
+  Prompt.ChooseMixedCounterRemoval _ _ _ spread owed offered -> do
+    State.modify' (<> [(spread, owed, offered)])
+    pure answer
+  _ -> pure (S.identityAnswer p)
+
+-- Soul Diviner {U}{B} Creature -- Zombie Wizard 2/3 (Oracle text checked against
+-- Scryfall 2026-09-27): "{T}, Remove a counter from an artifact, creature, land,
+-- or planeswalker you control: Draw a card."
+--
+-- The producer for WhichCounters.OfAnyKind spread FromOne: ONE counter, so the
+-- one-permanent division is the payer's pick of a permanent and a kind at once.
+--
+-- THE BOARD: alice controls the Diviner and a Hill Giant carrying a vigilance
+-- counter and a +1/+1 counter; her library two Islands.
+soulDivinerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulDivinerSpec s registry =
+  Spec.describe s "Soul Diviner" $ do
+    Spec.it s "CR 122.1 / 601.2h the payer picks the kind of the one counter" $ do
+      diviner <- S.printingOf s registry "Soul Diviner"
+      giant <- S.printingOf s registry "Hill Giant"
+      island <- S.printingOf s registry "Island"
+      let (divinerId, withDiviner) = S.addPermanent diviner S.alice (Setup.emptyGame S.bothPlayers)
+          (giantId, withGiant) = S.addPermanent giant S.alice withDiviner
+          stocked = snd (S.addLibraryCard island S.alice (snd (S.addLibraryCard island S.alice withGiant)))
+          board =
+            (S.addCounter vigilance 1 giantId (S.addCounter CounterKind.PlusOnePlusOne 1 giantId stocked))
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          answer = Map.singleton giantId (Map.singleton vigilance 1)
+          act = do Activate.activateAbility S.alice divinerId (theAbility diviner); Stack.resolveTop
+          (after, asked) = State.runState (fmap snd (Engine.runGame (recordingMixedRemovals answer) board act)) []
+      Spec.assertEqWith s "CR 122.1 the vigilance counter came off" (S.counterOf vigilance giantId after) 0
+      Spec.assertEqWith s "and the +1/+1 counter stayed" (S.counterOf CounterKind.PlusOnePlusOne giantId after) 1
+      Spec.assertEqWith s "CR 121.1 and the ability drew a card" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+      Spec.assertEqWith s "the payer was asked once, over the Giant's two kinds" asked [(CounterSpread.FromOne, 1, Map.singleton giantId (Map.fromList [(vigilance, 1), (CounterKind.PlusOnePlusOne, 1)]))]
+
+-- Quillspike {2}{B/G} Creature -- Beast 1/1 (Oracle text checked against
+-- Scryfall 2026-09-27): "{B/G}, Remove a -1/-1 counter from a creature you
+-- control: This creature gets +3/+3 until end of turn."
+--
+-- The producer for WhichCounters.OfKind at a kind other than +1/+1.
+--
+-- THE BOARD: alice controls Quillspike over a Swamp, a Hill Giant carrying the
+-- -1/-1 count given, and a Goblin Piker carrying a +1/+1 counter, a kind the cost
+-- does not reach.
+quillspikeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+quillspikeSpec s registry =
+  Spec.describe s "Quillspike" $ do
+    Spec.it s "CR 122.1 the -1/-1 counter comes off, and Quillspike gets +3/+3" $ do
+      quillspike <- S.printingOf s registry "Quillspike"
+      (quillId, giantId, pikerId, board) <- quillspikeBoard s registry 1
+      let after = S.runPure S.identityAnswer board (Activate.activateAbility S.alice quillId (theAbility quillspike) >> Stack.resolveTop)
+      Spec.assertEqWith s "CR 122.1 the Giant's -1/-1 counter came off" (S.counterOf CounterKind.MinusOneMinusOne giantId after) 0
+      Spec.assertEqWith s "and the Piker's +1/+1 counter stayed" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
+      Spec.assertEqWith s "CR 613.4c and Quillspike is 4/4" (S.powerToughnessOf quillId after) (Just (4, 4))
+    -- CR 118.3 / 602.2b over the pair differing in the Giant's -1/-1 counter: the
+    -- Piker's +1/+1 counter does not pay.
+    Spec.it s "CR 118.3 with no -1/-1 counter the ability is not offered" $ do
+      quillspike <- S.printingOf s registry "Quillspike"
+      (quillId, _, _, withCounter) <- quillspikeBoard s registry 1
+      (bareId, _, _, without) <- quillspikeBoard s registry 0
+      let offers oid gs = length (filter (isActivateOfAbility oid (theAbility quillspike)) (Action.legalActions S.alice gs))
+      Spec.assertEqWith s "CR 602.2b offered with a -1/-1 counter on the Giant" (offers quillId withCounter) 1
+      Spec.assertEqWith s "and not with only the Piker's +1/+1 counter" (offers bareId without) 0
+
+-- The board quillspikeSpec's cases share, described above it.
+quillspikeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Natural.Natural -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+quillspikeBoard s registry onGiant = do
+  quillspike <- S.printingOf s registry "Quillspike"
+  giant <- S.printingOf s registry "Hill Giant"
+  piker <- S.printingOf s registry "Goblin Piker"
+  swamp <- S.printingOf s registry "Swamp"
+  let lands = S.landsFor swamp S.alice 1 (Setup.emptyGame S.bothPlayers)
+      (quillId, withQuill) = S.addPermanent quillspike S.alice lands
+      (giantId, withGiant) = S.addPermanent giant S.alice withQuill
+      (pikerId, withPiker) = S.addPermanent piker S.alice withGiant
+      counted = S.addCounter CounterKind.MinusOneMinusOne onGiant giantId (S.addCounter CounterKind.PlusOnePlusOne 1 pikerId withPiker)
+  pure
+    ( quillId,
+      giantId,
+      pikerId,
+      counted
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
 
 -- Millikin {2} Artifact Creature -- Construct 0/1, "{T}, Mill a card: Add {C}"
 -- (Oracle text checked against Scryfall): the pool's producer of a cost that

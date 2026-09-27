@@ -6,26 +6,46 @@
           "cost": {
             "components": [
               {
+                "type": "TapThis"
+              },
+              {
                 "type": "RemoveCounters",
                 "value": {
-                  "count": 2,
+                  "count": 1,
                   "kind": {
-                    "type": "OfKind",
-                    "value": {
-                      "type": "PlusOnePlusOne"
-                    }
-                  },
-                  "spread": {
-                    "type": "FromAmong"
+                    "type": "OfAnyKind"
                   },
                   "whichPermanent": {
                     "type": "And",
                     "value": [
                       {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Creature"
-                        }
+                        "type": "Or",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Artifact"
+                            }
+                          },
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
+                          },
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Planeswalker"
+                            }
+                          }
+                        ]
                       },
                       {
                         "type": "ControlledBy",
@@ -38,12 +58,7 @@
                 }
               }
             ],
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 1
-              }
-            ]
+            "mana": []
           },
           "modal": {
             "modes": [
@@ -74,18 +89,8 @@
           }
         }
       ],
-      "keywords": [
-        {
-          "type": "Graft",
-          "value": 4
-        }
-      ],
       "manaCost": [
         {
-          "type": "Generic",
-          "value": 4
-        },
-        {
           "type": "OfType",
           "value": {
             "type": "Colored",
@@ -99,30 +104,27 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Blue"
+              "type": "Black"
             }
           }
         }
       ],
-      "name": "Novijen Sages",
+      "name": "Soul Diviner",
       "power": {
         "type": "Literal",
-        "value": 0
+        "value": 2
       },
       "toughness": {
         "type": "Literal",
-        "value": 0
+        "value": 3
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Advisor"
+            "type": "Wizard"
           },
           {
-            "type": "Human"
-          },
-          {
-            "type": "Mutant"
+            "type": "Zombie"
           }
         ],
         "types": [

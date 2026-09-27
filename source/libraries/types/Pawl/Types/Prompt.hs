@@ -21,6 +21,7 @@ import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -684,12 +685,12 @@ data Prompt r where
   -- how many (CR 118.1); ChooseTaps\' shape, answering as Response.ChoseReturns
   -- so a replay cannot tap what it should have returned.
   ChooseReturns :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
-  -- | CR 118.1 as a cost: which ONE permanent loses the +1\/+1 counters a cost
-  -- names (Zameck Guildmage). ChooseBlight's shape rather than ChooseTaps',
+  -- | CR 118.1 as a cost: which ONE permanent loses the counters of one kind a
+  -- cost names (Zameck Guildmage). ChooseBlight's shape rather than ChooseTaps',
   -- the count being counters and not objects, and elided at one candidate.
   ChooseCounterRemoval :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
-  -- | CR 118.1 as a cost / CR 601.2h: how many of the +1\/+1 counters a cost
-  -- names come off each permanent, the payer dividing the Natural among them
+  -- | CR 118.1 as a cost / CR 601.2h: how many of the counters of one kind a
+  -- cost names come off each permanent, the payer dividing the Natural among them
   -- (Novijen Sages); the Map is what each candidate carries. Elided where only
   -- one division exists, and an answer that does not add up is rejected. Also
   -- CR 608.2d's division of an effect's counters of one kind (Overseer of Vault
@@ -703,6 +704,12 @@ data Prompt r where
   -- | CR 608.2d: ChooseCounterRemovalAmong where the Natural is a cap, so none
   -- is an answer (Sensational Spider-Man). Never elided.
   ChooseCounterRemovalUpTo :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Map.Map ObjectId.ObjectId Natural.Natural -> Prompt (Map.Map ObjectId.ObjectId Natural.Natural)
+  -- | CR 122.1 / CR 601.2h: how many counters of EACH kind come off each
+  -- permanent, where a cost names no kind (Tayam, Luminous Enigma), or an effect
+  -- does not (Eventide's Shadow, CR 608.2d); the Map is what each candidate
+  -- carries, and the CounterSpread how the Natural binds the answer. Elided
+  -- where only one division exists.
+  ChooseMixedCounterRemoval :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CounterSpread.CounterSpread -> Natural.Natural -> Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural) -> Prompt (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))
   -- | CR 701.3a: where an effect moving an attached permanent puts it, the
   -- current host excluded (CR 701.3b); the offer is the card's text, so CR
   -- 303.4j is left to the player. Elided at one candidate. The PlayerId is the

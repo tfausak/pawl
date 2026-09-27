@@ -92,9 +92,15 @@
           "cost": {
             "components": [
               {
-                "type": "RemovePlusOneCounters",
+                "type": "RemoveCounters",
                 "value": {
                   "count": 1,
+                  "kind": {
+                    "type": "OfKind",
+                    "value": {
+                      "type": "PlusOnePlusOne"
+                    }
+                  },
                   "whichPermanent": {
                     "type": "And",
                     "value": [
