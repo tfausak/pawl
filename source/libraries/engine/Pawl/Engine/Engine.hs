@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.EndEffect as EndEffect
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Trigger as Trigger
 import qualified Pawl.Engine.Exile as Exile
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -766,12 +767,11 @@ perGameRecord pending = case TriggeredAbility.limit (PendingTrigger.ability pend
 placeOne :: PendingTrigger.PendingTrigger -> Game ()
 placeOne pending = do
   -- CR 801.16: the ability is an object its controller controls, and a
-  -- continuous effect applying to an object its event bound is part of what
-  -- made it trigger. Only a game using limited range reads the stamp, so only
-  -- one looks the effects up.
+  -- continuous effect without which it would not have triggered is part of
+  -- the loop too (Trigger.loopShapers). Only a game using limited range reads
+  -- the stamp, so only one looks the effects up.
   gs <- State.get
-  let named = concatMap Set.toList (Map.elems (Binding.slotObjects (PendingTrigger.bindings pending)))
-      shapers = if GameSettings.rangeOfInfluence (GameState.settings gs) == RangeOfInfluence.unlimited then [] else Projection.effectControllersOn named gs
+  let shapers = if GameSettings.rangeOfInfluence (GameState.settings gs) == RangeOfInfluence.unlimited then [] else Trigger.loopShapers pending gs
   State.put (foldr Game.involve gs (PendingTrigger.controller pending : shapers))
   case PendingTrigger.source pending of
     -- Monarch.placeInherent names no rule of its own: it is the generic sourceless
