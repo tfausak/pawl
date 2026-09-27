@@ -1482,6 +1482,9 @@ eventBindingSlots cond = case cond of
   -- arm and summed by batchBindings. Guaranteed given a match, the one event
   -- class this condition admits being a zone change.
   TriggerCondition.CardsLeaveZone {} -> Set.singleton Binding.eventAmount
+  -- Nothing: Dutiful Knowledge Seeker's payload names neither the cards nor a
+  -- count, and CR 400.7e withholds the arrival in a hidden zone anyway.
+  TriggerCondition.CardsPutIntoZone {} -> Set.empty
   -- Nothing, where PermanentDies binds CR 400.7e's graveyard card and CR 603.10a's
   -- departed permanent: rule 702.55b's ability speaks about the creature it
   -- HAUNTS -- an object GameState.haunting names rather than the event -- and
