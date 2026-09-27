@@ -700,6 +700,36 @@ lightmineFieldSpec s registry =
               Spec.assertEqWith s "the Elf did not attack, so it was dealt nothing" (damageOn elfId after) (Just 0)
             _ -> Spec.assertFailure s "fixture should give alice a Lightmine Field, a Hill Giant, a Goblin Piker and a Llanowar Elves"
 
+-- The same slot counted, through Quantity.BoundCount: Screaming Swarm's
+-- "whenever you attack with one or more creatures, target player mills that
+-- many cards". alice declares a Hill Giant and a Goblin Piker and keeps the
+-- Swarm and a Llanowar Elves home, so "that many" is two where the creatures
+-- she controls are four; bob, the target, holds five library cards.
+screamingSwarmSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+screamingSwarmSpec s registry =
+  let answering :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      answering plan p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (\oid -> List.elem oid plan) ids
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) sets
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+   in Spec.describe s "Screaming Swarm"
+        . Spec.it s "CR 608.2i the target player mills one card per creature attacked with"
+        $ do
+          swarm <- S.printingOf s registry "Screaming Swarm"
+          giant <- S.printingOf s registry "Hill Giant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          elves <- S.printingOf s registry "Llanowar Elves"
+          island <- S.printingOf s registry "Island"
+          case S.combatBoardOf [swarm, giant, piker, elves] [] of
+            (gs, [_, giantId, pikerId, _], []) -> do
+              let stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.bob g)) gs [1 :: Int .. 5]
+                  after = atBlockers (answering [giantId, pikerId]) stocked
+              Spec.assertEqWith s "CR 701.17a bob milled two, one per attacker" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
+              Spec.assertEqWith s "and three stay in his library" (length (Game.zoneMembers Zone.Library S.bob after)) 3
+              Spec.assertEqWith s "alice milled nothing" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+            _ -> Spec.assertFailure s "fixture should give alice a Screaming Swarm, a Hill Giant, a Goblin Piker and a Llanowar Elves"
+
 -- CR 508.3c at a floor ABOVE one, which is the whole difference between this
 -- group and hermesSpec above: the same condition counts the creatures the Filter
 -- admits instead of asking whether there is any.
@@ -4066,6 +4096,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   hermesSpec s registry
   tyvarAttackSpec s registry
   lightmineFieldSpec s registry
+  screamingSwarmSpec s registry
   militaryIntelligenceSpec s registry
   totalWarSpec s registry
   seiferSpec s registry

@@ -49,6 +49,7 @@ codec =
       Arm.nullary "Toughness" Quantity.Toughness,
       Arm.payload "InSlot" SlotName.codec Quantity.InSlot (\x -> case x of Quantity.InSlot y -> Just y; _ -> Nothing),
       Arm.payload "WasBound" SlotName.codec Quantity.WasBound (\x -> case x of Quantity.WasBound y -> Just y; _ -> Nothing),
+      Arm.payload "BoundCount" SlotName.codec Quantity.BoundCount (\x -> case x of Quantity.BoundCount y -> Just y; _ -> Nothing),
       Arm.nullary "Star" Quantity.Star,
       Arm.payload "Plus" (Plus.codec codec) Quantity.Plus (\x -> case x of Quantity.Plus y -> Just y; _ -> Nothing),
       -- CR 107.1a's rounding first, then what is halved: the direction is the
@@ -135,6 +136,7 @@ codec =
       -- rather than from anything the card names, and the turn is the log's
       -- extent rather than a window a card could state.
       Arm.payload "CardsDiscardedThisTurn" PlayerRef.codec Quantity.CardsDiscardedThisTurn (\x -> case x of Quantity.CardsDiscardedThisTurn y -> Just y; _ -> Nothing),
+      Arm.payload "CardsDrawnThisTurn" PlayerRef.codec Quantity.CardsDrawnThisTurn (\x -> case x of Quantity.CardsDrawnThisTurn y -> Just y; _ -> Nothing),
       -- CR 603.1b's four bending verbs, with only a PlayerRef on the wire for
       -- CardsDiscardedThisTurn's reason above.
       Arm.payload "BendingsThisTurn" PlayerRef.codec Quantity.BendingsThisTurn (\x -> case x of Quantity.BendingsThisTurn y -> Just y; _ -> Nothing),
@@ -217,6 +219,7 @@ tagOf x = case x of
   Quantity.Toughness {} -> "Toughness"
   Quantity.InSlot {} -> "InSlot"
   Quantity.WasBound {} -> "WasBound"
+  Quantity.BoundCount {} -> "BoundCount"
   Quantity.Star {} -> "Star"
   Quantity.Plus {} -> "Plus"
   Quantity.Halved {} -> "Halved"
@@ -254,6 +257,7 @@ tagOf x = case x of
   Quantity.OpponentsAttacked {} -> "OpponentsAttacked"
   Quantity.AttackersDeclaredThisTurn {} -> "AttackersDeclaredThisTurn"
   Quantity.CardsDiscardedThisTurn {} -> "CardsDiscardedThisTurn"
+  Quantity.CardsDrawnThisTurn {} -> "CardsDrawnThisTurn"
   Quantity.BendingsThisTurn {} -> "BendingsThisTurn"
   Quantity.LifeGainedThisTurn {} -> "LifeGainedThisTurn"
   Quantity.PlayersDealtDamageThisTurn {} -> "PlayersDealtDamageThisTurn"
