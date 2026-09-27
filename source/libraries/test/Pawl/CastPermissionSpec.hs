@@ -474,6 +474,65 @@ untimelyAlurenSpec s registry =
           Spec.assertEqWith s "X = 2: mana value 3, so the cast is taken back and the Hydra stays in hand" (elem oid (Game.zoneMembers Zone.Hand S.alice (castAt 2))) True
           Spec.assertEqWith s "X = 3: mana value 4, so the Hydra is cast" (length (GameState.stack (castAt 3))) 1
 
+-- CR 601.3's search exception is untimed, so neither CR 601.3b's narrowing nor
+-- its CR 601.2e re-check reaches it. Synthetic Glacial Blessing lets alice cast
+-- from her library while searching; it is bob's turn, so every window a flash
+-- permission could open is shut and only the exception lets the card through.
+searchIsUntimedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+searchIsUntimedSpec s registry =
+  let board land card grant = do
+        lands <- S.printingOf s registry land
+        blessing <- S.printingOf s registry "Synthetic Glacial Blessing"
+        other <- S.printingOf s registry grant
+        held <- S.printingOf s registry card
+        let (_, gs1) = S.addPermanent blessing S.alice (S.landsInPlay lands 9)
+            (_, gs2) = S.addPermanent other S.alice gs1
+            (_, gs3) = S.addLibraryCard held S.alice gs2
+        pure gs3 {GameState.activePlayer = S.bob, GameState.priority = Just S.alice}
+      -- Takes the first offer ONCE and declines after, so a rewound cast
+      -- ends the loop instead of being re-offered forever.
+      searchCasting :: Natural -> Prompt.Prompt r -> State.State Bool r
+      searchCasting x p = case p of
+        Prompt.CastWhileSearching _ _ options -> do
+          taken <- State.get
+          State.put True
+          pure (if taken then Nothing else Maybe.listToMaybe options)
+        Prompt.ChooseX {} -> pure x
+        _ -> pure (S.identityAnswer p)
+      castThere x gs = snd (State.evalState (Engine.runGame (searchCasting x) gs (Cast.castWhileSearching S.manaPerformer S.alice)) False)
+   in Spec.describe s "SearchIsUntimed" $ do
+        -- Under the Aluren X = 2 is outside "4 or greater"; the search needs no flash.
+        Spec.it s "CR 601.3 Protean Hydra is cast from the library at X = 2 beside Untimely Aluren" $ do
+          gs <- board "Forest" "Protean Hydra" "Synthetic Untimely Aluren"
+          Spec.assertEqWith s "the Hydra is on the stack" (length (GameState.stack (castThere 2 gs))) 1
+
+        -- The Aid names the Rollicker only bestowed, and there is no creature to
+        -- enchant; the search still offers the printed cost.
+        Spec.it s "CR 601.3 Nyxborn Rollicker is cast from the library at its printed cost beside Sigarda's Aid" $ do
+          gs <- board "Mountain" "Nyxborn Rollicker" "Sigarda's Aid"
+          Spec.assertEqWith s "the Rollicker is on the stack" (length (GameState.stack (castThere 0 gs))) 1
+
+-- Yeva, Nature's Herald names green creature spells. Rust Goliath is a colourless
+-- {10} card whose prototype {3}{G}{G} is green (CR 718.3b), so only the prototype
+-- choice brings it under Yeva (CR 601.3b, 601.3e).
+yevaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+yevaSpec s registry =
+  let board withYeva = do
+        forest <- S.printingOf s registry "Forest"
+        goliath <- S.printingOf s registry "Rust Goliath"
+        yeva <- S.printingOf s registry "Yeva, Nature's Herald"
+        let (oid, _, gs) = flashBoard forest goliath [yeva | withYeva]
+        pure (oid, gs)
+   in Spec.describe s "Yeva" $ do
+        Spec.it s "CR 601.3b / 718.3b Yeva lets Rust Goliath begin prototyped on the opponent's turn" $ do
+          (oid, gs) <- board True
+          (bareOid, bare) <- board False
+          let after = S.runPure S.castAnswer gs Engine.priorityLoop
+              goliaths = filter (\o -> fmap Face.name (Game.faceOf o after) == Just (CardName.MkCardName (Text.pack "Rust Goliath"))) (Game.zoneMembers Zone.Battlefield S.alice after)
+          Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice gs)) "offered under Yeva"
+          Spec.assertEqWith s "and it enters prototyped, a 3/5" (fmap (`Projection.powerOf` after) goliaths) [Just 3]
+          Spec.assertBool s (not (any (S.isCastOf bareOid) (Action.legalActions S.alice bare))) "and not without Yeva"
+
 -- ONE board for both halves of CR 701.6a's "a spell or ability": alice has a
 -- SPELL of the caller's choosing on the stack and a settled Prodigal Sorcerer
 -- whose {T} ABILITY can join it, and bob holds a Cancel for the first and a
@@ -2503,6 +2562,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   vedalkenOrrerySpec s registry
   sigardasAidSpec s registry
   untimelyAlurenSpec s registry
+  searchIsUntimedSpec s registry
+  yevaSpec s registry
   yawgmothsWillSpec s registry
   crucibleSpec s registry
   garruksHordeSpec s registry

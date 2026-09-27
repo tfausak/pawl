@@ -1440,7 +1440,7 @@ offerCastOnce context named caster optionality verb retake offer = do
     Just (Right (oid, name, applied, excused)) -> do
       let cast = do
             stackBefore <- State.gets GameState.stack
-            Cast.castSpellWith performManaAbility True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
+            Cast.castSpellWith performManaAbility False True applied (CastOffer.spending offer) caster oid name Facing.FaceUp
             -- CR 723.2's second span, dormant until the spell resolves
             -- (Pawl.Engine.Stack.resolveTopWith). A cast that was reversed put
             -- nothing new on top, and so waits on nothing.

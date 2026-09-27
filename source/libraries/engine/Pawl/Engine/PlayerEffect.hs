@@ -1827,7 +1827,7 @@ castFlashGrant effect = case effect of
 -- takes it as a disjunct. CR 601.3a's twin, choiceCouldEscape above, is the same
 -- question asked of a prohibition and answered in the other direction.
 --
--- TWO choices can do it in pawl. Bestow is one: CR 702.103b makes a
+-- THREE choices can do it in pawl. Bestow is one: CR 702.103b makes a
 -- spell cast bestowed an Aura enchantment with enchant creature, which is a card
 -- type and a subtype a criterion can read, and rule 601.3b's own example is that
 -- card in that hand. Projection.bestowedView is what the choice would make of the
@@ -1839,6 +1839,13 @@ castFlashGrant effect = case effect of
 -- choiceCouldEscape samples it. Pawl.CastPermissionSpec's "CR 601.3b Untimely
 -- Aluren lets Protean Hydra begin on the opponent's turn" is the proof;
 -- Cast.flashRefusedAt judges the X announced.
+--
+-- Prototype is the third: CR 718.3a/b and 601.3e judge a prototyped spell by its
+-- inset cost, and so its colour and mana value. The hypothetical stamps
+-- Object.prototyped onto a state that is only read, which is how
+-- Projection.View.withPrototype is asked; a card with no prototype views the
+-- same either way. Pawl.CastPermissionSpec's "CR 601.3b / 718.3b Yeva lets Rust
+-- Goliath begin prototyped on the opponent's turn" is the proof.
 --
 -- A HYPOTHETICAL here where CR 601.3a's prohibition side takes the stamp instead,
 -- and the difference is which question the caller is asking. Pawl.Engine.Cast
@@ -1866,8 +1873,10 @@ castFlashGrant effect = case effect of
 choiceCouldApply :: Maybe ObjectId -> Filter Keyword -> ObjectId -> GameState -> Bool
 choiceCouldApply src criterion oid gs =
   let bestowable = not (null (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs))))
+      prototyped = gs {GameState.objects = Map.adjust (\o -> o {Object.prototyped = True}) oid (GameState.objects gs)}
    in (bestowable && Filter.matches (contextFrom src oid gs) (Projection.bestowedView oid gs) criterion)
         || xCouldApply src criterion oid VariableChoice.Announced gs
+        || matchesObjectFrom src criterion oid prototyped
 
 -- choiceCouldApply's X half: could some X the candidate lets its caster announce
 -- (CR 107.3b fixes it at 0 under FixedAtZero) make `criterion` name `oid`?
