@@ -4352,6 +4352,94 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Firebent _ -> False
     GameEvent.ActivatedAbilityResolved _ -> False
     GameEvent.CardArrived _ -> False
+  -- CR 603.10a's third family read off the departing card itself: the bearer
+  -- is the graveyard incarnation (`ZoneChange.departed`), which only
+  -- eventTriggers' look-back offers. ANY of Moved.departures, CardLeavesZone's
+  -- reason. CR 400.3 puts a card only in its owner's graveyard, so "your" is
+  -- no further test.
+  TriggerCondition.SelfLeavesGraveyard -> case event of
+    GameEvent.Moved m ->
+      ZoneChange.from (Moved.change m) == Zone.Graveyard
+        && ZoneChange.to (Moved.change m) /= Zone.Graveyard
+        && elem bearer (Moved.departures m)
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.TookInitiative _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BecameBlocking {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.AbilityCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.TurnedFaceDown _ -> False
+    GameEvent.Transformed {} -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mutated _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.Exploited {} -> False
+    GameEvent.Trained _ -> False
+    GameEvent.BecameCrewed _ -> False
+    GameEvent.Convoked _ -> False
+    GameEvent.Saddled _ -> False
+    GameEvent.Crewed _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.BecameAttached {} -> False
+    GameEvent.BecameUnattached {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+    GameEvent.Scried _ -> False
+    GameEvent.DungeonCompleted _ -> False
+    GameEvent.Surveiled _ -> False
+    GameEvent.DiceRolled _ -> False
+    GameEvent.DieResultSettled _ -> False
+    GameEvent.RolledToVisit _ -> False
+    GameEvent.ClassLevelSet _ -> False
+    GameEvent.Plotted _ -> False
+    GameEvent.Explored _ -> False
+    GameEvent.Connived _ -> False
+    GameEvent.Exerted _ -> False
+    GameEvent.BecameAttacked _ -> False
+    GameEvent.AttackersDeclared _ -> False
+    GameEvent.BecameTapped _ -> False
+    GameEvent.BecameUntapped _ -> False
+    GameEvent.TappedForMana _ -> False
+    GameEvent.ManaAdded _ -> False
+    GameEvent.ManaAbilityResolved _ -> False
+    GameEvent.CoinFlipped {} -> False
+    GameEvent.RingTempted _ -> False
+    GameEvent.Blighted _ -> False
+    GameEvent.Foraged _ -> False
+    GameEvent.Foretold _ -> False
+    GameEvent.CollectedEvidence _ -> False
+    GameEvent.GaveGift _ -> False
+    GameEvent.AttractionOpened _ -> False
+    GameEvent.PrizeClaimed _ -> False
+    GameEvent.Earthbent _ -> False
+    GameEvent.Waterbent _ -> False
+    GameEvent.Airbent _ -> False
+    GameEvent.Firebent _ -> False
+    GameEvent.ActivatedAbilityResolved _ -> False
+    -- CR 730.3's departure split, whose origin is the battlefield.
+    GameEvent.CardArrived _ -> False
   -- CR 603.6: a zone-change trigger matched on BOTH ends of the move, library to
   -- graveyard. The bearer is the incarnation the card became on arrival per CR
   -- 400.7e, a graveyard being public (CR 400.2). The pair is also what makes CR

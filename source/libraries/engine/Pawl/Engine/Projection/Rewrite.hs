@@ -1691,6 +1691,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- every turn.
   TriggerCondition.CardLeavesZone p -> TriggerCondition.CardLeavesZone p {CardLeavesZone.filter = Filter.rewrite pairs (CardLeavesZone.filter p)}
   TriggerCondition.CardsLeaveZone p -> TriggerCondition.CardsLeaveZone p {CardLeavesZone.filter = Filter.rewrite pairs (CardLeavesZone.filter p)}
+  TriggerCondition.SelfLeavesGraveyard -> condition
   -- The Filter is rewritten and the counter kind is not: CR 612.1's pairs swap
   -- SUBTYPE words, and a counter kind names none.
   TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind f) -> TriggerCondition.PermanentsGetCounters (CounterPlacement.MkCounterPlacement kind (Filter.rewrite pairs f))

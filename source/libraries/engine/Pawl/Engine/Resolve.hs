@@ -588,7 +588,9 @@ applyCipher oid controller = do
 --
 -- The Adventure and Omen riders are keyed on the CHOSEN FACE's spell type (CR
 -- 205.3k) rather than on the card's layout, because the question is which set of
--- characteristics is resolving rather than which card printed them -- a
+-- characteristics is resolving rather than which card printed them -- read off
+-- Projection.spellFaceOf, so a spell that became a copy asks of the copy (CR
+-- 707.2, 715.3c, 720.3c) -- a
 -- classification either way, never an effect's identity. Buyback's is keyed on the
 -- record CR 601.2b's announcement wrote (Pawl.Engine.Cast.stampBoughtBack), which
 -- is rule 702.27a's own "if the buyback cost was paid", and rebound's on rule

@@ -492,6 +492,10 @@ looksBack condition = case condition of
   -- The batch reading is in the same family, PermanentsDie's reason: CR 603.10a
   -- names the family without counting its members.
   TriggerCondition.CardsLeaveZone p -> CardLeavesZone.from p == Zone.Graveyard
+  -- The same third family read off the card itself, and the one it is
+  -- load-bearing for: by CR 113.6k the bearer IS the departing card, so only the
+  -- look-back finds it at all.
+  TriggerCondition.SelfLeavesGraveyard -> True
   -- CR 603.10a's first family read off the HOST rather than the bearer: this
   -- triggers when a permanent leaves the battlefield, so the rule reaches the
   -- ability however the bearer is found.
@@ -770,6 +774,8 @@ batchScoped condition = case condition of
   -- Pawl.LeavesTriggerSpec's "CR 603.2c two cards leaving alice's graveyard at
   -- once put ONE counter on the Mascot".
   TriggerCondition.CardsLeaveZone {} -> True
+  -- One card, one departure.
+  TriggerCondition.SelfLeavesGraveyard -> False
   TriggerCondition.AttachedCreatureDies -> False
   -- CR 603.2e names the MOMENT the one enchanted permanent becomes tapped, so a
   -- batch holds at most one occurrence of it.
@@ -1047,7 +1053,9 @@ stepTriggerPlayers gs you cond event ability = case (cond, event) of
 -- fills it the same way: a card that left a graveyard before the boundary is not
 -- in the graveyard the boundary scan walks, so `leftGraveyardLater` offers it,
 -- from CR 608.2h, to every event of a strictly earlier group -- `laterGroups`
--- one zone over. The other direction is narrowed rather than widened: the
+-- one zone over, and `leftGraveyardSame` offers a card that left at the event's
+-- own group to its look-back abilities, `sameGroup` one zone over. The other
+-- direction is narrowed rather than widened: the
 -- graveyard the boundary scan walks holds cards the batch put there, and
 -- `arrivedLater` withholds each of them from every event of a strictly earlier
 -- group.
@@ -1440,25 +1448,30 @@ eventTriggers events gs =
       -- so what CR 113.6k and 113.6m let function there is checked against them --
       -- Bloodghast's landfall seeing a land that entered before the same
       -- resolution returned it to hand. Strictly later because a card removed by
-      -- this group's own event did not exist immediately after it.
-      --
-      -- Not implemented: CR 603.10a's look-back for a card's own "when this card
-      -- leaves your graveyard", which CR 113.6k makes function from the graveyard
-      -- and which would need the departing card offered to its own group; no
-      -- TriggerCondition spells that self form (#4208).
+      -- this group's own event did not exist immediately after it; the look-back
+      -- exception is `leftGraveyardSame` below.
       --
       -- A card that was there before the batch and one the batch put there are
       -- served alike; the second is narrowed by `arrivedLater` in `graveyardAt`
       -- below, so it reaches no event before its own arrival. Pawl.ZoneTriggerSpec's
       -- Travel Through Caradhras case is the proving board. Both boundaries --
       -- strictly later, and that narrowing -- are regression fences: loosening
-      -- either leaves the suite green, since no graveyard-functioning condition in
-      -- data/cards/ matches the event that removes its card, and no board there
-      -- buries a watcher after the event it would wrongly see.
+      -- either leaves the suite green, since no board in the suite offers a
+      -- first-sentence graveyard condition the event that removes its card, and
+      -- none buries a watcher after the event it would wrongly see.
       leftGraveyardLater = drop 1 (List.scanr (Map.union . Map.unions . fmap (leftGraveyard . LoggedEvent.event)) Map.empty groups)
+      -- CR 603.10a's third family, `sameGroup`'s graveyard twin: a card that left
+      -- a graveyard at the event's OWN group, offered for its look-back abilities
+      -- only -- CR 113.6k's "when this card leaves your graveyard", whose bearer
+      -- is the departing card itself and so is gone by the CR 117.5 boundary.
+      -- Disjoint from `leftGraveyardLater`'s entry, an id departing at exactly
+      -- one group. Proved by Pawl.ZoneTriggerSpec's "CR 603.10a a card's own
+      -- leaves-your-graveyard trigger sees its own departure".
+      leftGraveyardSame = fmap (Map.filter (not . null . snd) . Map.map (fmap (filter (looksBack . fst))) . Map.unions . fmap (leftGraveyard . LoggedEvent.event) . NonEmpty.toList) groups
       -- The graveyard each group's events are checked against: the live read,
-      -- plus what departed later, less what arrived later.
-      graveyardAt = List.zipWith (Map.withoutKeys . Map.union inGraveyards) leftGraveyardLater arrivedLater
+      -- plus what departed later or looks back at its own departure, less what
+      -- arrived later.
+      graveyardAt = List.zipWith3 (\same later arrived -> Map.withoutKeys (Map.unions [inGraveyards, later, same]) arrived) leftGraveyardSame leftGraveyardLater arrivedLater
       -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
       -- board that matters is "the appearance of objects immediately prior to the
       -- event", on which every permanent this same event removed was still
@@ -2694,6 +2707,10 @@ zonesTriggeredFrom cond =
         TriggerCondition.CardLeavesZone {} -> battlefield
         -- The batch reading watches the same graveyard from the same zone.
         TriggerCondition.CardsLeaveZone {} -> battlefield
+        -- CR 113.6k: a card leaving a graveyard is in one until it leaves, so the
+        -- graveyard is the one zone this can trigger from. eventTriggers'
+        -- `leftGraveyardSame` is what serves it, the departure being its own event.
+        TriggerCondition.SelfLeavesGraveyard -> Set.singleton Zone.Graveyard
         -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
         -- abilities of cards with haunt that refer to the haunted creature can trigger
         -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
@@ -2960,6 +2977,7 @@ stateTriggers gs
             TriggerCondition.PermanentsReturnedToHand _ -> False
             TriggerCondition.CardLeavesZone {} -> False
             TriggerCondition.CardsLeaveZone {} -> False
+            TriggerCondition.SelfLeavesGraveyard -> False
             TriggerCondition.HauntedCreatureDies -> False
             TriggerCondition.SpellOrAbilityCounters _ -> False
             TriggerCondition.AbilityIsCountered -> False

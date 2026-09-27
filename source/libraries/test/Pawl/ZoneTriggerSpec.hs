@@ -136,6 +136,7 @@ import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
@@ -329,6 +330,36 @@ graveyardTriggerSpec s registry =
         Prompt.ChooseOptional _ _ _ _ clause
           | clause == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
+      -- alice: two Swamps, Corpse Churn in hand, a one-Swamp library to mill,
+      -- and two creature cards in her graveyard for the return to choose from.
+      remainsBoard = do
+        swamp <- S.printingOf s registry "Swamp"
+        churn <- S.printingOf s registry "Corpse Churn"
+        remains <- S.printingOf s registry "Synthetic Restless Remains"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (remainsId, g1) = S.addGraveyardCard remains S.alice (S.landsInPlay swamp 2)
+            (pikerId, g2) = S.addGraveyardCard piker S.alice g1
+            (_, g3) = S.addLibraryCard swamp S.alice g2
+            (g4, spellId) = S.handOne churn g3
+        pure (g4 {GameState.priority = Just S.alice}, spellId, remainsId, pikerId)
+      -- Corpse Churn resolved returning the card pinned by id, then any trigger
+      -- placed and resolved.
+      churnReturning :: ObjectId.ObjectId -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+      churnReturning chosen gs spellId =
+        let answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              Prompt.ChooseCardInGraveyard _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== chosen) (NonEmpty.toList offered))
+              _ -> returnsIt p
+            cast = S.runPure answer gs (S.cast S.alice spellId)
+            placed = S.runPure answer (S.runPure answer cast Stack.resolveTop) Engine.settleForPriority
+         in if null (GameState.stack placed) then placed else S.runPure answer placed Stack.resolveTop
+      remainsName = CardName.MkCardName $ Text.pack "Synthetic Restless Remains"
+      zombieTapStates gs =
+        [ Object.tapped obj
+        | oid <- Game.zoneMembers Zone.Battlefield S.alice gs,
+          fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Zombie Token"),
+          Just obj <- [Game.lookupObject oid gs]
+        ]
    in Spec.describe s "GraveyardTrigger" $ do
         -- The gameplay-level proof, cast to resolution.
         Spec.it s "CR 113.6k whole card: Tome Scour mills Narcomoeba and its trigger puts it onto the battlefield" $ do
@@ -429,6 +460,22 @@ graveyardTriggerSpec s registry =
               resolved = S.runPure returnsIt cast Stack.resolveTop
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Hand S.alice resolved)) "Narcomoeba left the graveyard for the hand"
           Spec.assertEqWith s "and nothing triggered -- it never arrived from a library in this batch" (fmap PendingTrigger.source (gathered resolved)) []
+        -- CR 603.10a / 113.6k: Synthetic Restless Remains ("When this card leaves
+        -- your graveyard, create a tapped 2/2 black Zombie creature token.",
+        -- Oglor, Devoted Assistant's granted ability printed on a card) is gone
+        -- by the CR 117.5 boundary, so only the look-back at its own departure
+        -- finds it. The pair differs only in which of two graveyard creature
+        -- cards Corpse Churn returns.
+        Spec.it s "CR 603.10a a card's own leaves-your-graveyard trigger sees its own departure" $ do
+          (gs, spellId, remainsId, _) <- remainsBoard
+          let after = churnReturning remainsId gs spellId
+          Spec.assertEqWith s "CR 603.10a alice has one tapped Zombie token" (zombieTapStates after) [TapState.Tapped]
+          Spec.assertBool s (Set.member remainsName (namesIn Zone.Hand S.alice after)) "the Remains left the graveyard for the hand"
+        Spec.it s "CR 603.10a another card leaving the graveyard does not fire the Remains' trigger" $ do
+          (gs, spellId, _, pikerId) <- remainsBoard
+          let after = churnReturning pikerId gs spellId
+          Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Goblin Piker") (namesIn Zone.Hand S.alice after)) "the Piker left the graveyard for the hand"
+          Spec.assertEqWith s "and alice has no Zombie token" (zombieTapStates after) []
         -- The FILTER on that source, which is CR 113.6k itself: a departed
         -- graveyard card is offered only the abilities that function in a
         -- graveyard. Come Back Wrong ("Destroy target creature. If a creature
@@ -2488,6 +2535,8 @@ representativeEvents cond =
         -- delegates to the singular's, so the two match alike. It binds the
         -- event's share of CR 603.2c's "that many".
         TriggerCondition.CardsLeaveZone p -> one (moved (CardLeavesZone.from p) (Maybe.fromMaybe Zone.Battlefield (CardLeavesZone.to p)))
+        -- The self form out of the same zone. Empty: it binds nothing.
+        TriggerCondition.SelfLeavesGraveyard -> one (moved Zone.Graveyard Zone.Battlefield)
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all
@@ -2885,6 +2934,7 @@ everyTriggerCondition =
     TriggerCondition.CardLeavesZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Graveyard Nothing),
     TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Graveyard Nothing),
     TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone Filter.Type.IsSource TurnScope.EachTurn Zone.Exile Nothing),
+    TriggerCondition.SelfLeavesGraveyard,
     TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.AbilityIsCountered,

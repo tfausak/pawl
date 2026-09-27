@@ -2720,6 +2720,20 @@ acquireChoices copiedSpell mOriginal subject =
           Object.castUsing = mOriginal >>= Object.castUsing
         }
 
+-- CR 702.34a / 702.127a / 702.133a / 702.180a: the exile-as-it-leaves-the-stack
+-- ability is the SPELL's own static ability, conditioned on its cast record, so
+-- a spell that became a copy (CR 707.2) answers with the copied keywords and the
+-- acquired record rather than the ones Pawl.Engine.Cast armed at cast. Aftermath
+-- asks where the spell was cast from, which is the subject's own history rather
+-- than a copiable choice. Pawl.CopySpec's "CR 707.2 a flashed-back spell that
+-- becomes a copy of a Bolt" proves the disarm.
+rearmStackExile :: ObjectId -> PC.ProjectedCharacteristics -> Object.Object -> GameState -> GameState
+rearmStackExile subject copied obj gs =
+  let armed r = ActiveReplacement.source r == subject && ActiveReplacement.effect r == Keyword.castFromGraveyardExile
+      keywords = Map.keysSet (PC.keywords copied)
+      eligible = if Object.castFrom obj == Just Zone.Graveyard then keywords else Set.delete Keyword.Type.Aftermath keywords
+   in Cast.installCastFromGraveyard (Projection.defaultControllerOf obj) eligible (Object.castUsing obj) subject gs {GameState.replacements = filter (not . armed) (GameState.replacements gs)}
+
 -- The carrier CR 707.9a's "this ability" points at: the RESOLVING object's own
 -- Pawl.Types.Source, since rule 602.2a and rule 603.3 both put the ability's text
 -- on the stack object, so the words point at a value already in hand rather than
@@ -6514,7 +6528,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- the original's "choices made when casting or activating it" --
               -- none when the original is not on the stack. Off the pre-effect
               -- `gs` for the reason above.
-              acquire g = g {GameState.objects = foldr (\subject -> Map.adjust (acquireChoices (PC.spell (snapshotFor subject)) mOriginal) subject) (GameState.objects g) (filter (Maybe.isJust . onStackIn gs) subjects)}
+              acquire g = foldr acquireOne g (filter (Maybe.isJust . onStackIn gs) subjects)
+              acquireOne subject g =
+                let g1 = g {GameState.objects = Map.adjust (acquireChoices (PC.spell (snapshotFor subject)) mOriginal) subject (GameState.objects g)}
+                 in maybe g1 (\o -> rearmStackExile subject (snapshotFor subject) o g1) (Game.lookupObject subject g1)
            in case duration of
                 -- CR 707.3: the card states no ending, so the copiable values go
                 -- onto the subject itself (Binding.setCopy) and nothing has to

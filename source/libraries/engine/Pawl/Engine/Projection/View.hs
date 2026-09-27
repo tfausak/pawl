@@ -1078,13 +1078,18 @@ stampedSnapshotOf oid gs = do
     else stamped
 
 -- CR 707.2 / 608.2: the face a spell on the stack announces against and
--- resolves, its spell abilities read off its COPIABLE values rather than the
--- printed card -- so a spell that became a copy of another resolves the copied
--- text. Equal to Game.faceOf for an object copying nothing, whose copiable
--- values are seeded from that same face. Pawl.CopySpec's "CR 707.2 a spell that
--- becomes a copy of a Bolt" proves it.
+-- resolves, its spell abilities and type line read off its COPIABLE values
+-- rather than the printed card -- so a spell that became a copy of another
+-- resolves the copied text, and CR 715.3d's and 720.3d's riders ask whether the
+-- COPY is an Adventure or an Omen (Pawl.Engine.Resolve.finishSpell). Equal to
+-- Game.faceOf for an object copying nothing, whose copiable values are seeded
+-- from that same face. Pawl.CopySpec's "CR 707.2 a spell that becomes a copy of
+-- a Bolt" and "CR 707.2 an Adventure that becomes a copy of a Bolt" prove it.
 spellFaceOf :: ObjectId -> GameState -> Maybe (Face.Face Card.Type.Card)
-spellFaceOf oid gs = fmap (\face -> face {Face.spell = PC.spell (copiableCharacteristics oid gs)}) (Game.faceOf oid gs)
+spellFaceOf oid gs =
+  let copiable = copiableCharacteristics oid gs
+      typeLine = TypeLine.MkTypeLine (PC.supertypes copiable) (PC.cardTypes copiable) (PC.subtypes copiable)
+   in fmap (\face -> face {Face.spell = PC.spell copiable, Face.typeLine = typeLine}) (Game.faceOf oid gs)
 
 -- CR 612.5: the object whose copiable rules text `oid` carries -- `oid` itself
 -- unless a stored ExchangeTextBoxes effect moved another's text box onto it.

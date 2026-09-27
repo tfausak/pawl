@@ -970,6 +970,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- a Count.
   TriggerCondition.CardLeavesZone {} -> []
   TriggerCondition.CardsLeaveZone {} -> []
+  TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer _ -> []
@@ -4017,6 +4018,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- The batch reading carries the same record, swept the same way for
   -- PermanentsReturnedToHand's reason.
   TriggerCondition.CardsLeaveZone payload -> unframed [CardLeavesZone.filter payload]
+  TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins {} -> []
@@ -4284,6 +4286,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentsReturnedToHand _ -> []
   TriggerCondition.CardLeavesZone {} -> []
   TriggerCondition.CardsLeaveZone {} -> []
+  TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []
   TriggerCondition.PermanentsBecomeTapped _ -> []
