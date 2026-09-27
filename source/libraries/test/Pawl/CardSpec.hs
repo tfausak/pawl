@@ -783,6 +783,7 @@ restrictionConditions restriction = case restriction of
   ActivationRestriction.OnlyOnce -> []
   ActivationRestriction.OnlyOnceEachTurn -> []
   ActivationRestriction.DuringDieRoll -> []
+  ActivationRestriction.InstantSpeed -> []
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
@@ -1529,7 +1530,7 @@ spellCostsOf face =
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
 -- every clause. A READER of X rather than a declarer: Clash of Wills' "unless its
 -- controller pays {X}" spends the value its own {X}{U} announced (CR 107.3a),
--- which is what Pawl.Engine.Resolve.announcedXOn substitutes in.
+-- which is what Pawl.Engine.Resolve.Effect.announcedXOn substitutes in.
 payGateCostsOf :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Cost.Type.Cost Keyword.Keyword]
 payGateCostsOf =
   fmap PayGate.cost
@@ -2318,7 +2319,7 @@ modeBranchesOffend mode =
 -- mana cost (Pawl.Types.CostBasis) and a mana part of its own beside it?
 --
 -- The two are one field's worth of answer at the payment
--- (Pawl.Engine.Resolve.describedCost overwrites Cost.mana with the derived
+-- (Pawl.Engine.Resolve.Effect.describedCost overwrites Cost.mana with the derived
 -- amount), so a card writing both states mana nothing pays -- silently, which is
 -- why this is a lint. A card whose cost really is described states
 -- `mana: null`, which is the unpayable cost CR 118.6's first sentence describes
@@ -2930,7 +2931,7 @@ withCountersFilters w =
 -- same reason riderFilters is one -- the two halves of a gate must not be swept
 -- apart.
 --
--- The COST half is Unframed, an announced cost's framing: Pawl.Engine.Resolve.payGatePaidBy
+-- The COST half is Unframed, an announced cost's framing: Pawl.Engine.Resolve.Effect.payGatePaidBy
 -- measures and pays it with the resolving object's slots (Cost.canPayReading,
 -- Cost.payReading), the map Cost.announcedSlots hands an announced cost, so
 -- Filter.IsBound there reads them -- Calim, Djinn Emperor's "two other cards
@@ -5192,7 +5193,7 @@ data Framing
     -- merely by this engine: a special action uses no stack (CR 116.1), and a
     -- declaration announces no target. The ignore cost was tagged first, see
     -- #2883; the toll and the price last, see #2927. CR 118.12's gate cost was
-    -- here too (#2881) until Pawl.Engine.Resolve.payGatePaidBy handed it the
+    -- here too (#2881) until Pawl.Engine.Resolve.Effect.payGatePaidBy handed it the
     -- resolving object's slots.
     --
     -- NOT the costs an announcement pays -- CR 601.2f's additional cost, CR
@@ -6691,7 +6692,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- A CR 118.12 COST reads X the same way and by the same rule, and it is not an
   -- effect, so Card.allEffects cannot see it: Clash of Wills' only reader of the
   -- X it announces is the "pays {X}" its clause offers at resolution
-  -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.announcedXOn).
+  -- (`payGateCostsOf`, substituted in by Pawl.Engine.Resolve.Effect.announcedXOn).
   --
   -- A TARGET SLOT counting the announced X is the fourth such reader, and a
   -- slot whose CR 202.3 computed bound names it the fifth (both

@@ -148,4 +148,11 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       ActivationRestriction.codec
       ActivationRestriction.DuringDieRoll
       " {\"type\":\"DuringDieRoll\"} "
+  -- Rhystic Cave's "Activate only as an instant".
+  Spec.it s "InstantSpeed" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      ActivationRestriction.InstantSpeed
+      " {\"type\":\"InstantSpeed\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

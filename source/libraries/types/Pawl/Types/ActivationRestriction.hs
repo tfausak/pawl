@@ -180,4 +180,7 @@ data ActivationRestriction
     -- at once. No rule grants that window (CR 117.1b); Pawl.DiceSpec's Goblin
     -- Bookie group proves the reading.
     DuringDieRoll
+  | -- | CR 602.5e's "Activate only as an instant": the player must have priority
+    -- (CR 304.5), so never inside a payment -- Rhystic Cave.
+    InstantSpeed
   deriving (Eq, Ord, Show)

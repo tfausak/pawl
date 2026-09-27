@@ -199,6 +199,13 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- step: open only while Pawl.Engine.Resolve.Effect.throwDice is asking
   -- about a die, so never at priority (CR 117.1b).
   ActivationRestriction.DuringDieRoll -> Maybe.isJust (GameState.rollingDie gs)
+  -- CR 602.5e: the timing of an instant, which CR 304.5 reduces to holding
+  -- priority. Every road that asks this board-reading gate is one where the
+  -- activator holds it -- Engine.priorityLoop's offer, Activate.activateAbility
+  -- -- and the payment windows CR 605.3a adds for a mana ability refuse the
+  -- route before asking (`refusedMidPayment`), since no board fact tells a
+  -- payment in progress apart.
+  ActivationRestriction.InstantSpeed -> True
 
 -- CR 602.5b: record that THIS ability of this source has now been activated,
 -- for whichever counted rider it prints. The writer both readers above are
@@ -265,4 +272,29 @@ needsEmptyStack restriction = case restriction of
   ActivationRestriction.OnlyOnceEachTurn -> False
   -- A die roll's modification step opens inside a resolution, never at a
   -- payment's gate, so no move between the two can close it.
+  ActivationRestriction.DuringDieRoll -> False
+  -- Not a stack question: `refusedMidPayment` is how the payment windows ask.
+  ActivationRestriction.InstantSpeed -> False
+
+-- CR 602.5e / 605.3a: may a mana ability with this rider NOT be activated inside
+-- a payment? "Activate only as an instant" keeps it to the priority window, so a
+-- source whose route prints it is no source while a spell is being cast, an
+-- ability activated, or a resolution cost paid (Rhystic Cave's ruling).
+--
+-- A classification, needsEmptyStack's posture: Pawl.Engine.Cost asks it of the
+-- rider at both of a payment's gates -- the supply the offer counts
+-- (Cost.stackedManaActivations) and the window itself (Cost.midPayment) --
+-- because nothing on the board says a payment is in progress.
+refusedMidPayment :: ActivationRestriction.ActivationRestriction -> Bool
+refusedMidPayment restriction = case restriction of
+  ActivationRestriction.InstantSpeed -> True
+  ActivationRestriction.SorcerySpeed -> False
+  ActivationRestriction.DuringPhase _ -> False
+  ActivationRestriction.DuringTurn _ -> False
+  ActivationRestriction.AttackedThisStep -> False
+  ActivationRestriction.AfterBlockersDeclared -> False
+  ActivationRestriction.BeforeCombatDamage -> False
+  ActivationRestriction.OnlyIf _ -> False
+  ActivationRestriction.OnlyOnce -> False
+  ActivationRestriction.OnlyOnceEachTurn -> False
   ActivationRestriction.DuringDieRoll -> False

@@ -295,11 +295,14 @@ producedTypes oid gs production = case production of
 -- the classification the rest of the mana path runs on
 -- (ManaAbility.manaProduced), so the rules core stays off effect identity.
 --
--- Not implemented: a clause's "unless ... pays", whose mana is offered and
--- added as if nobody paid (#4204).
+-- A clause's CR 118.12 cost (Rhystic Cave's "unless any player pays {1}") is
+-- OFFERED here as if nobody will pay and asked in Pawl.Engine.Cost.tapForManaWith
+-- after the cost, like the "if". The offer never overstates a payment: that
+-- card's "Activate only as an instant" keeps it out of every payment window
+-- (Cost.midPayment), so its mana is only ever floated at priority.
 --
--- A clause's printed "may", "if you do" and "or" are not read either: MTGJSON's
--- dump of 2026-08-23 has no mana ability printing one on a clause (mana-ability
+-- A clause's printed "may", "if you do" and "or" are not read: MTGJSON's dump
+-- of 2026-08-23 has no mana ability printing one on a clause (mana-ability
 -- lines matching "may", "If you do" or "unless"; Rhystic Cave's "unless" is the
 -- one hit, above). Thomil, the Destroyer's "You may sacrifice a creature. If
 -- you do, add {B}{B}{B}" is a loyalty ability and so no mana ability (CR 605.1a).
@@ -1208,7 +1211,7 @@ everyManaType =
 --
 -- CR 107.4f's ways, and BOTH of CR 107.4e's hybrids' ways, are collapsed to ONE
 -- before payment by `announce`, which is what CR 601.2b calls for at CR 118.13a's
--- moment, Pawl.Engine.Resolve.payGatePaidBy at CR 118.13b's, the special actions
+-- moment, Pawl.Engine.Resolve.Effect.payGatePaidBy at CR 118.13b's, the special actions
 -- at CR 118.13c's and Pawl.Engine.Cost.announceToll at CR 508.1j's and CR
 -- 509.1f's -- and a mana ability's own activation cost through the same
 -- `announce`, so no gameplay road reaches payment with one unannounced. The
@@ -1247,7 +1250,7 @@ waysOf symbol = case symbol of
   ManaSymbol.Snow -> [(Just (MkDemand everyManaType (Set.singleton ProductionTag.Snow)), 0, 0)]
   -- Unreachable in payment: substituteX removes every Variable before canPay --
   -- at CR 601.2b for a cast or an activation, and at
-  -- Pawl.Engine.Resolve.payGatePaid for CR 118.12's cost paid on resolution.
+  -- Pawl.Engine.Resolve.Effect.payGatePaid for CR 118.12's cost paid on resolution.
   -- The match must be total, so a bare {X} demands nothing and counts as 0
   -- generic.
   ManaSymbol.Variable -> [(Nothing, 0, 0)]
@@ -1281,7 +1284,7 @@ waysOf symbol = case symbol of
 --      not come back: an unspent pool empties every step (CR 500.5) and a land
 --      untaps. Conservative, and still pawl choosing -- which is why a cast, an
 --      activation (`announce`, CR 118.13a), a cost paid on resolution
---      (Pawl.Engine.Resolve.payGatePaidBy, CR 118.13b), a special action (CR
+--      (Pawl.Engine.Resolve.Effect.payGatePaidBy, CR 118.13b), a special action (CR
 --      118.13c), a combat toll (Pawl.Engine.Cost.announceToll) and a mana
 --      ability's own activation cost all announce first and reach this sort with
 --      no Phyrexian symbol left to order.
