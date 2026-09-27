@@ -4,6 +4,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
@@ -272,10 +273,11 @@ data TriggerCondition
     -- reach the same graveyard from the same zone and do not match.
     SelfPutIntoGraveyardDuringResolution
   | -- | CR 603.6 read by a BYSTANDER: "whenever another card is put into a
-    -- graveyard from anywhere" (Planar Void), filtered over the arriving card.
+    -- graveyard from anywhere" (Planar Void), filtered over the arriving card and
+    -- narrowed by the zone it left (Oglor, Devoted Assistant).
     -- CR 712.21's Example makes this the condition a melded permanent's death
     -- fires TWICE.
-    CardPutIntoGraveyard (Filter.Filter Keyword.Keyword)
+    CardPutIntoGraveyard CardPutIntoGraveyard.CardPutIntoGraveyard
   | -- | CR 603.6c narrowed to CR 700.4's "dies", the battlefield-to-graveyard
     -- pair (Doomed Traveler). Self-scoped, and a CR 603.10a look-back.
     SelfDies

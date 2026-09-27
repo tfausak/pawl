@@ -3,6 +3,7 @@ module Pawl.Codec.TriggerCondition where
 import qualified Pawl.Codec.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Codec.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Codec.CardName as CardName
+import qualified Pawl.Codec.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.ControllerBecomesTarget as ControllerBecomesTarget
@@ -95,7 +96,7 @@ codec =
           Arm.nullary "SelfPutIntoGraveyardDuringResolution" TriggerCondition.SelfPutIntoGraveyardDuringResolution,
           Arm.nullary "SelfDies" TriggerCondition.SelfDies,
           Arm.nullary "SelfLeavesGraveyard" TriggerCondition.SelfLeavesGraveyard,
-          Arm.payload "CardPutIntoGraveyard" filterCodec TriggerCondition.CardPutIntoGraveyard (\x -> case x of TriggerCondition.CardPutIntoGraveyard y -> Just y; _ -> Nothing),
+          Arm.payload "CardPutIntoGraveyard" CardPutIntoGraveyard.codec TriggerCondition.CardPutIntoGraveyard (\x -> case x of TriggerCondition.CardPutIntoGraveyard y -> Just y; _ -> Nothing),
           Arm.payload "PermanentDies" filterCodec TriggerCondition.PermanentDies (\x -> case x of TriggerCondition.PermanentDies y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsDie" filterCodec TriggerCondition.PermanentsDie (\x -> case x of TriggerCondition.PermanentsDie y -> Just y; _ -> Nothing),
           Arm.nullary "SelfLeavesTheBattlefield" TriggerCondition.SelfLeavesTheBattlefield,

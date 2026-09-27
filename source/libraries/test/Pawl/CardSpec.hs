@@ -86,6 +86,7 @@ import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastObligation as CastObligation
@@ -3997,7 +3998,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.3b's names a PlayerRelation; the Saga is found through CR 714.2d's
   -- final chapter number rather than through a Filter.
   TriggerCondition.SagaFinalChapterTriggers _ -> []
-  TriggerCondition.CardPutIntoGraveyard f -> unframed [f]
+  TriggerCondition.CardPutIntoGraveyard p -> unframed [CardPutIntoGraveyard.filter p]
   TriggerCondition.PermanentDies f -> unframed [f]
   -- CR 603.2c's batch reading of the same written form carries the same Filter,
   -- so it is swept the same way -- answering [] here would exempt Vengeful
