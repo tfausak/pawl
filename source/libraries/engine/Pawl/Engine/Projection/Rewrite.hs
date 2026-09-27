@@ -1991,6 +1991,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Toughness -> quantity
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.WasBound _ -> quantity
+  Quantity.Type.BoundCount _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
   Quantity.Type.LifeTotal _ -> quantity
@@ -2030,6 +2031,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.OpponentsAttacked _ -> quantity
   Quantity.Type.AttackersDeclaredThisTurn _ -> quantity
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity
+  Quantity.Type.CardsDrawnThisTurn _ -> quantity
   Quantity.Type.BendingsThisTurn _ -> quantity
   Quantity.Type.LifeGainedThisTurn _ -> quantity
   Quantity.Type.PlayersDealtDamageThisTurn _ -> quantity

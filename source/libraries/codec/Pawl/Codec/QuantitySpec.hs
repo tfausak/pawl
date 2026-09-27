@@ -90,6 +90,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.WasBound (SlotName.MkSlotName (Text.pack "thatBeheldObject")))
       " {\"type\":\"WasBound\",\"value\":\"thatBeheldObject\"} "
+  Spec.it s "BoundCount" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.BoundCount (SlotName.MkSlotName (Text.pack "thoseAttackingCreatures")))
+      " {\"type\":\"BoundCount\",\"value\":\"thoseAttackingCreatures\"} "
   Spec.it s "Star" $
     Common.assertCodec
       s
@@ -483,6 +489,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.CardsDiscardedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       " {\"type\":\"CardsDiscardedThisTurn\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+  Spec.it s "CardsDrawnThisTurn" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.CardsDrawnThisTurn (PlayerRef.Relative PlayerRelation.You))
+      " {\"type\":\"CardsDrawnThisTurn\",\"value\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}} "
   -- CR 603.1b, on CardsDiscardedThisTurn's terms. Avatar Aang's is the Relative
   -- arm.
   Spec.it s "BendingsThisTurn" $

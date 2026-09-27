@@ -270,6 +270,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- the slot is there.
         Quantity.WasBound slot ->
           Just (if Set.null (Map.findWithDefault Set.empty slot (Filter.slotObjects context)) then 0 else 1)
+        -- WasBound's count rather than its yes-or-no, off the binding for the
+        -- same reason: an attacker that has since left the battlefield still
+        -- counts toward Screaming Swarm's "that many" (CR 608.2i).
+        Quantity.BoundCount slot ->
+          Just (toInteger (Set.size (Map.findWithDefault Set.empty slot (Filter.slotObjects context))))
         -- CR 208.2: a bare star has no value of its own. Both readers of a
         -- characteristic-defining P/T substitute the object's quantity for it first,
         -- through Projection.seedCharacteristicPT at the projection's seed
@@ -716,6 +721,12 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- unanswered is only the reference.
         Quantity.CardsDiscardedThisTurn ref -> case playersOf ref of
           Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))))
+          _ -> Nothing
+        -- CR 121.1 / 608.2i: how many cards that player has drawn this turn.
+        -- CardsDiscardedThisTurn's arm in footing and in arity, read off the
+        -- turn-scoped tally Event keeps per draw rather than a fold.
+        Quantity.CardsDrawnThisTurn ref -> case playersOf ref of
+          Just [pid] -> Just (toInteger (Map.findWithDefault 0 pid (GameState.drawsThisTurn gs)))
           _ -> Nothing
         -- CR 603.1b: how many of the four bending verbs that player has done this
         -- turn. CardsDiscardedThisTurn's arm in footing and in arity; Game.bendingsThisTurn
@@ -1195,6 +1206,7 @@ objectSlots quantity = case quantity of
   -- names an object slot but reaches Filter.slotOneObject on no road, asking
   -- only whether the slot is bound, so a plural slot does not damage it.
   Quantity.WasBound _ -> Set.empty
+  Quantity.BoundCount _ -> Set.empty
   Quantity.Literal _ -> Set.empty
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
@@ -1249,6 +1261,7 @@ objectSlots quantity = case quantity of
   Quantity.OpponentsAttacked _ -> Set.empty
   Quantity.AttackersDeclaredThisTurn _ -> Set.empty
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
+  Quantity.CardsDrawnThisTurn _ -> Set.empty
   Quantity.BendingsThisTurn _ -> Set.empty
   Quantity.LifeGainedThisTurn _ -> Set.empty
   Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
@@ -1450,6 +1463,7 @@ readsX quantity = case quantity of
   -- Never X: CR 601.2b's announcement binds an AMOUNT, and this arm asks whether
   -- a slot names an OBJECT, which Binding.variableX never does.
   Quantity.WasBound _ -> False
+  Quantity.BoundCount _ -> False
   -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
   -- Plus X (Literal 3), which reads X without being equal to it.
   Quantity.Plus (Plus.MkPlus a b) -> readsX a || readsX b
@@ -1518,6 +1532,7 @@ readsX quantity = case quantity of
   Quantity.OpponentsAttacked _ -> False
   Quantity.AttackersDeclaredThisTurn _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
+  Quantity.CardsDrawnThisTurn _ -> False
   Quantity.BendingsThisTurn _ -> False
   Quantity.LifeGainedThisTurn _ -> False
   Quantity.PlayersDealtDamageThisTurn _ -> False

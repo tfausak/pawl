@@ -3003,6 +3003,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   longtuskCubSpec s registry
   thrastaSpec s registry
   ertaisScornSpec s registry
+  deemInferiorSpec s registry
   frogmiteSpec s registry
   exhalationSpec s registry
   omniscienceSpec s registry
@@ -3271,6 +3272,26 @@ ertaisScornSpec s registry =
           (splitScorn, split) = board True
       Spec.assertBool s (S.castable S.alice carolsScorn carols) "carol cast two, so the Scorn costs {1}{U} and is offered"
       Spec.assertBool s (not (S.castable S.alice splitScorn split)) "bob and carol cast one each, so the Scorn keeps its {1}{U}{U} and is refused"
+
+-- CR 601.2f: Deem Inferior ({3}{U}) "costs {1} less to cast for each card you've
+-- drawn this turn". alice holds it over two Islands, which pay {1}{U} and not
+-- {2}{U}, with a Hill Giant of bob's to target. The turn's draw tally is written
+-- straight onto the board: Pawl.EventTriggerSpec proves the draws that fill it.
+deemInferiorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+deemInferiorSpec s registry =
+  Spec.describe s "Deem Inferior" $ do
+    Spec.it s "CR 601.2f each card alice drew this turn takes {1} off, and bob's draws do not" $ do
+      island <- S.printingOf s registry "Island"
+      giant <- S.printingOf s registry "Hill Giant"
+      deem <- S.printingOf s registry "Deem Inferior"
+      let board drawn =
+            let (_, gs1) = S.addPermanent giant S.bob (S.landsInPlay island 2)
+                (deemId, gs2) = S.addHandCard deem S.alice gs1
+             in (deemId, gs2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice, GameState.drawsThisTurn = Map.fromList drawn})
+          (twoId, two) = board [(S.alice, 2)]
+          (oneId, one) = board [(S.alice, 1), (S.bob, 2)]
+      Spec.assertBool s (S.castable S.alice twoId two) "alice drew two, so it costs {1}{U} and is offered"
+      Spec.assertBool s (not (S.castable S.alice oneId one)) "alice drew one and bob two, so it costs {2}{U} and is refused"
 
 -- alice holds Thrasta, Tempest's Roar ({10}{G}{G}) and `elves` copies of
 -- Glistener Elf ({G}), with `forests` untapped Forests and priority in her own

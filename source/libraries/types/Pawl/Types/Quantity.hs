@@ -55,6 +55,10 @@ data Quantity
     -- beheld out of a hand at all (CR 400.2). The QUALITY is not re-checked
     -- either, the cost's own Filter having settled it at payment time.
     WasBound SlotName.SlotName
+  | -- | CR 608.2i: how many objects that slot of the surrounding
+    -- announcement names, off the binding as WasBound reads it -- Screaming
+    -- Swarm's "mills that many", over the attackers its trigger bound.
+    BoundCount SlotName.SlotName
   | -- | CR 208.2 / 208.2a: the printed star -- notation, which the projection
     -- seed substitutes (Projection.baseCharacteristics) and evaluate answers
     -- Nothing for.
@@ -214,6 +218,9 @@ data Quantity
   | -- | CR 701.9a / 608.2i: how many cards that player discarded this turn,
     -- folded from the turn-scoped GameEvent.Discarded log.
     CardsDiscardedThisTurn PlayerRef.PlayerRef
+  | -- | CR 121.1 / 608.2i: how many cards that player drew this turn, read off
+    -- GameState.drawsThisTurn -- Deem Inferior's "each card you've drawn this turn".
+    CardsDrawnThisTurn PlayerRef.PlayerRef
   | -- | CR 603.1b / 608.2i: how many of the four bending verbs (CR 701.65b,
     -- 701.66b, 701.67c, 702.189b) that player has done this turn -- Avatar
     -- Aang's "if you've done all four this turn".
