@@ -851,6 +851,7 @@ cycling cost searchFor =
                 Search.owner = PlayerRef.Relative PlayerRelation.You,
                 -- CR 702.29e prints "your library" and no other zone.
                 Search.zones = Set.singleton Zone.Library,
+                Search.outsideTheGame = False,
                 Search.quantity = Just (Quantity.Literal 1),
                 Search.filter = filter_,
                 -- CR 702.29e prints no "up to", and its quality-stating filter puts
@@ -1040,6 +1041,7 @@ searchForSameManaValue cost filter_ destination =
               Search.owner = PlayerRef.Relative PlayerRelation.You,
               -- Both rules print "your library" and no other zone.
               Search.zones = Set.singleton Zone.Library,
+              Search.outsideTheGame = False,
               -- "Search your library for a card", so one card is the whole
               -- instruction's count.
               Search.quantity = Just (Quantity.Literal 1),
@@ -7930,6 +7932,7 @@ partnerWith name =
             { Search.searcher = PlayerRef.InSlot partnerWithTarget,
               Search.owner = PlayerRef.InSlot partnerWithTarget,
               Search.zones = Set.singleton Zone.Library,
+              Search.outsideTheGame = False,
               Search.quantity = Just (Quantity.Literal 1),
               Search.filter = Filter.HasName name,
               -- Rule 702.124j prints no "up to", and the filter states a quality,

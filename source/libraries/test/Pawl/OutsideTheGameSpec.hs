@@ -79,6 +79,8 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -844,6 +846,67 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     let resolved = S.runPure (researching [0, 0, 1, 2, 3]) gs (castHalf "Research" researchId >> Stack.resolveTop)
     Spec.assertEqWith s "CR 400.11c four cards arrived, in the order named, and the shuffle followed" (printingsIn Zone.Library S.alice resolved) (reverse before <> [signInBlood, signInBlood, miasma, dragon])
     Spec.assertEqWith s "and the fifth is still outside the game" (Map.elems (poolOf S.alice resolved)) [1]
+  -- CR 701.23j: a search that reaches outside the game beside its zones.
+  -- Invasion of Arcavios ({3}{U}{U} Battle -- Siege, "When this Siege enters,
+  -- search your library, graveyard, and/or outside the game for an instant or
+  -- sorcery card you own, reveal it, and put it into your hand. If you search
+  -- your library this way, shuffle."; api.scryfall.com 2026-09-27) on
+  -- arcaviosBoard, the cases differing in the answers alone: which places she
+  -- takes, which library card she finds, and whether she takes what she is
+  -- offered from outside the game.
+  Spec.it s "CR 701.23j Invasion of Arcavios brings an instant in from outside the game, and a search that skipped her library shuffles nothing" $ do
+    board <- arcaviosBoard s registry
+    let resolved = resolveArcavios (arcaviosAnswer [SearchPlace.OutsideTheGame] [] True) board
+    -- THE BEHAVIOUR first. An engine that did not offer outside the game as a
+    -- place falls back to every zone, and CR 400.2 then forces the graveyard's
+    -- Sign in Blood into her hand instead.
+    Spec.assertEqWith s "CR 701.23j the Fog from outside the game is in her hand" (printingsIn Zone.Hand S.alice resolved) [arcaviosFog board]
+    Spec.assertEqWith s "CR 400.11b and it left the pool, the Island the filter rejects staying" (Map.elems (poolOf S.alice resolved)) [1]
+    Spec.assertEqWith s "the graveyard's sorcery was not found" (printingsIn Zone.Graveyard S.alice resolved) [arcaviosSign board]
+    Spec.assertEqWith s "and the library she did not search was not shuffled" (printingsIn Zone.Library S.alice resolved) (arcaviosLibrary board)
+  -- CR 701.23j and CR 400.2 together: the graveyard is public, so a search of it
+  -- must find its match -- unless the one count is filled from outside the game,
+  -- which the searcher "may" take. Paired with the case after it, which differs
+  -- only in declining the Fog.
+  Spec.it s "CR 701.23j a card taken from outside the game fills the count, sparing the graveyard's match" $ do
+    board <- arcaviosBoard s registry
+    let resolved = resolveArcavios (arcaviosAnswer [SearchPlace.InZone Zone.Graveyard, SearchPlace.OutsideTheGame] [] True) board
+    Spec.assertEqWith s "CR 701.23j the Fog is in her hand" (printingsIn Zone.Hand S.alice resolved) [arcaviosFog board]
+    Spec.assertEqWith s "CR 701.23a one count over every place, so the graveyard's sorcery stayed" (printingsIn Zone.Graveyard S.alice resolved) [arcaviosSign board]
+  Spec.it s "CR 400.2 declining outside the game too, the graveyard's match is found" $ do
+    board <- arcaviosBoard s registry
+    let resolved = resolveArcavios (arcaviosAnswer [SearchPlace.InZone Zone.Graveyard, SearchPlace.OutsideTheGame] [] False) board
+    Spec.assertEqWith s "CR 400.2 the graveyard's Sign in Blood is in her hand" (printingsIn Zone.Hand S.alice resolved) [arcaviosSign board]
+    Spec.assertEqWith s "CR 400.11b and the pool is untouched" (Map.elems (poolOf S.alice resolved)) [1, 1]
+  -- CR 701.23j's "may" on its own: outside the game alone, declined, finds
+  -- nothing although the graveyard holds a match -- which it was not searched.
+  Spec.it s "CR 701.23j outside the game alone may find nothing" $ do
+    board <- arcaviosBoard s registry
+    let resolved = resolveArcavios (arcaviosAnswer [SearchPlace.OutsideTheGame] [] False) board
+    Spec.assertEqWith s "CR 701.23j her hand is empty" (printingsIn Zone.Hand S.alice resolved) []
+    Spec.assertEqWith s "and the graveyard's sorcery stayed" (printingsIn Zone.Graveyard S.alice resolved) [arcaviosSign board]
+  -- Every place, and the library's instant named: the one count is filled from
+  -- the zones, so nothing out there is taken whatever she would have answered,
+  -- and the card's own "if you search your library this way, shuffle" follows.
+  Spec.it s "CR 701.23a/701.23j a library find fills the one count, and the library is shuffled" $ do
+    board <- arcaviosBoard s registry
+    let everywhere = [SearchPlace.InZone Zone.Library, SearchPlace.InZone Zone.Graveyard, SearchPlace.OutsideTheGame]
+        resolved = resolveArcavios (arcaviosAnswer everywhere [arcaviosBoltId board] True) board
+    Spec.assertEqWith s "CR 701.23a the library's Lightning Bolt is in her hand, and nothing else" (printingsIn Zone.Hand S.alice resolved) [arcaviosBolt board]
+    Spec.assertEqWith s "CR 701.23a the pool is untouched" (Map.elems (poolOf S.alice resolved)) [1, 1]
+    Spec.assertEqWith s "the library was shuffled" (printingsIn Zone.Library S.alice resolved) (reverse (filter (/= arcaviosBolt board) (arcaviosLibrary board)))
+  -- The card's back face, Invocation of the Founders (Enchantment, "Whenever
+  -- you cast an instant or sorcery spell from your hand, you may copy that
+  -- spell. You may choose new targets for the copy."): a Lightning Bolt cast
+  -- from her hand is copied, and declining the "may" is the paired leg. Life
+  -- is summed over both seats, so the case does not turn on where the copy
+  -- was pointed.
+  Spec.it s "CR 707.10 Invocation of the Founders copies an instant she casts from her hand" $ do
+    (lifeTaking, _) <- invocationBolt s registry OptionalDecision.Exercises
+    Spec.assertEqWith s "CR 707.10 two Bolts resolved: six life lost between them" lifeTaking (Just 34)
+  Spec.it s "CR 608.2d declining Invocation of the Founders' may copies nothing" $ do
+    (lifeTaking, _) <- invocationBolt s registry OptionalDecision.Declines
+    Spec.assertEqWith s "one Bolt resolved: three life lost" lifeTaking (Just 37)
 
 -- alice with a Forest and an Island, Research // Development in hand -- {G}{U}
 -- pays Research and nothing pays Development --
@@ -883,6 +946,80 @@ castHalf half oid = Cast.castSpell S.manaPerformer S.alice oid (CardName.MkCardN
 researching :: [Int] -> Prompt.Prompt r -> r
 researching picks p = case p of
   Prompt.ChooseFromOutsideTheGame _ _ offered _ _ -> Maybe.mapMaybe (\i -> Maybe.listToMaybe (drop i (NonEmpty.toList offered))) picks
+  Prompt.Shuffle ids -> reverse ids
+  _ -> S.identityAnswer p
+
+-- Invasion of Arcavios's board: alice with five Islands and the Siege in hand;
+-- a Lightning Bolt above two Islands in her library, so the filter has a card to
+-- reject there and a shuffle of what is left is visible; a Sign in Blood in her
+-- graveyard; and an Island and a Fog outside the game, the Island interned first
+-- so an offer the filter did not narrow would lead with it.
+data ArcaviosBoard = MkArcaviosBoard
+  { arcaviosState :: GameState.GameState,
+    arcaviosSpell :: ObjectId.ObjectId,
+    arcaviosBoltId :: ObjectId.ObjectId,
+    arcaviosBolt :: Printing.Printing,
+    arcaviosSign :: Printing.Printing,
+    arcaviosFog :: Printing.Printing,
+    -- | Her library before the cast, top first.
+    arcaviosLibrary :: [Printing.Printing]
+  }
+
+arcaviosBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m ArcaviosBoard
+arcaviosBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  invasion <- S.printingOf s registry "Invasion of Arcavios"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  signInBlood <- S.printingOf s registry "Sign in Blood"
+  fog <- S.printingOf s registry "Fog"
+  let (board, spellId) = S.handOne invasion (S.landsInPlay island 5)
+      withIslands = stockLibrary island 2 S.alice board
+      (boltId, stocked) = S.addLibraryCard bolt S.alice withIslands
+      buried = snd (S.addGraveyardCard signInBlood S.alice stocked)
+      intern printing (acc, gs) = let (printingId, gs2) = Game.intern printing gs in (acc <> [(printingId, 1)], gs2)
+      (entries, interned) = List.foldl' (flip intern) ([], buried) [island, fog]
+      stock p = p {Player.outsideTheGame = Map.fromList entries}
+      ready = interned {GameState.players = Map.adjust stock S.alice (GameState.players interned)}
+  pure (MkArcaviosBoard ready spellId boltId bolt signInBlood fog (printingsIn Zone.Library S.alice ready))
+
+-- alice with Invasion of Arcavios on the battlefield showing its back face,
+-- a Mountain, and a Lightning Bolt in hand aimed at bob. Casts the Bolt, answers
+-- the trigger's "may" as given, and resolves the stack down; answers the life
+-- both seats have left, summed, and the settled board.
+invocationBolt :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> OptionalDecision.OptionalDecision -> m (Maybe Integer, GameState.GameState)
+invocationBolt s registry decision = do
+  mountain <- S.printingOf s registry "Mountain"
+  invasion <- S.printingOf s registry "Invasion of Arcavios"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  let (siegeId, placed) = S.addPermanent invasion S.alice (S.landsInPlay mountain 1)
+      turned = placed {GameState.objects = Map.adjust (\o -> o {Object.face = Just (CardName.MkCardName (Text.pack "Invocation of the Founders"))}) siegeId (GameState.objects placed)}
+      (board, boltId) = S.handOne bolt turned
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
+        Prompt.ChooseOptional {} -> decision
+        _ -> S.identityAnswer p
+      cast = S.runPure answer board (S.cast S.alice boltId)
+      settled = S.runPure answer cast Engine.settleForPriority
+      drained = List.foldl' (\g _ -> S.runPure answer (S.runPure answer g Stack.resolveTop) Engine.settleForPriority) settled [1 :: Int, 2, 3]
+      total = (+) <$> S.lifeOf S.alice drained <*> S.lifeOf S.bob drained
+  pure (total, drained)
+
+-- Cast the Siege, resolve it, and resolve its enters trigger.
+resolveArcavios :: (forall r. Prompt.Prompt r -> r) -> ArcaviosBoard -> GameState.GameState
+resolveArcavios answer board =
+  let entered = S.runPure answer (arcaviosState board) (S.cast S.alice (arcaviosSpell board) >> Stack.resolveTop)
+      settled = S.runPure answer entered Engine.settleForPriority
+   in S.runPure answer settled Stack.resolveTop
+
+-- The places she takes, the zone cards she finds, whether she takes everything
+-- she is offered from outside the game, and a shuffle that reverses what it is
+-- offered, so one is visible.
+arcaviosAnswer :: [SearchPlace.SearchPlace] -> [ObjectId.ObjectId] -> Bool -> Prompt.Prompt r -> r
+arcaviosAnswer places found takeOutside p = case p of
+  Prompt.ChooseSearchZones {} -> Set.fromList places
+  Prompt.Search {} -> found
+  Prompt.ChooseFromOutsideTheGame _ _ offered _ _ -> if takeOutside then NonEmpty.toList offered else []
   Prompt.Shuffle ids -> reverse ids
   _ -> S.identityAnswer p
 

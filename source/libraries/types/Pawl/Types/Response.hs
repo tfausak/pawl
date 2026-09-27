@@ -44,10 +44,10 @@ import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
-import qualified Pawl.Types.Zone as Zone
 
 -- | One answer to a prompt, serialized so a DecisionLog replays the game
 -- deterministically.
@@ -416,11 +416,11 @@ data Response
     -- Distinct from ChoseBasicLandType above because the two prompts are, and a
     -- replay must not answer one with the other's record.
     ChoseCreatureType Subtype.Subtype
-  | -- | CR 701.23: which of the zones a multi-zone search named the searcher
+  | -- | CR 701.23: which of the places a multi-place search named the searcher
     -- chose to look through (Prompt.ChooseSearchZones). Distinct from Searched,
     -- which records what they then found: Delivery Moogle asks both, one after
     -- the other, so two answers in one replay are not a duplicate.
-    ChoseSearchZones (Set.Set Zone.Zone)
+    ChoseSearchZones (Set.Set SearchPlace.SearchPlace)
   | -- | CR 701.23: the cards a search found, in whichever of the zones it looked
     -- through held them (empty = failed to find).
     Searched [ObjectId.ObjectId]
