@@ -28,6 +28,7 @@ import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
+import qualified Pawl.Types.EnteringTogether as EnteringTogether
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
@@ -107,6 +108,9 @@ data GameState = MkGameState
     -- | How deep the Event.simultaneously brackets are nested; the outermost
     -- bracket's group wins.
     eventGroupDepth :: Natural.Natural,
+    -- | CR 613.7m: the arrivals of the CR 608.2f action under way, ordered when
+    -- it ends (Event.together). Nothing outside one.
+    enteringTogether :: Maybe EnteringTogether.EnteringTogether,
     -- | CR 608.2h / 113.7a: last known information, keyed by the id an object
     -- had before it left a zone (CR 400.7). Grows for the whole game.
     lastKnown :: Map.Map ObjectId.ObjectId LastKnown.LastKnown,
