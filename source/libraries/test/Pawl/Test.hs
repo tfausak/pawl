@@ -91,6 +91,7 @@ import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardPutIntoGraveyardSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
+import qualified Pawl.Codec.CardsPutIntoZoneSpec
 import qualified Pawl.Codec.CastFromSpec
 import qualified Pawl.Codec.CastFromZoneSpec
 import qualified Pawl.Codec.CastObligationSpec
@@ -274,6 +275,7 @@ import qualified Pawl.Codec.HalfUnlockedSpec
 import qualified Pawl.Codec.HalvedSpec
 import qualified Pawl.Codec.HandActionSpec
 import qualified Pawl.Codec.HybridSpec
+import qualified Pawl.Codec.IfTakenSpec
 import qualified Pawl.Codec.IgnoredAbilitySpec
 import qualified Pawl.Codec.ImpendingSpec
 import qualified Pawl.Codec.InZoneSpec
@@ -807,6 +809,7 @@ spec s registry = do
   Pawl.Codec.CardArrivedInSpec.spec s
   Pawl.Codec.CardLeavesZoneSpec.spec s
   Pawl.Codec.CardPutIntoGraveyardSpec.spec s
+  Pawl.Codec.CardsPutIntoZoneSpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
@@ -1074,6 +1077,7 @@ spec s registry = do
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
   Pawl.Codec.OrElseSpec.spec s
+  Pawl.Codec.IfTakenSpec.spec s
   Pawl.Codec.OutsideDestinationSpec.spec s
   Pawl.Codec.OutsideObjectSpec.spec s
   Pawl.Codec.PaidExpirySpec.spec s

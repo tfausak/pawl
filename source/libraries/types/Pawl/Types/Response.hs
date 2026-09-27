@@ -365,7 +365,7 @@ data Response
     -- deck fulfills and rule 309.2a a dungeon card, and a transcript of one must
     -- not satisfy the other.
     ChoseCompanion (Maybe PrintingId.PrintingId)
-  | -- | CR 400.11c \/ 729.4: the card a player chose to bring in from outside the
+  | -- | CR 400.11c \/ 729.4: the cards a player chose to bring in from outside the
     -- game -- either CR 103.2a's sideboard pool or, from inside a subgame, CR
     -- 729.4's main game. Pawl.Types.OutsideCard's header comment gives the full
     -- reason it names one or the other rather than carrying a bare PrintingId.
@@ -373,7 +373,7 @@ data Response
     -- Its own constructor rather than ChoseDungeon reused, for the reason that one
     -- is not ChoseRoom: rule 309.2a admits a dungeon card and a wish admits what
     -- its own filter says, and a transcript of one must not satisfy the other.
-    ChoseFromOutsideTheGame OutsideCard.OutsideCard
+    ChoseFromOutsideTheGame [OutsideCard.OutsideCard]
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.
     ChoseRoom RoomIndex.RoomIndex
   | -- | CR 709.5f \/ 709.5g: the half of a permanent a player chose to unlock or

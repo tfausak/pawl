@@ -209,13 +209,11 @@ data Effect card ability
     -- Not implemented: rule 701.20a keeps a revealed card revealed "for as long
     -- as necessary", which pawl has nowhere to store (#1408).
     Reveal Reveal.Reveal
-  | -- | CR 400.11c: the resolving controller puts a card they own from outside
-    -- the game where the payload's destination says, showing it first where the
-    -- card prints CR 701.20a's reveal (Burning Wish). The Filter is evaluated
-    -- against the printed face, no object existing out there to project.
-    --
-    -- Not implemented: a count other than one, the axis
-    -- Pawl.Types.FromOutsideTheGame still does not carry (gap #2449).
+  | -- | CR 400.11c: the resolving controller puts as many cards they own from
+    -- outside the game as the payload's count allows where its destination
+    -- says, showing each first where the card prints CR 701.20a's reveal
+    -- (Burning Wish). The Filter is evaluated against the printed face, no
+    -- object existing out there to project.
     --
     -- Not implemented: where the reveal is printed it happens as the card
     -- arrives at its destination rather than before the move, GameEvent.Revealed being

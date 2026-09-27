@@ -1,10 +1,9 @@
 module Pawl.Types.Clause where
 
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Sequence as Seq
-import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.IfTaken as IfTaken
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
@@ -48,6 +47,10 @@ data Clause card ability = MkClause
     -- not a collection alone, because the Maybe is already the unmarked case and
     -- an empty one would be a second spelling of it.
     --
+    -- Or the NEGATIVE, Pawl.Types.IfTaken.NoneTaken: Browbeat's "if no one
+    -- does" runs only when no player asked took the named "may", which is the
+    -- same aggregation Pawl.Types.PayBranch.IfNonePaid makes over a cost.
+    --
     -- Keyed on the ANSWER the named clause's own riders produced -- did its
     -- instructions run -- and never on the board afterwards, which is PayGate's
     -- posture (CR 118.12's "regardless of what events actually occurred")
@@ -72,7 +75,7 @@ data Clause card ability = MkClause
     -- STATE, with customers outliving the resolution -- a "for as long as"
     -- duration, a static ability's "as long as" -- where a clause ordinal names
     -- nothing.
-    ifTaken :: Maybe (NonEmpty.NonEmpty ClauseIndex.ClauseIndex),
+    ifTaken :: Maybe IfTaken.IfTaken,
     -- | CR 701.46a's "if this permanent has no +1/+1 counters on it" -- a gate on
     -- THIS clause's effects rather than on the whole ability, which is why the
     -- rider rides the same carrier CR 603.5's "may" does. CR 701.37a's

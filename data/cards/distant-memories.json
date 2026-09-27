@@ -3,11 +3,15 @@
     {
       "manaCost": [
         {
+          "type": "Generic",
+          "value": 2
+        },
+        {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Red"
+              "type": "Blue"
             }
           }
         },
@@ -16,12 +20,12 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "White"
+              "type": "Blue"
             }
           }
         }
       ],
-      "name": "Thrilling Discovery",
+      "name": "Distant Memories",
       "spell": {
         "modes": [
           {
@@ -29,9 +33,16 @@
               {
                 "effects": [
                   {
-                    "type": "GainLife",
+                    "type": "Search",
                     "value": {
-                      "player": {
+                      "destination": {
+                        "type": "Exile"
+                      },
+                      "filter": {
+                        "type": "And",
+                        "value": []
+                      },
+                      "owner": {
                         "type": "Relative",
                         "value": {
                           "type": "You"
@@ -39,8 +50,15 @@
                       },
                       "quantity": {
                         "type": "Literal",
-                        "value": 2
-                      }
+                        "value": 1
+                      },
+                      "searcher": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "slot": "exiled"
                     }
                   }
                 ]
@@ -48,21 +66,26 @@
               {
                 "effects": [
                   {
-                    "type": "Discard",
+                    "type": "MoveToZone",
                     "value": {
-                      "type": "Counted",
-                      "value": {
-                        "quantity": {
-                          "type": "Literal",
-                          "value": 2
-                        },
-                        "slot": "you"
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "exiled"
+                      },
+                      "zone": {
+                        "type": "Hand"
                       }
                     }
                   }
                 ],
                 "optionality": {
-                  "type": "Optional"
+                  "type": "Optional",
+                  "value": {
+                    "type": "Relative",
+                    "value": {
+                      "type": "Opponent"
+                    }
+                  }
                 }
               },
               {
@@ -84,7 +107,7 @@
                   }
                 ],
                 "ifTaken": {
-                  "type": "AnyTaken",
+                  "type": "NoneTaken",
                   "value": [
                     1
                   ]

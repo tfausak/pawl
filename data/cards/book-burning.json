@@ -4,7 +4,7 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 2
+          "value": 1
         },
         {
           "type": "OfType",
@@ -16,7 +16,7 @@
           }
         }
       ],
-      "name": "Tweeze",
+      "name": "Book Burning",
       "spell": {
         "modes": [
           {
@@ -30,60 +30,44 @@
                         {
                           "quantity": {
                             "type": "Literal",
-                            "value": 3
+                            "value": 6
                           },
                           "ref": {
                             "type": "InSlot",
-                            "value": "target"
+                            "value": "thoseWhoMay"
                           }
                         }
                       ]
                     }
                   }
-                ]
-              },
-              {
-                "effects": [
-                  {
-                    "type": "Discard",
-                    "value": {
-                      "type": "Counted",
-                      "value": {
-                        "quantity": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "slot": "you"
-                      }
-                    }
-                  }
                 ],
                 "optionality": {
-                  "type": "Optional"
+                  "type": "Optional",
+                  "value": {
+                    "type": "EachPlayer"
+                  }
                 }
               },
               {
                 "effects": [
                   {
-                    "type": "Draw",
+                    "type": "Mill",
                     "value": {
                       "player": {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
+                        "type": "InSlot",
+                        "value": "target"
                       },
                       "quantity": {
                         "type": "Literal",
-                        "value": 1
+                        "value": 6
                       }
                     }
                   }
                 ],
                 "ifTaken": {
-                  "type": "AnyTaken",
+                  "type": "NoneTaken",
                   "value": [
-                    1
+                    0
                   ]
                 }
               }
@@ -91,7 +75,7 @@
             "targetSlots": {
               "target": {
                 "pool": {
-                  "type": "AnyTarget"
+                  "type": "Players"
                 }
               }
             }
@@ -101,7 +85,7 @@
       "typeLine": {
         "types": [
           {
-            "type": "Instant"
+            "type": "Sorcery"
           }
         ]
       }

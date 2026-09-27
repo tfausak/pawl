@@ -88,6 +88,7 @@ import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastObligation as CastObligation
 import qualified Pawl.Types.CastOffer as CastOffer
@@ -974,6 +975,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- a Count.
   TriggerCondition.CardLeavesZone {} -> []
   TriggerCondition.CardsLeaveZone {} -> []
+  TriggerCondition.CardsPutIntoZone {} -> []
   TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
@@ -4044,6 +4046,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- The batch reading carries the same record, swept the same way for
   -- PermanentsReturnedToHand's reason.
   TriggerCondition.CardsLeaveZone payload -> unframed [CardLeavesZone.filter payload]
+  -- The arrival side carries its Filter the same way: Dutiful Knowledge Seeker's
+  -- "cards" is that Filter.
+  TriggerCondition.CardsPutIntoZone payload -> unframed [CardsPutIntoZone.filter payload]
   TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.StateIs condition -> frame Unframed (conditionFilters condition)
   TriggerCondition.SelfEnters -> []
@@ -4312,6 +4317,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentsReturnedToHand _ -> []
   TriggerCondition.CardLeavesZone {} -> []
   TriggerCondition.CardsLeaveZone {} -> []
+  TriggerCondition.CardsPutIntoZone {} -> []
   TriggerCondition.SelfLeavesGraveyard -> []
   TriggerCondition.AttachedCreatureDies -> []
   TriggerCondition.AttachedCreatureBecomesTapped -> []

@@ -66,9 +66,12 @@
                     }
                   }
                 ],
-                "ifTaken": [
-                  0
-                ],
+                "ifTaken": {
+                  "type": "AnyTaken",
+                  "value": [
+                    0
+                  ]
+                },
                 "payGate": {
                   "basis": {
                     "reducedBy": [

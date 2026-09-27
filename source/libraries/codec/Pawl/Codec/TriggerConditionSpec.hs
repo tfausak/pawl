@@ -10,6 +10,7 @@ import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
@@ -573,6 +574,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.CardsLeaveZone (CardLeavesZone.MkCardLeavesZone (Filter.OwnedBy PlayerRelation.You) TurnScope.EachTurn Zone.Graveyard (Just Zone.Exile)))
       " {\"type\":\"CardsLeaveZone\",\"value\":{\"filter\":{\"type\":\"OwnedBy\",\"value\":{\"type\":\"You\"}},\"scope\":{\"type\":\"EachTurn\"},\"from\":{\"type\":\"Graveyard\"},\"to\":{\"type\":\"Exile\"}}} "
+  -- The arrival-side twin: Dutiful Knowledge Seeker's "cards" put into a library
+  -- from anywhere, so no origin zone is written.
+  Spec.it s "CardsPutIntoZone round-trips with its Filter and destination" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.CardsPutIntoZone (CardsPutIntoZone.MkCardsPutIntoZone (Filter.Not Filter.IsToken) Set.empty Zone.Library))
+      " {\"type\":\"CardsPutIntoZone\",\"value\":{\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}},\"to\":{\"type\":\"Library\"}}} "
   -- CR 700.4's death read off the enchanted permanent. Nullary: the link it
   -- matches on is board state, HauntedCreatureDies' reason.
   Spec.it s "AttachedCreatureDies" $

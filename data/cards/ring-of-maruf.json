@@ -37,6 +37,7 @@
                               "rewrite": {
                                 "type": "FromOutsideTheGame",
                                 "value": {
+                                  "count": 1,
                                   "destination": {
                                     "type": "Hand"
                                   },
@@ -44,7 +45,8 @@
                                     "type": "And",
                                     "value": []
                                   },
-                                  "reveal": false
+                                  "reveal": false,
+                                  "upTo": false
                                 }
                               },
                               "whose": {

@@ -22,7 +22,7 @@
 -- Exile Burning Wish.")
 -- for the pool, with Cunning Wish for the cycle's instant speed, Death Wish
 -- for a card that prints no reveal, The Raven's Warning for a destination that
--- is not the hand, and, in the last three cases, a Shahrazad
+-- is not the hand, Research for a count other than one, and, in three cases, a Shahrazad
 -- subgame for CR 729.4's main game -- Living Wish reaching two main-game
 -- creatures, then Death Wish reaching a main-game Titania's Song (CR 604.2's
 -- handover), then Burning Wish reaching the resolving Shahrazad itself (CR
@@ -43,6 +43,7 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -52,6 +53,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -60,6 +62,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
+import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -214,7 +217,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
         -- fails if the answer is ignored and the head is taken.
         answeringLast :: Prompt.Prompt r -> r
         answeringLast p = case p of
-          Prompt.ChooseFromOutsideTheGame _ _ candidates -> List.last (foldr (:) [] candidates)
+          Prompt.ChooseFromOutsideTheGame _ _ candidates _ _ -> [List.last (foldr (:) [] candidates)]
           _ -> exercising p
         resolved = resolveWish answeringLast wishId gs
     -- Psychic Miasma is interned second, so it is what the prompt offers last and
@@ -339,7 +342,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
         -- it names cannot matter: no candidate outside the game is any of them.
         bind o = o {Object.bindings = Map.insert slot (Binding.toObject wishId) (Object.bindings o)}
         gs = board {GameState.objects = Map.adjust bind wishId (GameState.objects board)}
-        bringing predicate = snd (Engine.runGamePure exercising gs (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame OutsideDestination.Hand predicate True) wishId S.alice))
+        bringing predicate = snd (Engine.runGamePure exercising gs (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand predicate True) wishId S.alice))
         atom = Filter.And [Filter.HasCardType CardType.Sorcery, Filter.IsBound slot]
     Spec.assertEqWith s "the slot names an object before either filter runs" (fmap Object.bindings (Game.lookupObject wishId gs)) (Just (Map.singleton slot (Binding.toObject wishId)))
     -- THE BEHAVIOUR: "a sorcery that IS the bound object" admits nothing, so the
@@ -362,7 +365,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     let (bearId, parent) = S.addPermanent bear S.alice (Setup.emptyGame S.bothPlayers)
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
-        after = snd (Engine.runGamePure S.identityAnswer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame OutsideDestination.Hand predicate True) bearId S.alice))
+        after = snd (Engine.runGamePure S.identityAnswer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand predicate True) bearId S.alice))
     Spec.assertEqWith s "CR 729.4/400.11c: the main-game creature arrives in her subgame hand" (printingsIn Zone.Hand S.alice after) [bear]
     Spec.assertEqWith s "CR 729.4a: the crossing is recorded for the outer frame to apply" (Foldable.toList (GameState.broughtIn after)) [bearId]
     Spec.assertEqWith s "and it is no longer offered" (Map.member bearId (GameState.outsideObjects after)) False
@@ -383,9 +386,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
           OutsideCard.InAnotherGame _ -> False
         answer :: Prompt.Prompt r -> r
         answer p = case p of
-          Prompt.ChooseFromOutsideTheGame _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find isPool (NonEmpty.toList candidates))
+          Prompt.ChooseFromOutsideTheGame _ _ candidates _ _ -> [Maybe.fromMaybe (NonEmpty.head candidates) (List.find isPool (NonEmpty.toList candidates))]
           _ -> S.identityAnswer p
-        after = snd (Engine.runGamePure answer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame OutsideDestination.Hand predicate True) bearId S.alice))
+        after = snd (Engine.runGamePure answer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand predicate True) bearId S.alice))
     Spec.assertEqWith s "the pool and the main game were both on offer" (length offered) 2
     Spec.assertEqWith s "the pool card is what arrived" (printingsIn Zone.Hand S.alice after) [dragon]
     Spec.assertEqWith s "the main-game creature is untouched: the answer did not take it" (Map.member bearId (GameState.outsideObjects after)) True
@@ -398,7 +401,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     let (bobsBearId, parent) = S.addPermanent bear S.bob (Setup.emptyGame S.bothPlayers)
         sub = Setup.subgameStateFrom S.alice parent
         predicate = Filter.Or [Filter.HasCardType CardType.Creature, Filter.HasCardType CardType.Land]
-        after = snd (Engine.runGamePure S.identityAnswer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame OutsideDestination.Hand predicate True) bobsBearId S.alice))
+        after = snd (Engine.runGamePure S.identityAnswer sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand predicate True) bobsBearId S.alice))
     Spec.assertEqWith s "alice's hand stays empty: bob's creature is not hers to reach" (printingsIn Zone.Hand S.alice after) []
     Spec.assertEqWith s "and bob's card is untouched" (Map.member bobsBearId (GameState.outsideObjects after)) True
   -- CR 708.2 over CR 729.4: what a subgame's wish sees of a FACE-DOWN main-game
@@ -440,9 +443,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
         -- which is the whole of what the sorcery leg asserts.
         preferManifest :: Prompt.Prompt r -> r
         preferManifest p = case p of
-          Prompt.ChooseFromOutsideTheGame _ _ candidates -> Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== OutsideCard.InAnotherGame manifestedId) (NonEmpty.toList candidates))
+          Prompt.ChooseFromOutsideTheGame _ _ candidates _ _ -> [Maybe.fromMaybe (NonEmpty.head candidates) (List.find (== OutsideCard.InAnotherGame manifestedId) (NonEmpty.toList candidates))]
           _ -> S.identityAnswer p
-        wishing predicate = snd (Engine.runGamePure preferManifest sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame OutsideDestination.Hand predicate True) manifestedId S.alice))
+        wishing predicate = snd (Engine.runGamePure preferManifest sub (Event.bringInto (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand predicate True) manifestedId S.alice))
         offeredOuter predicate = Maybe.mapMaybe (\card -> case card of OutsideCard.InAnotherGame oid -> Just oid; _ -> Nothing) (Event.eligible predicate manifestedId S.alice sub)
     -- CR 708.2a's 2/2 creature is what the creature-or-land wish reaches, and CR
     -- 708.9's reveal is what arrives: the card itself, not the 2/2.
@@ -518,8 +521,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
           -- a silent one: taking the head of the offer takes a PLAINS, which
           -- crosses instead, so the battlefield and library assertions below both
           -- redden rather than the case passing on the wrong card.
-          Prompt.ChooseFromOutsideTheGame _ _ offered ->
-            Maybe.fromMaybe (NonEmpty.head offered) (List.find isPiker (NonEmpty.toList offered))
+          Prompt.ChooseFromOutsideTheGame _ _ offered _ _ ->
+            [Maybe.fromMaybe (NonEmpty.head offered) (List.find isPiker (NonEmpty.toList offered))]
           -- CR 729.2's roll, answered so the turn count above is the one played.
           Prompt.RandomFirstPlayer _ -> S.alice
           _ -> S.castAnswer p
@@ -616,8 +619,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
           -- Jade Statue, so an answerer taking the head of it would cross a
           -- different card and every assertion below would redden rather than the
           -- case passing on the wrong one.
-          Prompt.ChooseFromOutsideTheGame _ _ offered ->
-            Maybe.fromMaybe (NonEmpty.head offered) (List.find (== OutsideCard.InAnotherGame songId) (NonEmpty.toList offered))
+          Prompt.ChooseFromOutsideTheGame _ _ offered _ _ ->
+            [Maybe.fromMaybe (NonEmpty.head offered) (List.find (== OutsideCard.InAnotherGame songId) (NonEmpty.toList offered))]
           -- CR 729.2's roll, answered so the turn count above is the one played.
           Prompt.RandomFirstPlayer _ -> S.alice
           _ -> S.castAnswer p
@@ -690,8 +693,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
           -- this names it. The fallback is not silent: taking the head of an offer
           -- that held anything else would leave Shahrazad's card in the main game
           -- rather than in her library, which the second assertion reddens on.
-          Prompt.ChooseFromOutsideTheGame _ _ offered ->
-            Maybe.fromMaybe (NonEmpty.head offered) (List.find isFromAnotherGame (NonEmpty.toList offered))
+          Prompt.ChooseFromOutsideTheGame _ _ offered _ _ ->
+            [Maybe.fromMaybe (NonEmpty.head offered) (List.find isFromAnotherGame (NonEmpty.toList offered))]
           -- CR 729.2's roll, answered so the turn count above is the one played.
           Prompt.RandomFirstPlayer _ -> S.alice
           _ -> S.castAnswer p
@@ -765,8 +768,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
   -- printing that says one -- Scryfall o:"outside the game" -is:digital
   -- -is:funny, 2026-09-16, twenty-one hits, of which the other non-hand
   -- destination is Research's "shuffle up to four cards you own from outside the
-  -- game into your library", which also needs a count this opcode does not carry
-  -- (gap #2449).
+  -- game into your library", which the Research group below drives.
   --
   -- Chapter III alone is what this case drives: the Saga is placed with two lore
   -- counters, so CR 714.3c's turn-based action puts the third on and the final
@@ -801,7 +803,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
         advanced = S.runPure S.identityAnswer ready (Engine.runTurnBasedActions Phase.PrecombatMain)
         answeringLast :: Prompt.Prompt r -> r
         answeringLast p = case p of
-          Prompt.ChooseFromOutsideTheGame _ _ offered -> List.last (foldr (:) [] offered)
+          Prompt.ChooseFromOutsideTheGame _ _ offered _ _ -> [List.last (foldr (:) [] offered)]
           _ -> exercising p
         settled = S.runPure answeringLast advanced Engine.settleForPriority
         resolved = S.runPure answeringLast settled Stack.resolveTop
@@ -815,6 +817,74 @@ spec s registry = Spec.describe s "Pawl.Engine.Event (CR 400.11)" $ do
     -- mutation the library is what observes.
     Spec.assertEqWith s "setup: CR 714.3c's turn-based action put the third lore counter on" (S.counterOf CounterKind.Lore sagaId advanced) 3
     Spec.assertEqWith s "setup: her library held the one card and no more before chapter III resolved" (printingsIn Zone.Library S.alice settled) [dragon]
+  -- A count other than one. Research ({G}{U} Instant, the left half of Research
+  -- // Development: "Shuffle up to four cards you own from outside the game into
+  -- your library."; read off card_faces at api.scryfall.com 2026-09-27) on
+  -- researchBoard, answered by position in the offer. Two copies of Sign in
+  -- Blood are named, so one answer spends a printing twice (CR 100.4a); the
+  -- shuffle REVERSES what it is offered, so the order the library comes back in
+  -- says the shuffle happened after the cards arrived.
+  Spec.it s "CR 400.11c Research shuffles the cards she chose, two copies of one printing among them, into her library" $ do
+    (gs, researchId, (signInBlood, _, dragon, _), before) <- researchBoard s registry
+    let resolved = S.runPure (researching [0, 0, 2]) gs (castHalf "Research" researchId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 701.24a the three cards she named are in her library, which was shuffled after they arrived" (printingsIn Zone.Library S.alice resolved) (reverse before <> [signInBlood, signInBlood, dragon])
+    Spec.assertEqWith s "CR 400.11b both copies and the Dragon left the pool, and the other two cards did not" (Map.elems (poolOf S.alice resolved)) [1, 1]
+    Spec.assertEqWith s "and nothing reached her hand" (printingsIn Zone.Hand S.alice resolved) []
+  -- "Up to" reaches none, and CR 701.24d shuffles the library all the same: the
+  -- same board, answered with nothing.
+  Spec.it s "CR 701.24d Research bringing in nothing still shuffles her library" $ do
+    (gs, researchId, _, before) <- researchBoard s registry
+    let resolved = S.runPure (researching []) gs (castHalf "Research" researchId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 701.24d her library holds what it did, shuffled" (printingsIn Zone.Library S.alice resolved) (reverse before)
+    Spec.assertEqWith s "CR 400.11b and the pool is untouched" (Map.elems (poolOf S.alice resolved)) [2, 1, 1, 1]
+  -- The count is a ceiling on the answer: five named, the first four arrive and
+  -- the fifth card stays out (Event.settleOutside).
+  Spec.it s "CR 400.11c Research brings in no more than four however many she names" $ do
+    (gs, researchId, (signInBlood, miasma, dragon, _), before) <- researchBoard s registry
+    let resolved = S.runPure (researching [0, 0, 1, 2, 3]) gs (castHalf "Research" researchId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 400.11c four cards arrived, in the order named, and the shuffle followed" (printingsIn Zone.Library S.alice resolved) (reverse before <> [signInBlood, signInBlood, miasma, dragon])
+    Spec.assertEqWith s "and the fifth is still outside the game" (Map.elems (poolOf S.alice resolved)) [1]
+
+-- alice with a Forest and an Island, Research // Development in hand -- {G}{U}
+-- pays Research and nothing pays Development --
+-- Goblin Piker and Cancel in her library, and five cards over four printings
+-- outside the game: one more card than "up to four" takes, and two copies of
+-- Sign in Blood. The pool printings are interned in list order, so the offer
+-- lists them Sign in Blood, Psychic Miasma, Hoarding Dragon, Lightning Bolt.
+-- Returns the pool's four printings and the library before the cast, top first.
+researchBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, (Printing.Printing, Printing.Printing, Printing.Printing, Printing.Printing), [Printing.Printing])
+researchBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  island <- S.printingOf s registry "Island"
+  research <- S.printingOf s registry "Research"
+  piker <- S.printingOf s registry "Goblin Piker"
+  cancel <- S.printingOf s registry "Cancel"
+  signInBlood <- S.printingOf s registry "Sign in Blood"
+  miasma <- S.printingOf s registry "Psychic Miasma"
+  dragon <- S.printingOf s registry "Hoarding Dragon"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  let lands = S.landsFor island S.alice 1 (S.landsFor forest S.alice 1 (Setup.emptyGame S.bothPlayers))
+      (board, researchId) = S.handOne research lands
+      (_, withPiker) = S.addLibraryCard piker S.alice board
+      (_, stocked) = S.addLibraryCard cancel S.alice withPiker
+      intern (printing, n) (acc, gs) = let (printingId, gs2) = Game.intern printing gs in (acc <> [(printingId, n)], gs2)
+      (entries, interned) = List.foldl' (flip intern) ([], stocked) [(signInBlood, 2), (miasma, 1), (dragon, 1), (bolt, 1)]
+      stock p = p {Player.outsideTheGame = Map.fromList entries}
+      ready = interned {GameState.players = Map.adjust stock S.alice (GameState.players interned)}
+  pure (ready, researchId, (signInBlood, miasma, dragon, bolt), printingsIn Zone.Library S.alice ready)
+
+-- alice casts one half of a split card by name (CR 709.3), paying from her lands.
+castHalf :: String -> ObjectId.ObjectId -> Game ()
+castHalf half oid = Cast.castSpell S.manaPerformer S.alice oid (CardName.MkCardName (Text.pack half)) Facing.FaceUp
+
+-- Research's two answers: the cards it brings in, named by POSITION in the offer
+-- so one position may be named twice, and a shuffle that reverses whatever it
+-- is offered, which is what makes one visible.
+researching :: [Int] -> Prompt.Prompt r -> r
+researching picks p = case p of
+  Prompt.ChooseFromOutsideTheGame _ _ offered _ _ -> Maybe.mapMaybe (\i -> Maybe.listToMaybe (drop i (NonEmpty.toList offered))) picks
+  Prompt.Shuffle ids -> reverse ids
+  _ -> S.identityAnswer p
 
 -- alice with five untapped lands, a Ring of Ma'rûf on the battlefield, two
 -- library cards of one printing and one card of another outside the game, with
