@@ -1,6 +1,7 @@
 module Pawl.Types.TurnWindow where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Timestamp as Timestamp
 
 -- | CR 603.7a: WHICH TURNS a stored delayed triggered ability may fire on, as the
 -- game remembers it. The runtime counterpart of the printed Pawl.Types.Onset,
@@ -13,15 +14,15 @@ import qualified Numeric.Natural as Natural
 -- whose one caller is a DelayedTrigger's, since a stored entry has to survive the
 -- trip.
 --
--- The three arms are one LIFE CYCLE rather than three independent choices, and
--- it only ever narrows: AnyTurn stands still, and an onset-gated entry goes
--- ControllersNextTurn -> OnTurn n -> gone. Pawl.Engine.Event is the only engine
--- module that may case on this type, the standing Pawl.Engine.Expiry has over
--- Expiry; Pawl.Engine.Engine.beginTurnOf asks it for the transitions at the one
--- moment they can happen.
+-- The arms are one LIFE CYCLE rather than independent choices, and it only
+-- ever narrows: AnyTurn stands still, and an onset-gated entry goes
+-- ControllersNextTurn or OnExtraTurn -> OnTurn n -> gone. Pawl.Engine.Event is
+-- the only engine module that may case on this type, the standing
+-- Pawl.Engine.Expiry has over Expiry; Pawl.Engine.Engine.beginTurn asks it for
+-- the transitions at the one moment they can happen.
 data TurnWindow
   = -- | Onset.Immediately: no turn restriction at all, which is CR 603.7a's floor
-    -- and every delayed ability in the pool but Meandering Towershell's. The
+    -- and the common case. The
     -- floor itself is the event scan's watermark, not this type's business.
     AnyTurn
   | -- | Onset.FromYourNextTurn, before that turn has arrived: the entry watches
@@ -61,4 +62,9 @@ data TurnWindow
     -- comparison forever: it can no longer fire, and CR 603.7b's one shot is not
     -- the only way an entry can end.
     OnTurn Natural.Natural
+  | -- | Onset.FromThatExtraTurn before that turn has begun: waiting for the
+    -- extra turn whose ExtraTurn.createdAt this is, and settled to OnTurn as it
+    -- begins. Dropped once that turn is no longer pending without having begun
+    -- (CR 800.4k).
+    OnExtraTurn Timestamp.Timestamp
   deriving (Eq, Ord, Show)

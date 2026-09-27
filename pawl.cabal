@@ -595,6 +595,8 @@ library codec
     Pawl.Codec.Hybrid
     Pawl.Codec.HybridPhyrexian
     Pawl.Codec.HybridSpec
+    Pawl.Codec.IfTaken
+    Pawl.Codec.IfTakenSpec
     Pawl.Codec.IgnoredAbility
     Pawl.Codec.IgnoredAbilitySpec
     Pawl.Codec.Impending
@@ -1960,6 +1962,7 @@ library types
     Pawl.Types.Hybrid
     Pawl.Types.HybridPayment
     Pawl.Types.HybridPhyrexian
+    Pawl.Types.IfTaken
     Pawl.Types.IgnoredAbility
     Pawl.Types.Impending
     Pawl.Types.IncreaseActivationCost

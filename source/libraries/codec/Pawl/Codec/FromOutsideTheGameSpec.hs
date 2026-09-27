@@ -17,25 +17,29 @@ spec s = Spec.describe s "Pawl.Codec.FromOutsideTheGame" $ do
       s
       FromOutsideTheGame.codec
       ( FromOutsideTheGame.MkFromOutsideTheGame
-          { FromOutsideTheGame.destination = OutsideDestination.Hand,
+          { FromOutsideTheGame.count = 1,
+            FromOutsideTheGame.upTo = False,
+            FromOutsideTheGame.destination = OutsideDestination.Hand,
             FromOutsideTheGame.filter = Filter.HasCardType CardType.Sorcery,
             FromOutsideTheGame.reveal = True
           }
       )
-      " {\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}},\"reveal\":true} "
-  -- The Raven's Warning's shape, and the pair is the point: all three fields
-  -- differ from the case above, so a dropped reveal, a dropped filter and a
-  -- dropped destination alike fail to round-trip. The empty And is CR 400.11c's
+      " {\"count\":1,\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}},\"reveal\":true,\"upTo\":false} "
+  -- Research's shape, and the pair is the point: every field differs from the
+  -- case above, so a dropped count, upTo, reveal, filter or destination alike
+  -- fails to round-trip. The empty And is CR 400.11c's
   -- "a card you own from outside the game" -- a quality that card does not state
   -- either, which admits everything.
-  Spec.it s "MkFromOutsideTheGame, no reveal, no stated quality, and a library destination" $
+  Spec.it s "MkFromOutsideTheGame, up to four, no reveal, no stated quality, and a shuffled library" $
     Common.assertCodec
       s
       FromOutsideTheGame.codec
       ( FromOutsideTheGame.MkFromOutsideTheGame
-          { FromOutsideTheGame.destination = OutsideDestination.LibraryTop,
+          { FromOutsideTheGame.count = 4,
+            FromOutsideTheGame.upTo = True,
+            FromOutsideTheGame.destination = OutsideDestination.LibraryShuffled,
             FromOutsideTheGame.filter = Filter.And [],
             FromOutsideTheGame.reveal = False
           }
       )
-      " {\"destination\":{\"type\":\"LibraryTop\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false} "
+      " {\"count\":4,\"destination\":{\"type\":\"LibraryShuffled\"},\"filter\":{\"type\":\"And\",\"value\":[]},\"reveal\":false,\"upTo\":true} "

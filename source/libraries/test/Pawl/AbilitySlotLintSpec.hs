@@ -419,6 +419,9 @@ discardsSelfAsCost =
 -- would silently narrow to the controller's turn, so its text would mean
 -- something the card does not say. That is what this rejects.
 --
+-- Onset.FromThatExtraTurn is held to the same pairing: "that turn" is an extra
+-- turn the controller takes (Final Fortune), so its step is theirs.
+--
 -- A dangling name (an onset naming an ability the card does not declare) is
 -- ALSO an offence here, and deliberately not silently accepted: the neighbouring
 -- "every armed delayed ability is declared" lint is what reports it precisely,

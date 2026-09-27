@@ -126,6 +126,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
@@ -1286,38 +1287,40 @@ eligible predicate source pid gs =
           )
    in fromPool <> fromOuter
 
--- CR 400.11c: put a card this player owns from outside the game matching the
--- Filter where the payload's destination says (CR 400.11b), showing it first
--- (CR 701.20a) where the payload's reveal says the card prints one -- Burning
--- Wish's sentence, Death Wish's without the reveal, and The Raven's Warning's
--- naming the top of a library instead of the hand.
+-- CR 400.11c: put cards this player owns from outside the game matching the
+-- Filter where the payload's destination says (CR 400.11b), as many as its
+-- count allows, showing each (CR 701.20a) where the payload's reveal says the
+-- card prints one -- Burning Wish's sentence, Death Wish's without the reveal,
+-- The Raven's Warning's naming the top of a library instead of the hand, and
+-- Research's "up to four" shuffled into the library.
 --
--- The card is MINTED, Pawl.Engine.Dungeon.enter's road: outside the game is not
--- a zone (CR 400.11), so no object stood for the card and its arrival
--- is not a zone change. `mintCard` above is where that happens, and its haddock
--- says why the insertion does not go through `changeZone`.
+-- The cards are MINTED, Pawl.Engine.Dungeon.enter's road: outside the game is
+-- not a zone (CR 400.11), so no object stood for a card and its arrival is not
+-- a zone change. `mintCard` above is where that happens, and its haddock says
+-- why the insertion does not go through `changeZone`.
 --
 -- The pool is SPENT, unlike Pawl.Engine.Dungeon.enter's supply: CR 400.11b keeps
 -- a card brought in "in the game until the game ends", so a second Burning Wish
 -- cannot find the same copy. A second COPY of the same printing survives the
 -- decrement, which is why Player.outsideTheGame counts rather than remembering a
--- set.
+-- set -- and why one answer may name one printing once per copy.
 --
 -- CHOSEN, not targeted (CR 115.10a): CR 601.2c would have announced a target as
 -- the spell was cast, and CR 400.11c lets nothing target a card out there.
--- FILTERED, NOT TRUSTED, Pawl.Engine.Dungeon.enter's posture: an answer naming a
--- printing this player does not own out there, or one the Filter does not admit,
--- falls back to the first offered.
+-- FILTERED, NOT TRUSTED, Pawl.Engine.Dungeon.enter's posture: see `settleOutside`.
+-- Every card is chosen before any moves, so the cards arrive together as the
+-- one instruction prints them.
+--
+-- Not asked where the answer is forced: a count that takes every copy on offer,
+-- or offers of one printing alone, whose copies are indistinguishable. An "up
+-- to" is always asked, since how many is itself the choice.
 --
 -- A player with no eligible card reveals nothing and puts nothing anywhere,
 -- which is CR 609.3's "if an effect attempts to do something impossible,
 -- it does only as much as possible" -- and is why
--- this returns unit rather than the id: nothing about Burning Wish's sentence
--- reads the card back.
---
--- Not implemented: a count other than one, every printing that names a larger
--- one wanting something else the opcode cannot say -- Research's shuffle and
--- Turtles Forever's search of a library and the pool together (gap #2449).
+-- this returns unit rather than the ids: nothing about Burning Wish's sentence
+-- reads the card back. The library a destination shuffles is shuffled all the
+-- same (CR 701.24d).
 --
 -- Not implemented: where the reveal is printed it happens as the card ARRIVES at
 -- its destination rather than before the move as the card prints it (#2450).
@@ -1329,28 +1332,52 @@ bringInto payload source pid = do
       -- CR 701.20a is a keyword action of its own, so a card that does not print
       -- it moves the card and shows nobody anything.
       showIt oid = Monad.when (FromOutsideTheGame.reveal payload) (reveal RevealCause.Ordinary pid oid)
-  case NonEmpty.nonEmpty (eligible predicate source pid gs0) of
-    Nothing -> pure ()
-    Just offered -> do
-      chosen <- case offered of
-        only NonEmpty.:| [] -> pure only
-        first NonEmpty.:| _ -> do
-          answer <- Game.choose (Prompt.ChooseFromOutsideTheGame (Decide.deciderFor pid gs0) pid offered)
-          pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-      -- Against the LIVE state and not gs0, Pawl.Engine.Dungeon.enter's care:
-      -- Game.choose above wrote the answer into the transcript, and minting off
-      -- the state from before the prompt would drop that.
-      case chosen of
-        OutsideCard.InPool printingId -> do
-          oid <- State.state (bringIn arrival pid printingId)
+      offered = eligible predicate source pid gs0
+      pool = maybe Map.empty Player.outsideTheGame (Map.lookup pid (GameState.players gs0))
+      copiesOf card = case card of
+        OutsideCard.InPool printingId -> Map.findWithDefault 0 printingId pool
+        OutsideCard.InAnotherGame _ -> 1
+      available = Map.fromList (fmap (\card -> (card, copiesOf card)) offered)
+      atMost = min (FromOutsideTheGame.count payload) (sum (Map.elems available))
+      atLeast = if FromOutsideTheGame.upTo payload then 0 else atMost
+  chosen <- case NonEmpty.nonEmpty offered of
+    Nothing -> pure []
+    Just candidates
+      | atLeast == atMost && (atMost == 0 || atMost == sum (Map.elems available) || Map.size available == 1) ->
+          pure (settleOutside available atLeast atMost [])
+      | otherwise -> do
+          answer <- Game.choose (Prompt.ChooseFromOutsideTheGame (Decide.deciderFor pid gs0) pid candidates atLeast atMost)
+          pure (settleOutside available atLeast atMost answer)
+  -- Against the LIVE state and not gs0, Pawl.Engine.Dungeon.enter's care:
+  -- Game.choose above wrote the answer into the transcript, and minting off
+  -- the state from before the prompt would drop that.
+  Monad.forM_ chosen $ \card -> case card of
+    OutsideCard.InPool printingId -> do
+      oid <- State.state (bringIn arrival pid printingId)
+      showIt oid
+    OutsideCard.InAnotherGame outerId -> do
+      gs1 <- State.get
+      case bringInFrom arrival pid outerId gs1 of
+        (Nothing, _) -> pure ()
+        (Just oid, gs2) -> do
+          State.put gs2
           showIt oid
-        OutsideCard.InAnotherGame outerId -> do
-          gs1 <- State.get
-          case bringInFrom arrival pid outerId gs1 of
-            (Nothing, _) -> pure ()
-            (Just oid, gs2) -> do
-              State.put gs2
-              showIt oid
+  Monad.when (arrivalShuffles arrival) (shuffleLibrary pid)
+
+-- CR 400.11c: the cards an answer to Prompt.ChooseFromOutsideTheGame brings in,
+-- FILTERED against what was offered. A name the offer did not hold, or one past
+-- its copies, is dropped; past the count, ignored; and an answer naming fewer
+-- than the least the instruction must bring is topped up from the first offered.
+settleOutside :: Map OutsideCard.OutsideCard Natural -> Natural -> Natural -> [OutsideCard.OutsideCard] -> [OutsideCard.OutsideCard]
+settleOutside available atLeast atMost answer =
+  let step (taken, left) card
+        | List.genericLength taken >= atMost = (taken, left)
+        | Map.findWithDefault 0 card left > 0 = (taken <> [card], Map.adjust (subtract 1) card left)
+        | otherwise = (taken, left)
+      (named, rest) = List.foldl' step ([], available) answer
+      spare = concatMap (\(card, n) -> List.genericReplicate n card) (Map.toAscList rest)
+      shortfall = atLeast - min atLeast (List.genericLength named)
+   in named <> List.genericTake shortfall spare
 
 -- CR 400.11b: the zone, and the end of it, an OutsideDestination names. The one
 -- place either road into the game reads that field, so a destination cannot mean
@@ -1362,6 +1389,16 @@ arrivalOf :: OutsideDestination.OutsideDestination -> (Zone.Zone, LibraryPositio
 arrivalOf destination = case destination of
   OutsideDestination.Hand -> (Zone.Hand, LibraryPosition.defaultValue)
   OutsideDestination.LibraryTop -> (Zone.Library, LibraryPosition.Top)
+  -- Any end: the shuffle `arrivalShuffles` asks for follows.
+  OutsideDestination.LibraryShuffled -> (Zone.Library, LibraryPosition.Top)
+
+-- CR 701.24a: whether a destination shuffles the library once the cards are in
+-- -- Research's "shuffle ... into your library".
+arrivalShuffles :: OutsideDestination.OutsideDestination -> Bool
+arrivalShuffles destination = case destination of
+  OutsideDestination.Hand -> False
+  OutsideDestination.LibraryTop -> False
+  OutsideDestination.LibraryShuffled -> True
 
 -- CR 400.11b: take one copy of this printing out of the player's pool and mint
 -- the card where the destination says. Split out from `bringInto` above because
@@ -8509,36 +8546,47 @@ controllerTurnScoped cond = case cond of
 -- for CR 702.109a's, CR 702.152a's and CR 702.185a's spell, and by
 -- Pawl.Engine.Combat for CR 702.154a's reflexive ability at rule 508.1g.
 armDelayed :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> ObjectId -> PlayerId -> Map.Map SlotName.SlotName Binding.Type.Binding -> Onset -> Maybe Expiry.Type.Expiry -> GameState -> GameState
-armDelayed ability source controller captured onset expiry gs =
-  let -- CR 603.7a's creation moment, from the same counter every other moment
-      -- comes from, so CR 701.27f can compare it against Object.turnedOverAt.
-      -- Minted here rather than reusing the resolving object's stamp: one
-      -- resolution can arm several entries, and each is created as its own
-      -- opcode runs.
-      (createdAt, gs1) = Game.freshTimestamp gs
-      entry =
-        DelayedTrigger.MkDelayedTrigger
-          { DelayedTrigger.ability = ability,
-            DelayedTrigger.source = source,
-            DelayedTrigger.controller = controller,
-            DelayedTrigger.bindings = captured,
-            DelayedTrigger.window = armOnset onset,
-            DelayedTrigger.expiry = expiry,
-            DelayedTrigger.createdAt = createdAt
-          }
-   in gs1 {GameState.delayedTriggers = GameState.delayedTriggers gs1 Seq.|> entry}
+armDelayed ability source controller captured onset expiry gs = case armOnset source controller gs onset of
+  -- "That turn" names no turn this resolution created, so the ability could
+  -- never fire (CR 603.7a).
+  Nothing -> gs
+  Just window ->
+    let -- CR 603.7a's creation moment, from the same counter every other moment
+        -- comes from, so CR 701.27f can compare it against Object.turnedOverAt.
+        -- Minted here rather than reusing the resolving object's stamp: one
+        -- resolution can arm several entries, and each is created as its own
+        -- opcode runs.
+        (createdAt, gs1) = Game.freshTimestamp gs
+        entry =
+          DelayedTrigger.MkDelayedTrigger
+            { DelayedTrigger.ability = ability,
+              DelayedTrigger.source = source,
+              DelayedTrigger.controller = controller,
+              DelayedTrigger.bindings = captured,
+              DelayedTrigger.window = window,
+              DelayedTrigger.expiry = expiry,
+              DelayedTrigger.createdAt = createdAt
+            }
+     in gs1 {GameState.delayedTriggers = GameState.delayedTriggers gs1 Seq.|> entry}
 
 -- CR 603.7a: the printed Onset as the game first stores it. The delayed-trigger
--- twin of Expiry.arm, deliberately blind to the board -- unlike a duration, an
--- onset has nothing to bake in when the ability is created, "your next turn" being
--- a boundary that has not happened yet. settleOnsets supplies the number.
-armOnset :: Onset -> TurnWindow
-armOnset onset = case onset of
-  Onset.Immediately -> TurnWindow.AnyTurn
-  Onset.FromYourNextTurn -> TurnWindow.ControllersNextTurn
+-- twin of Expiry.arm. "Your next turn" is a boundary that has not happened yet,
+-- so settleOnsets supplies its number later.
+--
+-- CR 500.7: "that turn" is the extra turn this resolution just created for the
+-- controller, the most recently created entry from this source that the
+-- controller takes. Nothing when there is none, as when the controller named
+-- by the extra-turn clause was not the one taking it.
+armOnset :: ObjectId -> PlayerId -> GameState -> Onset -> Maybe TurnWindow
+armOnset source controller gs onset = case onset of
+  Onset.Immediately -> Just TurnWindow.AnyTurn
+  Onset.FromYourNextTurn -> Just TurnWindow.ControllersNextTurn
+  Onset.FromThatExtraTurn ->
+    let created turn = ExtraTurn.source turn == source && Turn.sharesTurn gs controller (ExtraTurn.taker turn)
+     in fmap (TurnWindow.OnExtraTurn . ExtraTurn.createdAt) (List.find created (GameState.extraTurns gs))
 
 -- CR 603.7a: a turn has BEGUN, so settle every delayed entry waiting for one and
--- drop every entry whose turn is now over. Engine.beginTurnOf calls this once the
+-- drop every entry whose turn is now over. Engine.beginTurn calls this once the
 -- new turn's number and active player are in place, and only for a turn that
 -- actually begins -- CR 614.10a read on the turn axis, so CR 800.4k's turn a
 -- departed seat never begins is walked past without settling anything.
@@ -8564,8 +8612,12 @@ armOnset onset = case onset of
 -- triggering still ends them in delayedPending. An entry with a stated duration is
 -- dropped here too, and rightly: a duration keeps an ability armed for its event's
 -- next occurrence, not for a turn its printed text never named.
-settleOnsets :: GameState -> GameState
-settleOnsets gs =
+--
+-- `begun` is the ExtraTurn.createdAt of the extra turn beginning, if this is
+-- one: an entry waiting for THAT turn settles here, and one waiting for an extra
+-- turn no longer pending is dropped, CR 800.4k having spent it unbegun.
+settleOnsets :: Maybe Timestamp.Timestamp -> GameState -> GameState
+settleOnsets begun gs =
   let settled entry = case DelayedTrigger.window entry of
         -- The turn that is beginning IS the one the printed phrase named exactly
         -- when it belongs to the entry's controller (CR 603.7d-f).
@@ -8574,12 +8626,19 @@ settleOnsets gs =
               entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
         -- Anyone else's turn, including an intervening opponent's: still waiting.
         TurnWindow.ControllersNextTurn -> entry
+        -- CR 500.7: the extra turn the entry names, and no other, including
+        -- another extra turn created after it and so taken first.
+        TurnWindow.OnExtraTurn stamp
+          | Just stamp == begun ->
+              entry {DelayedTrigger.window = TurnWindow.OnTurn (GameState.turnNumber gs)}
+        TurnWindow.OnExtraTurn _ -> entry
         TurnWindow.AnyTurn -> entry
         -- Already settled, and this is a later turn -- `live` is what ends it.
         TurnWindow.OnTurn _ -> entry
       live entry = case DelayedTrigger.window entry of
         TurnWindow.AnyTurn -> True
         TurnWindow.ControllersNextTurn -> True
+        TurnWindow.OnExtraTurn stamp -> any ((== stamp) . ExtraTurn.createdAt) (GameState.extraTurns gs)
         TurnWindow.OnTurn n -> n >= GameState.turnNumber gs
    in gs {GameState.delayedTriggers = Seq.filter live (fmap settled (GameState.delayedTriggers gs))}
 

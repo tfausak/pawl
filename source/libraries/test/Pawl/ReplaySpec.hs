@@ -1263,21 +1263,21 @@ combatReplaySpec s =
           -- CR 103.2b again: with nothing recorded, nobody reveals -- an absent
           -- transcript must not make a choice for a player.
           Spec.assertEqWith s "a short transcript reveals nothing" (Replay.defaultAnswer p) Nothing
-        -- CR 400.11c: which card a wish brought in from outside the game is a
+        -- CR 400.11c: which cards a wish brought in from outside the game is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseFromOutsideTheGame round-trips through the transcript" $ do
           let a = OutsideCard.InPool (PrintingId.MkPrintingId 7)
               b = OutsideCard.InAnotherGame (ObjectId.MkObjectId 9)
-              p = Prompt.ChooseFromOutsideTheGame decider S.alice (a NonEmpty.:| [b])
-          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
-          Spec.assertEqWith s "choosing the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+              p = Prompt.ChooseFromOutsideTheGame decider S.alice (a NonEmpty.:| [b]) 1 2
+          Spec.assertEqWith s "choosing the second round trips" (Replay.decode p (Replay.encode p [b])) (Just [b])
+          Spec.assertEqWith s "choosing both round trips" (Replay.decode p (Replay.encode p [a, b])) (Just [a, b])
           -- Discriminating: fails if the prompt reuses Response.ChoseDungeon
           -- rather than getting its own constructor. The two are no longer even
           -- the same SHAPE now that this one answers with an OutsideCard rather
           -- than a bare PrintingId, but nothing but a distinct constructor keeps a
           -- transcript of one from replaying as the other.
           Spec.assertEqWith s "a dungeon choice does not decode as this one" (Replay.decode p (Response.ChoseDungeon (PrintingId.MkPrintingId 7))) Nothing
-          Spec.assertEqWith s "a short transcript brings in the first offered" (Replay.defaultAnswer p) a
+          Spec.assertEqWith s "a short transcript brings in the fewest allowed, from the front of the offer" (Replay.defaultAnswer p) [a]
         -- CR 601.3 / 709.3 / 712.11b / 715.3: which cast a player chose to make
         -- off an offer is a decision, so it has to survive a transcript like any
         -- other.

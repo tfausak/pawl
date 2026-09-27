@@ -53,6 +53,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.IfTaken as IfTaken
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Mode as Mode
@@ -845,13 +846,17 @@ recordAbilityResolution obj = case Object.source obj of
 -- Off the fold's record of what ran, so the answer is the one the named clause's
 -- own riders gave (Clause.ifTaken says why that rather than the board), and a
 -- name the fold has not reached -- a later clause, or one that does not exist --
--- is False. ANY of the names is enough, which is what Worms of the Earth's "if a
--- player does either" prints over the two halves of an either-or pair. Asked
+-- has not run. ANY of the names is enough, which is what Worms of the Earth's "if
+-- a player does either" prints over the two halves of an either-or pair; the
+-- negative, Browbeat's "if no one does", holds when NONE of them ran. Asked
 -- BEFORE the other three, so a skipped clause raises no prompt.
 --
 -- A pure function rather than a Game action: it reads nothing but the fold.
 ifTakenHolds :: Set ClauseIndex -> Clause.Clause Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
-ifTakenHolds ran clause = maybe True (any (`Set.member` ran)) (Clause.ifTaken clause)
+ifTakenHolds ran clause = case Clause.ifTaken clause of
+  Nothing -> True
+  Just (IfTaken.AnyTaken names) -> any (`Set.member` ran) names
+  Just (IfTaken.NoneTaken names) -> not (any (`Set.member` ran) names)
 
 -- The other end of the same fold: a clause's ordinal is recorded exactly when
 -- its instructions ran, which is what CR 608.2c's "If you do" asks about. One

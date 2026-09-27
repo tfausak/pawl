@@ -5,6 +5,7 @@ module Pawl.Codec.ExtraTurn where
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerId as PlayerId
+import qualified Pawl.Codec.Timestamp as Timestamp
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -17,9 +18,11 @@ codec = Fields.object $ do
   taker <- Fields.required "taker" PlayerId.codec ExtraTurn.taker
   source <- Fields.required "source" ObjectId.codec ExtraTurn.source
   skipped <- Fields.required "skipped" (Common.set PhaseSelector.codec) ExtraTurn.skipped
+  createdAt <- Fields.required "createdAt" Timestamp.codec ExtraTurn.createdAt
   pure
     ExtraTurn.MkExtraTurn
       { ExtraTurn.taker = taker,
         ExtraTurn.source = source,
-        ExtraTurn.skipped = skipped
+        ExtraTurn.skipped = skipped,
+        ExtraTurn.createdAt = createdAt
       }

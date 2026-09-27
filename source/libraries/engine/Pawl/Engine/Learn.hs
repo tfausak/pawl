@@ -47,7 +47,9 @@ import qualified Pawl.Types.Zone as Zone
 lessonFromOutside :: FromOutsideTheGame.FromOutsideTheGame
 lessonFromOutside =
   FromOutsideTheGame.MkFromOutsideTheGame
-    { FromOutsideTheGame.destination = OutsideDestination.Hand,
+    { FromOutsideTheGame.count = 1,
+      FromOutsideTheGame.upTo = False,
+      FromOutsideTheGame.destination = OutsideDestination.Hand,
       FromOutsideTheGame.filter = Filter.HasSubtype Subtype.Lesson :: Filter.Filter Keyword.Keyword,
       FromOutsideTheGame.reveal = True
     }

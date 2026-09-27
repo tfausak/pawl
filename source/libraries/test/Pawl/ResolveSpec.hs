@@ -22,6 +22,7 @@ import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
@@ -1102,6 +1103,78 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library still holds all three Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
     Spec.assertEqWith s "the control: the mandatory first clause still happened, so bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
+  -- CR 608.2c's negative, "if no one does": Browbeat ({2}{R} Sorcery, "Any
+  -- player may have Browbeat deal 5 damage to them. If no one does, target
+  -- player draws three cards."; api.scryfall.com 2026-09-27) at carol, off one
+  -- three-seat board twice, differing in bob's answer alone. The draw is
+  -- Clause.ifTaken's NoneTaken over the "may" clause, asked of every seat in
+  -- APNAP order (CR 101.4).
+  Spec.it s "CR 608.2c Browbeat's draw is skipped when a player takes the damage" $ do
+    (gs, spellId) <- browbeatBoard s registry
+    let after = S.runPure (browbeatAnswer [S.bob]) gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2c bob took the 5, so carol drew nothing" (namesIn Zone.Hand S.carol after) []
+    Spec.assertEqWith s "bob is at 15" (S.lifeOf S.bob after) (Just 15)
+    Spec.assertEqWith s "and the seats that declined were dealt nothing" (S.lifeOf S.alice after, S.lifeOf S.carol after) (Just 20, Just 20)
+  Spec.it s "CR 608.2c Browbeat's target draws three when no player takes the damage" $ do
+    (gs, spellId) <- browbeatBoard s registry
+    let after = S.runPure (browbeatAnswer []) gs (S.cast S.alice spellId >> Stack.resolveTop)
+        piker = Just (CardName.MkCardName (Text.pack "Goblin Piker"))
+    Spec.assertEqWith s "CR 608.2c no one took it, so carol drew three" (namesIn Zone.Hand S.carol after) [piker, piker, piker]
+    Spec.assertEqWith s "and nobody was dealt damage" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
+  -- Breaking Point ({1}{R}{R} Sorcery, "Any player may have Breaking Point deal
+  -- 6 damage to them. If no one does, destroy all creatures. Creatures
+  -- destroyed this way can't be regenerated."; api.scryfall.com 2026-09-27):
+  -- Browbeat's shape over an untargeted sweep, as a pair differing in carol's
+  -- answer alone.
+  Spec.it s "CR 608.2c Breaking Point destroys every creature when no player takes the damage" $ do
+    (gs, spellId, pikerId) <- breakingPointBoard s registry
+    let after = S.runPure (browbeatAnswer []) gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2c no one took it, so bob's Piker left the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 0
+    Spec.assertEqWith s "and it is in his graveyard" (namesIn Zone.Graveyard S.bob after) [Just (CardName.MkCardName (Text.pack "Goblin Piker"))]
+    Spec.assertEqWith s "setup: the Piker was on the battlefield before" (Maybe.isJust (Game.lookupObject pikerId gs)) True
+    Spec.assertEqWith s "and nobody was dealt damage" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
+  Spec.it s "CR 608.2c Breaking Point destroys nothing when a player takes the damage" $ do
+    (gs, spellId, _) <- breakingPointBoard s registry
+    let after = S.runPure (browbeatAnswer [S.carol]) gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2c carol took the 6, so bob's Piker survives" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 1
+    Spec.assertEqWith s "carol is at 14" (S.lifeOf S.carol after) (Just 14)
+  -- Distant Memories ({2}{U}{U} Sorcery, "Search your library for a card, exile
+  -- it, then shuffle. Any opponent may have you put that card into your hand. If
+  -- no player does, you draw three cards."; api.scryfall.com 2026-09-27): the
+  -- "may" is the opponents', its instruction acts on the card the search bound,
+  -- and the draw is alice's. alice takes every "may" put to her, so an offer
+  -- made to her -- no opponent -- would show as a missing draw.
+  Spec.it s "CR 608.2c Distant Memories puts the exiled card into her hand when an opponent lets her" $ do
+    (gs, spellId, cancelId) <- distantMemoriesBoard s registry
+    let after = S.runPure (distantMemoriesAnswer cancelId [S.alice, S.bob]) gs (S.cast S.alice spellId >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 608.2c bob let her, so Cancel is in her hand and she drew nothing" (namesIn Zone.Hand S.alice after) [Just (CardName.MkCardName (Text.pack "Cancel"))]
+    Spec.assertEqWith s "and her exile is empty" (namesIn Zone.Exile S.alice after) []
+  Spec.it s "CR 608.2c Distant Memories draws three when no opponent lets her have the card" $ do
+    (gs, spellId, cancelId) <- distantMemoriesBoard s registry
+    let after = S.runPure (distantMemoriesAnswer cancelId [S.alice]) gs (S.cast S.alice spellId >> Stack.resolveTop)
+        piker = Just (CardName.MkCardName (Text.pack "Goblin Piker"))
+    Spec.assertEqWith s "CR 608.2c no opponent did, so she drew three" (namesIn Zone.Hand S.alice after) [piker, piker, piker]
+    Spec.assertEqWith s "and Cancel stays exiled" (namesIn Zone.Exile S.alice after) [Just (CardName.MkCardName (Text.pack "Cancel"))]
+  -- The same negative through CR 118.12a: Development ({3}{U}{R} Instant, the
+  -- right half of Research // Development: "Create a 3/1 red Elemental creature
+  -- token unless any opponent has you draw a card. Repeat this process two more
+  -- times."; card_faces at api.scryfall.com 2026-09-27) reads as three pairs of
+  -- "any opponent may have you draw a card. If no one does, create the token."
+  -- Carol takes the first offer, bob the second, nobody the third, so one token
+  -- and two cards -- the Scryfall ruling's "a different opponent may let you draw
+  -- a card each time". alice takes every "may" put to her: she is no opponent,
+  -- so an offer made to her would show as a third draw.
+  Spec.it s "CR 118.12a Development makes a token only for the offer no opponent took" $ do
+    (gs, spellId) <- developmentBoard s registry
+    let takes pid cIdx = pid == S.alice || (pid, cIdx) `elem` [(S.carol, ClauseIndex.MkClauseIndex 0), (S.bob, ClauseIndex.MkClauseIndex 2)]
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseOptional _ pid _ _ cIdx -> if takes pid cIdx then OptionalDecision.Exercises else OptionalDecision.Declines
+          _ -> S.identityAnswer p
+        after = S.runPure answer gs (Cast.castSpell S.manaPerformer S.alice spellId (CardName.MkCardName (Text.pack "Development")) Facing.FaceUp >> Stack.resolveTop)
+        piker = Just (CardName.MkCardName (Text.pack "Goblin Piker"))
+    Spec.assertEqWith s "CR 118.12a one Elemental, for the third offer" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Elemental Token")) S.alice after) 1
+    Spec.assertEqWith s "and alice drew one card for each offer taken" (namesIn Zone.Hand S.alice after) [piker, piker]
   -- CR 608.2d, one opcode over: Excavating Anurid -- "When
   -- this creature enters, you may sacrifice a land. If you do, draw a card." --
   -- entering under a controller who controls no land. Two boards differing in
@@ -3422,6 +3495,70 @@ emptyHandedTweezeBoard s registry = do
   let (base, tweezeId) = S.handOne tweeze (S.landsInPlay mountain 3)
       stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) base [1 :: Int .. 3]
   pure (stocked, tweezeId)
+
+-- Three seats and three Mountains for Browbeat's {2}{R}, with three Goblin
+-- Pikers in carol's library so her draw is visible by name.
+browbeatBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+browbeatBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  browbeat <- S.printingOf s registry "Browbeat"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let lands = S.landsFor mountain S.alice 3 S.threePlayerGame
+      stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.carol gs)) lands [1 :: Int .. 3]
+  pure (S.handOne browbeat stocked)
+
+-- Browbeat aimed at carol by FILTERING the offer, and its "may" taken by the
+-- seats named and declined by the rest.
+browbeatAnswer :: [PlayerId.PlayerId] -> Prompt.Prompt r -> r
+browbeatAnswer takers p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.carol) sets
+  Prompt.ChooseOptional _ pid _ _ _ -> if pid `elem` takers then OptionalDecision.Exercises else OptionalDecision.Declines
+  _ -> S.identityAnswer p
+
+-- Three seats, three Mountains for Breaking Point's {1}{R}{R}, and a Goblin
+-- Piker of bob's for the sweep to find.
+breakingPointBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+breakingPointBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  breaking <- S.printingOf s registry "Breaking Point"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (pikerId, withPiker) = S.addPermanent piker S.bob (S.landsFor mountain S.alice 3 S.threePlayerGame)
+      (gs, spellId) = S.handOne breaking withPiker
+  pure (gs, spellId, pikerId)
+
+-- Three seats and four Islands for Distant Memories' {2}{U}{U}; alice's library
+-- holds a Cancel for the search and four Goblin Pikers for the draw.
+distantMemoriesBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+distantMemoriesBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  memories <- S.printingOf s registry "Distant Memories"
+  cancel <- S.printingOf s registry "Cancel"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let lands = S.landsFor island S.alice 4 S.threePlayerGame
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) lands [1 :: Int .. 4]
+      (cancelId, withCancel) = S.addLibraryCard cancel S.alice stocked
+      (gs, spellId) = S.handOne memories withCancel
+  pure (gs, spellId, cancelId)
+
+-- The search pinned to Cancel by id, and the "may" taken by the seats named.
+distantMemoriesAnswer :: ObjectId.ObjectId -> [PlayerId.PlayerId] -> Prompt.Prompt r -> r
+distantMemoriesAnswer wanted takers p = case p of
+  Prompt.Search _ _ matches _ -> filter (== wanted) matches
+  Prompt.ChooseOptional _ pid _ _ _ -> if pid `elem` takers then OptionalDecision.Exercises else OptionalDecision.Declines
+  _ -> S.identityAnswer p
+
+-- Three seats; an Island and four Mountains pay Development's {3}{U}{R}. Four
+-- Goblin Pikers in alice's
+-- library, so every draw is visible and CR 104.3c cannot end the game first.
+developmentBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
+developmentBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  card <- S.printingOf s registry "Research"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let lands = S.landsFor island S.alice 1 (S.landsFor mountain S.alice 4 S.threePlayerGame)
+      stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) lands [1 :: Int .. 4]
+  pure (S.handOne card stocked)
 
 -- One resolution of that board. The only thing the two cases vary is CR 603.5's
 -- answer, so the discard is pinned by id and the damage by seat.

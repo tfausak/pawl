@@ -98,6 +98,7 @@ import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.IfTaken as IfTaken
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.InZone as InZone
 import Pawl.Types.Keyword (Keyword)
@@ -8426,7 +8427,7 @@ demonstrate =
           (Seq.singleton (copyBy CopyStackObject.defaultCopier))
       theirs =
         Clause.MkClause
-          (Just (NonEmpty.singleton (ClauseIndex.MkClauseIndex 0)))
+          (Just (IfTaken.AnyTaken (NonEmpty.singleton (ClauseIndex.MkClauseIndex 0))))
           Nothing
           Nothing
           Optionality.Mandatory
