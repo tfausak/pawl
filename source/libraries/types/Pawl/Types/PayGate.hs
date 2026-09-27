@@ -73,7 +73,7 @@ data PayGate = MkPayGate
     --
     -- An {X} in it IS resolved, which is a different rule: CR 118.4 sends X to
     -- CR 107.3a, whose value is the one the object's controller announced at
-    -- CR 601.2b. Clash of Wills' is {X}; Pawl.Engine.Resolve.announcedXOn is
+    -- CR 601.2b. Clash of Wills' is {X}; Pawl.Engine.Resolve.Effect.announcedXOn is
     -- where it is substituted in.
     cost :: Cost.Cost Keyword.Keyword,
     -- | CR 118.6's other kind of cost: one the card DESCRIBES in terms of
@@ -131,7 +131,7 @@ data PayGate = MkPayGate
     -- descent already does.
     --
     -- Evaluated against the RESOLUTION and not against the payer
-    -- (Pawl.Engine.Resolve.payGatePaidBy): CR 109.5 makes Rakshasa's Disdain's
+    -- (Pawl.Engine.Resolve.Effect.payGatePaidBy): CR 109.5 makes Rakshasa's Disdain's
     -- "your graveyard" the countering spell's controller's, while its payer is
     -- the targeted spell's controller.
     perEach :: Maybe Quantity.Quantity,

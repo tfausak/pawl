@@ -1,10 +1,13 @@
 module Pawl.Types.ManaAbilityPerformer where
 
+import qualified Data.Map.Strict as Map
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Game as Game
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PlayerId as PlayerId
 
@@ -26,10 +29,11 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- and one would silently drop the damage Ancient Tomb charges for its mana at
 -- whichever call site forgot it.
 --
--- A RECORD of two functions rather than one, so that CR 605.4a's triggered mana
--- ability rides the same injection: the payment path applies that one too, and
--- it too resolves through Pawl.Engine.Resolve, so a parameter of its own would
--- have to be threaded through every caller of Pawl.Engine.Cost.pay for no gain.
+-- A RECORD rather than one function, so that CR 605.4a's triggered mana ability
+-- and CR 118.12's resolution cost ride the same injection: the payment path
+-- needs both too, and both live in Pawl.Engine.Resolve, so a parameter of each
+-- own would have to be threaded through every caller of Pawl.Engine.Cost.pay for
+-- no gain.
 data ManaAbilityPerformer = MkManaAbilityPerformer
   { -- | CR 405.6c: the ability's source, its controller, and the non-mana
     -- effects to run.
@@ -38,5 +42,10 @@ data ManaAbilityPerformer = MkManaAbilityPerformer
     -- putting it on the stack. Pawl.Engine.Cost.tapForManaWith gathers and
     -- classifies (Pawl.Engine.ManaAbility.isTriggeredManaAbility); this runs the
     -- ability's effects.
-    triggered :: PendingTrigger.PendingTrigger -> Game.Game ()
+    triggered :: PendingTrigger.PendingTrigger -> Game.Game (),
+    -- | CR 118.12: offer one clause's resolution cost -- the source, its
+    -- controller, the clause's ordinal and gate, and the answers already
+    -- recorded by ordinal (PayGate.offeredAt) -- and say whether the clause
+    -- happens. Rhystic Cave's "unless any player pays {1}".
+    payGate :: ObjectId.ObjectId -> PlayerId.PlayerId -> ClauseIndex.ClauseIndex -> PayGate.PayGate -> Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId.PlayerId Bool) -> Game.Game (Bool, Map.Map ClauseIndex.ClauseIndex (Map.Map PlayerId.PlayerId Bool))
   }

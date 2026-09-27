@@ -72,6 +72,7 @@ import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Claim as Claim.Type
 import qualified Pawl.Types.ClaimAxis as ClaimAxis
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
@@ -1613,7 +1614,7 @@ ceilingOf pid oid quantities gs =
 -- WHEN is the caller's, this function being the seam all of rule 118.13's
 -- moments share: rule 118.13a's as the spell or ability is proposed (CR 601.2b),
 -- one step before CR 601.2f's total, rule 118.13b's immediately before a cost
--- paid during a resolution is paid (Pawl.Engine.Resolve.payGatePaidBy), and rule
+-- paid during a resolution is paid (Pawl.Engine.Resolve.Effect.payGatePaidBy), and rule
 -- 118.13c's immediately before a special action's cost is
 -- (Pawl.Engine.FaceDown.turnFaceUp and its five siblings). `announceToll` below
 -- is the same choice at a moment rule 118.13 states none for.
@@ -1641,7 +1642,7 @@ announce subject spending pid oid total_ cost = case Cost.mana cost of
     -- The claims are read here rather than inside Mana.announce, which cannot
     -- reach claimOf -- this module imports that one, not the other way about.
     gs <- State.get
-    (announced, life, paidWithLife) <- Mana.announce subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost
+    (announced, life, paidWithLife) <- Mana.announce subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost
     pure
       ( cost
           { Cost.mana = Just announced,
@@ -2662,7 +2663,7 @@ canPayReading slots subject pid oid cost gs = case Cost.mana cost of
               -- 118.12's resolution-time payment -- so the mana is spent as it
               -- is. Which CR 106.6-restricted mana is a supply is the subject's
               -- question.
-              Mana.canPayCommitting subject (manaActivationsGiven (PlayerEffect.applying pid gs)) ManaSpending.AsProduced pid (lifeOwedBy components) (claimsOf slots pid oid components gs) residual gs
+              Mana.canPayCommitting subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) ManaSpending.AsProduced pid (lifeOwedBy components) (claimsOf slots pid oid components gs) residual gs
                 && all (\component -> canPayComponent slots pid oid component gs) components
                 && jointlyPayable slots pid oid components gs
      in any payableWith (waterbendSubstitutions (Cost.components cost) slots pid oid gs manaCost)
@@ -3110,10 +3111,24 @@ supplyManaSourcesGiven grants pcs pid gs = Mana.manaSourcesGiven Set.empty (Mana
 -- reads the real stack there and refuses the same routes. The gate and the
 -- payment agree because this function states exactly the move between them.
 stackedManaActivations :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
-stackedManaActivations effects measure pcs pid oid cost restrictions ability gs =
-  if any ActivationRestriction.needsEmptyStack restrictions
+stackedManaActivations effects = midPayment (stackedAt effects)
+  where
+    stackedAt given measure pcs pid oid cost restrictions ability gs =
+      if any ActivationRestriction.needsEmptyStack restrictions
+        then Mana.noActivations
+        else manaActivationsGiven given measure pcs pid oid cost restrictions ability gs
+
+-- CR 602.5e inside CR 605.3a's payment windows: a route whose rider keeps it to
+-- the priority window (ActivationRestriction.refusedMidPayment) is no route
+-- while something is being paid for. Rhystic Cave's "Activate only as an
+-- instant", which its ruling reads as forbidding exactly this, is what keeps
+-- its "unless any player pays {1}" from leaving a payment short: the mana a
+-- paid gate withholds was never counted as supply and never offered mid-payment.
+midPayment :: Mana.Capacity -> Mana.Capacity
+midPayment capacity measure pcs pid oid cost restrictions ability gs =
+  if any ActivationRestriction.refusedMidPayment restrictions
     then Mana.noActivations
-    else manaActivationsGiven effects measure pcs pid oid cost restrictions ability gs
+    else capacity measure pcs pid oid cost restrictions ability gs
 
 -- The same question given a board the CALLER has already walked; handing the
 -- board in changes no answer. Build `sources` with supplyManaSourcesGiven
@@ -4170,7 +4185,7 @@ announceToll pid charges =
             (settled, life, _) <-
               Mana.announce
                 PaymentSubject.ForNeither
-                (manaActivationsGiven (PlayerEffect.applying pid gs))
+                (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs)))
                 ManaSpending.AsProduced
                 pid
                 tag
@@ -4575,7 +4590,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
       -- permission the cast carried in, so a Celestial Dawn that leaves
       -- mid-payment stops applying (CR 604.2) -- the opposite of `spending`, which
       -- rule 118.14 fixes when the cast was permitted.
-      settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
+      settlement gs = Mana.spend (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid cost gs)) cost (Mana.Type.MkMana (fst (Mana.spendableFor subject pid gs)))
       -- `activated` is the sources whose mana ability this window ran, newest
       -- first -- CR 733.1's "any legal mana abilities that player activated",
       -- gathered because that rule offers them back.
@@ -4598,7 +4613,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
             -- Pawl.Engine.PlayerEffect.applying is a function of it. `pid` is the
             -- payer, and manaSourcesGiven offers only what that player controls, so
             -- the capacity's own `pid` is this one.
-            windowCapacity = manaActivationsGiven (PlayerEffect.applying pid gs)
+            windowCapacity = midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))
             offered = Mana.manaSourcesGiven inFlight windowCapacity (Projection.controlGrants gs) pcs pid gs
         case filter (`Set.notMember` refused) offered of
           [] -> settle activated
@@ -4607,7 +4622,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
             case answer of
               Nothing -> settle activated
               Just oid -> do
-                (produced, kept) <- tapForManaWith perform inFlight oid
+                (produced, kept) <- tapForManaWith perform midPayment inFlight oid
                 -- An activation that FAILED reversed itself already (payActivation
                 -- below), so it is not one of rule 733.1's to offer back -- but
                 -- the sources its own nested window activated and the payer KEPT
@@ -4641,7 +4656,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
         -- unspent, it does not vanish because one cost could not use it).
         let shut = ManaWindow.MkManaWindow {ManaWindow.payer = pid, ManaWindow.activated = reverse activated, ManaWindow.opened = entry, ManaWindow.closed = closed}
             (available, withheld) = Mana.spendableFor subject pid gs
-        case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (manaActivationsGiven (PlayerEffect.applying pid gs)) spending pid residual gs)) residual (Mana.Type.MkMana available) of
+        case Mana.plan (PlayerEffect.spendManaAsThough pid gs) spending (Maybe.fromMaybe 0 (Mana.lifeNeeded subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid residual gs)) residual (Mana.Type.MkMana available) of
           Nothing -> pure (False, extra, shut)
           Just (steps, life) -> do
             (Mana.Type.MkMana left, spent) <- Mana.spendChosen pid (PlayerEffect.spendManaAsThough pid gs) steps (Mana.Type.MkMana available)
@@ -4875,7 +4890,7 @@ payAssist helper subject sid cost = case Cost.mana cost of
 -- Pawl.Types.ManaAbilityPerformer rather than a call into Pawl.Engine.Resolve,
 -- which sits above this module.
 tapForMana :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game Bool
-tapForMana perform oid = fmap fst (tapForManaWith perform Set.empty oid)
+tapForMana perform oid = fmap fst (tapForManaWith perform id Set.empty oid)
 
 -- The same activation carrying the abilities already mid-activation (CR
 -- 605.3c), which is payManaExcept's one narrowing: the route CHOSEN here joins
@@ -4885,8 +4900,11 @@ tapForMana perform oid = fmap fst (tapForManaWith perform Set.empty oid)
 -- than in `payActivation`, which is the only caller and cannot see which route
 -- was chosen. CR 605.3a's priority window starts from the empty set, nothing
 -- being in flight there.
-tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Mana.InFlight -> ObjectId -> Game (Bool, [ObjectId])
-tapForManaWith perform inFlight oid = do
+--
+-- `window` narrows the capacity to the window the activation is made in:
+-- `midPayment` inside a payment, the identity at priority (`tapForMana`).
+tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> (Mana.Capacity -> Mana.Capacity) -> Mana.InFlight -> ObjectId -> Game (Bool, [ObjectId])
+tapForManaWith perform window inFlight oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure (False, [])
@@ -4904,7 +4922,7 @@ tapForManaWith perform inFlight oid = do
           -- ONE gather of the player's effects for every option this permanent
           -- offers, rather than one per option: `manaActivations` would take its
           -- own, and that walk is the shape #1073 was about.
-          capacity = manaActivationsGiven (PlayerEffect.applying controller gs)
+          capacity = window (manaActivationsGiven (PlayerEffect.applying controller gs))
       case filter (\option -> not (Mana.inFlightRoute inFlight oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure (False, [])
         first : rest -> do
@@ -4975,21 +4993,30 @@ tapForManaWith perform inFlight oid = do
               -- "Add ... . If ... add", every hit an "instead" whose "if" no cost
               -- of its own touches); a land whose cost removes the counter its
               -- "instead" reads would refute this.
+              --
+              -- CR 118.12 after the "if", Pawl.Types.Clause's printed order:
+              -- Rhystic Cave's "unless any player pays {1}" is offered to the
+              -- table by the performer, the source standing in for the ability
+              -- object here too, and a clause whose gate says no adds no mana.
               let happens clause = do
                     gsNow <- State.get
                     let context = Filter.contextFor (Game.teams gsNow) (Just controller) (Just oid)
                     pure (maybe True (Condition.holds (Projection.viewWithLastKnownAnywhere gsNow) context gsNow oid) (Clause.condition clause))
-                  step (filled, made) (clause, share) = do
-                    admitted <- happens clause
+                  gated cIdx answers clause = case Clause.payGate clause of
+                    Nothing -> pure (True, answers)
+                    Just gate -> ManaAbilityPerformer.payGate perform oid controller cIdx gate answers
+                  step (answers, filled, made) (cIdx, (clause, share)) = do
+                    holds <- happens clause
+                    (admitted, answers2) <- if holds then gated cIdx answers clause else pure (False, answers)
                     if not admitted
-                      then pure (filled, made)
+                      then pure (answers2, filled, made)
                       else do
                         gsNow <- State.get
                         let shares = concatMap (\(ref, mana) -> fmap (\recipient -> (recipient, Mana.unitsOf mana)) (Mana.recipientsOf controller gsNow ref)) (Map.toList share)
                         State.put (List.foldl' (\acc (recipient, units) -> Mana.addMana recipient units acc) gsNow shares)
                         ManaAbilityPerformer.effects perform oid controller (filter (Maybe.isNothing . ManaAbility.manaProduced) (Foldable.toList (Clause.effects clause)))
-                        pure (filled <> shares, made <> concatMap Mana.unitsOf (Map.elems share))
-              (shares, producedUnits) <- Monad.foldM step ([], []) (ManaOption.steps chosen)
+                        pure (answers2, filled <> shares, made <> concatMap Mana.unitsOf (Map.elems share))
+              (_, shares, producedUnits) <- Monad.foldM step (Map.empty, [], []) (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (ManaOption.steps chosen))
               -- CR 605.1b's "mana being added to a player's mana pool", one event
               -- per player whose pool this activation filled, and CR 106.12a's
               -- "produced": what the clauses that happened added, whoever's pool.

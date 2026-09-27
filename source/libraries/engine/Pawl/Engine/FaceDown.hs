@@ -270,7 +270,7 @@ turnFaceUp perform pid procedure oid = do
         -- the gate above, since what is announced is how to pay a cost already
         -- chosen, and before the mana window Cost.pay opens.
         --
-        -- CR 601.2f's totalling is `pure`, Pawl.Engine.Resolve.payGatePaidBy's
+        -- CR 601.2f's totalling is `pure`, Pawl.Engine.Resolve.Effect.payGatePaidBy's
         -- reason: pawl gathers cost adjustments for a SPELL (Pawl.Engine.Cast) and
         -- for an ACTIVATION (Pawl.Engine.Activate) and nowhere else, and CR 601.2f
         -- is a casting rule that reaches no special action, so the announced cost IS

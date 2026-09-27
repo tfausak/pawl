@@ -521,7 +521,7 @@ halfAnnouncements responses =
 -- contains a mana symbol that can be paid in multiple ways, the player paying
 -- that cost chooses how to pay for that symbol immediately before they pay that
 -- cost." The moment CR 118.13a's two announcements do not cover, reached through
--- Pawl.Engine.Resolve.payGatePaidBy rather than through a cast or an activation.
+-- Pawl.Engine.Resolve.Effect.payGatePaidBy rather than through a cast or an activation.
 --
 -- Shu Yun, the Silent Tempest, {2}{U} 3/2 with prowess and "Whenever you cast a
 -- noncreature spell, you may pay {R/W}{R/W}. If you do, target creature gains
@@ -1486,7 +1486,7 @@ moltensteelSpec s registry = Spec.describe s "Moltensteel" $ do
   -- mana taps it. CR 118.13b/c are not what governs this -- the cost is an
   -- activation cost, so CR 118.13a is, and the choice belongs at proposal
   -- rather than at payment. Rule 118.13b announces at its own site
-  -- (Pawl.Engine.Resolve.payGatePaidBy, the Shu Yun group above); rule
+  -- (Pawl.Engine.Resolve.Effect.payGatePaidBy, the Shu Yun group above); rule
   -- 118.13c's special action announces at its own
   -- (Pawl.FaceDownSpec's Dog Walker case).
   Spec.it s "CR 118.13a/602.2b an activation cost's {R/P} is asked, and mana taps the Mountain" $ do
