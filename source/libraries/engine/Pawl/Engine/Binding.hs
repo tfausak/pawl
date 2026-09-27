@@ -155,7 +155,8 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- didn't pay" opcode.
 --
 -- Which players are in it depends on Pawl.Types.PayBranch: the IfNotPaid branch
--- gets the offered players who did not pay, the IfPaid branch the ones who did.
+-- gets the offered players who did not pay, the IfPaid branch the ones who did,
+-- and the IfNonePaid branch every offered player, when none paid.
 -- One slot for both, because the printed word is the same word and which branch
 -- a clause is is a fact about the CLAUSE.
 --
