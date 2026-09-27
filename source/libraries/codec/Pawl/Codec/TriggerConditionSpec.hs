@@ -26,6 +26,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaSpecification as ManaSpecification
+import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
@@ -536,6 +537,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfLeavesTheBattlefield
       " {\"type\":\"SelfLeavesTheBattlefield\"} "
+  Spec.it s "SelfPutFromBattlefieldInto" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfPutFromBattlefieldInto (OwnedZone.MkOwnedZone {OwnedZone.zone = Zone.Graveyard, OwnedZone.owner = PlayerRelation.You}))
+      " {\"type\":\"SelfPutFromBattlefieldInto\",\"value\":{\"owner\":{\"type\":\"You\"},\"zone\":{\"type\":\"Graveyard\"}}} "
   -- The same written form read by a bystander, PermanentDies' relationship to
   -- SelfDies one rule wider: a separate tag carrying the Filter that holds
   -- "another".

@@ -15,6 +15,7 @@ import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
@@ -295,6 +296,10 @@ data TriggerCondition
     -- the battlefield" (Thragtusk) -- plus that rule's and CR 729.4a's
     -- leaving-the-game forms. Self-scoped and a look-back.
     SelfLeavesTheBattlefield
+  | -- | CR 603.6c narrowed to one destination -- "when this creature is put into
+    -- your graveyard from the battlefield" (Enigma Sphinx), "is put into exile
+    -- from the battlefield" (God-Eternal Oketra). Self-scoped and a look-back.
+    SelfPutFromBattlefieldInto OwnedZone.OwnedZone
   | -- | The same written form read by a bystander (Super Shredder), filtered
     -- over the departed permanent's last known information.
     PermanentLeavesTheBattlefield (Filter.Filter Keyword.Keyword)

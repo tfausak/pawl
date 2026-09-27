@@ -782,6 +782,8 @@ library codec
     Pawl.Codec.OutsideDestinationSpec
     Pawl.Codec.OutsideObject
     Pawl.Codec.OutsideObjectSpec
+    Pawl.Codec.OwnedZone
+    Pawl.Codec.OwnedZoneSpec
     Pawl.Codec.PaidExpiry
     Pawl.Codec.PaidExpirySpec
     Pawl.Codec.Pairing
@@ -2081,6 +2083,7 @@ library types
     Pawl.Types.OutsideCard
     Pawl.Types.OutsideDestination
     Pawl.Types.OutsideObject
+    Pawl.Types.OwnedZone
     Pawl.Types.PaidExpiry
     Pawl.Types.Pairing
     Pawl.Types.PartnerText

@@ -105,6 +105,7 @@ import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OwnedZone as OwnedZone
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
@@ -2547,6 +2548,9 @@ representativeEvents cond =
         -- binds nothing -- which is what keeps the floor empty.
         TriggerCondition.SelfLeavesTheBattlefield ->
           noTable (moved Zone.Battlefield Zone.Graveyard) NonEmpty.:| [noTable (moved Zone.Battlefield Zone.Hand), noTable (GameEvent.LeftTheGame departed)]
+        -- The one destination the arm above narrows to, and the only event this
+        -- condition admits; every instance listed below names a public zone.
+        TriggerCondition.SelfPutFromBattlefieldInto destination -> one (moved Zone.Battlefield (OwnedZone.zone destination))
         -- The bystander reading of the arm above, whose three events are the same
         -- three. Its CR 400.7e arrival is withheld for the same two reasons, but
         -- the floor is NOT empty: CR 603.10a's departed permanent is bound by
@@ -2974,6 +2978,8 @@ everyTriggerCondition =
     TriggerCondition.SelfPutIntoGraveyardDuringResolution,
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
+    TriggerCondition.SelfPutFromBattlefieldInto (OwnedZone.MkOwnedZone Zone.Graveyard PlayerRelation.You),
+    TriggerCondition.SelfPutFromBattlefieldInto (OwnedZone.MkOwnedZone Zone.Exile PlayerRelation.AnyPlayer),
     TriggerCondition.PermanentLeavesTheBattlefield Filter.Type.IsSource,
     TriggerCondition.PermanentReturnedToHand Filter.Type.IsSource,
     TriggerCondition.PermanentsReturnedToHand Filter.Type.IsSource,
@@ -3202,6 +3208,51 @@ paysFor who p = case p of
         PaymentDecision.Pays
   _ -> S.identityAnswer p
 
+-- CR 603.6c narrowed to one destination, a CR 603.10a look-back. Each board moves
+-- the bearer off the battlefield by the one door every destroy, sacrifice and
+-- exile goes through, then drains the stack.
+selfPutFromBattlefieldIntoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfPutFromBattlefieldIntoSpec s registry =
+  let -- Oketra's "you may" taken; S.identityAnswer declines it.
+      exercises :: Prompt.Prompt r -> r
+      exercises p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      drain gs =
+        let placed = S.runPure exercises gs Engine.settleForPriority
+         in if null (GameState.stack placed) then placed else drain (S.runPure exercises placed Stack.resolveTop)
+      -- Five Swamps in the owner's library, so "third from the top" is not the
+      -- middle read from either end.
+      moveOff printingName owner controller zone = do
+        swamp <- S.printingOf s registry "Swamp"
+        card <- S.printingOf s registry printingName
+        let (oid, g1) = S.addPermanent card owner (S.landsInPlay swamp 1)
+            g2 = if owner == controller then g1 else S.giveControl oid controller g1
+            g3 = iterate (snd . S.addLibraryCard swamp owner) g2 !! 5
+            (_, moved) = S.runPureWith S.identityAnswer g3 (Event.changeZoneReturning oid zone)
+        pure (drain moved)
+      namesOf zone pid gs = Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs)
+      depthOf name pid gs = List.elemIndex (CardName.MkCardName (Text.pack name)) (namesOf Zone.Library pid gs)
+   in Spec.describe s "SelfPutFromBattlefieldInto" $ do
+        -- Enigma Sphinx's "put into your graveyard from the battlefield". The
+        -- three boards differ in one thing each from the first: who OWNS it (CR
+        -- 400.3 sends a stolen Sphinx to bob's graveyard, which is not its
+        -- controller's), and where it went (exile is not a graveyard).
+        Spec.it s "CR 400.3 Enigma Sphinx triggers only on reaching its controller's own graveyard" $ do
+          owned <- moveOff "Enigma Sphinx" S.alice S.alice Zone.Graveyard
+          stolen <- moveOff "Enigma Sphinx" S.bob S.alice Zone.Graveyard
+          exiled <- moveOff "Enigma Sphinx" S.alice S.alice Zone.Exile
+          Spec.assertEqWith s "CR 401.7 alice's own Sphinx is third from the top of her library" (depthOf "Enigma Sphinx" S.alice owned) (Just 2)
+          Spec.assertEqWith s "CR 400.3 the stolen Sphinx stays in bob's graveyard" (depthOf "Enigma Sphinx" S.bob stolen, List.elem (CardName.MkCardName (Text.pack "Enigma Sphinx")) (namesOf Zone.Graveyard S.bob stolen)) (Nothing, True)
+          Spec.assertEqWith s "CR 603.6c an exiled Sphinx stays in exile" (depthOf "Enigma Sphinx" S.alice exiled) Nothing
+        -- God-Eternal Oketra's "dies or is put into exile from the battlefield":
+        -- both branches of the AnyOf.
+        Spec.it s "CR 603.10a God-Eternal Oketra goes third from the top from exile or the graveyard" $ do
+          exiled <- moveOff "God-Eternal Oketra" S.alice S.alice Zone.Exile
+          died <- moveOff "God-Eternal Oketra" S.alice S.alice Zone.Graveyard
+          Spec.assertEqWith s "CR 401.7 the exiled Oketra is third from the top" (depthOf "God-Eternal Oketra" S.alice exiled) (Just 2)
+          Spec.assertEqWith s "CR 700.4 so is the one that died" (depthOf "God-Eternal Oketra" S.alice died) (Just 2)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   cyclingTriggerSpec s registry
@@ -3220,3 +3271,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   arrivedLaterSpec s registry
   merenEndStepSpec s registry
   leavesBattlefieldSpec s registry
+  selfPutFromBattlefieldIntoSpec s registry

@@ -1109,6 +1109,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfPutIntoGraveyardDuringResolution -> []
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
+  TriggerCondition.SelfPutFromBattlefieldInto _ -> []
   TriggerCondition.HauntedCreatureDies -> []
   -- CR 701.6a's countering condition is a PlayerRelation, which holds no Count,
   -- exactly as the discard condition above.
@@ -4217,6 +4218,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfPutIntoGraveyardDuringResolution -> []
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
+  TriggerCondition.SelfPutFromBattlefieldInto _ -> []
   TriggerCondition.HauntedCreatureDies -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
   TriggerCondition.AbilityIsCountered -> []
@@ -4336,6 +4338,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentDies _ -> []
   TriggerCondition.PermanentsDie _ -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
+  TriggerCondition.SelfPutFromBattlefieldInto _ -> []
   TriggerCondition.PermanentLeavesTheBattlefield _ -> []
   TriggerCondition.PermanentReturnedToHand _ -> []
   TriggerCondition.PermanentsReturnedToHand _ -> []

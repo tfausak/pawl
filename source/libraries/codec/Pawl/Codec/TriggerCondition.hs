@@ -14,6 +14,7 @@ import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeast as CreatureBecomesBl
 import qualified Pawl.Codec.DieResult as DieResult
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.OwnedZone as OwnedZone
 import qualified Pawl.Codec.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Codec.PermanentTappedForMana as PermanentTappedForMana
@@ -102,6 +103,7 @@ codec =
           Arm.payload "PermanentDies" filterCodec TriggerCondition.PermanentDies (\x -> case x of TriggerCondition.PermanentDies y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsDie" filterCodec TriggerCondition.PermanentsDie (\x -> case x of TriggerCondition.PermanentsDie y -> Just y; _ -> Nothing),
           Arm.nullary "SelfLeavesTheBattlefield" TriggerCondition.SelfLeavesTheBattlefield,
+          Arm.payload "SelfPutFromBattlefieldInto" OwnedZone.codec TriggerCondition.SelfPutFromBattlefieldInto (\x -> case x of TriggerCondition.SelfPutFromBattlefieldInto y -> Just y; _ -> Nothing),
           Arm.payload "PermanentLeavesTheBattlefield" filterCodec TriggerCondition.PermanentLeavesTheBattlefield (\x -> case x of TriggerCondition.PermanentLeavesTheBattlefield y -> Just y; _ -> Nothing),
           Arm.payload "PermanentReturnedToHand" filterCodec TriggerCondition.PermanentReturnedToHand (\x -> case x of TriggerCondition.PermanentReturnedToHand y -> Just y; _ -> Nothing),
           Arm.payload "PermanentsReturnedToHand" filterCodec TriggerCondition.PermanentsReturnedToHand (\x -> case x of TriggerCondition.PermanentsReturnedToHand y -> Just y; _ -> Nothing),
@@ -255,6 +257,7 @@ tagOf x = case x of
   TriggerCondition.PermanentDies {} -> "PermanentDies"
   TriggerCondition.PermanentsDie {} -> "PermanentsDie"
   TriggerCondition.SelfLeavesTheBattlefield {} -> "SelfLeavesTheBattlefield"
+  TriggerCondition.SelfPutFromBattlefieldInto {} -> "SelfPutFromBattlefieldInto"
   TriggerCondition.PermanentLeavesTheBattlefield {} -> "PermanentLeavesTheBattlefield"
   TriggerCondition.PermanentReturnedToHand {} -> "PermanentReturnedToHand"
   TriggerCondition.PermanentsReturnedToHand {} -> "PermanentsReturnedToHand"

@@ -1790,6 +1790,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfPutIntoGraveyardDuringResolution -> condition
   TriggerCondition.SelfDies -> condition
   TriggerCondition.SelfLeavesTheBattlefield -> condition
+  TriggerCondition.SelfPutFromBattlefieldInto _ -> condition
   TriggerCondition.HauntedCreatureDies -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
   TriggerCondition.AbilityIsCountered -> condition
