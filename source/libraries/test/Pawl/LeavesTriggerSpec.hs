@@ -714,7 +714,7 @@ dutifulKnowledgeSeekerSpec s registry =
           Spec.assertEqWith s "CR 603.10a the look-back put the Seeker's trigger on the stack" (length (GameState.stack settled)) 1
           Spec.assertEqWith s "the Seeker is a library card by the time the scan ran" (length (Game.zoneMembers Zone.Library S.alice settled)) 1
           Spec.assertEqWith s "and the trigger resolved to nothing, \"this creature\" being gone" (GameState.stack after) []
-        -- The brief's negative, one difference from the proving case: the Seeker
+        -- The hidden-origin negative, one difference from the proving case: the Seeker
         -- starts in alice's hand, a hidden zone.
         Spec.it s "CR 603.10a the same Seeker put into her library from her hand does not" $ do
           seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
