@@ -106,6 +106,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -166,6 +167,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   backgroundSpec s registry
   doctorsCompanionSpec s registry
   bounceSpec s registry
+  orderingSpec s registry
   commanderDamageSpec s registry
   brawlSpec s registry
   subgameSpec s registry
@@ -914,6 +916,54 @@ bounceSpec s registry = Spec.describe s "Bounce" $ do
     -- battlefield to be returned, and neither started in a hand.
     Spec.assertEqWith s "setup: the command zone was empty and both commanders were in play" (commandZoneNames board, S.creaturesInPlay S.alice board, S.creaturesInPlay S.bob board) ([], 1, 1)
     Spec.assertEqWith s "setup: and neither owner held a card" (handNames S.alice board <> handNames S.bob board) []
+
+-- CR 616.1e: rule 903.9b's offer is one of the effects the affected object's
+-- controller orders. Synthetic Hand Interdiction's "if a card would be put into a
+-- player's hand from anywhere, exile it instead" competes for Unsummon's bounce,
+-- and each effect stops applying once the other has moved the destination.
+--
+-- Answered by `returningOnly` for the object ON THE BATTLEFIELD: CR 903.9a's
+-- state-based offer names the fresh exile id instead (CR 400.7), so accepting
+-- there cannot pass these cases for the wrong rule.
+orderingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+orderingSpec s registry = Spec.describe s "Ordering" $ do
+  Spec.it s "CR 616.1e/903.9b the owner may apply the offer before a card's redirect" $ do
+    (board, bounceId, commander) <- interdicted s registry
+    let after = bouncing (returningOnly commander) bounceId board
+    Spec.assertEqWith s "it went straight to the command zone" (length (inCommandZone after)) 1
+  Spec.it s "CR 616.1e declining the offer first lets the redirect exile it" $ do
+    (board, bounceId, _) <- interdicted s registry
+    let after = bouncing S.identityAnswer bounceId board
+    Spec.assertEqWith s "it is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+  -- CR 616.1: the affected object's CONTROLLER picks the order, so bob, who took
+  -- the commander, may let the redirect go first although alice would accept.
+  Spec.it s "CR 616.1 the controller of a stolen commander orders the offer" $ do
+    (board, bounceId, commander) <- interdicted s registry
+    let after = bouncing (returningOnly commander) bounceId (S.giveControl commander S.bob board)
+    Spec.assertEqWith s "bob declined to put the offer first, so it is in exile" (length (Game.zoneMembers Zone.Exile S.alice after), length (inCommandZone after)) (1, 0)
+
+-- bounceBoard with Synthetic Hand Interdiction on the battlefield, and alice's
+-- commander's id there.
+interdicted :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+interdicted s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+  unsummon <- S.printingOf s registry "Unsummon"
+  interdiction <- S.printingOf s registry "Synthetic Hand Interdiction"
+  let (board, bounceId) = bounceBoard mountain island shimatsu unsummon 1
+      guarded = snd (S.addPermanent interdiction S.bob board)
+  case commanderInPlay S.alice guarded of
+    Just commander -> pure (guarded, bounceId, commander)
+    Nothing -> Spec.assertFailure s "setup: expected alice's commander on the battlefield"
+
+-- Returns for `oid` alone and Leaves for every other object; every controller
+-- declines to put the offer first.
+returningOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+returningOnly oid p = case p of
+  Prompt.ReturnCommander _ _ asked -> if asked == oid then CommandZoneDecision.Returns else CommandZoneDecision.Leaves
+  Prompt.ChooseCommandZoneOfferFirst {} -> OptionalDecision.Declines
+  _ -> S.identityAnswer p
 
 -- The printed names of the cards in the command zone, in id order. NAMES and not
 -- ids because CR 400.7 makes the object that arrives a different one from the
