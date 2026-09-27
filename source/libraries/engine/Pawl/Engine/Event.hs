@@ -190,6 +190,7 @@ import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReplacementBucket as ReplacementBucket
 import Pawl.Types.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -1379,7 +1380,8 @@ bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outs
 -- board when this move is one member of a CR 608.2f / 704.3 batch.
 --
 -- CR 903.9b's rules-based offer is asked here too, once the loop has settled a
--- destination -- see `offerCommandZone`.
+-- destination -- see `offerCommandZone` -- unless the loop already applied it
+-- ahead of a card's row (`offerCommandZoneFirst`).
 --
 -- Also reports CR 607.2b's link: the object whose replacement effect is what made
 -- the destination exile, or Nothing when the move was headed there on its own
@@ -1394,13 +1396,18 @@ bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outs
 -- convenience rather than a constraint.
 resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
 resolveZoneChange asOf zc = do
-  (outcome, _, _, exiledBy, shuffling) <- applyReplacementsFully asOf Set.empty Map.empty (ProposedEvent.WouldChangeZone zc)
+  (outcome, _, _, exiledBy, shuffling, splitEarly) <- applyReplacementsFully asOf Set.empty Map.empty (ProposedEvent.WouldChangeZone zc)
   case outcome >>= Replacement.asZoneChange of
     Nothing -> pure (Nothing, exiledBy, shuffling, Nothing)
     Just settled -> do
       gs <- State.get
-      (redirected, splitOff) <- offerCommandZone (toJunkyard gs settled)
-      pure (Just redirected, exiledBy, shuffling, splitOff)
+      case splitEarly of
+        -- CR 903.9c's split already taken inside the loop: the commander card is
+        -- spoken for, so the rest is not offered again.
+        Just component -> pure (Just (toJunkyard gs settled), exiledBy, shuffling, Just component)
+        Nothing -> do
+          (redirected, splitOff) <- offerCommandZone (toJunkyard gs settled)
+          pure (Just redirected, exiledBy, shuffling, splitOff)
 
 -- CR 717.6: a card with an Astrotorium back bound anywhere but the battlefield,
 -- exile or the command zone goes to the command zone instead, where it is face
@@ -1429,18 +1436,13 @@ toJunkyard gs zc
 -- a restriction the rulebook states is asked by the engine, not modelled as
 -- something a card carries.
 --
--- AFTER the CR 616.1 loop and asked of the SETTLED destination, CR 614.6's
--- reading: a printed redirect that already moved this move off a hand or a library
--- is the event that happens, and rule 903.9b has nothing to say about it.
---
--- Not implemented: a place in CR 616.1's ordering, where CR 616.1e leaves the
--- affected player free to pick among the applicable effects and this offer instead
--- always goes last (#2266). Unobservable while no ZoneChangeR in data/cards/
--- matches a hand or a library -- every row there names a `whenDestination` of
--- the graveyard, the stack or the battlefield -- so no second candidate can be
--- applicable to the same event; a printed redirect naming a hand or a library as
--- the destination it watches (Wheel of Sun and Moon is the shape) would refute
--- that.
+-- Asked twice over: by `offerCommandZoneFirst` wherever a card's row competes
+-- for the same event, which is its place in CR 616.1e's ordering, and here AFTER
+-- the loop, of the SETTLED destination, which is CR 616.2's -- a printed redirect
+-- that moved a graveyard-bound commander into a library makes the offer
+-- applicable to the modified event. A redirect that already moved this move off a
+-- hand or a library is the event that happens, and rule 903.9b has nothing to say
+-- about it.
 --
 -- No case on effect identity: the question is a proposed event's destination ZONE
 -- and whether its subject is a commander.
@@ -1472,6 +1474,53 @@ offerCommandZone zc = do
           -- can only be identified by its PRINTING, and the id it will get is
           -- minted several steps later.
           Just component -> (zc, Just component)
+
+-- CR 616.1e / 903.9b: the command-zone offer as one of the applicable effects
+-- the affected object's controller picks among, asked ahead of the card-borne
+-- rows of CR 616.1e's bucket. A card's row watching a hand (Pawl.CommanderSpec's
+-- Synthetic Hand Interdiction) stops applying once the offer has moved the
+-- destination, and the offer stops applying once the row has, so which goes
+-- first decides where the commander ends up.
+--
+-- Two questions when the controller is not the owner: CR 616.1 lets the
+-- controller pick the offer, and rule 903.9b's "may" is still the owner's. The
+-- owner alone answers both when they coincide, since picking the offer and then
+-- declining it is picking nothing. Declined, the offer stays applicable -- rule
+-- 903.9b's exception to CR 614.5 -- and is asked again after the next row, or
+-- after the loop.
+--
+-- Not before a CR 616.1a-d bucket, which must be chosen first. Nothing when the
+-- bucket is empty either: with no row to order against, the post-loop question
+-- in `resolveZoneChange` is the same question.
+--
+-- A draw is not a second place the ordering reaches. A draw replacement (Words of
+-- Worship) and the offer on a drawn commander give the same outcomes in either
+-- order: a draw whose card is redirected is still a draw -- Rest in Peace's and
+-- Leyline of the Void's rulings say so of a redirected discard, CR 701.9a's
+-- sibling of CR 121.1 -- so the draw replacement still applies after the offer
+-- and replaces the whole draw.
+--
+-- No case on effect identity: the question is the proposed event's destination
+-- ZONE and whether its subject is a commander, as `offerCommandZone`'s.
+offerCommandZoneFirst :: GameState -> ProposedEvent -> [ReplacementCandidate] -> Maybe PrintingId.PrintingId -> Game (Maybe (ProposedEvent, Maybe PrintingId.PrintingId))
+offerCommandZoneFirst gs event bucket split = case (event, split, fmap Replacement.bucketOf (Maybe.listToMaybe bucket)) of
+  (ProposedEvent.WouldChangeZone zc, Nothing, Just ReplacementBucket.Other)
+    | Just owner <- Commander.commandZoneOffer zc gs -> do
+        picked <- case Replacement.chooserOf gs event of
+          Just chooser | chooser /= owner -> do
+            answer <- Game.choose (Prompt.ChooseCommandZoneOfferFirst (Decide.deciderFor chooser gs) chooser (ZoneChange.departed zc))
+            pure (answer == OptionalDecision.Exercises)
+          _ -> pure True
+        if not picked
+          then pure Nothing
+          else do
+            (redirected, component) <- offerCommandZone zc
+            pure $ case component of
+              Just _ -> Just (event, component)
+              Nothing
+                | ZoneChange.to redirected /= ZoneChange.to zc -> Just (ProposedEvent.WouldChangeZone redirected, Nothing)
+                | otherwise -> Nothing
+  _ -> pure Nothing
 
 -- CR 616.1's loop. `Nothing` means the event DOES NOT HAPPEN (CR 615.6, CR
 -- 701.19a). A rewrite that cancels an event has already performed its own
@@ -1598,7 +1647,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      for the floating one, and the AMOUNT half by its Squad Captain.
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
 applyReplacementsIn asOf batch event = do
-  (outcome, _, _, _, _) <- applyReplacementsFully asOf batch Map.empty event
+  (outcome, _, _, _, _, _) <- applyReplacementsFully asOf batch Map.empty event
   pure outcome
 
 -- The same loop, answering CR 615.13's second question as well: WHICH prevention
@@ -1616,7 +1665,7 @@ applyReplacementsIn asOf batch event = do
 -- off the first component alone.
 applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> ProposedEvent -> Game ([ProposedEvent], [Prevention])
 applyReplacementsReporting asOf batch allowances event = do
-  (outcome, residue, prevented, _, _) <- applyReplacementsFully asOf batch allowances event
+  (outcome, residue, prevented, _, _, _) <- applyReplacementsFully asOf batch allowances event
   pure (Maybe.maybeToList outcome <> residue, prevented)
 
 -- The loop itself, with the side answers its two classes of caller want: CR
@@ -1635,11 +1684,14 @@ applyReplacementsReporting asOf batch allowances event = do
 -- carried in per event: it caps what a countdown covers here, and a share of 0
 -- keeps its row out of CR 616.1's offer entirely. Empty for every caller but
 -- the batch, which is every caller but resolveDamage.
-applyReplacementsFully :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
-applyReplacementsFully asOf batch allowances = loop asOf batch allowances Set.empty [] Nothing False
+applyReplacementsFully :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
+applyReplacementsFully asOf batch allowances = loop asOf batch allowances Set.empty [] Nothing False Nothing
 
-loop :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
-loop asOf batch allowances applied prevented exiledBy shuffling event = do
+-- The last accumulator is CR 903.9c's split, taken when the owner accepted CR
+-- 903.9b's offer for a melded or merged commander inside the loop -- see
+-- `offerCommandZoneFirst`.
+loop :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> Maybe PrintingId.PrintingId -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
+loop asOf batch allowances applied prevented exiledBy shuffling split event = do
   gs <- State.get
   -- From scratch each iteration: collect against the CURRENT state (or, for a
   -- CR 608.2f batch, the state the batch began in), minus CR 614.5's
@@ -1668,52 +1720,62 @@ loop asOf batch allowances applied prevented exiledBy shuffling event = do
       fresh = filter (\candidate -> unused candidate && notSibling candidate && not (Replacement.allocatedOut allowances candidate)) (Replacement.applicable asOf gs event)
   case Replacement.highestBucket fresh of
     -- CR 616.1f / 614.6: no candidate remains, so the surviving event happens.
-    [] -> pure (Just event, [], prevented, exiledBy, shuffling)
+    [] -> pure (Just event, [], prevented, exiledBy, shuffling, split)
     bucket -> do
-      picked <- Replacement.choose gs event bucket
-      case picked of
-        -- Unreachable: highestBucket returns [] for an empty input, so `bucket`
-        -- is non-empty and `choose` always picks. Total rather than partial.
-        Nothing -> pure (Just event, [], prevented, exiledBy, shuffling)
-        -- CR 614.9 over a countdown (CR 615.7's shape, which that rule states
-        -- only for preventions; Harm's Way's rulings supply the redirect's):
-        -- the chosen effect covers only PART of this event (Harm's Way's
-        -- remaining 2 against a 5), so the event is split here and the
-        -- candidate applied to the covered half, while the residue -- "any
-        -- remaining damage is dealt normally" -- continues through the loop as
-        -- an event of its own. It carries the applied set INCLUDING this
-        -- candidate, which is CR 614.5: one effect applies to one event once,
-        -- and the residue is the rest of that same event rather than a new one
-        -- -- so a Furnace of Rath that already doubled it does not double the
-        -- residue again. The covered half's own thread runs first, the
-        -- residue's after it, both against whatever prompts they raise in that
-        -- order.
-        --
-        -- CR 614.5's other direction is not kept: an effect the covered half's
-        -- continuation applies is not recorded for the residue, so it may apply
-        -- to both halves. Harmless for every rewrite in the tree, each being
-        -- distributive over a split (a doubling of 2 and of 3 is a doubling of
-        -- 5); a non-distributive rewrite reaching both halves would be what
-        -- refutes it, and none has a producer.
-        --
-        -- The two halves may end up on the SAME recipient, which CR 120.4 deals
-        -- as one event; resolveDamage rejoins them once the loop is done
-        -- (Replacement.oneEventPerRecipient), rather than here, because a later
-        -- iteration can still move either half.
-        Just candidate
-          | Just covered <- Replacement.partialCoverage gs allowances candidate event,
-            Just (front, rest) <- Replacement.splitDamage covered event -> do
-              let applied1 = Set.insert (ReplacementCandidate.identity candidate) applied
-              (survivor, residue1, prevented1, exiledBy1, shuffling1) <- applyChosen asOf batch allowances applied prevented exiledBy shuffling candidate front
-              (leftover, residue2, prevented2, exiledBy2, shuffling2) <- loop asOf batch allowances applied1 prevented1 exiledBy1 shuffling1 rest
-              pure (survivor, residue1 <> Maybe.maybeToList leftover <> residue2, prevented2, exiledBy2, shuffling2)
-        Just candidate -> applyChosen asOf batch allowances applied prevented exiledBy shuffling candidate event
+      first <- offerCommandZoneFirst gs event bucket split
+      case first of
+        Just (rewritten, split1) -> loop asOf batch allowances applied prevented exiledBy shuffling split1 rewritten
+        Nothing -> chooseAndApply asOf batch allowances applied prevented exiledBy shuffling split gs event bucket
+
+-- The CR 616.1 choice among the card-borne candidates of one bucket, and its
+-- application. Split out of `loop` so `offerCommandZoneFirst` can stand in front
+-- of it.
+chooseAndApply :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> Maybe PrintingId.PrintingId -> GameState -> ProposedEvent -> [ReplacementCandidate] -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
+chooseAndApply asOf batch allowances applied prevented exiledBy shuffling split gs event bucket = do
+  picked <- Replacement.choose gs event bucket
+  case picked of
+    -- Unreachable: highestBucket returns [] for an empty input, so `bucket`
+    -- is non-empty and `choose` always picks. Total rather than partial.
+    Nothing -> pure (Just event, [], prevented, exiledBy, shuffling, split)
+    -- CR 614.9 over a countdown (CR 615.7's shape, which that rule states
+    -- only for preventions; Harm's Way's rulings supply the redirect's):
+    -- the chosen effect covers only PART of this event (Harm's Way's
+    -- remaining 2 against a 5), so the event is split here and the
+    -- candidate applied to the covered half, while the residue -- "any
+    -- remaining damage is dealt normally" -- continues through the loop as
+    -- an event of its own. It carries the applied set INCLUDING this
+    -- candidate, which is CR 614.5: one effect applies to one event once,
+    -- and the residue is the rest of that same event rather than a new one
+    -- -- so a Furnace of Rath that already doubled it does not double the
+    -- residue again. The covered half's own thread runs first, the
+    -- residue's after it, both against whatever prompts they raise in that
+    -- order.
+    --
+    -- CR 614.5's other direction is not kept: an effect the covered half's
+    -- continuation applies is not recorded for the residue, so it may apply
+    -- to both halves. Harmless for every rewrite in the tree, each being
+    -- distributive over a split (a doubling of 2 and of 3 is a doubling of
+    -- 5); a non-distributive rewrite reaching both halves would be what
+    -- refutes it, and none has a producer.
+    --
+    -- The two halves may end up on the SAME recipient, which CR 120.4 deals
+    -- as one event; resolveDamage rejoins them once the loop is done
+    -- (Replacement.oneEventPerRecipient), rather than here, because a later
+    -- iteration can still move either half.
+    Just candidate
+      | Just covered <- Replacement.partialCoverage gs allowances candidate event,
+        Just (front, rest) <- Replacement.splitDamage covered event -> do
+          let applied1 = Set.insert (ReplacementCandidate.identity candidate) applied
+          (survivor, residue1, prevented1, exiledBy1, shuffling1, split1) <- applyChosen asOf batch allowances applied prevented exiledBy shuffling split candidate front
+          (leftover, residue2, prevented2, exiledBy2, shuffling2, split2) <- loop asOf batch allowances applied1 prevented1 exiledBy1 shuffling1 split1 rest
+          pure (survivor, residue1 <> Maybe.maybeToList leftover <> residue2, prevented2, exiledBy2, shuffling2, split2)
+    Just candidate -> applyChosen asOf batch allowances applied prevented exiledBy shuffling split candidate event
 
 -- One iteration of `loop`: apply the chosen candidate to the event and continue
 -- with what comes back. Split out so the partial-cover branch above and the
 -- ordinary one apply a candidate the same way.
-applyChosen :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool)
-applyChosen asOf batch allowances applied prevented exiledBy shuffling candidate event = do
+applyChosen :: Maybe GameState -> Set ObjectId -> Map CandidateId Natural -> Set CandidateId -> [Prevention] -> Maybe ObjectId -> Bool -> Maybe PrintingId.PrintingId -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent, [ProposedEvent], [Prevention], Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
+applyChosen asOf batch allowances applied prevented exiledBy shuffling split candidate event = do
   gs <- State.get
   -- CR 615.12: the chosen effect is a prevention effect and this damage
   -- can't be prevented (Spider-Punk), so it is APPLIED and prevents none
@@ -1756,8 +1818,8 @@ applyChosen asOf batch allowances applied prevented exiledBy shuffling candidate
   -- SetAmount and Scale shrink an event without preventing a point of it.
   let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy inert candidate event outcome)
   case outcome of
-    Nothing -> pure (Nothing, [], prevented1, exiledBy, shuffling)
-    Just rewritten -> loop asOf batch allowances (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) (shuffling || shufflesAfter candidate) rewritten
+    Nothing -> pure (Nothing, [], prevented1, exiledBy, shuffling, split)
+    Just rewritten -> loop asOf batch allowances (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 (exiledByAfter candidate event rewritten exiledBy) (shuffling || shufflesAfter candidate) split rewritten
 
 -- CR 607.2b's link, read OUTSIDE `apply` from the event before and after --
 -- `preventionBy`'s posture above, for its reason: no arm of that fold has to
@@ -1779,9 +1841,9 @@ applyChosen asOf batch allowances applied prevented exiledBy shuffling candidate
 -- (CR 702.34a's "instead of putting it anywhere else" is the wording), would
 -- refute that and reach both arms. Only the first has a producer.
 --
--- `offerCommandZone` is not a second way to reach them either: it runs after this
--- loop has finished, so no candidate is read off its answer, and rule 903.9b only
--- fires on a destination of hand or library.
+-- CR 903.9b's offer is not a second way to reach them either: it only ever moves
+-- a destination of hand or library into the command zone, never into or out of
+-- exile.
 --
 -- No case on effect identity: the question is a proposed event's destination
 -- ZONE, and the answer is the row's source object.

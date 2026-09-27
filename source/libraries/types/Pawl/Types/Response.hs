@@ -720,6 +720,8 @@ data Response
     ChoseAssistAmount Natural.Natural
   | -- | CR 903.9a's answer: whether the commander goes to the command zone.
     ReturnedCommander CommandZoneDecision.CommandZoneDecision
+  | -- | CR 616.1e's answer: whether the controller applies CR 903.9b's offer first.
+    ChoseCommandZoneOfferFirst OptionalDecision.OptionalDecision
   | -- | CR 401.2's answer: the end of their library an owner picked for one card.
     ChoseLibraryEnd LibraryPosition.LibraryPosition
   | -- | CR 401.4's answer: the order an owner chose for the cards arriving at one

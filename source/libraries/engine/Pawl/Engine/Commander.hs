@@ -576,9 +576,7 @@ returnable events gs =
 --
 -- CR 903.9c's melded or merged commander is the ANSWER's other shape rather than
 -- a second question, and Pawl.Engine.Event.offerCommandZone is where it is read.
---
--- Not implemented: a place for the offer in the CR 616.1 ordering, where CR
--- 616.1e leaves the affected player free to pick among applicable effects (#2266).
+-- Its place in CR 616.1e's ordering is Pawl.Engine.Event.offerCommandZoneFirst's.
 commandZoneOffer :: ZoneChange.ZoneChange -> GameState -> Maybe PlayerId
 commandZoneOffer zc gs
   | notElem (ZoneChange.to zc) [Zone.Hand, Zone.Library] = Nothing
