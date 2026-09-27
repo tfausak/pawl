@@ -1,0 +1,144 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": {
+        "you lose": {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
+                }
+              },
+              "scope": {
+                "type": "ControllersTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "LoseGame",
+                        "value": {
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Chance for Glory",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": {
+                      "duration": {
+                        "type": "Indefinite"
+                      },
+                      "modification": {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Indestructible"
+                        }
+                      },
+                      "ref": {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "ControlledBy",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "TakeExtraTurn",
+                    "value": {
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "skips": []
+                    }
+                  },
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": {
+                      "name": "you lose",
+                      "onset": {
+                        "type": "FromThatExtraTurn"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

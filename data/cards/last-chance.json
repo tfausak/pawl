@@ -1,0 +1,106 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": {
+        "you lose": {
+          "condition": {
+            "type": "StepBegins",
+            "value": {
+              "phase": {
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
+                }
+              },
+              "scope": {
+                "type": "ControllersTurn"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "LoseGame",
+                        "value": {
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Last Chance",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "TakeExtraTurn",
+                    "value": {
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "skips": []
+                    }
+                  },
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": {
+                      "name": "you lose",
+                      "onset": {
+                        "type": "FromThatExtraTurn"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

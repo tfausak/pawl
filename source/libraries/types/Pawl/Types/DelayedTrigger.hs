@@ -50,7 +50,7 @@ data DelayedTrigger = MkDelayedTrigger
     bindings :: Map.Map SlotName.SlotName Binding.Binding,
     -- | Pawl.Types.Onset as the game remembers it: which turns this entry may
     -- fire on. TurnWindow.AnyTurn is the ordinary case, CR 603.7a's floor. The
-    -- other two arms are Onset.FromYourNextTurn before and after the turn it
+    -- other arms are an onset-gated entry before and after the turn it
     -- names has begun; see Pawl.Types.TurnWindow.
     --
     -- Not a Maybe: "no restriction" is one of the windows rather than the absence
