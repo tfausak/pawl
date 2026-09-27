@@ -37,6 +37,7 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
+import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Subtype as SubtypeEngine
@@ -82,6 +83,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
@@ -96,6 +98,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Status as Status
@@ -3872,11 +3875,68 @@ tyvarBoard s registry = do
   Spec.assertEqWith s "the fixture: Tyvar is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Tyvar the Bellicose") S.alice withBob) 1
   pure (myr, elves, forest, theirElves, withBob)
 
+-- Rhystic Cave, Land: "{T}: Choose a color. Add one mana of that color unless
+-- any player pays {1}. Activate only as an instant." CR 118.12a's gate on a mana
+-- ability's clause, which CR 605.3b gives no stack object -- the source stands in
+-- (Resolve.Effect.performManaPayGate) -- and CR 602.5e's rider, which keeps the
+-- ability to the priority window: its ruling forbids activating it while
+-- casting a spell or activating an ability, so a paid gate never leaves a
+-- payment short.
+--
+-- THREE SEATS, every one holding an untapped Island, so a decline is never CR
+-- 118.3's "can't" and the "any player" reading is told apart from the "each
+-- player" one.
+rhysticCaveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rhysticCaveSpec s registry =
+  let paysFor :: Maybe PlayerId.PlayerId -> Prompt.Prompt r -> r
+      paysFor who p = case p of
+        Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+          | Just d == who && Just player == who -> PaymentDecision.Pays
+        _ -> S.identityAnswer p
+      payResponses = filter (\r -> case r of Response.ChoseToPay _ -> True; _ -> False)
+      caveBoard aliceIslands = do
+        island <- S.printingOf s registry "Island"
+        cave <- S.printingOf s registry "Rhystic Cave"
+        let lands = S.landsFor island S.carol 1 (S.landsFor island S.bob 1 (S.landsFor island S.alice aliceIslands S.threePlayerGame))
+            (caveId, gs) = S.addPermanent cave S.alice lands
+        pure (caveId, gs {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+      -- CR 605.3a's priority window: the activation Engine.priorityLoop makes
+      -- for Action.ActivateManaAbility.
+      tapCave who = do
+        (caveId, gs) <- caveBoard 1
+        pure (caveId, gs, Replay.record (paysFor who) gs (Cost.tapForMana Resolve.performManaAbility caveId))
+   in Spec.describe s "CR 118.12a Rhystic Cave's unless any player pays" $ do
+        Spec.it s "CR 118.12a bob pays {1}, so no mana is added" $ do
+          (caveId, gs, ((_, after), transcript)) <- tapCave (Just S.bob)
+          Spec.assertEqWith s "CR 118.12a: alice's pool is empty" (poolTypes S.alice after) []
+          Spec.assertEqWith s "the Cave's {T} was paid" (Object.tapped <$> Game.lookupObject caveId after) (Just TapState.Tapped)
+          Spec.assertEqWith s "bob's Island paid the {1}" (S.tappedCount S.bob after) 1
+          Spec.assertEqWith s "setup: nothing was tapped before" (S.tappedCount S.bob gs) 0
+          Spec.assertEqWith s "CR 101.4: alice declined, bob paid, carol declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines, Response.ChoseToPay PaymentDecision.Pays, Response.ChoseToPay PaymentDecision.Declines]
+        Spec.it s "CR 118.12a nobody pays, so one mana is added" $ do
+          (_, _, ((_, after), transcript)) <- tapCave Nothing
+          Spec.assertEqWith s "CR 118.12a: alice's pool holds one mana" (length (poolTypes S.alice after)) 1
+          Spec.assertEqWith s "all three declined" (payResponses transcript) (replicate 3 (Response.ChoseToPay PaymentDecision.Declines))
+        -- CR 602.5e: the same Cave while a spell is being cast. It is alice's
+        -- only land, so Sol Ring's {1} needs it -- any colour pays, so the
+        -- colour answer cannot decide the case -- and the ruling forbids it,
+        -- where at priority the Cave is offered.
+        Spec.it s "CR 602.5e the Cave is offered at priority and not inside a cast's payment" $ do
+          (caveId, board) <- caveBoard 0
+          ring <- S.printingOf s registry "Sol Ring"
+          let (gs, ringId) = S.handOne ring board
+              afterCast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice ringId))
+          Spec.assertEqWith s "CR 602.5e: Sol Ring stays in alice's hand" (elem ringId (Game.zoneMembers Zone.Hand S.alice afterCast)) True
+          Spec.assertEqWith s "and the Cave stays untapped" (Object.tapped <$> Game.lookupObject caveId afterCast) (Just TapState.Untapped)
+          Spec.assertEqWith s "CR 118.3: the cast is not offered" (S.castable S.alice ringId gs) False
+          Spec.assertEqWith s "CR 605.3a: at priority the Cave is offered" (elem (Action.Type.ActivateManaAbility caveId) (Action.legalActions S.alice gs)) True
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
   castabilitySpec s registry
   anyColorSpec s registry
+  rhysticCaveSpec s registry
   chosenColorSpec s registry
   solRingSpec s registry
   ancientTombSpec s registry

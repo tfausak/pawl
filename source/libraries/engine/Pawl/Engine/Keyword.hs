@@ -6618,7 +6618,7 @@ training =
 -- 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
 -- shroud-bearing spell is countered as readily as any other.
 --
--- CR 702.21b's X rides PayGate.perEach, which Pawl.Engine.Resolve.payGatePaidBy
+-- CR 702.21b's X rides PayGate.perEach, which Pawl.Engine.Resolve.Effect.payGatePaidBy
 -- evaluates against the RESOLUTION -- "not locked in as the ability triggers".
 -- The narrow tally the keyword stores is widened into a Quantity here, the one
 -- place the two namespaces meet; Pawl.Types.Ward.perEach says why it is stored

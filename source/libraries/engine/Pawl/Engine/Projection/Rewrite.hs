@@ -1879,6 +1879,7 @@ rewriteRestriction pairs restriction = case restriction of
   ActivationRestriction.OnlyOnce -> restriction
   ActivationRestriction.OnlyOnceEachTurn -> restriction
   ActivationRestriction.DuringDieRoll -> restriction
+  ActivationRestriction.InstantSpeed -> restriction
 
 -- CR 612.1 through a Duration, which Pawl.Types.Duration holds as the card
 -- prints it: a CR 611.2b "for as long as ..." clause is rules text like any
