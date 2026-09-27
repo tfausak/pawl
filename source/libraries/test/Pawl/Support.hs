@@ -2662,7 +2662,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseCardFromAmong decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDungeon decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseCompanion decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseFromOutsideTheGame decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseFromOutsideTheGame decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseRoom decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseHalf decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLegend decider _ _ -> Just (Decider.unwrap decider)

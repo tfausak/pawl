@@ -102,9 +102,12 @@
                         }
                       }
                     ],
-                    "ifTaken": [
-                      0
-                    ],
+                    "ifTaken": {
+                      "type": "AnyTaken",
+                      "value": [
+                        0
+                      ]
+                    },
                     "optionality": {
                       "type": "Optional"
                     }

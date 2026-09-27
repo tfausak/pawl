@@ -219,6 +219,7 @@
                       {
                         "type": "FromOutsideTheGame",
                         "value": {
+                          "count": 1,
                           "destination": {
                             "type": "LibraryTop"
                           },
@@ -226,7 +227,8 @@
                             "type": "And",
                             "value": []
                           },
-                          "reveal": false
+                          "reveal": false,
+                          "upTo": false
                         }
                       }
                     ],

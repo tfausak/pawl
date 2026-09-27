@@ -17,6 +17,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.IfTaken as IfTaken
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -80,8 +81,8 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause (Just (pure (ClauseIndex.MkClauseIndex 1))) Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
-      " {\"ifTaken\":[1]} "
+      (Clause.MkClause (Just (IfTaken.AnyTaken (pure (ClauseIndex.MkClauseIndex 1)))) Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
+      " {\"ifTaken\":{\"type\":\"AnyTaken\",\"value\":[1]}} "
   -- CR 608.2d / 608.2c: Worms of the Earth's "if a player does either" hangs one
   -- clause off both halves of an either-or pair, so the key holds every ordinal
   -- it names.
@@ -90,8 +91,8 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       s
       toJson
       fromJson
-      (Clause.MkClause (Just (ClauseIndex.MkClauseIndex 0 NonEmpty.:| [ClauseIndex.MkClauseIndex 1])) Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
-      " {\"ifTaken\":[0,1]} "
+      (Clause.MkClause (Just (IfTaken.AnyTaken (ClauseIndex.MkClauseIndex 0 NonEmpty.:| [ClauseIndex.MkClauseIndex 1]))) Nothing Nothing Optionality.Mandatory Nothing Seq.empty)
+      " {\"ifTaken\":{\"type\":\"AnyTaken\",\"value\":[0,1]}} "
   -- CR 608.2d: Twiddle's tap names the untap it is exclusive with, and the key is
   -- emitted only when there is one. A DIFFERENT key from ifTaken, though both
   -- name clause ordinals: one clause may hang off an earlier one and branch

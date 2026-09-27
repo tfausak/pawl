@@ -4,7 +4,16 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 2
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
         },
         {
           "type": "OfType",
@@ -16,7 +25,7 @@
           }
         }
       ],
-      "name": "Tweeze",
+      "name": "Breaking Point",
       "spell": {
         "modes": [
           {
@@ -30,78 +39,59 @@
                         {
                           "quantity": {
                             "type": "Literal",
-                            "value": 3
+                            "value": 6
                           },
                           "ref": {
                             "type": "InSlot",
-                            "value": "target"
+                            "value": "thoseWhoMay"
                           }
                         }
                       ]
                     }
                   }
-                ]
-              },
-              {
-                "effects": [
-                  {
-                    "type": "Discard",
-                    "value": {
-                      "type": "Counted",
-                      "value": {
-                        "quantity": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "slot": "you"
-                      }
-                    }
-                  }
                 ],
                 "optionality": {
-                  "type": "Optional"
+                  "type": "Optional",
+                  "value": {
+                    "type": "EachPlayer"
+                  }
                 }
               },
               {
                 "effects": [
                   {
-                    "type": "Draw",
+                    "type": "Destroy",
                     "value": {
-                      "player": {
-                        "type": "Relative",
+                      "ref": {
+                        "type": "EachMatching",
                         "value": {
-                          "type": "You"
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
                         }
                       },
-                      "quantity": {
-                        "type": "Literal",
-                        "value": 1
+                      "regenerability": {
+                        "type": "CantBeRegenerated"
                       }
                     }
                   }
                 ],
                 "ifTaken": {
-                  "type": "AnyTaken",
+                  "type": "NoneTaken",
                   "value": [
-                    1
+                    0
                   ]
                 }
               }
-            ],
-            "targetSlots": {
-              "target": {
-                "pool": {
-                  "type": "AnyTarget"
-                }
-              }
-            }
+            ]
           }
         ]
       },
       "typeLine": {
         "types": [
           {
-            "type": "Instant"
+            "type": "Sorcery"
           }
         ]
       }

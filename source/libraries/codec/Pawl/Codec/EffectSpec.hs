@@ -2127,8 +2127,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame OutsideDestination.Hand (Filter.HasCardType CardType.Sorcery) True))
-      " {\"type\":\"FromOutsideTheGame\",\"value\":{\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}},\"reveal\":true}} "
+      (Effect.FromOutsideTheGame (FromOutsideTheGame.MkFromOutsideTheGame 1 False OutsideDestination.Hand (Filter.HasCardType CardType.Sorcery) True))
+      " {\"type\":\"FromOutsideTheGame\",\"value\":{\"count\":1,\"destination\":{\"type\":\"Hand\"},\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Sorcery\"}},\"reveal\":true,\"upTo\":false}} "
   -- CR 608.2n: no payload at all -- the spell exiling itself is the whole of it.
   Spec.it s "ExileThisSpell" $
     Common.assertJsonCodec

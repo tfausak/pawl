@@ -19,6 +19,12 @@ spec s = Spec.describe s "Pawl.Codec.OutsideDestination" $ do
       OutsideDestination.codec
       OutsideDestination.LibraryTop
       " {\"type\":\"LibraryTop\"} "
+  Spec.it s "LibraryShuffled" $
+    Common.assertCodec
+      s
+      OutsideDestination.codec
+      OutsideDestination.LibraryShuffled
+      " {\"type\":\"LibraryShuffled\"} "
   -- Exhaustive where the literals above are representative: Arm.enum derives
   -- the arm list from the type, so this is what would catch a constructor the
   -- derivation missed or two that encode alike.

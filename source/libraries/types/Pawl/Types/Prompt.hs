@@ -330,10 +330,12 @@ data Prompt r where
   -- WISH to reveal" makes declining an answer, so the prompt is raised even where
   -- one card is offered.
   ChooseCompanion :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PrintingId.PrintingId -> Prompt (Maybe PrintingId.PrintingId)
-  -- | CR 400.11c \/ 729.4: which card a player brings in from outside the game;
-  -- an OutsideCard rather than a printing because which zone it leaves decides
-  -- what triggers (CR 729.4a). Two copies of one printing are one offer.
-  ChooseFromOutsideTheGame :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty OutsideCard.OutsideCard -> Prompt OutsideCard.OutsideCard
+  -- | CR 400.11c \/ 729.4: which cards a player brings in from outside the
+  -- game, at least the first Natural and at most the second; an OutsideCard
+  -- rather than a printing because which zone it leaves decides what triggers
+  -- (CR 729.4a). Two copies of one printing are one offer, which the answer may
+  -- name once per copy.
+  ChooseFromOutsideTheGame :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty OutsideCard.OutsideCard -> Natural.Natural -> Natural.Natural -> Prompt [OutsideCard.OutsideCard]
   -- | CR 309.5a \/ 701.49b: which arrow out of the current room a venturing
   -- player follows; the ObjectId is the dungeon card.
   ChooseRoom :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty RoomIndex.RoomIndex -> Prompt RoomIndex.RoomIndex

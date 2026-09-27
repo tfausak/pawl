@@ -16,7 +16,7 @@
           }
         }
       ],
-      "name": "Tweeze",
+      "name": "Browbeat",
       "spell": {
         "modes": [
           {
@@ -30,36 +30,22 @@
                         {
                           "quantity": {
                             "type": "Literal",
-                            "value": 3
+                            "value": 5
                           },
                           "ref": {
                             "type": "InSlot",
-                            "value": "target"
+                            "value": "thoseWhoMay"
                           }
                         }
                       ]
                     }
                   }
-                ]
-              },
-              {
-                "effects": [
-                  {
-                    "type": "Discard",
-                    "value": {
-                      "type": "Counted",
-                      "value": {
-                        "quantity": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "slot": "you"
-                      }
-                    }
-                  }
                 ],
                 "optionality": {
-                  "type": "Optional"
+                  "type": "Optional",
+                  "value": {
+                    "type": "EachPlayer"
+                  }
                 }
               },
               {
@@ -68,22 +54,20 @@
                     "type": "Draw",
                     "value": {
                       "player": {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
+                        "type": "InSlot",
+                        "value": "target"
                       },
                       "quantity": {
                         "type": "Literal",
-                        "value": 1
+                        "value": 3
                       }
                     }
                   }
                 ],
                 "ifTaken": {
-                  "type": "AnyTaken",
+                  "type": "NoneTaken",
                   "value": [
-                    1
+                    0
                   ]
                 }
               }
@@ -91,7 +75,7 @@
             "targetSlots": {
               "target": {
                 "pool": {
-                  "type": "AnyTarget"
+                  "type": "Players"
                 }
               }
             }
@@ -101,7 +85,7 @@
       "typeLine": {
         "types": [
           {
-            "type": "Instant"
+            "type": "Sorcery"
           }
         ]
       }
