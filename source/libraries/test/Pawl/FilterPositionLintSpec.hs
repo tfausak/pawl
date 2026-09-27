@@ -372,10 +372,11 @@ hostFramed framing = case framing of
   LifeLossAmountFramed -> False
 
 -- How many CR 701.3a atoms this card carries in a position framed by an attach
--- -- Effect.AttachTarget's destination, Effect.AttachTargetToEach's, or CR
--- 614.1c's EntryRewrite.EntersAttachedTo host choice -- and how many anywhere
--- else. The second number is the offence; the first is what Aura Graft,
--- Synthetic Aura Diffusion and Grifter's Blade legitimately have one of each.
+-- -- Effect.AttachTarget's destination, Effect.AttachTargetToEach's,
+-- Effect.AttachAll's, or CR 614.1c's EntryRewrite.EntersAttachedTo host choice
+-- -- and how many anywhere else. The second number is the offence; the first is
+-- what Aura Graft, Synthetic Aura Diffusion, Grifter's Blade and Glamer
+-- Spinners legitimately have one of each.
 canHostSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canHostSubjectCounts card =
   let total wanted = sum (fmap (\(_, f) -> canHostSubjects f) (filter (\(framing, _) -> elem framing [AttachDestination, EntryAttachDestination] == wanted) (cardFilters card)))

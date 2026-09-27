@@ -187,8 +187,7 @@ data Effect card ability
     -- attachment's controller picks.
     AttachTargetToEach AttachTarget.AttachTarget
   | -- | CR 701.3a, the third arrangement: a bound object moves, to a targeted
-    -- destination (Sigarda's Aid) -- the only attach opcode whose destination is
-    -- chosen at CR 603.3d.
+    -- destination chosen at CR 603.3d (Sigarda's Aid).
     AttachBound AttachBound.AttachBound
   | -- | CR 701.3a: every object the ObjectRef names moves to one permanent
     -- chosen as this resolves (Glamer Spinners, Balan, Wandering Knight).

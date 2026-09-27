@@ -1134,10 +1134,10 @@ data Asks
     -- the random arm (Hymn to Tourach) through randomCardsInHand. Every other
     -- arm falls through to the pure sweep.
     AsksDiscardArm
-  | -- | Pawl.Engine.Resolve's turnPermanentsOver gather, shared by Effect.Transform
-    -- and Effect.Convert. It asks the any-number arm and nothing else: the four
-    -- card-shaped chosen arms name cards in a graveyard, a hand or a group, and CR
-    -- 701.27a turns over PERMANENTS.
+  | -- | Pawl.Engine.Resolve's permanentsGathered, shared by Effect.Transform,
+    -- Effect.Convert and Effect.AttachAll. It asks the any-number arm and
+    -- nothing else: the four card-shaped chosen arms name cards in a graveyard,
+    -- a hand or a group, and both instructions act on PERMANENTS.
     AsksTransformGather
   | -- | Pawl.Engine.Resolve's Effect.LookAt arm. It asks the hand chooser --
     -- Word of Command's "look at target opponent's hand and choose a card from
