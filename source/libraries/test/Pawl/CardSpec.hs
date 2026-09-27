@@ -747,6 +747,7 @@ countQuantities :: Count.Type.Count Quantity.Type.Quantity -> [Quantity.Type.Qua
 countQuantities count = case Count.Type.aggregation count of
   Aggregation.Members -> []
   Aggregation.DistinctCardTypes -> []
+  Aggregation.DistinctColors -> []
   Aggregation.Greatest quantity -> [quantity]
   Aggregation.Total quantity -> [quantity]
 
@@ -2480,6 +2481,7 @@ reservedSlots =
       Binding.mayPlayers,
       Binding.facingPlayers,
       Binding.became,
+      Binding.handArrival,
       Binding.departedPermanent,
       Binding.earthbentLand,
       Binding.airbentObjects,

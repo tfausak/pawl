@@ -181,6 +181,15 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- empties this list, and neither CR 305.7 nor CR 612.3 reaches a granted
     -- ability.
     grantedPlayerAbilities :: [(Timestamp.Timestamp, PlayerStaticAbility.PlayerStaticAbility)],
+    -- | CR 613.1f / 113.3d: the object-affecting static abilities a STATIC
+    -- ability's layer-6 grant gave the object, each with the grant's timestamp
+    -- (CR 613.7a), in the order the fold applied them. Only this fold knows who
+    -- such a grant reaches, so Pawl.Engine.Projection.withStaticGrants reads it back
+    -- off a projection to gather the abilities' own effects. A resolution's
+    -- stored grant is not recorded here: its set is fixed (CR 611.2c) and
+    -- Pawl.Engine.Projection.View.grantedStaticAbilitiesOf reads it without a
+    -- projection.
+    grantedStaticAbilities :: [(Timestamp.Timestamp, StaticAbility.StaticAbility (GrantedAbility.GrantedAbility Card.Card))],
     -- | CR 116.2: the special actions this object's rules text grants -- the
     -- axis Pawl.Types.Face.specialActions carries. Copiable because CR 707.2
     -- names rules text among the copiable values and CR 707.2a copies the

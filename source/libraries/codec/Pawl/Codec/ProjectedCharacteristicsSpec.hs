@@ -75,6 +75,7 @@ testCharacteristics =
       PC.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))],
       PC.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.EachPlayer, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.CantCastMoreThan 1}],
       PC.grantedPlayerAbilities = [(Timestamp.MkTimestamp 3, PlayerStaticAbility.MkPlayerStaticAbility {PlayerStaticAbility.scope = PlayerScope.You, PlayerStaticAbility.condition = Nothing, PlayerStaticAbility.name = Nothing, PlayerStaticAbility.effect = PlayerEffect.NoMaximumHandSize})],
+      PC.grantedStaticAbilities = [(Timestamp.MkTimestamp 4, StaticAbility.MkStaticAbility Affected.Attached Nothing Set.empty Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Trample)))],
       PC.specialActions = [SpecialAction.DiscardThisAnyTime],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
@@ -126,6 +127,7 @@ testCharacteristicsJson =
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Flying\"}}]}],"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"EachPlayer\"},\"effect\":{\"type\":\"CantCastMoreThan\",\"value\":1}}],"
     <> "\"grantedPlayerAbilities\":[{\"key\":3,\"value\":{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"NoMaximumHandSize\"}}}],"
+    <> "\"grantedStaticAbilities\":[{\"key\":4,\"value\":{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"GainKeyword\",\"value\":{\"type\":\"Trample\"}}]}}],"
     <> "\"specialActions\":[{\"type\":\"DiscardThisAnyTime\"}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
@@ -169,6 +171,7 @@ minimalCharacteristics =
       PC.staticAbilities = [],
       PC.playerAbilities = [],
       PC.grantedPlayerAbilities = [],
+      PC.grantedStaticAbilities = [],
       PC.specialActions = [],
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
