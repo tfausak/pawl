@@ -40,6 +40,7 @@ import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
+import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ClassLevelChange as ClassLevelChange
 import qualified Pawl.Types.CoinFlipped as CoinFlipped
@@ -4766,9 +4767,13 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- is CR 603.10a's look-back, unrestricted by this condition's own exclusion --
   -- and `Not IsSource` cannot do the excluding, CR 400.7 having minted the
   -- graveyard card a fresh id that the bearer's own id never equals.
-  TriggerCondition.CardPutIntoGraveyard f ->
+  --
+  -- The origin is read off the event, CR 400.7's zone left, and an empty set
+  -- admits any.
+  TriggerCondition.CardPutIntoGraveyard (CardPutIntoGraveyard.MkCardPutIntoGraveyard f origins) ->
     let admits zc =
           ZoneChange.to zc == Zone.Graveyard
+            && (Set.null origins || Set.member (ZoneChange.from zc) origins)
             && ZoneChange.departed zc /= bearer
             && let arrived = ZoneChange.object zc
                 in case Projection.viewWithLastKnown arrived gs arrived of

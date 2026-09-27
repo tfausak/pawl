@@ -41,6 +41,7 @@ import qualified Pawl.Types.CantBeRegenerated as CantBeRegenerated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -1674,7 +1675,7 @@ rewriteTriggerCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Tri
 rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
   TriggerCondition.PermanentEnters f -> TriggerCondition.PermanentEnters (Filter.rewrite pairs f)
-  TriggerCondition.CardPutIntoGraveyard f -> TriggerCondition.CardPutIntoGraveyard (Filter.rewrite pairs f)
+  TriggerCondition.CardPutIntoGraveyard p -> TriggerCondition.CardPutIntoGraveyard p {CardPutIntoGraveyard.filter = Filter.rewrite pairs (CardPutIntoGraveyard.filter p)}
   TriggerCondition.PermanentDies f -> TriggerCondition.PermanentDies (Filter.rewrite pairs f)
   TriggerCondition.PermanentsDie f -> TriggerCondition.PermanentsDie (Filter.rewrite pairs f)
   TriggerCondition.PermanentLeavesTheBattlefield f -> TriggerCondition.PermanentLeavesTheBattlefield (Filter.rewrite pairs f)

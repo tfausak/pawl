@@ -1664,9 +1664,12 @@ eventTriggers events gs =
       -- The two ids coincide by construction, and that is the hinge of this source.
       --
       -- Abilities from the last known projection rather than a printed face: a
-      -- ceased id has no face to look up, and `LastKnown` carries none. Identical
-      -- to `inGraveyards`' printed read today, no pool effect changing the
-      -- TRIGGERED abilities of a card in a graveyard (gap #1859). Not `abilitiesOf` either,
+      -- ceased id has no face to look up, and `LastKnown` carries none. So a
+      -- granted ability is seen here -- Oglor, Devoted Assistant's perpetual
+      -- leaves-your-graveyard trigger, which only this source serves, and
+      -- Pawl.ZoneTriggerSpec's "CR 603.10a Oglor's perpetual grant fires as the
+      -- milled card leaves the graveyard" proves it -- where `inGraveyards`'
+      -- printed read would miss one (gap #1859). Not `abilitiesOf` either,
       -- and not `graveyardTriggeredAbilitiesOf`, which `inGraveyards` does consult:
       -- both abilities on that roster -- CR 702.59a's recover and CR 702.55a's
       -- haunt on an instant or sorcery -- move the card they are on, and an id

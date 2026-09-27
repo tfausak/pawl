@@ -18,9 +18,11 @@
           "condition": {
             "type": "CardPutIntoGraveyard",
             "value": {
-              "type": "Not",
-              "value": {
-                "type": "IsSource"
+              "filter": {
+                "type": "Not",
+                "value": {
+                  "type": "IsSource"
+                }
               }
             }
           },
