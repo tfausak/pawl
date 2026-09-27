@@ -114,6 +114,7 @@ import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
+import qualified Pawl.Types.FullText as FullText
 import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
@@ -270,6 +271,9 @@ rewriteModification pairs m =
         -- CR 612.1 over the whole quoted ability: the words are printed on the
         -- GRANTER, so a text change affecting it rewrites them before the grant.
         Modification.GainAbility a -> Modification.GainAbility (rewriteGrantedAbility [(from, to)] a)
+        -- The same descent into CR 612.6's extra text, printed on the granter;
+        -- a PlayerRef names no subtype word.
+        Modification.HasFullText ft -> Modification.HasFullText ft {FullText.alsoHas = fmap (rewriteGrantedAbility [(from, to)]) (FullText.alsoHas ft)}
         -- Carries no word: rule 702.165a's grant names the SOURCE, and the
         -- abilities it will hand over are that object's copiable values as the
         -- ability was put on the stack (CR 702.165d, Pawl.Engine.Resolve.Effect's

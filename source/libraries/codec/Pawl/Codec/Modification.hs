@@ -7,6 +7,7 @@ import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.FullText as FullText
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.ModifyPowerToughness as ModifyPowerToughness
@@ -66,6 +67,7 @@ codec abilityCodec =
           Arm.nullary "AddChosenColor" Modification.AddChosenColor,
           Arm.nullary "ExchangeTextBoxes" Modification.ExchangeTextBoxes,
           Arm.payload "AddNamesMatching" (Filter.codec Keyword.codec) Modification.AddNamesMatching (\x -> case x of Modification.AddNamesMatching y -> Just y; _ -> Nothing),
+          Arm.payload "HasFullText" (FullText.codec abilityCodec) Modification.HasFullText (\x -> case x of Modification.HasFullText y -> Just y; _ -> Nothing),
           Arm.nullary "SwitchPowerToughness" Modification.SwitchPowerToughness,
           Arm.nullary "AssignCombatDamageWithToughness" Modification.AssignCombatDamageWithToughness,
           Arm.nullary "GrantsStationToughness" Modification.GrantsStationToughness
@@ -107,6 +109,7 @@ tagOf x = case x of
   Modification.AddChosenColor {} -> "AddChosenColor"
   Modification.ExchangeTextBoxes {} -> "ExchangeTextBoxes"
   Modification.AddNamesMatching {} -> "AddNamesMatching"
+  Modification.HasFullText {} -> "HasFullText"
   Modification.SwitchPowerToughness {} -> "SwitchPowerToughness"
   Modification.AssignCombatDamageWithToughness {} -> "AssignCombatDamageWithToughness"
   Modification.GrantsStationToughness {} -> "GrantsStationToughness"

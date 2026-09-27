@@ -7,6 +7,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.FullText as FullText
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -386,6 +387,9 @@ data Modification ability
   | -- | layer 3, CR 613.1c / 612.7: this object also has the name of every card
     -- whose face matches the Filter (Spy Kit).
     AddNamesMatching (Filter.Filter Keyword.Keyword)
+  | -- | layer 3, CR 613.1c / 612.6: this object has the full text of the top
+    -- card of a graveyard (Volrath's Shapeshifter).
+    HasFullText (FullText.FullText ability)
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect, never chosen: the
     -- effect's source's controller for GainControl, the OTHER permanent's

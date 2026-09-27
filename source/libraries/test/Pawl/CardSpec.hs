@@ -186,6 +186,7 @@ import qualified Pawl.Types.ForbidBlock as ForbidBlock
 import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import qualified Pawl.Types.FromReference as FromReference
+import qualified Pawl.Types.FullText as FullText
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GiveControl as GiveControl
 import qualified Pawl.Types.GrantLookAtExiled as GrantLookAtExiled
@@ -904,6 +905,8 @@ modificationCounts modification = case modification of
   -- Its Filter's Counts are reached through modificationFilters, GainEnchant's
   -- answer.
   Modification.AddNamesMatching _ -> []
+  -- The extra text descends as GainAbility's does; a PlayerRef holds no Count.
+  Modification.HasFullText ft -> concatMap (modificationCounts . Modification.GainAbility) (FullText.alsoHas ft)
   -- Payload-free, both of them, so there is no Count to sweep.
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
@@ -3967,6 +3970,9 @@ modificationFilters modification = case modification of
   Modification.ExchangeTextBoxes -> []
   -- CR 612.7's filter is card text like GainEnchant's slot, and is swept.
   Modification.AddNamesMatching f -> unframed [f]
+  -- Nothing HERE, GainAbility's answer: grantedModifications hands the extra
+  -- text to the outer granted-ability sweeps.
+  Modification.HasFullText _ -> []
   -- Payload-free, both of them, so there is no Filter to sweep.
   Modification.AssignCombatDamageWithToughness -> []
   Modification.GrantsStationToughness -> []
@@ -5997,10 +6003,15 @@ grantedModifications card =
       -- A granted static ability's own parts are card text too, and may grant.
       staticsIn modifications =
         concatMap (Foldable.toList . StaticAbility.modifications) (Maybe.mapMaybe (\modification -> case modification of Modification.GainAbility (GrantedAbility.Static sa) -> Just sa; _ -> Nothing) modifications)
+      -- CR 612.6's extra text is quoted ability text on this card too.
+      withFullText modifications =
+        modifications <> [Modification.GainAbility g | Modification.HasFullText ft <- modifications, g <- FullText.alsoHas ft]
       deeper modifications =
         if null modifications
           then []
-          else modifications <> deeper (storedIn (effectsOf modifications) <> staticsIn modifications)
+          else
+            let expanded = withFullText modifications
+             in expanded <> deeper (storedIn (effectsOf expanded) <> staticsIn expanded)
    in deeper (printed <> concatMap (copyQuotedAbilities . replacementCopyExceptions . PrintedReplacement.effect) (Face.replacementEffects card) <> storedIn (printedCarrierEffects card))
 
 -- CR 707.9a: the abilities a copy exception QUOTES, as the grant they amount to.
