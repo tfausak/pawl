@@ -215,13 +215,13 @@ data Response
     -- answers to it and to nothing else here.
     ChoseBehold ObjectId.ObjectId
   | -- | CR 118.1 as a cost: the permanent a paying player chose to take the
-    -- +1\/+1 counters off.
+    -- counters of one kind off.
     --
     -- Its own constructor for ChoseBolster's reason: a cost's candidates are an
     -- arbitrary Filter over the battlefield, which can coincide with any of the
     -- object choices above.
     ChoseCounterRemoval ObjectId.ObjectId
-  | -- | CR 118.1 as a cost / CR 601.2h: how many +1\/+1 counters a paying
+  | -- | CR 118.1 as a cost / CR 601.2h: how many counters of one kind a paying
     -- player chose to take off each permanent, where the cost divides them; or
     -- a resolving player, where an effect does (CR 608.2d).
     ChoseCounterRemovalAmong (Map.Map ObjectId.ObjectId Natural.Natural)
@@ -233,6 +233,9 @@ data Response
     -- cap. Its own constructor: an answer below the count is legal here and not
     -- to ChooseCounterRemovalAmong.
     ChoseCounterRemovalUpTo (Map.Map ObjectId.ObjectId Natural.Natural)
+  | -- | CR 122.1: the division by permanent AND kind a paying or resolving
+    -- player chose where the removal names no kind.
+    ChoseMixedCounterRemoval (Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural))
   | -- | CR 701.38a: the choice one player voted for.
     --
     -- Its own constructor for ChoseBolster's reason: a vote's candidates are an

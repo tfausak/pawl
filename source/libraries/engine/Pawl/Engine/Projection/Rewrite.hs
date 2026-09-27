@@ -765,7 +765,7 @@ rewriteEffect pairs effect = case effect of
   -- The count, the ObjectRef and the kind, each the descent its siblings
   -- make.
   Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from kind tally) ->
-    Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong (rewriteRemovalCount pairs count) (rewriteObjectRef pairs from) (Filter.rewriteCounterKind pairs kind) tally)
+    Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong (rewriteRemovalCount pairs count) (rewriteObjectRef pairs from) (Filter.rewriteWhichCounters pairs kind) tally)
   -- The destination and the kind: CR 122.8 names no count, and its third
   -- sentence lets the card settle which kinds cross, so that kind is printed
   -- text PutCounters' case above reaches the same way.

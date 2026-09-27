@@ -32,6 +32,7 @@ import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
@@ -1648,6 +1649,17 @@ combatReplaySpec s =
           Spec.assertEqWith s "taking none round trips" (Replay.decode p (Replay.encode p Map.empty)) (Just Map.empty)
           -- Discriminating: fails if the division prompts share a response.
           Spec.assertEqWith s "and a floored division transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemovalAtLeast most)) Nothing
+        -- CR 122.1 / 601.2h, where the payer divides by kind as well.
+        Spec.it s "ChooseMixedCounterRemoval round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 11
+              b = ObjectId.MkObjectId 13
+              vigilance = CounterKind.Keyword Keyword.Vigilance
+              offered = Map.fromList [(a, Map.fromList [(CounterKind.PlusOnePlusOne, 2 :: Natural.Natural), (vigilance, 1)]), (b, Map.singleton CounterKind.PlusOnePlusOne 1)]
+              p = Prompt.ChooseMixedCounterRemoval decider S.alice oid CounterSpread.FromAmong 3 offered
+              division = Map.fromList [(a, Map.singleton vigilance 1), (b, Map.singleton CounterKind.PlusOnePlusOne (1 :: Natural.Natural))]
+          Spec.assertEqWith s "a division by kind round trips" (Replay.decode p (Replay.encode p division)) (Just division)
+          -- Discriminating: fails if the mixed prompt shares a one-kind response.
+          Spec.assertEqWith s "and a one-kind division transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemovalAmong (Map.singleton a 3))) Nothing
         -- CR 701.61a: which half of forage the forager took is a decision, so it
         -- has to survive a transcript like any other.
         Spec.it s "ChooseForage round-trips through the transcript" $ do

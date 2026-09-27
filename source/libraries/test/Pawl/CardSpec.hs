@@ -127,6 +127,7 @@ import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
@@ -280,7 +281,6 @@ import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
-import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -336,6 +336,7 @@ import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.Ward as Ward
+import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -1499,17 +1500,17 @@ sacrificesAsCost =
         _ -> False
    in any isSacrifice . Cost.Type.components
 
--- Does this cost remove +1\/+1 counters from permanents the payer CHOOSES?
+-- Does this cost remove counters from permanents the payer CHOOSES?
 -- sacrificesAsCost's shape: CR 601.2h's payment binds how many under
 -- Binding.removedCounters (Pawl.Engine.Cost.payComponent's
--- RemovePlusOneCounters arm, folded on by Pawl.Engine.Activate), so Ooze Flux's
+-- RemoveCounters arm, folded on by Pawl.Engine.Activate), so Ooze Flux's
 -- "the number of +1\/+1 counters removed this way" is an ordinary slot read.
 -- Asked by AbilitySlotLintSpec for an activation; no printing puts this
 -- component on a spell's cost.
 removesCountersAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
 removesCountersAsCost =
   let isRemoval component = case component of
-        CostComponent.RemovePlusOneCounters {} -> True
+        CostComponent.RemoveCounters {} -> True
         _ -> False
    in any isRemoval . Cost.Type.components
 
@@ -2978,6 +2979,12 @@ payGateFilters gate =
 -- KeywordFramed out through every quoting position rather than inheriting the
 -- promise of whichever one quoted it -- `frame` below fills in only the
 -- positions still Unframed.
+-- counterKindFilters over the kind a removal names, where it names one.
+whichCountersFilters :: WhichCounters.WhichCounters Keyword.Keyword -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+whichCountersFilters which = case which of
+  WhichCounters.OfKind kind -> counterKindFilters kind
+  WhichCounters.OfAnyKind -> []
+
 counterKindFilters :: CounterKind.CounterKind Keyword.Keyword -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 counterKindFilters kind = case kind of
   CounterKind.Keyword keyword -> keywordFilters keyword
@@ -3513,7 +3520,7 @@ costComponentFilters component = case component of
   CostComponent.RemoveCountersFromThis _ -> []
   -- CR 118.1's removal aimed elsewhere: Zameck Guildmage's "a creature you
   -- control".
-  CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters _ f _) -> [f]
+  CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents _ _ f _) -> [f]
   -- Retribution of the Ancients' "creatures you control", X counters from among
   -- them.
   CostComponent.RemovePlusOneCountersX f -> [f]
@@ -5689,7 +5696,7 @@ effectFilters effect = case effect of
   -- slot beside them is a bare SlotName and carries no Filter.
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity _ _) -> frame Unframed (counterKindFilters kind <> quantityFilters quantity)
   -- RemoveCounters' two unframed positions, and MoveCounters' `from`.
-  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from kind _) -> frame Unframed (counterKindFilters kind <> foldMap quantityFilters (RemovalCount.quantityOf count)) <> frame SourceHostFramed (objectRefFilters from)
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count from which _) -> frame Unframed (whichCountersFilters which <> foldMap quantityFilters (RemovalCount.quantityOf count)) <> frame SourceHostFramed (objectRefFilters from)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []

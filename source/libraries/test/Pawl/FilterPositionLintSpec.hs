@@ -147,6 +147,7 @@ import qualified Pawl.Types.TopOfLibraryUntil as TopOfLibraryUntil
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneScope as ZoneScope
@@ -2036,7 +2037,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
           [ ("EntryRiders' kinds", holds (riderFilters riders)),
             ("Effect.PutCounters' kind", holds (effectFilters (Effect.PutCounters (PutCounters.MkPutCounters kind one anywhere)))),
             ("Effect.RemoveCounters' kind", holds (effectFilters (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind one slot Nothing)))),
-            ("Effect.RemoveCountersAmong' kind", holds (effectFilters (Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong (RemovalCount.Exactly one) anywhere kind Nothing)))),
+            ("Effect.RemoveCountersAmong' kind", holds (effectFilters (Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong (RemovalCount.Exactly one) anywhere (WhichCounters.OfKind kind) Nothing)))),
             ("Effect.MoveCounters' kinds", holds (effectFilters (Effect.MoveCounters (MoveCounters.MkMoveCounters anywhere (MovedKinds.Named kind one) Nothing anywhere)))),
             ("Effect.PutCountersFrom' kind", holds (effectFilters (Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom slot (Just kind) anywhere)))),
             ("Quantity.ObjectCounters' kind", holds (quantityFilters (Quantity.Type.ObjectCounters kind))),

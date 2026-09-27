@@ -2594,7 +2594,7 @@ printlifterSpec s registry = Spec.describe s "The counters a Create says its tok
 -- row came from.
 --
 -- The second ability is transcribed too, on
--- CostComponent.RemovePlusOneCounters, and is Pawl.CostSpec's Zameck Guildmage
+-- CostComponent.RemoveCounters, and is Pawl.CostSpec's Zameck Guildmage
 -- group rather than this one's: nothing here activates it, so the boards below
 -- are unchanged by it.
 --

@@ -9,6 +9,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterSpread as CounterSpread
+import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -16,12 +17,12 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.RemovePlusOneCounters as RemovePlusOneCounters
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
+import qualified Pawl.Types.WhichCounters as WhichCounters
 
 -- | Instantiated at 'Keyword.Keyword', the only concrete instantiation
 -- anywhere in the pool.
@@ -146,12 +147,12 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       (CostComponent.RemoveCountersFromThis (CountersFromThis.MkCountersFromThis CounterKind.PlusOnePlusOne 1))
       " {\"type\":\"RemoveCountersFromThis\",\"value\":{\"count\":1,\"kind\":{\"type\":\"PlusOnePlusOne\"}}} "
   -- The same removal aimed at a permanent the payer chooses, Zameck Guildmage's.
-  Spec.it s "RemovePlusOneCounters" $
+  Spec.it s "RemoveCounters" $
     Common.assertCodec
       s
       codec
-      (CostComponent.RemovePlusOneCounters (RemovePlusOneCounters.MkRemovePlusOneCounters 1 (Filter.HasCardType CardType.Creature) CounterSpread.FromOne))
-      " {\"type\":\"RemovePlusOneCounters\",\"value\":{\"count\":1,\"whichPermanent\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
+      (CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents 1 (WhichCounters.OfKind CounterKind.PlusOnePlusOne) (Filter.HasCardType CardType.Creature) CounterSpread.FromOne))
+      " {\"type\":\"RemoveCounters\",\"value\":{\"count\":1,\"kind\":{\"type\":\"OfKind\",\"value\":{\"type\":\"PlusOnePlusOne\"}},\"whichPermanent\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- Its X form, Retribution of the Ancients'.
   Spec.it s "RemovePlusOneCountersX" $
     Common.assertCodec

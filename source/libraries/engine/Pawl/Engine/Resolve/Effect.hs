@@ -155,6 +155,7 @@ import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterSpread as CounterSpread
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageDirection as DamageDirection
@@ -351,6 +352,7 @@ import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Vote as Vote
 import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
+import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZonePair as ZonePair
 import qualified Pawl.Types.ZoneScope as ZoneScope
@@ -2969,9 +2971,9 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
       _ -> False
   -- CR 608.2d: "remove three" is not an option where fewer are there. "Up to"
   -- and "any number" always are, none being an answer.
-  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count fromRef kind _) -> case count of
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count fromRef which _) -> case count of
     RemovalCount.Exactly quantity -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n | n > 0 -> toInteger (sum (carrying gs kind (objectRefObjects legal resolving controller source gs fromRef))) < n
+      Just n | n > 0 -> toInteger (sum (fmap sum (removableAmong gs which (objectRefObjects legal resolving controller source gs fromRef)))) < n
       _ -> False
     RemovalCount.UpTo _ -> False
     RemovalCount.AnyNumber -> False
@@ -8205,42 +8207,63 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- than leaving the clause unanswered.
             Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot resolving source tally (min before (Integer.toNaturalSaturating n)))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
-  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count fromRef kind mTally) -> do
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count fromRef which mTally) -> do
     -- CR 608.2d: the resolving controller divides the removal among the
     -- permanents the ObjectRef names that carry the kind, through the cost
-    -- side's division prompts (Pawl.Engine.Cost's RemovePlusOneCounters arm). An
+    -- side's division prompts (Pawl.Engine.Cost's RemoveCounters arm). An
     -- answer that does not add up is not repaired into another choice: it takes
     -- the least the card allows.
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-        offered = carrying gs kind (objectRefObjects legal resolving controller source gs fromRef)
+        permanents = objectRefObjects legal resolving controller source gs fromRef
         decider = Decide.deciderFor controller gs
         asked quantity = case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n | n > 0 -> Integer.toNaturalSaturating n
           _ -> 0
-    division <- case count of
-      RemovalCount.Exactly quantity
-        -- CR 609.3 where fewer are there than the card names, which a "may"
-        -- never reaches (effectIsImpossible); elided where the division is the
-        -- only one.
-        | sum offered <= asked quantity || Map.size offered == 1 -> pure (Cost.fillInOrder (asked quantity) offered)
-        | otherwise -> do
-            answer <- Game.choose (Prompt.ChooseCounterRemovalAmong decider controller source (asked quantity) offered)
-            pure (if Cost.dividesRemoval (asked quantity) offered answer then answer else Cost.fillInOrder (asked quantity) offered)
-      RemovalCount.UpTo quantity
-        | asked quantity == 0 || Map.null offered -> pure Map.empty
-        | otherwise -> do
-            answer <- Game.choose (Prompt.ChooseCounterRemovalUpTo decider controller source (asked quantity) offered)
-            pure (if sum answer <= asked quantity && Cost.withinOffer offered answer then answer else Map.empty)
-      RemovalCount.AnyNumber
-        | Map.null offered -> pure Map.empty
-        | otherwise -> do
-            answer <- Game.choose (Prompt.ChooseCounterRemovalAtLeast decider controller source 0 offered)
-            pure (if Cost.withinOffer offered answer then answer else Map.empty)
-    Monad.forM_ (Map.toList (Map.filter (> 0) division)) (\(permanent, taken) -> Event.removeCounters permanent kind taken)
+    removed <- case which of
+      WhichCounters.OfKind kind -> do
+        let offered = carrying gs kind permanents
+        division <- case count of
+          RemovalCount.Exactly quantity
+            -- CR 609.3 where fewer are there than the card names, which a "may"
+            -- never reaches (effectIsImpossible); elided where the division is the
+            -- only one.
+            | sum offered <= asked quantity || Map.size offered == 1 -> pure (Cost.fillInOrder (asked quantity) offered)
+            | otherwise -> do
+                answer <- Game.choose (Prompt.ChooseCounterRemovalAmong decider controller source (asked quantity) offered)
+                pure (if Cost.dividesRemoval (asked quantity) offered answer then answer else Cost.fillInOrder (asked quantity) offered)
+          RemovalCount.UpTo quantity
+            | asked quantity == 0 || Map.null offered -> pure Map.empty
+            | otherwise -> do
+                answer <- Game.choose (Prompt.ChooseCounterRemovalUpTo decider controller source (asked quantity) offered)
+                pure (if sum answer <= asked quantity && Cost.withinOffer offered answer then answer else Map.empty)
+          RemovalCount.AnyNumber
+            | Map.null offered -> pure Map.empty
+            | otherwise -> do
+                answer <- Game.choose (Prompt.ChooseCounterRemovalAtLeast decider controller source 0 offered)
+                pure (if Cost.withinOffer offered answer then answer else Map.empty)
+        Monad.forM_ (Map.toList (Map.filter (> 0) division)) (\(permanent, taken) -> Event.removeCounters permanent kind taken)
+        pure (sum division)
+      -- CR 122.1: with no kind named, the division is by kind as well
+      -- (Eventide's Shadow), through the cost side's mixed prompt at a floor of
+      -- zero. Only "any number" reaches here: Pawl.Codec.RemoveCountersAmong
+      -- rejects any kind at a stated count, which no printing writes.
+      WhichCounters.OfAnyKind -> case count of
+        RemovalCount.AnyNumber -> do
+          let offered = removableAmong gs which permanents
+          division <- case Cost.onlyMixedDivision CounterSpread.FromAmongAtLeast 0 offered of
+            Just only -> pure only
+            Nothing -> do
+              answer <- Game.choose (Prompt.ChooseMixedCounterRemoval decider controller source CounterSpread.FromAmongAtLeast 0 offered)
+              pure (if Cost.dividesMixedRemoval CounterSpread.FromAmongAtLeast 0 offered answer then answer else Map.empty)
+          let flat = Cost.flattenMixed division
+          Monad.forM_ (Map.toList flat) (\((permanent, kind), taken) -> Event.removeCounters permanent kind taken)
+          pure (sum flat)
+        RemovalCount.Exactly _ -> pure 0
+        RemovalCount.UpTo _ -> pure 0
     -- Bound even where nothing came off, Effect.RemoveCounters' posture.
-    Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot resolving source tally (sum division))
+    Monad.forM_ mTally $ \tally -> State.modify' (bindAmountSlot resolving source tally removed)
   Effect.MoveCounters (MoveCounters.MkMoveCounters fromRef kinds mSlot toRef) -> do
     -- CR 122.5: move counters off one permanent and onto a second. WHICH kinds
     -- cross is the card's call when it names one (Explorer's Cache's "move a
@@ -10160,6 +10183,11 @@ bindPlayerSlot holder slot players gs =
    in if Map.member holder (GameState.objects gs)
         then gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
         else gs {GameState.detachedBindings = Map.insertWith Map.union holder (Map.singleton slot binding) (GameState.detachedBindings gs)}
+
+-- The counters of the kinds a removal reaches on each of these permanents, by
+-- kind, the ones carrying none dropped.
+removableAmong :: GameState -> WhichCounters.WhichCounters Keyword.Type.Keyword -> [ObjectId] -> Map.Map ObjectId (Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural)
+removableAmong gs which candidates = Map.filter (not . Map.null) (Map.fromList [(candidate, Cost.removableCounters which candidate gs) | candidate <- candidates])
 
 -- The objects a RemoveCountersAmong names that carry the kind, with how many
 -- each carries: Pawl.Engine.Cost.spreadRemovalCandidates' shape.
