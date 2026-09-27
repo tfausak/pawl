@@ -1,6 +1,7 @@
 module Pawl.Types.ObjectRef where
 
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
@@ -171,4 +172,7 @@ data ObjectRef
     -- that the pair moves in one event -- proved by Pawl.MeldSpec's "CR 608.2f the
     -- pair leaves the battlefield in one event".
     SourceAndChosenPermanent (Filter.Filter Keyword.Keyword)
+  | -- | CR 303.4b / 608.2h: the permanents attached to the object a slot holds,
+    -- or attached as it left (Rhuk, Hexgold Nabber; Fumble).
+    AttachedToBound AttachedToBound.AttachedToBound
   deriving (Eq, Ord, Show)

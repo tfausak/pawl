@@ -184,8 +184,7 @@ data TriggerCondition
     -- Self-scoped, and once per blocking creature however many it blocked.
     SelfBlocks
   | -- | CR 509.3a read by a bystander: "whenever enchanted creature blocks"
-    -- (Super-Soldier Serum) -- SelfBlocks' event, the blocker the Filter admits
-    -- bound as "that creature".
+    -- (Super-Soldier Serum), once per blocker the Filter admits.
     CreatureBlocks (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3b: "whenever [a creature] blocks a creature" (Loyal Sentry) --
     -- SelfBlocks per attacker blocked, with the Filter over that attacker.

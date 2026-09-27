@@ -1,0 +1,192 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Trample"
+        },
+        {
+          "type": "Haste"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Rhuk, Hexgold Nabber",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "AnyOf",
+            "value": [
+              {
+                "type": "CreatureAttacks",
+                "value": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    },
+                    {
+                      "type": "Not",
+                      "value": {
+                        "type": "IsSource"
+                      }
+                    },
+                    {
+                      "type": "HasAttached",
+                      "value": {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Equipment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "PermanentDies",
+                "value": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    },
+                    {
+                      "type": "Not",
+                      "value": {
+                        "type": "IsSource"
+                      }
+                    },
+                    {
+                      "type": "HasAttached",
+                      "value": {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Equipment"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AttachAll",
+                        "value": {
+                          "destination": {
+                            "type": "IsSource"
+                          },
+                          "subjects": {
+                            "type": "AttachedToBound",
+                            "value": {
+                              "filter": {
+                                "type": "HasSubtype",
+                                "value": {
+                                  "type": "Equipment"
+                                }
+                              },
+                              "slot": "thatAttackingCreature"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "AttachAll",
+                        "value": {
+                          "destination": {
+                            "type": "IsSource"
+                          },
+                          "subjects": {
+                            "type": "AttachedToBound",
+                            "value": {
+                              "filter": {
+                                "type": "HasSubtype",
+                                "value": {
+                                  "type": "Equipment"
+                                }
+                              },
+                              "slot": "thatDepartedPermanent"
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Goblin"
+          },
+          {
+            "type": "Rebel"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
