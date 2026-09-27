@@ -10,6 +10,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Timestamp as Timestamp
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ExtraTurn" $ do
@@ -21,9 +22,10 @@ spec s = Spec.describe s "Pawl.Codec.ExtraTurn" $ do
       ExtraTurn.MkExtraTurn
         { ExtraTurn.taker = PlayerId.MkPlayerId 1,
           ExtraTurn.source = ObjectId.MkObjectId 4,
-          ExtraTurn.skipped = Set.empty
+          ExtraTurn.skipped = Set.empty,
+          ExtraTurn.createdAt = Timestamp.MkTimestamp 9
         }
-      " {\"taker\":1,\"source\":4,\"skipped\":[]} "
+      " {\"taker\":1,\"source\":4,\"skipped\":[],\"createdAt\":9} "
   -- CR 500.11's skip, travelling WITH the turn rather than referencing it --
   -- Savor the Moment's "skip the untap step of that turn".
   Spec.it s "a turn whose untap step is skipped" $
@@ -33,8 +35,9 @@ spec s = Spec.describe s "Pawl.Codec.ExtraTurn" $ do
       ExtraTurn.MkExtraTurn
         { ExtraTurn.taker = PlayerId.MkPlayerId 2,
           ExtraTurn.source = ObjectId.MkObjectId 5,
-          ExtraTurn.skipped = Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap))
+          ExtraTurn.skipped = Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)),
+          ExtraTurn.createdAt = Timestamp.MkTimestamp 11
         }
-      " {\"taker\":2,\"source\":5,\"skipped\":[{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Untap\"}}}]} "
+      " {\"taker\":2,\"source\":5,\"skipped\":[{\"type\":\"Step\",\"value\":{\"type\":\"Beginning\",\"value\":{\"type\":\"Untap\"}}}],\"createdAt\":11} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ExtraTurn.codec

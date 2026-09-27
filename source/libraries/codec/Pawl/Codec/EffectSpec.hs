@@ -1108,7 +1108,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       (Effect.OfferNamedCopy (CardName.MkCardName (Text.pack "Disenchant") NonEmpty.:| [CardName.MkCardName (Text.pack "Black Lotus")]))
       " {\"type\":\"OfferNamedCopy\",\"value\":[\"Disenchant\",\"Black Lotus\"]} "
   -- CR 104.3e, a bare PlayerRef too. Door to Nothingness writes the targeted
-  -- spelling; this is the self one, which no card in the pool writes yet (#3792).
+  -- spelling; Final Fortune and the Pacts write this self one.
   Spec.it s "LoseGame" $
     Common.assertJsonCodec
       s

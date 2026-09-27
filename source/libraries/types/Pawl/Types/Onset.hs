@@ -46,4 +46,10 @@ data Onset
     -- silently narrowed to the controller's turn. Card data must say what the
     -- card says instead of leaning on the engine to mean it.
     FromYourNextTurn
+  | -- | CR 500.7: "that turn", the extra turn the same resolution just created for
+    -- the entry's controller (Final Fortune). Not FromYourNextTurn: the most
+    -- recently created turn is taken first, so a second extra turn created later
+    -- would become "your next turn". Pawl.Engine.Event.armOnset names the turn by
+    -- its ExtraTurn.createdAt.
+    FromThatExtraTurn
   deriving (Bounded, Enum, Eq, Ord, Show)

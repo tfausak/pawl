@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Timestamp as Timestamp
 
 -- | CR 500.7: one turn that has been created and not yet taken, as an entry on
 -- GameState.extraTurns. Runtime-only, like ActiveReplacement: card data writes
@@ -24,9 +25,15 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- the skips can become ActiveReplacements naming it when the turn begins
 -- (Pawl.Engine.Replacement.installTurnSkips). CR 608.2n has put Savor the Moment
 -- into its owner's graveyard long before then.
+--
+-- `createdAt` is the turn's identity, so a delayed ability armed for "that
+-- turn" (Onset.FromThatExtraTurn, Final Fortune) can name it: CR 500.7's stack
+-- means "your next turn" is a different turn once a later effect creates
+-- another.
 data ExtraTurn = MkExtraTurn
   { taker :: PlayerId.PlayerId,
     source :: ObjectId.ObjectId,
-    skipped :: Set.Set PhaseSelector.PhaseSelector
+    skipped :: Set.Set PhaseSelector.PhaseSelector,
+    createdAt :: Timestamp.Timestamp
   }
   deriving (Eq, Ord, Show)
