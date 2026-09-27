@@ -68,6 +68,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -281,6 +282,81 @@ entrySpec s registry = Spec.describe s "EntersTransformed" $ do
     Spec.assertEqWith s "it is day when the spell resolves" (GameState.daytime board) (Just Daytime.Day)
     Spec.assertEqWith s "the permanent is showing its front face" (expertFaces entered) [expertFront]
     Spec.assertEqWith s "and its front face's trigger made one Insect" (S.countOnBattlefieldByName insectToken S.alice triggered) 1
+  -- CR 712.13a's second sentence, on the synthetic Dusklit Conjurer: daybound
+  -- makes it enter transformed, its back face is an instant, so it goes to its
+  -- owner's graveyard instead of the battlefield.
+  Spec.it s "CR 712.13a a spell entering transformed onto an instant back face goes to the graveyard" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    forest <- S.printingOf s registry "Forest"
+    conjurer <- S.printingOf s registry "Synthetic Dusklit Conjurer"
+    let (spellId, board) = expertBoard tovolar forest conjurer 0
+        (entered, _) = castExpert spellId board
+    Spec.assertEqWith s "it is night when the spell resolves" (GameState.daytime board) (Just Daytime.Night)
+    Spec.assertEqWith s "neither face is on the battlefield" (conjurerFaces entered) []
+    Spec.assertEqWith s "the card is in alice's graveyard" (cardsIn Zone.Graveyard conjurer entered) 1
+    Spec.assertEqWith s "and the stack is empty" (GameState.stack entered) []
+  -- The control: by day the same card enters front face up, so the case above
+  -- turns on the back face and not on the card failing to resolve.
+  Spec.it s "CR 712.13 by day that spell enters front face up" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    forest <- S.printingOf s registry "Forest"
+    conjurer <- S.printingOf s registry "Synthetic Dusklit Conjurer"
+    let (spellId, board) = expertBoard tovolar forest conjurer 1
+        (entered, _) = castExpert spellId board
+    Spec.assertEqWith s "it is day when the spell resolves" (GameState.daytime board) (Just Daytime.Day)
+    Spec.assertEqWith s "the permanent is showing its front face" (conjurerFaces entered) [conjurerFront]
+  -- CR 712.13a's copy clause: Double Major copies the spell, the copy enters
+  -- transformed too, and neither it nor the original reaches the battlefield.
+  Spec.it s "CR 712.13a a copy of that spell doesn't enter the battlefield either" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    conjurer <- S.printingOf s registry "Synthetic Dusklit Conjurer"
+    doubleMajor <- S.printingOf s registry "Double Major"
+    let (_, withTovolar) = S.addPermanent tovolar S.alice (S.landsFor island S.alice 1 (S.landsInPlay forest 6))
+        (withConjurer, spellId) = S.handOne conjurer withTovolar
+        (majorId, withMajor) = S.addHandCard doubleMajor S.alice withConjurer
+        board = untapStep (afterCasting 0 (settle withMajor))
+        cast1 = S.runPure S.castAnswer board (S.cast S.alice spellId)
+    case Maybe.listToMaybe (GameState.stack cast1) of
+      Nothing -> Spec.assertFailure s "the spell never reached the stack"
+      Just conjurerSpell -> do
+        let cast2 = S.runPure (pinTarget (Recipient.ToObject conjurerSpell)) cast1 (S.cast S.alice majorId)
+            after = resolveSettled (resolveSettled (resolveSettled cast2))
+        Spec.assertEqWith s "it is night when the spells resolve" (GameState.daytime board) (Just Daytime.Night)
+        Spec.assertEqWith s "neither the copy nor the original is on the battlefield" (conjurerFaces after) []
+        Spec.assertEqWith s "the card is in alice's graveyard" (cardsIn Zone.Graveyard conjurer after) 1
+        Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+
+conjurerFront :: CardName.CardName
+conjurerFront = CardName.MkCardName (Text.pack "Synthetic Dusklit Conjurer")
+
+conjurerBack :: CardName.CardName
+conjurerBack = CardName.MkCardName (Text.pack "Synthetic Dusk's Reprisal")
+
+-- Every face of Dusklit Conjurer on the battlefield, token copies included, by
+-- PROJECTED name (CR 707.2), since a copy's card is not the printing's.
+conjurerFaces :: GameState.GameState -> [CardName.CardName]
+conjurerFaces gs = do
+  oid <- Set.toList (GameState.battlefield gs)
+  name <- Set.toList (Projection.namesOf oid gs)
+  Monad.guard (name == conjurerFront || name == conjurerBack)
+  pure name
+
+-- How many cards of this printing alice owns in `zone`.
+cardsIn :: Zone.Zone -> Printing.Printing -> GameState.GameState -> Int
+cardsIn zone printing gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.nameOf (Printing.card printing))) (Game.zoneMembers zone S.alice gs))
+
+-- Resolve the top of the stack, then settle, so CR 704.5e removes a resolved
+-- copy between resolutions.
+resolveSettled :: GameState.GameState -> GameState.GameState
+resolveSettled gs = settle (S.runPure S.castAnswer gs Stack.resolveTop)
+
+-- Answer every target prompt with this recipient alone.
+pinTarget :: Recipient.Recipient -> Prompt.Prompt r -> r
+pinTarget recipient p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
+  _ -> S.identityAnswer p
 
 restrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 restrictionSpec s registry = Spec.describe s "TransformRestriction" $ do
