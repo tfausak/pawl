@@ -56,6 +56,7 @@ import qualified Pawl.Codec.AimedAtSpec
 import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
 import qualified Pawl.Codec.AsCopySpec
+import qualified Pawl.Codec.AttachAllSpec
 import qualified Pawl.Codec.AttachBoundSpec
 import qualified Pawl.Codec.AttachRestrictionSpec
 import qualified Pawl.Codec.AttachTargetSpec
@@ -775,6 +776,7 @@ spec s registry = do
   Pawl.Codec.AlternativeCostSpec.spec s
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
   Pawl.Codec.AsCopySpec.spec s
+  Pawl.Codec.AttachAllSpec.spec s
   Pawl.Codec.AttachBoundSpec.spec s
   Pawl.Codec.AttachRestrictionSpec.spec s
   Pawl.Codec.AttachTargetSpec.spec s

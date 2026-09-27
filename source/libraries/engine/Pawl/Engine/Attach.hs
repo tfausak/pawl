@@ -314,6 +314,26 @@ hostsAmong candidates context subject filter_ gs =
             candidates
         )
 
+-- hostsFor for a GROUP moving to one destination (Effect.AttachAll): the
+-- battlefield permanents the Filter admits, ascending.
+--
+-- Filter.CanHostSubject asks whether the candidate could host EVERY subject, the
+-- 2008-05-01 ruling on Glamer Spinners ("it must be able to be enchanted by all
+-- the Auras"); vacuously True for an empty group.
+--
+-- No current host is excluded, which is where this parts from hostsFor: CR
+-- 701.3b's "does nothing" is per mover, so a destination one mover already sits
+-- on is still one the others can move to (Balan, Wandering Knight), and
+-- Event.attach applies the no-op mover by mover. Filter.subjectHostCardTypes is
+-- left as the caller's: a group has no one host to read it off.
+groupHostsFor :: Filter.Context -> [ObjectId] -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+groupHostsFor context subjects filter_ gs =
+  let viewOf oid =
+        (Projection.viewOfObject oid gs)
+          { Filter.canHostSubject = all (\subject -> Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)) subjects
+          }
+   in List.sort (filter (\oid -> Filter.matches context (viewOf oid) filter_) (Set.toList (GameState.battlefield gs)))
+
 -- CR 303.4k: the destinations an Aura that is BEING TURNED FACE UP may become
 -- attached to, for a rider whose own text is `filter_` ("a creature").
 --
