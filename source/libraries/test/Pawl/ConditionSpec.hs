@@ -7,6 +7,7 @@
 -- DamageDealtToThisTurn, WasBlockedThisTurn and TimesResolvedThisTurn.
 module Pawl.ConditionSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
@@ -50,6 +51,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -923,17 +926,21 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
   damageDealtToItSpec s registry
   wasBlockedThisTurnSpec s registry
   ashlingSpec s registry
+  rumorGathererSpec s registry
+  omnathSpec s registry
   guidingSpiritSpec s registry
 
--- CR 608.2n / 608.2i: how many times an ABILITY has resolved this turn, which
--- Quantity.TimesResolvedThisTurn folds off GameEvent.ActivatedAbilityResolved.
+-- CR 608.2n / 608.2i: how many times an ACTIVATED ability has resolved this
+-- turn, which Quantity.TimesResolvedThisTurn folds off
+-- GameEvent.ActivatedAbilityResolved.
 --
 -- Ashling the Pilgrim ({1}{R} Legendary Creature -- Elemental Shaman 1/1,
 -- "{1}{R}: Put a +1/+1 counter on Ashling. If this is the third time this
 -- ability has resolved this turn, remove all +1/+1 counters from Ashling, and it
--- deals that much damage to each creature and each player.") is the fixture, and
--- the only one the pool needs: the clause is a printed "if" over CR 602.2a's
--- "this ability", read through Binding.thisAbility.
+-- deals that much damage to each creature and each player.") is the fixture:
+-- the clause is a printed "if" over CR 602.2a's "this ability", read through
+-- Binding.thisAbility. rumorGathererSpec and omnathSpec below are the triggered
+-- twin.
 --
 -- THE BOARD SHAPE that makes the cases discriminating. bob's Blind-Spot Giant is
 -- 4/3 and his Palace Guard 1/4, so 3 damage takes exactly one of them and the
@@ -1004,6 +1011,83 @@ activateAshling :: ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.C
 activateAshling ashlingId pump gs =
   let activated = S.runPure S.identityAnswer gs {GameState.priority = Just S.alice} (Activate.activateAbility S.alice ashlingId pump)
    in snd (Engine.runGamePure S.identityAnswer activated (Stack.resolveTop >> Engine.settleForPriority))
+
+-- CR 608.2n / 603.3: the same count on a TRIGGERED ability, read through the
+-- thisAbility slot Pawl.Engine.Engine.placeBorne stamps and filed by
+-- GameEvent.TriggeredAbilityResolved.
+--
+-- Rumor Gatherer ({1}{W}{W} Creature -- Elf Wizard 2/1, "Alliance -- Whenever
+-- another creature you control enters, scry 1. If this is the second time this
+-- ability has resolved this turn, draw a card instead.", Oracle text verified
+-- Scryfall 2026-09-27). Three Goblin Pikers enter from alice's hand one at a
+-- time, each trigger resolving before the next enters. The hand and the scry
+-- log part company on each resolution: the first and third scry and draw
+-- nothing, the second draws and does not scry -- so an engine that counted
+-- nothing, or counted every trigger as the first, leaves a readable wrong board.
+rumorGathererSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+rumorGathererSpec s registry = Spec.describe s "Rumor Gatherer (CR 608.2n)"
+  . Spec.it s "CR 608.2n the second resolution this turn draws instead of scrying, and the first and third scry"
+  $ do
+    gatherer <- S.printingOf s registry "Rumor Gatherer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    plains <- S.printingOf s registry "Plains"
+    let (_, withGatherer) = S.addPermanent gatherer S.alice (Setup.emptyGame S.bothPlayers)
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard plains S.alice g)) withGatherer [1 .. (5 :: Int)]
+        (first, g1) = S.addHandCard piker S.alice stocked
+        (second, g2) = S.addHandCard piker S.alice g1
+        (third, board) = S.addHandCard piker S.alice g2
+        once = enterFromHand first board
+        twice = enterFromHand second once
+        thrice = enterFromHand third twice
+    Spec.assertEqWith s "CR 608.2n the second resolution drew a card, so alice still holds two cards after putting a second one down" (S.handSize S.alice twice) 2
+    Spec.assertEqWith s "and it scried nothing, the draw being instead of the scry" (scriesBy S.alice twice) 1
+    Spec.assertEqWith s "the third resolution scried again" (scriesBy S.alice thrice) 2
+    Spec.assertEqWith s "and drew nothing" (S.handSize S.alice thrice) 1
+    Spec.assertEqWith s "the first resolution scried" (scriesBy S.alice once) 1
+    Spec.assertEqWith s "and drew nothing" (S.handSize S.alice once) 2
+
+-- Omnath, Locus of Creation ({R}{G}{W}{U} Legendary Creature -- Elemental 4/4,
+-- "When Omnath enters, draw a card." and "Landfall -- Whenever a land you
+-- control enters, you gain 4 life if this is the first time this ability has
+-- resolved this turn. If it's the second time, add {R}{G}{W}{U}. If it's the
+-- third time, Omnath deals 4 damage to each opponent and each planeswalker you
+-- don't control.", Oracle text verified Scryfall 2026-09-27). Four Forests enter
+-- from alice's hand in turn: each of the first three resolutions does one thing
+-- and only that, and the fourth does nothing. Ajani Steadfast under each seat
+-- tells "you don't control" from "each planeswalker".
+omnathSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+omnathSpec s registry = Spec.describe s "Omnath, Locus of Creation (CR 608.2n)"
+  . Spec.it s "CR 608.2n each landfall resolution this turn does what its count names"
+  $ do
+    omnath <- S.printingOf s registry "Omnath, Locus of Creation"
+    forest <- S.printingOf s registry "Forest"
+    ajani <- S.printingOf s registry "Ajani Steadfast"
+    let (_, withOmnath) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
+        (bobsAjani, withBobs) = S.addPermanent ajani S.bob withOmnath
+        (alicesAjani, withAlices) = S.addPermanent ajani S.alice withBobs
+        loyal = S.addCounter CounterKind.Loyalty 6 alicesAjani (S.addCounter CounterKind.Loyalty 9 bobsAjani withAlices)
+        (lands, board) = List.foldl' (\(acc, g) _ -> let (oid, g') = S.addHandCard forest S.alice g in (acc <> [oid], g')) ([], loyal) [1 .. (4 :: Int)]
+        steps = drop 1 (List.scanl (flip enterFromHand) board lands)
+        poolSize pid gs = maybe 0 (length . Mana.Type.unwrap) (Map.lookup pid (GameState.manaPool gs))
+    case steps of
+      [once, twice, thrice, fourth] -> do
+        Spec.assertEqWith s "CR 608.2n the third resolution dealt bob 4" (S.lifeOf S.bob thrice) (Just 16)
+        Spec.assertEqWith s "and 4 to the planeswalker alice does not control" (S.counterOf CounterKind.Loyalty bobsAjani thrice) 5
+        Spec.assertEqWith s "and none to the one she does" (S.counterOf CounterKind.Loyalty alicesAjani thrice) 6
+        Spec.assertEqWith s "the second resolution added {R}{G}{W}{U} and gained nothing" (poolSize S.alice twice, S.lifeOf S.alice twice) (4, Just 24)
+        Spec.assertEqWith s "the first resolution gained 4 and added nothing" (poolSize S.alice once, S.lifeOf S.alice once) (0, Just 24)
+        Spec.assertEqWith s "the fourth resolution did nothing at all" (S.lifeOf S.alice fourth, S.lifeOf S.bob fourth, poolSize S.alice fourth) (Just 24, Just 16, 4)
+      _ -> Spec.assertFailure s "four Forests should have entered"
+
+-- CR 603.2 / 603.3: one card alice holds is put onto the battlefield, the
+-- abilities it triggers are placed at the next settle, and the top one resolves.
+enterFromHand :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+enterFromHand oid gs =
+  S.runPure S.identityAnswer gs {GameState.priority = Just S.alice} (Event.changeZone oid Zone.Battlefield >> Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+
+-- How many times a player has scried this turn (CR 701.22b's scry event).
+scriesBy :: PlayerId.PlayerId -> GameState.GameState -> Int
+scriesBy pid gs = length [() | GameEvent.Scried p <- fmap LoggedEvent.event (Foldable.toList (GameState.events gs)), p == pid]
 
 -- CR 404.1 read from inside a CONDITION: Scope.TopOfGraveyard, which names ONE
 -- position in a graveyard so that a Filter over it TESTS that card rather than

@@ -841,17 +841,14 @@ resolveModesWith runSubgame stackId srcId modes = do
 -- An ability CR 608.2b removed never resolved and is not filed.
 --
 -- A CLASSIFICATION off the object's Source and never which ability it is: an
--- activated ability is filed, and rule 707.10b's copy of one carries the same
--- ActivatedAbilitySource (Resolve.Effect.copyOnStackOf), so the copy and the
--- original are one key.
---
--- Not implemented: a TRIGGERED ability's resolutions, which this arm leaves
--- unrecorded because nothing can read them back -- CR 602.2a's
--- Binding.thisAbility is the only slot naming an ability's own object and no
--- borne trigger carries it (#3815).
+-- activated or an object-borne triggered ability is filed, and rule 707.10b's
+-- copy of one carries the same Source (Resolve.Effect.copyOnStackOf), so the
+-- copy and the original are one key. Rumor Gatherer's and Omnath, Locus of
+-- Creation's landfall read the triggered arm (Pawl.ConditionSpec).
 recordAbilityResolution :: Object.Object -> Game ()
 recordAbilityResolution obj = case Object.source obj of
   Source.OfAbility activated -> State.modify' (Event.recordEvent (GameEvent.ActivatedAbilityResolved activated))
+  Source.OfTrigger triggered -> State.modify' (Event.recordEvent (GameEvent.TriggeredAbilityResolved triggered))
   _ -> pure ()
 
 -- CR 608.2c: does this clause's printed "If you do" hold? A clause naming no
