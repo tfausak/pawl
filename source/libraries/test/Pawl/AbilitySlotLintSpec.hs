@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, sacrificesAsCost, spellCostsOf, triggerConditionSlots)
+import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -196,10 +196,11 @@ modalCountsOffend modal =
 --
 -- What answers a read, and why each part of it answers one:
 --
---   * Binding.triggerSource (CR 113.7, the object whose ability triggered) and
---     Binding.you (CR 109.5, the ability's controller) are stamped for EVERY
---     triggered ability as it is placed (Engine.placeBorne, Binding.setYou), so
---     they need no agreement with the condition. `you` is stamped for every
+--   * Binding.triggerSource (CR 113.7, the object whose ability triggered),
+--     Binding.you (CR 109.5, the ability's controller) and Binding.thisAbility
+--     (CR 603.3, the ability's own object) are stamped for EVERY triggered
+--     ability as it is placed (Engine.placeBorne), so they need no agreement
+--     with the condition. `you` is stamped for every
 --     ACTIVATION and every SPELL too, by rule 109.5's other sentences -- which is
 --     why the spell lint subtracts it on the read side rather than listing it
 --     here.
@@ -218,8 +219,9 @@ modalCountsOffend modal =
 --     MODE's at a time, so a mode reading a slot only another mode declares is
 --     caught and so is a mode declaring a slot only another mode reads.
 --
--- The first two are what this passes to modalSlotsOffend as `abilityBound`: they
--- are stamped for the ability, not for a mode, so every mode gets them.
+-- The first bullet's three are what this passes to modalSlotsOffend as
+-- `abilityBound`: they are stamped for the ability, not for a mode, so every
+-- mode gets them.
 triggeredAbilityOffends :: TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Bool
 triggeredAbilityOffends = triggeredAbilityOffendsGiven Set.empty
 
@@ -230,7 +232,7 @@ triggeredAbilityOffendsGiven inherited ability =
   modalSlotsOffend
     ( Set.unions
         [ inherited,
-          Set.fromList [Binding.triggerSource, Binding.you],
+          Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility],
           Event.eventBindingSlots (TriggeredAbility.condition ability),
           Event.eventBindingSlotsSometimes (TriggeredAbility.condition ability)
         ]
@@ -329,7 +331,11 @@ activatedAbilityOffends ability =
         if discardsSelfAsCost (ActivatedAbility.cost ability)
           then Set.singleton Binding.discardedCard
           else Set.empty
-   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded]) (ActivatedAbility.modal ability)
+      removed =
+        if removesCountersAsCost (ActivatedAbility.cost ability)
+          then Set.singleton Binding.removedCounters
+          else Set.empty
+   in modalSlotsOffend (Set.unions [Set.fromList [Binding.triggerSource, Binding.you, Binding.thisAbility], announcedX, sacrificed, tapped, tappedForTotal, exiled, discarded, removed]) (ActivatedAbility.modal ability)
 
 -- Does this cost tap permanents the payer CHOOSES? sacrificesAsCost's shape, and
 -- the same reason: CR 601.2h's payment binds Binding.tappedPermanent

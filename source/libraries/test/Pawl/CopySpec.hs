@@ -3589,6 +3589,44 @@ copyAbilityOnStackSpec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
             Spec.assertBool s (notElem abilId (GameState.stack stifled)) "setup: the Stifle countered the original while the copy was still on the stack"
             Spec.assertBool s (elem abilId (GameState.stack afterEngine)) "setup: and the original was under the copy before the Stifle resolved"
       _ -> Spec.assertFailure s "Ashling the Pilgrim should declare one activated ability, and Lithoform Engine a {2} one"
+  -- The Stifle case again on a TRIGGERED ability: Rumor Gatherer's "if this is
+  -- the second time this ability has resolved this turn, draw a card instead"
+  -- (Oracle text verified Scryfall 2026-09-27). The first Piker's trigger
+  -- resolves; the second's is copied and then countered under the copy, so the
+  -- copy is the second resolution and has to ask through its OWN thisAbility
+  -- slot. A copy whose read answers nothing neither scries nor draws, leaving
+  -- alice's hand empty.
+  Spec.it s "CR 707.10b a copy of a triggered ability still counts once the original has been countered" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    engine <- S.printingOf s registry "Lithoform Engine"
+    gatherer <- S.printingOf s registry "Rumor Gatherer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    stifle <- S.printingOf s registry "Stifle"
+    let (engineId, withEngine) = S.addPermanent engine S.alice (S.landsFor island S.bob 1 (S.landsInPlay mountain 2))
+        (_, withGatherer) = S.addPermanent gatherer S.alice withEngine
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard plains S.alice g)) withGatherer [1 .. (3 :: Int)]
+        (firstPiker, g1) = S.addHandCard piker S.alice stocked
+        (secondPiker, g2) = S.addHandCard piker S.alice g1
+        (stifleId, board) = S.addHandCard stifle S.bob g2
+        enter oid gs = S.runPure S.identityAnswer gs {GameState.priority = Just S.alice} (Event.changeZone oid Zone.Battlefield >> Engine.settleForPriority)
+        once = resolveOne S.identityAnswer (enter firstPiker board)
+        triggered = enter secondPiker once
+    case (topOfStack triggered, engineAbilityCopyingAbilities engineId triggered) of
+      (Just abilId, Just copier) -> do
+        let staged = S.runPure (pinTarget (Recipient.ToObject abilId)) triggered {GameState.priority = Just S.alice} (Activate.activateAbility S.alice engineId copier)
+            afterEngine = resolveOne S.identityAnswer staged
+            cast = S.runPure (pinTarget (Recipient.ToObject abilId)) afterEngine {GameState.priority = Just S.bob} (S.cast S.bob stifleId)
+            stifled = resolveOne S.identityAnswer cast
+            afterCopy = resolveOne S.identityAnswer stifled
+        Spec.assertEqWith s "CR 707.10b the copy was the second resolution, so alice drew a card" (handSize S.alice afterCopy) 1
+        -- Supporting, and after the read above: the original really was
+        -- countered before the copy resolved.
+        Spec.assertBool s (notElem abilId (GameState.stack stifled)) "setup: the Stifle countered the original while the copy was still on the stack"
+        Spec.assertBool s (elem abilId (GameState.stack afterEngine)) "setup: and the original was under the copy before the Stifle resolved"
+        Spec.assertEqWith s "setup: both Pikers left alice's hand before the copy resolved" (handSize S.alice stifled) 0
+      _ -> Spec.assertFailure s "Rumor Gatherer's trigger should be on the stack, and Lithoform Engine should declare a {2} ability"
   -- CR 707.10c on an ABILITY, where the offer is a real choice: the copy is aimed
   -- at alice and the original stays on bob, so the two seats' life totals are
   -- 19 and 19. An engine that ignored the offer leaves 20 and 18, and one that

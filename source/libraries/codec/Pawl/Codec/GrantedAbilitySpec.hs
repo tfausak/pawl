@@ -22,7 +22,10 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -104,4 +107,11 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
             }
       )
       " {\"type\":\"Rules\",\"value\":{\"combatRestrictions\":[{\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Matching\",\"value\":{\"type\":\"IsSource\"}},\"blockers\":{\"type\":\"PowerAtMost\",\"value\":2}}}]}} "
+  -- CR 613.10: Nerd Rage's "You have no maximum hand size".
+  Spec.it s "Player" $
+    Common.assertCodec
+      s
+      codec
+      (GrantedAbility.Player (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You Nothing Nothing PlayerEffect.NoMaximumHandSize))
+      " {\"type\":\"Player\",\"value\":{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"NoMaximumHandSize\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

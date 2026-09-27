@@ -588,6 +588,18 @@ beheldObject = SlotName.MkSlotName (Text.pack "thatBeheldObject")
 collectedEvidence :: SlotName
 collectedEvidence = SlotName.MkSlotName (Text.pack "thatCollectedEvidence")
 
+-- CR 118.1 / 601.2h: the reserved slot under which a
+-- CostComponent.RemovePlusOneCounters payment binds HOW MANY counters it took
+-- off -- Ooze Flux's "the number of +1\/+1 counters removed this way", which
+-- the payer settles while paying (CounterSpread.FromAmongAtLeast), so it can be
+-- read off nothing but the payment. An amount and nothing else, folded onto the
+-- ability by Pawl.Engine.Activate as every payment's slots are.
+--
+-- Not a target (CR 115.10a), so the same CR 608.2b posture and the same "no
+-- card's targetSlots may name it" sweep as the slots above.
+removedCounters :: SlotName
+removedCounters = SlotName.MkSlotName (Text.pack "thatManyCountersRemoved")
+
 -- CR 400.7d: the part of a spell's binding environment the permanent it
 -- becomes keeps -- "information about the spell ... including what costs were
 -- paid to cast that spell". Pawl.Engine.Event.changeZoneAttaching writes it
@@ -777,12 +789,13 @@ airbentObjects = SlotName.MkSlotName (Text.pack "thoseAirbentObjects")
 castSpell :: SlotName
 castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 
--- CR 602.2a: the reserved slot under which an ACTIVATED ABILITY'S OWN STACK
+-- CR 602.2a / 603.3: the reserved slot under which an ABILITY'S OWN STACK
 -- OBJECT is bound -- the printed "this ability" in Forsworn Paladin's "if mana
 -- from a Treasure was spent to activate this ability" and in Ashling the
--- Pilgrim's "if this is the third time this ability has resolved this turn".
--- Stamped by Pawl.Engine.Activate as the ability is put on the stack, alongside
--- `triggerSource` and `you`.
+-- Pilgrim's and Rumor Gatherer's "if this is the ... time this ability has
+-- resolved this turn". Stamped by Pawl.Engine.Activate and, for a triggered
+-- ability, Pawl.Engine.Engine.placeBorne as the ability is put on the stack,
+-- alongside `triggerSource` and `you`.
 --
 -- Distinct from `triggerSource` (CR 113.7), which names the ability's SOURCE:
 -- rule 602.2a creates the ability as an object that is not the source, and the
@@ -794,8 +807,8 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 -- targetSlots may name it" rule and Pawl.CardSpec's binding sweep apply here
 -- too.
 --
--- Bound for an ACTIVATED ability only. A triggered ability has no activation to
--- ask about, and CR 605.3b's mana ability never reaches the stack.
+-- Bound for an activated or object-borne triggered ability. CR 605.3b's mana
+-- ability never reaches the stack.
 --
 -- NOT a CR 609.7a referent, and Pawl.Engine.Resolve.Effect.referentsOfBindings drops it
 -- by name for every carrier that reads a binding environment: this slot exists so
@@ -1141,7 +1154,7 @@ setDepartedPermanent oid = Map.insert departedPermanent (toObject oid)
 setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setCastSpell oid = Map.insert castSpell (toObject oid)
 
--- Bind an object under the reserved thisAbility slot (CR 602.2a).
+-- Bind an object under the reserved thisAbility slot (CR 602.2a, 603.3).
 setThisAbility :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setThisAbility oid = Map.insert thisAbility (toObject oid)
 
@@ -1211,14 +1224,37 @@ setUnattachedHost oid = Map.insert unattachedHost (toObject oid)
 -- evidence was collected" after a collection of two cards is Vitu-Ghazi
 -- Inspector's. Such a slot is the one kind that fills BOTH fields; they name the
 -- same objects, so no reader can see them disagree.
-setPaid :: Map SlotName (Set Recipient) -> Map SlotName Binding -> Map SlotName Binding
-setPaid paid =
-  let bind recipients =
-        let oids = Maybe.mapMaybe Recipient.objectOf (Set.toAscList recipients)
-         in if length oids >= 2
-              then (toRecipients recipients) {Binding.objects = Just (Seq.fromList oids)}
-              else toRecipients recipients
-   in Map.union (fmap bind paid)
+setPaid :: Map SlotName Binding -> Map SlotName Binding -> Map SlotName Binding
+setPaid = Map.union
+
+-- The objects one cost component took, bound under a reserved slot in setPaid's
+-- shape.
+paidObjects :: SlotName -> Set Recipient -> Map SlotName Binding
+paidObjects slot recipients = Map.singleton slot (paidRecipients recipients)
+
+-- setPaid's shape for a payment's objects: the recipients, and the same objects
+-- as a group once there are two.
+paidRecipients :: Set Recipient -> Binding
+paidRecipients recipients =
+  let oids = Maybe.mapMaybe Recipient.objectOf (Set.toAscList recipients)
+   in if length oids >= 2
+        then (toRecipients recipients) {Binding.objects = Just (Seq.fromList oids)}
+        else toRecipients recipients
+
+-- The slots two components of one cost bound, in one map. Recipients are
+-- UNIONED per slot rather than left-biased: Jarad, Golgari Lich Lord's
+-- "Sacrifice a Swamp and a Forest" is two Sacrifice components writing one
+-- reserved name, and what that names is the pair -- which onlyOne then declines
+-- to read as a single object, rather than silently answering with whichever
+-- component was paid first. Amounts are SUMMED for the same reason.
+mergePaid :: Map SlotName Binding -> Map SlotName Binding -> Map SlotName Binding
+mergePaid =
+  let recipientsOf b = Maybe.fromMaybe Set.empty (Binding.targets b)
+      merge a b =
+        (paidRecipients (Set.union (recipientsOf a) (recipientsOf b)))
+          { Binding.amount = ((+) <$> Binding.amount a <*> Binding.amount b) <|> Binding.amount a <|> Binding.amount b
+          }
+   in Map.unionWith merge
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

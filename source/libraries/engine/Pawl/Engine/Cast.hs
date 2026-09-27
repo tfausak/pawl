@@ -3324,7 +3324,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                           -- have shared with a tap the printed cost demanded.
                           Monad.when
                             (Set.member Keyword.Type.Convoke (Game.castingKeywordsOf sid pricedGs))
-                            ( let convokers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedPermanent substitutedBindings)))
+                            ( let convokers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedPermanent (Binding.targetsOf substitutedBindings))))
                                in Monad.unless
                                     (Set.null convokers)
                                     ( State.modify'

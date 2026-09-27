@@ -31,6 +31,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | The characteristics of an object after the layer fold (design.md §2.5). Maybe
@@ -172,6 +173,14 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- CR 612.5's exchange, for staticAbilities' reason above, copiable for the same one, and read by
     -- Pawl.Engine.Projection.playerAbilitiesOf.
     playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
+    -- | CR 613.1f / 613.10: the player abilities layer 6 GRANTED the object,
+    -- each with the timestamp of the effect that granted it (CR 613.7a). Apart
+    -- from playerAbilities because that list is the copiable text
+    -- Pawl.Engine.PlayerEffect gates by CR 305.7, CR 612 and CR 604.2's removal
+    -- itself, none of which a grant answers to here: layer 6's own removal
+    -- empties this list, and neither CR 305.7 nor CR 612.3 reaches a granted
+    -- ability.
+    grantedPlayerAbilities :: [(Timestamp.Timestamp, PlayerStaticAbility.PlayerStaticAbility)],
     -- | CR 116.2: the special actions this object's rules text grants -- the
     -- axis Pawl.Types.Face.specialActions carries. Copiable because CR 707.2
     -- names rules text among the copiable values and CR 707.2a copies the

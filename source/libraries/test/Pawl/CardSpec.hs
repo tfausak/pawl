@@ -856,6 +856,7 @@ modificationCounts modification = case modification of
     GrantedAbility.Static ability -> staticAbilityCounts ability
     GrantedAbility.Rules rules -> ruleAbilitiesCounts rules
     GrantedAbility.Replacement ability -> concatMap conditionCounts (Maybe.maybeToList (PrintedReplacement.condition ability))
+    GrantedAbility.Player ability -> concatMap conditionCounts (Maybe.maybeToList (PlayerStaticAbility.condition ability))
   -- Rule 702.165a's grant names the source, and the keywords it carries are
   -- minted from the card's Backup keyword, swept there.
   Modification.GainAbilitiesOfSource _ -> []
@@ -1485,6 +1486,20 @@ sacrificesAsCost =
         CostComponent.Sacrifice {} -> True
         _ -> False
    in any isSacrifice . Cost.Type.components
+
+-- Does this cost remove +1\/+1 counters from permanents the payer CHOOSES?
+-- sacrificesAsCost's shape: CR 601.2h's payment binds how many under
+-- Binding.removedCounters (Pawl.Engine.Cost.payComponent's
+-- RemovePlusOneCounters arm, folded on by Pawl.Engine.Activate), so Ooze Flux's
+-- "the number of +1\/+1 counters removed this way" is an ordinary slot read.
+-- Asked by AbilitySlotLintSpec for an activation; no printing puts this
+-- component on a spell's cost.
+removesCountersAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+removesCountersAsCost =
+  let isRemoval component = case component of
+        CostComponent.RemovePlusOneCounters {} -> True
+        _ -> False
+   in any isRemoval . Cost.Type.components
 
 -- The costs a SPELL can be announced against: the printed one -- mana cost plus
 -- CR 118.8's additional costs -- and each alternative cost the card offers, which
@@ -2472,6 +2487,7 @@ reservedSlots =
       Binding.revealedCard,
       Binding.beheldObject,
       Binding.collectedEvidence,
+      Binding.removedCounters,
       Binding.crewedVehicle,
       Binding.crewers,
       Binding.manaSource,
@@ -5852,6 +5868,16 @@ grantedReplacements card =
     )
     (grantedModifications card)
 
+-- The PLAYER kind of the same grant (CR 613.10), swept for the same reason.
+grantedPlayerAbilities :: Face.Face Card.Type.Card -> [PlayerStaticAbility.PlayerStaticAbility]
+grantedPlayerAbilities card =
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.Player ability) -> Just ability
+        _ -> Nothing
+    )
+    (grantedModifications card)
+
 -- CR 708.2: a face-down listing's quoted abilities, as the grant they amount to.
 listedGrants :: FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Type.Card) -> [Projection.Modification]
 listedGrants = fmap Modification.GainAbility . FaceDownCharacteristics.abilities
@@ -6103,6 +6129,10 @@ cardFilters card =
     <> concatMap staticAbilityFilters (grantedStaticAbilities card)
     <> concatMap ruleAbilitiesFilters (grantedRuleAbilities card)
     <> concatMap printedReplacementFilters (grantedReplacements card)
+    -- A granted player ability is its RECEIVER's, so it is framed against the
+    -- permanent holding it, exactly as a printed one above is.
+    <> concatMap (frame StandingHostFramed . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (grantedPlayerAbilities card)
+    <> concatMap (standingHosted . playerEffectFilters . PlayerStaticAbility.effect) (grantedPlayerAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)

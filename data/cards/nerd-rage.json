@@ -1,0 +1,204 @@
+{
+  "faces": [
+    {
+      "enchant": [
+        {
+          "pool": {
+            "type": "Creatures"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Nerd Rage",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "HasAttached",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainAbility",
+              "value": {
+                "type": "Player",
+                "value": {
+                  "effect": {
+                    "type": "NoMaximumHandSize"
+                  },
+                  "scope": {
+                    "type": "You"
+                  }
+                }
+              }
+            },
+            {
+              "type": "GainAbility",
+              "value": {
+                "type": "Triggered",
+                "value": {
+                  "condition": {
+                    "type": "SelfAttacks",
+                    "value": {
+                      "type": "EveryTime"
+                    }
+                  },
+                  "intervening": {
+                    "type": "Compares",
+                    "value": {
+                      "comparison": {
+                        "type": "AtLeast"
+                      },
+                      "measured": {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Members"
+                          },
+                          "filter": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": {
+                              "player": {
+                                "type": "Relative",
+                                "value": {
+                                  "type": "You"
+                                }
+                              },
+                              "zone": {
+                                "type": "Hand"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "threshold": {
+                        "type": "Literal",
+                        "value": 10
+                      }
+                    }
+                  },
+                  "modal": {
+                    "modes": [
+                      {
+                        "clauses": [
+                          {
+                            "effects": [
+                              {
+                                "type": "ModifyTarget",
+                                "value": {
+                                  "duration": {
+                                    "type": "UntilEndOfTurn"
+                                  },
+                                  "modification": {
+                                    "type": "ModifyPowerToughness",
+                                    "value": {
+                                      "power": {
+                                        "type": "Literal",
+                                        "value": 10
+                                      },
+                                      "toughness": {
+                                        "type": "Literal",
+                                        "value": 10
+                                      }
+                                    }
+                                  },
+                                  "ref": {
+                                    "type": "InSlot",
+                                    "value": "self"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Draw",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

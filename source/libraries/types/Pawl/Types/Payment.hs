@@ -1,8 +1,7 @@
 module Pawl.Types.Payment where
 
 import Data.Map.Strict (Map)
-import Data.Set (Set)
-import Pawl.Types.Recipient (Recipient)
+import Pawl.Types.Binding (Binding)
 import Pawl.Types.SlotName (SlotName)
 
 -- | Whether a cost was paid. CR 601.2h allows no partial payments, so the answer
@@ -20,14 +19,12 @@ import Pawl.Types.SlotName (SlotName)
 --
 -- Paid carries the slots the payment BOUND -- CR 608.2h's "the sacrificed
 -- creature", whose power Jarad, Golgari Lich Lord reads after the payment put it
--- in a graveyard. Shaped as the recipient map CR 601.2c's targets ride in
--- (Pawl.Engine.Binding.targetsOf) rather than as a bare id list, so the caller
--- that merges it into an object's bindings writes one field and the readers that
--- already answer "which object does this slot name" need no second shape. Empty
--- for every component that binds nothing, which is all of them but the ones
--- Pawl.Engine.Cost's payComponent gives a reserved name (its Sacrifice,
--- TapPermanents, TapForTotalPower and RevealCardFromHand arms).
+-- in a graveyard, and Ooze Flux's "the number of +1\/+1 counters removed this
+-- way". Shaped as the binding environment it is folded into
+-- (Pawl.Engine.Binding.setPaid), so an object slot and an amount slot ride the
+-- same map. Empty for every component that binds nothing, which is all of them
+-- but the ones Pawl.Engine.Cost's payComponent gives a reserved name.
 data Payment
-  = Paid (Map SlotName (Set Recipient))
+  = Paid (Map SlotName Binding)
   | Unpaid
   deriving (Eq, Ord, Show)

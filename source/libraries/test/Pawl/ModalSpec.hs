@@ -366,12 +366,13 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
     -- M4.5 P4 Task 8 (CR 109.5): Engine.placeOne now ALSO stamps the
     -- ability's controller under the reserved Binding.you ("you") slot,
     -- unconditionally and for the same reason -- so it joins "self" here
-    -- too, whether or not this card's own text ever reads it.
+    -- too, whether or not this card's own text ever reads it. CR 603.3's
+    -- own object joins them under Binding.thisAbility on the same terms.
     Spec.assertEqWith
       s
-      "the 'permanent' slot and the reserved self/you slots are bound"
+      "the 'permanent' slot and the reserved self/you/thisAbility slots are bound"
       boundSlots
-      (Just (Set.fromList [SlotName.MkSlotName (Text.pack "permanent"), Binding.triggerSource, Binding.you]))
+      (Just (Set.fromList [SlotName.MkSlotName (Text.pack "permanent"), Binding.triggerSource, Binding.you, Binding.thisAbility]))
 
   Spec.it s "draw mode ({2}) draws exactly one; no token made" $ do
     aetherChanneler <- S.printingOf s registry "Aether Channeler"
