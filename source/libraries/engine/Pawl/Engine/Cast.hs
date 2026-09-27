@@ -215,8 +215,9 @@ flashRefusedAt pid oid name manaValue gs =
 -- the lookahead lets the cast begin, and CR 601.2e would take back a printed cast
 -- of a bestow card Sigarda's Aid let begin.
 --
--- `timed` is False for a cast an effect offers mid-resolution (CR 608.2g),
--- whose timing no window governs, so offering narrows nothing there.
+-- `timed` is False for a cast an effect offers mid-resolution (CR 608.2g) and
+-- for one made while searching (CR 601.3), whose timing no window governs, so
+-- nothing narrows there.
 windowedCandidates :: Bool -> PlayerId -> ObjectId -> CardName.CardName -> GameState -> [CandidateCost.CandidateCost] -> [CandidateCost.CandidateCost]
 windowedCandidates timed pid oid name gs candidates =
   let ownWindow = timingWith False pid oid name gs
@@ -2023,8 +2024,8 @@ castableWhenOffered spending pid oid name candidates proposed =
 -- the chance to cast a castable-while-searching card from it, before any card is
 -- found (per the ruling). Loops so multiple copies may be cast; each cast removes
 -- a card from the library, so castableWhileSearching shrinks and the loop
--- terminates. castSpell is the re-entrant call -- casting mid-resolution, the
--- whole point.
+-- terminates. castSpellWith, untimed, is the re-entrant call -- casting
+-- mid-resolution, the whole point.
 castWhileSearching :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> Game ()
 castWhileSearching perform pid = do
   gs <- State.get
@@ -2041,7 +2042,8 @@ castWhileSearching perform pid = do
           -- half or facing the offer did not include is rejected even when the
           -- card's other one was offered (CR 709.3a, 708.4).
           Monad.when (elem (oid, name, facing) options) $ do
-            castSpell perform pid oid name facing
+            -- Untimed: the permission IS the CR 601.3 timing exception.
+            castSpellWith perform False False [] ManaSpending.AsProduced pid oid name facing
             castWhileSearching perform pid
 
 -- CR 601.2's own order, walked in it: 601.2a moves the card to the stack FIRST,
@@ -2090,7 +2092,7 @@ castWhileSearching perform pid = do
 -- object is put onto the stack, so it cannot be a prompt inside the
 -- announcement.
 castSpell :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpell perform = castSpellWith perform False [] ManaSpending.AsProduced
+castSpell perform = castSpellWith perform True False [] ManaSpending.AsProduced
 
 -- castSpell with CR 118.9's other source of an alternative cost: one "applied to
 -- it from another effect" rather than listed in the spell's own text. A non-empty
@@ -2118,12 +2120,16 @@ castSpell perform = castSpellWith perform False [] ManaSpending.AsProduced
 -- It is passed to the SAME function the gate above priced the offer with, so the
 -- announcement cannot be offered a candidate the cast then refuses to find.
 --
+-- `timed` says whether a window governs this cast at all: False for one an
+-- effect offers (CR 608.2g) and for one made while searching (castWhileSearching),
+-- so neither CR 601.3b's narrowing nor its CR 601.2e re-check reaches them.
+--
 -- `widened` is CR 118.14's, and a third question again: how the caster may spend
 -- mana toward whatever cost the two above settled on. Joined with the exile
 -- permission's rider by `spendingWith`, one step ahead of CR 601.2a's move for
 -- `spendingFor`'s reason.
-castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> [CandidateCost.CandidateCost] -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
-castSpellWith perform offered applied widened pid oid name facing = do
+castSpellWith :: ManaAbilityPerformer.ManaAbilityPerformer -> Bool -> Bool -> [CandidateCost.CandidateCost] -> ManaSpending -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
+castSpellWith perform timed offered applied widened pid oid name facing = do
   -- CR 406.3a, run BEFORE `before` is read and so before CR 601.2e's rewind
   -- captures it: the turn happens just before the announcement rather than
   -- inside it, so a cast the player backs out of leaves the card face up.
@@ -2201,7 +2207,7 @@ castSpellWith perform offered applied widened pid oid name facing = do
               (\candidate -> candidateAllowed pid oid (Face.name face) proposed candidate && candidateFillable pid oid name proposed candidate)
               ( fmap
                   (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
-                  (windowedCandidates (not offered) pid oid name proposed (if null applied then Cost.candidateCostsGiven offered pid name oid proposed else applied))
+                  (windowedCandidates timed pid oid name proposed (if null applied then Cost.candidateCostsGiven offered pid name oid proposed else applied))
               )
           -- CR 400.7g / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move
@@ -2283,12 +2289,12 @@ castSpellWith perform offered applied widened pid oid name facing = do
           -- CR 601.2e's re-asking, at the announced mana value, of a prohibition
           -- and of the permission the cast is made under, judged on the same
           -- proposal board candidateAllowed judged them on, and of a flash
-          -- window, which no window times for a cast an effect offers.
+          -- window where a window times the cast at all.
           let refusedAt castFor permission manaValue =
                 let board = proposedFor oid castFor proposed
                  in PlayerEffect.prohibitsAtManaValue pid oid manaValue board
                       || not (PlayerEffect.admitsAtManaValue permission oid manaValue board)
-                      || (not offered && flashRefusedAt pid oid name manaValue board)
+                      || (timed && flashRefusedAt pid oid name manaValue board)
           castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefore candidates spent permissions (riders sid) refusedAt before
 
 -- CR 305.2a / 305.3: whether `pid` may play a land at all now -- it is their
