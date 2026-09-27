@@ -30,6 +30,7 @@ empty =
       Combat.declaredBlockers = Set.empty,
       Combat.blockersDeclared = False,
       Combat.attackingNothing = Set.empty,
+      Combat.removedDefending = Map.empty,
       Combat.defenders = []
     }
 
@@ -80,6 +81,8 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           -- CR 506.4c, keyed by the ATTACKER, so a distinct id again -- this set
           -- and declaredAttackers above are the two keyed by the creature.
           Combat.attackingNothing = Set.singleton (ObjectId.MkObjectId 13),
+          -- CR 508.5, keyed by a creature that has LEFT combat, so distinct again.
+          Combat.removedDefending = Map.singleton (ObjectId.MkObjectId 19) (PlayerId.MkPlayerId 20),
           Combat.defenders = [PlayerId.MkPlayerId 10]
         }
       ( " {\"attackers\":{\"1\":{\"type\":\"OfPlayer\",\"value\":2}}"
@@ -94,6 +97,7 @@ spec s = Spec.describe s "Pawl.Codec.Combat" $ do
           <> ",\"declaredAttackedThisStep\":[{\"type\":\"OfBattle\",\"value\":9}]"
           <> ",\"declaredAttackers\":[11],\"declaredBlockers\":[12]"
           <> ",\"blockersDeclared\":true,\"attackingNothing\":[13]"
+          <> ",\"removedDefending\":{\"19\":20}"
           <> ",\"defenders\":[10]} "
       )
   -- CR 510.4's two ABSENT-looking states, which are not the same state. Nothing

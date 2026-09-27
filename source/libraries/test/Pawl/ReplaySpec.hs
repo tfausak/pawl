@@ -1638,6 +1638,16 @@ combatReplaySpec s =
           Spec.assertEqWith s "taking one round trips" (Replay.decode p (Replay.encode p (Map.singleton b 1))) (Just (Map.singleton b 1))
           -- Discriminating: fails if the two division prompts share a response.
           Spec.assertEqWith s "and a fixed-count division transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemovalAmong most)) Nothing
+        -- CR 608.2d, where the count is a cap and none is an answer.
+        Spec.it s "ChooseCounterRemovalUpTo round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 11
+              b = ObjectId.MkObjectId 13
+              p = Prompt.ChooseCounterRemovalUpTo decider S.alice oid 3 (Map.fromList [(a, 2), (b, 1)])
+              most = Map.fromList [(a, 2 :: Natural.Natural), (b, 1)]
+          Spec.assertEqWith s "taking the cap round trips" (Replay.decode p (Replay.encode p most)) (Just most)
+          Spec.assertEqWith s "taking none round trips" (Replay.decode p (Replay.encode p Map.empty)) (Just Map.empty)
+          -- Discriminating: fails if the division prompts share a response.
+          Spec.assertEqWith s "and a floored division transcript does not decode as one" (Replay.decode p (Response.ChoseCounterRemovalAtLeast most)) Nothing
         -- CR 701.61a: which half of forage the forager took is a decision, so it
         -- has to survive a transcript like any other.
         Spec.it s "ChooseForage round-trips through the transcript" $ do

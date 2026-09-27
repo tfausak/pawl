@@ -164,7 +164,9 @@ import qualified Pawl.Types.RandomCardInLibrary as RandomCardInLibrary
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -697,6 +699,7 @@ effectObjectRefs effect = case effect of
   Effect.Counter (Counter.MkCounter ref _ _) -> [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> [ref]
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong _ from _ _) -> [from]
   -- CR 122.5's two sides, either of which may name a group.
   Effect.MoveCounters (MoveCounters.MkMoveCounters from _ _ to) -> [from, to]
   -- CR 122.8's taker; the giver is a slot.
@@ -892,6 +895,7 @@ effectPlayerRefs effect = case effect of
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
+  Effect.RemoveCountersAmong {} -> []
   Effect.MoveCounters {} -> []
   Effect.PutCountersFrom {} -> []
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
@@ -1235,6 +1239,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- destination is an ObjectRef and may sweep.
   Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom from _ _) -> oneSlot from
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot _) -> insertOne slot (quantitySlots quantity)
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> foldMap quantitySlots (RemovalCount.quantityOf count)
   -- CR 122.5's pair: BOTH sides are ObjectRefs, joined at slotsOf's head with
   -- every other ref, so neither is read here. The count reads
   -- slots of its own -- Black Panther, Wakandan King's "all +1/+1 counters" is a
@@ -1861,6 +1866,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- No Quantity at all: CR 122.8 names neither a kind nor a count.
   Effect.PutCountersFrom {} -> True
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
+  Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> all Quantity.slotsAreExhaustive (RemovalCount.quantityOf count)
   -- The count the moved kinds may write. CR 122.5's GIVER carries the other one,
   -- through the ObjectRef it became when the first side was widened to a group,
   -- and it is effectObjectRefs' above -- an arm reading the kinds alone kept
@@ -2100,6 +2106,7 @@ readsX =
         Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
         Effect.PutCountersFrom {} -> False
         Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _ _) -> Quantity.readsX quantity
+        Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count _ _ _) -> any Quantity.readsX (RemovalCount.quantityOf count)
         Effect.MoveCounters (MoveCounters.MkMoveCounters _ kinds _ _) -> any Quantity.readsX (MovedKinds.quantityOf kinds)
         Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
         Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
@@ -2336,6 +2343,7 @@ boundSlots effect = case effect of
   -- CR 122.1: how many counters the removal actually took off, where the card
   -- reads it back -- Destroy's count slot one opcode over.
   Effect.RemoveCounters removeCounters -> foldMap Set.singleton (RemoveCounters.tally removeCounters)
+  Effect.RemoveCountersAmong removeCounters -> foldMap Set.singleton (RemoveCountersAmong.tally removeCounters)
   -- How many counters CR 122.5 ACTUALLY moved, for a "that much life".
   Effect.MoveCounters (MoveCounters.MkMoveCounters _ _ mSlot _) -> foldMap Set.singleton mSlot
   Effect.GainPlayerCounters {} -> Set.empty

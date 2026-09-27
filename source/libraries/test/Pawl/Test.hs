@@ -649,6 +649,7 @@ import qualified Pawl.RangeOfInfluenceSpec
 import qualified Pawl.RecruitSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
+import qualified Pawl.RemoveCounterSpec
 import qualified Pawl.ReplacementSpec
 import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec
@@ -1397,6 +1398,7 @@ spec s registry = do
   Pawl.ReplaySpec.spec s registry
   Pawl.MoveCounterSpec.spec s registry
   Pawl.PutCounterSpec.spec s registry
+  Pawl.RemoveCounterSpec.spec s registry
   Pawl.ResolveSpec.spec s registry
   Pawl.RestampSpec.spec s registry
   Pawl.ReversalSpec.spec s registry

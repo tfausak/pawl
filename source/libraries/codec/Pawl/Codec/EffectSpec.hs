@@ -147,7 +147,9 @@ import qualified Pawl.Types.PutCountersFrom as PutCountersFrom
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
@@ -1232,6 +1234,27 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "target")) Nothing))
       " {\"type\":\"RemoveCounters\",\"value\":{\"kind\":{\"type\":\"MinusOneMinusOne\"},\"quantity\":{\"type\":\"Literal\",\"value\":1},\"slot\":\"target\"}} "
+  -- Each RemovalCount arm, and the tally written only where it is bound.
+  Spec.it s "RemoveCountersAmong" $ do
+    let among count tally = Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong count (ObjectRef.EachMatching Filter.IsSource) CounterKind.Stun tally)
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (among (RemovalCount.Exactly (Quantity.Literal 3)) Nothing)
+      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"Exactly\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"Stun\"}}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (among (RemovalCount.UpTo (Quantity.Literal 3)) (Just (SlotName.MkSlotName (Text.pack "removed"))))
+      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"UpTo\",\"value\":{\"type\":\"Literal\",\"value\":3}},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"Stun\"},\"tally\":\"removed\"}} "
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (among RemovalCount.AnyNumber Nothing)
+      " {\"type\":\"RemoveCountersAmong\",\"value\":{\"count\":{\"type\":\"AnyNumber\"},\"from\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"IsSource\"}},\"kind\":{\"type\":\"Stun\"}}} "
   -- Every PlayerRef shape the opcode accepts: the self-scoped one, and the slot
   -- read CR 702.70a needs.
   Spec.it s "GainPlayerCounters" $ do

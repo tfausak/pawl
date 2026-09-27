@@ -295,7 +295,8 @@ admittedGiven pcs grants pools perspective unannounced bindings source slot gs =
 -- the two that fill Filter.defendingPlayer, because it is the one site that
 -- matches a TARGET SLOT's Filter -- both of CR 115's moments (CR 601.2c's
 -- choosing and CR 608.2b's re-check) reach those atoms through here, and CR
--- 702.134a, CR 702.39a and CR 202.3's computed bound are the only clauses that
+-- 702.134a, CR 702.39a, CR 202.3's computed bound and CR 508.5's printed
+-- "defending player controls" (Sensational Spider-Man) are the clauses that
 -- write them in a slot. CR 508.1c's gate is where the other defending-player
 -- read is (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no
 -- target slot can reach it. All are thunks, like the caller's `pcs`: a slot
@@ -339,7 +340,7 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
             -- attacking creature, and `source` is the object CR 113.7 says the
             -- ability came from.
-            Filter.defendingPlayer = Defender.playerOfAttacker Projection.controllerWithLastKnown source gs,
+            Filter.defendingPlayer = Defender.defendingPlayerOf Projection.controllerWithLastKnown source gs,
             -- Nothing: a target slot is judged before the effect names anyone, so
             -- there is no recipient it could have reached yet. CR 119.5's atom
             -- lives in an effect's QUANTITY, which is evaluated later and
