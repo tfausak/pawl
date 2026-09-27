@@ -6440,17 +6440,20 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- a bearer standing on the battlefield sees every move, a hand's included, by
   -- CR 603.10's first sentence.
   --
-  -- The Filter reads the card as it last existed in the zone it left (CR 608.2h),
-  -- the appearance "immediately prior to the event" the look-back asks for; a
-  -- card in a hidden zone reads the same on either side of the move.
+  -- The Filter reads each ARRIVAL, CardPutIntoGraveyard's posture, and not the
+  -- object that departed: a merged permanent is one departure and one arrival
+  -- per component (CR 730.3), and CR 730.2d makes it a token whenever its
+  -- topmost component is one, so "cards" read off the departure would reject a
+  -- card component that really did arrive. Pawl.LeavesTriggerSpec's "CR 730.3 a
+  -- merged token put into a library" case is the proof.
   TriggerCondition.CardsPutIntoZone (CardsPutIntoZone.MkCardsPutIntoZone f origins destination) ->
     let admits zc =
           ZoneChange.to zc == destination
             && ZoneChange.from zc /= destination
             && (Set.null origins || Set.member (ZoneChange.from zc) origins)
             && (Map.member bearer board || not (Game.isHiddenZone (ZoneChange.from zc)))
-            && let departed = ZoneChange.departed zc
-                in case Projection.viewWithLastKnown departed gs departed of
+            && let arrived = ZoneChange.object zc
+                in case Projection.viewWithLastKnown arrived gs arrived of
                      Nothing -> False
                      Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
      in case event of

@@ -10,9 +10,9 @@ import qualified Pawl.Types.Zone as Zone
 -- a library from anywhere".
 --
 -- The arrival-side twin of Pawl.Types.CardLeavesZone: the zone the card reached
--- is fixed and the zone it left may be any. The Filter is read against the card
--- as it last existed in the zone it left (CR 603.10a's look-back); the zones are
--- no characteristic of the card, so they come from the event.
+-- is fixed and the zone it left may be any. The Filter is read against each
+-- arriving object (CR 730.3's components one by one); the zones are no
+-- characteristic of the card, so they come from the event.
 data CardsPutIntoZone = MkCardsPutIntoZone
   { filter :: Filter.Filter Keyword.Keyword,
     -- | The zones it may have come from (CR 400.7); empty admits any but `to`.

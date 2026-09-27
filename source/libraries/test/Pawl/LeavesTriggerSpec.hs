@@ -20,6 +20,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
@@ -57,6 +58,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -746,7 +748,10 @@ dutifulKnowledgeSeekerSpec s registry =
               (settled, after) = settleAfter (Event.simultaneously (Event.changeZone firstId Zone.Library >> Event.changeZone secondId Zone.Library)) gs
           Spec.assertEqWith s "CR 603.2c the printed 2/2 is a 3/3, not the 4/4 a per-card reading would leave" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 3, Just 3)
           Spec.assertEqWith s "exactly one trigger reached the stack" (length (GameState.stack settled)) 1
-        -- "Cards": a token is none (CR 111.1).
+        -- "Cards": a token is none (CR 111.1). A regression fence, not a proof of
+        -- the card's `Not IsToken`: CR 704.5d has removed the token's library
+        -- incarnation before CR 117.5's scan reads the arrival, so it is
+        -- rejected with or without that filter.
         Spec.it s "CR 111.1 a token put into a library is no card, and the Seeker stays a 2/2" $ do
           seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
           pikerCard <- S.cardOf s registry "Goblin Piker"
@@ -756,6 +761,34 @@ dutifulKnowledgeSeekerSpec s registry =
               (settled, after) = settleAfter (Event.changeZone tokenId Zone.Library) gs
           Spec.assertEqWith s "the Seeker is still the printed 2/2" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 2, Just 2)
           Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+        -- CR 730.3 puts every component of a merged permanent into the zone, and
+        -- CR 730.2d makes the permanent a token when its topmost component is
+        -- one. Cubwarden {3}{W} (mutate {2}{W}{W}) mutated UNDER alice's Goblin
+        -- token is that permanent: a token on the battlefield, one of whose
+        -- components is a card. The filter has to read each ARRIVAL, not the
+        -- departed token.
+        Spec.it s "CR 730.3 a merged token put into a library still puts its Cubwarden card there, and the Seeker grows" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          cubwarden <- S.printingOf s registry "Cubwarden"
+          plains <- S.printingOf s registry "Plains"
+          pikerCard <- S.cardOf s registry "Goblin Piker"
+          let white = ManaSymbol.OfType (ManaType.Colored Color.White)
+              mutateCost = ManaCost.MkManaCost [ManaSymbol.Generic 2, white, white]
+              (seekerId, withSeeker) = S.addPermanent seeker S.alice (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers))
+              (tokenId, withToken) = S.addToken pikerCard S.alice withSeeker
+              (board, spellId) = S.handOne cubwarden withToken
+              main = board {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+              under :: Prompt.Prompt r -> r
+              under p = case p of
+                Prompt.ChooseCost _ _ _ candidates -> Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just mutateCost) . Cost.Type.mana) candidates)
+                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just tokenId) . Recipient.objectOf) . snd) sets
+                Prompt.ChooseMutateSide {} -> MutateSide.Under
+                _ -> S.identityAnswer p
+              merged = resolveWholeStack (S.runPure under (S.runPure under main (S.cast S.alice spellId)) (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority))
+              (_, after) = settleAfter (Event.changeZone tokenId Zone.Library) merged
+          Spec.assertEqWith s "CR 730.3 the Cubwarden card entered a library, so the printed 2/2 is a 3/3" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 3, Just 3)
+          Spec.assertBool s (Game.isToken tokenId merged) "CR 730.2d the merged permanent was a token"
+          Spec.assertEqWith s "and the Cubwarden is in alice's library" (fmap S.nameOf (Maybe.mapMaybe (`Game.cardOf` after) (Game.zoneMembers Zone.Library S.alice after))) [S.printingName cubwarden]
         -- A library card moved into a library arrives nowhere new (Wan Shi Tong,
         -- All-Knowing's ruling: reordering a library does not trigger).
         Spec.it s "a card moved from a library into a library is not put into one" $ do
