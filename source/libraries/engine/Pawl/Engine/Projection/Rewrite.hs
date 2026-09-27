@@ -1141,7 +1141,8 @@ rewriteRuleAbilities pairs abilities =
         }
 
 -- One CR 508.1c / 509.1b restriction under CR 612.1: its subject, its gate and
--- the other side of the pair it describes, as Pawl.Engine.CombatRestriction rewrites them.
+-- the other side of the pair it describes, as Pawl.Engine.CombatRestriction
+-- rewrites them.
 -- Exhaustive, so a new arm has to say where its words are.
 rewriteCombatRestriction :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CombatRestriction.CombatRestriction -> CombatRestriction.CombatRestriction
 rewriteCombatRestriction pairs restriction =

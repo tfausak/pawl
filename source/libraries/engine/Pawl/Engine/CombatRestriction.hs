@@ -387,12 +387,8 @@ blockedBy cr = case cr of
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
 
--- The other PAIRWISE selector, one declaration over. Its own for `blockedBy`'s
--- reason: what it answers is an Affected TOGETHER WITH the players those
--- creatures may not be announced against, and an Affected alone would say "this
--- creature can't attack" full stop. CR 506.3's kinds ride along for the same
--- reason: which announcements at that seat are barred is the rest of the
--- sentence, not a second restriction.
+-- `blockedBy`'s mirror: the blockers restricted and the attackers they may not
+-- block.
 blocksNot :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, Filter.Type.Filter Keyword.Type.Keyword)
 blocksNot cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing
@@ -404,6 +400,12 @@ blocksNot cr = case cr of
   CombatRestriction.CantAttackMoreThan {} -> Nothing
   CombatRestriction.CantBlockMoreThan {} -> Nothing
 
+-- The other PAIRWISE selector, one declaration over. Its own for `blockedBy`'s
+-- reason: what it answers is an Affected TOGETHER WITH the players those
+-- creatures may not be announced against, and an Affected alone would say "this
+-- creature can't attack" full stop. CR 506.3's kinds ride along for the same
+-- reason: which announcements at that seat are barred is the rest of the
+-- sentence, not a second restriction.
 attackingPlayer :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, PlayerScope.PlayerScope, Set AttackTargetKind.AttackTargetKind)
 attackingPlayer cr = case cr of
   CombatRestriction.CantAttack {} -> Nothing

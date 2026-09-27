@@ -3743,7 +3743,7 @@ cantBlockCreaturesSpec s registry = Spec.describe s "CantBlockCreatures" $ do
           Prompt.ChooseCopyTarget _ _ _ legal -> List.find (`elem` theirs) legal
           _ -> S.identityAnswer p
         resolved = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
-        -- The Printed Orcs leave, so the Clone is the only one that can block.
+        -- The printed Orcs leave, so the Clone is the only one that can block.
         gs1 = S.runPure S.identityAnswer resolved (mapM_ (`Event.changeZone` Zone.Graveyard) theirs)
         gs = snd (Engine.runGamePure S.aggressiveAnswer gs1 (Combat.declareAttackers S.manaPerformer S.alice))
         cloneOnField = filter (\oid -> Projection.controllerOf oid gs == Just S.bob) (Set.toList (GameState.battlefield gs))
