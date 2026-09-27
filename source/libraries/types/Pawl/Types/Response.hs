@@ -224,6 +224,10 @@ data Response
   | -- | CR 118.1 as a cost / CR 601.2h: how many +1\/+1 counters a paying
     -- player chose to take off each permanent, where the cost divides them.
     ChoseCounterRemovalAmong (Map.Map ObjectId.ObjectId Natural.Natural)
+  | -- | CR 118.1 as a cost / CR 601.2h: the division a paying player chose where
+    -- the count is a floor. Its own constructor: an answer above the count is
+    -- legal here and not to ChooseCounterRemovalAmong.
+    ChoseCounterRemovalAtLeast (Map.Map ObjectId.ObjectId Natural.Natural)
   | -- | CR 701.38a: the choice one player voted for.
     --
     -- Its own constructor for ChoseBolster's reason: a vote's candidates are an

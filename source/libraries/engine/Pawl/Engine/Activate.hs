@@ -468,7 +468,7 @@ activateAbility pid srcId ability = do
                   -- an ability that never resolves still leaves it (CrewSpec's
                   -- "a countered crew ability"). A case on the rule-702 keyword
                   -- stamp, never on an effect.
-                  let tappers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedForTotalPower bound)))
+                  let tappers = Set.fromList (Maybe.mapMaybe Recipient.objectOf (foldMap Set.toList (Map.lookup Binding.tappedForTotalPower (Binding.targetsOf bound))))
                   case Keyword.familyOf =<< stamp of
                     Just KeywordFamily.Crew ->
                       State.modify' (Event.recordEvent (GameEvent.Crewed Crewing.MkCrewing {Crewing.vehicle = srcId, Crewing.crewedBy = tappers}))

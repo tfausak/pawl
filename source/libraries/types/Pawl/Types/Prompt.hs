@@ -685,6 +685,10 @@ data Prompt r where
   -- (Novijen Sages); the Map is what each candidate carries. Elided where only
   -- one division exists, and an answer that does not add up is rejected.
   ChooseCounterRemovalAmong :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Map.Map ObjectId.ObjectId Natural.Natural -> Prompt (Map.Map ObjectId.ObjectId Natural.Natural)
+  -- | CR 118.1 as a cost / CR 601.2h: ChooseCounterRemovalAmong where the
+  -- Natural is a floor, so the payer also settles how many come off (Ooze
+  -- Flux). Elided only where the candidates carry exactly the floor.
+  ChooseCounterRemovalAtLeast :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Map.Map ObjectId.ObjectId Natural.Natural -> Prompt (Map.Map ObjectId.ObjectId Natural.Natural)
   -- | CR 701.3a: where an effect moving an attached permanent puts it, the
   -- current host excluded (CR 701.3b); the offer is the card's text, so CR
   -- 303.4j is left to the player. Elided at one candidate. The PlayerId is the

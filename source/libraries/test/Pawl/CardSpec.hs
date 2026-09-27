@@ -1486,6 +1486,20 @@ sacrificesAsCost =
         _ -> False
    in any isSacrifice . Cost.Type.components
 
+-- Does this cost remove +1\/+1 counters from permanents the payer CHOOSES?
+-- sacrificesAsCost's shape: CR 601.2h's payment binds how many under
+-- Binding.removedCounters (Pawl.Engine.Cost.payComponent's
+-- RemovePlusOneCounters arm, folded on by Pawl.Engine.Activate), so Ooze Flux's
+-- "the number of +1\/+1 counters removed this way" is an ordinary slot read.
+-- Asked by AbilitySlotLintSpec for an activation; no printing puts this
+-- component on a spell's cost.
+removesCountersAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+removesCountersAsCost =
+  let isRemoval component = case component of
+        CostComponent.RemovePlusOneCounters {} -> True
+        _ -> False
+   in any isRemoval . Cost.Type.components
+
 -- The costs a SPELL can be announced against: the printed one -- mana cost plus
 -- CR 118.8's additional costs -- and each alternative cost the card offers, which
 -- is the candidate list Pawl.Engine.Cost.costsFor builds. Any one of them
@@ -2472,6 +2486,7 @@ reservedSlots =
       Binding.revealedCard,
       Binding.beheldObject,
       Binding.collectedEvidence,
+      Binding.removedCounters,
       Binding.crewedVehicle,
       Binding.crewers,
       Binding.manaSource,
