@@ -63,6 +63,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -97,6 +98,8 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TeamId as TeamId
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -1288,7 +1291,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
     shahrazad <- S.printingOf s registry "Shahrazad"
-    let after = castShahrazad mountain plains shahrazad 8
+    let after = castShahrazad id mountain plains shahrazad 8
     Spec.assertEqWith s "alice's 8-card library survives the opening hand, so she wins and pays nothing" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "bob did not win: 13 halves to 7 rounded up, leaving 6" (S.lifeOf S.bob after) (Just 6)
     Spec.assertEqWith s "carol did not win either, and pays her OWN half: 9 halves to 5, leaving 4" (S.lifeOf S.carol after) (Just 4)
@@ -1306,12 +1309,26 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     mountain <- S.printingOf s registry "Mountain"
     plains <- S.printingOf s registry "Plains"
     shahrazad <- S.printingOf s registry "Shahrazad"
-    let after = castShahrazad mountain plains shahrazad 3
+    let after = castShahrazad id mountain plains shahrazad 3
     Spec.assertEqWith s "alice won nothing this time: 20 halves to 10" (S.lifeOf S.alice after) (Just 10)
     Spec.assertEqWith s "bob pays exactly what he paid when alice won" (S.lifeOf S.bob after) (Just 6)
     Spec.assertEqWith s "and so does carol" (S.lifeOf S.carol after) (Just 4)
     Spec.assertEqWith s "the drawn SUBGAME did not decide the main game (CR 729.1a)" (GameState.result after) Nothing
     Spec.assertEqWith s "Shahrazad resolved and left the stack" (GameState.stack after) []
+
+  -- CR 104.2c with CR 729.1b: the same board as the first case with alice and
+  -- bob on one team. bob decks in the subgame, but alice's survival is their
+  -- team's win, so bob wins too and only carol pays.
+  Spec.it s "CR 104.2c gameplay: a Shahrazad subgame won by a team excludes every player on it" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    let teamed gs = gs {GameState.settings = (GameState.settings gs) {GameSettings.teams = Teams.MkTeams (Map.fromList [(S.alice, TeamId.MkTeamId 0), (S.bob, TeamId.MkTeamId 0), (S.carol, TeamId.MkTeamId 1)])}}
+        after = castShahrazad teamed mountain plains shahrazad 8
+    Spec.assertEqWith s "CR 104.2c bob, on the winning team, pays nothing" (S.lifeOf S.bob after) (Just 13)
+    Spec.assertEqWith s "and neither does alice" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "carol pays her half" (S.lifeOf S.carol after) (Just 4)
+    Spec.assertEqWith s "the main game did not end" (GameState.result after) Nothing
 
   -- CR 729.1a #137: "the spell or ability that created the subgame" -- the rule
   -- names both kinds of object, and Shahrazad and Sindbad (Unknown Event,
@@ -3020,7 +3037,7 @@ restartReentrySpec s registry = Spec.describe s "restart re-entry (CR 727.4)" $ 
     -- cannot fire again and the rebuilt game decks out like any other.
     mountain <- S.printingOf s registry "Mountain"
     let (result, _) = Engine.runGamePure S.identityAnswer (restartOnStack mountain) Engine.playGame
-    Spec.assertBool s (case result of Result.Won _ -> True; Result.Drawn -> True) "the new game reached a result"
+    Spec.assertBool s (case result of Result.Won _ -> True; Result.TeamWon _ -> True; Result.Drawn -> True) "the new game reached a result"
 
 -- alice is the active player in her cleanup step with `n` cards in hand and
 -- nothing else scheduled; `others` are put onto the battlefield under bob's
@@ -3154,9 +3171,9 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
 -- opening hand (CR 729.3); `aliceLibrary` is the one dial, and it decides whether
 -- the subgame has a survivor. The Plains go on AFTER poolToLibraryG, which sweeps
 -- every object a player owns into their library.
-castShahrazad :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
-castShahrazad mountain plains shahrazad aliceLibrary =
-  let g0 = Setup.emptyGame S.threePlayers
+castShahrazad :: (GameState.GameState -> GameState.GameState) -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+castShahrazad staged mountain plains shahrazad aliceLibrary =
+  let g0 = staged (Setup.emptyGame S.threePlayers)
       g1 = addManyG mountain aliceLibrary S.alice (addManyG mountain 6 S.bob (addManyG mountain 4 S.carol g0))
       g2 = poolToLibraryG S.carol (poolToLibraryG S.bob (poolToLibraryG S.alice g1))
       g3 = S.landsFor plains S.alice 2 g2

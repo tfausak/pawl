@@ -5,6 +5,7 @@ import qualified Pawl.Codec.GameSettings as GameSettings
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AttackOption as AttackOption
+import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
@@ -19,22 +20,22 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False}
-      " {\"brawl\":false,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false} "
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none}
+      " {\"brawl\":false,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{}} "
   -- CR 903.12a: the same record with the Brawl option turned on.
   Spec.it s "a Brawl game" $
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = True, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False}
-      " {\"brawl\":true,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false} "
+      GameSettings.MkGameSettings {GameSettings.brawl = True, GameSettings.attackOption = Nothing, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none}
+      " {\"brawl\":true,\"attackOption\":null,\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{}} "
   -- CR 802.1: and the option every game pawl starts uses.
   Spec.it s "a game using the attack multiple players option" $
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False}
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false} "
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none}
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{}} "
   -- CR 803.1a: the option CR 807.2b makes the Grand Melee default. Its sibling
   -- Rightward is Pawl.Codec.AttackOptionSpec's business; what is this record's
   -- is that the field carries a NAMED option rather than a flag.
@@ -42,8 +43,8 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
     Common.assertCodec
       s
       GameSettings.codec
-      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.Leftward, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False}
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"Leftward\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false} "
+      GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.Leftward, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none}
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"Leftward\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{},\"deployCreatures\":false,\"emperors\":{}} "
   -- CR 808.1 / 805.1 / 804.1: a Team vs. Team game between two teams of two,
   -- each taking its turns together, with the deploy creatures option.
   Spec.it s "a game played between teams" $
@@ -64,9 +65,10 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
               ),
           GameSettings.sharedTeamTurns = True,
           GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited,
-          GameSettings.deployCreatures = True
+          GameSettings.deployCreatures = True,
+          GameSettings.emperors = Emperors.none
         }
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{\"0\":0,\"1\":1,\"2\":0,\"3\":1},\"sharedTeamTurns\":true,\"rangeOfInfluence\":{},\"deployCreatures\":true} "
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{\"0\":0,\"1\":1,\"2\":0,\"3\":1},\"sharedTeamTurns\":true,\"rangeOfInfluence\":{},\"deployCreatures\":true,\"emperors\":{}} "
   -- CR 801.2a: the limited range of influence option, one seat for two players.
   Spec.it s "a game using a limited range of influence" $
     Common.assertCodec
@@ -78,6 +80,23 @@ spec s = Spec.describe s "Pawl.Codec.GameSettings" $ do
           GameSettings.teams = Teams.none,
           GameSettings.sharedTeamTurns = False,
           GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(PlayerId.MkPlayerId 0, 1), (PlayerId.MkPlayerId 1, 1)]),
-          GameSettings.deployCreatures = False
+          GameSettings.deployCreatures = False,
+          GameSettings.emperors = Emperors.none
         }
-      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":1},\"deployCreatures\":false} "
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"MultiplePlayers\"},\"teams\":{},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":1},\"deployCreatures\":false,\"emperors\":{}} "
+  -- CR 809.2 / 809.3: an Emperor game, two teams of three with each team's
+  -- emperor in its middle seat.
+  Spec.it s "an Emperor game" $
+    Common.assertCodec
+      s
+      GameSettings.codec
+      GameSettings.MkGameSettings
+        { GameSettings.brawl = False,
+          GameSettings.attackOption = Just AttackOption.Adjacent,
+          GameSettings.teams = Teams.MkTeams (Map.fromList [(PlayerId.MkPlayerId p, TeamId.MkTeamId (if p < 3 then 0 else 1)) | p <- [0 .. 5]]),
+          GameSettings.sharedTeamTurns = False,
+          GameSettings.rangeOfInfluence = RangeOfInfluence.MkRangeOfInfluence (Map.fromList [(PlayerId.MkPlayerId p, if p == 1 || p == 4 then 2 else 1) | p <- [0 .. 5]]),
+          GameSettings.deployCreatures = True,
+          GameSettings.emperors = Emperors.MkEmperors (Map.fromList [(TeamId.MkTeamId 0, PlayerId.MkPlayerId 1), (TeamId.MkTeamId 1, PlayerId.MkPlayerId 4)])
+        }
+      " {\"brawl\":false,\"attackOption\":{\"type\":\"Adjacent\"},\"teams\":{\"0\":0,\"1\":0,\"2\":0,\"3\":1,\"4\":1,\"5\":1},\"sharedTeamTurns\":false,\"rangeOfInfluence\":{\"0\":1,\"1\":2,\"2\":1,\"3\":1,\"4\":2,\"5\":1},\"deployCreatures\":true,\"emperors\":{\"0\":1,\"1\":4}} "

@@ -168,9 +168,13 @@ attackableOpponents gs =
    in case GameSettings.attackOption (GameState.settings gs) of
         Just AttackOption.Leftward -> seatedAt (Maybe.listToMaybe others)
         Just AttackOption.Rightward -> seatedAt (Maybe.listToMaybe (reverse others))
-        -- Exhaustive rather than a wildcard, so a fourth attack option -- CR
-        -- 809.3c's is the one the CR already has -- is named by -Werror here
-        -- instead of silently inheriting CR 507.1's unrestricted list.
+        -- CR 809.3c: either neighbour, over CR 801.2c's seats rather than the
+        -- roster (Game.neighbours), so a seat emptied before this turn has
+        -- closed up.
+        Just AttackOption.Adjacent -> filter (\pid -> List.elem pid (Game.neighbours active gs)) opponents
+        -- Exhaustive rather than a wildcard, so a further attack option is named
+        -- by -Werror here instead of silently inheriting CR 507.1's
+        -- unrestricted list.
         Just AttackOption.MultiplePlayers -> opponents
         Nothing -> opponents
 

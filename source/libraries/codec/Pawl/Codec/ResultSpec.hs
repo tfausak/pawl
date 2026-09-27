@@ -5,6 +5,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.TeamId as TeamId
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Result" $ do
@@ -15,6 +16,13 @@ spec s = Spec.describe s "Pawl.Codec.Result" $ do
       Result.codec
       (Result.Won (PlayerId.MkPlayerId 1))
       " {\"type\":\"Won\",\"value\":1} "
+  -- CR 104.2c: a team wins, named by its team.
+  Spec.it s "TeamWon" $
+    Common.assertCodec
+      s
+      Result.codec
+      (Result.TeamWon (TeamId.MkTeamId 1))
+      " {\"type\":\"TeamWon\",\"value\":1} "
   -- CR 104.4: a draw names nobody.
   Spec.it s "Drawn" $
     Common.assertCodec

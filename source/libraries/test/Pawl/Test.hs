@@ -215,6 +215,7 @@ import qualified Pawl.Codec.EachCardInGraveyardSpec
 import qualified Pawl.Codec.EachCardInHandSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EmergeSpec
+import qualified Pawl.Codec.EmperorsSpec
 import qualified Pawl.Codec.EndTurnSignalSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EnteringTogetherSpec
@@ -562,6 +563,7 @@ import qualified Pawl.DiceSpec
 import qualified Pawl.DungeonSpec
 import qualified Pawl.EarthbendSpec
 import qualified Pawl.EffectLintSpec
+import qualified Pawl.EmperorSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EntryReplacementSpec
 import qualified Pawl.EntryRestrictionSpec
@@ -730,6 +732,7 @@ spec s registry = do
   Pawl.CardSpec.spec s registry
   Pawl.AbilitySlotLintSpec.spec s registry
   Pawl.EffectLintSpec.spec s registry
+  Pawl.EmperorSpec.spec s registry
   Pawl.FilterPositionLintSpec.spec s registry
   Pawl.CardsSpec.spec s
   Pawl.CaseSpec.spec s registry
@@ -924,6 +927,7 @@ spec s registry = do
   Pawl.Codec.EachCardInHandSpec.spec s
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EmergeSpec.spec s
+  Pawl.Codec.EmperorsSpec.spec s
   Pawl.Codec.EndTurnSignalSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntersWithSpec.spec s

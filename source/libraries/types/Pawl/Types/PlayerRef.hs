@@ -22,8 +22,9 @@ data PlayerRef
     -- rejected by Pawl.Codec.InZone as card data is decoded and swept for again
     -- by Pawl.CardSpec, not by this type, see #161.
     EachPlayer
-  | -- | EachPlayer minus the player a slot names -- Shahrazad's "each player who
-    -- doesn't win the subgame", where the slot holds the subgame's winner.
+  | -- | EachPlayer minus the players a slot names -- Shahrazad's "each player who
+    -- doesn't win the subgame", where the slot holds the subgame's winner, or
+    -- CR 104.2c's winning team.
     --
     -- NOT Relative Opponent: the excluded seat is the one a slot names, which
     -- need not be the perspective, and the set keeps the perspective in it when
