@@ -12,6 +12,7 @@ import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackTargetKind as AttackTargetKind
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -45,7 +46,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.codec
       (CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless Affected.Attached Nothing Nothing))
       " {\"type\":\"CantBlock\",\"value\":{\"affected\":{\"type\":\"Attached\"}}} "
-  -- CR 509.1b's PAIRWISE arm, whose payload is the only one with a second Filter
+  -- CR 509.1b's attacker-side PAIRWISE arm, whose payload has a second Filter
   -- position: "blockers" beside "affected", never a second "affected", since the
   -- two describe opposite sides of the block.
   Spec.it s "CantBeBlockedBy carries its Affected and its blockers" $
@@ -54,6 +55,13 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.codec
       (CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy Affected.Attached Filter.PowerGreaterThanSource Nothing Nothing))
       " {\"type\":\"CantBeBlockedBy\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"blockers\":{\"type\":\"PowerGreaterThanSource\"}}} "
+  -- Its blocker-side mirror: "attackers" beside "affected".
+  Spec.it s "CantBlockCreatures carries its Affected and its attackers" $
+    Common.assertCodec
+      s
+      CombatRestriction.codec
+      (CombatRestriction.CantBlockCreatures (CantBlockCreatures.MkCantBlockCreatures Affected.Attached Filter.PowerGreaterThanSource Nothing Nothing))
+      " {\"type\":\"CantBlockCreatures\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"attackers\":{\"type\":\"PowerGreaterThanSource\"}}} "
   -- CR 508.1c's PAIRWISE arm, the attacking one, whose payload spells
   -- "defenders" where CantBeBlockedBy spells "blockers": the players the
   -- restricted creatures may not be announced against (CR 508.1b), together

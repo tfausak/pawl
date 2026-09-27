@@ -42,6 +42,8 @@ import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackCostScope as AttackCostScope
 import qualified Pawl.Types.BlockCost as BlockCost
+import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
@@ -2197,15 +2199,21 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
   -- supplies a source power: Filter.Context.sourcePower is filled by
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by
   -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's condition and by
-  -- Pawl.Engine.CombatRestriction.cantBeBlockedBy for CR 701.54c's blocking
-  -- restriction, and is Nothing everywhere else -- so either atom in a card's
-  -- affected set, Count filter or search filter would be a silent False. Only
-  -- Pawl.Engine.Keyword's mentor and training and Pawl.Engine.Ring's emblem write
-  -- them, and this is what keeps that true.
+  -- Pawl.Engine.CombatRestriction's two CR 509.1b pairwise walks, and is Nothing
+  -- everywhere else -- so either atom in a card's affected set, Count filter or
+  -- search filter would be a silent False. Outside a face's own pairwise
+  -- position (Spitfire Handler's), only Pawl.Engine.Keyword's mentor and
+  -- training and Pawl.Engine.Ring's emblem write them, and this is what keeps
+  -- that true.
   Spec.it s "CR 702.134a / CR 702.149a no card writes a source-power comparison" $ do
     ps <- S.allPrintings s
-    let atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c)
-        greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Codec.encode (Face.Codec.codec Card.codec) c)
+    let pairwise tag c = sum (fmap (filterAtoms (Text.pack tag)) (concatMap pairwiseFilters (Face.combatRestrictions c)))
+        pairwiseFilters r = case r of
+          CombatRestriction.CantBeBlockedBy x -> [CantBeBlockedBy.blockers x]
+          CombatRestriction.CantBlockCreatures x -> [CantBlockCreatures.attackers x]
+          _ -> []
+        atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerLessThanSource" c
+        greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Codec.encode (Face.Codec.codec Card.codec) c) - pairwise "PowerGreaterThanSource" c
         offenders = filter (anyFace (\c -> atoms c /= 0 || greater c /= 0) . Printing.card) ps
     Spec.assertEqWith s "the atoms are the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous, the way the sweep above would be on its own: the same counter

@@ -4,6 +4,7 @@ import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.CantAttackPlayer as CantAttackPlayer
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.CantBlockCreatures as CantBlockCreatures
 import qualified Pawl.Types.LimitUnless as LimitUnless
 
 -- | CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an effect saying a
@@ -25,8 +26,8 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- object, and the two requirement carriers collapse opposite ones -- a blocking
 -- requirement carries the attacker to be blocked and no subject, an attacking
 -- requirement carries the subject and no object. A restriction names its SUBJECT
--- on every arm that names anything, and the two PAIRWISE arms -- CantBeBlockedBy
--- and CantAttackPlayer -- also name an object: Pacifism's two halves are the same
+-- on every arm that names anything, and the PAIRWISE arms -- CantBeBlockedBy,
+-- CantBlockCreatures and CantAttackPlayer -- also name an object: Pacifism's two halves are the same
 -- Affected twice, so the only thing distinguishing THOSE TWO is which declaration
 -- they forbid. Splitting them
 -- would copy the requirements' shape without the reason for it. What tells the
@@ -56,10 +57,11 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- subtracts nothing from CR 508.1a's or CR 509.1a's candidate list: every
 -- creature stays a legal candidate and it is the DECLARATION that is refused.
 --
--- The FOURTH shape is answered about a PAIR, and TWO arms take it -- one per
--- declaration. CantBeBlockedBy is CR 509.1b's: it names attackers and describes
--- the blockers that may not block them, so no set of creatures on either side is
--- the answer, and CR 509.1b's own Example is a pairwise board. It is the shape
+-- The FOURTH shape is answered about a PAIR, and THREE arms take it. Two are CR
+-- 509.1b's: CantBeBlockedBy names attackers and describes the blockers that may
+-- not block them, CantBlockCreatures names blockers and describes the attackers
+-- they may not block, so no set of creatures on either side is the answer, and
+-- CR 509.1b's own Example is a pairwise board. It is the shape
 -- that rule's second paragraph is about, though not always its evasion ABILITY:
 -- that paragraph's definition wants the ability on the attacking creature, and
 -- CR 701.54c's is on an emblem.
@@ -148,20 +150,19 @@ data CombatRestriction
   | -- | CR 509.1b: these creatures can't block, unless the gate holds. The
     -- second half of Pacifism's line and of the Aura family's beside it, and
     -- Blind-Spot Giant's gated one; CR 702.98a's unleash is the one rule 702 mints
-    -- (Pawl.Engine.Keyword.mintedCombatRestrictionsFor); every other one today
-    -- restricts being blocked rather than blocking, as an evasion keyword on the
-    -- ATTACKER or as the arm below.
+    -- (Pawl.Engine.Keyword.mintedCombatRestrictionsFor). A restriction naming
+    -- WHICH attackers is CantBlockCreatures.
     CantBlock AffectedUnless.AffectedUnless
   | -- | CR 509.1b's second paragraph: these ATTACKING creatures can't be blocked
     -- by creatures matching the Filter, unless the gate holds. Questing Beast's
     -- "can't be blocked by creatures with power 2 or less" and Relic Runner's
-    -- "can't be blocked if you've cast a historic spell this turn" are the pool's
-    -- printed statements of it -- the second describing no blocker at all, since
+    -- "can't be blocked if you've cast a historic spell this turn" are printed
+    -- statements of it -- the second describing no blocker at all, since
     -- CR 509.1a lets only creatures be declared -- and CR 701.54c's "your
     -- Ring-bearer ... can't be blocked by creatures with greater power" the
     -- rulebook's (Pawl.Engine.Ring.theRingCantBeBlockedByGreaterPower).
     --
-    -- The one arm carrying an OBJECT as well as a subject, because a pair is the
+    -- An arm carrying an OBJECT as well as a subject, because a pair is the
     -- smallest thing the sentence is about: the Filter describes a blocker
     -- RELATIVE TO the attacker it may not block ("with greater power"), so
     -- neither a set of attackers nor a set of blockers is an answer, and the two
@@ -182,6 +183,12 @@ data CombatRestriction
     -- against is the blocked creature's, not the emblem's -- CR 114.3 leaves an
     -- emblem no power at all. See Pawl.Engine.CombatRestriction.cantBeBlockedBy.
     CantBeBlockedBy CantBeBlockedBy.CantBeBlockedBy
+  | -- | CR 509.1b: these BLOCKING creatures can't block attackers matching the
+    -- Filter, unless the gate holds. Brassclaw Orcs' "can't block creatures with
+    -- power 2 or greater"; CantBeBlockedBy's mirror, its Filter read in the
+    -- BLOCKER's context (Spitfire Handler's "greater than this creature's
+    -- power"). See Pawl.Engine.CombatRestriction.cantBlockCreatures.
+    CantBlockCreatures CantBlockCreatures.CantBlockCreatures
   | -- | CR 508.1c through CR 802.3a: these creatures can't attack the players the
     -- scope names -- nor, where the kinds say so, what those players control
     -- (CR 506.3) -- unless the gate holds. Blazing Archon and Vow of Flight are

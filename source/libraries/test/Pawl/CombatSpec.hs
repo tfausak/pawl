@@ -3700,6 +3700,101 @@ mirageOn landId subtype p = case p of
   Prompt.ChooseBasicLandType {} -> subtype
   _ -> S.identityAnswer p
 
+-- CR 509.1b's pairwise restriction written from the BLOCKER's side
+-- (CombatRestriction.CantBlockCreatures). Every board attacks with a 2/1 Goblin
+-- Piker AND a 1/1 Llanowar Elves, so each barred pair has a legal twin beside it
+-- and a blocker that could block nothing fails the second leg.
+cantBlockCreaturesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cantBlockCreaturesSpec s registry = Spec.describe s "CantBlockCreatures" $ do
+  let pair blockerName = do
+        blocker <- S.printingOf s registry blockerName
+        piker <- S.printingOf s registry "Goblin Piker"
+        elves <- S.printingOf s registry "Llanowar Elves"
+        pure (attacking [piker, elves] [blocker])
+      blocks gs b a = Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs
+  Spec.it s "CR 509.1b Brassclaw Orcs can't block a creature with power 2, and can block one with power 1" $ do
+    (gs, mine, theirs) <- pair "Brassclaw Orcs"
+    case (mine, theirs) of
+      ([piker, elves], [orcs]) -> do
+        Spec.assertBool s (not (blocks gs orcs piker)) "the Orcs may not block the 2/1 Piker"
+        Spec.assertBool s (blocks gs orcs elves) "the Orcs may block the 1/1 Elves"
+      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
+  -- The Filter is read in the BLOCKER's context: "greater than this creature's
+  -- power" is the 1/1 Handler's. Read in the attacker's, the Piker would be
+  -- compared against itself and admitted.
+  Spec.it s "CR 509.1b Spitfire Handler can't block a creature with greater power than its own" $ do
+    (gs, mine, theirs) <- pair "Spitfire Handler"
+    case (mine, theirs) of
+      ([piker, elves], [handler]) -> do
+        Spec.assertBool s (not (blocks gs handler piker)) "the 1/1 Handler may not block the 2/1 Piker"
+        Spec.assertBool s (blocks gs handler elves) "the Handler may block the 1/1 Elves"
+      _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
+  -- THE PROJECTION TRIPWIRE: bob's blocker is a Clone of Brassclaw Orcs, so the
+  -- restriction comes off CR 707.2's copiable values, not the printed card.
+  Spec.it s "CR 707.2 a Clone of Brassclaw Orcs can't block the Piker either" $ do
+    orcs <- S.printingOf s registry "Brassclaw Orcs"
+    clone <- S.printingOf s registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (gs0, mine, theirs) = S.combatBoardOf [piker, elves] [orcs]
+        (cloneId, staged) = S.spellOnStack clone S.bob gs0
+        copying :: Prompt.Prompt r -> r
+        copying p = case p of
+          Prompt.ChooseCopyTarget _ _ _ legal -> List.find (`elem` theirs) legal
+          _ -> S.identityAnswer p
+        resolved = snd (Engine.runGamePure copying staged (Stack.resolveTop >> Engine.settleForPriority))
+        -- The Printed Orcs leave, so the Clone is the only one that can block.
+        gs1 = S.runPure S.identityAnswer resolved (mapM_ (`Event.changeZone` Zone.Graveyard) theirs)
+        gs = snd (Engine.runGamePure S.aggressiveAnswer gs1 (Combat.declareAttackers S.manaPerformer S.alice))
+        cloneOnField = filter (\oid -> Projection.controllerOf oid gs == Just S.bob) (Set.toList (GameState.battlefield gs))
+    case (mine, cloneOnField) of
+      ([pikerId, elvesId], [copy]) -> do
+        Spec.assertBool s (not (blocks gs copy pikerId)) "the Clone may not block the 2/1 Piker"
+        Spec.assertBool s (blocks gs copy elvesId) "the Clone may block the 1/1 Elves"
+        Spec.assertBool s (Projection.hasName (CardName.MkCardName (Text.pack "Brassclaw Orcs")) copy gs) "and it is a copy of the Orcs"
+      _ -> Spec.assertFailure s ("expected bob to control only the Clone (" <> show cloneId <> ")")
+  -- Wan Shi Tong, All-Knowing's Spirit tokens, "This token can't block or be
+  -- blocked by non-Spirit creatures": the card's own library trigger makes them,
+  -- and each half is proved against a Spirit (Dutiful Knowledge Seeker) and a
+  -- non-Spirit (Goblin Piker) on the other side.
+  let spiritsFor gs0 who = do
+        island <- S.printingOf s registry "Island"
+        let (cardId, gs1) = S.addHandCard island who gs0
+            moved = S.runPure S.identityAnswer gs1 (Event.changeZone cardId Zone.Library)
+            settle g =
+              let g' = S.runPure S.identityAnswer g Engine.settleForPriority
+               in if null (GameState.stack g') then g' else settle (S.runPure S.identityAnswer g' Stack.resolveTop)
+        pure (settle moved)
+  Spec.it s "CR 509.1b Wan Shi Tong's Spirit tokens can't block a non-Spirit, and can block a Spirit" $ do
+    wan <- S.printingOf s registry "Wan Shi Tong, All-Knowing"
+    seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs0, mine, _) = S.combatBoardOf [piker, seeker] [wan]
+    made <- spiritsFor gs0 S.bob
+    let gs = snd (Engine.runGamePure S.aggressiveAnswer made (Combat.declareAttackers S.manaPerformer S.alice))
+    case (mine, S.tokensOf gs) of
+      ([pikerId, seekerId], [a, b]) -> do
+        Spec.assertBool s (not (blocks gs a pikerId)) "a Spirit token may not block the non-Spirit Piker"
+        Spec.assertBool s (blocks gs a seekerId) "it may block the Spirit Seeker"
+        Spec.assertEqWith s "both tokens are bob's" (fmap (`Projection.controllerOf` gs) [a, b]) [Just S.bob, Just S.bob]
+      (_, other) -> Spec.assertFailure s ("expected two Spirit tokens, got " <> show (length other))
+  Spec.it s "CR 509.1b Wan Shi Tong's Spirit tokens can't be blocked by a non-Spirit, and can by a Spirit" $ do
+    wan <- S.printingOf s registry "Wan Shi Tong, All-Knowing"
+    seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs0, _, theirs) = S.combatBoardOf [wan] [piker, seeker]
+    made <- spiritsFor gs0 S.alice
+    -- CR 302.6: the tokens entered this turn. Settling them is the one fixture
+    -- step here that is not the cards' own doing.
+    let settleOne g oid = g {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects g)}
+        ready = List.foldl' settleOne made (S.tokensOf made)
+        gs = snd (Engine.runGamePure S.aggressiveAnswer ready (Combat.declareAttackers S.manaPerformer S.alice))
+    case (theirs, S.tokensOf gs) of
+      ([pikerId, seekerId], [a, _]) -> do
+        Spec.assertBool s (not (blocks gs pikerId a)) "the non-Spirit Piker may not block a Spirit token"
+        Spec.assertBool s (blocks gs seekerId a) "the Spirit Seeker may"
+      (_, other) -> Spec.assertFailure s ("expected two Spirit tokens, got " <> show (length other))
+
 -- CR 701.60c against the two rules that strip abilities: CR 613.1f's layer-6
 -- removal, ordered by CR 613.7, and CR 305.7's layer-4 subtype set, which spares
 -- an ability the rules granted. Proved by Reasonable Doubt {1}{U} Instant,
@@ -5328,6 +5423,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   blockRequirementSpec s registry
   attackRequirementSpec s registry
   combatRestrictionSpec s registry
+  cantBlockCreaturesSpec s registry
   keywordCounterRestrictionSpec s registry
   storedBlockRestrictionSpec s registry
   storedAttackRestrictionSpec s registry

@@ -86,6 +86,7 @@ import qualified Pawl.Codec.CandidateIdSpec
 import qualified Pawl.Codec.CantAttackPlayerSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
 import qualified Pawl.Codec.CantBeRegeneratedSpec
+import qualified Pawl.Codec.CantBlockCreaturesSpec
 import qualified Pawl.Codec.CantSearchLibrariesSpec
 import qualified Pawl.Codec.CardArrivedInSpec
 import qualified Pawl.Codec.CardLeavesZoneSpec
@@ -809,6 +810,7 @@ spec s registry = do
   Pawl.Codec.CandidateIdSpec.spec s
   Pawl.Codec.CantAttackPlayerSpec.spec s
   Pawl.Codec.CantBeBlockedBySpec.spec s
+  Pawl.Codec.CantBlockCreaturesSpec.spec s
   Pawl.Codec.CantBeRegeneratedSpec.spec s
   Pawl.Codec.CantSearchLibrariesSpec.spec s
   Pawl.Codec.CardArrivedInSpec.spec s
