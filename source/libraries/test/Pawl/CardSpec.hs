@@ -3781,6 +3781,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.Toughness -> []
   Quantity.Type.InSlot _ -> []
   Quantity.Type.WasBound _ -> []
+  Quantity.Type.BoundCount _ -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus (Plus.MkPlus a b) -> quantityKindFilters a <> quantityKindFilters b
   Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityKindFilters inner
@@ -3832,6 +3833,7 @@ quantityKindFilters quantity = case quantity of
   Quantity.Type.OpponentsAttacked _ -> []
   Quantity.Type.AttackersDeclaredThisTurn _ -> []
   Quantity.Type.CardsDiscardedThisTurn _ -> []
+  Quantity.Type.CardsDrawnThisTurn _ -> []
   Quantity.Type.BendingsThisTurn _ -> []
   Quantity.Type.LifeGainedThisTurn _ -> []
   Quantity.Type.PlayersDealtDamageThisTurn _ -> []

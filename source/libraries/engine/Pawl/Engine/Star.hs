@@ -38,6 +38,7 @@ substituteStar star quantity = case quantity of
   Quantity.Toughness -> quantity
   Quantity.InSlot _ -> quantity
   Quantity.WasBound _ -> quantity
+  Quantity.BoundCount _ -> quantity
   Quantity.Count _ -> quantity
   Quantity.ManaCount _ -> quantity
   Quantity.LifeTotal _ -> quantity
@@ -75,6 +76,7 @@ substituteStar star quantity = case quantity of
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.AttackersDeclaredThisTurn _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
+  Quantity.CardsDrawnThisTurn _ -> quantity
   Quantity.BendingsThisTurn _ -> quantity
   Quantity.LifeGainedThisTurn _ -> quantity
   Quantity.PlayersDealtDamageThisTurn _ -> quantity

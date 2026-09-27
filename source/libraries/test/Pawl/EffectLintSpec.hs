@@ -409,6 +409,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.Toughness -> False
   Quantity.Type.InSlot _ -> False
   Quantity.Type.WasBound _ -> False
+  Quantity.Type.BoundCount _ -> False
   Quantity.Type.Halved {} -> False
   Quantity.Type.Times {} -> False
   Quantity.Type.Negate {} -> False
@@ -448,6 +449,7 @@ printedBoxQuantity quantity = case quantity of
   Quantity.Type.OpponentsAttacked {} -> False
   Quantity.Type.AttackersDeclaredThisTurn {} -> False
   Quantity.Type.CardsDiscardedThisTurn {} -> False
+  Quantity.Type.CardsDrawnThisTurn {} -> False
   Quantity.Type.BendingsThisTurn {} -> False
   Quantity.Type.LifeGainedThisTurn {} -> False
   Quantity.Type.PlayersDealtDamageThisTurn {} -> False

@@ -96,6 +96,7 @@ overSlots f quantity =
         -- D4 dataflow lint, and a mode that renames its slots has to rename this
         -- one with them.
         Quantity.WasBound slot -> fmap Quantity.WasBound (f slot)
+        Quantity.BoundCount slot -> fmap Quantity.BoundCount (f slot)
         Quantity.Star -> pure quantity
         Quantity.Plus (Plus.MkPlus a b) -> fmap Quantity.Plus (Plus.MkPlus <$> recur a <*> recur b)
         -- Composition, as Plus is: the rounding names no slot and the payload may name
@@ -175,6 +176,7 @@ overSlots f quantity =
         Quantity.OpponentsAttacked _ -> pure quantity
         -- And a tenth, CR 701.9a's tally having nothing beside its PlayerRef either.
         Quantity.CardsDiscardedThisTurn _ -> pure quantity
+        Quantity.CardsDrawnThisTurn _ -> pure quantity
         Quantity.BendingsThisTurn _ -> pure quantity
         -- And another, CR 508.1a's declaration tally likewise.
         Quantity.AttackersDeclaredThisTurn _ -> pure quantity
@@ -299,6 +301,7 @@ nestedRefs quantity = case quantity of
   -- AgainstSlot's answer below: `slots` above DOES report this arm's own slot,
   -- and it hides no nested reference.
   Quantity.WasBound _ -> Set.empty
+  Quantity.BoundCount _ -> Set.empty
   Quantity.Star -> Set.empty
   Quantity.Plus (Plus.MkPlus a b) -> Set.union (nestedRefs a) (nestedRefs b)
   -- Plus' answer: the rounding hides no reference, so what the payload hides is
@@ -345,6 +348,7 @@ nestedRefs quantity = case quantity of
   Quantity.OpponentsAttacked ref -> Set.singleton (Left ref)
   Quantity.AttackersDeclaredThisTurn ref -> Set.singleton (Left ref)
   Quantity.CardsDiscardedThisTurn ref -> Set.singleton (Left ref)
+  Quantity.CardsDrawnThisTurn ref -> Set.singleton (Left ref)
   Quantity.BendingsThisTurn ref -> Set.singleton (Left ref)
   Quantity.LifeGainedThisTurn ref -> Set.singleton (Left ref)
   Quantity.PlayersDealtDamageThisTurn ref -> Set.singleton (Left ref)
@@ -401,6 +405,7 @@ nestedCounts quantity = case quantity of
   -- InSlot's answer, one half of the binding over: CR 701.4b's yes-or-no holds
   -- no Count either.
   Quantity.WasBound _ -> []
+  Quantity.BoundCount _ -> []
   Quantity.Star -> []
   Quantity.Plus (Plus.MkPlus a b) -> nestedCounts a <> nestedCounts b
   -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it halves
@@ -457,6 +462,7 @@ nestedCounts quantity = case quantity of
   Quantity.OpponentsAttacked _ -> []
   Quantity.AttackersDeclaredThisTurn _ -> []
   Quantity.CardsDiscardedThisTurn _ -> []
+  Quantity.CardsDrawnThisTurn _ -> []
   Quantity.BendingsThisTurn _ -> []
   Quantity.LifeGainedThisTurn _ -> []
   Quantity.PlayersDealtDamageThisTurn _ -> []
@@ -599,6 +605,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
         Quantity.AttackersDeclaredThisTurn ref -> Quantity.AttackersDeclaredThisTurn (f ref)
         Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
+        Quantity.CardsDrawnThisTurn ref -> Quantity.CardsDrawnThisTurn (f ref)
         Quantity.BendingsThisTurn ref -> Quantity.BendingsThisTurn (f ref)
         Quantity.LifeGainedThisTurn ref -> Quantity.LifeGainedThisTurn (f ref)
         Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
@@ -636,6 +643,7 @@ mapPlayerRefs f intoCount quantity =
         Quantity.Toughness -> quantity
         Quantity.InSlot _ -> quantity
         Quantity.WasBound _ -> quantity
+        Quantity.BoundCount _ -> quantity
         Quantity.Star -> quantity
         Quantity.ObjectCounters _ -> quantity
         Quantity.ObjectCountersOfAnyKind -> quantity

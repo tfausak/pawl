@@ -3716,6 +3716,7 @@ quantityReads q = case q of
   -- InSlot's answer: a binding is not a projected aspect, so neither half of the
   -- slot reads one.
   Quantity.Type.WasBound _ -> Set.empty
+  Quantity.Type.BoundCount _ -> Set.empty
   Quantity.Type.Star -> Set.empty
   Quantity.Type.ManaCount _ -> Set.empty
   Quantity.Type.LifeTotal _ -> Set.empty
@@ -3754,6 +3755,7 @@ quantityReads q = case q of
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.AttackersDeclaredThisTurn _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
+  Quantity.Type.CardsDrawnThisTurn _ -> Set.empty
   Quantity.Type.BendingsThisTurn _ -> Set.empty
   Quantity.Type.LifeGainedThisTurn _ -> Set.empty
   Quantity.Type.PlayersDealtDamageThisTurn _ -> Set.empty
