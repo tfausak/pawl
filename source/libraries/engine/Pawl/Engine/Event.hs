@@ -1493,12 +1493,9 @@ offerCommandZone zc = do
 -- bucket is empty either: with no row to order against, the post-loop question
 -- in `resolveZoneChange` is the same question.
 --
--- A draw is not a second place the ordering reaches. A draw replacement (Words of
--- Worship) and the offer on a drawn commander give the same outcomes in either
--- order: a draw whose card is redirected is still a draw -- Rest in Peace's and
--- Leyline of the Void's rulings say so of a redirected discard, CR 701.9a's
--- sibling of CR 121.1 -- so the draw replacement still applies after the offer
--- and replaces the whole draw.
+-- A draw is not a second place the ordering reaches: CR 616.1g has a draw
+-- replacement (Words of Worship) chosen before anything applying to the card's
+-- move, which is an event contained within the draw.
 --
 -- No case on effect identity: the question is the proposed event's destination
 -- ZONE and whether its subject is a commander, as `offerCommandZone`'s.
