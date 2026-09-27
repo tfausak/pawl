@@ -20,6 +20,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Binding as Event
@@ -57,6 +58,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -672,6 +674,150 @@ rakshasaVizierSpec s registry =
           Spec.assertEqWith s "the Vizier watches exile alone, so it is still the printed 4/4" (Projection.powerOf vizierId after, Projection.toughnessOf vizierId after) (Just 4, Just 4)
           Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack (S.runPure S.identityAnswer gone Engine.settleForPriority))) 0
           Spec.assertEqWith s "off the same departures: alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+-- CR 603.10a's fourth family: Dutiful Knowledge Seeker {2}{U} Creature -- Fox
+-- Spirit 2/2, "Whenever one or more cards are put into a library from anywhere,
+-- put a +1/+1 counter on this creature. / {3}: Put target card from a graveyard
+-- on the bottom of its owner's library." (data/cards/dutiful-knowledge-seeker.json;
+-- name, cost, type line and Oracle text checked against Scryfall 2026-09-27.)
+-- Nothing of the card is omitted.
+--
+-- THE DISCRIMINATION is where the moved object was before the move. A Seeker put
+-- into a library from the BATTLEFIELD, where all players could see it, looks back
+-- and triggers although it is a hidden library card by the CR 117.5 scan; the
+-- same Seeker put there from a HAND does not -- its ability does not function
+-- in a hand, and CR 603.10a's look-back does not reach an object in a hidden
+-- zone. A Seeker standing on the battlefield sees a hand's card arrive all the
+-- same: "from anywhere" is CR 603.10's first sentence for a bearer still there.
+dutifulKnowledgeSeekerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dutifulKnowledgeSeekerSpec s registry =
+  let resolveWholeStack gs =
+        if null (GameState.stack gs)
+          then gs
+          else resolveWholeStack (S.runPure S.identityAnswer gs Stack.resolveTop)
+      -- One move, then CR 117.5's scan: the board with whatever triggered on the
+      -- stack, and the board with the whole stack resolved.
+      settleAfter move gs =
+        let moved = S.runPure S.identityAnswer gs move
+            settled = S.runPure S.identityAnswer moved Engine.settleForPriority
+         in (settled, resolveWholeStack settled)
+      -- alice's lands, so every board has something on the battlefield besides
+      -- the Seeker.
+      islands = do
+        island <- S.printingOf s registry "Island"
+        pure (S.landsInPlay island 3)
+   in Spec.describe s "CardsPutIntoZone" $ do
+        -- The proving case: the trigger fires after its own bearer is hidden.
+        Spec.it s "CR 603.10a a Seeker put into its owner's library from the battlefield still triggers" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          lands <- islands
+          let (seekerId, gs) = S.addPermanent seeker S.alice lands
+              (settled, after) = settleAfter (Event.changeZone seekerId Zone.Library) gs
+          Spec.assertEqWith s "CR 603.10a the look-back put the Seeker's trigger on the stack" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "the Seeker is a library card by the time the scan ran" (length (Game.zoneMembers Zone.Library S.alice settled)) 1
+          Spec.assertEqWith s "and the trigger resolved to nothing, \"this creature\" being gone" (GameState.stack after) []
+        -- The hidden-origin negative, one difference from the proving case: the Seeker
+        -- starts in alice's hand, a hidden zone.
+        Spec.it s "CR 603.10a the same Seeker put into her library from her hand does not" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          lands <- islands
+          let (seekerId, gs) = S.addHandCard seeker S.alice lands
+              (settled, _) = settleAfter (Event.changeZone seekerId Zone.Library) gs
+          Spec.assertEqWith s "no look-back for an object only its owner could see" (GameState.stack settled) []
+          Spec.assertEqWith s "off the same move: the Seeker is in the library" (length (Game.zoneMembers Zone.Library S.alice settled)) 1
+        -- "From anywhere" read by a bearer still standing: a hand card put into a
+        -- library is a card put into a library.
+        Spec.it s "CR 603.10 a Seeker on the battlefield sees a card put into a library from a hand" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          island <- S.printingOf s registry "Island"
+          lands <- islands
+          let (seekerId, withSeeker) = S.addPermanent seeker S.alice lands
+              (cardId, gs) = S.addHandCard island S.bob withSeeker
+              (_, after) = settleAfter (Event.changeZone cardId Zone.Library) gs
+          Spec.assertEqWith s "the printed 2/2 is a 3/3" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 3, Just 3)
+          Spec.assertEqWith s "one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne seekerId after) 1
+        -- CR 603.2c: two cards in one event group are one trigger event.
+        Spec.it s "CR 603.2c two graveyard cards put into libraries at once put ONE counter on the Seeker" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          island <- S.printingOf s registry "Island"
+          forest <- S.printingOf s registry "Forest"
+          lands <- islands
+          let (seekerId, withSeeker) = S.addPermanent seeker S.alice lands
+              (firstId, withFirst) = S.addGraveyardCard island S.alice withSeeker
+              (secondId, gs) = S.addGraveyardCard forest S.bob withFirst
+              (settled, after) = settleAfter (Event.simultaneously (Event.changeZone firstId Zone.Library >> Event.changeZone secondId Zone.Library)) gs
+          Spec.assertEqWith s "CR 603.2c the printed 2/2 is a 3/3, not the 4/4 a per-card reading would leave" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 3, Just 3)
+          Spec.assertEqWith s "exactly one trigger reached the stack" (length (GameState.stack settled)) 1
+        -- "Cards": a token is none (CR 111.1). A regression fence, not a proof of
+        -- the card's `Not IsToken`: CR 704.5d has removed the token's library
+        -- incarnation before CR 117.5's scan reads the arrival, so it is
+        -- rejected with or without that filter.
+        Spec.it s "CR 111.1 a token put into a library is no card, and the Seeker stays a 2/2" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          pikerCard <- S.cardOf s registry "Goblin Piker"
+          lands <- islands
+          let (seekerId, withSeeker) = S.addPermanent seeker S.alice lands
+              (tokenId, gs) = S.addToken pikerCard S.alice withSeeker
+              (settled, after) = settleAfter (Event.changeZone tokenId Zone.Library) gs
+          Spec.assertEqWith s "the Seeker is still the printed 2/2" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 2, Just 2)
+          Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+        -- CR 730.3 puts every component of a merged permanent into the zone, and
+        -- CR 730.2d makes the permanent a token when its topmost component is
+        -- one. Cubwarden {3}{W} (mutate {2}{W}{W}) mutated UNDER alice's Goblin
+        -- token is that permanent: a token on the battlefield, one of whose
+        -- components is a card. The filter has to read each ARRIVAL, not the
+        -- departed token.
+        Spec.it s "CR 730.3 a merged token put into a library still puts its Cubwarden card there, and the Seeker grows" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          cubwarden <- S.printingOf s registry "Cubwarden"
+          plains <- S.printingOf s registry "Plains"
+          pikerCard <- S.cardOf s registry "Goblin Piker"
+          let white = ManaSymbol.OfType (ManaType.Colored Color.White)
+              mutateCost = ManaCost.MkManaCost [ManaSymbol.Generic 2, white, white]
+              (seekerId, withSeeker) = S.addPermanent seeker S.alice (S.landsFor plains S.alice 4 (Setup.emptyGame S.bothPlayers))
+              (tokenId, withToken) = S.addToken pikerCard S.alice withSeeker
+              (board, spellId) = S.handOne cubwarden withToken
+              main = board {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+              under :: Prompt.Prompt r -> r
+              under p = case p of
+                Prompt.ChooseCost _ _ _ candidates -> Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just mutateCost) . Cost.Type.mana) candidates)
+                Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just tokenId) . Recipient.objectOf) . snd) sets
+                Prompt.ChooseMutateSide {} -> MutateSide.Under
+                _ -> S.identityAnswer p
+              merged = resolveWholeStack (S.runPure under (S.runPure under main (S.cast S.alice spellId)) (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority))
+              (_, after) = settleAfter (Event.changeZone tokenId Zone.Library) merged
+          Spec.assertEqWith s "CR 730.3 the Cubwarden card entered a library, so the printed 2/2 is a 3/3" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 3, Just 3)
+          Spec.assertBool s (Game.isToken tokenId merged) "CR 730.2d the merged permanent was a token"
+          Spec.assertEqWith s "and the Cubwarden is in alice's library" (fmap S.nameOf (Maybe.mapMaybe (`Game.cardOf` after) (Game.zoneMembers Zone.Library S.alice after))) [S.printingName cubwarden]
+        -- A library card moved into a library arrives nowhere new (Wan Shi Tong,
+        -- All-Knowing's ruling: reordering a library does not trigger).
+        Spec.it s "a card moved from a library into a library is not put into one" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          island <- S.printingOf s registry "Island"
+          lands <- islands
+          let (seekerId, withSeeker) = S.addPermanent seeker S.alice lands
+              (cardId, gs) = S.addLibraryCard island S.alice withSeeker
+              (settled, after) = settleAfter (Event.changeZone cardId Zone.Library) gs
+          Spec.assertEqWith s "the Seeker is still the printed 2/2" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 2, Just 2)
+          Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+        -- The printed activation, end to end: the Seeker puts bob's graveyard
+        -- card into his library and grows off its own ability.
+        Spec.it s "the Seeker's {3} ability puts bob's graveyard card into his library, and the Seeker grows" $ do
+          seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+          island <- S.printingOf s registry "Island"
+          lands <- islands
+          let (seekerId, withSeeker) = S.addPermanent seeker S.alice lands
+              (cardId, gs) = S.addGraveyardCard island S.bob withSeeker
+              board = gs {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+              abilities = Activatable.abilitiesFor seekerId board
+              activated = case abilities of
+                [ability] -> S.runPure S.identityAnswer board (Activate.activateAbility S.alice seekerId ability >> Stack.resolveTop)
+                _ -> board
+              (_, after) = settleAfter (pure ()) activated
+          Spec.assertEqWith s "the printed 2/2 is a 3/3" (Projection.powerOf seekerId after, Projection.toughnessOf seekerId after) (Just 3, Just 3)
+          Spec.assertBool s (cardId `notElem` Game.zoneMembers Zone.Graveyard S.bob after) "bob's card left his graveyard"
+          Spec.assertEqWith s "for his library" (length (Game.zoneMembers Zone.Library S.bob after)) 1
+          Spec.assertEqWith s "the Seeker states exactly one activated ability" (length abilities) 1
 
 -- What PermanentReturnedToHand's bindings are FOR -- Warped Devotion {2}{B}
 -- Enchantment, "Whenever a permanent is returned to a player's hand, that
@@ -4229,6 +4375,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   kishlaSkimmerSpec s registry
   spiritMascotSpec s registry
   rakshasaVizierSpec s registry
+  dutifulKnowledgeSeekerSpec s registry
   warpedDevotionSpec s registry
   becameSlotSpec s registry
   persistentRoachesSpec s registry

@@ -5,6 +5,7 @@ import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
+import qualified Pawl.Types.CardsPutIntoZone as CardsPutIntoZone
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
@@ -308,6 +309,10 @@ data TriggerCondition
   | -- | CR 603.2c's batch reading of the arm above: "whenever one or more cards
     -- leave your graveyard" (Spirit Mascot), once however many left.
     CardsLeaveZone CardLeavesZone.CardLeavesZone
+  | -- | CR 603.2c: "whenever one or more cards are put into a library from
+    -- anywhere" (Dutiful Knowledge Seeker), once however many arrived. A CR
+    -- 603.10a look-back for an object that all players could see.
+    CardsPutIntoZone CardsPutIntoZone.CardsPutIntoZone
   | -- | CR 603.10a / 113.6k: "when this card leaves your graveyard" (Oglor,
     -- Devoted Assistant's grant). Self-scoped, and a look-back.
     SelfLeavesGraveyard
