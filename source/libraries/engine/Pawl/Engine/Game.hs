@@ -331,12 +331,12 @@ choose p = do
 -- ability is put on the stack (Pawl.Engine.Engine.placeOne), which every cycle
 -- of a mandatory loop does: nothing else acts with no player choosing. That
 -- call names the ability's controller and, under limited range, the
--- controllers of the continuous effects applying to what its event bound.
+-- controllers of the continuous effects it would not have triggered without
+-- (Pawl.Engine.Event.Trigger.loopShapers).
 --
--- Not implemented: an object the loop only acts on (moves, creates, damages),
--- and an effect applying only to a trigger's source, are not recorded, so
--- their controllers are named only if something else of theirs is in the loop
--- too (#4148).
+-- Not implemented: an object the loop only acts on (moves, creates, damages)
+-- is not recorded, so its controller is named only if something else of
+-- theirs is in the loop too (#4148).
 involve :: PlayerId -> GameState -> GameState
 involve pid gs = gs {GameState.loopInvolvement = Map.insert pid (GameState.nextTimestamp gs) (GameState.loopInvolvement gs)}
 
