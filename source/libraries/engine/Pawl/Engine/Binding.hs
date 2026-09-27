@@ -157,8 +157,8 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- Which players are in it depends on Pawl.Types.PayBranch: the IfNotPaid branch
 -- gets the offered players who did not pay, the IfPaid branch the ones who did,
 -- and the IfNonePaid branch every offered player, when none paid.
--- One slot for both, because the printed word is the same word and which branch
--- a clause is is a fact about the CLAUSE.
+-- One slot for all three, because the printed word is the same word and which
+-- branch a clause is is a fact about the CLAUSE.
 --
 -- SEVERAL players, which is the whole point and what parts it from
 -- `triggerPlayer`: CR 118.12a's rewriting is per player, so a gate whose payer
