@@ -838,6 +838,7 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       Combat.Type.declaredBlockers = Set.empty,
                       Combat.Type.blockersDeclared = True,
                       Combat.Type.attackingNothing = Set.empty,
+                      Combat.Type.removedDefending = Map.empty,
                       Combat.Type.defenders = [S.bob]
                     }
               }
