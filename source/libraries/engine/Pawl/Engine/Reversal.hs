@@ -66,6 +66,7 @@ withoutAnnouncement before entry closed = do
   events <- eventsOf GameState.events
   nextEventGroup <- newest GameState.nextEventGroup
   eventGroupDepth <- one GameState.eventGroupDepth
+  enteringTogether <- one GameState.enteringTogether
   lastKnown <- mapOf GameState.lastKnown
   stackArchive <- mapOf GameState.stackArchive
   scannedThrough <- one GameState.scannedThrough
@@ -167,6 +168,7 @@ withoutAnnouncement before entry closed = do
         GameState.events = events,
         GameState.nextEventGroup = nextEventGroup,
         GameState.eventGroupDepth = eventGroupDepth,
+        GameState.enteringTogether = enteringTogether,
         GameState.lastKnown = lastKnown,
         GameState.stackArchive = stackArchive,
         GameState.scannedThrough = scannedThrough,

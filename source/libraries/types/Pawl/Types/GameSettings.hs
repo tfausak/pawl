@@ -1,6 +1,7 @@
 module Pawl.Types.GameSettings where
 
 import qualified Pawl.Types.AttackOption as AttackOption
+import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Teams as Teams
 
@@ -78,6 +79,11 @@ data GameSettings = MkGameSettings
     -- | CR 804.2: whether each creature has "{T}: Target teammate gains control
     -- of this creature. Activate only as a sorcery." Off by default
     -- (Pawl.Engine.Setup.emptyGame), and read through Pawl.Engine.Deploy.
-    deployCreatures :: Bool
+    deployCreatures :: Bool,
+    -- | CR 809.2: each team's emperor. Emperors.none by default
+    -- (Pawl.Engine.Setup.emptyGame); Pawl.Engine.Emperor.setUp writes it with
+    -- the rest of CR 809.3's options, and Pawl.Engine.Departure reads it for CR
+    -- 809.5b and 809.5c.
+    emperors :: Emperors.Emperors
   }
   deriving (Eq, Ord, Show)

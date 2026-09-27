@@ -327,6 +327,7 @@ import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.Teams as Teams
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -3835,10 +3836,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- CR 729.1/729.5: run the nested game to completion, then bind its outcome.
   --
   -- CR 729.1b: what the main game may read is the subgame's WINNER, so the slot
-  -- holds a winner and a Drawn subgame binds nothing -- Shahrazad's "each player
-  -- who doesn't win" is PlayerRef.EachPlayerExcept over that slot, and gets the
-  -- drawn case for free. The roster the complement is taken against is
-  -- Game.stillPlaying's, the set Setup.subgameStateFrom seated.
+  -- holds the winners (a player, or CR 104.2c's whole team) and a Drawn
+  -- subgame binds nothing -- Shahrazad's "each player who doesn't win" is
+  -- PlayerRef.EachPlayerExcept over that slot, and gets the drawn case for
+  -- free. The roster the complement is taken against is Game.stillPlaying's,
+  -- the set Setup.subgameStateFrom seated.
   --
   -- The winner is bound onto `resolving` -- the object ON THE STACK -- and not
   -- onto `source`, because that is what the next effect's re-read looks at: both
@@ -3856,7 +3858,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.PlaySubgame slot -> do
     result <- runSubgame
     case result of
-      Result.Won winner -> State.modify' (bindPlayerSlot resolving slot winner)
+      Result.Won winner -> State.modify' (bindPlayerSlot resolving slot (Set.singleton winner))
+      -- CR 104.2c: each player on the winning team wins.
+      Result.TeamWon team -> do
+        gs <- State.get
+        State.modify' (bindPlayerSlot resolving slot (Map.keysSet (Map.filter (== team) (Teams.unwrap (Game.teams gs)))))
       Result.Drawn -> pure ()
   -- CR 608.2d: "choose an opponent" (Skullwinder) or "choose a player" (Stadium
   -- Vendors), announced as this effect is applied and bound so the sentence
@@ -3895,7 +3901,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 else Prompt.ChooseOpponent decider controller source offered
         answer <- Game.choose question
         pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
-    Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
+    Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot (Set.singleton pid))
   -- ChoosePlayer's twin with the decision replaced by randomness (Ruhan of the
   -- Fomori's "choose an opponent at random", Strax, Sontaran Nurse's "choose a
   -- player at random"): the same fold, the same bind, and the same CR 608.2d
@@ -3930,7 +3936,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let offered = first NonEmpty.:| (second : rest)
         answer <- Game.ask (Prompt.RandomPlayer offered)
         pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
-    Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
+    Monad.forM_ chosenPlayer $ \pid -> State.modify' (bindPlayerSlot resolving slot (Set.singleton pid))
   -- CR 706.1: roll a die of the stated kind, and bind CR 706.4's result at the
   -- slot for a later effect of this same resolution to read (Ancient Copper
   -- Dragon's "roll a d20. You create a number of Treasure tokens equal to the
@@ -5204,8 +5210,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Nothing here reorders the members: the bracket changes which events are one
     -- event, never when each iteration runs, so rule 608.2f's APNAP ordering and
     -- CR 603.12's per-member reset are untouched.
+    --
+    -- The same unit is CR 613.7m's: what the one action put onto the battlefield
+    -- entered simultaneously, so Event.together orders every arrival of every
+    -- iteration at once, by the seats that control them -- not the loop's own
+    -- order, whose chooser is the resolving controller. An individually
+    -- processed loop's iterations are separate moments, and each call settles
+    -- its own.
     accumulated <-
-      (if individually then id else Event.simultaneously) $
+      (if individually then id else Event.simultaneously . Event.together) $
         Monad.foldM
           ( \acc member -> do
               State.modify' rescope
@@ -6434,10 +6447,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     minted <- case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
-            -- Not implemented: CR 613.7m over copies of SEVERAL sources, which
-            -- enter together but are settled one createTokens call at a time
-            -- (#4222).
-            fmap concat . Monad.forM sources $ \src ->
+            -- CR 613.7m over copies of SEVERAL sources, which enter together:
+            -- one batch across every createTokens call (Event.together).
+            Event.together . fmap concat . Monad.forM sources $ \src ->
               fmap concat . Monad.forM (Maybe.maybeToList (Game.cardOfWithLastKnown src gs)) $ \card -> do
                 -- CR 707.2 copies no counters, so what the token arrives with
                 -- is what the EFFECT said and nothing the original carried --
@@ -9920,8 +9932,9 @@ isCardInAGraveyard oid gs = case Game.lookupObject oid gs of
 noSubgame :: Game Result
 noSubgame = pure Result.Drawn
 
--- Bind a PLAYER a resolution named into `slot` on `holder`, bindSlot's mirror
--- with a player recipient (ToPlayer) rather than an object.
+-- Bind the PLAYERS a resolution named into `slot` on `holder` -- one, or CR
+-- 104.2c's winning team -- bindSlot's mirror with player recipients (ToPlayer)
+-- rather than objects.
 --
 -- Every caller passes `resolving` -- the object on the stack, whose bindings both
 -- resolution loops re-read before each effect: CR 729.1b's subgame winner and CR
@@ -9946,9 +9959,9 @@ noSubgame = pure Result.Drawn
 -- can take, but an amount is read back by Pawl.Engine.Quantity's own lookup
 -- rather than through liveBindings, so a fallback here would not reach it
 -- (#2493).
-bindPlayerSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
-bindPlayerSlot holder slot player gs =
-  let binding = Binding.toPlayer player
+bindPlayerSlot :: ObjectId -> SlotName -> Set PlayerId -> GameState -> GameState
+bindPlayerSlot holder slot players gs =
+  let binding = Binding.toPlayers players
       put obj = obj {Object.bindings = Map.insert slot binding (Object.bindings obj)}
    in if Map.member holder (GameState.objects gs)
         then gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}

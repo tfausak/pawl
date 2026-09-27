@@ -78,6 +78,7 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EventGroup as EventGroup
@@ -3108,6 +3109,7 @@ withEvents events gs =
     { GameState.events = Seq.fromList (zipWith (\n event -> LoggedEvent.MkLoggedEvent {LoggedEvent.group = EventGroup.MkEventGroup n, LoggedEvent.event = event}) [0 ..] events),
       GameState.nextEventGroup = EventGroup.MkEventGroup (Natural.length events),
       GameState.eventGroupDepth = 0,
+      GameState.enteringTogether = Nothing,
       GameState.scannedThrough = 0,
       GameState.damageScannedThrough = 0,
       -- Rewriting the log rewrites the groups, so any sample Event.recordEvent
@@ -3357,7 +3359,7 @@ oneMountainState mountain ph =
             Object.activatedOnce = Set.empty
           }
    in GameState.MkGameState
-        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False},
+        { GameState.settings = GameSettings.MkGameSettings {GameSettings.brawl = False, GameSettings.attackOption = Just AttackOption.MultiplePlayers, GameSettings.teams = Teams.none, GameSettings.sharedTeamTurns = False, GameSettings.rangeOfInfluence = RangeOfInfluence.unlimited, GameSettings.deployCreatures = False, GameSettings.emperors = Emperors.none},
           GameState.objects = Map.singleton oid obj,
           GameState.library = Map.empty,
           GameState.hand = Map.singleton alice (Seq.singleton oid),
@@ -3377,6 +3379,7 @@ oneMountainState mountain ph =
           GameState.events = Seq.empty,
           GameState.nextEventGroup = EventGroup.first,
           GameState.eventGroupDepth = 0,
+          GameState.enteringTogether = Nothing,
           GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
           GameState.battlefieldWhenTriggered = Map.empty,

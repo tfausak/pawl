@@ -6,11 +6,13 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.EnteringTogether as EnteringTogether
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -88,13 +90,24 @@ order oids = do
 --
 -- Proved by Pawl.RestampSpec's Replenish boards (Humility and Opalescence), on
 -- Pawl.Engine.Resolve's MoveToZone road, and its Rite of Replication board on
--- Event.createTokens'. Pawl.Engine.MoveDuration.returnMoved reaches it too, and
--- no board observes that (gap #4214).
+-- the token road, which Event.together settles for Effect.CreateCopy.
+-- Pawl.Engine.MoveDuration.returnMoved reaches it too, and no board observes
+-- that (gap #4214).
+--
+-- Inside a CR 608.2f action (Event.together) the batch is only noted, and the
+-- action's whole batch is settled once as it ends: everything it put onto the
+-- battlefield entered at one moment, whichever instruction or iteration did it.
+-- Proved by Pawl.RestampSpec's Mirror Match board.
 settle :: Timestamp -> [ObjectId] -> Game ()
 settle start arrivals = do
   gs <- State.get
-  ordered <- order (filter (\oid -> fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield) arrivals)
-  State.modify' (reassign start ordered)
+  case GameState.enteringTogether gs of
+    Just batch
+      | null arrivals -> pure ()
+      | otherwise -> State.put gs {GameState.enteringTogether = Just batch {EnteringTogether.arrivals = EnteringTogether.arrivals batch <> Seq.fromList arrivals}}
+    Nothing -> do
+      ordered <- order (filter (\oid -> fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield) arrivals)
+      State.modify' (reassign start ordered)
 
 -- The permutation `settle` asks for: the batch's stamps, pooled and sorted, dealt
 -- out again block by block in `ordered`, each block in its own old order.

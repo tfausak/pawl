@@ -3,6 +3,7 @@
 module Pawl.Codec.GameSettings where
 
 import qualified Pawl.Codec.AttackOption as AttackOption
+import qualified Pawl.Codec.Emperors as Emperors
 import qualified Pawl.Codec.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Codec.Teams as Teams
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -26,6 +27,7 @@ codec = Fields.object $ do
   sharedTeamTurns <- Fields.required "sharedTeamTurns" Common.boolean GameSettings.sharedTeamTurns
   rangeOfInfluence <- Fields.required "rangeOfInfluence" RangeOfInfluence.codec GameSettings.rangeOfInfluence
   deployCreatures <- Fields.required "deployCreatures" Common.boolean GameSettings.deployCreatures
+  emperors <- Fields.required "emperors" Emperors.codec GameSettings.emperors
   pure
     GameSettings.MkGameSettings
       { GameSettings.brawl = brawl,
@@ -33,5 +35,6 @@ codec = Fields.object $ do
         GameSettings.teams = teams,
         GameSettings.sharedTeamTurns = sharedTeamTurns,
         GameSettings.rangeOfInfluence = rangeOfInfluence,
-        GameSettings.deployCreatures = deployCreatures
+        GameSettings.deployCreatures = deployCreatures,
+        GameSettings.emperors = emperors
       }
