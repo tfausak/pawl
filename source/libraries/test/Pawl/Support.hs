@@ -2690,6 +2690,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseAssistAmount decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseKicker decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ReturnCommander decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseCommandZoneOfferFirst decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLibraryEnd decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ArrangeLibraryArrivals decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ArrangeLibraryCards decider _ _ -> Just (Decider.unwrap decider)
@@ -2842,6 +2843,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseAssistAmount {} -> "ChooseAssistAmount"
   Prompt.ChooseKicker {} -> "ChooseKicker"
   Prompt.ReturnCommander {} -> "ReturnCommander"
+  Prompt.ChooseCommandZoneOfferFirst {} -> "ChooseCommandZoneOfferFirst"
   Prompt.ChooseLibraryEnd {} -> "ChooseLibraryEnd"
   Prompt.ArrangeLibraryArrivals {} -> "ArrangeLibraryArrivals"
   Prompt.ArrangeLibraryCards {} -> "ArrangeLibraryCards"
