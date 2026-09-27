@@ -16,13 +16,13 @@ import qualified Pawl.Types.Timestamp as Timestamp
 --
 -- The arms are one LIFE CYCLE rather than independent choices, and it only
 -- ever narrows: AnyTurn stands still, and an onset-gated entry goes
--- ControllersNextTurn or OnExtraTurn -> OnTurn n -> gone. Pawl.Engine.Event is the only engine
--- module that may case on this type, the standing Pawl.Engine.Expiry has over
--- Expiry; Pawl.Engine.Engine.beginTurnOf asks it for the transitions at the one
--- moment they can happen.
+-- ControllersNextTurn or OnExtraTurn -> OnTurn n -> gone. Pawl.Engine.Event is
+-- the only engine module that may case on this type, the standing
+-- Pawl.Engine.Expiry has over Expiry; Pawl.Engine.Engine.beginTurn asks it for
+-- the transitions at the one moment they can happen.
 data TurnWindow
   = -- | Onset.Immediately: no turn restriction at all, which is CR 603.7a's floor
-    -- and every delayed ability in the pool but Meandering Towershell's. The
+    -- and the common case. The
     -- floor itself is the event scan's watermark, not this type's business.
     AnyTurn
   | -- | Onset.FromYourNextTurn, before that turn has arrived: the entry watches

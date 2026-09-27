@@ -59,6 +59,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -858,8 +859,8 @@ aimPlayer pid p = case p of
 -- Time Warp (exactly {3}{U}{U} each) and that many Time Warps in hand. Both
 -- libraries are stocked, because these run SEVERAL whole turns and each one's
 -- draw step takes a card -- an empty library would end the game by CR 704.5b
--- before the turn order could be read off. `savorBoard` below stocks them for the
--- same reason; nothing else in this file runs past one turn.
+-- before the turn order could be read off. `savorBoard`, `fortuneBoard` and the
+-- Pact board below stock them for the same reason.
 warpBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, [ObjectId])
 warpBoard island warp piker n =
   let addOne (ids, g) _ = let (oid, g1) = S.addHandCard warp S.alice g in (ids <> [oid], g1)
@@ -1209,7 +1210,8 @@ fortuneBoard island mountain fortune warp piker =
    in ( (stock (stock withWarp S.alice) S.bob)
           { GameState.phase = Phase.PrecombatMain,
             GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
+            GameState.priority = Just S.alice,
+            GameState.remaining = S.phasesAfter Phase.PrecombatMain
           },
         fortuneId,
         warpId
@@ -1262,7 +1264,7 @@ thatTurnSpec s registry = Spec.describe s "ThatExtraTurn" $ do
         (bobPiker, withBob) = S.addPermanent piker S.bob withPiker
         (gloryId, withGlory) = S.addHandCard glory S.alice withBob
         stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
-        gs = (stock (stock withGlory S.alice) S.bob) {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        gs = (stock (stock withGlory S.alice) S.bob) {GameState.phase = Phase.PrecombatMain, GameState.remaining = S.phasesAfter Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
         resolved = castAndResolve gloryId gs
         atExtra = runTurns 1 resolved
         afterExtra = runTurns 1 atExtra
@@ -1270,6 +1272,57 @@ thatTurnSpec s registry = Spec.describe s "ThatExtraTurn" $ do
     Spec.assertBool s (not (Projection.hasKeyword Keyword.Indestructible bobPiker atExtra)) "bob's is not"
     Spec.assertEqWith s "the extra turn is alice's" (GameState.activePlayer atExtra) S.alice
     Spec.assertEqWith s "and alice loses at its end step" (Game.stillPlaying afterExtra) [S.bob]
+
+-- CR 603.7a / 603.7b / 118.12: "at the beginning of your next upkeep, pay ...
+-- If you don't, you lose the game", through Pact of the Titan ({0} Instant,
+-- "Create a 4/4 red Giant creature token." plus that clause). Onset.Immediately
+-- is the whole of "next": the ability watches from its creation, fires once,
+-- and only on its controller's upkeep.
+nextUpkeepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nextUpkeepSpec s registry = Spec.describe s "PactNextUpkeep" $ do
+  let boardOf = do
+        mountain <- S.printingOf s registry "Mountain"
+        pact <- S.printingOf s registry "Pact of the Titan"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (pactId, withPact) = S.addHandCard pact S.alice (S.landsInPlay mountain 5)
+            stock g pid = List.foldl' (\g1 _ -> snd (S.addLibraryCard piker pid g1)) g [1 .. (10 :: Int)]
+        pure
+          ( (stock (stock withPact S.alice) S.bob)
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice,
+                GameState.remaining = S.phasesAfter Phase.PrecombatMain
+              },
+            pactId
+          )
+      answering :: PaymentDecision.PaymentDecision -> Prompt.Prompt r -> r
+      answering decision p = case p of
+        Prompt.ChooseToPay {} -> decision
+        _ -> S.identityAnswer p
+      giant = CardName.MkCardName (Text.pack "Giant Token")
+      turnsWith decision n gs = if n <= (0 :: Int) then gs else turnsWith decision (n - 1) (fst (runTurn (answering decision) gs))
+  Spec.it s "CR 118.12 whole card: declining at alice's next upkeep loses her the game" $ do
+    (gs, pact) <- boardOf
+    let resolved = castAndResolve pact gs
+        atBobsTurn = turnsWith PaymentDecision.Declines 1 resolved
+        atAlicesTurn = turnsWith PaymentDecision.Declines 1 atBobsTurn
+        after = turnsWith PaymentDecision.Declines 1 atAlicesTurn
+    Spec.assertEqWith s "the Giant was made" (S.countOnBattlefieldByName giant S.alice resolved) 1
+    Spec.assertEqWith s "bob's upkeep is not alice's" (GameState.activePlayer atAlicesTurn, Game.stillPlaying atAlicesTurn) (S.alice, [S.alice, S.bob])
+    Spec.assertEqWith s "alice lost on her next turn" (Game.stillPlaying after) [S.bob]
+    Spec.assertEqWith s "in its upkeep" (GameState.phase after) (Phase.Beginning BeginningStep.Upkeep)
+  Spec.it s "CR 603.7b paying at alice's next upkeep spends the ability" $ do
+    (gs, pact) <- boardOf
+    let resolved = castAndResolve pact gs
+        atAlicesTurn = turnsWith PaymentDecision.Pays 2 resolved
+        paid = turnsWith PaymentDecision.Pays 1 atAlicesTurn
+        -- Declining from here on: an ability still armed would lose her the game
+        -- at her following upkeep.
+        later = turnsWith PaymentDecision.Declines 2 paid
+    Spec.assertEqWith s "alice paid and plays on" (Game.stillPlaying paid) [S.alice, S.bob]
+    Spec.assertEqWith s "her following turn, turn 5, has run" (GameState.turnNumber later) 6
+    Spec.assertEqWith s "and it never asked again" (Game.stillPlaying later) [S.alice, S.bob]
+    Spec.assertEqWith s "nothing is left armed" (length (GameState.delayedTriggers later)) 0
 
 -- Casts the first castable spell offered and passes otherwise, deferring every
 -- other prompt to S.identityAnswer. This is the CR 724.1f discriminator: under a
@@ -1761,6 +1814,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   repeatedExtraTurnSpec s registry
   turnScopedSkipSpec s registry
   thatTurnSpec s registry
+  nextUpkeepSpec s registry
   endTurnSpec s registry
   endCombatPhaseSpec s registry
   skippedEndOfCombatSpec s registry

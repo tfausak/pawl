@@ -8548,7 +8548,7 @@ armOnset source controller gs onset = case onset of
      in fmap (TurnWindow.OnExtraTurn . ExtraTurn.createdAt) (List.find created (GameState.extraTurns gs))
 
 -- CR 603.7a: a turn has BEGUN, so settle every delayed entry waiting for one and
--- drop every entry whose turn is now over. Engine.beginTurnOf calls this once the
+-- drop every entry whose turn is now over. Engine.beginTurn calls this once the
 -- new turn's number and active player are in place, and only for a turn that
 -- actually begins -- CR 614.10a read on the turn axis, so CR 800.4k's turn a
 -- departed seat never begins is walked past without settling anything.
