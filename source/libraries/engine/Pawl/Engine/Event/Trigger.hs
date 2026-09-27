@@ -3485,54 +3485,85 @@ interveningHolds gs pending =
         cond
 
 -- CR 801.16: the players a triggered ability's placement names as in a loop
--- beside its controller -- the controllers of the continuous effects without
--- which it would not have triggered. The candidates are the effects applying
--- to its source or to an object its event bound (Projection.effectSourcesOn):
--- frank's Life and Limb making each Saproling a land for alice's Sporemound,
--- frank's Necrosynthesis granting alice's Sporemound the ability itself. Each
--- is asked whether the trigger still fires with that source gone
--- (`firesWithout`); frank's Thelonite Hermit, which only makes each Saproling
--- bigger, is not named. Pawl.RangeOfInfluenceSpec's six-seat CR 801.16 loop
--- proves all three.
+-- beside its controller -- the controllers of the continuous effects it
+-- needed to trigger. The candidates are the effects applying to its source or
+-- to an object its event bound (Projection.effectSourcesOn): frank's Life and
+-- Limb making each Saproling a land for alice's Sporemound, frank's
+-- Necrosynthesis granting alice's Sporemound the ability itself.
+--
+-- A source is needed when it belongs to some MINIMAL set of candidates that
+-- is enough for the trigger to fire on its own (`firesWithout` the rest).
+-- Each of two Life and Limbs is such a set, so both are needed although
+-- removing either alone changes nothing; frank's Thelonite Hermit, which only
+-- makes each Saproling bigger, is in none. Pawl.RangeOfInfluenceSpec's
+-- six-seat CR 801.16 loop proves all four boards.
 --
 -- An effect sourced by the trigger's source or by a bound object is named
--- without the question: removing it would remove an object of the event
--- itself.
+-- without the question, and never removed: removing it would remove an object
+-- of the event itself.
 loopShapers :: PendingTrigger -> GameState -> [PlayerId]
 loopShapers pending gs =
   let bearer = case PendingTrigger.source pending of
         TriggerSource.OfObject oid -> [oid]
         TriggerSource.Sourceless -> []
       subjects = bearer <> concatMap Set.toList (Map.elems (Binding.slotObjects (PendingTrigger.bindings pending)))
-      shaper src = case Projection.controllerWithLastKnown src gs of
-        Just pid
-          | pid /= PendingTrigger.controller pending && (List.elem src subjects || not (firesWithout src pending gs)) -> Just pid
+      (direct, open) = List.partition (`List.elem` subjects) (Projection.effectSourcesOn subjects gs)
+      named src = case Projection.controllerWithLastKnown src gs of
+        Just pid | pid /= PendingTrigger.controller pending -> Just pid
         _ -> Nothing
-   in ListUtils.nubOrd (Maybe.mapMaybe shaper (Projection.effectSourcesOn subjects gs))
+   in ListUtils.nubOrd (Maybe.mapMaybe named (direct <> Set.toList (neededAmong (Set.fromList open) pending gs)))
 
--- Would this pending trigger still have fired with `src`'s continuous effects
--- gone -- `src` off the battlefield and out of the command zone, and every
--- stored effect it is the source of dropped? The trigger's own event is
--- scanned again (`eventTriggers`) against that board, with the event's
--- snapshot re-read there (`resnapshot`), and must yield the same ability of the
--- same source under the same controller, its CR 603.4 "if" still holding.
+-- The union of the minimal subsets of `open` enough for the trigger to fire
+-- with every other member of `open` gone, walked smallest first so that a
+-- superset of one already found is skipped. None when it fires with all of
+-- `open` gone. A board with more candidates than `neededLimit` names them all
+-- rather than walk every subset -- never short of the rule, at worst over it.
+-- That bound is a regression fence: no spec board reaches it.
+neededAmong :: Set.Set ObjectId -> PendingTrigger -> GameState -> Set.Set ObjectId
+neededAmong open pending gs
+  | firesWithout open pending gs = Set.empty
+  | Set.size open > neededLimit = open
+  | otherwise =
+      let members = Set.toList open
+          subsetsOf k xs = case (k :: Int, xs) of
+            (0, _) -> [Set.empty]
+            (_, []) -> []
+            (_, x : rest) -> fmap (Set.insert x) (subsetsOf (k - 1) rest) <> subsetsOf k rest
+          step found k =
+            found
+              <> filter
+                (\set -> not (any (`Set.isSubsetOf` set) found) && firesWithout (Set.difference open set) pending gs)
+                (subsetsOf k members)
+       in Set.unions (List.foldl' step [] [1 .. length members])
+
+-- `neededAmong`'s bound on the candidates it walks every subset of.
+neededLimit :: Int
+neededLimit = 8
+
+-- Would this pending trigger still have fired with the continuous effects of
+-- every source in `gone` removed -- each off the battlefield and out of the
+-- command zone, and every stored effect one of them is the source of dropped?
+-- The trigger's own event is scanned again (`eventTriggers`) against that
+-- board, with the event's snapshot re-read there (`resnapshot`), and must
+-- yield the same ability of the same source under the same controller, its CR
+-- 603.4 "if" still holding.
 --
--- Answers False -- the effect counts -- wherever the question cannot be put: a
+-- Answers False -- the effects count -- wherever the question cannot be put: a
 -- delayed, reflexive or state trigger, which has no event scan to repeat, and
 -- a snapshot `resnapshot` cannot re-read.
 --
 -- The CR 603.4 check is a regression fence rather than a proved behaviour:
 -- dropping it leaves Pawl.RangeOfInfluenceSpec green, no ability in its loop
 -- having an "if".
-firesWithout :: ObjectId -> PendingTrigger -> GameState -> Bool
-firesWithout src pending gs =
+firesWithout :: Set.Set ObjectId -> PendingTrigger -> GameState -> Bool
+firesWithout gone pending gs =
   case (PendingTrigger.firedBy pending, PendingTrigger.createdAt pending, PendingTrigger.source pending) of
     (Just event, Nothing, TriggerSource.OfObject _) ->
       let without =
             gs
-              { GameState.battlefield = Set.delete src (GameState.battlefield gs),
-                GameState.command = Set.delete src (GameState.command gs),
-                GameState.continuousEffects = filter ((/= src) . ContinuousEffect.source) (GameState.continuousEffects gs),
+              { GameState.battlefield = Set.difference (GameState.battlefield gs) gone,
+                GameState.command = Set.difference (GameState.command gs) gone,
+                GameState.continuousEffects = filter (\e -> Set.notMember (ContinuousEffect.source e) gone) (GameState.continuousEffects gs),
                 GameState.battlefieldWhenTriggered = Map.empty
               }
           same p =

@@ -675,6 +675,11 @@ spec s registry = Spec.describe s "Range of influence" $ do
     -- loop, but his static ability is what makes each Saproling a land for
     -- Sporemound to see, so his neighbour erin draws too.
     Spec.assertEqWith s "CR 801.16 with frank's Life and Limb only dave is still playing" (Game.stillPlaying (loopedWith frank S.bob (S.withRange 1))) [S.dave]
+    -- The same with a second Life and Limb of frank's: either is enough on
+    -- its own, so neither is needed alone, but both are objects of frank's in
+    -- the loop and erin still draws.
+    let secondLimb _ gs = snd (S.addPermanent limb frank gs)
+    Spec.assertEqWith s "CR 801.16 with two of frank's Life and Limbs only dave is still playing" (Game.stillPlaying (loopedBeside secondLimb frank S.bob (S.withRange 1))) [S.dave]
     -- The first board with frank's face-up Thelonite Hermit ("All Saprolings
     -- get +1/+1."): each Saproling is a 2/2 that Aether Flash still buries, and
     -- without the Hermit Sporemound and Aether Flash would trigger just the
