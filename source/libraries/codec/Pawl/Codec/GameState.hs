@@ -29,6 +29,7 @@ import qualified Pawl.Codec.Daytime as Daytime
 import qualified Pawl.Codec.Decider as Decider
 import qualified Pawl.Codec.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Codec.EndTurnSignal as EndTurnSignal
+import qualified Pawl.Codec.EnteringTogether as EnteringTogether
 import qualified Pawl.Codec.EventGroup as EventGroup
 import qualified Pawl.Codec.ExileLink as ExileLink
 import qualified Pawl.Codec.ExtraTurn as ExtraTurn
@@ -126,6 +127,7 @@ codec resolve = Fields.object $ do
   events <- Fields.defaulted "events" Seq.empty (Common.seq LoggedEvent.codec) GameState.events
   nextEventGroup <- Fields.required "nextEventGroup" EventGroup.codec GameState.nextEventGroup
   eventGroupDepth <- Fields.defaulted "eventGroupDepth" 0 Common.natural GameState.eventGroupDepth
+  enteringTogether <- Fields.defaulted "enteringTogether" Nothing (Common.maybe EnteringTogether.codec) GameState.enteringTogether
   lastKnown <- Fields.defaulted "lastKnown" Map.empty (Common.naturalMap ObjectId.codec LastKnown.codec) GameState.lastKnown
   stackArchive <- Fields.defaulted "stackArchive" Map.empty (Common.naturalMap ObjectId.codec Object.codec) GameState.stackArchive
   scannedThrough <- Fields.defaulted "scannedThrough" 0 Common.natural GameState.scannedThrough
@@ -222,6 +224,7 @@ codec resolve = Fields.object $ do
         GameState.events = events,
         GameState.nextEventGroup = nextEventGroup,
         GameState.eventGroupDepth = eventGroupDepth,
+        GameState.enteringTogether = enteringTogether,
         GameState.lastKnown = lastKnown,
         GameState.stackArchive = stackArchive,
         GameState.scannedThrough = scannedThrough,
