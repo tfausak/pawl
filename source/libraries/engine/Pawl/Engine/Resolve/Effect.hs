@@ -3597,7 +3597,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
     Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot differentNames) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -3834,7 +3834,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- your library and graveyard for any number of cards" would
                   -- refute both.
                   let mayDecline zone = upTo || Maybe.isNothing cap || (isHidden zone && Filter.statesAQuality filter_)
-                      picked = List.genericTake capHere . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
+                      -- CR 201.2b: "with different names". Filtered, not
+                      -- trusted: a card sharing a name with one kept ahead of it
+                      -- is dropped. The completion below is not held to it,
+                      -- which no card reaches: every card in data/cards/
+                      -- printing it says "up to".
+                      picked = List.genericTake capHere . (if differentNames then differentlyNamed gs else id) . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
                       filler = filter (\oid -> List.notElem oid picked) forced
                       -- CR 701.23j: the searcher "MAY choose" a card out there,
@@ -10259,6 +10264,19 @@ outsideArrival destination = case destination of
   SearchDestination.BattlefieldAttachedOrHand -> Nothing
   SearchDestination.BattlefieldAttached -> Nothing
   SearchDestination.Reveal -> Nothing
+
+-- CR 201.2b: the cards, in order, that keep the group differently named -- each
+-- has a name and shares none with a card kept ahead of it. Names are read off
+-- the CR 613 projection, so a split card's two count (CR 201.2a).
+differentlyNamed :: GameState -> [ObjectId] -> [ObjectId]
+differentlyNamed gs = go Set.empty
+  where
+    go _ [] = []
+    go seen (oid : rest) =
+      let names = Filter.names (Projection.viewOfObject oid gs)
+       in if not (Set.null names) && Set.disjoint names seen
+            then oid : go (Set.union seen names) rest
+            else go seen rest
 
 putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game [ObjectId]
 putFound searcher subject destination cardId = case destination of

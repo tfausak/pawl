@@ -118,6 +118,13 @@ data Search = MkSearch
     -- | CR 608.2c: the slot the found cards are bound to, as the incarnations
     -- the destination minted (CR 400.7), so a later clause or a delayed ability
     -- can say "that card" -- Grinning Totem's "you may play that card".
-    slot :: Maybe SlotName.SlotName
+    slot :: Maybe SlotName.SlotName,
+    -- | Whether the found cards must have different names (CR 201.2b) --
+    -- Gifts Ungiven's "up to four cards with different names". A constraint on
+    -- the found SET, which no per-card filter can state.
+    --
+    -- Not implemented: a find outside the game (CR 701.23j) is not held to it
+    -- (#4295).
+    differentNames :: Bool
   }
   deriving (Eq, Ord, Show)

@@ -46,6 +46,9 @@ codec = Fields.object $ do
   subject <- Fields.defaulted "subject" Nothing (Common.maybe SlotName.codec) Search.subject
   -- Defaulted: an absent key is a search whose finds no later clause names.
   slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Search.slot
+  -- Defaulted: an absent key is a search that does not print "with different
+  -- names", which is every card file already written.
+  differentNames <- Fields.defaulted "differentNames" False Common.boolean Search.differentNames
   pure
     Search.MkSearch
       { Search.searcher = searcher,
@@ -57,5 +60,6 @@ codec = Fields.object $ do
         Search.upTo = upTo,
         Search.destination = destination,
         Search.subject = subject,
-        Search.slot = slot
+        Search.slot = slot,
+        Search.differentNames = differentNames
       }
