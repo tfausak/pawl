@@ -217,6 +217,7 @@ import qualified Pawl.Codec.EmergeSpec
 import qualified Pawl.Codec.EmperorsSpec
 import qualified Pawl.Codec.EndTurnSignalSpec
 import qualified Pawl.Codec.EndingStepSpec
+import qualified Pawl.Codec.EnteringTogetherSpec
 import qualified Pawl.Codec.EntersWithSpec
 import qualified Pawl.Codec.EntryAttackSpec
 import qualified Pawl.Codec.EntryBlockSpec
@@ -935,6 +936,7 @@ spec s registry = do
   Pawl.Codec.EntryRSpec.spec s
   Pawl.Codec.CounterRestrictionSpec.spec s
   Pawl.Codec.CrewRestrictionSpec.spec s
+  Pawl.Codec.EnteringTogetherSpec.spec s
   Pawl.Codec.EntryRestrictionSpec.spec s
   Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s

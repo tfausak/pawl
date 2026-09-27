@@ -5210,8 +5210,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- Nothing here reorders the members: the bracket changes which events are one
     -- event, never when each iteration runs, so rule 608.2f's APNAP ordering and
     -- CR 603.12's per-member reset are untouched.
+    --
+    -- The same unit is CR 613.7m's: what the one action put onto the battlefield
+    -- entered simultaneously, so Event.together orders every arrival of every
+    -- iteration at once, by the seats that control them -- not the loop's own
+    -- order, whose chooser is the resolving controller. An individually
+    -- processed loop's iterations are separate moments, and each call settles
+    -- its own.
     accumulated <-
-      (if individually then id else Event.simultaneously) $
+      (if individually then id else Event.simultaneously . Event.together) $
         Monad.foldM
           ( \acc member -> do
               State.modify' rescope
@@ -6440,10 +6447,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     minted <- case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
-            -- Not implemented: CR 613.7m over copies of SEVERAL sources, which
-            -- enter together but are settled one createTokens call at a time
-            -- (#4222).
-            fmap concat . Monad.forM sources $ \src ->
+            -- CR 613.7m over copies of SEVERAL sources, which enter together:
+            -- one batch across every createTokens call (Event.together).
+            Event.together . fmap concat . Monad.forM sources $ \src ->
               fmap concat . Monad.forM (Maybe.maybeToList (Game.cardOfWithLastKnown src gs)) $ \card -> do
                 -- CR 707.2 copies no counters, so what the token arrives with
                 -- is what the EFFECT said and nothing the original carried --

@@ -479,6 +479,8 @@ library codec
     Pawl.Codec.EndingStepSpec
     Pawl.Codec.EndTurnSignal
     Pawl.Codec.EndTurnSignalSpec
+    Pawl.Codec.EnteringTogether
+    Pawl.Codec.EnteringTogetherSpec
     Pawl.Codec.EntersWith
     Pawl.Codec.EntersWithSpec
     Pawl.Codec.EntryAttack
@@ -1890,6 +1892,7 @@ library types
     Pawl.Types.Emperors
     Pawl.Types.EndingStep
     Pawl.Types.EndTurnSignal
+    Pawl.Types.EnteringTogether
     Pawl.Types.EntersWith
     Pawl.Types.EntryAttack
     Pawl.Types.EntryBlock
