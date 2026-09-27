@@ -11,12 +11,12 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Blue"
+              "type": "Red"
             }
           }
         }
       ],
-      "name": "Synthetic Mimicry",
+      "name": "Transcantation",
       "spell": {
         "modes": [
           {
@@ -26,16 +26,14 @@
                   {
                     "type": "BecomeCopy",
                     "value": {
+                      "newTargets": true,
                       "original": {
-                        "type": "OfObject",
-                        "value": {
-                          "type": "InSlot",
-                          "value": "original"
-                        }
+                        "type": "Named",
+                        "value": "Lightning Bolt"
                       },
                       "subject": {
                         "type": "InSlot",
-                        "value": "subject"
+                        "value": "spell"
                       }
                     }
                   }
@@ -43,41 +41,7 @@
               }
             ],
             "targetSlots": {
-              "original": {
-                "filter": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "Or",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Instant"
-                          }
-                        },
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Sorcery"
-                          }
-                        }
-                      ]
-                    },
-                    {
-                      "type": "Not",
-                      "value": {
-                        "type": "IsBound",
-                        "value": "subject"
-                      }
-                    }
-                  ]
-                },
-                "pool": {
-                  "type": "Spells"
-                }
-              },
-              "subject": {
+              "spell": {
                 "filter": {
                   "type": "Or",
                   "value": [
