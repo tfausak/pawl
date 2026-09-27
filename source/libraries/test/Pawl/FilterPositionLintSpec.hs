@@ -1108,11 +1108,19 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Glamer Spinners' atom is framed by its group attach"
       (canHostSubjectCounts (S.combinedFace spinners))
       (1, 0)
+    -- The sixth, Fumble's: its 2018-06-08 ruling's "one creature that they can
+    -- all legally be attached to".
+    fumble <- S.printingOf s registry "Fumble"
     Spec.assertEqWith
       s
-      "and those five cards are the whole of data/cards' authorship of it"
+      "Fumble's atom is framed by its group attach too"
+      (canHostSubjectCounts (S.combinedFace fumble))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those six cards are the whole of data/cards' authorship of it"
       (sum (fmap (uncurry (+) . canHostSubjectCounts . S.combinedFace) ps))
-      5
+      6
     -- The traversal reaches a Filter position no effect, target slot or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
     -- card. Its absence would not show up in the sweep above, because Ash Barrens

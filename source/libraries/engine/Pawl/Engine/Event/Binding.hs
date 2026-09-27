@@ -28,6 +28,7 @@ import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.Binding as Binding.Type
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CounterChange as CounterChange
@@ -674,6 +675,10 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- name. The bystander form: the ATTACKER is not the bearer here, and it gets no
   -- slot, rule 701.54c naming it only as "your Ring-bearer" in the condition.
   (TriggerCondition.PermanentBecomesBlockedBy _, GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker})) ->
+    Binding.setBlockingCreature blocker Map.empty
+  -- CR 509.3a read by a bystander: Super-Soldier Serum's "it" is the blocker,
+  -- never the bearer, under the name the two arms above give it.
+  (TriggerCondition.CreatureBlocks _, GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker _)) ->
     Binding.setBlockingCreature blocker Map.empty
   -- CR 509.3b's "that creature": the ATTACKER on the very same declaration, which
   -- Loyal Sentry's payload destroys. The mirror of the arm above, and
@@ -1370,6 +1375,7 @@ eventBindingSlots cond = case cond of
   -- blocker's controller the defending player, whom CR 109.5's `you` already
   -- names.
   TriggerCondition.SelfBlocks -> Set.empty
+  TriggerCondition.CreatureBlocks _ -> Set.singleton Binding.blockingCreature
   TriggerCondition.SelfBlocksAtLeast _ -> Set.empty
   TriggerCondition.SelfBlocksOneOrMore _ -> Set.empty
   -- CR 509.3b's form is the one that DOES name the attacker, off the same event.

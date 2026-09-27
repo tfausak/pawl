@@ -34,6 +34,7 @@ import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackingPlayers as AttackingPlayers
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
@@ -120,6 +121,7 @@ import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InitiativeTarget as InitiativeTarget
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
@@ -474,6 +476,9 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- The arm above's answer, for its reason: neither the source nor the
   -- candidates come out of a slot.
   ObjectRef.SourceAndChosenPermanent _ -> Map.empty
+  -- The host is read out of the slot, and the Filter over what is attached to
+  -- it may name slots of its own.
+  ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot filter_) -> joinTwo (Map.singleton slot SlotArity.Many) (filterSlotsOf filter_)
 
 -- The Quantities an ObjectRef carries: the two library walks' counts.
 -- Exhaustive, no wildcard, and every payload destructured positionally rather
@@ -530,6 +535,7 @@ objectRefQuantities ref = case ref of
   ObjectRef.AnyNumberMatching _ -> []
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
+  ObjectRef.AttachedToBound _ -> []
 
 -- Every PlayerRef nested in one ObjectRef -- effectPlayerRefs' other half, and
 -- the seat a per-player walk counts against. objectRefSlots takes its player
@@ -588,6 +594,7 @@ objectRefPlayerRefs ref = case ref of
   -- No chooser to report: the arm below names the source alongside ONE permanent,
   -- and CR 608.2c's resolving controller is the only seat that picks it.
   ObjectRef.SourceAndChosenPermanent _ -> []
+  ObjectRef.AttachedToBound _ -> []
 
 -- The refs a CR 707.10 answer names: rule 707.10d's candidates, and nothing for
 -- the other two, neither of which describes anything.
@@ -2634,6 +2641,19 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- sweep answers nothing for it -- the source half included, which no reader may
   -- take without the counterpart the one instruction names alongside it.
   ObjectRef.SourceAndChosenPermanent _ -> []
+  -- CR 303.4b read off each object the slot holds: what is attached to it now,
+  -- or -- once it has left -- CR 608.2h's record of what was attached as it left,
+  -- still on the battlefield. CR 704.5n has unattached an Equipment from a
+  -- creature that died before its dies trigger resolves (Rhuk, Hexgold Nabber),
+  -- and Fumble asks in the same resolution that bounced the host. Through
+  -- battlefieldMatching, so the Filter and the APNAP order are EachMatching's.
+  ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot filter_) ->
+    let hosts = objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot)
+        attachedTo host
+          | Set.member host (GameState.battlefield gs) = Game.attachments host gs
+          | otherwise = maybe Set.empty LastKnown.attached (Projection.lastKnownOf host gs)
+        attached = foldMap attachedTo hosts
+     in filter (`Set.member` attached) (battlefieldMatching legal resolving controller source gs filter_)
   -- EachMatching's sweep with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over CR 400.1's per-player zone. Whose
   -- graveyards is zoneScopePlayers below -- either the perspective's own

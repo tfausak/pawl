@@ -1,6 +1,7 @@
 module Pawl.Codec.ObjectRef where
 
 import qualified Pawl.Codec.AbilityName as AbilityName
+import qualified Pawl.Codec.AttachedToBound as AttachedToBound
 import qualified Pawl.Codec.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Codec.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Codec.ChosenCardInHand as ChosenCardInHand
@@ -83,7 +84,8 @@ codec =
           Arm.payload "RandomCardInLibrary" RandomCardInLibrary.codec ObjectRef.RandomCardInLibrary (\x -> case x of ObjectRef.RandomCardInLibrary y -> Just y; _ -> Nothing),
           Arm.payload "AnyNumberMatching" filterCodec ObjectRef.AnyNumberMatching (\x -> case x of ObjectRef.AnyNumberMatching y -> Just y; _ -> Nothing),
           Arm.payload "ChosenPermanent" ChosenPermanent.codec ObjectRef.ChosenPermanent (\x -> case x of ObjectRef.ChosenPermanent y -> Just y; _ -> Nothing),
-          Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing)
+          Arm.payload "SourceAndChosenPermanent" filterCodec ObjectRef.SourceAndChosenPermanent (\x -> case x of ObjectRef.SourceAndChosenPermanent y -> Just y; _ -> Nothing),
+          Arm.payload "AttachedToBound" AttachedToBound.codec ObjectRef.AttachedToBound (\x -> case x of ObjectRef.AttachedToBound y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: ObjectRef.ObjectRef -> String
@@ -117,3 +119,4 @@ tagOf x = case x of
   ObjectRef.AnyNumberMatching {} -> "AnyNumberMatching"
   ObjectRef.ChosenPermanent {} -> "ChosenPermanent"
   ObjectRef.SourceAndChosenPermanent {} -> "SourceAndChosenPermanent"
+  ObjectRef.AttachedToBound {} -> "AttachedToBound"

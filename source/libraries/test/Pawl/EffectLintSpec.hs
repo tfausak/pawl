@@ -1196,6 +1196,7 @@ chooserRef ref = case ref of
   ObjectRef.AnyNumberMatching {} -> True
   ObjectRef.ChosenPermanent {} -> True
   ObjectRef.SourceAndChosenPermanent {} -> True
+  ObjectRef.AttachedToBound {} -> False
 
 -- The asking matrix itself: whether the site an Asks names asks THIS arm. A
 -- per-(site, arm) pair and not a per-site or per-arm predicate, because both
@@ -1851,6 +1852,8 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- ALONGSIDE the one permanent it picks, so a per-player count over it
           -- moves two.
           ObjectRef.SourceAndChosenPermanent _ -> False
+          -- FALSE: every attachment to a host moves, however many there are.
+          ObjectRef.AttachedToBound _ -> False
         -- Does this PlayerRef name at most ONE seat? A per-player count over it
         -- -- a library's top card, a card chosen out of a hand -- moves at most
         -- one object exactly when it does.
