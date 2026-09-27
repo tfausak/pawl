@@ -56,6 +56,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.RollAdjustment as RollAdjustment
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetCount as TargetCount
@@ -334,7 +335,8 @@ data Prompt r where
   -- game, at least the first Natural and at most the second; an OutsideCard
   -- rather than a printing because which zone it leaves decides what triggers
   -- (CR 729.4a). Two copies of one printing are one offer, which the answer may
-  -- name once per copy.
+  -- name once per copy. Also a search's find outside the game (CR 701.23j),
+  -- asked after its find in the zones.
   ChooseFromOutsideTheGame :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty OutsideCard.OutsideCard -> Natural.Natural -> Natural.Natural -> Prompt [OutsideCard.OutsideCard]
   -- | CR 309.5a \/ 701.49b: which arrow out of the current room a venturing
   -- player follows; the ObjectId is the dungeon card.
@@ -402,10 +404,11 @@ data Prompt r where
   -- written to Object.chosenSubtype; no candidate list (CR 205.3m), the arm
   -- above's posture.
   ChooseCreatureType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
-  -- | The printed "and/or" of a multi-zone search: which of the offered zones
-  -- this searcher looks through, a nonempty subset (Boonweaver Giant's "may"
-  -- is why nonempty). Asked ahead of CR 601.3's offer and the search.
-  ChooseSearchZones :: Decider.Decider -> PlayerId.PlayerId -> Set.Set Zone.Zone -> Prompt (Set.Set Zone.Zone)
+  -- | The printed "and/or" of a multi-place search: which of the offered places
+  -- (CR 701.23a's zones, CR 701.23j's outside the game) this searcher looks
+  -- through, a nonempty subset (Boonweaver Giant's "may" is why nonempty).
+  -- Asked ahead of CR 601.3's offer and the search.
+  ChooseSearchZones :: Decider.Decider -> PlayerId.PlayerId -> Set.Set SearchPlace.SearchPlace -> Prompt (Set.Set SearchPlace.SearchPlace)
   -- | CR 701.23 / 701.23b: which of the matching cards across the zones
   -- searched the searcher finds, at most the Natural. Fewer is legal for a
   -- hidden zone (CR 400.2) stating a quality, an "up to", or no count;

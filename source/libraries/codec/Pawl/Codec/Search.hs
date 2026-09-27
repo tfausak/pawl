@@ -27,6 +27,9 @@ codec = Fields.object $ do
   -- that names no zone, which every card file already written means as a
   -- library.
   zones <- Fields.defaulted "zones" (Set.singleton Zone.Type.Library) (Common.set Zone.codec) Search.zones
+  -- Defaulted: an absent key is a search that does not reach outside the game,
+  -- which is every card file already written.
+  outsideTheGame <- Fields.defaulted "outsideTheGame" False Common.boolean Search.outsideTheGame
   -- Required but nullable, rather than defaulted-absent: a null is a card
   -- printing "any number of", and an absent key is a card file that forgot the
   -- count. Defaulting would read the second as the first.
@@ -48,6 +51,7 @@ codec = Fields.object $ do
       { Search.searcher = searcher,
         Search.owner = owner,
         Search.zones = zones,
+        Search.outsideTheGame = outsideTheGame,
         Search.quantity = quantity,
         Search.filter = filter_,
         Search.upTo = upTo,

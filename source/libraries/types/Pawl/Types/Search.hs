@@ -52,6 +52,14 @@ data Search = MkSearch
     -- "and/or" makes that a choice the searcher is asked on resolution, and this
     -- set is what Pawl.Types.Prompt.ChooseSearchZones offers them.
     zones :: Set.Set Zone.Zone,
+    -- | Whether the instruction also looks through the cards `owner` owns
+    -- outside the game (CR 701.23j) -- Invasion of Arcavios's "your library,
+    -- graveyard, and/or outside the game".
+    --
+    -- A Bool beside `zones` rather than a member of it: CR 400.11 says outside
+    -- the game is not a zone. The printed "and/or" still offers it beside them
+    -- (Pawl.Types.SearchPlace), and the one count covers the union.
+    outsideTheGame :: Bool,
     -- | How many cards the search may find, or 'Nothing' where the printed
     -- instruction states no count at all -- Mana Severance's "any number of land
     -- cards".

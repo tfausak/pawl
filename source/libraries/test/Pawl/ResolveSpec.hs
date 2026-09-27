@@ -129,6 +129,7 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
@@ -913,7 +914,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             []
             0
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.outsideTheGame = False, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Activator.Controller
             Nothing
@@ -932,7 +933,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) [] 0 (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.outsideTheGame = False, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Activator.Controller Nothing Nothing Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility ActivatedAbilitySource.MkActivatedAbilitySource {ActivatedAbilitySource.source = ObjectId.MkObjectId 0, ActivatedAbilitySource.ability = ability}) Zone.Stack TapState.Untapped Facing.FaceUp False False Set.empty 0 (Sickness.Settled S.alice) Map.empty (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Map.empty Nothing Nothing Nothing Set.empty Nothing ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty Map.empty Map.empty False False False False False Seq.empty 0 (Mana.MkMana []) Nothing Nothing Nothing Nothing Set.empty Set.empty False Set.empty Set.empty Nothing Nothing
@@ -959,7 +960,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             []
             0
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.outsideTheGame = False, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Activator.Controller
             Nothing
@@ -988,7 +989,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             []
             0
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.zones = Set.singleton Zone.Library, Search.outsideTheGame = False, Search.quantity = Just (Quantity.Literal 1), Search.filter = basicLandFilter, Search.upTo = False, Search.destination = SearchDestination.BattlefieldTapped, Search.subject = Nothing, Search.slot = Nothing}]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Activator.Controller
             Nothing
@@ -2311,7 +2312,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- and hands her the Bonesplitter.
   Spec.it s "CR 701.23a whole card: Delivery Moogle's and/or lets alice take the library half alone" $ do
     board <- moogleBoard s registry ["Bonesplitter"]
-    let settled = resolveMoogle (searchingZones (Set.singleton Zone.Library) []) board
+    let settled = resolveMoogle (searchingZones (Set.singleton (SearchPlace.InZone Zone.Library)) []) board
     Spec.assertEqWith
       s
       "the graveyard she never looked through still holds the Bonesplitter"
@@ -2335,7 +2336,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- "if you search your library this way, shuffle" with its condition unmet.
   Spec.it s "CR 701.23a whole card: Delivery Moogle's and/or lets alice take the graveyard half alone, and then she does not shuffle" $ do
     board <- moogleBoard s registry ["Bonesplitter"]
-    let settled = resolveMoogle (searchingZones (Set.singleton Zone.Graveyard) [moogleStar board]) board
+    let settled = resolveMoogle (searchingZones (Set.singleton (SearchPlace.InZone Zone.Graveyard)) [moogleStar board]) board
     Spec.assertEqWith
       s
       "she named the library card, but only the graveyard was searched, so the Bonesplitter is what reached her hand"
@@ -2352,7 +2353,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- reading, and the one the searcher cannot decline out of in a public zone.
   Spec.it s "CR 701.23a whole card: a zone Delivery Moogle never named is not one alice can choose" $ do
     board <- moogleBoard s registry ["Bonesplitter"]
-    let settled = resolveMoogle (searchingZones (Set.singleton Zone.Exile) []) board
+    let settled = resolveMoogle (searchingZones (Set.singleton (SearchPlace.InZone Zone.Exile)) []) board
     Spec.assertEqWith
       s
       "both printed zones were searched, so CR 400.2 still forced the graveyard find"
@@ -4046,7 +4047,7 @@ resolveAshiokExtract board =
 -- reversed is one that was shuffled and the original order is one that was not
 -- -- the only quantity that tells "she took the library and found nothing" apart
 -- from "she never took the library at all".
-searchingZones :: Set.Set Zone.Zone -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+searchingZones :: Set.Set SearchPlace.SearchPlace -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 searchingZones zones wanted p = case p of
   Prompt.ChooseSearchZones {} -> zones
   Prompt.Shuffle offered -> reverse offered

@@ -262,6 +262,7 @@ import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
@@ -322,6 +323,7 @@ import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SearchPlace as SearchPlace
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
@@ -3569,7 +3571,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.MoveMana (MoveMana.MkMoveMana fromRef toRef) -> do
     gs <- State.get
     Mana.moveMana (apnapPlayersOf fromRef legal controller gs) (apnapPlayersOf toRef legal controller gs)
-  Effect.Search (Search.MkSearch searcherRef ownerRef zones quantity filter_ upTo destination subject foundSlot) ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef zones outside quantity filter_ upTo destination subject foundSlot) ->
     -- CR 701.23a: match each candidate through its own CR 613 projection --
     -- rule 613.1 names no zone, so a card in any of the searched zones is folded
     -- exactly as a permanent is, and CR 208.2a's characteristic-defining power
@@ -3632,6 +3634,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 701.23c and CR 701.23d are each scoped to a hidden zone, so this is
         -- what decides, PER ZONE, whether a find may be declined.
         isHidden zone = zone == Zone.Library || zone == Zone.Hand
+        -- The places the printed "and/or" names: the zones, and outside the
+        -- game where the card says so (CR 701.23j) and its destination can take
+        -- a card from there -- see outsideArrival.
+        places =
+          Set.map SearchPlace.InZone zones
+            <> (if outside && Maybe.isJust (outsideArrival destination) then Set.singleton SearchPlace.OutsideTheGame else Set.empty)
      in do
           gs0 <- State.get
           -- Search.searcher names who searches; Search.owner names whose zones
@@ -3707,21 +3715,34 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- them. Read LIVE rather than off gs0: CR 601.3's cast happens
             -- during an earlier searcher's pass, so a later pass asks over a
             -- board this resolution has already moved.
-            chosenZones <-
-              if Set.size zones < 2
-                then pure zones
+            --
+            -- Outside the game is one of the places on offer where the card
+            -- names it (CR 701.23j), though CR 400.11 makes it no zone: Invasion
+            -- of Arcavios's searcher may take it alone, and then shuffles
+            -- nothing and is forced to find nothing.
+            chosenPlaces <-
+              if Set.size places < 2
+                then pure places
                 else do
                   gsZones <- State.get
-                  answer <- Game.choose (Prompt.ChooseSearchZones (Decide.deciderFor searcher gsZones) searcher zones)
-                  let kept = Set.intersection answer zones
-                  pure (if Set.null kept then zones else kept)
-            let searchedZones = if prohibited then Set.delete Zone.Library chosenZones else chosenZones
+                  answer <- Game.choose (Prompt.ChooseSearchZones (Decide.deciderFor searcher gsZones) searcher places)
+                  let kept = Set.intersection answer places
+                  pure (if Set.null kept then places else kept)
+            let chosenZones = Set.fromList [zone | SearchPlace.InZone zone <- Set.toList chosenPlaces]
+                searchedZones = if prohibited then Set.delete Zone.Library chosenZones else chosenZones
+                -- CR 701.23j: "a card THEY own", so the pool is the searcher's,
+                -- whoever `owner` names. Read LIVE, the zones' reason above.
+                lookOutside = Set.member SearchPlace.OutsideTheGame chosenPlaces
+            outsideAvailable <-
+              if lookOutside
+                then State.gets (Event.outsideOffer filter_ source searcher)
+                else pure Map.empty
             -- A cap of zero asks nothing and finds nothing: one legal answer is
             -- no choice to put to a player. An unbounded search has no such
             -- shortcut -- its cap is not known until the zones are read.
-            found <-
-              if Set.null searchedZones || cap == Just 0
-                then pure []
+            (found, foundOutside) <-
+              if (Set.null searchedZones && Map.null outsideAvailable) || cap == Just 0
+                then pure ([], [])
                 else do
                   -- CR 601.3 (Panglacial Wurm): the chance to cast is offered AT
                   -- THE SEARCH, not when the resolution began, so earlier
@@ -3744,11 +3765,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   -- CR 701.23b's permission is a property of the ZONE.
                   let byZone = fmap (\zone -> (zone, filter (matches1 gs) (Game.zoneMembers zone owner gs))) (Set.toAscList searchedZones)
                       matches = concatMap snd byZone
-                      -- CR 701.23a bounds an unbounded search by the zones: every
+                      outsideCopies = sum (Map.elems outsideAvailable)
+                      -- CR 701.23a bounds an unbounded search by the places: every
                       -- card the filter admits is findable, and no more.
-                      capHere = Maybe.fromMaybe (List.genericLength matches) cap
+                      capHere = Maybe.fromMaybe (List.genericLength matches + outsideCopies) cap
                       decider = Decide.deciderFor searcher gs
-                  answer <- Game.choose (Prompt.Search decider searcher matches capHere)
+                  answer <-
+                    if Set.null searchedZones
+                      then pure []
+                      else Game.choose (Prompt.Search decider searcher matches capHere)
                   -- CR 701.23a: every card found is one the filter admits.
                   -- Filtered, not trusted, deduplicated, and truncated to the cap.
                   -- What a SHORT answer leaves is the difference between CR
@@ -3786,8 +3811,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       picked = List.genericTake capHere . ListUtils.nubOrd $ filter (\oid -> List.elem oid matches) answer
                       forced = concatMap snd (filter (not . mayDecline . fst) byZone)
                       filler = filter (\oid -> List.notElem oid picked) forced
-                  pure (List.genericTake capHere (picked <> filler))
-            pure (searcher, owner, chosenZones, found)
+                      -- CR 701.23j: the searcher "MAY choose" a card out there,
+                      -- so nothing forces a find outside the game, and what the
+                      -- zones' find left of the one count is its ceiling. Asked
+                      -- AFTER that find and BEFORE the completion below, so a
+                      -- card taken from outside is what spares a public zone's
+                      -- match -- Invasion of Arcavios's searcher who wants her
+                      -- sideboard's sorcery over her graveyard's.
+                      outsideRoom = min (capHere - min capHere (List.genericLength picked)) outsideCopies
+                  outsidePicked <- case NonEmpty.nonEmpty (Map.keys outsideAvailable) of
+                    Just candidates
+                      | outsideRoom > 0 -> do
+                          outsideAnswer <- Game.choose (Prompt.ChooseFromOutsideTheGame decider searcher candidates 0 outsideRoom)
+                          pure (Event.settleOutside outsideAvailable 0 outsideRoom outsideAnswer)
+                    _ -> pure []
+                  let room = capHere - min capHere (List.genericLength picked + List.genericLength outsidePicked)
+                  pure (picked <> List.genericTake room filler, outsidePicked)
+            pure (searcher, owner, chosenZones, found, foundOutside)
           -- Where the cards go is the CARD's instruction, not rule 701.23's;
           -- CR 701.23e says the same of the reveal. The searcher is the
           -- revealer (CR 701.20a), and the cards go in the order the searcher
@@ -3801,16 +3841,22 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- skip itself is a REGRESSION FENCE, since that card exiles and the
           -- move of a ceased object (CR 400.7) already does nothing, so
           -- removing it reddens nothing.
-          arrivals <- fmap concat . Monad.forM decisions $ \(searcher, owner, chosenZones, found) -> do
+          arrivals <- fmap concat . Monad.forM decisions $ \(searcher, owner, chosenZones, found, foundOutside) -> do
             -- Read HERE rather than when the arm was entered, the reason the
             -- context above is a function of the board: CR 608.2c carries the
             -- clauses out in order, so the slot an earlier clause bound is read
             -- as it stands now.
             host <- State.gets subjectOf
             let stillThere gs oid = any (\zone -> List.elem oid (Game.zoneMembers zone owner gs)) (Set.toList chosenZones)
-            fmap concat . Monad.forM found $ \oid -> do
+            fromZones <- fmap concat . Monad.forM found $ \oid -> do
               present <- State.gets (`stillThere` oid)
               if present then putFound searcher host destination oid else pure []
+            -- CR 400.11b: a card found outside the game is brought in rather
+            -- than moved, the reveal riding along as it arrives (#2450).
+            fromOutside <- case outsideArrival destination of
+              Nothing -> pure []
+              Just (arrival, revealIt) -> Event.bringChosen arrival revealIt searcher foundOutside
+            pure (fromZones <> fromOutside)
           -- The shuffle is the CARD's instruction too (CR 701.23h, CR 701.24b).
           -- The library shuffled is the one that was READ, so the seat is the
           -- owner -- and only where a LIBRARY is among the zones a searcher
@@ -3824,7 +3870,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           --
           -- ONCE per library, however many searchers read it: the card prints
           -- one "then shuffle" of that library, not one per searcher.
-          let shuffled = ListUtils.nubOrd [owner | (_, owner, chosenZones, _) <- decisions, Set.member Zone.Library chosenZones]
+          let shuffled = ListUtils.nubOrd [owner | (_, owner, chosenZones, _, _) <- decisions, Set.member Zone.Library chosenZones]
           Monad.forM_ shuffled $ \owner -> do
             lib <- State.gets (Game.zoneMembers Zone.Library owner)
             shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
@@ -10082,6 +10128,24 @@ changeLifeByDelta pid delta =
 -- Answers what Search.slot binds: the incarnations a move minted (CR 400.7), the
 -- found card itself where the instruction only revealed it, and nothing where a
 -- move did not happen.
+-- CR 400.11b: where a card a search found outside the game arrives, and whether
+-- it is shown (CR 701.23e), for a destination that can take one: Invasion of
+-- Arcavios's "reveal it, and put it into your hand". Nothing for the rest, which
+-- then offers nothing out there -- MTGJSON dump of 2026-08-23, text "search" with
+-- "outside the game": Invasion of Arcavios and Turtles Forever, both ending in a
+-- hand; a search sending a card from outside the game onto the battlefield would
+-- refute it.
+outsideArrival :: SearchDestination.SearchDestination -> Maybe (OutsideDestination.OutsideDestination, Bool)
+outsideArrival destination = case destination of
+  SearchDestination.RevealThenHand -> Just (OutsideDestination.Hand, True)
+  SearchDestination.Hand -> Just (OutsideDestination.Hand, False)
+  SearchDestination.Battlefield -> Nothing
+  SearchDestination.BattlefieldTapped -> Nothing
+  SearchDestination.Exile -> Nothing
+  SearchDestination.BattlefieldAttachedOrHand -> Nothing
+  SearchDestination.BattlefieldAttached -> Nothing
+  SearchDestination.Reveal -> Nothing
+
 putFound :: PlayerId -> Maybe ObjectId -> SearchDestination.SearchDestination -> ObjectId -> Game [ObjectId]
 putFound searcher subject destination cardId = case destination of
   -- Nature's Lore's "put that card onto the battlefield": the plain move, with
