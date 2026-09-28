@@ -5,7 +5,8 @@
 -- (Target.announcedSlots) and re-judged per copy at CR 608.2b
 -- (Target.boundCopies). Riptide Gearhulk and Enigma Thief take the triggered
 -- road, Dismantling Wave and Blatant Thievery the spell's, The Theorist, Jace
--- Beleren the activation's. Every board has three seats, so "each
+-- Beleren the activation's. Sepulchral Primordial and Afterlife from the Loam
+-- reach "that player's graveyard" instead. Every board has three seats, so "each
 -- opponent" and "that player" are never the same seat by accident.
 module Pawl.TargetPerPlayerSpec where
 
@@ -20,6 +21,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection.Engine
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
@@ -33,6 +35,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -175,6 +178,85 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" . Spec.describe s "PerPla
         Spec.assertEqWith s "one slot per opponent, each its own player's" offers [[Set.singleton pikerId, Set.singleton thopterId]]
       _ -> Spec.assertFailure s "The Theorist has three loyalty abilities"
 
+  -- "that player's graveyard": each copy's POOL is its own player's graveyard
+  -- (ZoneScope.BoundPlayer). bob's graveyard holds a Goblin Piker, an Ornithopter
+  -- and a Forest; carol's a Llanowar Elves and a Glorious Anthem; alice's an
+  -- Ornithopter. bob's and carol's libraries hold three cards each.
+  let graveyards card = do
+        forest <- S.printingOf s registry "Forest"
+        piker <- S.printingOf s registry "Goblin Piker"
+        ornithopter <- S.printingOf s registry "Ornithopter"
+        elves <- S.printingOf s registry "Llanowar Elves"
+        anthem <- S.printingOf s registry "Glorious Anthem"
+        swamp <- S.printingOf s registry "Swamp"
+        printing <- S.printingOf s registry card
+        seeded <- traverse (S.printingOf s registry) ["Lightning Bolt", "Unsummon", "Griptide"]
+        let (pikerId, g1) = S.addGraveyardCard piker S.bob (S.landsFor swamp S.alice 8 S.threePlayerGame)
+            (bobThopterId, g2) = S.addGraveyardCard ornithopter S.bob g1
+            (_, g3) = S.addGraveyardCard forest S.bob g2
+            (elvesId, g4) = S.addGraveyardCard elves S.carol g3
+            (_, g5) = S.addGraveyardCard anthem S.carol g4
+            (aliceThopterId, g6) = S.addGraveyardCard ornithopter S.alice g5
+            stock pid g = List.foldl' (\g' p -> snd (S.addLibraryCard p pid g')) g seeded
+            (gs, cardId) = S.handOne printing (stock S.carol (stock S.bob g6))
+        pure (gs, cardId, (pikerId, bobThopterId, elvesId, aliceThopterId))
+      -- Resolve the top of the stack, taking `takes` out of CR 608.2d's "you
+      -- may" per member (FILTERED from the offer).
+      resolveTaking :: Set.Set ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      resolveTaking takes gs = State.evalState (fmap snd (Engine.runGame (taking takes Set.empty) gs Stack.resolveTop)) []
+      exile oid gs = State.evalState (fmap snd (Engine.runGame (aiming Set.empty) gs (Event.changeZone oid Zone.Exile))) []
+      -- How many permanents named `name` `pid` CONTROLS (not owns).
+      controls name pid gs =
+        length
+          [ o
+          | o <- Set.toList (GameState.battlefield gs),
+            fmap S.nameOf (Game.cardOf o gs) == named name,
+            Projection.controllerOf o gs == Just pid
+          ]
+  Spec.it s "CR 601.2c Sepulchral Primordial asks each opponent's slot for that player's graveyard only" $ do
+    (gs, cardId, (pikerId, bobThopterId, elvesId, aliceThopterId)) <- graveyards "Sepulchral Primordial"
+    let (placed, offers) = enter (Set.fromList [pikerId, elvesId]) cardId gs
+        after = resolveTaking (Set.fromList [pikerId, elvesId]) placed
+    -- THE GAMEPLAY ASSERTIONS, ahead of the offer proxy.
+    Spec.assertEqWith s "alice controls bob's Goblin Piker" (controls "Goblin Piker" S.alice after) 1
+    Spec.assertEqWith s "alice controls carol's Llanowar Elves" (controls "Llanowar Elves" S.alice after) 1
+    Spec.assertEqWith s "no Ornithopter entered" (controls "Ornithopter" S.alice after) 0
+    Spec.assertEqWith s "one slot per opponent, each offering that player's creature cards" offers [[Set.fromList [pikerId, bobThopterId], Set.singleton elvesId]]
+    Spec.assertBool s (not (any (any (Set.member aliceThopterId)) offers)) "alice's own graveyard is offered to no slot"
+  -- CR 608.2d: "for each opponent, you may" is a choice per target, so alice can
+  -- take carol's Elves and leave bob's targeted Piker where it is.
+  Spec.it s "CR 608.2d Sepulchral Primordial may put carol's Elves onto the battlefield and not bob's Piker" $ do
+    (gs, cardId, (pikerId, _, elvesId, _)) <- graveyards "Sepulchral Primordial"
+    let after = resolveTaking (Set.singleton elvesId) (fst (enter (Set.fromList [pikerId, elvesId]) cardId gs))
+    Spec.assertEqWith s "alice controls carol's Llanowar Elves" (controls "Llanowar Elves" S.alice after) 1
+    Spec.assertBool s (elem (named "Goblin Piker") (namesIn Zone.Graveyard S.bob after)) "bob's Piker stayed in his graveyard"
+  -- CR 115.6: "up to one" per opponent, so carol's copy may go unfilled.
+  Spec.it s "CR 115.6 Sepulchral Primordial may leave carol's slot empty and still take bob's Piker" $ do
+    (gs, cardId, (pikerId, _, elvesId, _)) <- graveyards "Sepulchral Primordial"
+    let after = resolveTaking (Set.fromList [pikerId, elvesId]) (fst (enter (Set.singleton pikerId) cardId gs))
+    Spec.assertEqWith s "alice controls bob's Goblin Piker" (controls "Goblin Piker" S.alice after) 1
+    Spec.assertBool s (elem (named "Llanowar Elves") (namesIn Zone.Graveyard S.carol after)) "carol's Elves stayed in her graveyard"
+  -- CR 400.7 / 608.2b: bob's Piker leaving his graveyard in response makes his
+  -- copy's target illegal; carol's is still returned.
+  Spec.it s "CR 608.2b Sepulchral Primordial returns carol's Elves after bob's targeted Piker is exiled" $ do
+    (gs, cardId, (pikerId, _, elvesId, _)) <- graveyards "Sepulchral Primordial"
+    let placed = fst (enter (Set.fromList [pikerId, elvesId]) cardId gs)
+        after = resolveTaking (Set.fromList [pikerId, elvesId]) (exile pikerId placed)
+    Spec.assertEqWith s "no Goblin Piker entered" (controls "Goblin Piker" S.alice after) 0
+    Spec.assertEqWith s "alice controls carol's Llanowar Elves" (controls "Llanowar Elves" S.alice after) 1
+  -- "For each player": alice's own graveyard gets a copy too, and every returned
+  -- card is a Zombie under alice's control.
+  Spec.it s "CR 601.2c Afterlife from the Loam takes one creature card from each player's graveyard as Zombies" $ do
+    (gs, spellId, (pikerId, bobThopterId, elvesId, aliceThopterId)) <- graveyards "Afterlife from the Loam"
+    let picks = Set.fromList [pikerId, elvesId, aliceThopterId]
+        (after, offers) = State.runState (fmap snd (Engine.runGame (taking Set.empty picks) gs (S.cast S.alice spellId >> Stack.resolveTop))) []
+        entered = [o | o <- Set.toList (GameState.battlefield after), Projection.controllerOf o after == Just S.alice, fmap S.nameOf (Game.cardOf o after) /= named "Swamp"]
+    Spec.assertEqWith s "alice controls bob's Piker" (controls "Goblin Piker" S.alice after) 1
+    Spec.assertEqWith s "alice controls carol's Elves" (controls "Llanowar Elves" S.alice after) 1
+    Spec.assertEqWith s "alice controls her own Ornithopter" (controls "Ornithopter" S.alice after) 1
+    Spec.assertEqWith s "each is a Zombie" (fmap (\o -> Set.member Subtype.Zombie (Projection.Engine.subtypesOf o after)) entered) [True, True, True]
+    Spec.assertEqWith s "one slot per player, each offering that player's creature cards" offers [[Set.singleton aliceThopterId, Set.fromList [pikerId, bobThopterId], Set.singleton elvesId]]
+
 -- Announce one target for every slot offering one of `picks`, none elsewhere,
 -- and take `picks` out of each offer -- FILTERED from the offer, so the
 -- recipient is the one the pool tagged. Every AnnounceTargets offer is
@@ -186,6 +268,13 @@ aiming picks p = case p of
     pure (fmap (\(_, legal) -> if Set.null (Set.intersection picks (objectsOf legal)) then 0 else 1 :: Natural.Type.Natural) offers)
   Prompt.ChooseTargets _ _ _ asked -> pure (fmap (Set.filter (maybe False (`Set.member` picks) . Recipient.objectOf) . snd) asked)
   _ -> pure (S.identityAnswer p)
+
+-- `aiming picks`, and CR 608.2d's per-member "you may" answered with `takes`,
+-- FILTERED from the swept members.
+taking :: Set.Set ObjectId.ObjectId -> Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[Set.Set ObjectId.ObjectId]] r
+taking takes picks p = case p of
+  Prompt.ChooseLoopMembers _ _ _ swept -> pure (Set.fromList (filter (maybe False (`Set.member` takes) . Recipient.objectOf) swept))
+  _ -> aiming picks p
 
 objectsOf :: Set.Set Recipient.Recipient -> Set.Set ObjectId.ObjectId
 objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList

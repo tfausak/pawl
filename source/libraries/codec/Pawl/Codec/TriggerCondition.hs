@@ -11,6 +11,7 @@ import qualified Pawl.Codec.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.CounterPlacement as CounterPlacement
 import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Codec.CreatureExploits as CreatureExploits
 import qualified Pawl.Codec.DieResult as DieResult
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -151,6 +152,7 @@ codec =
           Arm.nullary "SelfMutates" TriggerCondition.SelfMutates,
           Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
           Arm.nullary "SelfExploits" TriggerCondition.SelfExploits,
+          Arm.payload "CreatureExploits" CreatureExploits.codec TriggerCondition.CreatureExploits (\x -> case x of TriggerCondition.CreatureExploits y -> Just y; _ -> Nothing),
           Arm.nullary "SelfTrains" TriggerCondition.SelfTrains,
           Arm.payload "SelfBecomesCrewed" TriggerFrequency.codec TriggerCondition.SelfBecomesCrewed (\x -> case x of TriggerCondition.SelfBecomesCrewed y -> Just y; _ -> Nothing),
           Arm.nullary "SelfCrewsVehicle" TriggerCondition.SelfCrewsVehicle,
@@ -165,6 +167,7 @@ codec =
           -- CR 309.7's "whenever you complete a dungeon", PlayerScries' shape above.
           Arm.payload "PlayerCompletesDungeon" PlayerRelation.codec TriggerCondition.PlayerCompletesDungeon (\x -> case x of TriggerCondition.PlayerCompletesDungeon y -> Just y; _ -> Nothing),
           Arm.payload "PlayerSurveils" PlayerRelation.codec TriggerCondition.PlayerSurveils (\x -> case x of TriggerCondition.PlayerSurveils y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerProliferates" PlayerRelation.codec TriggerCondition.PlayerProliferates (\x -> case x of TriggerCondition.PlayerProliferates y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsDice" PlayerRelation.codec TriggerCondition.PlayerRollsDice (\x -> case x of TriggerCondition.PlayerRollsDice y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsResult" (DieResult.codec PlayerRelation.codec) TriggerCondition.PlayerRollsResult (\x -> case x of TriggerCondition.PlayerRollsResult y -> Just y; _ -> Nothing),
           Arm.nullary "Visit" TriggerCondition.Visit,
@@ -307,6 +310,7 @@ tagOf x = case x of
   TriggerCondition.SelfMutates {} -> "SelfMutates"
   TriggerCondition.AttachedCreatureMentors {} -> "AttachedCreatureMentors"
   TriggerCondition.SelfExploits {} -> "SelfExploits"
+  TriggerCondition.CreatureExploits {} -> "CreatureExploits"
   TriggerCondition.SelfTrains {} -> "SelfTrains"
   TriggerCondition.SelfBecomesCrewed {} -> "SelfBecomesCrewed"
   TriggerCondition.SelfCrewsVehicle {} -> "SelfCrewsVehicle"
@@ -320,6 +324,7 @@ tagOf x = case x of
   TriggerCondition.PlayerScries {} -> "PlayerScries"
   TriggerCondition.PlayerCompletesDungeon {} -> "PlayerCompletesDungeon"
   TriggerCondition.PlayerSurveils {} -> "PlayerSurveils"
+  TriggerCondition.PlayerProliferates {} -> "PlayerProliferates"
   TriggerCondition.PlayerRollsDice {} -> "PlayerRollsDice"
   TriggerCondition.PlayerRollsResult {} -> "PlayerRollsResult"
   TriggerCondition.Visit {} -> "Visit"

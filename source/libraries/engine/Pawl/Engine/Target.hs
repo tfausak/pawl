@@ -1121,6 +1121,7 @@ zoneScopePlayers perspective bindings scope gs = case scope of
     Maybe.mapMaybe
       (Recipient.objectOf Monad.>=> \oid -> Projection.controllerWithLastKnown oid gs)
       (Set.toList (Map.findWithDefault Set.empty slot bindings))
+  ZoneScope.BoundPlayer pid -> [pid]
 
 -- CR 404.1 over a list of players, deduplicated by the Set the caller gets back.
 graveyardsOf :: [PlayerId] -> GameState -> Set Recipient
@@ -1396,6 +1397,8 @@ zoneScopeSlot scope = case scope of
   ZoneScope.Scoped _ -> Nothing
   ZoneScope.InSlot slot -> Just slot
   ZoneScope.ControllerOfBound slot -> Just slot
+  -- Baked by splitPerPlayer: the player is fixed, so nothing depends on another slot.
+  ZoneScope.BoundPlayer _ -> Nothing
 
 -- CR 601.2c: the number a slot's COMPUTED count reads on this board -- Mogis's
 -- Marauder's "up to X target creatures ... where X is your devotion to black".
@@ -2108,12 +2111,39 @@ splitPerPlayer playersOf keep =
         Just each ->
           let copies =
                 Map.fromList
-                  [ (Modal.Engine.perPlayerSlot name pid, bakeSlot (Map.singleton (SlotPerPlayer.slot each) pid) slot {TargetSlot.perPlayer = Nothing})
+                  [ (Modal.Engine.perPlayerSlot name pid, bakePerPlayer (SlotPerPlayer.slot each) pid slot)
                   | pid <- playersOf name each
                   ]
               kept = Map.filter keep copies
            in if Map.null kept then copies else kept
    in Map.unions . Map.mapWithKey split
+
+-- One copy of a perPlayer slot, its "that player" baked to `pid`: bakeSlot's
+-- Filter atoms, and the pool's "that player's graveyard" too (ZoneScope.BoundPlayer),
+-- so Sepulchral Primordial's copy offers only that player's graveyard.
+--
+-- The pool is baked HERE and not in bakeSlot, whose other callers bake a
+-- TARGET player slot at CR 608.2b: there a ZoneScope.InSlot pool must keep reading
+-- the re-validated binding, so a player who became an illegal target empties it.
+bakePerPlayer :: SlotName -> PlayerId -> TargetSlot -> TargetSlot
+bakePerPlayer name pid slot =
+  let baked = bakeSlot (Map.singleton name pid) slot
+      bakeScope scope = case scope of
+        ZoneScope.InSlot named | named == name -> ZoneScope.BoundPlayer pid
+        _ -> scope
+      bakePool pool = case pool of
+        Pool.CardsInGraveyard scope -> Pool.CardsInGraveyard (bakeScope scope)
+        Pool.CreaturesAndCardsInGraveyard scope -> Pool.CreaturesAndCardsInGraveyard (bakeScope scope)
+        Pool.Creatures -> pool
+        Pool.Players -> pool
+        Pool.AnyTarget -> pool
+        Pool.Permanents -> pool
+        Pool.Spells -> pool
+        Pool.Abilities -> pool
+        Pool.SpellsAndPermanents -> pool
+        Pool.PlayersAndPlaneswalkers -> pool
+        Pool.CardsInExile -> pool
+   in baked {TargetSlot.pool = bakePool (TargetSlot.pool baked), TargetSlot.perPlayer = Nothing}
 
 -- bakeSlots over a whole modal payload, for the caller that must bake BEFORE the
 -- modes are chosen: CR 700.2b's mode selection asks which modes are fillable

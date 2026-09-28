@@ -99,7 +99,9 @@
                         "value": {
                           "type": "These",
                           "value": {
-                            "type": "EachCardInYourHand"
+                            "cards": {
+                              "type": "EachCardInYourHand"
+                            }
                           }
                         }
                       }

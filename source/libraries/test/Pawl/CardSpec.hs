@@ -134,6 +134,7 @@ import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.CreatureExploits as CreatureExploits
 import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.DamageDirection as DamageDirection
@@ -323,6 +324,7 @@ import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.TheseDiscard as TheseDiscard
 import qualified Pawl.Types.Times as Times
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
@@ -609,7 +611,7 @@ objectRefPositions =
         ("explore", Effect.Explore (plantedRef "ex"), [plantedRef "ex"]),
         ("arrange-in-library", Effect.ArrangeInLibrary (plantedRef "al"), [plantedRef "al"]),
         ("connive", Effect.Connive (Connive.MkConnive (Quantity.Type.Literal 1) (plantedRef "cn")), [plantedRef "cn"]),
-        ("discard-these", Effect.Discard (Discard.These (plantedRef "di")), [plantedRef "di"]),
+        ("discard-these", Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard (plantedRef "di") Nothing)), [plantedRef "di"]),
         ("create-copy", Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Type.Literal 1) (plantedRef "cc") plainRiders Nothing []), [plantedRef "cc"]),
         ("become-copy", Effect.BecomeCopy (BecomeCopy.MkBecomeCopy (CopyOriginal.OfObject (plantedRef "bc-original")) (plantedRef "bc-subject") Nothing [] False), [plantedRef "bc-original", plantedRef "bc-subject"]),
         ("copy-spell", Effect.CopyStackObject (CopyStackObject.MkCopyStackObject (plantedRef "cs") CopyTargets.Copied CopyStackObject.defaultQuantity CopyStackObject.defaultCopier []), [plantedRef "cs"]),
@@ -970,6 +972,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
+  TriggerCondition.CreatureExploits {} -> []
   -- Nor does CR 702.122e's: its payload is a TriggerFrequency, SelfAttacks' above.
   TriggerCondition.SelfBecomesCrewed {} -> []
   -- Nor does CR 702.122b's crewer side, nullary too.
@@ -1083,6 +1086,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -2079,6 +2083,7 @@ replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
+  ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -2106,6 +2111,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
+  ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 111.1's token a replacement MINTS: TokenR's appended token (Queen Allenal
@@ -2131,6 +2137,7 @@ replacementMintedCards replacement = case replacement of
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
+  ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -4059,6 +4066,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
+  -- Skull Skaab's two, both card text.
+  TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits exploiter exploited) -> unframed [exploiter, exploited]
   -- CR 702.122e's carries none either: it names "this Vehicle" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfBecomesCrewed {} -> []
@@ -4209,6 +4218,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -4424,6 +4434,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.AttachedCreatureMentors -> []
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
+  TriggerCondition.CreatureExploits {} -> []
   TriggerCondition.SelfBecomesCrewed {} -> []
   TriggerCondition.SelfCrewsVehicle -> []
   TriggerCondition.PermanentSacrificed {} -> []
@@ -4455,6 +4466,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerFirebends _ -> []
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -4980,6 +4992,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
+  ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 614.9's printed destination, the one Filter a damage REWRITE carries.
@@ -5644,7 +5657,7 @@ effectFilters effect = case effect of
   -- "nonland" -- so the lint reaches it, as Reveal's does.
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> frame Unframed (quantityFilters quantity)
-    Discard.These ref -> frame SourceHostFramed (objectRefFilters ref)
+    Discard.These (TheseDiscard.MkTheseDiscard ref _) -> frame SourceHostFramed (objectRefFilters ref)
     -- The card filter is a position a card author writes -- Borborygmos and
     -- Fblthp's "land" -- read as ObjectRef.AnyNumberMatching's is.
     Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ (AnyNumberMatching.MkAnyNumberMatching f atMost) _) -> unframed [f] <> frame Unframed (foldMap quantityFilters atMost)

@@ -300,13 +300,14 @@ instancePool rename pool = case pool of
   Pool.PlayersAndPlaneswalkers -> pool
   Pool.CardsInExile -> pool
 
--- CR 109.5's Scoped arm names no slot and is untouched; InSlot's is the printed
--- name `rename` rewrites.
+-- CR 109.5's Scoped arm and a baked BoundPlayer name no slot and are untouched;
+-- InSlot's is the printed name `rename` rewrites.
 instanceZoneScope :: (SlotName -> SlotName) -> ZoneScope.ZoneScope -> ZoneScope.ZoneScope
 instanceZoneScope rename scope = case scope of
   ZoneScope.Scoped _ -> scope
   ZoneScope.InSlot slot -> ZoneScope.InSlot (rename slot)
   ZoneScope.ControllerOfBound slot -> ZoneScope.ControllerOfBound (rename slot)
+  ZoneScope.BoundPlayer _ -> scope
 
 -- CR 700.2d: the binding-shaped environment ONE chosen instance's effects read.
 -- Three parts, and each is a rule rather than a convenience:

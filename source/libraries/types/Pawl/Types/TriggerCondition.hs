@@ -12,6 +12,7 @@ import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Types.CreatureExploits as CreatureExploits
 import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -497,6 +498,9 @@ data TriggerCondition
     -- creatures under the exploited creature's toughness" is what proves that slot
     -- is readable.
     SelfExploits
+  | -- | CR 702.110b read by a bystander: a creature the first Filter admits
+    -- exploited one the second admits (Skull Skaab).
+    CreatureExploits CreatureExploits.CreatureExploits
   | -- | CR 702.122e: "whenever this Vehicle becomes crewed" (Mobilizer Mech),
     -- which that rule defines as a crew ability of the bearer RESOLVING.
     -- Self-scoped; the TriggerFrequency is Mighty Servant of Leuk-o's "for the
@@ -554,6 +558,9 @@ data TriggerCondition
   | -- | CR 701.25d, PlayerScries' twin: a surveil that put nothing into a
     -- graveyard fires it just the same, and CR 701.25c's surveil 0 fires nothing.
     PlayerSurveils PlayerRelation.PlayerRelation
+  | -- | CR 701.34a: "whenever you proliferate" (Scheming Aspirant), against
+    -- GameEvent.Proliferated.
+    PlayerProliferates PlayerRelation.PlayerRelation
   | -- | CR 706.1: "whenever you roll one or more dice" (Feywild Trickster). The
     -- event and not the result, which is what lets CR 706.7's planar die fire it.
     --

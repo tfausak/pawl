@@ -226,6 +226,7 @@ movedOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.Proliferated _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -370,6 +371,7 @@ participants event =
         GameEvent.Scried pid -> player pid
         GameEvent.DungeonCompleted pid -> player pid
         GameEvent.Surveiled pid -> player pid
+        GameEvent.Proliferated pid -> player pid
         GameEvent.DiceRolled pid -> player pid
         GameEvent.DieResultSettled r -> player (DieResult.roller r)
         GameEvent.RolledToVisit r -> player (DieResult.roller r)
@@ -439,6 +441,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerScries _ -> False
   TriggerCondition.RingTemptsPlayer _ -> False
   TriggerCondition.PlayerSurveils _ -> False
+  TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
@@ -596,11 +599,15 @@ looksBack condition = case condition of
   -- Nor here, and by the same sentence: rule 702.149a's counter goes on an
   -- attacking creature, which CR 506.4 has removed from combat if it left.
   TriggerCondition.SelfTrains -> False
-  -- Nor here: rule 702.110a's ability fires on an ENTRY, so its bearer arrived
-  -- rather than departed, and there is no departure to look back past.
-  TriggerCondition.SelfExploits -> False
-  -- Nor here: rule 702.122e's Vehicle is on the battlefield when its own crew
-  -- ability resolves, so there is no departure to look back past.
+  -- CR 603.10a's second family: rule 702.110b's exploit IS a sacrifice, so these
+  -- trigger when a player sacrifices a permanent -- and the sacrificed creature
+  -- may be the bearer itself, which the Colonel Autumn ruling says still
+  -- triggers. Proved by Pawl.CardTriggerSpec's "CR 702.110b Skull Skaab
+  -- exploiting itself still triggers".
+  TriggerCondition.SelfExploits -> True
+  TriggerCondition.CreatureExploits {} -> True
+  -- Not on the list: rule 702.122e's Vehicle is on the battlefield when its own
+  -- crew ability resolves, so there is no departure to look back past.
   TriggerCondition.SelfBecomesCrewed {} -> False
   -- Nor here: rule 702.122a's cost taps the crewer, which is not a departure
   -- either.
@@ -753,6 +760,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerFirebends _ -> False
   TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
+  TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
@@ -851,6 +859,7 @@ batchScoped condition = case condition of
   TriggerCondition.AttachedCreatureMentors -> False
   TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfExploits -> False
+  TriggerCondition.CreatureExploits {} -> False
   TriggerCondition.SelfBecomesCrewed {} -> False
   TriggerCondition.SelfCrewsVehicle -> False
   TriggerCondition.SelfEnters -> False
@@ -1246,6 +1255,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.Proliferated _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
@@ -1612,6 +1622,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.Proliferated _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
@@ -1872,6 +1883,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.Proliferated _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
@@ -2041,6 +2053,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.Proliferated _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
@@ -2461,6 +2474,7 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerScries _ -> battlefield
         TriggerCondition.RingTemptsPlayer _ -> battlefield
         TriggerCondition.PlayerSurveils _ -> battlefield
+        TriggerCondition.PlayerProliferates _ -> battlefield
         TriggerCondition.PermanentExplores _ -> battlefield
         TriggerCondition.PermanentConnives _ -> battlefield
         -- CR 113.6's default again: Synthetic Blight Chronicler is an ordinary
@@ -2608,6 +2622,9 @@ zonesTriggeredFrom cond =
         -- The same default from the exploiting creature's own side: rule 702.110a's
         -- ability fires on its bearer's entry, so the bearer is on the battlefield.
         TriggerCondition.SelfExploits -> battlefield
+        -- The same default from a bystander's side: Skull Skaab watches from the
+        -- battlefield, and CR 113.6k's exception does not apply.
+        TriggerCondition.CreatureExploits {} -> battlefield
         -- The same default: CR 702.122a's ability is a Vehicle permanent's, so its
         -- bearer is on the battlefield and CR 113.6k's exception does not apply.
         TriggerCondition.SelfBecomesCrewed {} -> battlefield
@@ -2943,6 +2960,7 @@ stateTriggers gs
             TriggerCondition.PlayerScries _ -> False
             TriggerCondition.RingTemptsPlayer _ -> False
             TriggerCondition.PlayerSurveils _ -> False
+            TriggerCondition.PlayerProliferates _ -> False
             TriggerCondition.SelfBecomesPlotted -> False
             TriggerCondition.PermanentExplores _ -> False
             TriggerCondition.PermanentConnives _ -> False
@@ -3143,6 +3161,7 @@ stateTriggers gs
             -- missing from the battlefield afterwards could have left for any
             -- reason, so the board says nothing about who exploited it.
             TriggerCondition.SelfExploits -> False
+            TriggerCondition.CreatureExploits {} -> False
             -- CR 702.122e likewise fires on a resolution, and the board
             -- afterwards -- an animated Vehicle -- is CR 702.122a's effect
             -- rather than a record of the crewing.
@@ -3715,6 +3734,7 @@ resnapshot gs without event =
         GameEvent.Scried {} -> Just event
         GameEvent.DungeonCompleted {} -> Just event
         GameEvent.Surveiled {} -> Just event
+        GameEvent.Proliferated {} -> Just event
         GameEvent.DiceRolled {} -> Just event
         GameEvent.DieResultSettled {} -> Just event
         GameEvent.RolledToVisit {} -> Just event

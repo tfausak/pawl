@@ -187,6 +187,7 @@ import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.TheseDiscard as TheseDiscard
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
@@ -532,6 +533,7 @@ idleTokenRowOffends replacement = case replacement of
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
+  ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- The non-vacuity half of idleTokenRowOffends' lint, isPhaseR's shape.
@@ -590,6 +592,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
+  ReplacementEffect.ProliferateR {} -> False
 
 -- Every replacement shape the codec accepts and no card may author, for
 -- phasePatternOffends' reason and one more. A card cannot name an ObjectId or a
@@ -644,6 +647,7 @@ engineOnlyOffends replacement = case replacement of
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
+  ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.TurnUpR {} -> False
 
 -- Is this damage rewrite one the ENGINE mints and no card may print? Three of
@@ -729,6 +733,7 @@ turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
+  ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- isPhaseR's twin: did the sweep above have anything to look at? A wildcard for
@@ -763,6 +768,7 @@ riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
+  ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.1a: does this rewrite use the word "prevent"? engineMintedDamage's
@@ -809,6 +815,7 @@ shufflingOutsideLibraryOffends replacement = case replacement of
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
+  ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- The non-vacuity half of shufflingOutsideLibraryOffends' lint, isPhaseR's shape.
@@ -1341,7 +1348,7 @@ effectObjectRefs effect =
         Effect.Connive (Connive.MkConnive _ ref) -> read_ [ref]
         Effect.Discard subject -> case subject of
           Discard.Counted {} -> []
-          Discard.These ref -> [(AsksDiscardArm, ref)]
+          Discard.These (TheseDiscard.MkTheseDiscard ref _) -> [(AsksDiscardArm, ref)]
           Discard.AnyNumber {} -> []
         Effect.LoseLife {} -> []
         Effect.GainLife {} -> []
@@ -1881,6 +1888,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           ZoneScope.Scoped PlayerScope.ControllingMostPermanents -> True
           ZoneScope.InSlot _ -> True
           ZoneScope.ControllerOfBound _ -> True
+          ZoneScope.BoundPlayer _ -> True
         namesOneSeat player = case player of
           PlayerRef.Relative PlayerRelation.You -> True
           PlayerRef.Relative PlayerRelation.Opponent -> False
@@ -1952,10 +1960,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- CR 701.9's look-back slot, the destruction's shape and for its
           -- reason: the counted discard's arm binds the group however few cards
           -- moved, so no ref test and no count test. Psychic Miasma's "if a land
-          -- card is discarded this way" is one that writes it. Discard.These
-          -- binds nothing at all and so is not here; Discard.AnyNumber binds
-          -- through the same burial.
+          -- card is discarded this way" is one that writes it. Discard.These and
+          -- Discard.AnyNumber bind through the same burial.
           Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded)) -> Maybe.maybeToList mDiscarded
+          Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard _ mDiscarded)) -> Maybe.maybeToList mDiscarded
           Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ _ mDiscarded)) -> Maybe.maybeToList mDiscarded
           -- CR 111.1's minted tokens. No count test and no seat test, unlike
           -- the mill's and the draw's: Resolve.bindMinted binds every token the
@@ -2442,7 +2450,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "CR 701.9b's discard asks from-among and at-random, and neither zone-keyed chosen arm"
-      (inert (fmap (Effect.Discard . Discard.These) [inGraveyard, inHand, fromAmong, atRandom]))
+      (inert (fmap discardsThese [inGraveyard, inHand, fromAmong, atRandom]))
       [True, True, False, False]
     -- Tovolar, Dire Overlord's opcode. CR 701.27a turns over PERMANENTS, so its
     -- gather asks for the battlefield subset and for NONE of the four
@@ -2497,7 +2505,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "a random graveyard card is asked by the move gather alone"
-      (inert [moves atRandomInGraveyard, reveals atRandomInGraveyard, Effect.Discard (Discard.These atRandomInGraveyard), Effect.Tap atRandomInGraveyard])
+      (inert [moves atRandomInGraveyard, reveals atRandomInGraveyard, discardsThese atRandomInGraveyard, Effect.Tap atRandomInGraveyard])
       [False, True, True, True]
     -- The at-random arm over a LIBRARY, the Gates' seek, and the same row for
     -- the same reasons: seek reveals nothing, and CR 701.9a discards out of a
@@ -2505,7 +2513,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "a sought card is asked by the move gather alone"
-      (inert [moves sought, reveals sought, Effect.Discard (Discard.These sought), Effect.Tap sought])
+      (inert [moves sought, reveals sought, discardsThese sought, Effect.Tap sought])
       [False, True, True, True]
     -- CR 701.28a's convert, classified with Transform because it IS Transform's
     -- gather (Pawl.Engine.Resolve.Effect.turnPermanentsOver): the same four card-shaped
@@ -3327,3 +3335,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Card" $ do
   effectLintSpec s registry
+
+-- | The discard of the cards a ref names, binding nothing.
+discardsThese :: ObjectRef.ObjectRef -> Effect.Effect card ability
+discardsThese ref = Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard ref Nothing))

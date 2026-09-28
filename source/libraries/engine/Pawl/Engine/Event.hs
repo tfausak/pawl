@@ -186,6 +186,8 @@ import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.ProliferateR as ProliferateR
+import qualified Pawl.Types.ProliferateRewrite as ProliferateRewrite
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
@@ -663,6 +665,7 @@ damageOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.Proliferated _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -748,6 +751,7 @@ revealOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.Proliferated _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -1972,6 +1976,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
+  ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
@@ -3905,6 +3910,16 @@ apply batch candidate event =
           )
     -- Unreachable: `applies` admits DieRollR only against WouldRollDice.
     (ReplacementEffect.DieRollR {}, _) -> pure (Just event)
+    -- CR 701.34a / 614.1a: Tekuthal, Inquiry Dominus's "proliferate twice
+    -- instead". Left STANDING at a doubled count, the CoinFlipR arm above for its
+    -- reason: CR 616.1f repeats the choice against it, so a second row doubles
+    -- again, and CR 614.5 keeps this row off the event it just made.
+    (ReplacementEffect.ProliferateR (ProliferateR.MkProliferateR _ rewrite), ProposedEvent.WouldProliferate pid n) -> case rewrite of
+      ProliferateRewrite.Doubled -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldProliferate pid (n * 2)))
+    -- Unreachable: `applies` admits ProliferateR only against WouldProliferate.
+    (ReplacementEffect.ProliferateR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
@@ -8276,6 +8291,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerScries _ -> False
   TriggerCondition.RingTemptsPlayer _ -> False
   TriggerCondition.PlayerSurveils _ -> False
+  TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
@@ -8395,6 +8411,7 @@ controllerTurnScoped cond = case cond of
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.
   TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfExploits -> False
+  TriggerCondition.CreatureExploits {} -> False
   -- Rule 702.122e names no turn either: a Vehicle may be crewed at instant speed
   -- on any player's turn, CR 702.122a's cost carrying no timing clause.
   TriggerCondition.SelfBecomesCrewed {} -> False
@@ -8855,6 +8872,7 @@ abilityTriggeredOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.Proliferated _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing

@@ -69,6 +69,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Types.CreatureExploits as CreatureExploits
 import qualified Pawl.Types.Crewing as Crewing
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -2762,6 +2763,9 @@ representativeEvents cond =
         -- `departed` for SelfTrains' reason above. BOTH ids are `departed`, so the
         -- exploiter side matches whichever way the arm reads the pair.
         TriggerCondition.SelfExploits -> one (GameEvent.Exploited (Exploited.MkExploited departed departed))
+        -- The bystander reading of the same event, `departed` on both sides for
+        -- the arm above's reason; the slot it binds is SelfExploits' too.
+        TriggerCondition.CreatureExploits {} -> one (GameEvent.Exploited (Exploited.MkExploited departed departed))
         -- CR 702.122e's own event, and the only one this condition admits, on
         -- `departed` for SelfTrains' reason above.
         TriggerCondition.SelfBecomesCrewed _ -> one (GameEvent.BecameCrewed (Crewing.MkCrewing departed (Set.singleton departed)))
@@ -2858,6 +2862,7 @@ representativeEvents cond =
         -- is what keeps this pin honest: an arm matching a scry here would claim
         -- the floor for the wrong keyword action.
         TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
+        TriggerCondition.PlayerProliferates _ -> one (GameEvent.Proliferated S.bob)
         TriggerCondition.PlayerRollsDice _ -> one (GameEvent.DiceRolled S.bob)
         -- CR 706.2's per-die event, carrying the number the condition states.
         TriggerCondition.PlayerRollsResult watched -> one (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = DieResult.result watched})
@@ -3093,6 +3098,7 @@ everyTriggerCondition =
     TriggerCondition.SelfManaAbilityResolves,
     TriggerCondition.SelfTrains,
     TriggerCondition.SelfExploits,
+    TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits (Filter.Type.And []) (Filter.Type.And [])),
     TriggerCondition.SelfBecomesCrewed TriggerFrequency.EveryTime,
     TriggerCondition.SelfCrewsVehicle,
     -- ALL THREE relations, on the PlayerAttacksWith rows' reasoning above: an
@@ -3123,6 +3129,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerScries PlayerRelation.Opponent,
     TriggerCondition.PlayerSurveils PlayerRelation.You,
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
+    TriggerCondition.PlayerProliferates PlayerRelation.You,
+    TriggerCondition.PlayerProliferates PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsDice PlayerRelation.You,
     TriggerCondition.PlayerRollsDice PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6},

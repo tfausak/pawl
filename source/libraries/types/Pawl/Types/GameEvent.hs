@@ -439,6 +439,9 @@ data GameEvent
     -- Milled above, a surveil binning a card without milling it -- a reader
     -- folding either would miss a surveil that binned nothing.
     Surveiled PlayerId.PlayerId
+  | -- | CR 701.34a: a player proliferated, once per proliferate and whether or
+    -- not anything was chosen.
+    Proliferated PlayerId.PlayerId
   | -- | CR 706.1: a player rolled a die -- the resolving ability's controller or
     -- the player rolling to visit, recorded by Pawl.Engine.Resolve.Effect's
     -- recordRoll after CR 706.2's result is settled. No result and no die kind: a reader wanting

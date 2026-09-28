@@ -505,10 +505,6 @@ data Keyword
     -- and returns to its owner's hand at the next end step.
     Dash (Cost.Cost Keyword)
   | -- | 702.110a: "When this creature enters, you may sacrifice a creature."
-    --
-    -- Not implemented: rule 702.110b's phrase asked of a creature that is not the
-    -- bearer -- Skull Skaab's "whenever a creature you control exploits a nontoken
-    -- creature" (#3845).
     Exploit
   | -- | 702.111b: a creature with menace can't be blocked except by two or more
     -- creatures.

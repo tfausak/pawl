@@ -2572,6 +2572,7 @@ zoneScopeSlotName scope = case scope of
   ZoneScope.Scoped _ -> Set.empty
   ZoneScope.InSlot name -> Set.singleton name
   ZoneScope.ControllerOfBound name -> Set.singleton name
+  ZoneScope.BoundPlayer _ -> Set.empty
 
 -- clauseTargetSlotNames' direct answer, closed under targetSlotSiblingNames
 -- until it stops growing -- a fixpoint over a finite declared set, so it always
