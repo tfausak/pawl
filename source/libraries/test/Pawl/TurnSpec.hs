@@ -25,6 +25,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Action as Action.Engine
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
@@ -1357,6 +1358,54 @@ gambitSpec s registry = Spec.describe s "AlchemistsGambit" $ do
     Spec.assertEqWith s "the extra turn's 3 cannot be prevented" (struck atExtra) (Just 3)
     Spec.assertEqWith s "alice loses at its end step" (GameState.phase afterExtra, Game.stillPlaying afterExtra) (Phase.Ending EndingStep.EndStep, [S.bob])
 
+-- CR 611.2a / 500.7 / 702.193a: Kang the Conqueror ({2}{U}{U}, "Power-up --
+-- {5}{U}{U}{U}: Put a +1\/+1 counter on Kang. Take an extra turn after this one.
+-- During that turn, power-up abilities can't be activated." -- Oracle verified on
+-- Scryfall 2026-09-28), beside Hulk, Gamma Goliath as the other power-up ability
+-- and a Prodigal Sorcerer as an ability the prohibition does not name.
+--
+-- Every reading asks one question off one helper: with eight fresh lands paying
+-- Hulk's {6}{R}{G} and alice holding priority in a main phase, is his power-up
+-- offered?
+kangSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+kangSpec s registry = Spec.describe s "KangTheConqueror" $ do
+  Spec.it s "CR 611.2a power-up abilities can't be activated during Kang's extra turn, and only then" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    kang <- S.printingOf s registry "Kang the Conqueror"
+    hulk <- S.printingOf s registry "Hulk, Gamma Goliath"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    -- Kang did not enter this turn, and Hulk's "{3} less" is the only
+    -- reduction: {5}{U}{U}{U} less {3} is five Islands.
+    let (kangId, g1) = S.addPermanent kang S.alice (S.landsInPlay island 5)
+        (hulkId, g2) = S.addPermanent hulk S.alice g1
+        (sorcererId, g3) = S.addPermanent sorcerer S.alice g2
+        stock g pid = List.foldl' (\g4 _ -> snd (S.addLibraryCard piker pid g4)) g [1 .. (10 :: Int)]
+        gs =
+          (stock (stock g3 S.alice) S.bob)
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice,
+              GameState.remaining = S.phasesAfter Phase.PrecombatMain
+            }
+        powerUp = case Face.activatedAbilities (S.combinedFace kang) of
+          ability : _ -> Just ability
+          [] -> Nothing
+        activated = maybe gs (snd . Engine.runGamePure S.identityAnswer gs . Activate.activateAbility S.alice kangId) powerUp
+        resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+        atExtra = runTurns 1 resolved
+        atBobsTurn = runTurns 1 atExtra
+        ready g = (S.landsFor mountain S.alice 1 (S.landsFor forest S.alice 7 g)) {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        offered oid g = length (filter (\a -> case a of Action.Activate o _ -> o == oid; _ -> False) (Action.Engine.legalActions S.alice (ready g)))
+    Spec.assertEqWith s "during the extra turn Hulk's power-up is not offered" (offered hulkId atExtra) 0
+    Spec.assertEqWith s "on the turn Kang resolved, the window has not begun" (offered hulkId resolved) 1
+    Spec.assertEqWith s "and on bob's turn after it, the window has closed" (offered hulkId atBobsTurn) 1
+    Spec.assertEqWith s "the Sorcerer's {T}, no power-up ability, is offered during the extra turn" (offered sorcererId atExtra) 1
+    Spec.assertEqWith s "the extra turn is alice's turn 2, and bob's is turn 3" (fmap (\g -> (GameState.turnNumber g, GameState.activePlayer g)) [atExtra, atBobsTurn]) [(2, S.alice), (3, S.bob)]
+    Spec.assertEqWith s "Kang resolved: a +1/+1 counter, and the stack is empty" (S.powerToughnessOf kangId resolved, GameState.stack resolved) (Just (5, 6), [])
+
 -- Alchemist's Gambit's printed {1}{R}{R} and its cleave {4}{U}{U}{R}.
 gambitCost, gambitCleave :: [ManaSymbol.ManaSymbol]
 gambitCost = [ManaSymbol.Generic 1, theRed, theRed]
@@ -1920,6 +1969,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   turnScopedSkipSpec s registry
   thatTurnSpec s registry
   gambitSpec s registry
+  kangSpec s registry
   nextUpkeepSpec s registry
   endTurnSpec s registry
   endCombatPhaseSpec s registry

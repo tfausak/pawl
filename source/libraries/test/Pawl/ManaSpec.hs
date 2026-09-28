@@ -4332,9 +4332,9 @@ lootAnswer p = case p of
 -- these three -- including the mana one, whose stamp Cost.manaActivationAdjustmentsGiven
 -- threads.
 --
--- Not implemented: rule 702.177a's rewriting, so the card states the rider it
--- rewrites into directly (ActivationRestriction.OnlyOnce) rather than having the
--- keyword add it (#3044).
+-- The card file states no rider: the keyword adds rule 702.177a's
+-- (Keyword.printedRiders), and Mana.manaRoutesOfGiven reads it through
+-- Keyword.restrictionsOf, so the refusal below is the keyword's.
 --
 -- ONE Forest and two Lightning Bolts. The Forest pays no {R}, so Loot's route is
 -- the only way to pay for either Bolt, and the Forest is what Loot's own {G}

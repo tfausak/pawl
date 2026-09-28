@@ -3421,6 +3421,8 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Boast -> []
   -- CR 702.57a is payload-free for the same reason: the ability is the CARD's.
   Keyword.Forecast -> []
+  -- CR 702.193a is payload-free for exhaust's reason: the ability is the CARD's.
+  Keyword.PowerUp -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
   -- TriggeredAbility, so any Filter in it is swept there rather than here.
@@ -4726,7 +4728,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- and whose components carry one of their own ("sacrifice a SWAMP").
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components _) -> f : concatMap costComponentFilters components
   PlayerEffect.CantCastSpells -> []
-  PlayerEffect.CantActivateAbilities -> []
+  PlayerEffect.CantActivateAbilities _ -> []
   PlayerEffect.CantCastMoreThan _ -> []
   -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
   -- the source entered, which is not a Filter and is not written by the card.

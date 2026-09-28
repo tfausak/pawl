@@ -11,6 +11,7 @@ import qualified Pawl.Codec.InZone as InZone
 import qualified Pawl.Codec.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Codec.ManaFilter as ManaFilter
 import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
@@ -33,7 +34,7 @@ codec =
    in Arm.tagged
         tagOf
         [ Arm.nullary "CantCastSpells" PlayerEffect.CantCastSpells,
-          Arm.nullary "CantActivateAbilities" PlayerEffect.CantActivateAbilities,
+          Arm.payload "CantActivateAbilities" (Common.maybe KeywordDesignator.codec) PlayerEffect.CantActivateAbilities (\x -> case x of PlayerEffect.CantActivateAbilities y -> Just y; _ -> Nothing),
           Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan (\x -> case x of PlayerEffect.CantCastMoreThan y -> Just y; _ -> Nothing),
           Arm.nullary "CantCastChosenName" PlayerEffect.CantCastChosenName,
           Arm.nullary "CantPlayLandChosenName" PlayerEffect.CantPlayLandChosenName,

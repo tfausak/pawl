@@ -87,7 +87,8 @@
                             "type": "UntilEndOfTurn"
                           },
                           "effect": {
-                            "type": "CantActivateAbilities"
+                            "type": "CantActivateAbilities",
+                            "value": null
                           },
                           "players": {
                             "type": "Named",

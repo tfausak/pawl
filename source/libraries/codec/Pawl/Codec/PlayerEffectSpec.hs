@@ -21,6 +21,8 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -406,13 +408,20 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.CastOnlyAtSorcerySpeed
       " {\"type\":\"CastOnlyAtSorcerySpeed\"} "
-  -- CR 602.5 / Sen Triplets' second clause.
+  -- CR 602.5 / Sen Triplets' second clause, which names every ability.
   Spec.it s "CantActivateAbilities" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      PlayerEffect.CantActivateAbilities
-      " {\"type\":\"CantActivateAbilities\"} "
+      (PlayerEffect.CantActivateAbilities Nothing)
+      " {\"type\":\"CantActivateAbilities\",\"value\":null} "
+  -- CR 702.193a / Kang the Conqueror's "power-up abilities can't be activated".
+  Spec.it s "CantActivateAbilities naming a keyword" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.CantActivateAbilities (Just (KeywordDesignator.OfNullary Keyword.PowerUp)))
+      " {\"type\":\"CantActivateAbilities\",\"value\":{\"type\":\"OfNullary\",\"value\":{\"type\":\"PowerUp\"}}} "
   -- CR 305.1 / City in a Bottle's land half, whose Filter names the land
   -- (Damping Engine's writes the empty And instead).
   Spec.it s "CantPlayLands" $
