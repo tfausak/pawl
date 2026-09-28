@@ -37,12 +37,7 @@ data CountedDiscard = MkCountedDiscard
     -- Filter.IsBound sees nothing. Pawl.ZoneChangeSpec's Psychic Miasma leg
     -- under Rest in Peace is what proves it.
     --
-    -- Absent for a discard nothing looks back at, which is every discard in
-    -- data/cards/ but Psychic Miasma. Pawl.Types.Discard's These arm has no such
-    -- field at all: nothing in data/cards/ names what an "all nonland cards"
-    -- discard moved, so a slot there would be a bind position no card exercises
-    -- (docs/design.md section 4). A card pairing Amnesia's sweep with a "this
-    -- way" rider is what would call for one.
+    -- Absent for a discard nothing looks back at.
     discarded :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

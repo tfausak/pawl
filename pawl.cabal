@@ -393,6 +393,8 @@ library codec
     Pawl.Codec.CreateSpec
     Pawl.Codec.CreatureBecomesBlockedByAtLeast
     Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
+    Pawl.Codec.CreatureExploits
+    Pawl.Codec.CreatureExploitsSpec
     Pawl.Codec.Crewing
     Pawl.Codec.CrewingSpec
     Pawl.Codec.CrewRestriction
@@ -1082,6 +1084,8 @@ library codec
     Pawl.Codec.TeamIdSpec
     Pawl.Codec.Teams
     Pawl.Codec.TeamsSpec
+    Pawl.Codec.TheseDiscard
+    Pawl.Codec.TheseDiscardSpec
     Pawl.Codec.Times
     Pawl.Codec.TimesSpec
     Pawl.Codec.Timestamp
@@ -1894,6 +1898,7 @@ library types
     Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.CreatureBecomesBlockedByAtLeast
+    Pawl.Types.CreatureExploits
     Pawl.Types.Crewing
     Pawl.Types.CrewRestriction
     Pawl.Types.Cycling
@@ -2285,6 +2290,7 @@ library types
     Pawl.Types.TargetSlot
     Pawl.Types.TeamId
     Pawl.Types.Teams
+    Pawl.Types.TheseDiscard
     Pawl.Types.Times
     Pawl.Types.Timestamp
     Pawl.Types.TimeTravelChoice

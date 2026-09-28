@@ -8432,6 +8432,7 @@ controllerTurnScoped cond = case cond of
   -- which is not CR 109.5's "you" -- a stolen creature trains on its thief's turn.
   TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfExploits -> False
+  TriggerCondition.CreatureExploits {} -> False
   -- Rule 702.122e names no turn either: a Vehicle may be crewed at instant speed
   -- on any player's turn, CR 702.122a's cost carrying no timing clause.
   TriggerCondition.SelfBecomesCrewed {} -> False

@@ -176,6 +176,7 @@ import qualified Pawl.Codec.CraftSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
 import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
+import qualified Pawl.Codec.CreatureExploitsSpec
 import qualified Pawl.Codec.CrewRestrictionSpec
 import qualified Pawl.Codec.CrewingSpec
 import qualified Pawl.Codec.CyclingSpec
@@ -514,6 +515,7 @@ import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TeamIdSpec
 import qualified Pawl.Codec.TeamsSpec
+import qualified Pawl.Codec.TheseDiscardSpec
 import qualified Pawl.Codec.TimesSpec
 import qualified Pawl.Codec.TimestampSpec
 import qualified Pawl.Codec.TokenPatternSpec
@@ -795,6 +797,7 @@ spec s registry = do
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s
   Pawl.Codec.AnyNumberDiscardSpec.spec s
+  Pawl.Codec.TheseDiscardSpec.spec s
   Pawl.Codec.AnyNumberMatchingSpec.spec s
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
   Pawl.Codec.AsCopySpec.spec s
@@ -919,6 +922,7 @@ spec s registry = do
   Pawl.Codec.ConjureSpec.spec s
   Pawl.Codec.CreateSpec.spec s
   Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec.spec s
+  Pawl.Codec.CreatureExploitsSpec.spec s
   Pawl.Codec.BackupSpec.spec s
   Pawl.Codec.CyclingSpec.spec s
   Pawl.Codec.DamageDirectionSpec.spec s

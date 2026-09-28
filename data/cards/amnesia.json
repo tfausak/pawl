@@ -60,20 +60,22 @@
                     "value": {
                       "type": "These",
                       "value": {
-                        "type": "EachCardInHand",
-                        "value": {
-                          "filter": {
-                            "type": "Not",
-                            "value": {
-                              "type": "HasCardType",
+                        "cards": {
+                          "type": "EachCardInHand",
+                          "value": {
+                            "filter": {
+                              "type": "Not",
                               "value": {
-                                "type": "Land"
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
                               }
+                            },
+                            "hands": {
+                              "type": "InSlot",
+                              "value": "target"
                             }
-                          },
-                          "hands": {
-                            "type": "InSlot",
-                            "value": "target"
                           }
                         }
                       }

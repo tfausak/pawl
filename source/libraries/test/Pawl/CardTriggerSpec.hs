@@ -56,6 +56,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -4048,6 +4049,160 @@ profanerSpec s registry =
           Spec.assertBool s (S.onBattlefield giantId after) "and the Hill Giant alice did not choose stayed"
           Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 702.110a the Goblin Piker she did choose was sacrificed"
 
+-- CR 702.110b read by a bystander: TriggerCondition.CreatureExploits puts the
+-- exploiter and the exploited creature to a Filter each, both read off last
+-- known information since either may be the creature sacrificed.
+--
+-- Skull Skaab {U}{B} Creature -- Zombie 2/2, "Exploit / Whenever a creature you
+-- control exploits a nontoken creature, create a 2/2 black Zombie creature
+-- token"; Colonel Autumn {1}{W}{B} Legendary Creature -- Human Soldier 2/3,
+-- "Lifelink / Exploit / Other legendary creatures you control have exploit. /
+-- Whenever a creature you control exploits a creature, put a +1/+1 counter on
+-- each creature you control"; Henry Wu, InGen Geneticist {B}{G}{U} Legendary
+-- Creature -- Human Scientist 1/4, "Henry Wu and other Human creatures you
+-- control have exploit. / Whenever a creature you control exploits a non-Human
+-- creature, draw a card. If the exploited creature had power 3 or greater,
+-- create a Treasure token" (all checked against api.scryfall.com, 2026-09-28).
+--
+-- THREE SEATS throughout, the fixture's convention, and every negative is the
+-- paired board of a positive, differing in the one choice or seat named.
+creatureExploitsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+creatureExploitsSpec s registry =
+  let -- Takes rule 702.110a's offer and sacrifices the first offered creature the
+      -- predicate admits, and aims any Qarsi Sadist trigger at its first legal
+      -- player.
+      exploiting :: (ObjectId.ObjectId -> Bool) -> Prompt.Prompt r -> r
+      exploiting wanted p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChoosePermanent _ _ _ offered ->
+          Maybe.fromMaybe (NonEmpty.head offered) (List.find wanted (NonEmpty.toList offered))
+        Prompt.ChooseTargets _ _ _ slots -> fmap (\(_, legal) -> Set.take 1 legal) slots
+        _ -> S.identityAnswer p
+      -- Resolves the spell and then every trigger it leads to, settling between
+      -- each so CR 603.3 puts the next one on. Bounded, so a stack that never
+      -- empties fails the assertions rather than hanging.
+      drain :: Int -> Game.Type.Game ()
+      drain n = Monad.when (n > 0) $ do
+        stack <- State.gets GameState.stack
+        Monad.unless (null stack) (Stack.resolveTop >> Engine.settleForPriority >> drain (n - 1))
+      played :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      played answer staged = S.runPure answer staged (drain 8)
+      named text = CardName.MkCardName (Text.pack text)
+      zombies = S.countOnBattlefieldByName (named "Zombie Token") S.alice
+      -- Skull Skaab on the stack over a Hill Giant and a Goblin Piker TOKEN of
+      -- alice's: either may be exploited, and so may the Skaab itself.
+      skaabBoard = do
+        skaab <- S.printingOf s registry "Skull Skaab"
+        giant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let base = Setup.emptyGame S.threePlayers
+            (giantId, withGiant) = S.addPermanent giant S.alice base
+            (tokenId, withToken) = S.addToken (Printing.card piker) S.alice withGiant
+            (_, staged) = S.spellOnStack skaab S.alice withToken
+        pure (giantId, tokenId, staged)
+      -- Skull Skaab already on alice's battlefield, and a Qarsi Sadist on the
+      -- stack over a Hill Giant, both of `caster`'s.
+      bystanderBoard caster = do
+        skaab <- S.printingOf s registry "Skull Skaab"
+        sadist <- S.printingOf s registry "Qarsi Sadist"
+        giant <- S.printingOf s registry "Hill Giant"
+        let base = Setup.emptyGame S.threePlayers
+            (skaabId, withSkaab) = S.addPermanent skaab S.alice base
+            (giantId, withGiant) = S.addPermanent giant caster withSkaab
+            (_, staged) = S.spellOnStack sadist caster withGiant
+        pure (skaabId, giantId, staged)
+      -- Henry Wu on alice's battlefield over a Hill Giant (3 power), a Goblin
+      -- Piker (2) and a Cabal Evangel (a Human), with a second Cabal Evangel on
+      -- the stack that his first ability gives exploit. Her library is stocked
+      -- for the draw.
+      henryBoard = do
+        henry <- S.printingOf s registry "Henry Wu, InGen Geneticist"
+        giant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        evangel <- S.printingOf s registry "Cabal Evangel"
+        let base = Setup.emptyGame S.threePlayers
+            (_, withHenry) = S.addPermanent henry S.alice base
+            (giantId, withGiant) = S.addPermanent giant S.alice withHenry
+            (pikerId, withPiker) = S.addPermanent piker S.alice withGiant
+            (humanId, withHuman) = S.addPermanent evangel S.alice withPiker
+            (_, stocked) = S.addLibraryCard piker S.alice (snd (S.addLibraryCard piker S.alice withHuman))
+            (_, staged) = S.spellOnStack evangel S.alice stocked
+        pure (giantId, pikerId, humanId, staged)
+      treasures = S.countOnBattlefieldByName (named "Treasure Token") S.alice
+   in Spec.describe s "CreatureExploits" $ do
+        Spec.it s "CR 702.110b Skull Skaab exploiting a nontoken creature makes a Zombie" $ do
+          (giantId, tokenId, staged) <- skaabBoard
+          let after = played (exploiting (== giantId)) staged
+          Spec.assertEqWith s "CR 702.110b alice got one Zombie" (zombies after) 1
+          Spec.assertBool s (not (S.onBattlefield giantId after)) "CR 702.110a the Hill Giant was the creature sacrificed"
+          Spec.assertBool s (S.onBattlefield tokenId after) "and the token stayed"
+        -- The paired board, differing in the victim alone: a token fails "a
+        -- nontoken creature", read off last known information since CR 111.7's
+        -- token has ceased to exist by the time the trigger is asked.
+        Spec.it s "CR 702.110b Skull Skaab exploiting a token makes nothing" $ do
+          (giantId, tokenId, staged) <- skaabBoard
+          let after = played (exploiting (== tokenId)) staged
+          Spec.assertEqWith s "CR 111.1 no Zombie for a token" (zombies after) 0
+          Spec.assertBool s (not (S.onBattlefield tokenId after)) "CR 702.110a the token was the creature sacrificed"
+          Spec.assertBool s (S.onBattlefield giantId after) "and the Hill Giant stayed"
+        -- The Colonel Autumn ruling: a creature that exploits ITSELF still
+        -- triggers, which is CR 603.10a's look-back at the sacrifice.
+        Spec.it s "CR 702.110b Skull Skaab exploiting itself still triggers" $ do
+          (giantId, tokenId, staged) <- skaabBoard
+          let after = played (exploiting (\oid -> oid /= giantId && oid /= tokenId)) staged
+          Spec.assertEqWith s "CR 603.10a alice got one Zombie off the Skaab's own sacrifice" (zombies after) 1
+          Spec.assertEqWith s "CR 702.110a the Skaab itself was sacrificed" (S.countOnBattlefieldByName (named "Skull Skaab") S.alice after) 0
+          Spec.assertBool s (S.onBattlefield giantId after) "and the Hill Giant stayed"
+        Spec.it s "CR 702.110b another creature alice controls exploiting triggers the Skaab" $ do
+          (skaabId, giantId, staged) <- bystanderBoard S.alice
+          let after = played (exploiting (== giantId)) staged
+          Spec.assertEqWith s "CR 702.110b alice got one Zombie off the Sadist's exploit" (zombies after) 1
+          Spec.assertBool s (S.onBattlefield skaabId after) "and the Skaab watched from the battlefield"
+          Spec.assertBool s (not (S.onBattlefield giantId after)) "CR 702.110a the Hill Giant was the creature sacrificed"
+        -- The paired board, differing in the seat that casts the Sadist and
+        -- controls its victim: bob's exploiter is not "a creature you control".
+        Spec.it s "CR 702.110b an opponent's creature exploiting does not trigger the Skaab" $ do
+          (skaabId, giantId, staged) <- bystanderBoard S.bob
+          let after = played (exploiting (== giantId)) staged
+          Spec.assertEqWith s "CR 109.5 alice got no Zombie off bob's exploit" (zombies after) 0
+          Spec.assertBool s (S.onBattlefield skaabId after) "and the Skaab was there to see it"
+          Spec.assertBool s (not (S.onBattlefield giantId after)) "CR 702.110a bob's Hill Giant really was exploited"
+        -- Henry Wu grants the exploit, and the exploited creature's power is read
+        -- off last known information by the Treasure clause.
+        Spec.it s "CR 702.110b Henry Wu draws and makes a Treasure off a power-3 non-Human" $ do
+          (giantId, _, _, staged) <- henryBoard
+          let after = played (exploiting (== giantId)) staged
+          Spec.assertEqWith s "CR 608.2h the Hill Giant had power 3, so a Treasure" (treasures after) 1
+          Spec.assertEqWith s "CR 702.110b and alice drew one card" (S.handSize S.alice after) 1
+          Spec.assertBool s (not (S.onBattlefield giantId after)) "CR 702.110a the Hill Giant was the creature sacrificed"
+        Spec.it s "CR 702.110b Henry Wu draws but makes no Treasure off a power-2 non-Human" $ do
+          (_, pikerId, _, staged) <- henryBoard
+          let after = played (exploiting (== pikerId)) staged
+          Spec.assertEqWith s "CR 608.2h the Goblin Piker had power 2, so no Treasure" (treasures after) 0
+          Spec.assertEqWith s "CR 702.110b but alice drew one card" (S.handSize S.alice after) 1
+          Spec.assertBool s (not (S.onBattlefield pikerId after)) "CR 702.110a the Goblin Piker was the creature sacrificed"
+        Spec.it s "CR 702.110b Henry Wu ignores an exploited Human" $ do
+          (_, _, humanId, staged) <- henryBoard
+          let after = played (exploiting (== humanId)) staged
+          Spec.assertEqWith s "CR 205.3m exploiting a Human draws nothing" (S.handSize S.alice after) 0
+          Spec.assertBool s (not (S.onBattlefield humanId after)) "CR 702.110a the Cabal Evangel was the creature sacrificed"
+        -- Colonel Autumn's grant reaches a legendary creature entering, and her
+        -- trigger reads "a creature" with no further narrowing.
+        Spec.it s "CR 702.110b Colonel Autumn counters every creature alice controls" $ do
+          autumn <- S.printingOf s registry "Colonel Autumn"
+          jedit <- S.printingOf s registry "Jedit Ojanen"
+          giant <- S.printingOf s registry "Hill Giant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let base = Setup.emptyGame S.threePlayers
+              (autumnId, withAutumn) = S.addPermanent autumn S.alice base
+              (giantId, withGiant) = S.addPermanent giant S.alice withAutumn
+              (pikerId, withPiker) = S.addPermanent piker S.alice withGiant
+              (_, staged) = S.spellOnStack jedit S.alice withPiker
+              after = played (exploiting (== giantId)) staged
+          Spec.assertEqWith s "CR 702.110b the Colonel got a +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne autumnId after) 1
+          Spec.assertEqWith s "and so did the Goblin Piker" (S.counterOf CounterKind.PlusOnePlusOne pikerId after) 1
+          Spec.assertBool s (not (S.onBattlefield giantId after)) "CR 702.110a Jedit Ojanen's granted exploit sacrificed the Hill Giant"
+
 -- Fire Lord Zuko {R}{W}{B} Legendary Creature -- Ally Human Noble 2/4,
 -- "Firebending X, where X is Fire Lord Zuko's power. / Whenever you cast a spell
 -- from exile and whenever a permanent you control enters from exile, put a
@@ -4112,6 +4267,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   fireLordZukoSpec s registry
   profanerSpec s registry
+  creatureExploitsSpec s registry
   ferventChargeSpec s registry
   conjurersMantleSpec s registry
   anafenzaAttackSpec s registry
