@@ -5366,6 +5366,35 @@ cleansingSpec s registry =
           Spec.assertEqWith s "CR 701.21a the Piker bob paid for stands, and the other two were sacrificed" standing [kept]
           Spec.assertEqWith s "CR 107.3a bob paid X = 2 life, once" (lives after) [Just 20, Just 18, Just 20]
           Spec.assertEqWith s "CR 101.4 alice answered for her Piker, then bob for each of his, and carol controls none" (fmap (\(who, creature, _) -> (who, creature)) asked) [(S.alice, Just hers), (S.bob, Just kept), (S.bob, Just lost)]
+        -- CR 101.4's "then the actions happen simultaneously", and Killing
+        -- Wave's ruling that each player "pays life and sacrifices creatures at
+        -- the same time": bob's three payments are ONE loss of 3 life. carol's
+        -- Exquisite Blood sees one opponent losing life, so her Ajani's
+        -- Pridemate sees one gain and gets one counter -- three separate
+        -- payments would make it three.
+        Spec.it s "CR 101.4 Killing Wave: a payer's agreed payments are one life loss" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          blood <- S.printingOf s registry "Exquisite Blood"
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          wave <- S.printingOf s registry "Killing Wave"
+          let (_, g1) = S.addPermanent piker S.bob (S.landsFor swamp S.alice 2 S.threePlayerGame)
+              (_, g2) = S.addPermanent piker S.bob g1
+              (_, g3) = S.addPermanent piker S.bob g2
+              (_, g4) = S.addPermanent blood S.carol g3
+              (mateId, g5) = S.addPermanent pridemate S.carol g4
+              (gs, waveId) = S.handOne wave g5
+              xOne :: Prompt.Prompt r -> r
+              xOne p = case p of
+                Prompt.ChooseX {} -> 1
+                _ -> S.identityAnswer p
+              onStack = S.runPure xOne gs (S.cast S.alice waveId)
+              policy player _ _ = if player == S.alice then PaymentDecision.Declines else PaymentDecision.Pays
+              ((_, resolved), _) = resolveWith policy onStack
+              settled = S.runPure S.identityAnswer resolved Engine.priorityLoop
+          Spec.assertEqWith s "CR 603.2 one life-loss event, one Exquisite Blood gain, one Pridemate counter" (S.counterOf CounterKind.PlusOnePlusOne mateId settled) 1
+          Spec.assertEqWith s "bob paid 3, carol paid 1 and gained 3" (lives settled) [Just 20, Just 17, Just 22]
+          Spec.assertEqWith s "every creature was paid for: two Swamps, three Pikers, the Blood and the Pridemate stand" (length (permanentsOf settled)) 7
         -- Cut the Tethers: the payer is each Spirit's OWNER, paying mana, and
         -- the board is re-read per offer -- bob's {3} for one Spirit leaves him
         -- nothing for the other, so CR 118.3 asks him nothing about it.
