@@ -17,6 +17,7 @@
 module Pawl.ManaSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -2667,6 +2668,42 @@ transmograntAltarSpec s registry = Spec.describe s "Transmogrant Altar" $ do
     Spec.assertBool s (casts crucible) "and the same board still pays a plain {3}"
     Spec.assertBool s (not (casts statue)) "CR 118.3 but not a {4}: every link charges its own cost, so three mana is the ceiling"
 
+-- The board Pawl.Benchmark's payable group times: every shape that keeps a source
+-- plural in payableResolutions' search at once. Treasonous Ogre pays life,
+-- Springleaf Drum's tap contends with every Llanowar Elves, and Transmogrant
+-- Altar and Chromatic Star eat mana. Each assertion sits on a boundary of the
+-- relaxation that refuses a cost before the search, so a relaxation tighter
+-- than the boards reddens the payable half of a pair.
+pluralBoardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+pluralBoardSpec s registry = Spec.describe s "plural sources" $ do
+  -- CR 119.4 holds the two Ogres to one life total: six activations between
+  -- them at 20 life, where each alone could take six.
+  Spec.it s "CR 119.4 two Treasonous Ogres share one life total" $ do
+    ogre <- S.printingOf s registry "Treasonous Ogre"
+    let (_, g1) = S.addPermanent ogre S.alice (Setup.emptyGame S.bothPlayers)
+        (_, gs) = S.addPermanent ogre S.alice g1
+        reds n = ManaCost.MkManaCost (replicate n (ManaSymbol.OfType (ManaType.Colored Color.Red)))
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (reds 6) gs) "eighteen life buys {R}{R}{R}{R}{R}{R}"
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice (reds 7) gs)) "and a seventh would cost 21"
+
+  -- Six red from the Ogres, four green from the Elves, one from the Drum tapping
+  -- an Ogre, and the Altar's {C}{C}{C} net of its {B} (CR 602.2b); the Star's
+  -- {1} buys back exactly the one mana it makes. The Drum and the Star are the
+  -- only blue.
+  Spec.it s "CR 118.3 the plural board pays thirteen and two blue, and no more" $ do
+    ogre <- S.printingOf s registry "Treasonous Ogre"
+    drum <- S.printingOf s registry "Springleaf Drum"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    altar <- S.printingOf s registry "Transmogrant Altar"
+    star <- S.printingOf s registry "Chromatic Star"
+    let gs = Foldable.foldl' (\board printing -> snd (S.addPermanent printing S.alice board)) (Setup.emptyGame S.bothPlayers) ([ogre, ogre, drum, altar, star] <> replicate 4 elves)
+        pays = (\cost -> Mana.canPay Cost.manaActivations S.alice cost gs) . ManaCost.MkManaCost
+        blues n = replicate n (ManaSymbol.OfType (ManaType.Colored Color.Blue))
+    Spec.assertBool s (pays [ManaSymbol.Generic 13]) "CR 602.2b a {13}, every source at its best"
+    Spec.assertBool s (not (pays [ManaSymbol.Generic 14])) "CR 118.3 but not a {14}"
+    Spec.assertBool s (pays (blues 2)) "CR 106.1a the Drum and the Star make {U}{U}"
+    Spec.assertBool s (not (pays (blues 3))) "CR 118.3 and nothing makes a third {U}"
+
 -- alice, active, in her precombat main phase: one Transmogrant Altar, one Goblin
 -- Piker for the sacrifice to take, and optionally a Swamp to pay the {B} and a
 -- pair of spells in her hand. Returns the Altar and whichever spells were dealt.
@@ -3963,6 +4000,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   heritageDruidSpec s registry
   phyrexianAltarSpec s registry
   transmograntAltarSpec s registry
+  pluralBoardSpec s registry
   grinningIgnusSpec s registry
   mysticGateSpec s registry
   skyshroudElfSpec s registry
