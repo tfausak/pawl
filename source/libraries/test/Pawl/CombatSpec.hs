@@ -57,6 +57,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -74,6 +75,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -1278,6 +1280,65 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (gs, a : _, [b, f1, f2]) ->
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (animate f2 (animate f1 gs)))) "CR 205.3m three creatures sharing only Forest: illegal"
       _ -> Spec.assertFailure s "fixture should give bob a Dryad Arbor and two Forests"
+  -- CR 601.2c / 205.3m on an ACTIVATED ability (CR 602.2b): Secret Tunnel's
+  -- "{4}, {T}: Two target creatures you control that share a creature type can't
+  -- be blocked this turn". alice has two Hill Giants and a Goblin Piker, four
+  -- Mountains, a Frogmite and the Tunnel; bob a Hill Giant to block with. The
+  -- cases name different pairs, or change a target between activation and
+  -- resolution, on the same board.
+  Spec.it s "CR 205.3m Secret Tunnel's two targets must share a creature type" $ do
+    tunnel <- S.printingOf s registry "Secret Tunnel"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    frogmite <- S.printingOf s registry "Frogmite"
+    mountain <- S.printingOf s registry "Mountain"
+    case (S.combatBoardOf [giant, giant, piker, frogmite] [giant], Face.activatedAbilities (S.combinedFace tunnel)) of
+      ((gs0, [giantA, giantB, pikerId, frogmiteId], [blocker]), [_, ability]) -> do
+        let (tunnelId, gs1) = S.addPermanent tunnel S.alice (S.landsFor mountain S.alice 4 gs0)
+            ready = gs1 {GameState.priority = Just S.alice}
+            aim :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+            aim firstId secondId p = case p of
+              Prompt.ChooseTargets _ _ _ asked ->
+                Map.mapWithKey
+                  ( \slot (_, offered) ->
+                      let wanted = if slot == SlotName.MkSlotName (Text.pack "first") then firstId else secondId
+                       in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+                  )
+                  asked
+              _ -> S.identityAnswer p
+            -- Turn to Frog's layer-4 half (CR 205.1b / 613.1d), stored the way
+            -- withFear stores its grant: the creature is a Frog and nothing else.
+            frog oid gs =
+              let (ts, gs') = Game.freshTimestamp gs
+                  eff = ContinuousEffect.MkContinuousEffect oid ts Expiry.AtCleanup (Modification.SetCreatureSubtype Subtype.Frog) (Affected.TheseObjects (Set.singleton oid))
+               in gs' {GameState.continuousEffects = eff : GameState.continuousEffects gs'}
+            activatedOn board a b = S.runPure (aim a b) board (Activate.activateAbility S.alice tunnelId ability)
+            activated = activatedOn ready
+            -- `before` changes the board before activation, `between` while the
+            -- ability waits on the stack (CR 608.2b re-checks at resolution).
+            declaredWith before between a b =
+              let resolved = S.runPure S.identityAnswer (between (activatedOn (before ready) a b)) Stack.resolveTop
+               in snd (Engine.runGamePure S.aggressiveAnswer resolved (Combat.declareAttackers S.manaPerformer S.alice))
+            declared = declaredWith id id
+            blockable board attacker = Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton attacker)) board
+            giants = declared giantA giantB
+            mixed = declared giantA pikerId
+            -- The FIRST target stops sharing a type: both targets are illegal
+            -- (the pair's condition binds each), so neither is affected.
+            frogged = declaredWith id (frog giantA) giantA giantB
+            -- A Frogged Giant and the Frogmite share Frog; the Giant then dies,
+            -- and the Frogmite still shares a type with the Giant as it last
+            -- existed (CR 608.2h), though the Giant CARD is no Frog.
+            departed = declaredWith (frog giantA) (\g -> S.runPure S.identityAnswer g (Event.changeZone giantA Zone.Graveyard)) giantA frogmiteId
+        -- THE GAMEPLAY-LEVEL ASSERTIONS first.
+        Spec.assertEqWith s "two Giants named: neither can be blocked, the Goblin can" (fmap (blockable giants) [giantA, giantB, pikerId]) [False, False, True]
+        Spec.assertEqWith s "a Giant and a Goblin named: every attacker can be blocked" (fmap (blockable mixed) [giantA, giantB, pikerId]) [True, True, True]
+        Spec.assertEqWith s "CR 608.2b the first Giant turned Frog in response: neither is unblockable" (fmap (blockable frogged) [giantA, giantB]) [True, True]
+        Spec.assertBool s (not (blockable departed frogmiteId)) "CR 608.2h the Frogmite shares Frog with the Giant as it last existed: unblockable"
+        -- CR 602.2b / 601.2e's reversal behind the second: nothing was paid.
+        Spec.assertEqWith s "the refused activation left the stack empty" (length (GameState.stack (activated giantA pikerId))) 0
+        Spec.assertEqWith s "and tapped nothing" (S.tappedCount S.alice (activated giantA pikerId)) 0
+      _ -> Spec.assertFailure s "fixture should give alice two Giants, a Goblin and a Frogmite, bob a Giant, and the Tunnel two abilities"
   -- CR 702.16f: "Attacking creatures with protection can't be blocked by
   -- creatures that have the stated quality." Rule 702.16 stated as CR 509.1b's
   -- pairwise restriction, and the one clause of protection that is already a
