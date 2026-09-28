@@ -2655,9 +2655,9 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- is the chooser's, and two gathers reach the Game monad to ask --
   -- permanentsGathered, which Effect.Transform, Effect.Convert, Effect.AttachAll
   -- and Effect.Untap share, and the Effect.MoveToZone gather. Under any other
-  -- opcode this empty answer is an
-  -- inert card-data error, which Pawl.CardSpec's inertChoosers rejects at load
-  -- time -- ChosenCardInGraveyard's note below is the shape.
+  -- opcode this empty answer is an inert card-data error, which
+  -- Pawl.EffectLintSpec's inertChoosers rejects at load time --
+  -- ChosenCardInGraveyard's note below is the shape.
   ObjectRef.AnyNumberMatching _ -> []
   -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
   -- sweep answers nothing for it. The Effect.MoveToZone gather is the one arm
