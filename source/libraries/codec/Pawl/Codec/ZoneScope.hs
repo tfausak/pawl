@@ -1,5 +1,6 @@
 module Pawl.Codec.ZoneScope where
 
+import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -17,7 +18,8 @@ codec =
     tagOf
     [ Arm.payload "Scoped" PlayerScope.codec ZoneScope.Scoped (\x -> case x of ZoneScope.Scoped y -> Just y; _ -> Nothing),
       Arm.payload "InSlot" SlotName.codec ZoneScope.InSlot (\x -> case x of ZoneScope.InSlot y -> Just y; _ -> Nothing),
-      Arm.payload "ControllerOfBound" SlotName.codec ZoneScope.ControllerOfBound (\x -> case x of ZoneScope.ControllerOfBound y -> Just y; _ -> Nothing)
+      Arm.payload "ControllerOfBound" SlotName.codec ZoneScope.ControllerOfBound (\x -> case x of ZoneScope.ControllerOfBound y -> Just y; _ -> Nothing),
+      Arm.payload "BoundPlayer" PlayerId.codec ZoneScope.BoundPlayer (\x -> case x of ZoneScope.BoundPlayer y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: ZoneScope.ZoneScope -> String
@@ -25,3 +27,4 @@ tagOf x = case x of
   ZoneScope.Scoped {} -> "Scoped"
   ZoneScope.InSlot {} -> "InSlot"
   ZoneScope.ControllerOfBound {} -> "ControllerOfBound"
+  ZoneScope.BoundPlayer {} -> "BoundPlayer"

@@ -78,6 +78,7 @@ import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.CreatureExploits as CreatureExploits
 import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.DamagePart as DamagePart
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -1854,6 +1855,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfManaAbilityResolves -> condition
   TriggerCondition.SelfTrains -> condition
   TriggerCondition.SelfExploits -> condition
+  TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits exploiter exploited) -> TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits (Filter.rewrite pairs exploiter) (Filter.rewrite pairs exploited))
   TriggerCondition.SelfBecomesCrewed {} -> condition
   TriggerCondition.SelfCrewsVehicle -> condition
   TriggerCondition.PermanentSacrificed payload -> TriggerCondition.PermanentSacrificed payload {PermanentSacrificed.filter = Filter.rewrite pairs (PermanentSacrificed.filter payload)}

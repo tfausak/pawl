@@ -1890,6 +1890,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           ZoneScope.Scoped PlayerScope.ControllingMostPermanents -> True
           ZoneScope.InSlot _ -> True
           ZoneScope.ControllerOfBound _ -> True
+          ZoneScope.BoundPlayer _ -> True
         namesOneSeat player = case player of
           PlayerRef.Relative PlayerRelation.You -> True
           PlayerRef.Relative PlayerRelation.Opponent -> False

@@ -1,5 +1,6 @@
 module Pawl.Types.ZoneScope where
 
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -7,7 +8,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- which graveyards Pawl.Types.Pool.CardsInGraveyard draws from and
 -- Pawl.Types.ObjectRef.EachCardInGraveyard sweeps, which hands
 -- Pawl.Types.ObjectRef.EachCardInHand sweeps, and which graveyards
--- Pawl.Types.ObjectRef.ChosenCardInGraveyard offers candidates out of. Neither
+-- Pawl.Types.ObjectRef.ChosenCardInGraveyard offers candidates out of. No
 -- arm names a zone, which is what lets one type answer for all of them.
 --
 -- Its own type rather than Pawl.Types.PlayerScope, which the pool used to carry
@@ -43,4 +44,8 @@ data ZoneScope
     -- no controller at all; Pawl.Types.PlayerRef.ControllerOfBound is the same
     -- read one type over.
     ControllerOfBound SlotName.SlotName
+  | -- | CR 601.2c: InSlot with its player resolved -- one copy of a "for each
+    -- opponent" slot's "that player's graveyard" (Pawl.Engine.Target.announcedSlots).
+    -- Runtime-only, Pawl.Types.Filter.ControlledByPlayer's posture.
+    BoundPlayer PlayerId.PlayerId
   deriving (Eq, Ord, Show)

@@ -1,0 +1,148 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Exploit"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Skull Skaab",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "CreatureExploits",
+            "value": {
+              "exploited": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "Not",
+                    "value": {
+                      "type": "IsToken"
+                    }
+                  }
+                ]
+              },
+              "exploiter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "colorIndicator": [
+                                  {
+                                    "type": "Black"
+                                  }
+                                ],
+                                "name": "Zombie Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Zombie"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Zombie"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
