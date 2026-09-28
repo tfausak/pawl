@@ -18,7 +18,6 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -1521,7 +1520,7 @@ restrictionMet pid gs restriction = case restriction of
   -- (CR 307.5).
   CastingRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
-      && Event.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
+      && Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
   -- CR 508.3b's question, and it lives in Pawl.Engine.Turn because the ability
   -- side's clause of the same name asks exactly it: one question about the combat
   -- record, two gates that differ in what ELSE they may read (CR 307.5).

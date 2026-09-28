@@ -7,6 +7,7 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Codec.ManaCost as ManaCost
+import qualified Pawl.Codec.TurnScope as TurnScope
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -26,12 +27,16 @@ import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 -- `whichTargets` is defaulted the same way and for the same reason: Nothing is a
 -- sentence that names no target, which is every reducer in the pool but Dwarven
 -- Mauler's, so no other card file writes the key.
+--
+-- `onlyFirst` is defaulted the same way: Nothing is every matching activation,
+-- so only Professor Hojo's card file writes the key.
 codec :: Codec.Codec ReduceActivationCost.ReduceActivationCost
 codec = Fields.object $ do
   whichAbilities <- Fields.required "whichAbilities" (Filter.codec Keyword.codec) ReduceActivationCost.whichAbilities
   grantedBy <- Fields.defaulted "grantedBy" Nothing (Common.maybe KeywordDesignator.codec) ReduceActivationCost.grantedBy
   whichKind <- Fields.defaulted "whichKind" Nothing (Common.maybe AbilityKind.codec) ReduceActivationCost.whichKind
   whichTargets <- Fields.defaulted "whichTargets" Nothing (Common.maybe (Filter.codec Keyword.codec)) ReduceActivationCost.whichTargets
+  onlyFirst <- Fields.defaulted "onlyFirst" Nothing (Common.maybe TurnScope.codec) ReduceActivationCost.onlyFirst
   reduction <- Fields.required "reduction" ManaCost.codec ReduceActivationCost.reduction
   floor_ <- Fields.required "floor" Common.natural ReduceActivationCost.floor
   pure
@@ -40,6 +45,7 @@ codec = Fields.object $ do
         ReduceActivationCost.grantedBy = grantedBy,
         ReduceActivationCost.whichKind = whichKind,
         ReduceActivationCost.whichTargets = whichTargets,
+        ReduceActivationCost.onlyFirst = onlyFirst,
         ReduceActivationCost.reduction = reduction,
         ReduceActivationCost.floor = floor_
       }
