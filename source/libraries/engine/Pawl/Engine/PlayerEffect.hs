@@ -203,17 +203,22 @@ playersInScope perspective gs scope =
 -- Pawl.Types.PlayerEffect; the one accessor both share is
 -- Projection.copiableSnapshotOf, which is also where CR 709.5's copied halves
 -- are forked out for every reader at once. Read off Projection.textBoxHolderOf
--- first, for CR 612.5, as staticAbilitiesOf is.
+-- first, for CR 612.5, as staticAbilitiesOf is. CR 612.6's full text is the
+-- other way the list changes hands, read off Projection.fullTextOf as
+-- Projection.ruleAbilitiesOf reads it; Pawl.ProjectionSpec's "CR 612.6 the
+-- Shapeshifter as Gnat Miser cuts bob's maximum hand size" proves it.
 playerAbilitiesOf :: ObjectId -> GameState -> [PlayerStaticAbility.PlayerStaticAbility]
 playerAbilitiesOf carrier gs =
   let oid = Projection.textBoxHolderOf carrier gs
-   in case Projection.carriedSnapshotOf carrier oid gs of
-        Just snapshot -> PC.playerAbilities snapshot
-        -- CR 709.5: a copy of a Room reads the copied card's halves against its OWN
-        -- designations, which Game.faceOf already does, so it lands here --
-        -- Projection.copiableSnapshotOf answering Nothing is what puts it here, the
-        -- fork being made once for all six readers rather than per reader.
-        Nothing -> foldMap Face.playerAbilities (Game.faceOf oid gs)
+   in case Projection.fullTextOf carrier gs of
+        Just pc -> PC.playerAbilities pc
+        Nothing -> case Projection.carriedSnapshotOf carrier oid gs of
+          Just snapshot -> PC.playerAbilities snapshot
+          -- CR 709.5: a copy of a Room reads the copied card's halves against its OWN
+          -- designations, which Game.faceOf already does, so it lands here --
+          -- Projection.copiableSnapshotOf answering Nothing is what puts it here, the
+          -- fork being made once for all six readers rather than per reader.
+          Nothing -> foldMap Face.playerAbilities (Game.faceOf oid gs)
 
 -- CR 613.7a: the PRINTED carrier's rows -- printed as opposed to CR 611.2c's
 -- stored one, the list itself being the COPIABLE one above -- one per player

@@ -564,6 +564,8 @@ gathered gs =
         any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Projection.staticAbilitiesOf oid gs)
           || Projection.anyCopiableKeyword Keyword.mintsCombatRestriction oid gs
           || any countedKeywordMints (Map.keys (Projection.countersOf oid gs))
+          -- CR 612.6: a keyword the full text brought is on no copiable value.
+          || Maybe.isJust (Projection.fullTextOf oid gs)
       -- CR 122.1b: the keyword a keyword counter grants, asked of the counters
       -- themselves rather than of the projection that turns them into layer-6
       -- grants -- this is the SHORT-CIRCUIT, and projecting the permanent is the
