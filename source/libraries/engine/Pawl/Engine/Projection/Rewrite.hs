@@ -111,6 +111,7 @@ import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -968,6 +969,8 @@ rewriteEffect pairs effect = case effect of
         }
   Effect.ForEach (ForEach.MkForEach ref membership slot body individually) ->
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually)
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) ->
+    Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
 
 -- CR 612.2 over one word whose family a card's text names rather than a

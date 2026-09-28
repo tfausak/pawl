@@ -263,6 +263,7 @@ import qualified Pawl.Codec.FightSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
+import qualified Pawl.Codec.ForEachNumberSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.ForbidActivationSpec
 import qualified Pawl.Codec.ForbidAttackSpec
@@ -997,6 +998,7 @@ spec s registry = do
   Pawl.Codec.FlipCoinSpec.spec s
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
+  Pawl.Codec.ForEachNumberSpec.spec s
   Pawl.Codec.ForetellCostSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s
   Pawl.Codec.ForbidActivationSpec.spec s

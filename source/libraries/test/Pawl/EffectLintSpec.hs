@@ -100,6 +100,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -393,6 +394,7 @@ ownQuantities effect = case effect of
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile grant -> durationQuantities (GrantPlayFromExile.duration grant)
   Effect.ForEach {} -> []
+  Effect.ForEachNumber loop -> [ForEachNumber.upTo loop]
   Effect.Heal _ -> []
 
 -- The shapes CR 208.1 and CR 208.2 allow in a printed power or toughness box:
@@ -1465,6 +1467,7 @@ effectObjectRefs effect =
         Effect.OfferCast offer -> read_ [OfferCast.ref offer]
         Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
         Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> read_ [ref]
+        Effect.ForEachNumber {} -> []
         Effect.Heal ref -> read_ [ref]
 
 -- The chooser-shaped refs one effect writes where nothing can ask for them: the
