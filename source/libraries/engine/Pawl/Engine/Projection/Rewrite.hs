@@ -25,6 +25,7 @@ import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -1035,7 +1036,7 @@ rewriteObjectRef pairs ref = case ref of
   -- The arm above's regression fence, for its reason: the Gates' "nonland" is a
   -- card type and no printing changes their text.
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p f c) -> ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p (Filter.rewrite pairs f) (rewriteQuantity pairs c))
-  ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
+  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching f n) -> ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n))
   ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f w) -> ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.rewrite pairs f) w)
   ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot f) -> ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot (Filter.rewrite pairs f))
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)

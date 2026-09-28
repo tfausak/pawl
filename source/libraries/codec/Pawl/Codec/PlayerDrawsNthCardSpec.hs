@@ -16,8 +16,15 @@ spec s = Spec.describe s "Pawl.Codec.PlayerDrawsNthCard" $ do
       PlayerDrawsNthCard.codec
       ( PlayerDrawsNthCard.MkPlayerDrawsNthCard
           { PlayerDrawsNthCard.player = PlayerRelation.You,
-            PlayerDrawsNthCard.nth = 2
+            PlayerDrawsNthCard.nth = Just 2
           }
       )
       " {\"player\":{\"type\":\"You\"},\"nth\":2} "
+  -- Teferi, Hero of Dominaria's emblem: every draw, so no key.
+  Spec.it s "no ordinal writes no key" $
+    Common.assertCodec
+      s
+      PlayerDrawsNthCard.codec
+      (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You Nothing)
+      " {\"player\":{\"type\":\"You\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerDrawsNthCard.codec

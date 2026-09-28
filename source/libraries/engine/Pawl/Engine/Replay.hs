@@ -1097,10 +1097,10 @@ defaultAnswer p = case p of
   -- Every candidate, the arm above's maximal subset: CR 702.38a admits every
   -- subset here and revealing spends nothing, so no answer can be illegal.
   Prompt.ChooseAnyNumberToReveal _ _ _ candidates -> Set.fromList candidates
-  -- Every candidate, the arm above's maximal subset: CR 608.2d admits every
-  -- subset here, so no answer can be illegal. A deterministic fallback, not a
-  -- recommendation.
-  Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates -> Set.fromList candidates
+  -- The first candidates up to the ceiling, the arm above's maximal subset: CR
+  -- 608.2d admits every subset no larger than the ceiling, so no answer can be
+  -- illegal. A deterministic fallback, not a recommendation.
+  Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates atMost -> Set.fromList (maybe id (take . Natural.toIntSaturating) atMost candidates)
   -- CR 608.2d: the head of the offer, ChooseCardInGraveyard's fallback. Every
   -- candidate was pre-filtered by the engine, so the head is a legal answer. A
   -- deterministic fallback, not a recommendation.

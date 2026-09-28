@@ -2405,7 +2405,7 @@ representativeEvents cond =
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
         -- eventBindings being consulted only for a match.
-        TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard _ nth) -> one (GameEvent.Drew (Drew.MkDrew S.alice nth))
+        TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard _ nth) -> one (GameEvent.Drew (Drew.MkDrew S.alice (Maybe.fromMaybe 1 nth)))
         -- CR 508.5's defending player, and deliberately NOT the attacker's own
         -- controller: eventBindings binds this field under `thatPlayer`, so an
         -- arm that bound the attacking side instead would still agree with
@@ -2943,7 +2943,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerDiscardsCards PlayerRelation.You,
     TriggerCondition.PlayerCycles PlayerRelation.You,
     TriggerCondition.PlayerCycles PlayerRelation.Opponent,
-    TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You 2),
+    TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You (Just 2)),
+    TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You Nothing),
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfAttacksWithAnother (Filter.Type.And []),
     TriggerCondition.SelfAttacksPermanent (Filter.Type.And []),
