@@ -705,6 +705,33 @@ lightmineFieldSpec s registry =
 -- many cards". alice declares a Hill Giant and a Goblin Piker and keeps the
 -- Swarm and a Llanowar Elves home, so "that many" is two where the creatures
 -- she controls are four; bob, the target, holds five library cards.
+-- CR 603.4 over CR 205.3m: Littjara Kinseekers (a changeling) "when this
+-- creature enters, if you control three or more creatures that share a creature
+-- type, put a +1/+1 counter on this creature". alice casts it off four Islands
+-- beside a Hill Giant and one other creature; the boards differ only in that
+-- creature. The Kinseekers counts itself, so a Giant and a Goblin make two
+-- two-member groups -- it shares a type with each, but they share none.
+littjaraKinseekersSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+littjaraKinseekersSpec s registry =
+  Spec.describe s "Littjara Kinseekers"
+    . Spec.it s "CR 205.3m three creatures must hold ONE creature type in common, the changeling itself among them"
+    $ do
+      kinseekers <- S.printingOf s registry "Littjara Kinseekers"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      island <- S.printingOf s registry "Island"
+      let cast second =
+            let placed = List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) (S.landsInPlay island 4) [giant, second]
+                (kid, gs) = S.addHandCard kinseekers S.alice placed
+                ready = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+                onStack = S.runPure S.identityAnswer ready (S.cast S.alice kid)
+             in (kid, S.runPure S.identityAnswer onStack Engine.priorityLoop)
+          (giantsId, giants) = cast giant
+          (pikerId, pikers) = cast piker
+      Spec.assertEqWith s "with two Giants, three Giants: the trigger put a +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne giantsId giants) 1
+      Spec.assertEqWith s "with a Giant and a Goblin, no type is held three ways: no counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId pikers) 0
+      Spec.assertBool s (S.onBattlefield pikerId pikers) "and the Kinseekers did resolve onto the battlefield"
+
 screamingSwarmSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 screamingSwarmSpec s registry =
   let answering :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
@@ -4097,6 +4124,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   tyvarAttackSpec s registry
   lightmineFieldSpec s registry
   screamingSwarmSpec s registry
+  littjaraKinseekersSpec s registry
   militaryIntelligenceSpec s registry
   totalWarSpec s registry
   seiferSpec s registry

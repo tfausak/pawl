@@ -496,6 +496,15 @@ aggregate quantityOf aggregation members = case aggregation of
   Aggregation.DistinctCardTypes -> Just (toInteger (Set.size (Set.unions (fmap (Filter.cardTypes . snd) members))))
   -- CR 105.2c: a colorless member adds nothing.
   Aggregation.DistinctColors -> Just (toInteger (Set.size (Set.unions (fmap (Filter.colors . snd) members))))
+  -- CR 205.3m: the size of the largest group of members holding one creature
+  -- type in common -- not "pairwise sharing", which is not transitive (a Human
+  -- Cleric, a Human Rogue and an Elf Rogue are no three sharing a type). A
+  -- changeling reaches every group through its projected subtypes (CR 702.73a);
+  -- a land type or other non-creature subtype groups nothing. 0 over an empty
+  -- set, or where no member has a creature type.
+  Aggregation.MostSharingACreatureType ->
+    let tally = Map.fromListWith (+) [(subtype, 1 :: Integer) | (_, view) <- members, subtype <- Set.toList (Filter.subtypes view), Subtype.isCreatureType subtype]
+     in Just (Foldable.foldl' max 0 tally)
   -- Undeterminable in both directions. A member whose quantity cannot be
   -- determined makes the whole maximum undeterminable rather than being dropped, which
   -- would report the maximum of a set the card never named; and an EMPTY

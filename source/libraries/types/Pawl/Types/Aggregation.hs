@@ -19,6 +19,9 @@ data Aggregation quantity
   | -- | How many of CR 105.1's five colors the members have among them -- Vivid's
     -- "the number of colors among permanents you control" (Volatile Rift).
     DistinctColors
+  | -- | The most members that share one creature type (CR 205.3m) -- Synchronized
+    -- Eviction's "at least two creatures that share a creature type".
+    MostSharingACreatureType
   | -- | The largest value of a per-member quantity -- "the greatest mana value
     -- among artifacts you control" (Karn, Legacy Reforged). Unlike the three above
     -- it must know WHICH per-object quantity to read, and the payload is the

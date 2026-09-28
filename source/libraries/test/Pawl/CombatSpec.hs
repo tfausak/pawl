@@ -1249,6 +1249,22 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (a : _, b : _) ->
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  -- CR 509.1b's "unless" gate read against CR 205.3m: Graxiplon "can't be blocked
+  -- unless defending player controls three or more creatures that share a
+  -- creature type". Every board declares the same Hill Giant of bob's blocking;
+  -- they differ only in bob's third creature, and the last in alice's.
+  Spec.it s "CR 205.3m Graxiplon can be blocked only when bob controls three creatures sharing a creature type" $ do
+    graxiplon <- S.printingOf s registry "Graxiplon"
+    giant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    let blockable mine third = case attacking (graxiplon : mine) [giant, giant, third] of
+          (gs, a : _, b : _) -> Just (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)
+          _ -> Nothing
+    Spec.assertEqWith s "three Giants: the block is legal" (blockable [] giant) (Just True)
+    Spec.assertEqWith s "two Giants and a Goblin share no type three ways: illegal" (blockable [] piker) (Just False)
+    Spec.assertEqWith s "CR 702.73a two Giants and a changeling: legal" (blockable [] changeling) (Just True)
+    Spec.assertEqWith s "alice's Goblin is not the defending player's: still illegal" (blockable [piker] piker) (Just False)
   -- CR 702.16f: "Attacking creatures with protection can't be blocked by
   -- creatures that have the stated quality." Rule 702.16 stated as CR 509.1b's
   -- pairwise restriction, and the one clause of protection that is already a
