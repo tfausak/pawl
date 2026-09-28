@@ -818,7 +818,7 @@ effectObjectRefs effect = case effect of
   Effect.PlayerSacrifices {} -> []
   Effect.Vote {} -> []
   Effect.TakeExtraTurn {} -> []
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> [ref]
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []

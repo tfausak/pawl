@@ -1,5 +1,6 @@
 module Pawl.Codec.ShuffleIntoLibrarySpec where
 
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.JsonCodec.Common as Common
@@ -19,10 +20,10 @@ spec s = Spec.describe s "Pawl.Codec.ShuffleIntoLibrary" $ do
       ShuffleIntoLibrary.codec
       ( ShuffleIntoLibrary.MkShuffleIntoLibrary
           { ShuffleIntoLibrary.library = Nothing,
-            ShuffleIntoLibrary.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
+            ShuffleIntoLibrary.refs = NonEmpty.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
           }
       )
-      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+      " {\"refs\":[{\"type\":\"InSlot\",\"value\":\"target\"}]} "
   -- CR 701.24c's named library -- Dwell on the Past's "their library", which
   -- is shuffled whether or not any of the named cards arrive.
   Spec.it s "MkShuffleIntoLibrary, library named" $
@@ -31,8 +32,19 @@ spec s = Spec.describe s "Pawl.Codec.ShuffleIntoLibrary" $ do
       ShuffleIntoLibrary.codec
       ( ShuffleIntoLibrary.MkShuffleIntoLibrary
           { ShuffleIntoLibrary.library = Just (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player"))),
-            ShuffleIntoLibrary.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "cards"))
+            ShuffleIntoLibrary.refs = NonEmpty.singleton (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "cards")))
           }
       )
-      " {\"library\":{\"type\":\"InSlot\",\"value\":\"player\"},\"ref\":{\"type\":\"InSlot\",\"value\":\"cards\"}} "
+      " {\"library\":{\"type\":\"InSlot\",\"value\":\"player\"},\"refs\":[{\"type\":\"InSlot\",\"value\":\"cards\"}]} "
+  -- Timetwister's "their hand and graveyard": two sets in one instruction.
+  Spec.it s "MkShuffleIntoLibrary, two refs" $
+    Common.assertCodec
+      s
+      ShuffleIntoLibrary.codec
+      ( ShuffleIntoLibrary.MkShuffleIntoLibrary
+          { ShuffleIntoLibrary.library = Nothing,
+            ShuffleIntoLibrary.refs = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "hand")) NonEmpty.:| [ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "graveyard"))]
+          }
+      )
+      " {\"refs\":[{\"type\":\"InSlot\",\"value\":\"hand\"},{\"type\":\"InSlot\",\"value\":\"graveyard\"}]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ShuffleIntoLibrary.codec

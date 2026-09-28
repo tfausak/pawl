@@ -5056,7 +5056,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             (\pid -> fmap (\oid -> (oid, other)) (Game.zoneMembers one pid before) <> fmap (\oid -> (oid, one)) (Game.zoneMembers other pid before))
             exchanging
     Event.simultaneously (Monad.forM_ moves (uncurry (Event.changeZoneInBatch before)))
-  -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries. Two
+  -- CR 701.24: shuffle the objects the refs name into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
   -- uses, so a library-entry replacement gets its CR 616.1 opportunity (CR 400.3
   -- files the arrival under Object.owner), then CR 701.24a's randomisation.
@@ -5067,15 +5067,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- UNION of the two, since rule 701.24's objects go to their owners' libraries and
   -- the named player need not be one of them. Each library is shuffled ONCE (CR
   -- 608.2f), and CR 701.24a makes WHO shuffles unobservable.
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> do
+  --
+  -- Every ref's objects move as ONE event (CR 608.2f / 603.2c), so Timetwister's
+  -- hand and graveyard are one arrival and one shuffle -- proved by
+  -- Pawl.MassEffectSpec's Timetwister group.
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named refs) -> do
     gs <- State.get
-    let targets = objectRefObjects legal resolving controller source gs ref
+    let targets = ListUtils.nubOrd (foldMap (objectRefObjects legal resolving controller source gs) refs)
         -- The owners are read from the PRE-MOVE objects (CR 701.24c); an id that
         -- no longer resolves contributes no owner.
         owners =
           Set.fromList (Maybe.mapMaybe (\target -> fmap Object.owner (Game.lookupObject target gs)) targets)
             <> Set.fromList (foldMap (playerRefPlayers legal controller gs) named)
-    Monad.forM_ targets $ \target -> Monad.void (Event.changeZoneReturning target Zone.Library)
+    Event.simultaneously (Monad.forM_ targets (\target -> Event.changeZoneInBatch gs target Zone.Library))
     -- APNAP (CR 608.2f), which is what makes the ORDER of the Prompt.Shuffle calls
     -- a fact about the rules rather than about PlayerId's Ord.
     Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Event.shuffleLibrary
