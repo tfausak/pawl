@@ -99,6 +99,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Sickness as Sickness
@@ -4720,6 +4721,56 @@ fullTextSpec s registry = Spec.describe s "HasFullText" $ do
         unleashed = S.addCounter CounterKind.PlusOnePlusOne 1 shifterId board
     Spec.assertBool s (not (Combat.canBlock S.alice shifterId unleashed)) "CR 702.98a with a +1/+1 counter it can't block"
     Spec.assertBool s (Combat.canBlock S.alice shifterId board) "and without one it can"
+
+  -- CR 612.1 / 613.8: the fold rewrites the full text's rule abilities, and a
+  -- gatherer must not rewrite them again. Glacial Crasher ("can't attack unless
+  -- there is a Mountain on the battlefield") goes on top after two Magical
+  -- Hacks on the Shapeshifter: Island -> Mountain, then Mountain -> Island. The
+  -- first depends on the second (CR 613.8a, the second makes the Island it
+  -- changes), so the gate reads Mountain -> Island -> Mountain: alice's Islands
+  -- do not free the Shapeshifter and bob's Mountain does. Re-applying the two
+  -- swaps, composed in timestamp order (Mountain -> Island), would read Island.
+  Spec.it s "CR 612.6 two Hacks rewrite the Shapeshifter's Glacial Crasher gate once" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    crasher <- S.printingOf s registry "Glacial Crasher"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    hack <- S.printingOf s registry "Magical Hack"
+    case S.combatBoardOf [shapeshifter] [] of
+      (board, [shifterId], _) -> do
+        let (_, b1) = S.addPermanent island S.alice board
+            (_, b2) = S.addPermanent island S.alice b1
+            (b3, earlyId) = S.handOne hack b2
+            (b4, lateId) = S.handOne hack b3
+            staged = b4 {GameState.priority = Just S.alice}
+            castEarly = S.runPure (hackSwapping shifterId (Subtype.Type.Island, Subtype.Type.Mountain)) staged (S.cast S.alice earlyId)
+            early = S.runPure (hackSwapping shifterId (Subtype.Type.Island, Subtype.Type.Mountain)) castEarly Stack.resolveTop
+            castLate = S.runPure (hackSwapping shifterId (Subtype.Type.Mountain, Subtype.Type.Island)) early (S.cast S.alice lateId)
+            late = S.runPure (hackSwapping shifterId (Subtype.Type.Mountain, Subtype.Type.Island)) castLate Stack.resolveTop
+            -- The Crasher goes on top AFTER the Hacks, which would otherwise
+            -- bury it in alice's graveyard.
+            (_, hacked) = S.addGraveyardCard crasher S.alice late
+            (_, freed) = S.addPermanent mountain S.bob hacked
+        Spec.assertBool s (not (Combat.canAttack S.alice shifterId hacked)) "CR 613.8 the gate reads Mountain, so alice's Islands leave the Shapeshifter bound"
+        Spec.assertBool s (Combat.canAttack S.alice shifterId freed) "and bob's Mountain frees it"
+        Spec.assertEqWith s "setup: both Hacks resolved onto the Shapeshifter, composing to Mountain -> Island" (Projection.textChangesAffecting shifterId hacked) [(Subtype.Type.Mountain, Subtype.Type.Island)]
+      _ -> Spec.assertFailure s "expected one Shapeshifter"
+
+  -- CR 612.6 / 614.1: a replacement effect comes with the full text. Anafenza,
+  -- the Foremost ("If a nontoken creature an opponent owns would die ..., exile
+  -- that card instead.") on top: bob's destroyed Goblin Piker is exiled. With
+  -- Prodigal Sorcerer on top it reaches bob's graveyard.
+  Spec.it s "CR 612.6 the Shapeshifter as Anafenza exiles bob's dying creature" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, b0) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (_, asAnafenza) = fullTextBoard shapeshifter anafenza b0
+        (_, asSorcerer) = fullTextBoard shapeshifter sorcerer b0
+        kill = S.runPure S.identityAnswer `flip` Event.destroy Regenerability.Regenerable [pikerId]
+    Spec.assertEqWith s "CR 612.6 bob's Piker is exiled, not put in his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob (kill asAnafenza))) 0
+    Spec.assertEqWith s "with the Sorcerer on top it reaches his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob (kill asSorcerer))) 1
 
 exchangeTextBoxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do

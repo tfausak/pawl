@@ -114,7 +114,7 @@ additionalBlocks candidates gs =
               -- rather than hoisted for CombatRestriction.inForce's reason: the
               -- empty case above already turned away every permanent that
               -- prints no permission.
-              rowsOf source (Projection.textChangesAffecting source gs) permissions
+              rowsOf source (Projection.readerTextChanges source gs) permissions
             else []
       rowsOf source changes permissions = do
         permission <- permissions

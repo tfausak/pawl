@@ -331,12 +331,12 @@ printedRows gs =
                 -- CR 612.1's word swap over the permanent's own text, computed
                 -- HERE rather than hoisted beside setEffs above, exactly as
                 -- Pawl.Engine.CombatRestriction.restricted computes it:
-                -- textChangesAffecting folds the whole continuous-effect list,
+                -- readerTextChanges folds the whole continuous-effect list,
                 -- and the empty case above has already turned away every
                 -- permanent that prints no player ability, so the fold runs
                 -- once per ability-bearing permanent instead of once per
                 -- permanent on the battlefield.
-                rowsOf (Projection.textChangesAffecting oid gs) oid controller (fmap ((,) (Projection.staticTimestampOf oid object gs)) abilities)
+                rowsOf (Projection.readerTextChanges oid gs) oid controller (fmap ((,) (Projection.staticTimestampOf oid object gs)) abilities)
               else []
       -- CR 613.1f / 613.10: the player abilities layer 6 GRANTED a permanent
       -- (Nerd Rage's "You have no maximum hand size"), read off the finished

@@ -775,6 +775,15 @@ ruleAbilitiesOf oid gs = maybe (copiableRuleAbilitiesOf oid gs) PC.ruleAbilities
 specialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
 specialActionsOf oid gs = maybe (copiableSpecialActionsOf oid gs) PC.specialActions (fullTextOf oid gs)
 
+-- CR 612.1: the word swaps a reader outside the fold applies to what
+-- ruleAbilitiesOf, specialActionsOf or PlayerEffect.playerAbilitiesOf handed
+-- it -- none for CR 612.6's full text, whose lists the fold has already
+-- rewritten in CR 613.7 order, and textChangesAffecting's for the copiable
+-- lists, which no fold touched. Pawl.ProjectionSpec's "CR 612.6 two Hacks
+-- rewrite the Shapeshifter's Glacial Crasher gate once" proves the first.
+readerTextChanges :: ObjectId -> GameState -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
+readerTextChanges oid gs = if Maybe.isJust (fullTextOf oid gs) then [] else textChangesAffecting oid gs
+
 -- CR 305.7's strip, shared by both modifications that set a land's subtype. It
 -- does the subtype and ability clauses; the new basic type's mana ability rides
 -- the subtype and is read at the mana call site (CR 305.6). An ability landing on
@@ -5493,7 +5502,10 @@ grantsMintingType m = case m of
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
   -- Writes whatever type line the top card prints, which this function cannot
-  -- see; True, since a wrong True costs only a projection.
+  -- see; True, since a wrong True costs only a projection. It is also what
+  -- opens replacementsAffecting's gate to the top card's replacement effects,
+  -- which Pawl.ProjectionSpec's "CR 612.6 the Shapeshifter as Anafenza exiles
+  -- bob's dying creature" proves.
   Modification.HasFullText _ -> True
   -- Neither marker writes a card type or subtype.
   Modification.AssignCombatDamageWithToughness -> False

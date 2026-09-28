@@ -84,7 +84,7 @@ prohibited oid kind gs =
         restrictions ->
           (null setEffs || Projection.liveAfterLayers setEffs source gs)
             && not (removed source)
-            && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+            && any (fromRestriction source (Projection.readerTextChanges source gs)) restrictions
       -- The CR 305.7 setEffs gate and the CR 612.1 rewrite are REGRESSION FENCES
       -- rather than proven behaviour, exactly as Pawl.Engine.EntryRestriction's
       -- header records of its own: neither printing in the pool is a land, and no
