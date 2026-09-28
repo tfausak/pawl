@@ -757,6 +757,7 @@ countQuantities count = case Count.Type.aggregation count of
   Aggregation.Members -> []
   Aggregation.DistinctCardTypes -> []
   Aggregation.DistinctColors -> []
+  Aggregation.MostSharingACreatureType -> []
   Aggregation.Greatest quantity -> [quantity]
   Aggregation.Total quantity -> [quantity]
 

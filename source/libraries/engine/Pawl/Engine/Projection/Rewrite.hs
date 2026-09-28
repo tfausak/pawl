@@ -2124,6 +2124,7 @@ rewriteAggregation pairs aggregation = case aggregation of
   Aggregation.Members -> aggregation
   Aggregation.DistinctCardTypes -> aggregation
   Aggregation.DistinctColors -> aggregation
+  Aggregation.MostSharingACreatureType -> aggregation
 
 -- CR 612.1 through CR 208.2a's characteristic-defining power and toughness. Both
 -- boxes are rewritten rather than only the one a card fills, since seedCharacteristicPT

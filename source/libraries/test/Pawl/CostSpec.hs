@@ -3008,6 +3008,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   thrastaSpec s registry
   ertaisScornSpec s registry
   deemInferiorSpec s registry
+  synchronizedEvictionSpec s registry
   richlauSpec s registry
   targetCostSpec s registry
   frogmiteSpec s registry
@@ -3278,6 +3279,34 @@ ertaisScornSpec s registry =
           (splitScorn, split) = board True
       Spec.assertBool s (S.castable S.alice carolsScorn carols) "carol cast two, so the Scorn costs {1}{U} and is offered"
       Spec.assertBool s (not (S.castable S.alice splitScorn split)) "bob and carol cast one each, so the Scorn keeps its {1}{U}{U} and is refused"
+
+-- CR 601.2f / 205.3m: Synchronized Eviction ({4}{U}) "costs {2} less to cast if
+-- you control at least two creatures that share a creature type". alice holds it
+-- over three Islands, which pay {2}{U} and not {4}{U}; boards differ only in
+-- alice's second creature beside a Hill Giant. bob's Goblin Piker is on every
+-- board, so alice's own Piker shares a type only with a creature she does not
+-- control.
+synchronizedEvictionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+synchronizedEvictionSpec s registry =
+  Spec.describe s "Synchronized Eviction" $ do
+    Spec.it s "CR 205.3m two creatures alice controls sharing a creature type take {2} off" $ do
+      island <- S.printingOf s registry "Island"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      elves <- S.printingOf s registry "Llanowar Elves"
+      changeling <- S.printingOf s registry "Woodland Changeling"
+      eviction <- S.printingOf s registry "Synchronized Eviction"
+      let board :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+          board second =
+            let placed = List.foldl' (\g (p, who) -> snd (S.addPermanent p who g)) (S.landsInPlay island 3) [(giant, S.alice), (second, S.alice), (elves, S.bob), (piker, S.bob)]
+                (evictionId, gs) = S.addHandCard eviction S.alice placed
+             in (evictionId, gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+          (giantsId, giants) = board giant
+          (pikerId, pikers) = board piker
+          (changelingId, changelings) = board changeling
+      Spec.assertBool s (S.castable S.alice giantsId giants) "two Giants share Giant, so it costs {2}{U} and is offered"
+      Spec.assertBool s (not (S.castable S.alice pikerId pikers)) "a Giant and a Goblin share nothing, and bob's Goblin is not alice's, so it keeps {4}{U} and is refused"
+      Spec.assertBool s (S.castable S.alice changelingId changelings) "CR 702.73a a changeling is a Giant too, so it costs {2}{U} and is offered"
 
 -- CR 601.2f: Deem Inferior ({3}{U}) "costs {1} less to cast for each card you've
 -- drawn this turn". alice holds it over two Islands, which pay {1}{U} and not
