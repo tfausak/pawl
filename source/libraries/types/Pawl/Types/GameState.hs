@@ -45,6 +45,7 @@ import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OutsideObject as OutsideObject
+import qualified Pawl.Types.PastActivation as PastActivation
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.Phase as Phase
@@ -330,6 +331,10 @@ data GameState = MkGameState
     -- identically worded twin is the caveat Object.activatedOnce's haddock states
     -- about the same key.
     activatedThisTurn :: Map.Map ObjectId.ObjectId (Set.Set (ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card))),
+    -- | CR 602.2: every activated ability begun this turn, oldest first, as
+    -- Pawl.Types.ReduceActivationCost.onlyFirst asks after it; cleared at turn
+    -- handoff. Written by Pawl.Engine.ActivationRestriction.logActivation.
+    activationsThisTurn :: Seq.Seq PastActivation.PastActivation,
     -- | CR 601.3: which once-each-turn permissions have been used this turn, by
     -- a cast or (a Play-verb one) a land play, read only for a budgeted
     -- PermissionLimit; cleared at turn handoff, which is the whole of "each

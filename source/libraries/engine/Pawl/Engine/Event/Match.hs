@@ -187,24 +187,6 @@ castOrdinal context predicate fromZone spell gs =
             && maybe False (\view -> Filter.matches context view predicate) (Count.snapshotView (Projection.viewWithLastKnownAnywhere gs) gs EventShape.SpellCast (LoggedEvent.event entry))
    in 1 + Natural.length (Seq.filter counted earlier)
 
--- CR 102.1: does this turn belong to the scope? `active` is "the player whose
--- turn it is", and `own` is the seat the scope is read against -- the player
--- Pawl.Types.TurnScope deliberately names none of, since each reader supplies
--- its own: CR 109.5's "you" for a triggered ability (CR 603.3a), the CR 602.2
--- activator for an activated one.
---
--- ControllersTurn is Turn.sharesTurn, so under CR 805.4 the active team's turn is
--- each of its members' turn. OpponentsTurn is CR 102.3's relation rather than an
--- enumeration of opponents: the active player is one, which in a two-player game
--- (CR 102.2) and a Free-for-All (CR 806.1) is any other seat, and in a game
--- between teams is a seat on another team. Teams.areOpponents is the one
--- predicate.
-turnScopeAdmits :: GameState -> TurnScope.TurnScope -> PlayerId -> PlayerId -> Bool
-turnScopeAdmits gs scope active own = case scope of
-  TurnScope.EachTurn -> True
-  TurnScope.ControllersTurn -> Turn.sharesTurn gs active own
-  TurnScope.OpponentsTurn -> Teams.areOpponents (Game.teams gs) own active
-
 -- CR 805.4d: the players whose step this is, among those the scope names, read
 -- against `own` as turnScopeAdmits reads it. Every active player for "each
 -- player's", each active opponent for "each opponent's", and `own` alone for
@@ -657,7 +639,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.StepBegan (StepBegan.MkStepBegan began active) ->
       began == wanted
         && Maybe.maybe True (== mainPhasesBegun gs) ordinal
-        && turnScopeAdmits gs scope active you
+        && Turn.turnScopeAdmits gs scope active you
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast {} -> False
@@ -6645,7 +6627,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           GameEvent.Moved m
             | ZoneChange.from (Moved.change m) == CardLeavesZone.from p,
               maybe True (== ZoneChange.to (Moved.change m)) (CardLeavesZone.to p) ->
-                turnScopeAdmits gs (CardLeavesZone.scope p) (GameState.activePlayer gs) you
+                Turn.turnScopeAdmits gs (CardLeavesZone.scope p) (GameState.activePlayer gs) you
                   && not (Seq.null (admitted m))
           GameEvent.Moved {} -> False
           GameEvent.LeftTheGame _ -> False
@@ -7852,7 +7834,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom _) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
-        turnScopeAdmits gs scope (GameState.activePlayer gs) you
+        Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) you
           -- "During combat" off the GAME STATE, the TurnScope's reason: the cast
           -- happened in this same settle, so the phase standing now is its phase.
           && maybe True (`Turn.inWindow` GameState.phase gs) window

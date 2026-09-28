@@ -778,6 +778,8 @@ library codec
     Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef
     Pawl.Codec.ObjectRefSpec
+    Pawl.Codec.ObjectSnapshot
+    Pawl.Codec.ObjectSnapshotSpec
     Pawl.Codec.ObjectSpec
     Pawl.Codec.OfferCast
     Pawl.Codec.OfferCastSpec
@@ -799,6 +801,8 @@ library codec
     Pawl.Codec.PairingSpec
     Pawl.Codec.PartnerText
     Pawl.Codec.PartnerTextSpec
+    Pawl.Codec.PastActivation
+    Pawl.Codec.PastActivationSpec
     Pawl.Codec.PayBranch
     Pawl.Codec.PayBranchSpec
     Pawl.Codec.PayGate
@@ -2104,6 +2108,7 @@ library types
     Pawl.Types.Object
     Pawl.Types.ObjectId
     Pawl.Types.ObjectRef
+    Pawl.Types.ObjectSnapshot
     Pawl.Types.OfferCast
     Pawl.Types.Onset
     Pawl.Types.OptionalDecision
@@ -2116,6 +2121,7 @@ library types
     Pawl.Types.PaidExpiry
     Pawl.Types.Pairing
     Pawl.Types.PartnerText
+    Pawl.Types.PastActivation
     Pawl.Types.PayBranch
     Pawl.Types.PayGate
     Pawl.Types.Payment

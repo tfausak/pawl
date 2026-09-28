@@ -10167,6 +10167,7 @@ activateWhileRolling pid oid ability = do
     Payment.Unpaid -> pure False
     Payment.Paid _ -> do
       State.modify' (ActivationRestriction.recordActivation oid ability)
+      State.modify' (ActivationRestriction.logActivation before pid oid stamp AbilityKind.NonManaAbility Set.empty)
       let modal = ActivatedAbility.modal ability
           every = Set.fromList (fmap fst (zip (fmap ModeIndex.MkModeIndex [0 ..]) (Modal.modeEffects modal)))
           bound =

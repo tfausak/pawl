@@ -1656,6 +1656,9 @@ beginTurn extra pid gs =
             -- object, and a permanent whose controller is not the active player
             -- gets its activation back here just the same.
             GameState.activatedThisTurn = Map.empty,
+            -- CR 602.2's activation history, which "the first activated ability
+            -- you activate each turn" reads: a turn's, for every player.
+            GameState.activationsThisTurn = Seq.empty,
             -- CR 601.3's "Once each turn, you may cast ..." (Johann, Apprentice
             -- Sorcerer), cleared for every object beside the activation-side
             -- rider above and for its reason: the budget is the permission's

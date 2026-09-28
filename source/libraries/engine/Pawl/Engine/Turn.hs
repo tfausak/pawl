@@ -19,6 +19,7 @@ import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.TurnScope as TurnScope
 
 allPhases :: [Phase]
 allPhases =
@@ -43,6 +44,24 @@ sharesTurn gs one other =
   let settings = GameState.settings gs
    in one == other
         || (GameSettings.sharedTeamTurns settings && Teams.sameTeam (GameSettings.teams settings) one other)
+
+-- CR 102.1: does this turn belong to the scope? `active` is "the player whose
+-- turn it is", and `own` is the seat the scope is read against -- the player
+-- Pawl.Types.TurnScope deliberately names none of, since each reader supplies
+-- its own: CR 109.5's "you" for a triggered ability (CR 603.3a), the CR 602.2
+-- activator for an activated one.
+--
+-- ControllersTurn is sharesTurn, so under CR 805.4 the active team's turn is
+-- each of its members' turn. OpponentsTurn is CR 102.3's relation rather than an
+-- enumeration of opponents: the active player is one, which in a two-player game
+-- (CR 102.2) and a Free-for-All (CR 806.1) is any other seat, and in a game
+-- between teams is a seat on another team. Teams.areOpponents is the one
+-- predicate.
+turnScopeAdmits :: GameState -> TurnScope.TurnScope -> PlayerId -> PlayerId -> Bool
+turnScopeAdmits gs scope active own = case scope of
+  TurnScope.EachTurn -> True
+  TurnScope.ControllersTurn -> sharesTurn gs active own
+  TurnScope.OpponentsTurn -> Teams.areOpponents (GameSettings.teams (GameState.settings gs)) own active
 
 -- | CR 805.4a / 805.9: is this player an active player -- the active player, or
 -- under the shared team turns option a member of the active team?

@@ -6,6 +6,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | The payload of Pawl.Types.PlayerEffect's ReduceActivationCost arm (#1305).
 --
@@ -71,6 +72,13 @@ data ReduceActivationCost = MkReduceActivationCost
     grantedBy :: Maybe KeywordDesignator.KeywordDesignator,
     whichKind :: Maybe AbilityKind.AbilityKind,
     whichTargets :: Maybe (Filter.Filter Keyword.Keyword),
+    -- | Professor Hojo's "the FIRST activated ability you activate during your
+    -- turn": Just a scope applies the reduction only in a turn the scope admits,
+    -- and only to the first activation the player begins that turn matching the
+    -- four criteria above -- whether or not that one was reduced, and whether or
+    -- not this reducer existed yet (Tezzeret, Betrayer of Flesh's ruling). Read
+    -- off GameState.activationsThisTurn. Nothing is every matching activation.
+    onlyFirst :: Maybe TurnScope.TurnScope,
     reduction :: ManaCost.ManaCost,
     floor :: Natural.Natural
   }
