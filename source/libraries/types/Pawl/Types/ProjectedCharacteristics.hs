@@ -150,7 +150,8 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     cardTypes :: Set.Set CardType.CardType,
     subtypes :: Set.Set Subtype.Subtype,
     -- | CR 604.1 / 613 layer 6: the object's static abilities. Seeded from the
-    -- card and touched by no layer but CR 612.5's exchange, unlike the three
+    -- card and touched by no layer but CR 612.5's exchange and CR 612.6's full
+    -- text (hasFullText), unlike the three
     -- ability lists below: a static ability's continuous effect is what the
     -- layers apply, so the fold reads this field rather than writing it, and CR
     -- 613.1f's removal and CR 305.7's strip are asked of the GATHER
@@ -170,8 +171,9 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- | CR 613.10 / 613.11: the object's player-affecting static abilities --
     -- the axis Pawl.Types.Face.playerAbilities carries, applied AFTER the seven
     -- layers by Pawl.Engine.PlayerEffect. Seeded and untouched by any layer but
-    -- CR 612.5's exchange, for staticAbilities' reason above, copiable for the same one, and read by
-    -- Pawl.Engine.Projection.playerAbilitiesOf.
+    -- CR 612.5's exchange and CR 612.6's full text, for staticAbilities' reason
+    -- above, copiable for the same one, and read by
+    -- Pawl.Engine.PlayerEffect.playerAbilitiesOf.
     playerAbilities :: [PlayerStaticAbility.PlayerStaticAbility],
     -- | CR 613.1f / 613.10: the player abilities layer 6 GRANTED the object,
     -- each with the timestamp of the effect that granted it (CR 613.7a). Apart
@@ -195,8 +197,8 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- names rules text among the copiable values and CR 707.2a copies the
     -- abilities derived from it, so a copy of Leonin Arbiter offers the {2} its
     -- own printed face never mentions. Seeded and touched by no layer but CR
-    -- 612.5's exchange, exactly as playerAbilities above is, and read by
-    -- Pawl.Engine.Projection.View.specialActionsOf.
+    -- 612.5's exchange and CR 612.6's full text, exactly as playerAbilities
+    -- above is, and read by Pawl.Engine.Projection.specialActionsOf.
     specialActions :: [SpecialAction.SpecialAction],
     -- | CR 602 / 613 layer 6: the object's activated abilities after the layer
     -- system. Seeded from the card and added to by CR 613.1f's grant (Presence of
@@ -243,14 +245,15 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Pawl.Types.RuleAbilities says why the thirteen ride one field.
     --
     -- Here for playerAbilities' reason exactly: CR 613.11 applies them outside
-    -- the layer system, so no layer but CR 612.5's exchange writes this, but CR
+    -- the layer system, so no layer but CR 612.5's exchange and CR 612.6's full
+    -- text writes this, but CR
     -- 707.2 names rules text among the copiable values and CR 707.2a copies the
     -- abilities derived from it -- so a permanent that became a copy of Silent Arbiter limits attackers
     -- and its own printed face is never consulted. CR 702.140e's union rides the
     -- same field (Pawl.Engine.Projection.View.withMergedAbilities), which is
     -- what gives a mutated permanent every component's.
     --
-    -- Read through Pawl.Engine.Projection.View.ruleAbilitiesOf, which the thirteen
+    -- Read through Pawl.Engine.Projection.ruleAbilitiesOf, which the thirteen
     -- gatherer modules share; Pawl.MutateSpec's "CR 702.140e a Silent Arbiter
     -- under a Cubwarden still holds alice to one attacker" is what proves the
     -- union reaches them.
@@ -276,6 +279,13 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- Pawl.ManaSpec's "CR 613.1f Humility strips Dryad Arbor's CR 305.6 mana
     -- ability" is what proves it reaches the mana routes.
     lostAllAbilities :: Bool,
+    -- | CR 612.6 layer 3: did a full-text effect replace this object's text? When
+    -- it did, the four lists no layer otherwise writes (staticAbilities,
+    -- playerAbilities, specialActions, ruleAbilities) are the card's it read,
+    -- and the readers take them off the projection rather than off the copiable
+    -- values (Pawl.Engine.Projection.fullTextOf). Not copiable, for
+    -- subtypeWordChanges' reason.
+    hasFullText :: Bool,
     -- | CR 612.1 layer 3: the subtype word swaps applied to the text box this
     -- object carries, in the order they were applied -- CR 612.5's exchange
     -- moves them with the text. A RECORD of what layer 3 did, where every field

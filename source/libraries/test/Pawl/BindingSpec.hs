@@ -47,6 +47,7 @@ sampleSnapshot =
       PC.castingPermissions = [],
       PC.ruleAbilities = mempty,
       PC.lostAllAbilities = False,
+      PC.hasFullText = False,
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,
       PC.assignsCombatDamageWithToughness = False,
