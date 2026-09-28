@@ -134,14 +134,14 @@ instances candidates targets gs =
             then
               -- CR 612.1's word swap over the source's own text, computed HERE
               -- rather than hoisted beside setEffs, the placement
-              -- CombatRestriction.restricted argues for: textChangesAffecting
+              -- CombatRestriction.restricted argues for: readerTextChanges
               -- folds the whole continuous-effect list, and the empty case above
               -- already turned away every permanent that prints no requirement.
               --
               -- The SOURCE's changes and not the required creature's: CR 612.1
               -- changes the words printed on THAT object, and the subject clause
               -- below is printed on the card stating the requirement.
-              mconcat (fmap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements)
+              mconcat (fmap (fromRequirement source (Projection.readerTextChanges source gs)) requirements)
             else ([], [])
       -- One whole-board projection and one grant walk for the whole walk, both
       -- unforced until some permanent actually reaches `named`.

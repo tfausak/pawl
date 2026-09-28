@@ -646,7 +646,7 @@ objectRefPositions =
         ("forbid-attack", Effect.ForbidAttack (ForbidAttack.MkForbidAttack Duration.UntilEndOfTurn (RestrictedCreatures.Named (plantedRef "fa")) Nothing), [plantedRef "fa"]),
         ("forbid-activation", Effect.ForbidActivation (ForbidActivation.MkForbidActivation Duration.UntilEndOfTurn (plantedRef "fv")), [plantedRef "fv"]),
         ("unsuspect", Effect.Unsuspect (plantedRef "us"), [plantedRef "us"]),
-        ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (plantedRef "sl")), [plantedRef "sl"]),
+        ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary Nothing (NonEmpty.singleton (plantedRef "sl"))), [plantedRef "sl"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc") (PlayerRef.Relative PlayerRelation.You) CastObligation.Optional PermissionVerb.Cast CastOffer.defaultValue CastRepetition.Once False False), [plantedRef "oc"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (PlayerRef.Relative PlayerRelation.You) (plantedRef "gp") ManaSpending.AsProduced False PermissionVerb.Play), [plantedRef "gp"]),
         ("grant-look-at-exiled", Effect.GrantLookAtExiled (GrantLookAtExiled.MkGrantLookAtExiled (plantedRef "gl") False), [plantedRef "gl"]),
@@ -699,7 +699,7 @@ playerRefPositions =
         ("give-control", Effect.GiveControl (GiveControl.MkGiveControl (plantedPlayer "gv") (plantedRef "gv")), [plantedPlayer "gv"]),
         ("blight", Effect.Blight (Blight.MkBlight (plantedPlayer "bl") one Nothing), [plantedPlayer "bl"]),
         ("take-extra-turn", Effect.TakeExtraTurn TakeExtraTurn.MkTakeExtraTurn {TakeExtraTurn.player = plantedPlayer "te", TakeExtraTurn.skips = Set.empty, TakeExtraTurn.count = Quantity.Type.Literal 1}, [plantedPlayer "te"]),
-        ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (plantedRef "si")), [plantedPlayer "si"]),
+        ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
         ("cloak", Effect.Cloak (plantedPlayer "ck"), [plantedPlayer "ck"]),
         ("player-sacrifices", Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (plantedPlayer "ps") (Filter.Type.And []) one), [plantedPlayer "ps"]),
@@ -5824,7 +5824,7 @@ effectFilters effect = case effect of
   Effect.FlipCoin flipCoin -> frame Unframed (quantityFilters (FlipCoin.count flipCoin))
   -- CR 500.7's number of turns is a Quantity, so its filters are reachable here.
   Effect.TakeExtraTurn takeExtraTurn -> frame Unframed (quantityFilters (TakeExtraTurn.count takeExtraTurn))
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> frame SourceHostFramed (foldMap objectRefFilters refs)
   -- A PlayerRef carries no Filter, exactly as GainPlayerCounters' does not.
   Effect.Shuffle {} -> []
   -- Nor do card names.

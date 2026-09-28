@@ -79,11 +79,11 @@ gathered gs =
             then
               -- CR 612.1's word swap over the SOURCE's own text, computed here
               -- rather than hoisted beside setEffs, the placement
-              -- CombatRestriction.restricted argues for: textChangesAffecting
+              -- CombatRestriction.restricted argues for: readerTextChanges
               -- folds the whole continuous-effect list, and the empty case
               -- above already turned away every permanent that prints no
               -- prohibition.
-              fmap (\prohibition -> (source, Projection.textChangesAffecting source gs, prohibition)) prohibitions
+              fmap (\prohibition -> (source, Projection.readerTextChanges source gs, prohibition)) prohibitions
             else []
    in concatMap (\source -> fromPermanent source <> fromGrant source) (Set.toList (GameState.battlefield gs))
 

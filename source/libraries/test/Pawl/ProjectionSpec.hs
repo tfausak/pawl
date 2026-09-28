@@ -99,6 +99,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Sickness as Sickness
@@ -4574,6 +4575,13 @@ shapeshifterBoard shapeshifter sorcerer sentry =
 tapAbilityOf :: Bool -> ObjectId.ObjectId -> GameState.GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 tapAbilityOf taps oid gs = filter (\a -> (CostComponent.TapThis `elem` Cost.Type.components (ActivatedAbility.cost a)) == taps) (Activatable.abilitiesFor oid gs)
 
+-- alice's Volrath's Shapeshifter, with `top` the only card in her graveyard.
+fullTextBoard :: Printing.Printing -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+fullTextBoard shapeshifter top gs0 =
+  let (shifterId, b0) = S.addPermanent shapeshifter S.alice gs0
+      (_, b1) = S.addGraveyardCard top S.alice b0
+   in (shifterId, b1)
+
 fullTextSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 fullTextSpec s registry = Spec.describe s "HasFullText" $ do
   -- CR 612.6 whole card: Volrath's Shapeshifter ({1}{U}{U} 0/1, "As long as the
@@ -4635,6 +4643,134 @@ fullTextSpec s registry = Spec.describe s "HasFullText" $ do
         let (_, stocked) = S.addGraveyardCard sentry S.bob copied
         Spec.assertEqWith s "and a 3/3 Ogre Sentry once bob's graveyard has one on top" (Projection.namesOf cloneId stocked, S.powerToughnessOf cloneId stocked) (Set.singleton (CardName.MkCardName (Text.pack "Ogre Sentry")), Just (3, 3))
       ids -> Spec.assertFailure s ("expected one Clone, got " <> show (length ids))
+
+  -- CR 612.6 / 613.6: the full text brings the top card's STATIC abilities, and
+  -- the Shapeshifter's own full-text ability keeps applying though its text is
+  -- gone. Lord of Atlantis ("Other Merfolk get +1/+1 and have islandwalk.") on
+  -- top: alice's Merfolk Seer is a 3/3 islandwalker. The control board has
+  -- Prodigal Sorcerer on top instead, one difference between the two.
+  Spec.it s "CR 612.6 the Shapeshifter as Lord of Atlantis pumps the other Merfolk" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    lord <- S.printingOf s registry "Lord of Atlantis"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    seer <- S.printingOf s registry "Merfolk Seer"
+    let (seerId, b0) = S.addPermanent seer S.alice (Setup.emptyGame S.bothPlayers)
+        (shifterId, asLord) = fullTextBoard shapeshifter lord b0
+        (_, asSorcerer) = fullTextBoard shapeshifter sorcerer b0
+        islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)
+    Spec.assertEqWith s "CR 612.6 with Lord of Atlantis on top the Seer is a 3/3" (S.powerToughnessOf seerId asLord) (Just (3, 3))
+    Spec.assertBool s (Projection.hasKeyword islandwalk seerId asLord) "with islandwalk"
+    Spec.assertEqWith s "with Prodigal Sorcerer on top it is its printed 2/2" (S.powerToughnessOf seerId asSorcerer) (Just (2, 2))
+    Spec.assertBool s (not (Projection.hasKeyword islandwalk seerId asSorcerer)) "without islandwalk"
+    Spec.assertEqWith s "and the Shapeshifter, a Lord of Atlantis itself, is not an OTHER Merfolk" (Projection.namesOf shifterId asLord, S.powerToughnessOf shifterId asLord) (Set.singleton (S.printingName lord), Just (2, 2))
+
+  -- CR 612.6 / 613.10: a player ability comes with the full text. Gnat Miser
+  -- ("Each opponent's maximum hand size is reduced by one.") on top cuts bob's to
+  -- six; the control board's Prodigal Sorcerer leaves it at seven.
+  Spec.it s "CR 612.6 the Shapeshifter as Gnat Miser cuts bob's maximum hand size" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    miser <- S.printingOf s registry "Gnat Miser"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (_, asMiser) = fullTextBoard shapeshifter miser (Setup.emptyGame S.bothPlayers)
+        (_, asSorcerer) = fullTextBoard shapeshifter sorcerer (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "CR 612.6 bob's maximum hand size is six" (PlayerEffect.maximumHandSize S.bob asMiser) (Just 6)
+    Spec.assertEqWith s "and seven with the Sorcerer on top" (PlayerEffect.maximumHandSize S.bob asSorcerer) (Just 7)
+    Spec.assertEqWith s "alice's is untouched" (PlayerEffect.maximumHandSize S.alice asMiser) (Just 7)
+
+  -- CR 612.6 / 116.2: a special action comes with the full text. Leonin Arbiter
+  -- ("Players can't search libraries. Any player may pay {2} for that player to
+  -- ignore this effect until end of turn.") on top: the {2} is offered as the
+  -- Shapeshifter's.
+  Spec.it s "CR 612.6 the Shapeshifter as Leonin Arbiter offers its {2}" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    arbiter <- S.printingOf s registry "Leonin Arbiter"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    island <- S.printingOf s registry "Island"
+    let searchBan = AbilityName.MkAbilityName (Text.pack "search ban")
+        (shifterId, asArbiter) = fullTextBoard shapeshifter arbiter (S.landsInPlay island 2)
+        (_, asSorcerer) = fullTextBoard shapeshifter sorcerer (S.landsInPlay island 2)
+    Spec.assertBool s (List.elem (Action.Type.Ignore shifterId searchBan) (Action.legalActions S.alice asArbiter)) "CR 612.6 the {2} is offered as the Shapeshifter's"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore shifterId searchBan) (Action.legalActions S.alice asSorcerer)) "and not with the Sorcerer on top"
+
+  -- CR 612.6 / 613.11: a rule-affecting ability comes with the full text. Silent
+  -- Arbiter ("No more than one creature can attack each combat. ...") on top
+  -- holds alice's two Goblin Pikers to one attacker; with Prodigal Sorcerer on
+  -- top both attack. One Piker attacks on both boards, so the refusal is the
+  -- bound.
+  Spec.it s "CR 612.6 the Shapeshifter as Silent Arbiter bounds the attack" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    arbiter <- S.printingOf s registry "Silent Arbiter"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    case S.combatBoardOf [piker, piker] [] of
+      (board, [one, two], _) -> do
+        let (_, asArbiter) = fullTextBoard shapeshifter arbiter board
+            (_, asSorcerer) = fullTextBoard shapeshifter sorcerer board
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [one, two] asArbiter)) "CR 612.6 the Arbiter's bound holds alice to one attacker"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [one, two] asSorcerer) "both Pikers attack with the Sorcerer on top"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [one] asArbiter) "and one attacks under the bound"
+      _ -> Spec.assertFailure s "expected two Pikers"
+
+  -- CR 612.6 / 702.98a: a keyword's minted restriction comes with the full
+  -- text. Gore-House Chainwalker ("Unleash") on top, and a +1/+1 counter on the
+  -- Shapeshifter: it can't block. Without the counter it can.
+  Spec.it s "CR 612.6 the Shapeshifter as Gore-House Chainwalker can't block with a counter" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    chainwalker <- S.printingOf s registry "Gore-House Chainwalker"
+    let (shifterId, board) = fullTextBoard shapeshifter chainwalker (Setup.emptyGame S.bothPlayers)
+        unleashed = S.addCounter CounterKind.PlusOnePlusOne 1 shifterId board
+    Spec.assertBool s (not (Combat.canBlock S.alice shifterId unleashed)) "CR 702.98a with a +1/+1 counter it can't block"
+    Spec.assertBool s (Combat.canBlock S.alice shifterId board) "and without one it can"
+
+  -- CR 612.1 / 613.8: the fold rewrites the full text's rule abilities, and a
+  -- gatherer must not rewrite them again. Glacial Crasher ("can't attack unless
+  -- there is a Mountain on the battlefield") goes on top after two Magical
+  -- Hacks on the Shapeshifter: Island -> Mountain, then Mountain -> Island. The
+  -- first depends on the second (CR 613.8a, the second makes the Island it
+  -- changes), so the gate reads Mountain -> Island -> Mountain: alice's Islands
+  -- do not free the Shapeshifter and bob's Mountain does. Re-applying the two
+  -- swaps, composed in timestamp order (Mountain -> Island), would read Island.
+  Spec.it s "CR 612.6 two Hacks rewrite the Shapeshifter's Glacial Crasher gate once" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    crasher <- S.printingOf s registry "Glacial Crasher"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    hack <- S.printingOf s registry "Magical Hack"
+    case S.combatBoardOf [shapeshifter] [] of
+      (board, [shifterId], _) -> do
+        let (_, b1) = S.addPermanent island S.alice board
+            (_, b2) = S.addPermanent island S.alice b1
+            (b3, earlyId) = S.handOne hack b2
+            (b4, lateId) = S.handOne hack b3
+            staged = b4 {GameState.priority = Just S.alice}
+            castEarly = S.runPure (hackSwapping shifterId (Subtype.Type.Island, Subtype.Type.Mountain)) staged (S.cast S.alice earlyId)
+            early = S.runPure (hackSwapping shifterId (Subtype.Type.Island, Subtype.Type.Mountain)) castEarly Stack.resolveTop
+            castLate = S.runPure (hackSwapping shifterId (Subtype.Type.Mountain, Subtype.Type.Island)) early (S.cast S.alice lateId)
+            late = S.runPure (hackSwapping shifterId (Subtype.Type.Mountain, Subtype.Type.Island)) castLate Stack.resolveTop
+            -- The Crasher goes on top AFTER the Hacks, which would otherwise
+            -- bury it in alice's graveyard.
+            (_, hacked) = S.addGraveyardCard crasher S.alice late
+            (_, freed) = S.addPermanent mountain S.bob hacked
+        Spec.assertBool s (not (Combat.canAttack S.alice shifterId hacked)) "CR 613.8 the gate reads Mountain, so alice's Islands leave the Shapeshifter bound"
+        Spec.assertBool s (Combat.canAttack S.alice shifterId freed) "and bob's Mountain frees it"
+        Spec.assertEqWith s "setup: both Hacks resolved onto the Shapeshifter, composing to Mountain -> Island" (Projection.textChangesAffecting shifterId hacked) [(Subtype.Type.Mountain, Subtype.Type.Island)]
+      _ -> Spec.assertFailure s "expected one Shapeshifter"
+
+  -- CR 612.6 / 614.1: a replacement effect comes with the full text. Anafenza,
+  -- the Foremost ("If a nontoken creature an opponent owns would die ..., exile
+  -- that card instead.") on top: bob's destroyed Goblin Piker is exiled. With
+  -- Prodigal Sorcerer on top it reaches bob's graveyard.
+  Spec.it s "CR 612.6 the Shapeshifter as Anafenza exiles bob's dying creature" $ do
+    shapeshifter <- S.printingOf s registry "Volrath's Shapeshifter"
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, b0) = S.addPermanent piker S.bob (Setup.emptyGame S.bothPlayers)
+        (_, asAnafenza) = fullTextBoard shapeshifter anafenza b0
+        (_, asSorcerer) = fullTextBoard shapeshifter sorcerer b0
+        kill = S.runPure S.identityAnswer `flip` Event.destroy Regenerability.Regenerable [pikerId]
+    Spec.assertEqWith s "CR 612.6 bob's Piker is exiled, not put in his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob (kill asAnafenza))) 0
+    Spec.assertEqWith s "with the Sorcerer on top it reaches his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob (kill asSorcerer))) 1
 
 exchangeTextBoxSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do

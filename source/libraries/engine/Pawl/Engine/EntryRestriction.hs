@@ -80,7 +80,7 @@ prohibited oid origin gs =
         restrictions ->
           (null setEffs || Projection.liveAfterLayers setEffs source gs)
             && not (removed source)
-            && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+            && any (fromRestriction source (Projection.readerTextChanges source gs)) restrictions
       -- Two of the three gates above are REGRESSION FENCES rather than proven
       -- behaviour, and both were mutated: CR 305.7's setEffs gate cannot fire for
       -- any printing in the pool, none of which is a land, and no card in

@@ -18,6 +18,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
@@ -38,6 +39,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -2358,6 +2360,121 @@ blossomingTortoiseSpec s registry = Spec.describe s "BlossomingTortoise" $ do
                 (List.sort (named "Forest" : replicate 4 (named "Goblin Piker")))
               Spec.assertBool s (S.onBattlefield tortoiseId resolved) "and the Tortoise itself never moved"
 
+-- Timetwister {2}{U} Sorcery, "Each player shuffles their hand and graveyard
+-- into their library, then draws seven cards." Commit // Memory: Commit {3}{U}
+-- Instant, "Put target spell or nonland permanent into its owner's library
+-- second from the top."; Memory {4}{U}{U} Sorcery, "Aftermath / Each player
+-- shuffles their hand and graveyard into their library, then draws seven
+-- cards." (names, costs, type lines and Oracle text checked against
+-- api.scryfall.com, 2026-09-27.)
+--
+-- CR 701.24 over TWO sets in one instruction. Written as two instructions, the
+-- hand and the graveyard would arrive as two events and each library would be
+-- shuffled twice; the Shuffle log and bob's Dutiful Knowledge Seeker, which
+-- counts arrival events (CR 603.2c), are what tell the readings apart.
+--
+-- THREE SEATS with distinct hand, graveyard and library sizes, so no per-player
+-- figure coincides with another's, and every library holds more than seven.
+timetwisterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+timetwisterSpec s registry = Spec.describe s "Timetwister" $ do
+  let stock printing pid n gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 :: Int .. n]
+      -- Every Prompt.Shuffle is logged by the size of the library it randomizes,
+      -- in the order the engine asks.
+      logging :: Prompt.Prompt r -> State.State [Int] r
+      logging p = case p of
+        Prompt.Shuffle ids -> State.modify' (length ids :) >> pure ids
+        _ -> pure (S.identityAnswer p)
+      runLogged gs game =
+        let ((_, after), shuffles) = State.runState (Engine.runGame logging gs game) []
+         in (after, reverse shuffles)
+      -- Every trigger placed is resolved, so a Seeker that fired twice would
+      -- show two counters rather than one left on the stack.
+      settle gs =
+        let placed = S.runPure S.identityAnswer gs Engine.settleForPriority
+         in if null (GameState.stack placed) then placed else settle (S.runPure S.identityAnswer placed Stack.resolveTop)
+      -- alice: hand 1 (beside the spell), graveyard 1, library 9. bob: hand 2,
+      -- graveyard 3, library 8, and the Seeker. carol: hand 0, graveyard 2,
+      -- library 10.
+      board island forest piker bolt seeker base =
+        let (_, a1) = S.addHandCard piker S.alice base
+            (_, a2) = S.addGraveyardCard bolt S.alice a1
+            (_, b1) = S.addHandCard piker S.bob a2
+            (_, b2) = S.addHandCard bolt S.bob b1
+            (_, b3) = S.addGraveyardCard piker S.bob b2
+            (_, b4) = S.addGraveyardCard bolt S.bob b3
+            (_, b5) = S.addGraveyardCard island S.bob b4
+            (seekerId, b6) = S.addPermanent seeker S.bob b5
+            (_, c1) = S.addGraveyardCard piker S.carol b6
+            (_, c2) = S.addGraveyardCard bolt S.carol c1
+         in (seekerId, stock forest S.alice 9 (stock forest S.bob 8 (stock forest S.carol 10 c2)))
+      sizes zone gs = fmap (\pid -> length (Game.zoneMembers zone pid gs)) [S.alice, S.bob, S.carol]
+  Spec.it s "CR 701.24 each player's hand and graveyard go into their library as ONE event and ONE shuffle, then each draws seven" $ do
+    timetwister <- S.printingOf s registry "Timetwister"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+    let (withSpell, spell) = S.handOne timetwister (S.landsFor island S.alice 3 S.threePlayerGame)
+        (seekerId, ready) = board island forest piker bolt seeker withSpell
+        (resolved, shuffles) = runLogged ready (S.cast S.alice spell >> Stack.resolveTop)
+        after = settle resolved
+    Spec.assertEqWith
+      s
+      "CR 701.24a each library shuffled ONCE, over its old cards, hand and graveyard together, in APNAP order"
+      shuffles
+      [9 + 1 + 1, 8 + 2 + 3, 10 + 0 + 2]
+    Spec.assertEqWith
+      s
+      "CR 603.2c the Seeker saw one arrival event, so the printed 2/2 is a 3/3"
+      (S.counterOf CounterKind.PlusOnePlusOne seekerId after)
+      1
+    Spec.assertEqWith s "then each player drew seven" (sizes Zone.Hand after) [7, 7, 7]
+    Spec.assertEqWith s "out of libraries holding everything else" (sizes Zone.Library after) [11 - 7, 13 - 7, 12 - 7]
+    Spec.assertEqWith
+      s
+      "every graveyard emptied, alice's holding only the Timetwister that resolved (CR 608.2n)"
+      (namesIn Zone.Graveyard S.alice after, sizes Zone.Graveyard after)
+      ([Just (S.printingName timetwister)], [1, 0, 0])
+  -- Memory, cast off the graveyard (CR 702.127a) for the same instruction, and
+  -- exiled on the way out rather than put back.
+  Spec.it s "CR 702.127a Memory cast from a graveyard shuffles every hand and graveyard in, and is exiled" $ do
+    commitMemory <- S.printingOf s registry "Commit"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    seeker <- S.printingOf s registry "Dutiful Knowledge Seeker"
+    let (withIslands, _) = S.handOne piker (S.landsFor island S.alice 6 S.threePlayerGame)
+        (spell, withCard) = S.addGraveyardCard commitMemory S.alice withIslands
+        (seekerId, ready) = board island forest piker bolt seeker withCard
+        memory = CardName.MkCardName (Text.pack "Memory")
+        (resolved, shuffles) = runLogged ready (Cast.castSpell S.manaPerformer S.alice spell memory Facing.FaceUp >> Stack.resolveTop)
+        after = settle resolved
+    Spec.assertEqWith s "CR 701.24a one shuffle per library, over the combined set" shuffles [9 + 2 + 1, 8 + 2 + 3, 10 + 0 + 2]
+    Spec.assertEqWith s "CR 603.2c one arrival event for the Seeker" (S.counterOf CounterKind.PlusOnePlusOne seekerId after) 1
+    Spec.assertEqWith s "each player drew seven" (sizes Zone.Hand after) [7, 7, 7]
+    Spec.assertEqWith s "every graveyard is empty" (sizes Zone.Graveyard after) [0, 0, 0]
+    Spec.assertEqWith s "CR 702.127a and Commit // Memory is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+  -- Commit's own half: CR 401.7's "second from the top", read off a SPELL, which
+  -- leaves the stack for its owner's library without being countered.
+  Spec.it s "CR 401.7 Commit puts target spell into its owner's library second from the top" $ do
+    commitMemory <- S.printingOf s registry "Commit"
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (withSpell, spell) = S.handOne commitMemory (S.landsFor island S.alice 4 (Setup.emptyGame S.bothPlayers))
+        (_, withLibrary) = S.addLibraryCard forest S.bob (snd (S.addLibraryCard forest S.bob withSpell))
+        (_, ready) = S.spellOnStack piker S.bob withLibrary
+        cast = S.runPure S.identityAnswer ready (Cast.castSpell S.manaPerformer S.alice spell (CardName.MkCardName (Text.pack "Commit")) Facing.FaceUp)
+        after = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith
+      s
+      "bob's library reads Forest, Goblin Piker, Forest from the top"
+      (namesIn Zone.Library S.bob after)
+      (fmap Just [S.printingName forest, S.printingName piker, S.printingName forest])
+    Spec.assertEqWith s "and the stack is empty" (length (GameState.stack after)) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   destroyAllSpec s registry
@@ -2379,3 +2496,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   openTheWaySpec s registry
   carthTheLionSpec s registry
   blossomingTortoiseSpec s registry
+  timetwisterSpec s registry

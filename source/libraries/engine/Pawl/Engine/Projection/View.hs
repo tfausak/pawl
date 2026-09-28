@@ -985,7 +985,7 @@ copiableCharacteristicsTurned oid gs = copiableCharacteristicsFaceUp oid (Game.w
 -- above).
 --
 -- THE accessor all seven of those readers share -- the record above,
--- staticAbilitiesOf and specialActionsOf below, Pawl.Engine.Projection's
+-- staticAbilitiesOf and copiableSpecialActionsOf below, Pawl.Engine.Projection's
 -- copiableReplacementsOf, anyCopiableKeyword and copiableMintsType, and
 -- Pawl.Engine.PlayerEffect's playerAbilitiesOf -- so that no two of them can
 -- answer differently about one object. Four of the seven are disjuncts of ONE
@@ -998,8 +998,9 @@ copiableCharacteristicsTurned oid gs = copiableCharacteristicsFaceUp oid (Game.w
 -- Two of those seven have a producer over a copied door -- copiableReplacementsOf
 -- (Torture Pit, proved by Pawl.RoomSpec's "CR 707.2a a copy of a Room gathers the
 -- replacement effect behind the door IT unlocked") and playerAbilitiesOf
--- (Steaming Sauna). anyCopiableKeyword, copiableMintsType and specialActionsOf
--- have none and are REGRESSION FENCES: no printed Room half prints a keyword,
+-- (Steaming Sauna). anyCopiableKeyword, copiableMintsType and
+-- copiableSpecialActionsOf have none and are REGRESSION FENCES: no printed Room
+-- half prints a keyword,
 -- none is a Saga, a planeswalker or a battle, and none grants a CR 116.2
 -- permission (Scryfall `t:room`, 2026-09-05), so nothing can redden if they are
 -- left behind again.
@@ -1218,7 +1219,7 @@ grantedStaticAbilitiesOf oid gs =
 -- CR 116.2: the special actions this object's copiable rules text grants -- its
 -- copy snapshot's when it has one, its printed face's otherwise.
 -- staticAbilitiesOf above in every respect, and split from it for the same two
--- structural reasons; the one caller is Pawl.Engine.Ignore.ignoreGrants.
+-- structural reasons; the one caller is Pawl.Engine.Projection.specialActionsOf.
 --
 -- CR 707.2a is what puts the snapshot first: the permission is derived from the
 -- copied object's rules text, so a permanent that became a copy of Leonin
@@ -1230,8 +1231,8 @@ grantedStaticAbilitiesOf oid gs =
 -- CR 116.2e's discard is not asked of this: that permission is read of a card in
 -- HAND (Pawl.Engine.Action.discardableCards, off Pawl.Engine.Card.combined), a
 -- zone in which nothing in data/cards/ can make an object a copy.
-specialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
-specialActionsOf carrier gs =
+copiableSpecialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
+copiableSpecialActionsOf carrier gs =
   let oid = textBoxHolderOf carrier gs
    in case carriedSnapshotOf carrier oid gs of
         Just snapshot -> PC.specialActions snapshot
@@ -1240,11 +1241,12 @@ specialActionsOf carrier gs =
 
 -- CR 613.11: the twelve rule-affecting ability families this object's copiable
 -- rules text gives it -- its copy snapshot's when it has one, its printed face's
--- otherwise. specialActionsOf above in every respect, and split out for the same
--- two structural reasons.
+-- otherwise. copiableSpecialActionsOf above in every respect, and split out for
+-- the same two structural reasons.
 --
 -- THE reader for all twelve gatherer modules (Pawl.Engine.CombatRestriction and
--- its eleven siblings), which is what makes the two rules it settles settle once:
+-- its eleven siblings), through Pawl.Engine.Projection.ruleAbilitiesOf, which
+-- is what makes the two rules it settles settle once:
 -- CR 707.2a, so a permanent that became a copy of Silent Arbiter limits attackers
 -- and its own printed face is never consulted, and CR 702.140e with CR 730.2a, so
 -- a merged permanent answers with every component's -- Pawl.Engine.Event.merge
@@ -1259,8 +1261,8 @@ specialActionsOf carrier gs =
 -- Copiable text only: what a stored grant gave the object is
 -- Pawl.Engine.Projection.grantedRuleAbilities, which each gatherer reads beside
 -- this.
-ruleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
-ruleAbilitiesOf carrier gs =
+copiableRuleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
+copiableRuleAbilitiesOf carrier gs =
   let oid = textBoxHolderOf carrier gs
    in case carriedSnapshotOf carrier oid gs of
         Just snapshot -> PC.ruleAbilities snapshot
@@ -1268,7 +1270,8 @@ ruleAbilitiesOf carrier gs =
         Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)
 
 -- The thirteen lists a printed face declares. Its own function so that the seed
--- above and ruleAbilitiesOf's fallback cannot drift on what a face contributes.
+-- above and copiableRuleAbilitiesOf's fallback cannot drift on what a face
+-- contributes.
 ruleAbilitiesOfFace :: Face.Face Card.Type.Card -> RuleAbilities.RuleAbilities
 ruleAbilitiesOfFace face =
   RuleAbilities.MkRuleAbilities
@@ -1347,6 +1350,7 @@ noCharacteristics =
       -- CR 613.11: no characteristics, so none of the twelve families either.
       PC.ruleAbilities = mempty,
       PC.lostAllAbilities = False,
+      PC.hasFullText = False,
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,
       PC.assignsCombatDamageWithToughness = False,
@@ -1478,8 +1482,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               PC.grantedPlayerAbilities = [],
               PC.grantedStaticAbilities = [],
               -- CR 116.2, in the seed for the same reason and read by
-              -- specialActionsOf below: CR 707.2a copies the abilities a face's
-              -- rules text derives, and CR 116.2d's permission is one of them.
+              -- copiableSpecialActionsOf below: CR 707.2a copies the abilities a
+              -- face's rules text derives, and CR 116.2d's permission is one of
+              -- them.
               PC.specialActions = Face.specialActions face,
               PC.activatedAbilities = Face.activatedAbilities face,
               PC.replacementEffects = Face.replacementEffects face,
@@ -1503,6 +1508,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               -- CR 613.1's starting point, before layer 6 has run:
               -- applyModification's LoseAllAbilities arm is the only writer.
               PC.lostAllAbilities = False,
+              -- Nor has layer 3.
+              PC.hasFullText = False,
               -- The seed is CR 613.1's starting point, before layer 3 has run.
               PC.subtypeWordChanges = [],
               PC.textChangedKeywords = Map.empty,
