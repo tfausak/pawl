@@ -167,7 +167,7 @@ isActivateOf oid action = case action of
   A.TurnFaceUp {} -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
-  A.Plot _ -> False
+  A.Plot {} -> False
   A.Foretell _ -> False
   A.Suspend _ -> False
   A.PutCompanionIntoHand -> False

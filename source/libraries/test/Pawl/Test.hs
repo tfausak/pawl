@@ -54,6 +54,7 @@ import qualified Pawl.Codec.AfterTurnSpec
 import qualified Pawl.Codec.AgainstSlotSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AimedAtSpec
+import qualified Pawl.Codec.AlternativeActivationCostSpec
 import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.AnyNumberDiscardSpec
 import qualified Pawl.Codec.AnyNumberMatchingSpec
@@ -418,6 +419,7 @@ import qualified Pawl.Codec.PlayerSacrificesSpec
 import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PlayerSpec
 import qualified Pawl.Codec.PlayerStaticAbilitySpec
+import qualified Pawl.Codec.PlotFromZoneSpec
 import qualified Pawl.Codec.PlusSpec
 import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.PowerSpec
@@ -770,6 +772,7 @@ spec s registry = do
   Pawl.CoinSpec.spec s registry
   Pawl.Codec.AbilityAddsManaSpec.spec s
   Pawl.Codec.AbilityKindSpec.spec s
+  Pawl.Codec.AlternativeActivationCostSpec.spec s
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
   Pawl.Codec.ActivatedAbilitySourceSpec.spec s
@@ -1163,6 +1166,7 @@ spec s registry = do
   Pawl.Codec.PlayerRelationSpec.spec s
   Pawl.Codec.PlayerSacrificesSpec.spec s
   Pawl.Codec.PlayerScopeSpec.spec s
+  Pawl.Codec.PlotFromZoneSpec.spec s
   Pawl.Codec.PlayerSpec.spec s
   Pawl.Codec.PlayerStaticAbilitySpec.spec s
   Pawl.Codec.PlusSpec.spec s

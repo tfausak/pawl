@@ -2,6 +2,7 @@ module Pawl.Codec.PlayerEffect where
 
 import qualified Pawl.Codec.AddActivationCost as AddActivationCost
 import qualified Pawl.Codec.AddSpellCost as AddSpellCost
+import qualified Pawl.Codec.AlternativeActivationCost as AlternativeActivationCost
 import qualified Pawl.Codec.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Codec.CastFromZone as CastFromZone
 import qualified Pawl.Codec.DamagePattern as DamagePattern
@@ -14,6 +15,7 @@ import qualified Pawl.Codec.ManaFilter as ManaFilter
 import qualified Pawl.Codec.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerScope as PlayerScope
+import qualified Pawl.Codec.PlotFromZone as PlotFromZone
 import qualified Pawl.Codec.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Codec.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Codec.SpendManaAsThough as SpendManaAsThough
@@ -40,6 +42,7 @@ codec =
           Arm.payload "ReduceSpellCost" ReduceSpellCost.codec PlayerEffect.ReduceSpellCost (\x -> case x of PlayerEffect.ReduceSpellCost y -> Just y; _ -> Nothing),
           Arm.payload "ReduceActivationCost" ReduceActivationCost.codec PlayerEffect.ReduceActivationCost (\x -> case x of PlayerEffect.ReduceActivationCost y -> Just y; _ -> Nothing),
           Arm.payload "AddActivationCost" AddActivationCost.codec PlayerEffect.AddActivationCost (\x -> case x of PlayerEffect.AddActivationCost y -> Just y; _ -> Nothing),
+          Arm.payload "AlternativeActivationCost" AlternativeActivationCost.codec PlayerEffect.AlternativeActivationCost (\x -> case x of PlayerEffect.AlternativeActivationCost y -> Just y; _ -> Nothing),
           Arm.payload "AddSpellCost" AddSpellCost.codec PlayerEffect.AddSpellCost (\x -> case x of PlayerEffect.AddSpellCost y -> Just y; _ -> Nothing),
           Arm.payload "PlayAdditionalLands" Common.natural PlayerEffect.PlayAdditionalLands (\x -> case x of PlayerEffect.PlayAdditionalLands y -> Just y; _ -> Nothing),
           Arm.nullary "NoMaximumHandSize" PlayerEffect.NoMaximumHandSize,
@@ -66,6 +69,7 @@ codec =
           Arm.payload "CantPlayLands" filterCodec PlayerEffect.CantPlayLands (\x -> case x of PlayerEffect.CantPlayLands y -> Just y; _ -> Nothing),
           Arm.payload "CastFrom" CastFromZone.codec PlayerEffect.CastFrom (\x -> case x of PlayerEffect.CastFrom y -> Just y; _ -> Nothing),
           Arm.payload "PlayLandsFrom" InZone.codec PlayerEffect.PlayLandsFrom (\x -> case x of PlayerEffect.PlayLandsFrom y -> Just y; _ -> Nothing),
+          Arm.payload "PlotFrom" PlotFromZone.codec PlayerEffect.PlotFrom (\x -> case x of PlayerEffect.PlotFrom y -> Just y; _ -> Nothing),
           Arm.payload "CastFromHandWithoutPayingManaCost" filterCodec PlayerEffect.CastFromHandWithoutPayingManaCost (\x -> case x of PlayerEffect.CastFromHandWithoutPayingManaCost y -> Just y; _ -> Nothing),
           Arm.payload "CantGetCounters" (Common.maybe PlayerCounterKind.codec) PlayerEffect.CantGetCounters (\x -> case x of PlayerEffect.CantGetCounters y -> Just y; _ -> Nothing),
           Arm.payload "StateCoinFlip" StatedFlip.codec PlayerEffect.StateCoinFlip (\x -> case x of PlayerEffect.StateCoinFlip y -> Just y; _ -> Nothing),
@@ -87,6 +91,7 @@ tagOf x = case x of
   PlayerEffect.ReduceSpellCost {} -> "ReduceSpellCost"
   PlayerEffect.ReduceActivationCost {} -> "ReduceActivationCost"
   PlayerEffect.AddActivationCost {} -> "AddActivationCost"
+  PlayerEffect.AlternativeActivationCost {} -> "AlternativeActivationCost"
   PlayerEffect.AddSpellCost {} -> "AddSpellCost"
   PlayerEffect.PlayAdditionalLands {} -> "PlayAdditionalLands"
   PlayerEffect.NoMaximumHandSize {} -> "NoMaximumHandSize"
@@ -113,6 +118,7 @@ tagOf x = case x of
   PlayerEffect.CantPlayLands {} -> "CantPlayLands"
   PlayerEffect.CastFrom {} -> "CastFrom"
   PlayerEffect.PlayLandsFrom {} -> "PlayLandsFrom"
+  PlayerEffect.PlotFrom {} -> "PlotFrom"
   PlayerEffect.CastFromHandWithoutPayingManaCost {} -> "CastFromHandWithoutPayingManaCost"
   PlayerEffect.CantGetCounters {} -> "CantGetCounters"
   PlayerEffect.StateCoinFlip {} -> "StateCoinFlip"

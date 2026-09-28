@@ -48,7 +48,7 @@ import qualified Pawl.Types.Zone as Zone
 -- cost together -- or Nothing when it has none.
 --
 -- Read off the CARD (Card.combined) and never a projection, the reading
--- Pawl.Engine.Plot.plotCostOf gives one rule over: the ability functions in the
+-- Pawl.Engine.Plot.plotCostsOf gives one rule over: the ability functions in the
 -- hand, where this reader takes the printed card (#1859). A hand member with no
 -- card behind it -- a token, an ability -- has no suspend ability.
 suspendOf :: ObjectId -> GameState -> Maybe (Suspend.Suspend Keyword)

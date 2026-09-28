@@ -263,6 +263,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
@@ -717,12 +718,13 @@ playerRefPositions =
         -- RedirectDamage and this one.
         ("grant-play-from-exile-duration", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile (Duration.UntilEndOfNextTurnOf (plantedPlayer "gp-duration")) (plantedPlayer "gp-player") (plantedRef "gp-ref") ManaSpending.AsProduced False PermissionVerb.Play), [plantedPlayer "gp-duration", plantedPlayer "gp-player"]),
         -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
-        -- the opcode -- the two CR 601.3 / 305.1 permissions that name whose zone
-        -- (Sen Triplets). Both are planted, since Pawl.Engine.PlayerEffect's
+        -- the opcode -- the CR 601.3 / 305.1 / 702.170f permissions that name whose
+        -- zone (Sen Triplets). All three are planted, since Pawl.Engine.PlayerEffect's
         -- traversal is what the AffectPlayers arm delegates to and a missing arm
         -- there answers [] rather than failing to compile.
         ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []) PermissionLimit.Unlimited PermissionVerb.Cast)), [plantedPlayer "ap-cast"]),
         ("affect-players-play-lands-from", affecting (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (plantedPlayer "ap-land"))), [plantedPlayer "ap-land"]),
+        ("affect-players-plot-from", affecting (PlayerEffect.PlotFrom (PlotFromZone.MkPlotFromZone (InZone.MkInZone Zone.Library (plantedPlayer "ap-plot")) (Filter.Type.And []))), [plantedPlayer "ap-plot"]),
         -- And an arm carrying none, so the traversal is shown answering nothing where
         -- there is nothing to answer.
         ("affect-players-cant-cast", affecting PlayerEffect.CantCastSpells, [])
@@ -4712,6 +4714,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- ones go through costComponentFilters so an added component and a printed
   -- one are held to one standard.
   PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f _ components _) -> f : concatMap costComponentFilters components
+  PlayerEffect.AlternativeActivationCost _ -> []
   -- The spell-side twin, whose Filter names the SPELL (Drought's is universal)
   -- and whose components carry one of their own ("sacrifice a SWAMP").
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components _) -> f : concatMap costComponentFilters components
@@ -4795,6 +4798,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 305.1's play-side permission narrows nothing: a land play has already
   -- fixed the card type, and Crucible of Worlds' sentence says no more.
   PlayerEffect.PlayLandsFrom _ -> []
+  -- CR 702.170f's permission, narrowed by the card's own qualities exactly as
+  -- the cast-side one above is (Fblthp, Lost on the Range's "nonland cards").
+  PlayerEffect.PlotFrom grant -> [PlotFromZone.matching grant]
   -- CR 118.9's standing alternative cost, narrowed by the spell's own qualities
   -- exactly as the zone permission above is (Omniscience's is `And []`).
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> [f]

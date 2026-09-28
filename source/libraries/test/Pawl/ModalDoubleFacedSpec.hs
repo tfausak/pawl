@@ -135,7 +135,7 @@ landPlays actions =
         A.Unlock _ _ -> Nothing
         A.Activate _ _ -> Nothing
         A.DiscardFromHand _ -> Nothing
-        A.Plot _ -> Nothing
+        A.Plot {} -> Nothing
         A.Foretell _ -> Nothing
         A.Suspend _ -> Nothing
         A.PutCompanionIntoHand -> Nothing

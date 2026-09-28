@@ -55,6 +55,7 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AlternativeActivationCost as AlternativeActivationCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import Pawl.Types.CardName (CardName)
@@ -71,8 +72,10 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
+import qualified Pawl.Types.ManaCost as ManaCost
 import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.Object as Object
@@ -90,6 +93,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.PlayerScope (PlayerScope)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
@@ -97,6 +101,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
 import qualified Pawl.Types.StatedFlip as StatedFlip
 import Pawl.Types.Timestamp (Timestamp)
+import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.Zone as Zone
 
@@ -593,6 +598,7 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         -- CR 305.2 raises how many LANDS may be played, and a land is never
         -- cast (CR 305.1), so this grant reaches nothing here.
@@ -676,6 +682,7 @@ prohibitsCasting pid oid name variable gs =
         -- where it is read.
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -755,6 +762,7 @@ prohibitsPlayingLand pid names oid gs =
         -- ever "does something stop THIS land". mayPlayLandsFrom below is where
         -- the grant is read.
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         -- CR 305.1 again, in the other direction: a prohibition on CASTING says
         -- nothing about a special action, so Silence and Rule of Law leave a
         -- land play alone. CR 305.2's and CR 305.3's limits are the closed
@@ -771,6 +779,7 @@ prohibitsPlayingLand pid names oid gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         -- CR 305.2 raises HOW MANY lands may be played, never WHICH: a grant is
         -- no permission for a land this rule stops. landPlaysAllowed below is
@@ -857,6 +866,7 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -880,6 +890,7 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -924,6 +935,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -947,6 +959,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
@@ -989,6 +1002,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -1017,6 +1031,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -1046,6 +1061,7 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -1069,6 +1085,7 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -1098,6 +1115,7 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -1121,6 +1139,7 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -1375,6 +1394,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities -> Nothing
@@ -1406,6 +1426,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1424,6 +1445,7 @@ spellCostAdjustments pid oid gs =
         -- gathered here, by additionOf below, and never there.
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities -> Nothing
@@ -1455,6 +1477,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1477,6 +1500,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
@@ -1507,6 +1531,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1531,6 +1556,45 @@ spellCostAdjustments pid oid gs =
           -- spell from another effect.
           CostAdjustments.components = concat (Maybe.mapMaybe additionOf effects)
         }
+
+-- Professor Hojo's "the FIRST activated ability you activate during your turn"
+-- and Kíli the Resourceful's "the first equip ability you activate each turn":
+-- in a turn the scope admits, is there no activation by `pid` earlier this turn
+-- matching the criteria? Reduced or not, and whether or not the effect asking
+-- existed yet (Tezzeret, Betrayer of Flesh's ruling). Asked of
+-- GameState.activationsThisTurn's snapshots rather than the live board, with the
+-- same four criteria Pawl.Types.ReduceActivationCost carries; `source` is the
+-- asking effect's own permanent, which Filter.IsSource reads.
+firstActivation :: PlayerId -> Maybe ObjectId -> Filter Keyword -> Maybe KeywordDesignator.KeywordDesignator -> Maybe AbilityKind.AbilityKind -> Maybe (Filter Keyword) -> GameState -> TurnScope.TurnScope -> Bool
+firstActivation pid source criterion granted wantedKind aimedAt gs scope =
+  let snapshotView snapshot =
+        (Count.viewOfSnapshot False (ObjectSnapshot.controller snapshot) (Just (ObjectSnapshot.owner snapshot)) False Map.empty (ObjectSnapshot.characteristics snapshot))
+          { Filter.identity = Just (ObjectSnapshot.object snapshot)
+          }
+      matchesSnapshot you criterion' snapshot = Filter.matches (contextFor you source gs) (snapshotView snapshot) criterion'
+      admits past =
+        PastActivation.activator past == pid
+          && matchesSnapshot (ObjectSnapshot.controller (PastActivation.source past)) criterion (PastActivation.source past)
+          && maybe True (\g -> any (Keyword.designates g) (PastActivation.keyword past)) granted
+          && maybe True (== PastActivation.kind past) wantedKind
+          && maybe True (\f -> any (matchesSnapshot (Just pid) f) (PastActivation.targets past)) aimedAt
+   in Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
+        && not (any admits (GameState.activationsThisTurn gs))
+
+-- CR 118.9 through CR 602.2b: the costs `pid` may pay RATHER THAN the
+-- activation cost of an ability stamped `stamp` -- Kíli the Resourceful's {0}
+-- for "the equip cost of the first equip ability you activate each turn".
+-- Offered at CR 601.2b by Pawl.Engine.Activatable.costsFor; CR 118.9d's
+-- increases and reductions then apply to whichever is chosen.
+alternativeActivationCosts :: PlayerId -> Maybe Keyword -> GameState -> [ManaCost.ManaCost]
+alternativeActivationCosts pid stamp gs =
+  let offered (source, effect) = case effect of
+        PlayerEffect.AlternativeActivationCost (AlternativeActivationCost.MkAlternativeActivationCost granted onlyFirst amount) ->
+          if any (Keyword.designates granted) stamp && maybe True (firstActivation pid source (Filter.Type.And []) (Just granted) Nothing Nothing gs) onlyFirst
+            then Just amount
+            else Nothing
+        _ -> Nothing
+   in Maybe.mapMaybe offered (applying pid gs)
 
 -- CR 613.11 / 601.2f: the cost reductions that apply to `pid` ACTIVATING an
 -- ability of `srcId`, with the floor those reductions impose (CR 101.1 card
@@ -1621,27 +1685,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
       -- not the target's own controller, which would make Professor Hojo's "a
       -- creature you control" true of every creature.
       aims source criterion = any (\oid -> matchesObjectFor pid source criterion oid gs) (Set.toList targets)
-      -- The same four criteria asked of an activation already in
-      -- GameState.activationsThisTurn, against its snapshots rather than the
-      -- live board -- what "the first activated ability you activate" counts.
-      snapshotView snapshot =
-        (Count.viewOfSnapshot False (ObjectSnapshot.controller snapshot) (Just (ObjectSnapshot.owner snapshot)) False Map.empty (ObjectSnapshot.characteristics snapshot))
-          { Filter.identity = Just (ObjectSnapshot.object snapshot)
-          }
-      matchesSnapshot you source criterion snapshot = Filter.matches (contextFor you source gs) (snapshotView snapshot) criterion
-      admits source criterion granted wantedKind aimedAt past =
-        PastActivation.activator past == pid
-          && matchesSnapshot (ObjectSnapshot.controller (PastActivation.source past)) source criterion (PastActivation.source past)
-          && maybe True (\g -> any (Keyword.designates g) (PastActivation.keyword past)) granted
-          && maybe True (== PastActivation.kind past) wantedKind
-          && maybe True (\f -> any (matchesSnapshot (Just pid) source f) (PastActivation.targets past)) aimedAt
-      -- Professor Hojo's "the FIRST activated ability you activate during your
-      -- turn": in a turn the scope admits, and with no matching activation
-      -- earlier this turn -- reduced or not, and whether or not this reducer
-      -- existed yet (Tezzeret, Betrayer of Flesh's ruling).
-      isFirst source criterion granted wantedKind aimedAt scope =
-        Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
-          && not (any (admits source criterion granted wantedKind aimedAt) (GameState.activationsThisTurn gs))
+      isFirst source criterion granted wantedKind aimedAt = firstActivation pid source criterion granted wantedKind aimedAt gs
       -- CR 601.2f's MANA increase, the half CostAdjustments.increases was an
       -- empty literal for until Oppressive Rays gave it a producer; see #1242.
       -- No family beside the criterion, IncreaseActivationCost's own reason --
@@ -1659,6 +1703,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities -> Nothing
@@ -1690,6 +1735,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1715,6 +1761,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         -- arithmetic has nothing to do to a component, so it never joins the
         -- reductions.
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         -- Thalia and Sapphire Medallion, turned away by the constructor and not
         -- by their Filters, which is exactly what keeps a noncreature permanent's
@@ -1752,6 +1799,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1777,6 +1825,8 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
           if matchesObjectFrom source criterion srcId gs && maybe True (== loyalty) wantedLoyalty
             then Just (fmap ((,) scale) components)
             else Nothing
+        -- CR 118.9: not an addition; Activatable.costsFor offers it at 601.2b.
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.IncreaseSpellCost {} -> Nothing
@@ -1812,6 +1862,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -1903,6 +1954,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.ReduceSpellCost {} -> Nothing
   PlayerEffect.ReduceActivationCost {} -> Nothing
   PlayerEffect.AddActivationCost {} -> Nothing
+  PlayerEffect.AlternativeActivationCost {} -> Nothing
   PlayerEffect.AddSpellCost {} -> Nothing
   PlayerEffect.PlayAdditionalLands _ -> Nothing
   PlayerEffect.NoMaximumHandSize -> Nothing
@@ -1927,6 +1979,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.CantPlayLands _ -> Nothing
   PlayerEffect.CastFrom _ -> Nothing
   PlayerEffect.PlayLandsFrom _ -> Nothing
+  PlayerEffect.PlotFrom _ -> Nothing
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
   PlayerEffect.CantGetCounters _ -> Nothing
   PlayerEffect.StateCoinFlip _ -> Nothing
@@ -2151,6 +2204,7 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -2179,6 +2233,7 @@ castPermissionsFrom pid zone oid gs =
         -- play lands from a graveyard permits no cast (Crucible of Worlds lets
         -- nobody cast anything).
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         -- A COST and not a permission at all: Omniscience says what a spell
         -- pays, never where it may be cast from, so it opens no zone.
         -- mayCastFromHandWithoutPayingManaCost below is its one reader, and CR
@@ -2298,6 +2353,29 @@ landPermissionOptions rides pid oid gs = case Game.lookupObject oid gs of
         free = (zone == Zone.Hand && Object.owner obj == pid) || elem (zone, Object.owner obj) (playLandPiles pid gs)
      in permissionOptions rides free (landPermissionsFrom pid zone oid gs)
 
+-- CR 702.170f: the (zone, owner) piles some PlotFrom grant opens to `pid`, for
+-- Pawl.Engine.Plot to draw candidates from, playPermissionPiles' shape; which of
+-- their cards it covers is mayPlotFrom's per-card answer.
+plotPiles :: PlayerId -> GameState -> [(Zone.Zone, PlayerId)]
+plotPiles pid gs =
+  [ (InZone.zone inZone, owner)
+  | (_, PlayerEffect.PlotFrom grant) <- applying pid gs,
+    let inZone = PlotFromZone.from grant,
+    owner <- zoneOwners pid (InZone.player inZone) gs
+  ]
+
+-- CR 702.170f: does some PlotFrom grant let plot function for `oid` in `zone`
+-- for `pid`? The zone and its owner are opensZoneOf's, the criterion
+-- matchesObjectFrom's, castPermissionsFrom's two conjuncts; the narrowing to a
+-- library's top card is the caller's (Pawl.Engine.Cast.pileCandidates).
+mayPlotFrom :: PlayerId -> Zone.Zone -> ObjectId -> GameState -> Bool
+mayPlotFrom pid zone oid gs =
+  or
+    [ opensZoneOf pid zone oid (PlotFromZone.from grant) gs
+        && matchesObjectFrom source (PlotFromZone.matching grant) oid gs
+    | (source, PlayerEffect.PlotFrom grant) <- applying pid gs
+    ]
+
 -- CR 118.9 / Omniscience: may `pid` cast `oid` from their hand without paying
 -- its mana cost, because an EFFECT applies that alternative cost to it?
 --
@@ -2344,6 +2422,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities -> False
@@ -2360,6 +2439,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.SetMaximumHandSize _ -> False
@@ -2415,6 +2495,8 @@ playLandPiles pid gs =
         -- one narrows by card and spends a budget, so playPermissionPiles and
         -- landPermissionsFrom answer for it rather than this unfiltered list.
         PlayerEffect.CastFrom _ -> []
+        -- CR 702.170f's plot is a special action of its own and plays nothing.
+        PlayerEffect.PlotFrom _ -> []
         -- CR 305.2's COUNT, which says nothing about a zone. The two compose in
         -- Pawl.Engine.Action.legalActions -- that one bounds how many plays,
         -- this one widens where they may come from -- without either knowing of
@@ -2432,6 +2514,7 @@ playLandPiles pid gs =
         PlayerEffect.ReduceSpellCost {} -> []
         PlayerEffect.ReduceActivationCost {} -> []
         PlayerEffect.AddActivationCost {} -> []
+        PlayerEffect.AlternativeActivationCost {} -> []
         PlayerEffect.AddSpellCost {} -> []
         PlayerEffect.NoMaximumHandSize -> []
         PlayerEffect.SetMaximumHandSize _ -> []
@@ -2520,6 +2603,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -2548,6 +2632,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -2617,6 +2702,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -2639,6 +2725,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -2698,6 +2785,7 @@ protectionCarriers gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
@@ -2720,6 +2808,7 @@ protectionCarriers gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -2774,6 +2863,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.SetMaximumHandSize _ -> Nothing
@@ -2797,6 +2887,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -2835,6 +2926,7 @@ votesAllowed pid gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands {} -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
@@ -2861,6 +2953,7 @@ votesAllowed pid gs =
         PlayerEffect.CantPlayLands {} -> Nothing
         PlayerEffect.CastFrom {} -> Nothing
         PlayerEffect.PlayLandsFrom {} -> Nothing
+        PlayerEffect.PlotFrom {} -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost {} -> Nothing
         PlayerEffect.CantGetCounters {} -> Nothing
         PlayerEffect.StateCoinFlip {} -> Nothing
@@ -2928,6 +3021,7 @@ maximumHandSize pid gs =
         PlayerEffect.ReduceSpellCost {} -> current
         PlayerEffect.ReduceActivationCost {} -> current
         PlayerEffect.AddActivationCost {} -> current
+        PlayerEffect.AlternativeActivationCost {} -> current
         PlayerEffect.AddSpellCost {} -> current
         PlayerEffect.PlayAdditionalLands _ -> current
         PlayerEffect.DontLoseUnspentMana _ -> current
@@ -2950,6 +3044,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantPlayLands _ -> current
         PlayerEffect.CastFrom _ -> current
         PlayerEffect.PlayLandsFrom _ -> current
+        PlayerEffect.PlotFrom _ -> current
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> current
         PlayerEffect.CantGetCounters _ -> current
         PlayerEffect.StateCoinFlip _ -> current
@@ -3001,6 +3096,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
@@ -3024,6 +3120,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -3064,6 +3161,7 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.ReduceSpellCost _ -> False
         PlayerEffect.ReduceActivationCost _ -> False
         PlayerEffect.AddActivationCost _ -> False
+        PlayerEffect.AlternativeActivationCost _ -> False
         PlayerEffect.AddSpellCost _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -3090,6 +3188,7 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -3131,6 +3230,7 @@ prohibitsGainingLife pid gs =
         PlayerEffect.ReduceSpellCost _ -> False
         PlayerEffect.ReduceActivationCost _ -> False
         PlayerEffect.AddActivationCost _ -> False
+        PlayerEffect.AlternativeActivationCost _ -> False
         PlayerEffect.AddSpellCost _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -3157,6 +3257,7 @@ prohibitsGainingLife pid gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -3193,6 +3294,7 @@ prohibitsLosingLife pid gs =
         PlayerEffect.ReduceSpellCost _ -> False
         PlayerEffect.ReduceActivationCost _ -> False
         PlayerEffect.AddActivationCost _ -> False
+        PlayerEffect.AlternativeActivationCost _ -> False
         PlayerEffect.AddSpellCost _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -3219,6 +3321,7 @@ prohibitsLosingLife pid gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -3259,6 +3362,7 @@ spendManaAsThough pid gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
@@ -3282,6 +3386,7 @@ spendManaAsThough pid gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -3336,6 +3441,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.ReduceSpellCost {} -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.AlternativeActivationCost {} -> False
         PlayerEffect.AddSpellCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
@@ -3364,6 +3470,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
@@ -3431,6 +3538,7 @@ unpreventable gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -3449,6 +3557,7 @@ unpreventable gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
@@ -3503,6 +3612,7 @@ unredirectable gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
         PlayerEffect.StateCoinFlip _ -> Nothing
@@ -3521,6 +3631,7 @@ unredirectable gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
@@ -3574,6 +3685,7 @@ statedFlips pid gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
@@ -3600,6 +3712,7 @@ statedFlips pid gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
    in Maybe.mapMaybe (says . snd) (applying pid gs)
@@ -3642,6 +3755,7 @@ rollModifiers pid gs =
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
@@ -3668,6 +3782,7 @@ rollModifiers pid gs =
         PlayerEffect.CantPlayLands _ -> Nothing
         PlayerEffect.CastFrom _ -> Nothing
         PlayerEffect.PlayLandsFrom _ -> Nothing
+        PlayerEffect.PlotFrom _ -> Nothing
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantGetCounters _ -> Nothing
    in Maybe.mapMaybe (\(source, effect) -> fmap ((,) source) (modifies effect)) (applying pid gs)
@@ -3730,6 +3845,7 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.ReduceSpellCost _ -> pure effect
   PlayerEffect.ReduceActivationCost _ -> pure effect
   PlayerEffect.AddActivationCost _ -> pure effect
+  PlayerEffect.AlternativeActivationCost _ -> pure effect
   PlayerEffect.AddSpellCost _ -> pure effect
   PlayerEffect.PlayAdditionalLands _ -> pure effect
   PlayerEffect.NoMaximumHandSize -> pure effect
@@ -3758,6 +3874,8 @@ overPlayerRefs f effect = case effect of
     fmap (\ref -> PlayerEffect.CastFrom grant {CastFromZone.from = (CastFromZone.from grant) {InZone.player = ref}}) (f (InZone.player (CastFromZone.from grant)))
   PlayerEffect.PlayLandsFrom inZone ->
     fmap (\ref -> PlayerEffect.PlayLandsFrom inZone {InZone.player = ref}) (f (InZone.player inZone))
+  PlayerEffect.PlotFrom grant ->
+    fmap (\ref -> PlayerEffect.PlotFrom grant {PlotFromZone.from = (PlotFromZone.from grant) {InZone.player = ref}}) (f (InZone.player (PlotFromZone.from grant)))
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> pure effect
   PlayerEffect.CantGetCounters _ -> pure effect
   PlayerEffect.StateCoinFlip _ -> pure effect
@@ -3799,6 +3917,7 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.ReduceSpellCost _ -> pure effect
   PlayerEffect.ReduceActivationCost _ -> pure effect
   PlayerEffect.AddActivationCost _ -> pure effect
+  PlayerEffect.AlternativeActivationCost _ -> pure effect
   PlayerEffect.AddSpellCost _ -> pure effect
   PlayerEffect.PlayAdditionalLands _ -> pure effect
   PlayerEffect.NoMaximumHandSize -> pure effect
@@ -3825,6 +3944,7 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.CantPlayLands _ -> pure effect
   PlayerEffect.CastFrom _ -> pure effect
   PlayerEffect.PlayLandsFrom _ -> pure effect
+  PlayerEffect.PlotFrom _ -> pure effect
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> pure effect
   PlayerEffect.CantGetCounters _ -> pure effect
   PlayerEffect.StateCoinFlip _ -> pure effect

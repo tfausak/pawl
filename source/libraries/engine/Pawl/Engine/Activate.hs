@@ -221,8 +221,7 @@ activateAbility pid srcId ability = do
       -- both go through payableCostAt, so CR 601.2f's totalling is applied by the
       -- predicate rather than baked into the cost handed to it. Nothing filters
       -- the answer against the bound (see Prompt.ChooseX).
-      let printedCost = ActivatedAbility.cost ability
-          -- CR 601.2c's slots and their legal recipients, taken HERE rather than
+      let -- CR 601.2c's slots and their legal recipients, taken HERE rather than
           -- below where they are answered: the gate one step down has to measure
           -- a cost the targets can still change, so it is handed what they could
           -- be (aimingSomewhere). Read off `gs`, the same pre-stack board
@@ -259,6 +258,18 @@ activateAbility pid srcId ability = do
           -- CR 101.1: the floor the same words put on it -- Katara, Water Tribe's
           -- Hope's "X can't be 0". Printed, so there is nothing to evaluate.
           floorX = ActivatedAbility.minimumX ability
+      -- CR 601.2b / 118.9 through CR 602.2b: announce which cost is paid, the
+      -- printed activation cost or an alternative an effect offers in its place
+      -- (Kíli the Resourceful's {0} for an equip cost) -- after the modes and
+      -- before X and targets, Cast.castSpellWith's position for a spell's
+      -- alternative cost. Only the payable ones are offered, as the gate
+      -- measured them, and a question with one answer is not asked. The
+      -- printed cost is FIRST, so a default answer pays it.
+      let offeredCosts = filter (Activatable.payableCostAt aimableUnannounced floorX stamp pid srcId gs) (Activatable.costsFor pid ability gs)
+      printedCost <- case offeredCosts of
+        _ : _ : _ -> Game.choose (Prompt.ChooseCost decider pid abilId offeredCosts)
+        [only] -> pure only
+        [] -> pure (ActivatedAbility.cost ability)
       mAmount <-
         if Cost.hasVariable printedCost
           then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId floorX (Activatable.affordableX mCeiling aimableUnannounced stamp pid srcId gs printedCost)))
@@ -319,7 +330,8 @@ activateAbility pid srcId ability = do
       -- Asked unconditionally rather than only when there is an {X}, which buys
       -- one predicate over one cost instead of two spellings of when the gate
       -- applies.
-      if overCeiling || underFloor || not (Activatable.payableCost aimable stamp pid srcId gs announcedAtX)
+      -- An answer outside the offered costs is rejected, ChooseCost's contract.
+      if overCeiling || underFloor || (length offeredCosts > 1 && notElem printedCost offeredCosts) || not (Activatable.payableCost aimable stamp pid srcId gs announcedAtX)
         then State.put before -- reject: the whole activation is a no-op
         else do
           -- CR 118.13a's announcement, which names an activated ability's

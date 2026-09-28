@@ -989,6 +989,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.AlternativeActivationCost {} -> False
   PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities -> False
@@ -1012,6 +1013,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantPlayLands _ -> False
   PlayerEffect.CastFrom _ -> False
   PlayerEffect.PlayLandsFrom _ -> False
+  PlayerEffect.PlotFrom _ -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
   PlayerEffect.StateCoinFlip _ -> False
@@ -1058,6 +1060,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.AlternativeActivationCost {} -> False
   PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities -> False
@@ -1081,6 +1084,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantPlayLands _ -> False
   PlayerEffect.CastFrom _ -> False
   PlayerEffect.PlayLandsFrom _ -> False
+  PlayerEffect.PlotFrom _ -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
   PlayerEffect.StateCoinFlip _ -> False
