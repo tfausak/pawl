@@ -1119,7 +1119,7 @@ threeSeatBoard plains nullChamber =
 -- reached at two seats. Everything else is the shared interpreter.
 chamberAnswer :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> Prompt.Prompt r -> r
 chamberAnswer opponent pick p = case p of
-  Prompt.ChooseCardName _ chooser _ _ -> pick chooser
+  Prompt.ChooseCardName _ chooser _ _ _ -> pick chooser
   Prompt.ChooseOpponent {} -> opponent
   _ -> S.identityAnswer p
 
@@ -1134,7 +1134,7 @@ recordingChamberAnswer ::
   Prompt.Prompt r ->
   State.State [(PlayerId.PlayerId, Filter.Type.Filter Keyword.Keyword)] r
 recordingChamberAnswer opponent pick p = case p of
-  Prompt.ChooseCardName _ chooser _ restriction -> do
+  Prompt.ChooseCardName _ chooser _ restriction _ -> do
     State.modify' (<> [(chooser, restriction)])
     pure (pick chooser)
   _ -> pure (chamberAnswer opponent pick p)
@@ -1278,6 +1278,30 @@ nullChamberSpec s registry =
               []
       Spec.assertEqWith s "alice is active" (GameState.activePlayer board) S.alice
       Spec.assertEqWith s "alice names first, then bob" (fmap fst asked) [S.alice, S.bob]
+
+    -- CR 101.4b: a pair of casts differing only in alice's name. bob names
+    -- whatever his prompt says alice named, and Cancel when it says nothing, so
+    -- the Chamber holds one name exactly when bob was told hers.
+    Spec.it s "CR 101.4b the later chooser knows the name the earlier one chose" $ do
+      plains <- S.printingOf s registry "Plains"
+      mountain <- S.printingOf s registry "Mountain"
+      nullChamber <- S.printingOf s registry "Null Chamber"
+      piker <- S.printingOf s registry "Goblin Piker"
+      giant <- S.printingOf s registry "Hill Giant"
+      cancel <- S.printingOf s registry "Cancel"
+      let (oid, board) = nullChamberBoard plains mountain nullChamber
+          echoing :: CardName.CardName -> Prompt.Prompt r -> r
+          echoing hers p = case p of
+            Prompt.ChooseCardName _ chooser _ _ earlier
+              | chooser == S.alice -> hers
+              | otherwise -> maybe (S.printingName cancel) snd (List.find ((== S.alice) . fst) earlier)
+            _ -> chamberAnswer S.bob (const (S.printingName cancel)) p
+          run hers =
+            let cast = snd (Engine.runGamePure (echoing hers) board (S.cast S.alice oid))
+                after = snd (Engine.runGamePure (echoing hers) cast Stack.resolveTop)
+             in fmap Object.chosenNames (enteredOne board after >>= \chamber -> Game.lookupObject chamber after)
+      Spec.assertEqWith s "CR 101.4b told alice named Goblin Piker, bob named it too" (run (S.printingName piker)) (Just (Set.singleton (S.printingName piker)))
+      Spec.assertEqWith s "CR 101.4b told alice named Hill Giant, bob named it too" (run (S.printingName giant)) (Just (Set.singleton (S.printingName giant)))
 
     -- CR 201.4a: "If a player is instructed to choose a card name with certain
     -- characteristics, the player must choose the name of a card whose Oracle
@@ -1821,7 +1845,7 @@ recordingCastHalo :: CardName.CardName -> GameState.GameState -> ObjectId.Object
 recordingCastHalo name gs oid =
   let answer :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
       answer p = case p of
-        Prompt.ChooseCardName _ chooser _ _ -> do
+        Prompt.ChooseCardName _ chooser _ _ _ -> do
           State.modify' (<> [chooser])
           pure name
         _ -> pure (S.identityAnswer p)

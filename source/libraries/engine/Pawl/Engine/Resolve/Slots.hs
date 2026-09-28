@@ -191,6 +191,7 @@ import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.SlotPerPlayer as SlotPerPlayer
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -3235,34 +3236,37 @@ matchingFromAmong legal resolving controller source gs filter_ members =
 -- printed or granted" sweep is what states it: neither may read anything.
 targetSlotSlots :: TargetSlot.TargetSlot -> Map.Map SlotName SlotArity
 targetSlotSlots slot =
-  joinSlots
-    [ poolSlot (TargetSlot.pool slot),
-      -- Every slot the slot's own FILTER names -- CR 603.2's "target artifact or
-      -- enchantment that player controls".
-      maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots) (TargetSlot.filter slot),
-      -- And every slot its CR 202.3 computed bound names -- Venerable Warsinger's
-      -- "mana value X or less ... where X is the amount of damage this creature
-      -- dealt to that player", whose X is the trigger's own event amount
-      -- (Pawl.Engine.Binding.eventAmount). Target.slotContext is what answers it,
-      -- off the announcement the caller hands over.
-      --
-      -- What it buys is the pairing -- a card whose bound names an amount its
-      -- CONDITION does not supply (Pawl.Engine.Event.Binding.eventBindingSlots) is caught
-      -- only because the read is reported here. No card in data/cards/ misauthors
-      -- that pairing, so the proof is a planted one.
-      --
-      -- quantitySlots' WHOLE answer, which is what makes a bound naming a slot
-      -- only through a PlayerRef buried inside the number ("mana value X or less,
-      -- where X is the amount of life THAT PLAYER gained this turn") or through CR
-      -- 400.7j's Scope.OverBound visible to the equality above.
-      -- Pawl.AbilitySlotLintSpec's "the lint itself catches a computed bound
-      -- naming a slot through a player" is the case that proves it.
-      maybe Map.empty quantitySlots (TargetSlot.amount slot),
-      -- CR 601.2c's computed COUNT is a Quantity too, and names slots the same
-      -- way its bound does, so it is reported beside it or a slot named only
-      -- there would dangle.
-      maybe Map.empty quantitySlots (SlotCount.quantity (TargetSlot.count slot))
-    ]
+  -- CR 601.2c's "that player" of a "for each opponent" slot is bound by the
+  -- slot itself (Target.announcedSlots), so it is not a read of anything else.
+  maybe id (Map.delete . SlotPerPlayer.slot) (TargetSlot.perPlayer slot) $
+    joinSlots
+      [ poolSlot (TargetSlot.pool slot),
+        -- Every slot the slot's own FILTER names -- CR 603.2's "target artifact or
+        -- enchantment that player controls".
+        maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots) (TargetSlot.filter slot),
+        -- And every slot its CR 202.3 computed bound names -- Venerable Warsinger's
+        -- "mana value X or less ... where X is the amount of damage this creature
+        -- dealt to that player", whose X is the trigger's own event amount
+        -- (Pawl.Engine.Binding.eventAmount). Target.slotContext is what answers it,
+        -- off the announcement the caller hands over.
+        --
+        -- What it buys is the pairing -- a card whose bound names an amount its
+        -- CONDITION does not supply (Pawl.Engine.Event.Binding.eventBindingSlots) is caught
+        -- only because the read is reported here. No card in data/cards/ misauthors
+        -- that pairing, so the proof is a planted one.
+        --
+        -- quantitySlots' WHOLE answer, which is what makes a bound naming a slot
+        -- only through a PlayerRef buried inside the number ("mana value X or less,
+        -- where X is the amount of life THAT PLAYER gained this turn") or through CR
+        -- 400.7j's Scope.OverBound visible to the equality above.
+        -- Pawl.AbilitySlotLintSpec's "the lint itself catches a computed bound
+        -- naming a slot through a player" is the case that proves it.
+        maybe Map.empty quantitySlots (TargetSlot.amount slot),
+        -- CR 601.2c's computed COUNT is a Quantity too, and names slots the same
+        -- way its bound does, so it is reported beside it or a slot named only
+        -- there would dangle.
+        maybe Map.empty quantitySlots (SlotCount.quantity (TargetSlot.count slot))
+      ]
 
 -- Every slot a whole MODE reads: its effects', every payer CR 118.12a's "unless
 -- [a player] pays" names, every slot that gate's own "for each" counts over,

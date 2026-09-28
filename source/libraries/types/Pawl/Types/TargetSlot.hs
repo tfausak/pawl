@@ -7,6 +7,8 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotCount as SlotCount
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SlotPerPlayer as SlotPerPlayer
 import qualified Pawl.Types.TargetCount as TargetCount
 
 -- | What a target slot may hold: a closed Pool of candidate recipients (CR 115),
@@ -102,7 +104,11 @@ data TargetSlot = MkTargetSlot
     -- Whose choice it is does NOT move CR 109.5's "you". Legality is still judged
     -- from the ability's controller -- hexproof asks who controls the ability (CR
     -- 702.11b), not who points it -- so only the prompt's seat changes.
-    chooser :: Maybe PlayerRelation.PlayerRelation
+    chooser :: Maybe PlayerRelation.PlayerRelation,
+    -- | CR 601.2c: "for each opponent, ... target ... that player controls" --
+    -- the slot announced once per player, each copy with its own "that player"
+    -- (Pawl.Engine.Target.announcedSlots). Nothing is one ordinary slot.
+    perPlayer :: Maybe SlotPerPlayer.SlotPerPlayer
   }
   deriving (Eq, Ord, Show)
 
@@ -110,22 +116,22 @@ data TargetSlot = MkTargetSlot
 -- almost every slot in the engine and the corpus is one, so writing the count out
 -- at each would bury the handful that are not.
 required :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-required p f = MkTargetSlot p f (SlotCount.Printed TargetCount.one) Nothing Nothing
+required p f = MkTargetSlot p f (SlotCount.Printed TargetCount.one) Nothing Nothing Nothing
 
 -- CR 115.6 / 601.2c's "up to N targets": a slot the caster may fill any number of
 -- times up to N, the empty answer included.
 upTo :: Natural.Natural -> Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-upTo n p f = MkTargetSlot p f (SlotCount.Printed (TargetCount.upTo n)) Nothing Nothing
+upTo n p f = MkTargetSlot p f (SlotCount.Printed (TargetCount.upTo n)) Nothing Nothing Nothing
 
 -- CR 601.2c's "any number of target ...": the same slot with no printed ceiling,
 -- so the board's candidates are the only bound.
 anyNumber :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-anyNumber p f = MkTargetSlot p f (SlotCount.Printed TargetCount.anyNumber) Nothing Nothing
+anyNumber p f = MkTargetSlot p f (SlotCount.Printed TargetCount.anyNumber) Nothing Nothing Nothing
 
 -- CR 601.2c with CR 601.2b: a slot taking exactly the X the caster announced
 -- ("each of X target creatures", Rot-Curse Rakshasa).
 announcedX :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
-announcedX p f = MkTargetSlot p f SlotCount.AnnouncedX Nothing Nothing
+announcedX p f = MkTargetSlot p f SlotCount.AnnouncedX Nothing Nothing Nothing
 
 -- CR 601.2c: the same slot with the computed bound its Filter compares against --
 -- see `amount` above. Separate from the three builders so that the slots that
@@ -139,3 +145,8 @@ withAmount q slot = slot {amount = Just q}
 -- were.
 chosenBy :: PlayerRelation.PlayerRelation -> TargetSlot -> TargetSlot
 chosenBy relation slot = slot {chooser = Just relation}
+
+-- CR 601.2c's "for each opponent": the same slot announced once per player the
+-- relation names, `thatPlayer` naming that player for the slot's own Filter.
+forEachPlayer :: PlayerRelation.PlayerRelation -> SlotName.SlotName -> TargetSlot -> TargetSlot
+forEachPlayer relation thatPlayer slot = slot {perPlayer = Just (SlotPerPlayer.MkSlotPerPlayer relation thatPlayer)}

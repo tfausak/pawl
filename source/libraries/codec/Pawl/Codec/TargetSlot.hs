@@ -9,6 +9,7 @@ import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.SlotCount as SlotCount
+import qualified Pawl.Codec.SlotPerPlayer as SlotPerPlayer
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -30,6 +31,7 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- (Pawl.Types.TargetSlot's `amount`), so every other slot in the corpus renders
 -- unchanged. The chooser key is omitted on the same terms: CR 115.1's default is
 -- the ability's controller, which every slot but Cuombajj Witches' second takes.
+-- The perPlayer key likewise: only CR 601.2c's "for each opponent" slots name one.
 codec :: Codec.Codec TargetSlot.TargetSlot
 codec = Fields.object $ do
   pool <- Fields.required "pool" Pool.codec TargetSlot.pool
@@ -37,13 +39,15 @@ codec = Fields.object $ do
   count <- Fields.defaulted "count" (SlotCount.Printed TargetCount.one) SlotCount.codec TargetSlot.count
   amount <- Fields.defaulted "amount" Nothing (Common.maybe Quantity.codec) TargetSlot.amount
   chooser <- Fields.defaulted "chooser" Nothing (Common.maybe PlayerRelation.codec) TargetSlot.chooser
+  perPlayer <- Fields.defaulted "perPlayer" Nothing (Common.maybe SlotPerPlayer.codec) TargetSlot.perPlayer
   pure
     TargetSlot.MkTargetSlot
       { TargetSlot.pool = pool,
         TargetSlot.filter = filter_,
         TargetSlot.count = count,
         TargetSlot.amount = amount,
-        TargetSlot.chooser = chooser
+        TargetSlot.chooser = chooser,
+        TargetSlot.perPlayer = perPlayer
       }
 
 -- | A slot-keyed map as a JSON object keyed by the slot name (#1303).

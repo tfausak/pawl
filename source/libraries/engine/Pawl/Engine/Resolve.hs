@@ -321,9 +321,10 @@ resolveSpellWith runSubgame oid = do
                         Nothing -> pure (answers, ran)
                         Just limb -> do
                           gateBindings <- State.gets (liveBindings obj oid)
-                          let instanceView = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode)
+                          let instanceView :: Map SlotName (Set Recipient) -> Map SlotName (Set Recipient)
+                              instanceView = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode)
                               legalHere = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                              boundHere = Map.keysSet (instanceView gateBindings)
+                              boundHere = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                           gated <- gateHolds effectController oid (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
                           taken <- if gated then exercises oid oid effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
                           (admitted, answers2) <-
@@ -354,7 +355,7 @@ resolveSpellWith runSubgame oid = do
                         -- SAME live bindings CR 608.2b's filter is applied to, so
                         -- a clause whose every read is dead is not asked about.
                         let legalNowForMay = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                            boundNowForMay = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) gateBindings)
+                            boundNowForMay = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Monad.void gateBindings))
                         -- CR 608.2d's "or" next, and BEFORE the "may": Twiddle
                         -- prints one "may" over the pair, so a branch a player
                         -- did not announce has no "may" left to offer THEM.
@@ -698,7 +699,10 @@ resolveModesWith runSubgame stackId srcId modes = do
       -- bake never reads. Pawl.ModalSpec's "CR 700.2d a repeated mode on a trigger
       -- keeps reading the trigger's own bound player" is what proves the two paths
       -- agree.
-      let slots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (uncurry Modal.modeInstanceTargetSlots) modes))
+      let printedSlots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (uncurry Modal.modeInstanceTargetSlots) modes))
+          -- CR 608.2b judges a "for each opponent" slot per copy it bound;
+          -- instanceView folds the copies back under the printed name.
+          slots = Target.boundCopies (Map.keysSet (Object.bindings obj)) printedSlots
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipients = case Map.lookup slot slots of
             -- CR 608.2b is about TARGETS. A slot declaring none is a RESERVED
@@ -722,7 +726,8 @@ resolveModesWith runSubgame stackId srcId modes = do
               let idx = ModeInstance.index mi
                   -- CR 700.2d: this instance's slots under the names its mode
                   -- prints, applied to both maps so they cannot disagree.
-                  instanceView = Modal.instanceView slots mi (Mode.targetSlots mode)
+                  instanceView :: Map SlotName (Set Recipient) -> Map SlotName (Set Recipient)
+                  instanceView = Modal.instanceView printedSlots mi (Mode.targetSlots mode)
                   -- CR 608.2c's printed order, and the lookup CR 608.2d's
                   -- either-or reads its SIBLING back out of.
                   indexedClauses = zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))
@@ -744,7 +749,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                     Just limb -> do
                       gateBindings <- State.gets (liveBindings obj stackId)
                       let legalHere = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                          boundHere = Map.keysSet (instanceView gateBindings)
+                          boundHere = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                       gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
                       taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
                       (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) answers limb else pure (False, answers)
@@ -774,7 +779,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                         -- SAME live bindings CR 608.2b's filter is applied to, so a
                         -- clause whose every read is dead is not asked about.
                         let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                            boundNowForMay = Map.keysSet (instanceView gateBindings)
+                            boundNowForMay = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                         -- CR 608.2d's "or" next, and BEFORE the "may", off the same
                         -- helper the spell path uses. Proved on THIS loop and not
                         -- merely on the spell's twin: Teardrop Kami's "sacrifice
@@ -953,16 +958,17 @@ chosenBranch resolving controller idx cIdx legal eligible picked clause = case C
               [forced] -> pure (Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)))
               first : rest ->
                 let live = first NonEmpty.:| rest
-                 in Monad.foldM
-                      ( \acc chooser -> do
-                          gs1 <- State.get
-                          -- Not implemented: a later chooser is not told the
-                          -- earlier choosers' answers (#4328).
-                          answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx live)
-                          pure (Map.insert chooser (if elem answered live then answered else first) acc)
-                      )
-                      Map.empty
-                      (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+                 in -- CR 101.4b: each chooser is told the branches the choosers
+                    -- before them announced.
+                    fmap (Map.fromList . Foldable.toList) $
+                      Monad.foldM
+                        ( \made chooser -> do
+                            gs1 <- State.get
+                            answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx live made)
+                            pure (made Seq.|> (chooser, if elem answered live then answered else first))
+                        )
+                        Seq.empty
+                        (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
             pure (won answers, Map.insert key answers picked)
 
 -- CR 608.2d's pair, in CR 608.2c's printed order. A clause naming ITSELF is one
@@ -1032,16 +1038,20 @@ facedVillainously picked cIdx clause = case Clause.orElse clause of
 villainousPass :: ObjectId -> PlayerId -> ModeIndex -> Map.Map SlotName (Set Recipient) -> OrElse.OrElse -> NonEmpty.NonEmpty ClauseIndex -> (ClauseIndex -> Set PlayerId -> acc -> Game acc) -> acc -> Game acc
 villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
   gs <- State.get
-  Monad.foldM
-    ( \acc chooser -> do
-        gs1 <- State.get
-        answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs)
-        let chosen = if elem answered limbs then answered else NonEmpty.head limbs
-        State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
-        performLimb chosen (Set.singleton chooser) acc
-    )
-    acc0
-    (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+  -- CR 101.4b: each seat is told the choices the seats before it made. No test
+  -- drives two seats through this pass, so the payload is unproven here.
+  fmap fst $
+    Monad.foldM
+      ( \(acc, made) chooser -> do
+          gs1 <- State.get
+          answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs made)
+          let chosen = if elem answered limbs then answered else NonEmpty.head limbs
+          State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
+          performed <- performLimb chosen (Set.singleton chooser) acc
+          pure (performed, made Seq.|> (chooser, chosen))
+      )
+      (acc0, Seq.empty)
+      (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made
@@ -1097,19 +1107,17 @@ exercises resolving source controller idx cIdx bound legal announced clause = do
       | impossible || clauseIsInert (Set.insert Binding.mayPlayers bound) legal clause -> pure False
       | otherwise -> do
           gs <- State.get
-          accepted <-
+          -- CR 101.4b: each seat is told the answers the seats before it gave.
+          answers <-
             Monad.foldM
-              ( \acc pid -> do
+              ( \made pid -> do
                   gs1 <- State.get
-                  -- Not implemented: a later seat is not told the earlier
-                  -- seats' answers (#4328).
-                  decision <- Game.choose (Prompt.ChooseOptional (Decide.deciderFor pid gs1) pid resolving idx cIdx)
-                  pure $ case decision of
-                    OptionalDecision.Exercises -> Set.insert pid acc
-                    OptionalDecision.Declines -> acc
+                  decision <- Game.choose (Prompt.ChooseOptional (Decide.deciderFor pid gs1) pid resolving idx cIdx made)
+                  pure (made Seq.|> (pid, decision))
               )
-              Set.empty
+              Seq.empty
               (announcedOnly announced (apnapPlayersOf asker legal controller gs))
+          let accepted = Set.fromList [pid | (pid, OptionalDecision.Exercises) <- Foldable.toList answers]
           State.modify' (bindPlayersSlot resolving Binding.mayPlayers accepted)
           pure (not (Set.null accepted))
 

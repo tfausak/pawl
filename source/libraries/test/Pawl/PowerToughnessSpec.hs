@@ -2160,7 +2160,7 @@ graveyardNamed name gs =
 -- put the cards in the graveyard in.
 picksSecondCard :: Prompt.Prompt r -> r
 picksSecondCard p = case p of
-  Prompt.ChooseCardInGraveyard _ _ _ offered -> case offered of
+  Prompt.ChooseCardInGraveyard _ _ _ offered _ -> case offered of
     _ NonEmpty.:| (second : _) -> second
     only NonEmpty.:| [] -> only
   _ -> S.identityAnswer p

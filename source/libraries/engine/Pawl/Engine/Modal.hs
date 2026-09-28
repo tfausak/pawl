@@ -28,6 +28,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
@@ -35,6 +36,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.ZoneScope as ZoneScope
+import qualified Text.Read as Read
 
 -- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
 -- inner list per mode, kept apart. The shape a caller wants when the MODE is
@@ -141,6 +143,25 @@ instanceSlot mi slot =
    in case spliced <> repeated of
         "" -> slot
         suffix -> SlotName.MkSlotName (SlotName.unwrap slot <> Text.pack suffix)
+
+-- CR 601.2c: the slot one player's copy of a "for each opponent" slot is
+-- announced and bound under (Pawl.Types.TargetSlot's perPlayer). A suffix a card
+-- cannot print, for instanceSlot's reason, so perPlayerOf reads it back.
+perPlayerSlot :: SlotName -> PlayerId.PlayerId -> SlotName
+perPlayerSlot slot pid = SlotName.MkSlotName (SlotName.unwrap slot <> perPlayerMark <> Text.pack (show (PlayerId.unwrap pid)))
+
+-- perPlayerSlot's inverse: the printed slot and the player, or Nothing for any
+-- other name.
+perPlayerOf :: SlotName -> Maybe (SlotName, PlayerId.PlayerId)
+perPlayerOf name =
+  let (prefix, digits) = Text.breakOnEnd perPlayerMark (SlotName.unwrap name)
+   in do
+        base <- Text.stripSuffix perPlayerMark prefix
+        pid <- Read.readMaybe (Text.unpack digits)
+        pure (SlotName.MkSlotName base, PlayerId.MkPlayerId pid)
+
+perPlayerMark :: Text.Text
+perPlayerMark = Text.pack "#player"
 
 -- CR 608.2c/700.2: the CHOSEN modes themselves, each with the ModeInstance
 -- naming which mode it is and which occurrence of it, in printed order. Out-of-
@@ -318,10 +339,15 @@ instanceZoneScope rename scope = case scope of
 -- because the two resolution paths hold different things: a spell's `allSlots`
 -- also carries CR 303.4a's enchant slot, which is the card's and not any mode's,
 -- and so must survive the projection.
-instanceView :: Map SlotName TargetSlot -> ModeInstance.ModeInstance -> Map SlotName TargetSlot -> Map SlotName v -> Map SlotName v
+--
+-- A "for each opponent" slot's per-player copies (perPlayerSlot) are folded back
+-- under the slot's own name first, with (<>): the effect acts on every copy's
+-- target. `allSlots` is the UNSPLIT map, naming the slot and not its copies.
+instanceView :: (Semigroup v) => Map SlotName TargetSlot -> ModeInstance.ModeInstance -> Map SlotName TargetSlot -> Map SlotName v -> Map SlotName v
 instanceView allSlots mi printed env =
-  let renamed = Maybe.mapMaybe (\slot -> fmap ((,) slot) (Map.lookup (instanceSlot mi slot) env)) (Map.keys printed)
-   in Map.union (Map.fromList renamed) (Map.withoutKeys env (Map.keysSet allSlots))
+  let gathered = Map.mapKeysWith (<>) (\slot -> maybe slot fst (perPlayerOf slot)) env
+      renamed = Maybe.mapMaybe (\slot -> fmap ((,) slot) (Map.lookup (instanceSlot mi slot) gathered)) (Map.keys printed)
+   in Map.union (Map.fromList renamed) (Map.withoutKeys gathered (Map.keysSet allSlots))
 
 -- The target slots of one mode by index (CR 700.2c: only the chosen mode's
 -- slots). Nothing if the index is out of range (total).

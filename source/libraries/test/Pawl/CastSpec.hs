@@ -3810,7 +3810,7 @@ emergeSpec s registry = Spec.describe s "Emerge" $ do
                     else do
                       State.put True
                       pure (Just altarId)
-                Prompt.ChooseSacrifices _ _ oid _ _ | oid == altarId -> pure (Set.singleton giantId)
+                Prompt.ChooseSacrifices _ _ oid _ _ _ | oid == altarId -> pure (Set.singleton giantId)
                 _ -> pure (S.identityAnswer prompt)
               step g action = snd (State.evalState (Engine.runGame answer g action) False)
            in step (step board (S.cast S.alice spellId)) (Stack.resolveTop >> Engine.settleForPriority)
@@ -5039,7 +5039,7 @@ squadSpec s registry = Spec.describe s "Squad" $ do
 bargainingWith :: ObjectId.ObjectId -> Natural.Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 bargainingWith fodder times victim p = case p of
   Prompt.ChooseKicker {} -> KickerDecision.MkKickerDecision times
-  Prompt.ChooseSacrifices _ _ _ offered _ -> Set.fromList (filter (== fodder) offered)
+  Prompt.ChooseSacrifices _ _ _ offered _ _ -> Set.fromList (filter (== fodder) offered)
   _ -> aimedAt victim p
 
 -- bargainingWith's twin over CR 702.194a's tap, pinned the same way.
