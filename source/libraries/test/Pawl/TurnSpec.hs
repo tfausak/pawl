@@ -28,6 +28,8 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -44,9 +46,13 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
@@ -56,6 +62,9 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -1273,6 +1282,102 @@ thatTurnSpec s registry = Spec.describe s "ThatExtraTurn" $ do
     Spec.assertEqWith s "the extra turn is alice's" (GameState.activePlayer atExtra) S.alice
     Spec.assertEqWith s "and alice loses at its end step" (Game.stillPlaying afterExtra) [S.bob]
 
+-- CR 611.2a / 500.7 / 615.12: a continuous effect lasting "during that turn",
+-- the extra turn the same spell created, through Alchemist's Gambit ({1}{R}{R}
+-- Sorcery, "Cleave {4}{U}{U}{R} / Take an extra turn after this one. During
+-- that turn, damage can't be prevented. [At the beginning of that turn's end
+-- step, you lose the game.] / Exile Alchemist's Gambit." -- Oracle verified on
+-- Scryfall 2026-09-28).
+--
+-- Every reading is asked the same question, off one helper: alice shields her
+-- Goblin Piker with Mending Hands ("Prevent the next 4 damage that would be
+-- dealt to any target this turn") and bob's Piker deals it 3. Prevented, the
+-- Piker carries 0; unpreventable, it carries 3.
+gambitSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gambitSpec s registry = Spec.describe s "AlchemistsGambit" $ do
+  let boardOf = do
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        plains <- S.printingOf s registry "Plains"
+        gambit <- S.printingOf s registry "Alchemist's Gambit"
+        warp <- S.printingOf s registry "Time Warp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        mending <- S.printingOf s registry "Mending Hands"
+        -- Twelve lands: the cleave cost {4}{U}{U}{R} and Time Warp's {3}{U}{U}
+        -- exactly, and two Mountains so the printed {1}{R}{R} is payable too.
+        let lands = S.landsFor mountain S.alice 2 (S.landsInPlay island 10)
+            (target, g1) = S.addPermanent piker S.alice lands
+            (striker, g2) = S.addPermanent piker S.bob g1
+            (gambitId, g3) = S.addHandCard gambit S.alice g2
+            (warpId, g4) = S.addHandCard warp S.alice g3
+            stock g pid = List.foldl' (\g5 _ -> snd (S.addLibraryCard piker pid g5)) g [1 .. (10 :: Int)]
+            gs =
+              (stock (stock g4 S.alice) S.bob)
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice,
+                  GameState.remaining = S.phasesAfter Phase.PrecombatMain
+                }
+            -- A fresh untapped Plains pays for the shield on whatever turn this
+            -- is asked, so the answer never rests on whose lands untapped.
+            struck g =
+              let (g6, shield) = S.handOne mending (S.landsFor plains S.alice 1 g)
+                  shielded = castAndResolveWith (aimCreature target) shield g6
+                  hit = DamageEvent.MkDamageEvent striker (Recipient.ToCreature target) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat
+               in S.damageOf target (S.runPure S.identityAnswer shielded (Damage.applyDamage [hit]))
+        pure (gs, gambitId, warpId, struck)
+  -- THE PROVING CASE. The Gambit, cleaved, creates extra turn A; Time Warp,
+  -- cast after it, creates extra turn B, which CR 500.7 takes first. "That
+  -- turn" is A alone: the damage is prevented on the turn the spell resolved,
+  -- on B, and on bob's turn after A, and lands in full only on A. A "during
+  -- your next turn" reading would open the window on B instead.
+  Spec.it s "CR 500.7 damage can't be prevented during the Gambit's own extra turn, and on no other" $ do
+    (gs, gambitId, warpId, struck) <- boardOf
+    let resolved = castAndResolveWith (aimPlayer S.alice) warpId (castAndResolveWith (payingFor gambitCleave) gambitId gs)
+        atWarpTurn = runTurns 1 resolved
+        atGambitTurn = runTurns 1 atWarpTurn
+        atBobsTurn = runTurns 1 atGambitTurn
+    Spec.assertEqWith s "during the Gambit's turn the 3 cannot be prevented" (struck atGambitTurn) (Just 3)
+    Spec.assertEqWith s "during Time Warp's turn, taken first, the shield prevents it" (struck atWarpTurn) (Just 0)
+    Spec.assertEqWith s "on the turn the Gambit resolved, the window has not begun" (struck resolved) (Just 0)
+    Spec.assertEqWith s "and on bob's turn after it, the window has closed" (struck atBobsTurn) (Just 0)
+    -- Hygiene rather than behaviour: `begun` alone decides whether the row
+    -- applies, so only the store shows that its turn's cleanup dropped it.
+    Spec.assertEqWith s "the row is dropped at the cleanup of the Gambit's turn, not before" (length (GameState.playerEffects atGambitTurn), GameState.playerEffects atBobsTurn) (1, [])
+    Spec.assertEqWith s "Time Warp's turn is turn 2 and the Gambit's turn 3, both alice's" (fmap (\g -> (GameState.turnNumber g, GameState.activePlayer g)) [atWarpTurn, atGambitTurn, atBobsTurn]) [(2, S.alice), (3, S.alice), (4, S.bob)]
+    Spec.assertBool s (S.alice `elem` Game.stillPlaying atBobsTurn) "CR 702.148a cleaved, the loss clause is gone and alice survives"
+    Spec.assertEqWith s "the Gambit exiled itself" (length (Game.zoneMembers Zone.Exile S.alice resolved), length (Game.zoneMembers Zone.Graveyard S.alice resolved)) (1, 1)
+  -- The printed cost keeps the bracketed clause: the extra turn is still the
+  -- unpreventable one, and alice loses at its end step.
+  Spec.it s "CR 603.7a uncleaved, alice loses at the end step of the unpreventable extra turn" $ do
+    (gs, gambitId, _, struck) <- boardOf
+    let resolved = castAndResolveWith (payingFor gambitCost) gambitId gs
+        atExtra = runTurns 1 resolved
+        afterExtra = runTurns 1 atExtra
+    Spec.assertEqWith s "the extra turn's 3 cannot be prevented" (struck atExtra) (Just 3)
+    Spec.assertEqWith s "alice loses at its end step" (GameState.phase afterExtra, Game.stillPlaying afterExtra) (Phase.Ending EndingStep.EndStep, [S.bob])
+
+-- Alchemist's Gambit's printed {1}{R}{R} and its cleave {4}{U}{U}{R}.
+gambitCost, gambitCleave :: [ManaSymbol.ManaSymbol]
+gambitCost = [ManaSymbol.Generic 1, theRed, theRed]
+gambitCleave = [ManaSymbol.Generic 4, theBlue, theBlue, theRed]
+
+theRed, theBlue :: ManaSymbol.ManaSymbol
+theRed = ManaSymbol.OfType (ManaType.Colored Color.Red)
+theBlue = ManaSymbol.OfType (ManaType.Colored Color.Blue)
+
+-- CR 601.2b / 702.148a: pay the offered cost whose mana is `wanted`.
+payingFor :: [ManaSymbol.ManaSymbol] -> Prompt.Prompt r -> r
+payingFor wanted p = case p of
+  Prompt.ChooseCost _ _ _ candidates ->
+    Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost wanted)) . Cost.Type.mana) candidates)
+  _ -> S.identityAnswer p
+
+aimCreature :: ObjectId -> Prompt.Prompt r -> r
+aimCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
+  _ -> S.identityAnswer p
+
 -- CR 603.7a / 603.7b / 118.12: "at the beginning of your next upkeep, pay ...
 -- If you don't, you lose the game", through Pact of the Titan ({0} Instant,
 -- "Create a 4/4 red Giant creature token." plus that clause). Onset.Immediately
@@ -1814,6 +1919,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Turn" $ do
   repeatedExtraTurnSpec s registry
   turnScopedSkipSpec s registry
   thatTurnSpec s registry
+  gambitSpec s registry
   nextUpkeepSpec s registry
   endTurnSpec s registry
   endCombatPhaseSpec s registry

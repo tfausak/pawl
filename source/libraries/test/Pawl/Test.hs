@@ -473,6 +473,8 @@ import qualified Pawl.Codec.SaddlingSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.SchemeSetInMotionSpec
 import qualified Pawl.Codec.ScopeSpec
+import qualified Pawl.Codec.ScryRSpec
+import qualified Pawl.Codec.ScryRewriteSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SearchSpec
 import qualified Pawl.Codec.SelfCountersReachedSpec
@@ -871,6 +873,8 @@ spec s registry = do
   Pawl.Codec.CoinFlipRSpec.spec s
   Pawl.Codec.ProliferateRewriteSpec.spec s
   Pawl.Codec.ProliferateRSpec.spec s
+  Pawl.Codec.ScryRewriteSpec.spec s
+  Pawl.Codec.ScryRSpec.spec s
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
   Pawl.Codec.CombatSpec.spec s

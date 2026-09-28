@@ -1,0 +1,62 @@
+{
+  "faces": [
+    {
+      "name": "All in Good Time",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SetInMotion"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "TakeExtraTurn",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "skips": []
+                        }
+                      },
+                      {
+                        "type": "AffectPlayers",
+                        "value": {
+                          "duration": {
+                            "type": "DuringThatExtraTurn"
+                          },
+                          "effect": {
+                            "type": "CantSetSchemesInMotion"
+                          },
+                          "players": {
+                            "type": "Scoped",
+                            "value": {
+                              "type": "EachPlayer"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Scheme"
+          }
+        ]
+      }
+    }
+  ]
+}

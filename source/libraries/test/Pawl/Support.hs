@@ -3466,6 +3466,7 @@ oneMountainState mountain ph =
           GameState.extraTurns = [],
           GameState.subgamesThisMatch = 0,
           GameState.turnAnchor = Nothing,
+          GameState.extraTurnUnderWay = Nothing,
           GameState.rollingDie = Nothing,
           GameState.rerolledTo = Nothing
         }

@@ -1427,6 +1427,7 @@ durationPlayerRefs duration = case duration of
   Duration.DuringNextTurnOf ref -> [ref]
   -- CR 109.5's "you" is no reference at all.
   Duration.DuringYourNextTurn -> []
+  Duration.DuringThatExtraTurn -> []
   Duration.UntilEndOfTurn -> []
   Duration.Indefinite -> []
   Duration.Perpetual -> []
@@ -1455,6 +1456,7 @@ durationSlots duration = case duration of
   Duration.UntilEndOfNextTurnOf ref -> playerRefSlots ref
   Duration.DuringNextTurnOf ref -> playerRefSlots ref
   Duration.DuringYourNextTurn -> Map.empty
+  Duration.DuringThatExtraTurn -> Map.empty
   Duration.ForAsLongAs condition -> conditionSlots condition
   -- A Cost reads no slot: the activation cost of an ability is not walked by
   -- modeSlots either, and CR 116.2c's price is paid outside any resolution, so
@@ -1549,6 +1551,7 @@ replacementRowReads re = case re of
   ReplacementEffect.CoinFlipR {} -> ([], [])
   ReplacementEffect.DieRollR {} -> ([], [])
   ReplacementEffect.ProliferateR {} -> ([], [])
+  ReplacementEffect.ScryR {} -> ([], [])
   ReplacementEffect.PhaseR _ -> ([], [])
 
 -- A row's pattern Filter joined onto what its rewrite reads.
@@ -1694,6 +1697,7 @@ replacementRowEffects re = case re of
   ReplacementEffect.CoinFlipR _ -> []
   ReplacementEffect.DieRollR _ -> []
   ReplacementEffect.ProliferateR _ -> []
+  ReplacementEffect.ScryR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The program an ENTRY rewrite runs. entryRewriteReads' discipline: no wildcard,
@@ -2029,6 +2033,7 @@ durationSlotsAreExhaustive duration = case duration of
   Duration.UntilEndOfNextTurnOf _ -> True
   Duration.DuringNextTurnOf _ -> True
   Duration.DuringYourNextTurn -> True
+  Duration.DuringThatExtraTurn -> True
   Duration.ForAsLongAs condition -> conditionSlotsAreExhaustive condition
   -- durationSlots' answer: a Cost reads no slot, so its enumeration is complete.
   Duration.UntilPaid _ -> True

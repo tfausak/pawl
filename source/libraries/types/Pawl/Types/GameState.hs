@@ -440,6 +440,9 @@ data GameState = MkGameState
     -- | CR 500.7 / 103.1: while an extra turn is under way, the seat the
     -- ordinary turn order resumes from; Nothing on an ordinary turn.
     turnAnchor :: Maybe PlayerId.PlayerId,
+    -- | CR 500.7: the ExtraTurn.createdAt of the extra turn under way; Nothing
+    -- on an ordinary turn.
+    extraTurnUnderWay :: Maybe Timestamp.Timestamp,
     -- | CR 706.2: the sides of the die whose modification step is open, while
     -- Pawl.Engine.Resolve.Effect.throwDice asks about it; Nothing otherwise.
     rollingDie :: Maybe Natural.Natural,

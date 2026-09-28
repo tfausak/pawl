@@ -53,6 +53,8 @@ import qualified Pawl.Types.ProliferateRewrite as ProliferateRewrite
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.ScryR as ScryR
+import qualified Pawl.Types.ScryRewrite as ScryRewrite
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
@@ -246,6 +248,13 @@ spec s =
             codec
             (ReplacementEffect.ProliferateR (ProliferateR.MkProliferateR ControllerRelation.Yours ProliferateRewrite.Doubled))
             " {\"type\":\"ProliferateR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Doubled\"}}} "
+        -- CR 701.22a: Eligeth, Crossroads Augur.
+        Spec.it s "ScryR (Eligeth, Crossroads Augur)" $
+          Common.assertCodec
+            s
+            codec
+            (ReplacementEffect.ScryR (ScryR.MkScryR ControllerRelation.Yours ScryRewrite.DrawInstead))
+            " {\"type\":\"ScryR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"DrawInstead\"}}} "
         -- A fixed kind, a real filter, and CR 614.16's AddMore.
         Spec.it s "CounterR (Hardened Scales)" $
           Common.assertCodec

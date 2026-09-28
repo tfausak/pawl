@@ -464,6 +464,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- sentence keeps a subtype swap off a name.
   PlayerEffect.HasProtectionFromChosenName -> effect
   PlayerEffect.CantBecomeMonarch -> effect
+  PlayerEffect.CantSetSchemesInMotion -> effect
   PlayerEffect.CantAttackWithCreatures -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
   PlayerEffect.PlayLandsFrom _ -> effect
@@ -1370,9 +1371,10 @@ rewriteReplacementEffect pairs effect = case effect of
   -- CR 614.1a / 706.1: a DieRollR is one CR 109.5 relation and one nullary
   -- rewrite, so CR 612.1's text change has nothing to walk into.
   ReplacementEffect.DieRollR {} -> effect
-  -- CR 614.1a / 701.34a: a ProliferateR is one CR 109.5 relation and one nullary
-  -- rewrite, DieRollR's answer.
+  -- CR 614.1a / 701.34a / 701.22a: a ProliferateR or a ScryR is one CR 109.5
+  -- relation and one nullary rewrite, DieRollR's answer.
   ReplacementEffect.ProliferateR {} -> effect
+  ReplacementEffect.ScryR {} -> effect
   -- A DrawR's pattern is one CR 109.5 relation, but the REWRITE can hold CR 400.11c's
   -- wish filter, which rewriteEffect's own Effect.FromOutsideTheGame arm swaps on
   -- the resolution road -- so it has to be swapped here too, or the same sentence
@@ -1958,6 +1960,7 @@ rewriteDuration pairs duration = case duration of
   Duration.UntilEndOfNextTurnOf _ -> duration
   Duration.DuringNextTurnOf _ -> duration
   Duration.DuringYourNextTurn -> duration
+  Duration.DuringThatExtraTurn -> duration
   Duration.UntilEndOfCombat -> duration
   Duration.UntilEndOfCombatOnYourNextTurn -> duration
   -- CR 116.2c's price, which is a Cost and not a Condition. An activated

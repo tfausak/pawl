@@ -244,4 +244,8 @@ data ProposedEvent
     -- its own choice of permanents and players. Raised once per proliferate
     -- instruction by Pawl.Engine.Resolve.Effect's Proliferate arm.
     WouldProliferate PlayerId.PlayerId Natural.Natural
+  | -- | CR 701.22a / 614.1a: this player would scry this many cards. Raised by
+    -- Pawl.Engine.Resolve.Effect's Scry arm for a positive count only, CR
+    -- 701.22b's scry 0 being no scry event.
+    WouldScry PlayerId.PlayerId Natural.Natural
   deriving (Eq, Ord, Show)
