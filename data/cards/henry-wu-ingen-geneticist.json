@@ -1,0 +1,271 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Henry Wu, InGen Geneticist",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "IsSource"
+                    },
+                    {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Human"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Exploit"
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "CreatureExploits",
+            "value": {
+              "exploited": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "Not",
+                    "value": {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Human"
+                      }
+                    }
+                  }
+                ]
+              },
+              "exploiter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Draw",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "condition": {
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "AtLeast"
+                        },
+                        "measured": {
+                          "type": "AgainstSlot",
+                          "value": {
+                            "quantity": {
+                              "type": "Power"
+                            },
+                            "slot": "thatExploitedCreature"
+                          }
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 3
+                        }
+                      }
+                    },
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
+                                        {
+                                          "type": "TapThis"
+                                        },
+                                        {
+                                          "type": "SacrificeThis"
+                                        }
+                                      ],
+                                      "mana": []
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "AddMana",
+                                                  "value": {
+                                                    "production": {
+                                                      "type": "AnyColor"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ],
+                                "name": "Treasure Token",
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Treasure"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Artifact"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Scientist"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

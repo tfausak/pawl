@@ -599,11 +599,15 @@ looksBack condition = case condition of
   -- Nor here, and by the same sentence: rule 702.149a's counter goes on an
   -- attacking creature, which CR 506.4 has removed from combat if it left.
   TriggerCondition.SelfTrains -> False
-  -- Nor here: rule 702.110a's ability fires on an ENTRY, so its bearer arrived
-  -- rather than departed, and there is no departure to look back past.
-  TriggerCondition.SelfExploits -> False
-  -- Nor here: rule 702.122e's Vehicle is on the battlefield when its own crew
-  -- ability resolves, so there is no departure to look back past.
+  -- CR 603.10a's second family: rule 702.110b's exploit IS a sacrifice, so these
+  -- trigger when a player sacrifices a permanent -- and the sacrificed creature
+  -- may be the bearer itself, which the Colonel Autumn ruling says still
+  -- triggers. Proved by Pawl.CardTriggerSpec's "CR 702.110b Skull Skaab
+  -- exploiting itself still triggers".
+  TriggerCondition.SelfExploits -> True
+  TriggerCondition.CreatureExploits {} -> True
+  -- Not on the list: rule 702.122e's Vehicle is on the battlefield when its own
+  -- crew ability resolves, so there is no departure to look back past.
   TriggerCondition.SelfBecomesCrewed {} -> False
   -- Nor here: rule 702.122a's cost taps the crewer, which is not a departure
   -- either.
@@ -855,6 +859,7 @@ batchScoped condition = case condition of
   TriggerCondition.AttachedCreatureMentors -> False
   TriggerCondition.SelfTrains -> False
   TriggerCondition.SelfExploits -> False
+  TriggerCondition.CreatureExploits {} -> False
   TriggerCondition.SelfBecomesCrewed {} -> False
   TriggerCondition.SelfCrewsVehicle -> False
   TriggerCondition.SelfEnters -> False
@@ -2617,6 +2622,9 @@ zonesTriggeredFrom cond =
         -- The same default from the exploiting creature's own side: rule 702.110a's
         -- ability fires on its bearer's entry, so the bearer is on the battlefield.
         TriggerCondition.SelfExploits -> battlefield
+        -- The same default from a bystander's side: Skull Skaab watches from the
+        -- battlefield, and CR 113.6k's exception does not apply.
+        TriggerCondition.CreatureExploits {} -> battlefield
         -- The same default: CR 702.122a's ability is a Vehicle permanent's, so its
         -- bearer is on the battlefield and CR 113.6k's exception does not apply.
         TriggerCondition.SelfBecomesCrewed {} -> battlefield
@@ -3153,6 +3161,7 @@ stateTriggers gs
             -- missing from the battlefield afterwards could have left for any
             -- reason, so the board says nothing about who exploited it.
             TriggerCondition.SelfExploits -> False
+            TriggerCondition.CreatureExploits {} -> False
             -- CR 702.122e likewise fires on a resolution, and the board
             -- afterwards -- an animated Vehicle -- is CR 702.122a's effect
             -- rather than a record of the crewing.

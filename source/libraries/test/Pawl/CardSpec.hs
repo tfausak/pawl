@@ -134,6 +134,7 @@ import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.CreatureExploits as CreatureExploits
 import qualified Pawl.Types.CrewRestriction as CrewRestriction
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.DamageDirection as DamageDirection
@@ -971,6 +972,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Nor does CR 702.149c's, for the same reason.
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
+  TriggerCondition.CreatureExploits {} -> []
   -- Nor does CR 702.122e's: its payload is a TriggerFrequency, SelfAttacks' above.
   TriggerCondition.SelfBecomesCrewed {} -> []
   -- Nor does CR 702.122b's crewer side, nullary too.
@@ -4064,6 +4066,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- it to narrow by.
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
+  -- Skull Skaab's two, both card text.
+  TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits exploiter exploited) -> unframed [exploiter, exploited]
   -- CR 702.122e's carries none either: it names "this Vehicle" and nothing about
   -- it to narrow by.
   TriggerCondition.SelfBecomesCrewed {} -> []
@@ -4430,6 +4434,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.AttachedCreatureMentors -> []
   TriggerCondition.SelfTrains -> []
   TriggerCondition.SelfExploits -> []
+  TriggerCondition.CreatureExploits {} -> []
   TriggerCondition.SelfBecomesCrewed {} -> []
   TriggerCondition.SelfCrewsVehicle -> []
   TriggerCondition.PermanentSacrificed {} -> []

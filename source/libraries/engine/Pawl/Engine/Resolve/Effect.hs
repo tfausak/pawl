@@ -7886,6 +7886,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- destruction and CR 701.21a can refuse this one only for a permanent this
   -- controller does not control, which the sweep's Filter.ControlledBy has just
   -- excluded.
+  --
+  -- The sacrifice and the marker are ONE event (Event.simultaneously): rule
+  -- 702.110b makes the sacrifice the exploit, so CR 603.10a's look-back offers
+  -- an exploiter that sacrificed itself its own trigger.
   Effect.Exploit -> do
     gs <- State.get
     let candidates =
@@ -7903,7 +7907,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         let offered = first NonEmpty.:| (second : more)
         answer <- Game.choose (Prompt.ChoosePermanent (Decide.deciderFor controller gs) controller source offered)
         pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
-    Monad.forM_ victims $ \victim -> do
+    Monad.forM_ victims $ \victim -> Event.simultaneously $ do
       Event.sacrifice controller victim
       State.modify' (Event.recordEvent (GameEvent.Exploited (Exploited.MkExploited source victim)))
   -- CR 702.174c's marker, Firebend's reading of who gives it: `controller`

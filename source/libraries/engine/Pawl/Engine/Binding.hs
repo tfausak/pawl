@@ -1026,12 +1026,14 @@ combatDamager = SlotName.MkSlotName (Text.pack "thatDamager")
 mentoredCreature :: SlotName
 mentoredCreature = SlotName.MkSlotName (Text.pack "thatMentoredCreature")
 
--- CR 702.110b's "a creature": the creature the BEARER exploited, which Profaner
--- of the Dead's "the exploited creature's toughness" reads. Stamped by
+-- CR 702.110b's "a creature": the creature that was exploited, which Profaner
+-- of the Dead's "the exploited creature's toughness" and Henry Wu, InGen
+-- Geneticist's "the exploited creature had power 3" read. Stamped by
 -- Pawl.Engine.Event.Binding.eventBindings as the trigger is gathered.
 --
 -- Distinct from `triggerSource` (CR 113.7a) for `mentoredCreature`'s reason: the
--- bearer is the exploiter, so the creature it sacrificed is a second object.
+-- exploiter is a different object from the creature it sacrificed, except where
+-- it sacrificed itself.
 --
 -- One object, never a group: rule 702.110b's ability sacrifices one creature, and
 -- two exploits are two events. Not a target (nothing was chosen), so the same CR
