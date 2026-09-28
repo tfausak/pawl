@@ -61,6 +61,7 @@ import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.RestartSignal as RestartSignal
 import qualified Pawl.Codec.Result as Result
 import qualified Pawl.Codec.ReturnWatch as ReturnWatch
+import qualified Pawl.Codec.SpellWasCast as SpellWasCast
 import qualified Pawl.Codec.Timestamp as Timestamp
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -195,6 +196,7 @@ codec resolve = Fields.object $ do
   daytime <- Fields.defaulted "daytime" Nothing (Common.maybe Daytime.codec) GameState.daytime
   spellsCastLastTurn <- Fields.defaulted "spellsCastLastTurn" 0 Common.natural GameState.spellsCastLastTurn
   castsLastTurn <- Fields.defaulted "castsLastTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.castsLastTurn
+  castsBeforeThisTurn <- Fields.defaulted "castsBeforeThisTurn" Seq.empty (Common.seq SpellWasCast.codec) GameState.castsBeforeThisTurn
   exiledUntilMonarch <- Fields.defaulted "exiledUntilMonarch" Map.empty (Common.naturalMap ObjectId.codec MonarchWatch.codec) GameState.exiledUntilMonarch
   movedUntilSourceLeaves <- Fields.defaulted "movedUntilSourceLeaves" Map.empty (Common.naturalMap ObjectId.codec ReturnWatch.codec) GameState.movedUntilSourceLeaves
   haunting <- Fields.defaulted "haunting" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.haunting
@@ -296,6 +298,7 @@ codec resolve = Fields.object $ do
         GameState.daytime = daytime,
         GameState.spellsCastLastTurn = spellsCastLastTurn,
         GameState.castsLastTurn = castsLastTurn,
+        GameState.castsBeforeThisTurn = castsBeforeThisTurn,
         GameState.exiledUntilMonarch = exiledUntilMonarch,
         GameState.movedUntilSourceLeaves = movedUntilSourceLeaves,
         GameState.haunting = haunting,

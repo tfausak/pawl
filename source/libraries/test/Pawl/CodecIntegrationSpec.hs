@@ -6,6 +6,7 @@
 -- card data, which a synthetic fixture could not stand in for.
 module Pawl.CodecIntegrationSpec where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -18,6 +19,7 @@ import qualified Pawl.Codec.PlayerControl as PlayerControl.Codec
 import qualified Pawl.Codec.PlayerId as PlayerId.Codec
 import qualified Pawl.Codec.Printing as Printing.Codec
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Setup as Setup
@@ -62,6 +64,7 @@ import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -342,6 +345,17 @@ gameStateRoundTripSpec s registry = do
                   AbilityTriggered.ability = ability
                 }
          in roundTrips "a spent per-game rider" gs {GameState.triggeredThisGame = Set.singleton spent}
+
+  -- GameState.castsBeforeThisTurn, CR 601.2i's casts of earlier turns, the
+  -- other record the handoff keeps. Built through a real cast and handoff, so
+  -- the record is non-empty for the reason the case above gives.
+  Spec.it s "a cast on an earlier turn round trips" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (gs, spellId) = S.handOne lightningBolt (S.landsInPlay mountain 1)
+        handed = Engine.beginTurnOf S.bob (S.runPure S.castAnswer gs (S.cast S.alice spellId))
+    Spec.assertEqWith s "the handoff kept alice's cast" (fmap SpellWasCast.player (Foldable.toList (GameState.castsBeforeThisTurn handed))) [S.alice]
+    roundTrips "a cast on an earlier turn" handed
 
   -- GameState.departedThisTurn, CR 801.2c's seats that still count until the
   -- next turn begins. Non-empty for the reason the case above gives.
