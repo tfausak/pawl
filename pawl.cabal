@@ -393,6 +393,8 @@ library codec
     Pawl.Codec.CreateSpec
     Pawl.Codec.CreatureBecomesBlockedByAtLeast
     Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
+    Pawl.Codec.CreatureExploits
+    Pawl.Codec.CreatureExploitsSpec
     Pawl.Codec.Crewing
     Pawl.Codec.CrewingSpec
     Pawl.Codec.CrewRestriction
@@ -1886,6 +1888,7 @@ library types
     Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.CreatureBecomesBlockedByAtLeast
+    Pawl.Types.CreatureExploits
     Pawl.Types.Crewing
     Pawl.Types.CrewRestriction
     Pawl.Types.Cycling

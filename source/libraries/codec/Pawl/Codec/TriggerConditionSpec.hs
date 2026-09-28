@@ -20,6 +20,7 @@ import qualified Pawl.Types.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPlacement as CounterPlacement
 import qualified Pawl.Types.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Types.CreatureExploits as CreatureExploits
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -1024,6 +1025,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.SelfExploits
       " {\"type\":\"SelfExploits\"} "
+  -- CR 702.110b's bystander reading, Skull Skaab's two Filters.
+  Spec.it s "CreatureExploits" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.CreatureExploits (CreatureExploits.MkCreatureExploits (Filter.HasCardType CardType.Creature) (Filter.Not Filter.IsToken)))
+      " {\"type\":\"CreatureExploits\",\"value\":{\"exploiter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"exploited\":{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}}} "
   -- CR 702.122e's marker, self-scoped but carrying a frequency for SelfAttacks'
   -- reason above -- Mighty Servant of Leuk-o prints "for the first time each
   -- turn". Both, since either could round-trip alone.

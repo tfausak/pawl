@@ -2916,7 +2916,7 @@ echoSpec s registry =
 --
 -- Qarsi Sadist {1}{B} Creature -- Human Cleric 1/3 is the printing, "Exploit"
 -- plus "When this creature exploits a creature, target opponent loses 2 life and
--- you gain 2 life". Every exploit printing pairs the keyword with its own
+-- you gain 2 life". Every exploit printing pairs the keyword with an
 -- "exploits" trigger -- MTGJSON 2026-08-23, keywords containing Exploit, 25
 -- names, no exception -- so the pair is what a gameplay test can reach at all.
 --
@@ -2929,15 +2929,15 @@ exploitSpec s registry =
       declining p = case p of
         Prompt.ChooseOptional {} -> OptionalDecision.Declines
         _ -> S.identityAnswer p
-      -- Takes rule 702.110a's offer, sacrifices the LAST candidate offered -- the
-      -- Sadist is on the battlefield too, so a fixture taking the first would
-      -- prove nothing about which creature the choice reached -- and aims rule
-      -- 702.110b's trigger at bob.
-      exploiting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-      exploiting victim p = case p of
+      -- Takes rule 702.110a's offer, sacrifices the first offered creature the
+      -- predicate admits -- the Sadist is on the battlefield too, so a fixture
+      -- taking the first would prove nothing about which creature the choice
+      -- reached -- and aims rule 702.110b's trigger at bob.
+      exploiting :: (ObjectId.ObjectId -> Bool) -> Prompt.Prompt r -> r
+      exploiting wanted p = case p of
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
         Prompt.ChoosePermanent _ _ _ offered ->
-          Maybe.fromMaybe (NonEmpty.head offered) (List.find (== victim) (NonEmpty.toList offered))
+          Maybe.fromMaybe (NonEmpty.head offered) (List.find wanted (NonEmpty.toList offered))
         Prompt.ChooseTargets _ _ _ slots ->
           fmap (\(_, legal) -> Set.filter (== Recipient.ToPlayer S.bob) legal) slots
         _ -> S.identityAnswer p
@@ -2949,10 +2949,10 @@ exploitSpec s registry =
         piker <- S.printingOf s registry "Goblin Piker"
         giant <- S.printingOf s registry "Hill Giant"
         let base = Setup.emptyGame S.threePlayers
-            (_, withPiker) = S.addPermanent piker S.alice base
+            (pikerId, withPiker) = S.addPermanent piker S.alice base
             (giantId, withGiant) = S.addPermanent giant S.alice withPiker
-            (spell, staged) = S.spellOnStack sadist S.alice withGiant
-        pure (spell, giantId, staged)
+            (_, staged) = S.spellOnStack sadist S.alice withGiant
+        pure (pikerId, giantId, staged)
       -- The Sadist resolves, its entry trigger goes on the stack and resolves,
       -- and whatever rule 702.110b's event then triggers goes on and resolves
       -- too. Engine.settleForPriority between them is what puts each trigger on
@@ -2973,7 +2973,7 @@ exploitSpec s registry =
         -- 702.110b's phrase fired the printed trigger off the back of it.
         Spec.it s "CR 702.110b taking the sacrifice fires the printed exploits trigger" $ do
           (_, giantId, staged) <- sadistBoard
-          let after = played (exploiting giantId) staged
+          let after = played (exploiting (== giantId)) staged
           Spec.assertEqWith s "CR 702.110b bob lost 2 life to the exploits trigger" (S.lifeOf S.bob after) (Just 18)
           Spec.assertEqWith s "and alice gained 2" (S.lifeOf S.alice after) (Just 22)
           Spec.assertEqWith s "carol, the other opponent, was untouched" (S.lifeOf S.carol after) (Just 20)
@@ -2988,6 +2988,15 @@ exploitSpec s registry =
           Spec.assertEqWith s "CR 702.110b bob lost nothing, the exploits trigger never firing" (S.lifeOf S.bob after) (Just 20)
           Spec.assertEqWith s "and alice gained nothing" (S.lifeOf S.alice after) (Just 20)
           Spec.assertBool s (S.onBattlefield giantId after) "CR 702.110a the Hill Giant stayed on the battlefield"
+        -- The same board, differing in the victim: the Sadist sacrifices ITSELF,
+        -- and CR 603.10a's look-back at the sacrifice still fires its trigger
+        -- (the Colonel Autumn ruling).
+        Spec.it s "CR 702.110b exploiting itself still fires the printed exploits trigger" $ do
+          (pikerId, giantId, staged) <- sadistBoard
+          let after = played (exploiting (\oid -> oid /= pikerId && oid /= giantId)) staged
+          Spec.assertEqWith s "CR 603.10a bob lost 2 life to the self-exploit's trigger" (S.lifeOf S.bob after) (Just 18)
+          Spec.assertEqWith s "CR 702.110a the Sadist itself was sacrificed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Qarsi Sadist")) S.alice after) 0
+          Spec.assertBool s (S.onBattlefield giantId after) "and the Hill Giant stayed"
 
 -- CR 702.72 champion, whose rule is a PAIR of triggered abilities linked through
 -- the exile pile (CR 702.72b, CR 607.2k): "When this permanent enters, sacrifice

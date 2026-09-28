@@ -176,6 +176,7 @@ import qualified Pawl.Codec.CraftSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
 import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec
+import qualified Pawl.Codec.CreatureExploitsSpec
 import qualified Pawl.Codec.CrewRestrictionSpec
 import qualified Pawl.Codec.CrewingSpec
 import qualified Pawl.Codec.CyclingSpec
@@ -911,6 +912,7 @@ spec s registry = do
   Pawl.Codec.ConjureSpec.spec s
   Pawl.Codec.CreateSpec.spec s
   Pawl.Codec.CreatureBecomesBlockedByAtLeastSpec.spec s
+  Pawl.Codec.CreatureExploitsSpec.spec s
   Pawl.Codec.BackupSpec.spec s
   Pawl.Codec.CyclingSpec.spec s
   Pawl.Codec.DamageDirectionSpec.spec s

@@ -11,6 +11,7 @@ import qualified Pawl.Codec.ControllerBecomesTarget as ControllerBecomesTarget
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.CounterPlacement as CounterPlacement
 import qualified Pawl.Codec.CreatureBecomesBlockedByAtLeast as CreatureBecomesBlockedByAtLeast
+import qualified Pawl.Codec.CreatureExploits as CreatureExploits
 import qualified Pawl.Codec.DieResult as DieResult
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -151,6 +152,7 @@ codec =
           Arm.nullary "SelfMutates" TriggerCondition.SelfMutates,
           Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
           Arm.nullary "SelfExploits" TriggerCondition.SelfExploits,
+          Arm.payload "CreatureExploits" CreatureExploits.codec TriggerCondition.CreatureExploits (\x -> case x of TriggerCondition.CreatureExploits y -> Just y; _ -> Nothing),
           Arm.nullary "SelfTrains" TriggerCondition.SelfTrains,
           Arm.payload "SelfBecomesCrewed" TriggerFrequency.codec TriggerCondition.SelfBecomesCrewed (\x -> case x of TriggerCondition.SelfBecomesCrewed y -> Just y; _ -> Nothing),
           Arm.nullary "SelfCrewsVehicle" TriggerCondition.SelfCrewsVehicle,
@@ -307,6 +309,7 @@ tagOf x = case x of
   TriggerCondition.SelfMutates {} -> "SelfMutates"
   TriggerCondition.AttachedCreatureMentors {} -> "AttachedCreatureMentors"
   TriggerCondition.SelfExploits {} -> "SelfExploits"
+  TriggerCondition.CreatureExploits {} -> "CreatureExploits"
   TriggerCondition.SelfTrains {} -> "SelfTrains"
   TriggerCondition.SelfBecomesCrewed {} -> "SelfBecomesCrewed"
   TriggerCondition.SelfCrewsVehicle {} -> "SelfCrewsVehicle"

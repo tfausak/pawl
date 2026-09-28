@@ -725,6 +725,10 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- promise needs: every GameEvent.Exploited carries both ids.
   (TriggerCondition.SelfExploits, GameEvent.Exploited (Exploited.MkExploited _ exploited)) ->
     Binding.setExploitedCreature exploited Map.empty
+  -- The same slot read by a bystander, Henry Wu, InGen Geneticist's "the
+  -- exploited creature". The exploiter gets none: no printed payload names it.
+  (TriggerCondition.CreatureExploits {}, GameEvent.Exploited (Exploited.MkExploited _ exploited)) ->
+    Binding.setExploitedCreature exploited Map.empty
   -- CR 702.122b's "that Vehicle": the Vehicle the bearer just crewed, which
   -- Gearshift Ace's "that Vehicle gains first strike until end of turn" reads.
   -- The CREWERS get no slot -- matchesTrigger has just proved the bearer is one
@@ -1733,6 +1737,8 @@ eventBindingSlots cond = case cond of
   -- exploited creature's toughness". Guaranteed given a match, every
   -- GameEvent.Exploited carrying both ids.
   TriggerCondition.SelfExploits -> Set.singleton Binding.exploitedCreature
+  -- The same slot, guaranteed for the same reason.
+  TriggerCondition.CreatureExploits {} -> Set.singleton Binding.exploitedCreature
   -- NOT empty, unlike SelfEvolves above: rule 702.122e's event names the Vehicle,
   -- which Binding.triggerSource already answers, but its rider makes the CREWERS
   -- a subject of their own -- Mighty Servant of Leuk-o's "if it was crewed by
