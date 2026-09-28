@@ -63,6 +63,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -375,6 +376,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     Spec.assertEqWith s "undeterminable" (S.countOf viewOf (Filter.contextFor Teams.none (Just S.alice) Nothing) gs count) Nothing
 
   aetherfluxReservoirSpec s registry
+  approachSpec s registry
   tobiasSpec s registry
   charnelTallySpec s registry
   roothaSpec s registry
@@ -504,6 +506,90 @@ aetherfluxReservoirSpec s registry =
           Spec.assertEqWith s "six over alice's own turn" (gained three S.alice) (Just 6)
           Spec.assertEqWith s "the handoff itself gains nothing" (gained handed S.alice) (Just 6)
           Spec.assertEqWith s "and the next turn's first cast gains 1, not 4" (gained fourth S.alice) (Just 7)
+
+-- CR 608.2i's look-back over a whole GAME rather than a turn
+-- (EventShape.SpellCastThisGame). Approach of the Second Sun, {6}{W} Sorcery: "If
+-- this spell was cast from your hand and you've cast another spell named
+-- Approach of the Second Sun this game, you win the game. Otherwise, put
+-- Approach of the Second Sun into its owner's library seventh from the top and
+-- you gain 7 life." (Oracle text verified against Scryfall 2026-09-28.)
+--
+-- Every second cast happens on a LATER turn than the first, across real
+-- handoffs, so a count that read only this turn's log answers 1 and loses the
+-- win. Three seats, so bob's Approach is an opponent's and not "the other
+-- player's". Future Sight sits under alice on every board, so the library-cast
+-- case differs from the winning one only in where the second copy is.
+approachSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+approachSpec s registry =
+  let -- alice: fourteen Plains (two casts, no untap step between them), eight
+      -- Plains in her library, Future Sight. bob: seven Plains. alice's main
+      -- phase.
+      board plains sight =
+        let withLands = S.landsFor plains S.bob 7 (S.landsFor plains S.alice 14 S.threePlayerGame)
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard plains S.alice g)) withLands [1 .. (8 :: Int)]
+            (_, withSight) = S.addPermanent sight S.alice stocked
+         in mainOf S.alice withSight
+      mainOf pid gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = pid, GameState.priority = Just pid}
+      castAndResolve pid oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast pid oid)) Engine.priorityLoop
+      -- One real turn handoff, then the main phase of whoever it reached.
+      nextTurn gs =
+        let handed = S.runPure S.identityAnswer gs Engine.handoffTurn
+         in mainOf (GameState.activePlayer handed) handed
+      -- 1-based, from the top: where each Approach sits in that library. By
+      -- name, since CR 400.7 gives the card a new id as it moves.
+      approachesIn pid gs =
+        fmap (+ 1) (List.findIndices (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just approachName) (Game.zoneMembers Zone.Library pid gs))
+      approachName = CardName.MkCardName (Text.pack "Approach of the Second Sun")
+      printings = do
+        plains <- S.printingOf s registry "Plains"
+        sight <- S.printingOf s registry "Future Sight"
+        approach <- S.printingOf s registry "Approach of the Second Sun"
+        pure (plains, sight, approach)
+   in Spec.describe s "Approach of the Second Sun" $ do
+        Spec.it s "CR 608.2c a first Approach goes seventh from the top and gains 7" $ do
+          (plains, sight, approach) <- printings
+          let (first, gs) = S.addHandCard approach S.alice (board plains sight)
+              after = castAndResolve S.alice first gs
+          Spec.assertEqWith s "nobody has won" (GameState.result after) Nothing
+          Spec.assertEqWith s "alice gained 7" (S.lifeOf S.alice after) (Just 27)
+          Spec.assertEqWith s "and it is seventh from the top of her library" (approachesIn S.alice after) [7 :: Int]
+
+        Spec.it s "CR 104.2b the second, cast from hand on a LATER turn, wins" $ do
+          (plains, sight, approach) <- printings
+          let (first, g1) = S.addHandCard approach S.alice (board plains sight)
+              (second, g2) = S.addHandCard approach S.alice g1
+              turnOne = castAndResolve S.alice first g2
+              turnFour = nextTurn (nextTurn (nextTurn turnOne))
+              after = castAndResolve S.alice second turnFour
+          Spec.assertEqWith s "alice won" (GameState.result after) (Just (Result.Won S.alice))
+          Spec.assertEqWith s "the first cast is three turns back" (GameState.turnNumber after - GameState.turnNumber turnOne) 3
+          Spec.assertEqWith s "on her own turn" (GameState.activePlayer turnFour) S.alice
+          Spec.assertEqWith s "and alice gained no second 7" (S.lifeOf S.alice after) (Just 27)
+
+        Spec.it s "CR 601.2a an OPPONENT's earlier Approach is not one you've cast" $ do
+          (plains, sight, approach) <- printings
+          let (his, g1) = S.addHandCard approach S.bob (board plains sight)
+              (hers, g2) = S.addHandCard approach S.alice g1
+              bobsTurn = castAndResolve S.bob his (nextTurn g2)
+              aliceTurn = nextTurn (nextTurn bobsTurn)
+              after = castAndResolve S.alice hers aliceTurn
+          Spec.assertEqWith s "bob's went into his library and gained him 7" (S.lifeOf S.bob bobsTurn) (Just 27)
+          Spec.assertEqWith s "nobody has won" (GameState.result after) Nothing
+          Spec.assertEqWith s "alice's went seventh from the top instead" (approachesIn S.alice after) [7 :: Int]
+          Spec.assertEqWith s "and gained her 7" (S.lifeOf S.alice after) (Just 27)
+
+        Spec.it s "CR 601.2a the second, cast from the LIBRARY, does not win" $ do
+          (plains, sight, approach) <- printings
+          let (first, g1) = S.addHandCard approach S.alice (board plains sight)
+              turnOne = castAndResolve S.alice first g1
+              (second, g2) = S.addLibraryCard approach S.alice turnOne
+              turnFour = nextTurn (nextTurn (nextTurn g2))
+              after = castAndResolve S.alice second turnFour
+          Spec.assertEqWith s "it is alice's turn again" (GameState.activePlayer turnFour) S.alice
+          Spec.assertBool s (S.castable S.alice second turnFour) "Future Sight offers the top card"
+          Spec.assertEqWith s "nobody has won" (GameState.result after) Nothing
+          Spec.assertEqWith s "it went seventh from the top, above the first at eighth" (approachesIn S.alice after) [7, 8 :: Int]
+          Spec.assertEqWith s "and alice gained a second 7" (S.lifeOf S.alice after) (Just 34)
 
 -- CR 608.2i read over CR 608.2h's record of a ZONE CHANGE: "for each nontoken
 -- creature you controlled that died this turn". GAMEPLAY LEVEL for the

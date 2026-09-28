@@ -5,9 +5,9 @@ import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Zone as Zone
 
 -- | Which recorded events a history count folds over. GameState.events is cleared
--- at the turn change (Pawl.Engine.Engine), an engine choice made under CR 608.2i
--- because every history-reading card in the pool asks "this turn" -- so the
--- log's extent IS the window and none is carried here.
+-- at the turn change (Pawl.Engine.Engine), an engine choice made under CR 608.2i,
+-- so the log's extent IS the window -- "this turn" -- for every shape but
+-- SpellCastThisGame, whose window is the game (GameState.castsBeforeThisTurn).
 --
 -- Only the zone changes, GameEvent.LeftTheGame and the cast have a shape: every
 -- other GameEvent constructor is recorded in the log with no EventShape arm, so a
@@ -59,4 +59,6 @@ data EventShape
     -- Filter.HasCardType -- so putting any of it here would be a second way to
     -- say what the Count's own filter already says.
     SpellCast
+  | -- | CR 601.2i: SpellCast above, over the whole game rather than this turn.
+    SpellCastThisGame
   deriving (Eq, Ord, Show)
