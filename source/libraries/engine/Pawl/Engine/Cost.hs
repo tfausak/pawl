@@ -2844,7 +2844,7 @@ manaActivations measure pcs pid oid cost restrictions ability gs = manaActivatio
 -- and no reader here reads: see Pawl.Engine.PlayerEffect.matchesObjectFrom.
 manaActivationsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Mana.Capacity
 manaActivationsGiven effects measure pcs pid oid printedCost restrictions ability gs =
-  let adjustments = manaActivationAdjustmentsGiven effects (ActivatedAbility.keyword =<< ability) oid gs
+  let adjustments = manaActivationAdjustmentsGiven effects pid (ActivatedAbility.keyword =<< ability) oid gs
       -- The COMPONENT half of CR 601.2f, applied here so every conjunct below
       -- measures the components an effect added as well as the printed ones. The
       -- MANA half is not folded in, because CR 118.7e and CR 601.2f leave two
@@ -2942,11 +2942,11 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
 -- Dawnwaker's "that aren't mana abilities" spare every activation gathered here,
 -- the increase side and the reduction side of one rider.
 manaActivationAdjustments :: Maybe Keyword.Type.Keyword -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-manaActivationAdjustments stamp pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) stamp oid gs
+manaActivationAdjustments stamp pid oid gs = manaActivationAdjustmentsGiven (PlayerEffect.applying pid gs) pid stamp oid gs
 
 -- The same gather off a hoisted effect list; see manaActivationsGiven.
-manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> Maybe Keyword.Type.Keyword -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-manaActivationAdjustmentsGiven effects stamp = PlayerEffect.activationCostAdjustmentsGiven effects Set.empty stamp AbilityKind.ManaAbility LoyaltyKind.NonLoyaltyAbility
+manaActivationAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect.Type.PlayerEffect)] -> PlayerId -> Maybe Keyword.Type.Keyword -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+manaActivationAdjustmentsGiven effects pid stamp = PlayerEffect.activationCostAdjustmentsGiven effects pid Set.empty stamp AbilityKind.ManaAbility LoyaltyKind.NonLoyaltyAbility
 
 -- CR 118.3 asked of a mana ability's own MANA part, and the one read
 -- manaActivations makes that could ask itself. Nothing is CR 118.6's unpayable
@@ -5158,6 +5158,11 @@ tapForManaWith perform window inFlight oid = do
               case ManaOption.ability chosen of
                 Just spent -> State.modify' (ActivationRestriction.recordActivation oid spent)
                 Nothing -> pure ()
+              -- CR 602.2's history, off `gs`, the board the activation began on:
+              -- a Treasure its own cost sacrificed is still logged as what it was.
+              -- The intrinsic route is logged too; CR 305.6 makes it an activated
+              -- ability all the same.
+              State.modify' (ActivationRestriction.logActivation gs controller oid (ActivatedAbility.keyword =<< ManaOption.ability chosen) AbilityKind.ManaAbility Set.empty)
               -- CR 106.12: this activation "tapped [the permanent] for mana"
               -- exactly when {T} was in its cost and it produced mana, which is
               -- what CR 106.12a's condition watches. Recorded LAST, after CR

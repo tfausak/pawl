@@ -838,6 +838,7 @@ durationConditions duration = case duration of
   Duration.UntilEndOfNextTurnOf _ -> []
   Duration.DuringNextTurnOf _ -> []
   Duration.DuringYourNextTurn -> []
+  Duration.DuringThatExtraTurn -> []
   Duration.ForAsLongAs condition -> [condition]
   Duration.UntilEndOfCombat -> []
   Duration.UntilEndOfCombatOnYourNextTurn -> []
@@ -2086,6 +2087,7 @@ replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.ProliferateR {} -> []
+  ReplacementEffect.ScryR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -2114,6 +2116,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.ProliferateR {} -> []
+  ReplacementEffect.ScryR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 111.1's token a replacement MINTS: TokenR's appended token (Queen Allenal
@@ -2140,6 +2143,7 @@ replacementMintedCards replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.ProliferateR {} -> []
+  ReplacementEffect.ScryR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -3937,6 +3941,7 @@ durationFilters duration =
           Duration.UntilEndOfNextTurnOf _ -> []
           Duration.DuringNextTurnOf _ -> []
           Duration.DuringYourNextTurn -> []
+          Duration.DuringThatExtraTurn -> []
           Duration.ForAsLongAs _ -> []
           Duration.UntilEndOfCombat -> []
           Duration.UntilEndOfCombatOnYourNextTurn -> []
@@ -4693,7 +4698,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- creature") asks about the ability's chosen TARGET rather than its source, but
   -- Pawl.Engine.PlayerEffect.matchesObjectFrom builds the same Context for it, so
   -- the same framing and the same atom vocabulary apply.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _ targets _ _) -> f : Maybe.maybeToList targets
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _ targets _ _ _) -> f : Maybe.maybeToList targets
   -- CR 601.2f's addition carries a Filter in two places: its own criterion
   -- ("nontoken Rebels"), and one inside each component it adds ("sacrifice a
   -- land"). Both are authored by the card, so both are linted, and the inner
@@ -4763,6 +4768,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 725 names no quality either: the designation has no parts (Jared
   -- Carthalion, True Heir).
   PlayerEffect.CantBecomeMonarch -> []
+  PlayerEffect.CantSetSchemesInMotion -> []
   PlayerEffect.CantAttackWithCreatures -> []
   -- CR 601.3a's Filter half, which is exactly a quality of the spell (Damping
   -- Engine's "artifact, creature, or enchantment spells").
@@ -4998,6 +5004,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.ProliferateR {} -> []
+  ReplacementEffect.ScryR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 614.9's printed destination, the one Filter a damage REWRITE carries.

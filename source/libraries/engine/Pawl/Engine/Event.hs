@@ -201,6 +201,8 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.ScryR as ScryR
+import qualified Pawl.Types.ScryRewrite as ScryRewrite
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -1977,6 +1979,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
+  ReplacementEffect.ScryR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
@@ -3920,6 +3923,24 @@ apply batch candidate event =
         pure (Just (ProposedEvent.WouldProliferate pid (n * 2)))
     -- Unreachable: `applies` admits ProliferateR only against WouldProliferate.
     (ReplacementEffect.ProliferateR {}, _) -> pure (Just event)
+    -- CR 701.22a / 614.1a: Kenessos, Priest of Thassa's "scry that many cards
+    -- plus one instead" leaves the event STANDING one card larger, the
+    -- ProliferateR arm above for its reason. Eligeth, Crossroads Augur's "draw
+    -- that many cards instead" cancels it (CR 614.6) -- no scry, so no CR 701.22d
+    -- event -- and draws through CR 121.2a's instruction, so a draw replacement
+    -- still gets its say (CR 616.2).
+    (ReplacementEffect.ScryR (ScryR.MkScryR _ rewrite), ProposedEvent.WouldScry pid n) -> case rewrite of
+      ScryRewrite.PlusOne -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldScry pid (n + 1)))
+      ScryRewrite.DrawInstead -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        outcome <- applyReplacements (ProposedEvent.WouldDrawCards pid n)
+        Monad.forM_ (outcome >>= Replacement.asDrawCount) $ \(drawer, settled) ->
+          Monad.replicateM_ (Natural.toIntSaturating settled) (drawCard drawer)
+        pure Nothing
+    -- Unreachable: `applies` admits ScryR only against WouldScry.
+    (ReplacementEffect.ScryR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
@@ -8629,16 +8650,12 @@ armDelayed ability source controller captured onset expiry gs = case armOnset so
 -- so settleOnsets supplies its number later.
 --
 -- CR 500.7: "that turn" is the extra turn this resolution just created for the
--- controller, the most recently created entry from this source that the
--- controller takes. Nothing when there is none, as when the controller named
--- by the extra-turn clause was not the one taking it.
+-- controller (Turn.thatExtraTurn).
 armOnset :: ObjectId -> PlayerId -> GameState -> Onset -> Maybe TurnWindow
 armOnset source controller gs onset = case onset of
   Onset.Immediately -> Just TurnWindow.AnyTurn
   Onset.FromYourNextTurn -> Just TurnWindow.ControllersNextTurn
-  Onset.FromThatExtraTurn ->
-    let created turn = ExtraTurn.source turn == source && Turn.sharesTurn gs controller (ExtraTurn.taker turn)
-     in fmap (TurnWindow.OnExtraTurn . ExtraTurn.createdAt) (List.find created (GameState.extraTurns gs))
+  Onset.FromThatExtraTurn -> fmap TurnWindow.OnExtraTurn (Turn.thatExtraTurn source controller gs)
 
 -- CR 603.7a: a turn has BEGUN, so settle every delayed entry waiting for one and
 -- drop every entry whose turn is now over. Engine.beginTurn calls this once the

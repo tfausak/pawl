@@ -780,6 +780,8 @@ library codec
     Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef
     Pawl.Codec.ObjectRefSpec
+    Pawl.Codec.ObjectSnapshot
+    Pawl.Codec.ObjectSnapshotSpec
     Pawl.Codec.ObjectSpec
     Pawl.Codec.OfferCast
     Pawl.Codec.OfferCastSpec
@@ -801,6 +803,8 @@ library codec
     Pawl.Codec.PairingSpec
     Pawl.Codec.PartnerText
     Pawl.Codec.PartnerTextSpec
+    Pawl.Codec.PastActivation
+    Pawl.Codec.PastActivationSpec
     Pawl.Codec.PayBranch
     Pawl.Codec.PayBranchSpec
     Pawl.Codec.PayGate
@@ -1002,6 +1006,10 @@ library codec
     Pawl.Codec.SchemeSetInMotionSpec
     Pawl.Codec.Scope
     Pawl.Codec.ScopeSpec
+    Pawl.Codec.ScryR
+    Pawl.Codec.ScryRewrite
+    Pawl.Codec.ScryRewriteSpec
+    Pawl.Codec.ScryRSpec
     Pawl.Codec.Search
     Pawl.Codec.SearchDestination
     Pawl.Codec.SearchDestinationSpec
@@ -2115,6 +2123,7 @@ library types
     Pawl.Types.Object
     Pawl.Types.ObjectId
     Pawl.Types.ObjectRef
+    Pawl.Types.ObjectSnapshot
     Pawl.Types.OfferCast
     Pawl.Types.Onset
     Pawl.Types.OptionalDecision
@@ -2127,6 +2136,7 @@ library types
     Pawl.Types.PaidExpiry
     Pawl.Types.Pairing
     Pawl.Types.PartnerText
+    Pawl.Types.PastActivation
     Pawl.Types.PayBranch
     Pawl.Types.PayGate
     Pawl.Types.Payment
@@ -2245,6 +2255,8 @@ library types
     Pawl.Types.Scaling
     Pawl.Types.SchemeSetInMotion
     Pawl.Types.Scope
+    Pawl.Types.ScryR
+    Pawl.Types.ScryRewrite
     Pawl.Types.Search
     Pawl.Types.SearchDestination
     Pawl.Types.SearchPlace

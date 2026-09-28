@@ -366,6 +366,7 @@ import qualified Pawl.Codec.MovedKindsSpec
 import qualified Pawl.Codec.MovedSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
+import qualified Pawl.Codec.ObjectSnapshotSpec
 import qualified Pawl.Codec.ObjectSpec
 import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
@@ -377,6 +378,7 @@ import qualified Pawl.Codec.OwnedZoneSpec
 import qualified Pawl.Codec.PaidExpirySpec
 import qualified Pawl.Codec.PairingSpec
 import qualified Pawl.Codec.PartnerTextSpec
+import qualified Pawl.Codec.PastActivationSpec
 import qualified Pawl.Codec.PayBranchSpec
 import qualified Pawl.Codec.PayGateSpec
 import qualified Pawl.Codec.PayObligationSpec
@@ -474,6 +476,8 @@ import qualified Pawl.Codec.SaddlingSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.SchemeSetInMotionSpec
 import qualified Pawl.Codec.ScopeSpec
+import qualified Pawl.Codec.ScryRSpec
+import qualified Pawl.Codec.ScryRewriteSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SearchSpec
 import qualified Pawl.Codec.SelfCountersReachedSpec
@@ -817,6 +821,8 @@ spec s registry = do
   Pawl.Codec.AttackerDeclaredSpec.spec s
   Pawl.Codec.AttackingPlayersSpec.spec s
   Pawl.Codec.BattlefieldCandidateSpec.spec s
+  Pawl.Codec.PastActivationSpec.spec s
+  Pawl.Codec.ObjectSnapshotSpec.spec s
   Pawl.Codec.BecameAttackedSpec.spec s
   Pawl.Codec.BecameDesignatedSpec.spec s
   Pawl.Codec.BecomeCopySpec.spec s
@@ -872,6 +878,8 @@ spec s registry = do
   Pawl.Codec.CoinFlipRSpec.spec s
   Pawl.Codec.ProliferateRewriteSpec.spec s
   Pawl.Codec.ProliferateRSpec.spec s
+  Pawl.Codec.ScryRewriteSpec.spec s
+  Pawl.Codec.ScryRSpec.spec s
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
   Pawl.Codec.CombatSpec.spec s

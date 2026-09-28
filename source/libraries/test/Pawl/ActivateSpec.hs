@@ -154,6 +154,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
   activationCostReductionSpec s registry
+  professorHojoFirstActivationSpec s registry
   unflooredActivationCostReductionSpec s registry
   activationCostAdditionSpec s registry
   droughtActivationSpec s registry
@@ -3953,6 +3954,92 @@ outlastSpec s registry = Spec.describe s "Outlast" $ do
         gs = g0 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain}
     Spec.assertEqWith s "no ability in a hand" (Activatable.abilitiesFor oid gs) []
     Spec.assertEqWith s "and no activation offered" (activationsOf oid (Action.legalActions S.alice gs)) []
+
+-- Professor Hojo's first line, checked against Scryfall on 2026-09-28: "The
+-- first activated ability you activate during your turn that targets a creature
+-- you control costs {2} less to activate." CR 601.2f / 602.2b apply the
+-- reduction; "first" is card text counted over GameState.activationsThisTurn.
+--
+-- WHY TWO TOWERS OF THE MAGISTRATE. "{1}, {T}: Target creature gains protection
+-- from artifacts until end of turn" is instant speed, so the opponent's-turn leg
+-- can be built; it can aim at bob's creature, so a non-matching activation can
+-- come first; and its cost is generic, so the Mountains that pay it can never be
+-- tapped for a colour the cost does not want. A reduced activation taps its Tower
+-- alone and a full-price one taps a Mountain besides, so every reading below is a
+-- distinct tapped count. Two, because {T} spends each once.
+professorHojoFirstActivationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+professorHojoFirstActivationSpec s registry = Spec.describe s "ProfessorHojoFirstActivation" $ do
+  let board withHojo = do
+        hojo <- S.printingOf s registry "Professor Hojo"
+        tower <- S.printingOf s registry "Tower of the Magistrate"
+        mammoth <- S.printingOf s registry "War Mammoth"
+        mountain <- S.printingOf s registry "Mountain"
+        -- Mountains FIRST, so the head of every mana-source prompt is a Mountain
+        -- and never the other Tower's {C}.
+        let (towerA, g0) = S.addPermanent tower S.alice (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
+            (towerB, g1) = S.addPermanent tower S.alice g0
+            (alicesMammoth, g2) = S.addPermanent mammoth S.alice g1
+            (bobsMammoth, g3) = S.addPermanent mammoth S.bob g2
+            g4 = if withHojo then snd (S.addPermanent hojo S.alice g3) else g3
+            ready = g4 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        pure (towerA, towerB, alicesMammoth, bobsMammoth, ready, hojo)
+      -- The Tower's targeting ability, told from its {C} ability by its mana cost.
+      targeting ability = case ActivatedAbility.cost ability of
+        Cost.Type.MkCost (Just (ManaCost.MkManaCost (_ : _))) _ -> True
+        _ -> False
+      -- Activate a Tower at one creature and resolve it, off whatever board.
+      activateAt towerId victim gs = case filter targeting (Projection.abilitiesOf towerId gs) of
+        [ability] -> S.runPure (aimAtOffered victim) (S.runPure (aimAtOffered victim) gs (Activate.activateAbility S.alice towerId ability)) Stack.resolveTop
+        _ -> gs
+      protected victim gs =
+        let isProtection k = case k of
+              Keyword.Protection _ -> True
+              _ -> False
+         in any isProtection (Map.keys (PC.keywords (Projection.project victim gs)))
+  Spec.it s "CR 601.2f whole card: the first matching activation of your turn costs {2} less and the second does not" $ do
+    (towerA, towerB, alicesMammoth, _, gs, _) <- board True
+    let first = activateAt towerA alicesMammoth gs
+        second = activateAt towerB alicesMammoth first
+    Spec.assertEqWith s "the first activation at alice's Mammoth pays nothing: its Tower alone is tapped" (S.tappedCount S.alice first) 1
+    Spec.assertEqWith s "and the second pays the printed {1}: its Tower and a Mountain" (S.tappedCount S.alice second) 3
+    Spec.assertEqWith s "the Mammoth gained protection from artifacts" (protected alicesMammoth second) True
+    Spec.assertEqWith s "setup: nothing was tapped before" (S.tappedCount S.alice gs) 0
+  -- The count is over MATCHING activations: one aimed at bob's creature is not
+  -- one that "targets a creature you control", so it leaves the discount.
+  Spec.it s "CR 601.2f an earlier activation at an opponent's creature does not spend it" $ do
+    (towerA, towerB, alicesMammoth, bobsMammoth, gs, _) <- board True
+    let atBob = activateAt towerA bobsMammoth gs
+        atAlice = activateAt towerB alicesMammoth atBob
+    Spec.assertEqWith s "the activation at bob's Mammoth pays the printed {1}" (S.tappedCount S.alice atBob) 2
+    Spec.assertEqWith s "and the next, at alice's Mammoth, is still the first and pays nothing" (S.tappedCount S.alice atAlice) 3
+    Spec.assertEqWith s "bob's Mammoth gained protection from artifacts" (protected bobsMammoth atAlice) True
+  -- "The first activated ability you activate": a history of the turn, not a
+  -- budget of the Hojo's. An activation made before the Hojo arrived is still
+  -- the turn's first (Tezzeret, Betrayer of Flesh's ruling on the same wording).
+  Spec.it s "CR 601.2f a matching activation before the Hojo arrived was the first" $ do
+    (towerA, towerB, alicesMammoth, _, gs, hojo) <- board False
+    let before = activateAt towerA alicesMammoth gs
+        withHojo = snd (S.addPermanent hojo S.alice before)
+        after = activateAt towerB alicesMammoth withHojo
+    Spec.assertEqWith s "the activation with no Hojo pays the printed {1}" (S.tappedCount S.alice before) 2
+    Spec.assertEqWith s "and the one after the Hojo arrived is not the first, so pays it too" (S.tappedCount S.alice after) 4
+  -- "During your turn": the same activation on bob's turn is not reduced.
+  Spec.it s "CR 601.2f the reduction does not apply during an opponent's turn" $ do
+    (towerA, _, alicesMammoth, _, gs, _) <- board True
+    let bobsTurn = gs {GameState.activePlayer = S.bob}
+        activated = activateAt towerA alicesMammoth bobsTurn
+    Spec.assertEqWith s "the activation on bob's turn pays the printed {1}" (S.tappedCount S.alice activated) 2
+    Spec.assertEqWith s "and resolved" (protected alicesMammoth activated) True
+  -- "Each turn": GameState.activationsThisTurn is cleared at the handoff, so
+  -- alice's next turn has a first activation again.
+  Spec.it s "CR 601.2f the next turn has a first activation again" $ do
+    (towerA, towerB, alicesMammoth, _, gs, _) <- board True
+    let spent = activateAt towerB alicesMammoth (activateAt towerA alicesMammoth gs)
+        nextTurn = (nextTurnOfAlice spent) {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        again = activateAt towerA alicesMammoth nextTurn
+    Spec.assertEqWith s "setup: both activations were made last turn" (S.tappedCount S.alice spent) 3
+    Spec.assertEqWith s "setup: the untap step untapped everything" (S.tappedCount S.alice nextTurn) 0
+    Spec.assertEqWith s "and the first activation of the new turn pays nothing" (S.tappedCount S.alice again) 1
 
 -- `owner`'s board: `lands` Mountains and the permanent whose ability is under
 -- test, plus Heartstone under ALICE's control when one is passed. The positive and

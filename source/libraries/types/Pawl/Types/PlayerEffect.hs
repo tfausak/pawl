@@ -146,6 +146,8 @@ data PlayerEffect
   | -- | CR 725.1 / 101.2 / Jared Carthalion, True Heir: this player can't become
     -- the monarch.
     CantBecomeMonarch
+  | -- | CR 701.32 / 904.9 / All in Good Time: schemes can't be set in motion.
+    CantSetSchemesInMotion
   | -- | CR 508.1c / Angelic Arbiter: this player can't attack with creatures.
     CantAttackWithCreatures
   | -- | CR 601.3a / Damping Engine: this player can't cast a spell matching the

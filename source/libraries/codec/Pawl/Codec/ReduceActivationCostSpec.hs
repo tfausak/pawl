@@ -11,6 +11,7 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
+import qualified Pawl.Types.TurnScope as TurnScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
@@ -26,6 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
             ReduceActivationCost.grantedBy = Nothing,
             ReduceActivationCost.whichKind = Nothing,
             ReduceActivationCost.whichTargets = Nothing,
+            ReduceActivationCost.onlyFirst = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 1],
             ReduceActivationCost.floor = 1
           }
@@ -45,6 +47,7 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
             ReduceActivationCost.grantedBy = Just (KeywordDesignator.OfFamily KeywordFamily.Cycling),
             ReduceActivationCost.whichKind = Nothing,
             ReduceActivationCost.whichTargets = Nothing,
+            ReduceActivationCost.onlyFirst = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
             ReduceActivationCost.floor = 0
           }
@@ -64,6 +67,7 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
             ReduceActivationCost.grantedBy = Just (KeywordDesignator.OfFamily KeywordFamily.Equip),
             ReduceActivationCost.whichKind = Nothing,
             ReduceActivationCost.whichTargets = Just Filter.IsSource,
+            ReduceActivationCost.onlyFirst = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
             ReduceActivationCost.floor = 0
           }
@@ -83,9 +87,27 @@ spec s = Spec.describe s "Pawl.Codec.ReduceActivationCost" $ do
             ReduceActivationCost.grantedBy = Nothing,
             ReduceActivationCost.whichKind = Just AbilityKind.NonManaAbility,
             ReduceActivationCost.whichTargets = Nothing,
+            ReduceActivationCost.onlyFirst = Nothing,
             ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
             ReduceActivationCost.floor = 1
           }
       )
       " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"whichKind\":{\"type\":\"NonManaAbility\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":1} "
+  -- Professor Hojo's "the first activated ability you activate during your
+  -- turn": its own case, since onlyFirst is DEFAULTED like the fields above.
+  Spec.it s "MkReduceActivationCost, the first matching activation of your turn" $
+    Common.assertCodec
+      s
+      ReduceActivationCost.codec
+      ( ReduceActivationCost.MkReduceActivationCost
+          { ReduceActivationCost.whichAbilities = Filter.And [],
+            ReduceActivationCost.grantedBy = Nothing,
+            ReduceActivationCost.whichKind = Nothing,
+            ReduceActivationCost.whichTargets = Just (Filter.HasCardType CardType.Creature),
+            ReduceActivationCost.onlyFirst = Just TurnScope.ControllersTurn,
+            ReduceActivationCost.reduction = ManaCost.MkManaCost [ManaSymbol.Generic 2],
+            ReduceActivationCost.floor = 0
+          }
+      )
+      " {\"whichAbilities\":{\"type\":\"And\",\"value\":[]},\"whichTargets\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},\"onlyFirst\":{\"type\":\"ControllersTurn\"},\"reduction\":[{\"type\":\"Generic\",\"value\":2}],\"floor\":0} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ReduceActivationCost.codec

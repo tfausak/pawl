@@ -23,6 +23,7 @@ codec =
       Arm.payload "UntilEndOfNextTurnOf" PlayerRef.codec Duration.UntilEndOfNextTurnOf (\x -> case x of Duration.UntilEndOfNextTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "DuringNextTurnOf" PlayerRef.codec Duration.DuringNextTurnOf (\x -> case x of Duration.DuringNextTurnOf y -> Just y; _ -> Nothing),
       Arm.nullary "DuringYourNextTurn" Duration.DuringYourNextTurn,
+      Arm.nullary "DuringThatExtraTurn" Duration.DuringThatExtraTurn,
       Arm.payload "ForAsLongAs" Condition.codec Duration.ForAsLongAs (\x -> case x of Duration.ForAsLongAs y -> Just y; _ -> Nothing),
       Arm.nullary "UntilEndOfCombat" Duration.UntilEndOfCombat,
       Arm.nullary "UntilEndOfCombatOnYourNextTurn" Duration.UntilEndOfCombatOnYourNextTurn,
@@ -41,6 +42,7 @@ tagOf x = case x of
   Duration.UntilEndOfNextTurnOf {} -> "UntilEndOfNextTurnOf"
   Duration.DuringNextTurnOf {} -> "DuringNextTurnOf"
   Duration.DuringYourNextTurn {} -> "DuringYourNextTurn"
+  Duration.DuringThatExtraTurn {} -> "DuringThatExtraTurn"
   Duration.ForAsLongAs {} -> "ForAsLongAs"
   Duration.UntilEndOfCombat {} -> "UntilEndOfCombat"
   Duration.UntilEndOfCombatOnYourNextTurn {} -> "UntilEndOfCombatOnYourNextTurn"

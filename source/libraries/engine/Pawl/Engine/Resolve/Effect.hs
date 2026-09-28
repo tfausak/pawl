@@ -1914,6 +1914,7 @@ referentsOfReplacement re = case re of
   ReplacementEffect.CoinFlipR _ -> []
   ReplacementEffect.DieRollR _ -> []
   ReplacementEffect.ProliferateR _ -> []
+  ReplacementEffect.ScryR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The recipients a damage REWRITE bakes, which is CR 614.9's redirect destination
@@ -5708,8 +5709,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     decided <-
       fmap Maybe.catMaybes . Monad.forM scryers $ \pid ->
         case evaluateForRecipient viewOf context gs resolving source pid quantity of
-          -- CR 701.22b: scry 0 is not a scry, so zero raises no prompt.
-          Just n | n > 0 -> fmap Just (decideScry n pid)
+          -- CR 701.22b: scry 0 is not a scry, so zero raises no prompt and
+          -- proposes no event for a CR 614.1a row to replace.
+          Just n | n > 0 -> do
+            outcome <- Event.applyReplacements (ProposedEvent.WouldScry pid (Integer.toNaturalSaturating n))
+            -- A row that replaced the scry outright (Eligeth, Crossroads Augur)
+            -- has done its own work: nothing to decide and, CR 614.6, no scry.
+            Monad.forM (outcome >>= Replacement.asScry) $ \(scryer, settled) ->
+              decideScry (toInteger settled) scryer
           _ -> pure Nothing
     Monad.mapM_ (\(pid, order) -> Monad.forM_ order (State.modify' . reorderLibrary pid)) decided
     -- CR 701.22d: recorded once the process is complete, and for a scry whose
@@ -10187,6 +10194,7 @@ activateWhileRolling pid oid ability = do
     Payment.Unpaid -> pure False
     Payment.Paid _ -> do
       State.modify' (ActivationRestriction.recordActivation oid ability)
+      State.modify' (ActivationRestriction.logActivation before pid oid stamp AbilityKind.NonManaAbility Set.empty)
       let modal = ActivatedAbility.modal ability
           every = Set.fromList (fmap fst (zip (fmap ModeIndex.MkModeIndex [0 ..]) (Modal.modeEffects modal)))
           bound =

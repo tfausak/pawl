@@ -4,6 +4,7 @@ import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.PaidExpiry as PaidExpiry
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.While as While
 
 -- | CR 611.2: how long a STORED effect lasts, as the game remembers it. The
@@ -55,7 +56,8 @@ data Expiry
     -- Pawl.Types.AfterTurn and by the same reading, and BEGINS where AtTurnOf
     -- ends: the effect does nothing until that turn is under way.
     --
-    -- The one arm whose stored row is inert for part of its life, which is why
+    -- One of the two arms whose stored row is inert for part of its life (the
+    -- other is DuringExtraTurn below), which is why
     -- Pawl.Engine.Expiry.begun exists beside the sweeps -- a reader that asks
     -- only "has this ended" sees this row from the moment it is stored and
     -- applies it a turn early.
@@ -70,6 +72,12 @@ data Expiry
     -- player control), and a row stored on one would apply from the moment it is
     -- stored.
     DuringTurnOf AfterTurn.AfterTurn
+  | -- | CR 611.2a / 500.7: Duration.DuringThatExtraTurn, stored as the
+    -- ExtraTurn.createdAt of the turn it names. A window like DuringTurnOf
+    -- above, inert until that turn is under way (Pawl.Engine.Expiry.begun), and
+    -- meaningful only on a carrier that asks `begun`: GameState.playerEffects
+    -- is where both producers (Alchemist's Gambit, All in Good Time) store it.
+    DuringExtraTurn Timestamp.Timestamp
   | -- | CR 500.5: effects lasting until the end of a step or phase expire as it
     -- ends. A Pawl.Types.PhaseSelector because CR 500.5 names both grains and
     -- that type spans both.

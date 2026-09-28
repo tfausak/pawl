@@ -416,7 +416,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- there today and neutralising that descent leaves the suite green -- it is
   -- here so that the card which does write one cannot silently keep the printed
   -- word.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family kind targets cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family kind (fmap (Filter.rewrite pairs) targets) cost floor_)
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f family kind targets first cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) family kind (fmap (Filter.rewrite pairs) targets) first cost floor_)
   -- The two arms with a word in TWO places: their own criterion ("nontoken
   -- Rebels"), and the criterion inside each component they add ("sacrifice a
   -- LAND", "sacrifice a SWAMP"). Both descend, which is Filter.rewriteCost's
@@ -466,6 +466,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- sentence keeps a subtype swap off a name.
   PlayerEffect.HasProtectionFromChosenName -> effect
   PlayerEffect.CantBecomeMonarch -> effect
+  PlayerEffect.CantSetSchemesInMotion -> effect
   PlayerEffect.CantAttackWithCreatures -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
   PlayerEffect.PlayLandsFrom _ -> effect
@@ -1372,9 +1373,10 @@ rewriteReplacementEffect pairs effect = case effect of
   -- CR 614.1a / 706.1: a DieRollR is one CR 109.5 relation and one nullary
   -- rewrite, so CR 612.1's text change has nothing to walk into.
   ReplacementEffect.DieRollR {} -> effect
-  -- CR 614.1a / 701.34a: a ProliferateR is one CR 109.5 relation and one nullary
-  -- rewrite, DieRollR's answer.
+  -- CR 614.1a / 701.34a / 701.22a: a ProliferateR or a ScryR is one CR 109.5
+  -- relation and one nullary rewrite, DieRollR's answer.
   ReplacementEffect.ProliferateR {} -> effect
+  ReplacementEffect.ScryR {} -> effect
   -- A DrawR's pattern is one CR 109.5 relation, but the REWRITE can hold CR 400.11c's
   -- wish filter, which rewriteEffect's own Effect.FromOutsideTheGame arm swaps on
   -- the resolution road -- so it has to be swapped here too, or the same sentence
@@ -1960,6 +1962,7 @@ rewriteDuration pairs duration = case duration of
   Duration.UntilEndOfNextTurnOf _ -> duration
   Duration.DuringNextTurnOf _ -> duration
   Duration.DuringYourNextTurn -> duration
+  Duration.DuringThatExtraTurn -> duration
   Duration.UntilEndOfCombat -> duration
   Duration.UntilEndOfCombatOnYourNextTurn -> duration
   -- CR 116.2c's price, which is a Cost and not a Condition. An activated

@@ -46,6 +46,7 @@ import qualified Pawl.Codec.MonarchWatch as MonarchWatch
 import qualified Pawl.Codec.Object as Object
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.OutsideObject as OutsideObject
+import qualified Pawl.Codec.PastActivation as PastActivation
 import qualified Pawl.Codec.PendingDamageEffect as PendingDamageEffect
 import qualified Pawl.Codec.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Codec.Phase as Phase
@@ -183,6 +184,7 @@ codec resolve = Fields.object $ do
   drawsThisTurn <- Fields.defaulted "drawsThisTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.drawsThisTurn
   departedThisTurn <- Fields.defaulted "departedThisTurn" Set.empty (Common.set PlayerId.codec) GameState.departedThisTurn
   activatedThisTurn <- Fields.defaulted "activatedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec)))) GameState.activatedThisTurn
+  activationsThisTurn <- Fields.defaulted "activationsThisTurn" Seq.empty (Common.seq PastActivation.codec) GameState.activationsThisTurn
   castPermissionsUsedThisTurn <- Fields.defaulted "castPermissionsUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set CastFromZone.codec)) GameState.castPermissionsUsedThisTurn
   rollModifiersUsedThisTurn <- Fields.defaulted "rollModifiersUsedThisTurn" Map.empty (Common.naturalMap ObjectId.codec (Common.set ModifiedRoll.codec)) GameState.rollModifiersUsedThisTurn
   triggeredThisGame <- Fields.defaulted "triggeredThisGame" Set.empty (Common.set AbilityTriggered.codec) GameState.triggeredThisGame
@@ -203,6 +205,7 @@ codec resolve = Fields.object $ do
   extraTurns <- Fields.defaulted "extraTurns" [] (Common.list ExtraTurn.codec) GameState.extraTurns
   subgamesThisMatch <- Fields.defaulted "subgamesThisMatch" 0 Common.natural GameState.subgamesThisMatch
   turnAnchor <- Fields.defaulted "turnAnchor" Nothing (Common.maybe PlayerId.codec) GameState.turnAnchor
+  extraTurnUnderWay <- Fields.defaulted "extraTurnUnderWay" Nothing (Common.maybe Timestamp.codec) GameState.extraTurnUnderWay
   rollingDie <- Fields.defaulted "rollingDie" Nothing (Common.maybe Common.natural) GameState.rollingDie
   rerolledTo <- Fields.defaulted "rerolledTo" Nothing (Common.maybe Common.natural) GameState.rerolledTo
   pure
@@ -282,6 +285,7 @@ codec resolve = Fields.object $ do
         GameState.drawsThisTurn = drawsThisTurn,
         GameState.departedThisTurn = departedThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
+        GameState.activationsThisTurn = activationsThisTurn,
         GameState.castPermissionsUsedThisTurn = castPermissionsUsedThisTurn,
         GameState.rollModifiersUsedThisTurn = rollModifiersUsedThisTurn,
         GameState.triggeredThisGame = triggeredThisGame,
@@ -302,6 +306,7 @@ codec resolve = Fields.object $ do
         GameState.extraTurns = extraTurns,
         GameState.subgamesThisMatch = subgamesThisMatch,
         GameState.turnAnchor = turnAnchor,
+        GameState.extraTurnUnderWay = extraTurnUnderWay,
         GameState.rollingDie = rollingDie,
         GameState.rerolledTo = rerolledTo,
         -- Derived rather than written: see the note above.

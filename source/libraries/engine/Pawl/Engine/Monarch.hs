@@ -10,9 +10,9 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
@@ -112,7 +112,7 @@ inherentMatch monarch cond gs logged =
       -- inherent abilities "controlled by the player who was the monarch at the
       -- time the abilities triggered", so they are the "you" CR 109.5 would give a
       -- printed one.
-      scopeOk s a = Event.turnScopeAdmits gs s a monarch
+      scopeOk s a = Turn.turnScopeAdmits gs s a monarch
    in case (cond, LoggedEvent.event logged) of
         (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active))
           | began == wanted && scopeOk scope active -> Just Map.empty
