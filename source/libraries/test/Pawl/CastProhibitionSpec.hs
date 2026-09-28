@@ -1724,7 +1724,7 @@ isActivateOf oid action = case action of
   Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
-  Action.Type.Plot _ -> False
+  Action.Type.Plot {} -> False
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
@@ -1742,7 +1742,7 @@ isPlay action = case action of
   Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
-  Action.Type.Plot _ -> False
+  Action.Type.Plot {} -> False
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False

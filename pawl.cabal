@@ -886,6 +886,8 @@ library codec
     Pawl.Codec.PlayerStaticAbilitySpec
     Pawl.Codec.PlayPermissionOrigin
     Pawl.Codec.PlayPermissionOriginSpec
+    Pawl.Codec.PlotFromZone
+    Pawl.Codec.PlotFromZoneSpec
     Pawl.Codec.Plus
     Pawl.Codec.PlusSpec
     Pawl.Codec.Pool
@@ -2184,6 +2186,7 @@ library types
     Pawl.Types.PlayerScope
     Pawl.Types.PlayerStaticAbility
     Pawl.Types.PlayPermissionOrigin
+    Pawl.Types.PlotFromZone
     Pawl.Types.Plus
     Pawl.Types.Pool
     Pawl.Types.Power

@@ -59,7 +59,7 @@ import qualified Pawl.Types.Zone as Zone
 -- face down".
 --
 -- Minted here rather than read off Keyword.Foretell, which is the whole
--- difference from Pawl.Engine.Plot.plotCostOf: rule 116.2h fixes this amount for
+-- difference from Pawl.Engine.Plot.plotCostsOf: rule 116.2h fixes this amount for
 -- every printing, and the keyword's own payload is the later CAST's cost
 -- (Pawl.Engine.Keyword.foretellCost). Pawl.Engine.Cost.faceDownCost is the same
 -- shape one rule over -- an amount rule 702.37a states rather than any card.

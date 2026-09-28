@@ -1043,7 +1043,7 @@ offeredPlays pid gs =
         A.TurnFaceUp {} -> False
         A.Unlock _ _ -> False
         A.DiscardFromHand _ -> False
-        A.Plot _ -> False
+        A.Plot {} -> False
         A.Foretell _ -> False
         A.Suspend _ -> False
         A.PutCompanionIntoHand -> False
@@ -2233,7 +2233,7 @@ manaActivationOffer action = case action of
   A.Unlock {} -> False
   A.DiscardFromHand _ -> False
   A.Ignore _ _ -> False
-  A.Plot _ -> False
+  A.Plot {} -> False
   A.Foretell _ -> False
   A.Suspend _ -> False
   A.PutCompanionIntoHand -> False

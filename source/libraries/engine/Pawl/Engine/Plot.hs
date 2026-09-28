@@ -1,9 +1,10 @@
 -- Rule 702.170 in the one voice the rest of the engine cannot supply for itself:
 -- CR 116.2k's special action that pays a card's plot cost to exile it from a
--- hand, and the stamp that makes the exiled card a PLOTTED one. CR 702.170c's
--- other route into that stamp -- a spell or ability that makes an exiled card
--- plotted -- is an Effect opcode and belongs to the open half, so its arm sits in
--- Pawl.Engine.Resolve and calls becomePlotted here.
+-- hand or, under CR 702.170f, the zone an effect names, and the stamp that makes
+-- the exiled card a PLOTTED one. CR 702.170c's other route into that stamp -- a
+-- spell or ability that makes an exiled card plotted -- is an Effect opcode and
+-- belongs to the open half, so its arm sits in Pawl.Engine.Resolve and calls
+-- becomePlotted here.
 --
 -- The rule's other half lives where every other casting question does. CR
 -- 702.170d's permission -- "a plotted card's owner may cast it from exile without
@@ -21,15 +22,21 @@ module Pawl.Engine.Plot where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -44,34 +51,53 @@ import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Zone as Zone
 
--- CR 702.170a: what this object's plot ability costs, or Nothing when it has
--- none.
+-- CR 702.170a / 702.170f: every plot cost `pid` may plot this object for from
+-- where it is, or none.
+--
+-- From `pid`'s HAND, the card's own plot ability. From a pile a PlayerEffect
+-- PlotFrom grant opens (Fblthp, Lost on the Range), that ability AND the one the
+-- grant gives, whose cost is the card's mana cost -- Room.unlockCostOf's
+-- reading, so a card with no mana cost has an unpayable one (CR 118.6). Two
+-- equal costs are one: nothing tells the actions apart.
 --
 -- Read off the CARD (Card.combined) and never a projection, the reading
 -- Pawl.Engine.Action.discardableCards gives for CR 116.2e one rule over: the
--- ability functions in the hand, where this reader takes the printed card (#1859). A
--- hand member with no card behind it -- a token, an ability -- has no plot cost.
-plotCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
-plotCostOf oid gs = do
-  card <- Game.cardOfHandMember oid gs
-  Keyword.plotCost (Face.keywordSet (Card.combined card))
+-- ability functions in a hand or a library, where this reader takes the printed
+-- card (#1859). A member with no card behind it has no plot cost.
+plotCostsOf :: PlayerId -> ObjectId -> GameState -> [Cost Keyword]
+plotCostsOf pid oid gs = case Game.cardOfHandMember oid gs of
+  Nothing -> []
+  Just card ->
+    let face = Card.combined card
+        printed = Maybe.maybeToList (Keyword.plotCost (Face.keywordSet face))
+        granted = Cost.Type.MkCost (Face.manaCost face) []
+        inHand = elem oid (Game.zoneMembers Zone.Hand pid gs)
+        fromPile =
+          or
+            [ PlayerEffect.mayPlotFrom pid zone oid gs
+            | (zone, owner) <- PlayerEffect.plotPiles pid gs,
+              elem oid (Cast.pileCandidates zone owner gs)
+            ]
+     in ListUtils.nubOrd ((if inHand then printed else []) <> (if fromPile then printed <> [granted] else []))
 
--- CR 702.170a / 116.2k: may this player plot this card right now? Three
--- conjuncts, each a clause of the rule:
+-- CR 702.170a / 116.2k: may this player plot this card for this cost right now?
+-- Three conjuncts, each a clause of the rule:
 --
---   * the card is in THIS PLAYER'S HAND with a plot cost to pay ("you may exile
---     this card FROM YOUR HAND"), which plotCostOf and the zone test settle
---     together;
+--   * the cost is one of the card's plot costs from where it is ("you may exile
+--     this card FROM YOUR HAND", or CR 702.170f's other zone), which
+--     plotCostsOf settles;
 --   * the window is a main phase of their own turn with the stack empty ("any
 --     time you have priority during your main phase while the stack is empty"),
 --     which is CR 307.5's sorcery-speed window conjunct for conjunct -- so it is
 --     asked through Turn.sorcerySpeedWindow rather than a near-copy that can
 --     drift. CR 116.2k's own wording drops "main phase" and rule 702.170a keeps
 --     it; the keyword is what a card grants, so the narrower one governs.
---   * the plot cost is payable. An action the player cannot take is not offered,
---     which is Pawl.Engine.Action.legalActions' posture throughout.
+--   * the plot cost is payable at X = 0 (CR 107.3d's X is named later, in
+--     `plot`). An action the player cannot take is not offered, which is
+--     Pawl.Engine.Action.legalActions' posture throughout.
 --
 -- The payability check is Cost.canPay and NOT Cost.total's CR 601.2f adjustments,
 -- for the reason Room.canUnlock gives: that rule totals the cost of a spell being
@@ -79,34 +105,52 @@ plotCostOf oid gs = do
 --
 -- The PRIORITY clause has no conjunct, for the reason CR 116.2a's land play has
 -- none: legalActions is asked only of the priority holder.
-canPlot :: PlayerId -> ObjectId -> GameState -> Bool
-canPlot pid oid gs = case plotCostOf oid gs of
-  Nothing -> False
-  Just cost ->
-    elem oid (Game.zoneMembers Zone.Hand pid gs)
-      && Turn.sorcerySpeedWindow pid gs
-      && Cost.canPay PaymentSubject.ForNeither pid oid cost gs
+canPlot :: PlayerId -> ObjectId -> Cost Keyword -> GameState -> Bool
+canPlot pid oid cost gs =
+  elem cost (plotCostsOf pid oid gs)
+    && Turn.sorcerySpeedWindow pid gs
+    && payableAtX 0 pid oid cost gs
 
--- Every card this player may plot right now -- what Action.Plot is built from,
--- and the shape Room.unlockable and FaceDown.turnableFaceUp have.
-plottable :: PlayerId -> GameState -> [ObjectId]
-plottable pid gs = filter (\oid -> canPlot pid oid gs) (Game.zoneMembers Zone.Hand pid gs)
+-- CR 107.3d: is this plot cost payable with X named as this number?
+payableAtX :: Natural -> PlayerId -> ObjectId -> Cost Keyword -> GameState -> Bool
+payableAtX x pid oid cost = Cost.canPay PaymentSubject.ForNeither pid oid (Cost.substituteX x cost)
 
--- CR 702.170a, in the rule's own order: exile the card from hand and pay the
--- cost, leaving it a plotted card.
+-- Every (card, cost) this player may plot right now -- what Action.Plot is built
+-- from, and the shape Room.unlockable and FaceDown.turnableFaceUp have. The
+-- candidates are the player's hand and the cards Cast.pileCandidates offers of
+-- each pile a PlotFrom grant opens.
+plottable :: PlayerId -> GameState -> [(ObjectId, Cost Keyword)]
+plottable pid gs =
+  let candidates =
+        ListUtils.nubOrd
+          ( Game.zoneMembers Zone.Hand pid gs
+              <> concat [Cast.pileCandidates zone owner gs | (zone, owner) <- PlayerEffect.plotPiles pid gs]
+          )
+   in [(oid, cost) | oid <- candidates, cost <- plotCostsOf pid oid gs, canPlot pid oid cost gs]
+
+-- CR 702.170a, in the rule's own order: exile the card from where it is (the hand,
+-- or CR 702.170f's other zone) and pay the cost, leaving it a plotted card.
 --
 -- REJECT-NOT-REPAIR, the posture Room.unlock, FaceDown.turnFaceUp and
 -- Cast.castSpell all take: a payment that fails restores the state from before it
--- was attempted and the card stays in hand. The payment runs FIRST for that
+-- was attempted and the card stays where it was. The payment runs FIRST for that
 -- reason -- a failed one has moved nothing to put back -- where rule 702.170a's
 -- own sentence names the exile first ("exile this card from your hand and pay
--- [cost]"). Nothing in the pool observes the order: no player has priority inside
--- a special action (CR 116.1), every printed plot cost is mana, and the two
--- halves either both happen or neither does.
+-- [cost]"). Nothing observes the order: no player has priority inside a special
+-- action (CR 116.1), and the exile names the card by its id. A mana ability can
+-- still shuffle a library mid-payment through a replacement effect, which CR
+-- 605.1a's last sentence leaves out of the classification (Ashnod's Altar
+-- sacrificing Progenitus), but Event.shuffleLibrary reorders the ids it holds and
+-- mints none, so the card plotted from the top is exiled wherever it went.
+--
+-- CR 107.3d's X, which a mana cost granted as a plot cost can hold, is named
+-- "immediately before they pay that cost", Suspend.suspend's prompt and for its
+-- reasons: the bound is advisory, and an answer the board cannot pay takes the
+-- whole action away.
 --
 -- The stamp is written onto the id the move RETURNS and never onto `oid`, the
 -- reading Resolve.finishSpell gives CR 715.3d's permission: CR 400.7 mints a
--- fresh incarnation in exile and deletes the one that was in hand, so the plotted
+-- fresh incarnation in exile and deletes the one it left, so the plotted
 -- designation belongs to the new object. Nothing comes back when the move was
 -- cancelled, and then there is no exiled card to be plotted.
 --
@@ -118,33 +162,39 @@ plottable pid gs = filter (\oid -> canPlot pid oid gs) (Game.zoneMembers Zone.Ha
 -- stamp, for that reason and one more: a move that was cancelled plotted
 -- nothing, so there is no event to record. It is what a "when this card becomes
 -- plotted" trigger (CR 702.170a, CR 702.170c) reads, the exile's own zone change
--- saying only that a card left a hand.
-plot :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game ()
-plot perform pid oid = do
+-- saying only that a card left a hand or a library.
+plot :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Cost Keyword -> Game ()
+plot perform pid oid printed = do
   before <- State.get
-  if not (canPlot pid oid before)
+  if not (canPlot pid oid printed before)
     then pure ()
     else do
-      -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for its
-      -- reasons. No printed plot cost holds such a symbol -- Scryfall
-      -- `keyword:plot`, 2026-09-01, every plot cost generic or monocoloured
-      -- -- so no prompt is raised today.
-      (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
-      payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
-      case payment of
-        -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
-        -- special action IS the whole of what failed, so `before` goes to
-        -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
-        -- window included -- happens there.
-        Payment.Unpaid -> pure ()
-        -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled and
-        -- the later cast pays its own cost.
-        Payment.Paid _ -> do
-          -- One stamp per arrival: the funnel answers with more than one only
-          -- for a melded permanent leaving the battlefield (CR 712.21), and this
-          -- special action exiles a card from a hand.
-          exiled <- Event.changeZoneReturning oid Zone.Exile
-          Monad.forM_ exiled (State.modify' . becomePlotted)
+      announcedX <-
+        if Cost.hasVariable printed
+          then Game.choose (Prompt.ChooseX (Decide.deciderFor pid before) pid oid 0 (Cost.greatestPayableX Nothing (\x -> payableAtX x pid oid printed before) printed))
+          else pure 0
+      if not (payableAtX announcedX pid oid printed before)
+        then pure ()
+        else do
+          -- CR 118.13c, Pawl.Engine.FaceDown.turnFaceUp's announcement and for
+          -- its reasons: a granted plot cost is a card's mana cost, which can
+          -- hold a symbol payable in more than one way.
+          (announced, _) <- Cost.announce PaymentSubject.ForNeither ManaSpending.AsProduced pid oid pure (Cost.substituteX announcedX printed)
+          payment <- Cost.pay perform before PaymentMoment.OutsideResolution PaymentSubject.ForNeither Nothing ManaSpending.AsProduced pid oid announced
+          case payment of
+            -- CR 733.1's reversal, Pawl.Engine.Foretell.foretell's reason: this
+            -- special action IS the whole of what failed, so `before` goes to
+            -- Cost.pay and the reversal -- the payer's choice about the CR 605.3a
+            -- window included -- happens there.
+            Payment.Unpaid -> pure ()
+            -- Dropped, Pawl.Engine.Foretell's reason exactly: the card is exiled
+            -- and the later cast pays its own cost.
+            Payment.Paid _ -> do
+              -- One stamp per arrival: the funnel answers with more than one only
+              -- for a melded permanent leaving the battlefield (CR 712.21), and
+              -- this special action exiles a card from a hand or a library.
+              exiled <- Event.changeZoneReturning oid Zone.Exile
+              Monad.forM_ exiled (State.modify' . becomePlotted)
 
 -- "It becomes a plotted card" -- the stamp and the event together, which is the
 -- WHOLE of what becoming plotted is.
