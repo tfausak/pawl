@@ -18,6 +18,7 @@ import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
+import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
@@ -68,6 +69,12 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       CostComponent.PayLifeX
       " {\"type\":\"PayLifeX\"} "
+  Spec.it s "PayHalfLife" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.PayHalfLife Rounding.Up)
+      " {\"type\":\"PayHalfLife\",\"value\":{\"type\":\"Up\"}} "
   -- The count and the Filter both ride the payload, positionally.
   Spec.it s "Sacrifice" $
     Common.assertCodec
