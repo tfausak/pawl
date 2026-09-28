@@ -1280,7 +1280,8 @@ rewriteGrantedAbility pairs granted = case granted of
     GrantedAbility.SelfCostReduction
       r
         { CostReduction.perEach = rewriteQuantity pairs (CostReduction.perEach r),
-          CostReduction.condition = fmap (rewriteCondition pairs) (CostReduction.condition r)
+          CostReduction.condition = fmap (rewriteCondition pairs) (CostReduction.condition r),
+          CostReduction.whichTargets = fmap (Filter.rewrite pairs) (CostReduction.whichTargets r)
         }
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not

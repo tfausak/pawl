@@ -78,6 +78,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CostScale as CostScale
 import qualified Pawl.Types.CounterCause as CounterCause
@@ -902,7 +903,7 @@ candidateCostsGiven permitted pid name oid gs =
 -- additional cost is the cost reducer, so a re-read after CR 601.2h's sacrifice
 -- costs a mana more.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
-total pid oid cost gs = totalWith (spellAdjustments pid oid gs) cost
+total pid oid cost gs = totalWith (spellAdjustments Set.empty pid oid gs) cost
 
 -- CR 601.2f: the reductions a CANDIDATE COST brings with it
 -- (Pawl.Types.CandidateCost's @reductions@) folded into the adjustments the board
@@ -924,9 +925,14 @@ plusReductions amounts adjustments =
 -- selfReductions below) plus CR 903.8's commander tax. The tax joins the
 -- INCREASES rather than the printed mana cost, rule 903.8 wording it "plus {2}
 -- for each previous time", so a reduction still applies afterwards.
-spellAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
-spellAdjustments pid oid gs =
+--
+-- `targets` is CR 601.2c's announcement, which the spell's own sentence may
+-- read (selfReductions); empty for a caller standing before CR 601.2c, where
+-- such a sentence does not apply.
+spellAdjustments :: Set.Set ObjectId -> PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+spellAdjustments targets pid oid gs =
   let adjustments = PlayerEffect.spellCostAdjustments pid oid gs
+      self = selfReductions targets pid oid gs
       withSelf =
         adjustments
           { CostAdjustments.reductions =
@@ -934,7 +940,12 @@ spellAdjustments pid oid gs =
               -- and Ertai's Scorn's sentences state neither restriction, so CR
               -- 601.2f's own {0} and CR 118.7b-d's spill both stand.
               CostAdjustments.reductions adjustments
-                <> fmap (\amount -> AppliedReduction.MkAppliedReduction amount 0 False) (selfReductions pid oid gs)
+                <> [AppliedReduction.MkAppliedReduction amount 0 False | (CostDirection.Less, amount) <- self],
+            -- Dragon's Prey's "costs {2} more": generic mana, the only kind an
+            -- increase carries (Pawl.Types.CostAdjustments.increases).
+            CostAdjustments.increases =
+              CostAdjustments.increases adjustments
+                <> [sum [n | ManaSymbol.Generic n <- ManaCost.unwrap amount] | (CostDirection.More, amount) <- self]
           }
       commanderTax = Commander.tax pid oid gs
    in if commanderTax == 0
@@ -946,8 +957,14 @@ spellAdjustments pid oid gs =
 -- 702.41a's affinity and CR 702.125a's undaunted state as a keyword
 -- (Keyword.selfCostReductionsOf) -- each Quantity evaluated and its amount
 -- REPEATED that many times rather than multiplied, so a typed amount falls out
--- with no arithmetic. A NEGATIVE or UNDETERMINABLE Quantity contributes nothing,
--- the direction that leaves the spell dearer.
+-- with no arithmetic. A NEGATIVE or UNDETERMINABLE Quantity contributes nothing.
+-- Each comes back with its direction, a "costs more" sentence being the same
+-- shape (Dragon's Prey).
+--
+-- CR 601.2c's announced `targets` answer a sentence's whichTargets: ANY object
+-- target matching, against its own view with the spell as the source and `pid`
+-- as the perspective. Pawl.CostSpec's "a cost that reads the spell's targets"
+-- group proves it.
 --
 -- The PRINTED reductions come straight off the object rather than through a
 -- projection: it is the half Cast.asProposed already stamped (CR 709.3b), with
@@ -956,27 +973,39 @@ spellAdjustments pid oid gs =
 -- records them -- Pawl.CostSpec's Richlau, Headmaster group proves it. Not
 -- implemented: an effect removing a printed reduction from a card off the
 -- battlefield (#1859).
-selfReductions :: PlayerId -> ObjectId -> GameState -> [ManaCost.ManaCost]
-selfReductions pid oid gs =
+selfReductions :: Set.Set ObjectId -> PlayerId -> ObjectId -> GameState -> [(CostDirection.CostDirection, ManaCost.ManaCost)]
+selfReductions targets pid oid gs =
   let -- CR 109.5: the perspective is the would-be controller, `pid` -- not
       -- Projection.controllerOf, which answers Nothing for a card in a hand.
       -- The source is the spell itself, the reduction being printed on it.
       context = Filter.contextFor (Game.teams gs) (Just pid) (Just oid)
       -- CR 601.2f: a conditional reduction is asked here, as the total is
       -- determined, against the same perspective as its count.
-      applies reduction = all (Condition.holds (Projection.fullView gs) context gs oid) (CostReduction.condition reduction)
+      applies reduction =
+        all (Condition.holds (Projection.fullView gs) context gs oid) (CostReduction.condition reduction)
+          && all (\wanted -> any (\target -> Filter.matches context (Projection.viewOfObject target gs) wanted) (Set.toList targets)) (CostReduction.whichTargets reduction)
       scaled reduction =
         let copies = Quantity.evaluate (Projection.fullView gs) context gs oid (CostReduction.perEach reduction)
             -- Saturating rather than partial: an Int cannot hold every Integer.
             -- A negative saturates to 0, the floor the header states.
             times n = concat (replicate (max 0 (Integer.toIntSaturating n)) (ManaCost.unwrap (CostReduction.amount reduction)))
-         in fmap (ManaCost.MkManaCost . times) copies
-   in case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
-        (Just obj, Just card, Just printedFace) ->
-          let face = Game.castingFaceOf obj card printedFace
-              granted = PC.grantedCostReductions (Projection.project oid gs)
-           in Maybe.mapMaybe scaled (filter applies (Face.costReductions face <> granted <> Keyword.selfCostReductionsOf (Face.keywordSet face)))
-        _ -> []
+         in fmap ((,) (CostReduction.direction reduction) . ManaCost.MkManaCost . times) copies
+   in Maybe.mapMaybe scaled (filter applies (selfSentences oid gs))
+
+-- The sentences selfReductions reads, printed, granted and keyword alike.
+selfSentences :: ObjectId -> GameState -> [CostReduction.CostReduction]
+selfSentences oid gs = case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
+  (Just obj, Just card, Just printedFace) ->
+    let face = Game.castingFaceOf obj card printedFace
+        granted = PC.grantedCostReductions (Projection.project oid gs)
+     in Face.costReductions face <> granted <> Keyword.selfCostReductionsOf (Face.keywordSet face)
+  _ -> []
+
+-- Whether any of the spell's own cost sentences reads CR 601.2c's targets, so a
+-- gate measuring the cost before them has to search the aimings
+-- (Pawl.Engine.Cast.payableCostAt).
+selfReadsTargets :: ObjectId -> GameState -> Bool
+selfReadsTargets oid gs = any (Maybe.isJust . CostReduction.whichTargets) (selfSentences oid gs)
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes
 -- through rule 601.2b-i like a spell's. No commander tax: CR 903.8 taxes
