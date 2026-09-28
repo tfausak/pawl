@@ -1,10 +1,12 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Setup and Pawl.Types.Deck: setup, deck composition, opening
 -- hands, and the two funnels that rebuild a game's object pool -- CR 727's
 -- restart and CR 729's subgame teardown.
 module Pawl.SetupSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -15,12 +17,14 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Archenemy as Archenemy
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Phasing as Phasing
+import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -29,6 +33,9 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
@@ -37,8 +44,10 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -46,6 +55,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaSpending as ManaSpending
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OutsideDestination as OutsideDestination
@@ -1120,6 +1131,151 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "carol goes first" (GameState.activePlayer sub) S.carol
     Spec.assertEqWith s "CR 800.1: a two-seat subgame is not a multiplayer game, so no free mulligan" (Mulligan.freeMulligans sub) 0
 
+-- CR 100.2d's supplementary decks of nontraditional cards across the two
+-- funnels: CR 727's restart (Karn Liberated) and CR 729's subgame (Shahrazad).
+supplementaryDeckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+supplementaryDeckSpec s registry = Spec.describe s "supplementary decks" $ do
+  -- CR 727.1a / 103.7: bob restarts, so bob is the new game's starting player
+  -- and turns up the top of HIS planar deck; alice's face-up Academy goes back
+  -- into hers (CR 311.2 / 103.3a).
+  Spec.it s "CR 727.1 / 103.7 a restarted Planechase game sets a new starting plane" $ do
+    academy <- S.printingOf s registry "Academy at Tolaria West"
+    tazeem <- S.printingOf s registry "Tazeem"
+    karn <- S.printingOf s registry "Karn Liberated"
+    board <- supplementaryBoard s registry (\d -> d {Deck.planes = Set.singleton academy}) (\d -> d {Deck.planes = Set.singleton tazeem})
+    let started = S.runPure S.identityAnswer board (Planechase.setStartingPlane S.alice)
+        (karnId, withKarn) = S.addPermanent karn S.bob started
+        before = (S.addCounter CounterKind.Loyalty 14 karnId withKarn) {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+        after = snd (Engine.runGamePure karnAnswer before Engine.priorityLoop)
+    Spec.assertEqWith s "the old game's plane is alice's Academy" (cardNames (Planechase.faceUp before) before) ["Academy at Tolaria West"]
+    Spec.assertEqWith s "CR 103.7 the new game's starting plane is bob's Tazeem" (cardNames (Planechase.faceUp after) after) ["Tazeem"]
+    Spec.assertEqWith s "CR 311.2 and the Academy is back in alice's planar deck" (cardNames (Planechase.deckOf S.alice after) after) ["Academy at Tolaria West"]
+    Spec.assertEqWith s "not in a library or a hand" (length (Game.zoneMembers Zone.Library S.alice after) + S.handSize S.alice after) 10
+
+  -- CR 727.2 / 103.3a: a restart starts the archenemy's scheme deck over, so
+  -- the ongoing Very Soil she had face up is back in it, shuffled.
+  Spec.it s "CR 727.2 / 103.3a a restart puts a face-up scheme back into the shuffled scheme deck" $ do
+    look <- S.printingOf s registry "Look Skyward and Despair"
+    soil <- S.printingOf s registry "The Very Soil Shall Shake"
+    karn <- S.printingOf s registry "Karn Liberated"
+    board <- supplementaryBoard s registry (\d -> d {Deck.schemes = Map.fromList [(look, 1), (soil, 1)]}) id
+    let set = turnUp "The Very Soil Shall Shake" board
+        (karnId, withKarn) = S.addPermanent karn S.bob set
+        before = (S.addCounter CounterKind.Loyalty 14 karnId withKarn) {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+        schemeIds = Set.fromList (Archenemy.faceUp before <> Archenemy.deckOf S.alice before)
+        ((_, after), shuffles) = State.runState (Engine.runGame (recordShuffles karnAnswer) before Engine.priorityLoop) []
+    Spec.assertEqWith s "the old game had Very Soil face up" (cardNames (Archenemy.faceUp before) before) ["The Very Soil Shall Shake"]
+    Spec.assertEqWith s "CR 727.2 the new game has no scheme face up" (Archenemy.faceUp after) []
+    Spec.assertEqWith s "and both are in alice's scheme deck" (List.sort (cardNames (Archenemy.deckOf S.alice after) after)) ["Look Skyward and Despair", "The Very Soil Shall Shake"]
+    Spec.assertBool s (elem schemeIds (fmap Set.fromList shuffles)) "CR 103.3a which alice shuffled"
+    Spec.assertEqWith s "CR 103.4e she is still the archenemy, at 40 life" (S.lifeOf S.alice after, S.lifeOf S.bob after) (Just 40, Just 20)
+
+  -- CR 729.2a / 103.7 / 729.5a: the planar decks move into the Shahrazad
+  -- subgame, where alice's top card becomes the starting plane; her face-up
+  -- plane stays in the main game; and every plane in the subgame comes back to
+  -- its owner's deck -- bob's two from his deck, not his library.
+  Spec.it s "CR 729.2a the planar deck plays the subgame and comes back" $ do
+    academy <- S.printingOf s registry "Academy at Tolaria West"
+    tazeem <- S.printingOf s registry "Tazeem"
+    let planes d = d {Deck.planes = Set.fromList [academy, tazeem]}
+    board <- supplementaryBoard s registry planes planes
+    before <- withShahrazad s registry (S.runPure S.identityAnswer board (Planechase.setStartingPlane S.alice))
+    let ((_, after), asks) = State.runState (Engine.runGameAsked recordAsked before Engine.priorityLoop) []
+        subStates = [g | (depth, g, _) <- asks, depth == 1]
+        up = cardNames (Planechase.faceUp before) before
+        down = cardNames (Planechase.deckOf S.alice before) before
+    Spec.assertEqWith s "the main game has one plane face up and one in the deck" (length up, length down) (1, 1)
+    Spec.assertEqWith s "CR 729.2a / 103.7 the subgame's starting plane is the one from alice's deck" (fmap (\g -> cardNames (Planechase.faceUp g) g) (Maybe.listToMaybe (reverse subStates))) (Just down)
+    Spec.assertEqWith s "CR 729.5a it is back in alice's planar deck" (cardNames (Planechase.deckOf S.alice after) after) down
+    Spec.assertEqWith s "and the main game's plane never left" (cardNames (Planechase.faceUp after) after) up
+    Spec.assertEqWith s "and bob's planar deck is back whole" (List.sort (cardNames (Planechase.deckOf S.bob after) after)) ["Academy at Tolaria West", "Tazeem"]
+    Spec.assertBool s (elem (Set.fromList (Planechase.deckOf S.bob before)) [Set.fromList ids | (1, _, ids) <- asks]) "CR 729.2a bob shuffled it in the subgame"
+    Spec.assertBool s (elem (Set.fromList (Planechase.deckOf S.bob after)) [Set.fromList ids | (0, _, ids) <- asks]) "CR 729.5a and again in the main game"
+    Spec.assertEqWith s "CR 729.5 no plane went into a library" (length (Game.zoneMembers Zone.Library S.alice after), length (Game.zoneMembers Zone.Library S.bob after)) (10, 10)
+
+  -- CR 729.2a / 103.4e / 904.9 / 729.5a: the scheme deck moves into the
+  -- subgame, so alice is its archenemy -- at 40 life, setting a scheme in
+  -- motion -- while the ongoing scheme she had face up stays in the main game.
+  Spec.it s "CR 729.2a the scheme deck plays the subgame and comes back" $ do
+    look <- S.printingOf s registry "Look Skyward and Despair"
+    soil <- S.printingOf s registry "The Very Soil Shall Shake"
+    board <- supplementaryBoard s registry (\d -> d {Deck.schemes = Map.fromList [(look, 2), (soil, 1)]}) id
+    before <- withShahrazad s registry (turnUp "The Very Soil Shall Shake" board)
+    let ((_, after), asks) = State.runState (Engine.runGameAsked recordAsked before Engine.priorityLoop) []
+        subStates = [g | (depth, g, _) <- asks, depth == 1]
+        faceUpNames g = cardNames (Archenemy.faceUp g) g
+    Spec.assertEqWith s "CR 103.4e the subgame starts alice at 40 and bob at 20" (fmap (\g -> (S.lifeOf S.alice g, S.lifeOf S.bob g)) (Maybe.listToMaybe subStates)) (Just (Just 40, Just 20))
+    Spec.assertBool s (any (\g -> faceUpNames g == ["Look Skyward and Despair"]) subStates) "CR 904.9 alice sets a Look Skyward and Despair in motion in the subgame"
+    Spec.assertBool s (all (notElem "The Very Soil Shall Shake" . faceUpNames) subStates) "CR 729.2a the main game's face-up Very Soil is not in the subgame"
+    Spec.assertEqWith s "CR 729.5a both Look Skywards are back in alice's scheme deck" (cardNames (Archenemy.deckOf S.alice after) after) ["Look Skyward and Despair", "Look Skyward and Despair"]
+    Spec.assertBool s (elem (Set.fromList (Archenemy.deckOf S.alice after)) [Set.fromList ids | (0, _, ids) <- asks]) "and alice shuffled it in the main game"
+    Spec.assertEqWith s "and Very Soil is still face up in the main game" (cardNames (Archenemy.faceUp after) after) ["The Very Soil Shall Shake"]
+    Spec.assertEqWith s "CR 729.5 no scheme went into a library" (length (Game.zoneMembers Zone.Library S.alice after)) 10
+
+-- Ten Forests in each library and alice's and bob's decks adjusted, built
+-- without opening hands so a subgame's libraries are the whole ten.
+supplementaryBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> (Deck.Deck -> Deck.Deck) -> (Deck.Deck -> Deck.Deck) -> m GameState.GameState
+supplementaryBoard s registry alices bobs = do
+  forest <- S.printingOf s registry "Forest"
+  let deck = Deck.fromCards (Map.singleton forest 10)
+  pure (S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice (alices deck) >> Setup.createDeck S.bob (bobs deck)))
+
+-- Alice's precombat main phase with priority, Shahrazad in hand and two Plains
+-- to cast it.
+withShahrazad :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> GameState.GameState -> m GameState.GameState
+withShahrazad s registry gs = do
+  plains <- S.printingOf s registry "Plains"
+  shahrazad <- S.printingOf s registry "Shahrazad"
+  let (_, inHand) = S.addHandCard shahrazad S.alice (S.landsFor plains S.alice 2 gs)
+  pure inHand {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+
+-- Move alice's scheme of this name from her scheme deck to face up, where CR
+-- 701.32b's set in motion puts it.
+turnUp :: String -> GameState.GameState -> GameState.GameState
+turnUp name gs = case filter (\oid -> cardNames [oid] gs == [name]) (Archenemy.deckOf S.alice gs) of
+  [] -> gs
+  oid : _ -> gs {GameState.schemeDecks = Map.adjust (Seq.filter (/= oid)) S.alice (GameState.schemeDecks gs), GameState.command = Set.insert oid (GameState.command gs)}
+
+cardNames :: [ObjectId.ObjectId] -> GameState.GameState -> [String]
+cardNames oids gs = Maybe.mapMaybe (\oid -> fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) oids
+
+-- Activate Karn Liberated's restart whenever it is offered, else pass.
+karnAnswer :: Prompt.Prompt r -> r
+karnAnswer p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    let isRestart e = case e of
+          Effect.RestartGame _ -> True
+          _ -> False
+        restarts a = case a of
+          A.Activate _ ability -> any isRestart (foldMap Mode.allEffects (Modal.modes (ActivatedAbility.modal ability)))
+          _ -> False
+     in Maybe.fromMaybe A.Pass (List.find restarts actions)
+  _ -> S.identityAnswer p
+
+-- Answer as `answer` does, recording the cards of every shuffle.
+recordShuffles :: (forall a. Prompt.Prompt a -> a) -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+recordShuffles answer p = do
+  case p of
+    Prompt.Shuffle ids -> State.modify' (ids :)
+    _ -> pure ()
+  pure (answer p)
+
+-- Cast whatever is castable, else pass, recording how deep each question was
+-- asked, the game it was asked of, and the cards of a shuffle.
+recordAsked :: Asked.Asked r -> State.State [(Int, GameState.GameState, [ObjectId.ObjectId])] r
+recordAsked asked = do
+  let shuffled = case Asked.prompt asked of
+        Prompt.Shuffle ids -> ids
+        _ -> []
+  State.modify' (<> [(length (Asked.enclosing asked), Asked.game asked, shuffled)])
+  pure $ case Asked.prompt asked of
+    Prompt.ChooseAction _ _ actions -> Maybe.fromMaybe A.Pass (List.find isCast actions)
+    p -> S.identityAnswer p
+  where
+    isCast a = case a of
+      A.Cast {} -> True
+      _ -> False
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Setup" $ do
   setupSpec s registry
@@ -1127,3 +1283,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Setup" $ do
   deckSpec s registry
   restartSpec s registry
   subgameSpec s registry
+  supplementaryDeckSpec s registry
