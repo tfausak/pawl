@@ -1546,6 +1546,7 @@ replacementRowReads re = case re of
   ReplacementEffect.CoinFlipR {} -> ([], [])
   ReplacementEffect.DieRollR {} -> ([], [])
   ReplacementEffect.ProliferateR {} -> ([], [])
+  ReplacementEffect.ScryR {} -> ([], [])
   ReplacementEffect.PhaseR _ -> ([], [])
 
 -- A row's pattern Filter joined onto what its rewrite reads.
@@ -1691,6 +1692,7 @@ replacementRowEffects re = case re of
   ReplacementEffect.CoinFlipR _ -> []
   ReplacementEffect.DieRollR _ -> []
   ReplacementEffect.ProliferateR _ -> []
+  ReplacementEffect.ScryR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The program an ENTRY rewrite runs. entryRewriteReads' discipline: no wildcard,

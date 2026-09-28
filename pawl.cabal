@@ -998,6 +998,10 @@ library codec
     Pawl.Codec.SchemeSetInMotionSpec
     Pawl.Codec.Scope
     Pawl.Codec.ScopeSpec
+    Pawl.Codec.ScryR
+    Pawl.Codec.ScryRewrite
+    Pawl.Codec.ScryRewriteSpec
+    Pawl.Codec.ScryRSpec
     Pawl.Codec.Search
     Pawl.Codec.SearchDestination
     Pawl.Codec.SearchDestinationSpec
@@ -2237,6 +2241,8 @@ library types
     Pawl.Types.Scaling
     Pawl.Types.SchemeSetInMotion
     Pawl.Types.Scope
+    Pawl.Types.ScryR
+    Pawl.Types.ScryRewrite
     Pawl.Types.Search
     Pawl.Types.SearchDestination
     Pawl.Types.SearchPlace

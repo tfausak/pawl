@@ -533,6 +533,7 @@ idleTokenRowOffends replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
+  ReplacementEffect.ScryR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- The non-vacuity half of idleTokenRowOffends' lint, isPhaseR's shape.
@@ -592,6 +593,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
+  ReplacementEffect.ScryR {} -> False
 
 -- Every replacement shape the codec accepts and no card may author, for
 -- phasePatternOffends' reason and one more. A card cannot name an ObjectId or a
@@ -647,6 +649,7 @@ engineOnlyOffends replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
+  ReplacementEffect.ScryR {} -> False
   ReplacementEffect.TurnUpR {} -> False
 
 -- Is this damage rewrite one the ENGINE mints and no card may print? Three of
@@ -733,6 +736,7 @@ turnUpRequiringOffends replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
+  ReplacementEffect.ScryR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- isPhaseR's twin: did the sweep above have anything to look at? A wildcard for
@@ -768,6 +772,7 @@ riderWithoutPreventionOffends replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
+  ReplacementEffect.ScryR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.1a: does this rewrite use the word "prevent"? engineMintedDamage's
@@ -815,6 +820,7 @@ shufflingOutsideLibraryOffends replacement = case replacement of
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
+  ReplacementEffect.ScryR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- The non-vacuity half of shufflingOutsideLibraryOffends' lint, isPhaseR's shape.
