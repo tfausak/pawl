@@ -223,6 +223,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing
   Effect.PayAnyEnergy _ -> Nothing
+  Effect.ChooseNumber _ -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
   Effect.Detain _ -> Nothing
@@ -319,4 +320,5 @@ zoneFunctionedFrom itself delayed effect = case effect of
   -- card in the pool writes such a body.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
+  Effect.Repeat body -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.Heal _ -> Nothing

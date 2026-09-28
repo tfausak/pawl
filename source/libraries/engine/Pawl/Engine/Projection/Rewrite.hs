@@ -803,6 +803,7 @@ rewriteEffect pairs effect = case effect of
   Effect.GainPlayerCounters x -> Effect.GainPlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
   Effect.RemovePlayerCounters x -> Effect.RemovePlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
   Effect.PayAnyEnergy _ -> effect
+  Effect.ChooseNumber _ -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   Effect.Detain ref -> Effect.Detain (rewriteObjectRef pairs ref)
@@ -976,6 +977,7 @@ rewriteEffect pairs effect = case effect of
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) ->
     Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
+  Effect.Repeat body -> Effect.Repeat (fmap (rewriteEffect pairs) body)
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
 
 -- CR 612.2 over one word whose family a card's text names rather than a
@@ -2132,6 +2134,7 @@ rewriteAggregation pairs aggregation = case aggregation of
   Aggregation.DistinctCardTypes -> aggregation
   Aggregation.DistinctColors -> aggregation
   Aggregation.MostSharingACreatureType -> aggregation
+  Aggregation.MostSharingACardType -> aggregation
 
 -- CR 612.1 through CR 208.2a's characteristic-defining power and toughness. Both
 -- boxes are rewritten rather than only the one a card fills, since seedCharacteristicPT

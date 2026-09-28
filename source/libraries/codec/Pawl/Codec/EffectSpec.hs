@@ -404,6 +404,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PayAnyEnergy (SlotName.MkSlotName (Text.pack "paid")))
       " {\"type\":\"PayAnyEnergy\",\"value\":\"paid\"} "
+  Spec.it s "ChooseNumber" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ChooseNumber (SlotName.MkSlotName (Text.pack "number")))
+      " {\"type\":\"ChooseNumber\",\"value\":\"number\"} "
   Spec.it s "Sacrifice" $
     Common.assertJsonCodec
       s
@@ -1023,6 +1030,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       " {\"type\":\"ForEachNumber\",\"value\":{\"upTo\":{\"type\":\"InSlot\",\"value\":\"X\"},\"slot\":\"number\",\"body\":[{\"type\":\"Draw\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"InSlot\",\"value\":\"number\"}}}]}} "
+  Spec.it s "Repeat" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Repeat (Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) Nothing))))
+      " {\"type\":\"Repeat\",\"value\":[{\"type\":\"Draw\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"Literal\",\"value\":1}}}]} "
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
   Spec.it s "PreventAllDamage" $
     Common.assertJsonCodec

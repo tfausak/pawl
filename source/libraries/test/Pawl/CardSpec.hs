@@ -760,6 +760,7 @@ countQuantities count = case Count.Type.aggregation count of
   Aggregation.DistinctCardTypes -> []
   Aggregation.DistinctColors -> []
   Aggregation.MostSharingACreatureType -> []
+  Aggregation.MostSharingACardType -> []
   Aggregation.Greatest quantity -> [quantity]
   Aggregation.Total quantity -> [quantity]
 
@@ -1314,6 +1315,7 @@ ownCounts effect = case effect of
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -1391,6 +1393,7 @@ ownCounts effect = case effect of
   -- card's -- the rider's recursion one opcode over.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectCounts body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> quantityCounts upTo <> concatMap effectCounts body
+  Effect.Repeat body -> concatMap effectCounts body
   Effect.Heal _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
@@ -1648,6 +1651,7 @@ effectNestedEffects effect = case effect of
   -- CR 608.2f's body, run once per member of the fold.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Foldable.toList body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Foldable.toList body
+  Effect.Repeat body -> Foldable.toList body
   Effect.Heal _ -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
@@ -1739,6 +1743,7 @@ effectNestedEffects effect = case effect of
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap {} -> []
   Effect.Untap {} -> []
   Effect.Detain {} -> []
@@ -2230,6 +2235,7 @@ effectReplacements effect = case effect of
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectReplacements body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectReplacements body
+  Effect.Repeat body -> concatMap effectReplacements body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed replacement abilities.
@@ -2248,6 +2254,7 @@ effectReplacements effect = case effect of
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -2707,6 +2714,7 @@ effectMintedFaces effect = case effect of
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectMintedFaces body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectMintedFaces body
+  Effect.Repeat body -> concatMap effectMintedFaces body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
@@ -2727,6 +2735,7 @@ effectMintedFaces effect = case effect of
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -5758,6 +5767,7 @@ effectFilters effect = case effect of
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Untap ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Detain ref -> frame SourceHostFramed (objectRefFilters ref)
@@ -5877,6 +5887,7 @@ effectFilters effect = case effect of
   -- list is exactly what this traversal must not stop at.
   Effect.ForEach (ForEach.MkForEach ref _ _ body _) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectFilters body
+  Effect.Repeat body -> concatMap effectFilters body
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so

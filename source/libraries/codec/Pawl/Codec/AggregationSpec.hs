@@ -28,6 +28,12 @@ spec s = Spec.describe s "Pawl.Codec.Aggregation" $ do
       (Aggregation.codec Common.integer)
       Aggregation.MostSharingACreatureType
       " {\"type\":\"MostSharingACreatureType\"} "
+  Spec.it s "MostSharingACardType" $
+    Common.assertCodec
+      s
+      (Aggregation.codec Common.integer)
+      Aggregation.MostSharingACardType
+      " {\"type\":\"MostSharingACardType\"} "
   Spec.it s "DistinctColors" $
     Common.assertCodec
       s
