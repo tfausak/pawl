@@ -574,6 +574,8 @@ library codec
     Pawl.Codec.ForbidBlock
     Pawl.Codec.ForbidBlockSpec
     Pawl.Codec.ForEach
+    Pawl.Codec.ForEachNumber
+    Pawl.Codec.ForEachNumberSpec
     Pawl.Codec.ForEachSpec
     Pawl.Codec.ForetellCost
     Pawl.Codec.ForetellCostSpec
@@ -1974,6 +1976,7 @@ library types
     Pawl.Types.ForbidAttack
     Pawl.Types.ForbidBlock
     Pawl.Types.ForEach
+    Pawl.Types.ForEachNumber
     Pawl.Types.ForetellCost
     Pawl.Types.FromOutsideTheGame
     Pawl.Types.FromReference

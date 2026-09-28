@@ -208,6 +208,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -3128,6 +3129,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.MakeForetold {} -> False
   Effect.MakeWarped {} -> False
   Effect.ForEach {} -> False
+  Effect.ForEachNumber {} -> False
   -- CR 701.69a removes marked damage, so permanents bearing none have nothing
   -- to lose. A regression fence: no printed "may" in data/cards reaches it.
   Effect.Heal ref ->
@@ -5377,6 +5379,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Map.empty
           members
     State.modify' (bindAcross accumulated . rescope)
+  -- CR 608.2f over numbers: the bound read once off the pre-loop board, and each
+  -- number bound on the source (bindAmountSlot) for its iteration's body to
+  -- read. One action, so ForEach's bracket: one event group, and one CR 613.7m
+  -- batch for everything the loop puts onto the battlefield. Pawl.RestampSpec's
+  -- Ornate Imitations board proves the batch.
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) -> do
+    gs0 <- State.get
+    let viewOf = effectViewOf source legal gs0
+        context = effectContext gs0 controller source legal (slotBindings resolving gs0)
+        count = maybe 0 Integer.toNaturalSaturating (evaluateForRecipient viewOf context gs0 resolving source controller upTo)
+    Event.simultaneously . Event.together . Monad.forM_ [1 .. count] $ \n -> do
+      State.modify' (bindAmountSlot resolving source slot n)
+      applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
   Effect.Draw (Draw.MkDraw ref quantity mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -6537,8 +6552,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- loop and by every CR 603.6a watcher of the entry.
             -- One batch per pick, which on the written road is the one pick the
             -- whole count is minted from and on the duplicate road is one batch
-            -- of `n` per named object.
-            ConjureDestination.Battlefield entry -> case cards of
+            -- of `n` per named object. Every batch enters at one moment, so
+            -- Event.together orders them all as one CR 613.7m batch -- a
+            -- regression fence, since no card in data/cards/ conjures a duplicate
+            -- of two or more objects onto the battlefield.
+            ConjureDestination.Battlefield entry -> Event.together $ case cards of
               ConjureCards.Written written -> pickWritten written >>= onto entry n
               ConjureCards.Duplicate ref -> concat <$> Monad.mapM (onto entry n) (duplicatesOf ref)
               ConjureCards.Reference from -> referencePickers from 1 >>= fmap concat . Monad.mapM (\p -> p >>= fmap concat . Monad.mapM (onto entry n) . Maybe.maybeToList)

@@ -14,10 +14,12 @@
 -- reaches the same function and no board can observe it -- see the note on
 -- restampOrderSpec. Objects ENTERING together are Restamp.settle's, driven on
 -- Replenish's MoveToZone road by entryOrderSpec and on the token road by
--- tokenOrderSpec, and on Mirror Match's CR 608.2f loop by simultaneousCopiesSpec.
+-- tokenOrderSpec, on Mirror Match's CR 608.2f loop by simultaneousCopiesSpec,
+-- and on Ornate Imitations' conjure loop by conjuredOrderSpec.
 module Pawl.RestampSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -29,9 +31,11 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Interpreter as Interpreter
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
@@ -58,6 +62,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
   entryOrderSpec s registry
   tokenOrderSpec s registry
   simultaneousCopiesSpec s registry
+  conjuredOrderSpec s registry
 
 -- | The producer is a synthetic pair, and no printing reaches the rule; see
 -- #2571 for the search behind that. Observing which of two simultaneous CR
@@ -409,4 +414,72 @@ mirrorMatch caster permutation gs =
         oid : _ -> oid
         [] -> ObjectId.MkObjectId 0
       ((_, after), asked) = State.runState (Engine.runGame answer gs (S.cast caster spell >> Stack.resolveTop >> Engine.settleForPriority)) []
+   in (after, asked)
+
+-- | CR 613.7m over a conjure: Ornate Imitations ({X}{G}{U} Sorcery, "For each
+-- number between 1 and X, conjure a duplicate of a random creature card with
+-- that mana value onto the battlefield. X can't be 0."), Oracle text verified on
+-- Scryfall 2026-09-27. One action (CR 608.2f), so every card it conjures enters
+-- at one moment and alice orders their stamps.
+--
+-- Cast for X = 6 over a FIXTURE reference of Godhead of Awe (mana value 5) and
+-- Harmonious Archon (6), so numbers 1 to 4 admit nothing and conjure nothing. The
+-- two write base P/T in layer 7b (1/1 and 3/3), and bob's Goblin Piker (2/1)
+-- reads whichever is later. The Godhead is conjured first, so the arrival order
+-- stamps the Archon later; the two boards differ only in alice's answer.
+conjuredOrderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+conjuredOrderSpec s registry =
+  Spec.describe s "Conjure" $ do
+    Spec.it s "CR 613.7m / 608.2f the controller orders every card one conjure loop made" $ do
+      (board, pikerId, fixture) <- ornateBoard s registry
+      let (after, asked) = ornateImitations fixture (Just [1, 0]) board
+          (canonical, _) = ornateImitations fixture Nothing board
+      Spec.assertEqWith s "CR 613.7m alice stamped the Godhead last, so bob's Goblin Piker is 1/1" (S.powerToughnessOf pikerId after) (Just (1, 1))
+      Spec.assertEqWith s "while the arrival order leaves the Archon last, so it is 3/3" (S.powerToughnessOf pikerId canonical) (Just (3, 3))
+      Spec.assertEqWith s "and alice was asked once, over both cards" asked [(S.alice, 2)]
+
+-- alice holds Ornate Imitations and eight lands in her precombat main; bob
+-- controls a Goblin Piker. Hands back the fixture reference beside the board.
+ornateBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, Registry.Registry (State.State [(PlayerId.PlayerId, Int)]))
+ornateBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  ornate <- S.printingOf s registry "Ornate Imitations"
+  reference <- mapM (S.cardOf s registry) ["Godhead of Awe", "Harmonious Archon"]
+  let lands = S.landsFor forest S.alice 4 (S.landsFor island S.alice 4 (Setup.emptyGame S.bothPlayers))
+      (pikerId, withPiker) = S.addPermanent piker S.bob lands
+      (_, withSpell) = S.addHandCard ornate S.alice withPiker
+      fixture =
+        Registry.MkRegistry
+          { Registry.fetchCard = \name -> pure (List.find (\card -> S.nameOf card == name) reference),
+            Registry.cards = pure reference
+          }
+  pure
+    ( withSpell
+        { GameState.activePlayer = S.alice,
+          GameState.phase = Phase.PrecombatMain,
+          GameState.priority = Just S.alice
+        },
+      pikerId,
+      fixture
+    )
+
+-- alice casts the Ornate Imitations in her hand for X = 6 and it resolves, the
+-- reference answered off `fixture`. CR 613.7m's order is answered with
+-- `permutation`, or with the offered order; hands back the board and who was
+-- asked that order, over how many.
+ornateImitations :: Registry.Registry (State.State [(PlayerId.PlayerId, Int)]) -> Maybe [Natural.Natural] -> GameState.GameState -> (GameState.GameState, [(PlayerId.PlayerId, Int)])
+ornateImitations fixture permutation gs =
+  let answer :: Asked.Asked r -> State.State [(PlayerId.PlayerId, Int)] r
+      answer question = case Asked.prompt question of
+        Prompt.ChooseX {} -> pure 6
+        Prompt.OrderTimestamps _ pid batch -> do
+          State.modify (<> [(pid, length batch)])
+          pure (Maybe.fromMaybe (zipWith const [0 ..] batch) permutation)
+        p -> pure (S.identityAnswer p)
+      spell = case Game.zoneMembers Zone.Hand S.alice gs of
+        oid : _ -> oid
+        [] -> ObjectId.MkObjectId 0
+      ((_, after), asked) = State.runState (Engine.runGameAsked (Interpreter.lookingUpCards fixture answer) gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) []
    in (after, asked)
