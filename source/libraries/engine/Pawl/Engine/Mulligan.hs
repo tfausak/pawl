@@ -154,7 +154,9 @@ revealsItself = any isSelfReveal . HandAction.effects
 -- declines never leaves the window, which is CR 104.4b's optional loop: those
 -- are not draws and the rules give nothing to break one with. The CR 103.6
 -- window terminates either way: its cap takes a revealed card's reveals out of
--- the offers, and CR 103.6a's action takes the card out of the hand.
+-- the offers, and CR 103.6a's action takes the card out of the hand. CardSpec's
+-- "CR 103.6 every opening-hand action reveals its card or puts it onto the
+-- battlefield" holds the card data to those two.
 --
 -- Proved by MulliganSpec's "an action that leaves its card in hand is offered
 -- again", which takes the Egret twice and then declines. Card DATA that makes
