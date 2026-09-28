@@ -4,6 +4,7 @@ import qualified Pawl.Codec.AfterTurn as AfterTurn
 import qualified Pawl.Codec.PaidExpiry as PaidExpiry
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerId as PlayerId
+import qualified Pawl.Codec.Timestamp as Timestamp
 import qualified Pawl.Codec.While as While
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -25,6 +26,7 @@ codec =
       Arm.payload "AtUpkeepOf" PlayerId.codec Expiry.AtUpkeepOf (\x -> case x of Expiry.AtUpkeepOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOfTurnOf" AfterTurn.codec Expiry.AtEndOfTurnOf (\x -> case x of Expiry.AtEndOfTurnOf y -> Just y; _ -> Nothing),
       Arm.payload "DuringTurnOf" AfterTurn.codec Expiry.DuringTurnOf (\x -> case x of Expiry.DuringTurnOf y -> Just y; _ -> Nothing),
+      Arm.payload "DuringExtraTurn" Timestamp.codec Expiry.DuringExtraTurn (\x -> case x of Expiry.DuringExtraTurn y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOf" PhaseSelector.codec Expiry.AtEndOf (\x -> case x of Expiry.AtEndOf y -> Just y; _ -> Nothing),
       Arm.payload "AtEndOfCombatOn" AfterTurn.codec Expiry.AtEndOfCombatOn (\x -> case x of Expiry.AtEndOfCombatOn y -> Just y; _ -> Nothing),
       Arm.payload "WhenPaid" PaidExpiry.codec Expiry.WhenPaid (\x -> case x of Expiry.WhenPaid y -> Just y; _ -> Nothing),
@@ -41,6 +43,7 @@ tagOf x = case x of
   Expiry.AtUpkeepOf {} -> "AtUpkeepOf"
   Expiry.AtEndOfTurnOf {} -> "AtEndOfTurnOf"
   Expiry.DuringTurnOf {} -> "DuringTurnOf"
+  Expiry.DuringExtraTurn {} -> "DuringExtraTurn"
   Expiry.AtEndOf {} -> "AtEndOf"
   Expiry.AtEndOfCombatOn {} -> "AtEndOfCombatOn"
   Expiry.WhenPaid {} -> "WhenPaid"

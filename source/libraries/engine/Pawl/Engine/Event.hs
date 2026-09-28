@@ -8628,16 +8628,12 @@ armDelayed ability source controller captured onset expiry gs = case armOnset so
 -- so settleOnsets supplies its number later.
 --
 -- CR 500.7: "that turn" is the extra turn this resolution just created for the
--- controller, the most recently created entry from this source that the
--- controller takes. Nothing when there is none, as when the controller named
--- by the extra-turn clause was not the one taking it.
+-- controller (Turn.thatExtraTurn).
 armOnset :: ObjectId -> PlayerId -> GameState -> Onset -> Maybe TurnWindow
 armOnset source controller gs onset = case onset of
   Onset.Immediately -> Just TurnWindow.AnyTurn
   Onset.FromYourNextTurn -> Just TurnWindow.ControllersNextTurn
-  Onset.FromThatExtraTurn ->
-    let created turn = ExtraTurn.source turn == source && Turn.sharesTurn gs controller (ExtraTurn.taker turn)
-     in fmap (TurnWindow.OnExtraTurn . ExtraTurn.createdAt) (List.find created (GameState.extraTurns gs))
+  Onset.FromThatExtraTurn -> fmap TurnWindow.OnExtraTurn (Turn.thatExtraTurn source controller gs)
 
 -- CR 603.7a: a turn has BEGUN, so settle every delayed entry waiting for one and
 -- drop every entry whose turn is now over. Engine.beginTurn calls this once the

@@ -1,5 +1,6 @@
 module Pawl.Engine.Turn where
 
+import qualified Data.List as List
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -10,15 +11,18 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.EndingStep as EndingStep
 import Pawl.Types.ExtraPhase (ExtraPhase)
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.Phase (Phase)
 import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.Timestamp as Timestamp
 
 allPhases :: [Phase]
 allPhases =
@@ -48,6 +52,17 @@ sharesTurn gs one other =
 -- under the shared team turns option a member of the active team?
 isActive :: GameState -> PlayerId -> Bool
 isActive gs = sharesTurn gs (GameState.activePlayer gs)
+
+-- | CR 500.7: "that turn", the extra turn `source`'s resolution just created
+-- for `controller` -- the most recently created pending entry from that source
+-- that the controller takes -- named by its ExtraTurn.createdAt. Nothing when
+-- there is none, as when the controller named by the extra-turn clause was not
+-- the one taking it. Onset.FromThatExtraTurn and Duration.DuringThatExtraTurn
+-- both name their turn through this.
+thatExtraTurn :: ObjectId -> PlayerId -> GameState -> Maybe Timestamp.Timestamp
+thatExtraTurn source controller gs =
+  let created turn = ExtraTurn.source turn == source && sharesTurn gs controller (ExtraTurn.taker turn)
+   in fmap ExtraTurn.createdAt (List.find created (GameState.extraTurns gs))
 
 -- | Every active player in seating order from the active player, departed
 -- seats included (CR 800.4j); a caller that must not name one filters them.

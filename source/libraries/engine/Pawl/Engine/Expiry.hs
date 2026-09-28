@@ -59,6 +59,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import Pawl.Types.Expiry (Expiry)
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -136,6 +137,11 @@ arm targets controller source duration gs = case duration of
   -- seat, so this window always begins.
   Duration.DuringYourNextTurn ->
     Just (Expiry.DuringTurnOf (AfterTurn.MkAfterTurn controller (GameState.turnNumber gs)))
+  -- CR 611.2a / 500.7: the extra turn this resolution created, named by its
+  -- creation stamp as Onset.FromThatExtraTurn names it (Turn.thatExtraTurn).
+  -- Nothing where no such turn is pending: the window cannot begin, so per CR
+  -- 611.2b's reading above nothing is stored.
+  Duration.DuringThatExtraTurn -> fmap Expiry.DuringExtraTurn (Turn.thatExtraTurn source controller gs)
   -- BAKED, and stored baked: the condition outlives the resolution that stored
   -- it, and sweepConditional below re-reads it off the effect's
   -- SOURCE, whose bindings never held the resolution's slots. An InSlot left
@@ -246,6 +252,7 @@ perSeat duration = case duration of
   Duration.UntilYourNextUpkeep -> Nothing
   Duration.UntilEndOfYourNextTurn -> Nothing
   Duration.DuringYourNextTurn -> Nothing
+  Duration.DuringThatExtraTurn -> Nothing
   Duration.ForAsLongAs _ -> Nothing
   Duration.UntilEndOfCombat -> Nothing
   Duration.UntilEndOfCombatOnYourNextTurn -> Nothing
@@ -271,16 +278,17 @@ follows expiry = case expiry of
   Expiry.AtUpkeepOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
+  Expiry.DuringExtraTurn _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.AtEndOfCombatOn _ -> False
   Expiry.WhenPaid _ -> False
   Expiry.WhenUsed -> False
 
--- CR 611.2a: has this duration's window BEGUN? Every arm but DuringTurnOf states
--- only an end, so the answer for them is True from the moment the effect is
--- stored and a sweep is the whole of their life cycle. This one names a turn
--- that has not started yet, and a reader that asks only whether the row was
--- swept applies it a turn early.
+-- CR 611.2a: has this duration's window BEGUN? Every arm but DuringTurnOf and
+-- DuringExtraTurn states only an end, so the answer for them is True from the
+-- moment the effect is stored and a sweep is the whole of their life cycle.
+-- Those two name a turn that has not started yet, and a reader that asks only
+-- whether the row was swept applies it early.
 --
 -- The reading is dropAtCleanup's, one turn shifted: the window is the first turn
 -- of the named player numbered ABOVE the one the duration began on, so it is
@@ -296,6 +304,8 @@ begun gs expiry = case expiry of
   Expiry.DuringTurnOf afterTurn ->
     Turn.isActive gs (AfterTurn.player afterTurn)
       && GameState.turnNumber gs > AfterTurn.turn afterTurn
+  -- CR 500.7: open exactly while the extra turn it names is the one under way.
+  Expiry.DuringExtraTurn stamp -> GameState.extraTurnUnderWay gs == Just stamp
   Expiry.AtCleanup -> True
   Expiry.Never -> True
   Expiry.Perpetual -> True
@@ -344,6 +354,11 @@ dropAtCleanup gs =
         Expiry.DuringTurnOf afterTurn ->
           not (Turn.isActive gs (AfterTurn.player afterTurn))
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn
+        -- CR 611.2a / 500.7: kept while the turn it names is still pending, so
+        -- the cleanup that ends that turn -- it was popped as it began -- ends
+        -- it, and so does the first cleanup after CR 800.4k spent it unbegun.
+        -- Hygiene: `begun` alone decides whether the row applies.
+        Expiry.DuringExtraTurn stamp -> any ((== stamp) . ExtraTurn.createdAt) (GameState.extraTurns gs)
         Expiry.AtEndOf _ -> True
         -- The named turn is over, so a turn that had no combat phase takes the
         -- effect with it rather than handing it to a later turn of theirs, which
@@ -418,6 +433,7 @@ sweepConditional = do
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringExtraTurn _ -> True
         Expiry.AtEndOf _ -> True
         Expiry.AtEndOfCombatOn _ -> True
         -- CR 116.2c states a price, not a condition, so no board change ends it.
@@ -589,6 +605,9 @@ dropAtTurnOf pid gs =
         -- still in the game keeps it, and this is the very moment `begun` starts
         -- answering True for the turn it names.
         Expiry.DuringTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
+        -- Named by a turn rather than a seat, so no seat's handoff ends it; an
+        -- extra turn CR 800.4k spent unbegun is dropAtCleanup's to end.
+        Expiry.DuringExtraTurn _ -> True
         -- CR 800.4m's "a specific point in that turn", for the two arms above' reason.
         Expiry.AtEndOfCombatOn afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
         Expiry.AtEndOf _ -> True
@@ -658,6 +677,7 @@ dropAtEndOf ending gs =
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringExtraTurn _ -> True
         -- CR 116.2c: no window of the turn ends it.
         Expiry.WhenPaid _ -> True
         -- No step or phase ending is a use.
@@ -681,6 +701,7 @@ dropAtUpkeepOf pid =
     Expiry.AtTurnOf _ -> True
     Expiry.AtEndOfTurnOf _ -> True
     Expiry.DuringTurnOf _ -> True
+    Expiry.DuringExtraTurn _ -> True
     Expiry.AtEndOf _ -> True
     Expiry.AtEndOfCombatOn _ -> True
     Expiry.WhenPaid _ -> True
@@ -741,6 +762,7 @@ paidExpiries gs =
         Expiry.AtUpkeepOf _ -> []
         Expiry.AtEndOfTurnOf _ -> []
         Expiry.DuringTurnOf _ -> []
+        Expiry.DuringExtraTurn _ -> []
         Expiry.AtEndOf _ -> []
         Expiry.AtEndOfCombatOn _ -> []
         Expiry.WhenUsed -> []
@@ -788,6 +810,7 @@ dropWhenPaidBy oid gs =
         Expiry.AtUpkeepOf _ -> True
         Expiry.AtEndOfTurnOf _ -> True
         Expiry.DuringTurnOf _ -> True
+        Expiry.DuringExtraTurn _ -> True
         Expiry.AtEndOf _ -> True
         Expiry.AtEndOfCombatOn _ -> True
         Expiry.WhenUsed -> True
@@ -837,6 +860,7 @@ expiresWhenUsed expiry = case expiry of
   Expiry.AtUpkeepOf _ -> False
   Expiry.AtEndOfTurnOf _ -> False
   Expiry.DuringTurnOf _ -> False
+  Expiry.DuringExtraTurn _ -> False
   Expiry.AtEndOf _ -> False
   Expiry.AtEndOfCombatOn _ -> False
   Expiry.WhenPaid _ -> False

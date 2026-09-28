@@ -13,7 +13,6 @@
 --   * CR 904.2's team structure and CR 904.6's first turn, which are the
 --     caller's settings and turn order (#4315).
 --   * CR 904.13's Archenemy Commander option (#4315).
---   * An effect that stops schemes being set in motion for a turn (#4318).
 module Pawl.Engine.Archenemy where
 
 import qualified Control.Monad as Monad
@@ -25,6 +24,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Event.Trigger as Trigger
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Scheme as Scheme
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -72,10 +72,14 @@ shuffleSchemeDeck pid = do
 -- and turn it face up, which is joining GameState.command. The event is what
 -- CR 904.9's "When you set this scheme in motion" triggers on. A fresh
 -- timestamp, Pawl.Engine.Planechase.turnUpTop's reason.
+--
+-- CR 101.2: nothing happens while an effect says schemes can't be set in motion
+-- (All in Good Time, PlayerEffect.schemesCantBeSetInMotion).
 setInMotion :: PlayerId -> Game ()
 setInMotion pid = do
   gs <- State.get
   case deckOf pid gs of
+    _ | PlayerEffect.schemesCantBeSetInMotion gs -> pure ()
     [] -> pure ()
     top : rest -> do
       ts <- State.state Game.freshTimestamp
