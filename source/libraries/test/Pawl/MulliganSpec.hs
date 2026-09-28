@@ -250,6 +250,30 @@ chancellorGame chancellor mountain n =
       withAlice = addMany mountain S.alice n (addMany chancellor S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
+-- alice's library: a Synthetic Twofold Leyline on top, then `n` Mountains; bob's
+-- is uniform. The card grants one action of each CR 103.6 kind, battlefield
+-- (index 0) then reveal (index 1).
+twofoldLeylineGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+twofoldLeylineGame leyline mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addPermanent p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany leyline S.alice 1 g0)
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
+
+-- Takes the CR 103.6 action at the next index of `picks` on each offer, declines
+-- once the list runs out or the index is not offered, and keeps; every offer's
+-- candidate list is recorded. By INDEX for useActionAt's reason.
+takeOpeningAt :: [Natural] -> Prompt.Prompt r -> State.State [[(ObjectId.ObjectId, HandActionIndex.HandActionIndex)]] r
+takeOpeningAt picks p = case p of
+  Prompt.OpeningHandAction _ _ candidates -> do
+    seen <- State.get
+    State.put (candidates : seen)
+    pure $ case drop (length seen) picks of
+      i : _ -> List.find (\(_, index) -> index == HandActionIndex.MkHandActionIndex i) candidates
+      [] -> Nothing
+  Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
+  _ -> pure (S.identityAnswer p)
+
 -- Takes the first offered CR 103.6 action for the first `k` offers, declines the
 -- next, and keeps; every offer's candidate list is recorded.
 --
@@ -681,6 +705,33 @@ spec s registry =
       Spec.assertEqWith s "CR 103.6b: one Goblin token, not one per taking" (goblins after) 1
       Spec.assertEqWith s "the capped card is not offered a second time" (length offers) 1
       Spec.assertEqWith s "CR 701.20a: and it was revealed once" (revealedNames afterWindow) ["Chancellor of the Forge"]
+    Spec.it s "CR 103.6: a card revealed first may still begin the game on the battlefield" $ do
+      -- The discriminating case for CR 103.6's "any such actions in any order":
+      -- CR 103.6b caps the reveal and nothing else, so the battlefield action
+      -- survives it. A cap on the whole card would end the window after the
+      -- reveal and leave the card in hand.
+      leyline <- S.printingOf s registry "Synthetic Twofold Leyline"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = twofoldLeylineGame leyline mountain 20
+          ((_, after), offers) = State.runState (Engine.runGame (takeOpeningAt [1, 0]) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
+      Spec.assertEqWith s "CR 103.6a: the revealed card is on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
+      Spec.assertEqWith s "and her hand is one smaller" (S.handSize S.alice after) 6
+      Spec.assertEqWith s "CR 701.20a: it was revealed once" (revealedNames after) ["Synthetic Twofold Leyline"]
+      Spec.assertEqWith
+        s
+        "CR 103.6b: both actions, then the battlefield action alone"
+        (reverse (fmap (fmap snd) offers))
+        [[HandActionIndex.MkHandActionIndex 0, HandActionIndex.MkHandActionIndex 1], [HandActionIndex.MkHandActionIndex 0]]
+    Spec.it s "CR 103.6: a card put onto the battlefield first can no longer be revealed" $ do
+      -- The other order: CR 103.6a's action takes the card out of the hand, so
+      -- the reveal is gone with it and the window asks nothing more.
+      leyline <- S.printingOf s registry "Synthetic Twofold Leyline"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = twofoldLeylineGame leyline mountain 20
+          ((_, after), offers) = State.runState (Engine.runGame (takeOpeningAt [0, 1]) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
+      Spec.assertEqWith s "CR 103.6a: the card is on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
+      Spec.assertEqWith s "and nothing was revealed" (revealedNames after) []
+      Spec.assertEqWith s "after one offer, none" (length offers) 1
     Spec.it s "CR 103.5b: one card granting two actions offers both" $ do
       -- Nothing in CR 103 caps how many such actions a card grants, so the two
       -- are two offers with the same granting card and different indices. A

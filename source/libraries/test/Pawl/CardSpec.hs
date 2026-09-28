@@ -35,6 +35,7 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Keyword as KeywordEngine
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -6557,6 +6558,27 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- sweep that did not subtract the performer's binding would demand a targetSlots
   -- entry the reserved-name sweep below forbids, and the two would be mutually
   -- unsatisfiable.
+  -- CR 103.6a and CR 103.6b are the only opening-hand actions, and
+  -- Mulligan.handWindowExcept's termination rests on it: it caps a reveal per
+  -- card and relies on the other kind leaving the hand. An action that is
+  -- neither would be re-offered for as long as the player took it.
+  Spec.it s "CR 103.6 every opening-hand action reveals its card or puts it onto the battlefield" $ do
+    ps <- S.allPrintings s
+    let entersItself =
+          any
+            ( \effect -> case effect of
+                Effect.MoveToZone move -> MoveToZone.ref move == ObjectRef.InSlot Binding.triggerSource && MoveToZone.zone move == Zone.Battlefield
+                _ -> False
+            )
+            . HandAction.effects
+        offends = any (\action -> not (Mulligan.revealsItself action || entersItself action)) . Face.openingHandActions
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertBool s (any (anyFace (any Mulligan.revealsItself . Face.openingHandActions) . Printing.card) ps) "the pool prints an opening-hand reveal"
+    Spec.assertEqWith s "every opening-hand action is rule 103.6a's or rule 103.6b's" (fmap (S.nameOf . Printing.card) offenders) []
+    chancellor <- S.printingOf s registry "Chancellor of the Forge"
+    let face = S.combinedFace chancellor
+    Spec.assertBool s (not (offends face)) "the real Chancellor of the Forge is accepted"
+    Spec.assertBool s (offends face {Face.openingHandActions = [HandAction.MkHandAction Nothing []]}) "an action that does neither is rejected"
   Spec.it s "the lint itself catches a hand action naming a slot nothing binds" $ do
     leyline <- S.printingOf s registry "Leyline of the Void"
     let face = S.combinedFace leyline

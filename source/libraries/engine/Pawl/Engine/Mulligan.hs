@@ -7,6 +7,7 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -18,6 +19,7 @@ import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameSettings as GameSettings
@@ -29,8 +31,10 @@ import qualified Pawl.Types.HandWindowCap as HandWindowCap
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 103.5: the starting hand size. Deliberately NOT shared with CR 402.2's
@@ -121,6 +125,20 @@ allows pid oid action gs = case HandAction.condition action of
   Nothing -> True
   Just condition -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just pid) (Just oid)) gs oid condition
 
+-- CR 103.6b: is this action the rule's reveal -- does taking it reveal the
+-- granting card itself? The one kind of action CR 103.6b caps, so the one
+-- handWindowExcept's RevealOncePerCard asks about.
+--
+-- Casing on Effect here is Pawl.Engine.ManaAbility's classification, not a
+-- breach of design.md section 1: every arm answers the one question in the
+-- type, and none acts on which effect it is.
+revealsItself :: HandAction.HandAction Card.Card -> Bool
+revealsItself = any isSelfReveal . HandAction.effects
+  where
+    isSelfReveal effect = case effect of
+      Effect.Reveal reveal -> Reveal.ref reveal == ObjectRef.InSlot Binding.triggerSource
+      _ -> False
+
 -- The shared CR 103.5b / CR 103.6 loop: offer this player every action their
 -- hand grants through `field`, on the `question` channel, until they decline or
 -- none is left. Performing one is never a mulligan and never a cost. Both rules
@@ -135,8 +153,10 @@ allows pid oid action gs = case HandAction.condition action of
 -- that loop ends when they decline and not before. An interpreter that never
 -- declines never leaves the window, which is CR 104.4b's optional loop: those
 -- are not draws and the rules give nothing to break one with. The CR 103.6
--- window terminates either way, its cap taking each acted-on card out of the
--- offers.
+-- window terminates either way: its cap takes a revealed card's reveals out of
+-- the offers, and CR 103.6a's action takes the card out of the hand. CardSpec's
+-- "CR 103.6 every opening-hand action reveals its card or puts it onto the
+-- battlefield" holds the card data to those two.
 --
 -- Proved by MulliganSpec's "an action that leaves its card in hand is offered
 -- again", which takes the Egret twice and then declines. Card DATA that makes
@@ -145,10 +165,9 @@ allows pid oid action gs = case HandAction.condition action of
 -- lint from #184 is what rejects it; that belongs at load, not here.
 --
 -- CR 103.6b's cap is the `cap` parameter, and the reason this loop takes one:
--- the CR 103.6 window may not re-offer a card that has already been acted on,
--- and the CR 103.5b window must (Serum Powder, No-Regrets Egret). See
--- Pawl.Types.HandWindowCap for why the cap is per card and why it is applied to
--- every CR 103.6 action rather than to reveals alone.
+-- the CR 103.6 window may not re-offer a reveal of a card already revealed,
+-- and the CR 103.5b window must (No-Regrets Egret). See Pawl.Types.HandWindowCap
+-- for why the cap is per card and why it spares CR 103.6a's action.
 --
 -- Not implemented: CR 103.6b's second sentence, "the card remains revealed until
 -- the first turn begins". pawl's reveal is momentary and there is no per-object
@@ -164,9 +183,9 @@ handWindow ::
   Game ()
 handWindow cap = handWindowExcept cap Set.empty
 
--- handWindow's body, carrying the cards this window has already been acted on
--- with. The set is a LOOP-LOCAL fact about one player's one visit to one window,
--- so it never enters GameState -- the mulligan counts' argument, one rule over.
+-- handWindow's body, carrying the cards this window has already revealed. The
+-- set is a LOOP-LOCAL fact about one player's one visit to one window, so it
+-- never enters GameState -- the mulligan counts' argument, one rule over.
 --
 -- A set of cards and not of (card, action) keys: CR 103.6b caps the CARD.
 handWindowExcept ::
@@ -177,14 +196,14 @@ handWindowExcept ::
   HandActionPerformer ->
   PlayerId ->
   Game ()
-handWindowExcept cap acted field question perform pid = do
+handWindowExcept cap revealed field question perform pid = do
   -- Filtered before the offer, not after the answer: an action the rule no longer
   -- allows is not a choice the player is asked to make. Two filters, and the
   -- SAME line is where both live -- CR 103.6b's cap, and the action's own printed
   -- clause (`allows`). Re-read on every pass of the loop rather than once, so an
   -- action taken earlier in this window that changed the board is seen by the
   -- next read.
-  candidates <- State.gets (\gs -> filter (\((oid, _), action) -> Set.notMember oid acted && allows pid oid action gs) (actionsFor field pid gs))
+  candidates <- State.gets (\gs -> filter (\((oid, _), action) -> uncapped oid action && allows pid oid action gs) (actionsFor field pid gs))
   case candidates of
     -- Where the rules leave nothing to ask, don't prompt.
     [] -> pure ()
@@ -203,10 +222,12 @@ handWindowExcept cap acted field question perform pid = do
           Nothing -> pure ()
           Just action -> do
             perform (fst key) pid (HandAction.effects action)
-            let acted2 = case cap of
-                  HandWindowCap.Repeatable -> acted
-                  HandWindowCap.OncePerCard -> Set.insert (fst key) acted
-            handWindowExcept cap acted2 field question perform pid
+            let revealed2 = if revealsItself action then Set.insert (fst key) revealed else revealed
+            handWindowExcept cap revealed2 field question perform pid
+  where
+    uncapped oid action = case cap of
+      HandWindowCap.Repeatable -> True
+      HandWindowCap.RevealOncePerCard -> not (revealsItself action && Set.member oid revealed)
 
 -- CR 103.6: the starting player acts first, then each other player in turn
 -- order, which is exactly the order `owners` arrives in. A player who has left
@@ -214,7 +235,7 @@ handWindowExcept cap acted field question perform pid = do
 -- Game.stillPlayingInOrder, so they get no window and no opening hand.
 openingHandActions :: HandActionPerformer -> [PlayerId] -> Game ()
 openingHandActions perform owners =
-  Monad.forM_ owners (handWindow HandWindowCap.OncePerCard Face.openingHandActions Prompt.OpeningHandAction perform)
+  Monad.forM_ owners (handWindow HandWindowCap.RevealOncePerCard Face.openingHandActions Prompt.OpeningHandAction perform)
 
 -- CR 103.5: repeat the declare-all-then-take-all round until no still-deciding
 -- player mulligans. `deciding` is the players who have NOT yet kept -- keeping
