@@ -31,6 +31,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -317,4 +318,5 @@ zoneFunctionedFrom itself delayed effect = case effect of
   -- and is never "the object it's on", so only the body can answer at all. No
   -- card in the pool writes such a body.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.Heal _ -> Nothing

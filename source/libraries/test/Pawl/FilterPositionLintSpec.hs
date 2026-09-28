@@ -1596,21 +1596,23 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace manaValueEqualToAmountOffends . Printing.card) ps
     Spec.assertEqWith s "the atom sits only where the slot supplies the bound" (fmap (S.nameOf . Printing.card) offenders) []
-    -- NOT vacuous: Chthonian Nightmare and Fear of Change are the pool's authors
-    -- of the atom, one per position that fills the bound, and both are ACCEPTED
-    -- here rather than skipped.
+    -- NOT vacuous: Chthonian Nightmare, Fear of Change and Ornate Imitations are
+    -- the pool's authors of the atom -- a slot, and a reference pick at the top
+    -- level and inside a ForEachNumber body -- and all are ACCEPTED here rather
+    -- than skipped.
     nightmare <- S.printingOf s registry "Chthonian Nightmare"
     fear <- S.printingOf s registry "Fear of Change"
+    ornate <- S.printingOf s registry "Ornate Imitations"
     Spec.assertEqWith
       s
-      "the Nightmare's slot names its bound, and so does Fear of Change's reference pick"
-      (manaValueEqualToAmountCounts (S.combinedFace nightmare), manaValueEqualToAmountCounts (S.combinedFace fear))
-      ((1, 0), (1, 0))
+      "the Nightmare's slot names its bound, and so do Fear of Change's and Ornate Imitations' reference picks"
+      (manaValueEqualToAmountCounts (S.combinedFace nightmare), manaValueEqualToAmountCounts (S.combinedFace fear), manaValueEqualToAmountCounts (S.combinedFace ornate))
+      ((1, 0), (1, 0), (1, 0))
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . manaValueEqualToAmountCounts . S.combinedFace) ps))
-      2
+      3
     -- The rejected side, the at-most lint's pair one operator over: the same atom
     -- buried under all three combinators, in a target slot that names no amount.
     piker <- S.printingOf s registry "Goblin Piker"

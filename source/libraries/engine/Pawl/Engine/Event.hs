@@ -337,10 +337,10 @@ simultaneously body = do
 
 -- CR 613.7m over CR 608.2f's action: run `body` so that everything it puts onto
 -- the battlefield is one batch, settled by Restamp.settle once it ends rather
--- than per instruction or per iteration, and only then are its tokens' CR 111.2
--- entry events recorded, so they describe the order chosen. A caller that is
--- also one event opens this INSIDE its `simultaneously`, which keeps those
--- events in the group.
+-- than per instruction or per iteration, and only then are the entry events of
+-- its tokens (CR 111.2) and conjured cards recorded, so they describe the order
+-- chosen. A caller that is also one event opens this INSIDE its
+-- `simultaneously`, which keeps those events in the group.
 --
 -- The OUTERMOST bracket wins, `simultaneously`'s posture: an inner one runs its
 -- body and leaves the batch to the outer.
@@ -349,10 +349,10 @@ simultaneously body = do
 -- extra: an arrival is a new object (CR 400.7), so every stamp it carries was
 -- minted as or after it entered.
 --
--- Pawl.RestampSpec's Mirror Match board proves the order. Holding back the entry
--- events is a regression fence: a CR 603.6a match reads the entrant live
--- (Pawl.Engine.Event.Match), so recording them before the order leaves the suite
--- green.
+-- Pawl.RestampSpec's Mirror Match and Ornate Imitations boards prove the order.
+-- Holding back the entry events is a regression fence: a CR 603.6a match reads
+-- the entrant live (Pawl.Engine.Event.Match), so recording them before the order
+-- leaves the suite green.
 together :: Game a -> Game a
 together body = do
   before <- State.get
@@ -1078,7 +1078,7 @@ conjureOntoBattlefield controller card copied count tapped = do
       Monad.forM_ copied (\snapshot -> Monad.mapM_ (`markDuplicate` snapshot) ids)
       let siblingsOf oid = Set.delete oid (Set.fromList ids)
       Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
-      Monad.mapM_ recordMintedEntry ids
+      settleMinted (GameState.nextTimestamp gs) ids
       pure (Seq.fromList ids)
 
 -- CR 114.2: a player gets an emblem with the given abilities, put into the
@@ -1676,6 +1676,9 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- each arrives: a member still in its old zone is not on the battlefield for a
 -- sweep to find, and one that has arrived is. Either way a later member's entry
 -- loop would otherwise find its siblings already sitting on the battlefield.
+-- Across CALLS, inside one CR 608.2f action (`together`), runEntry adds every
+-- arrival the action has already settled, so a loop's later iterations see its
+-- earlier ones as siblings too.
 --
 -- Where the CR says the cards are NOT simultaneous the set is empty again and a
 -- sibling is a plain battlefield permanent, which is the whole of what CR
@@ -4181,7 +4184,13 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- board each collects from. That a contained event keeps its own footing is this
 -- engine's reading, resting on CR 614.12; no rule states it outright.
 runEntry :: Set ObjectId -> ObjectId -> Game ()
-runEntry batch oid = do
+runEntry given oid = do
+  -- CR 608.2f / 614.12: inside one action (`together`), what an EARLIER call
+  -- put onto the battlefield entered at the same moment as this object, so it
+  -- is a sibling too -- Ornate Imitations' later numbers and Mirror Match's later
+  -- tokens. Pawl.RestampSpec's Tayam boards prove both.
+  open <- State.gets GameState.enteringTogether
+  let batch = Set.delete oid (given <> foldMap (Set.fromList . Foldable.toList . EnteringTogether.arrivals) open)
   -- CR 113.6 / 614.12: for the span of this loop, the batch's OTHER members are
   -- materialized but not entered, so Pawl.Engine.Projection gathers no continuous
   -- effect from their static abilities (see GameState.enteringBeside). The
@@ -7461,19 +7470,23 @@ createTokens controller card copy n tapped entering attached = do
               let siblingsOf oid = Set.delete oid (Set.fromList ids)
               Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
               Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
-              -- CR 613.7m: the tokens entered together, so their stamps are
-              -- ordered by the seat that controls them, asked after every entry
-              -- loop has settled who that is (CR 616.1b) and what each became.
-              Restamp.settle (GameState.nextTimestamp unminted) ids
-              -- No prior incarnation to snapshot, so a token's last known information
-              -- IS what it is now (CR 111.3). Recorded after every entry loop, so the
-              -- events describe settled objects -- and so, inside a CR 608.2f
-              -- action, only once `together` has settled its whole batch.
-              deferred <- State.gets GameState.enteringTogether
-              case deferred of
-                Just batch -> State.modify' (\g -> g {GameState.enteringTogether = Just batch {EnteringTogether.minted = EnteringTogether.minted batch <> Seq.fromList ids}})
-                Nothing -> Monad.mapM_ recordMintedEntry ids
+              settleMinted (GameState.nextTimestamp unminted) ids
               pure ids
+
+-- The tail createTokens and conjureOntoBattlefield share, run after every entry
+-- loop of a batch minted onto the battlefield. CR 613.7m: the batch entered
+-- together, so its stamps are ordered by the seats that control them, asked once
+-- CR 616.1b has settled who that is. Then the entry events, recorded after the
+-- entry loops so they describe settled objects -- and, inside a CR 608.2f action,
+-- only once `together` has settled its whole batch. No prior incarnation to
+-- snapshot, so each event samples the object as it is now.
+settleMinted :: Timestamp.Timestamp -> [ObjectId] -> Game ()
+settleMinted start ids = do
+  Restamp.settle start ids
+  deferred <- State.gets GameState.enteringTogether
+  case deferred of
+    Just batch -> State.modify' (\g -> g {GameState.enteringTogether = Just batch {EnteringTogether.minted = EnteringTogether.minted batch <> Seq.fromList ids}})
+    Nothing -> Monad.mapM_ recordMintedEntry ids
 
 -- Nothing departed, so `departed` is the arrival's own id. Harmless rather than a
 -- fiction readers must know about: from == to == Battlefield already fails every

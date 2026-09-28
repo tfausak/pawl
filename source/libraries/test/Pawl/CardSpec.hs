@@ -182,6 +182,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -1384,6 +1385,7 @@ ownCounts effect = case effect of
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectCounts body
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> quantityCounts upTo <> concatMap effectCounts body
   Effect.Heal _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
@@ -1640,6 +1642,7 @@ effectNestedEffects effect = case effect of
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body, run once per member of the fold.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Foldable.toList body
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Foldable.toList body
   Effect.Heal _ -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
@@ -2218,6 +2221,7 @@ effectReplacements effect = case effect of
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectReplacements body
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectReplacements body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed replacement abilities.
@@ -2694,6 +2698,7 @@ effectMintedFaces effect = case effect of
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectMintedFaces body
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectMintedFaces body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
@@ -5857,6 +5862,7 @@ effectFilters effect = case effect of
   -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
   -- list is exactly what this traversal must not stop at.
   Effect.ForEach (ForEach.MkForEach ref _ _ body _) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectFilters body
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
@@ -6207,6 +6213,7 @@ cardFilters card =
         <> concatMap (frame Unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
         <> concatMap (concatMap conditionFilters . Maybe.maybeToList . CostReduction.condition) (Face.costReductions card)
+        <> unframed (Maybe.mapMaybe CostReduction.whichTargets (Face.costReductions card))
         <> concatMap (slotlessCost . specialActionFilters) (Face.specialActions card)
         <> ruleAbilitiesFilters (Projection.ruleAbilitiesOfFace card)
     )
@@ -6237,6 +6244,7 @@ cardFilters card =
     -- A granted reduction of its own cost, Unframed for the printed one's reason.
     <> frame Unframed (concatMap (quantityFilters . CostReduction.perEach) (grantedCostReductions card))
     <> frame Unframed (concatMap (concatMap conditionFilters . Maybe.maybeToList . CostReduction.condition) (grantedCostReductions card))
+    <> unframed (Maybe.mapMaybe CostReduction.whichTargets (grantedCostReductions card))
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)
