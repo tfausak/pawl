@@ -3009,6 +3009,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   ertaisScornSpec s registry
   deemInferiorSpec s registry
   synchronizedEvictionSpec s registry
+  weightOfConscienceSpec s registry
   richlauSpec s registry
   targetCostSpec s registry
   frogmiteSpec s registry
@@ -3279,6 +3280,42 @@ ertaisScornSpec s registry =
           (splitScorn, split) = board True
       Spec.assertBool s (S.castable S.alice carolsScorn carols) "carol cast two, so the Scorn costs {1}{U} and is offered"
       Spec.assertBool s (not (S.castable S.alice splitScorn split)) "bob and carol cast one each, so the Scorn keeps its {1}{U}{U} and is refused"
+
+-- CR 601.2h / 205.3m: Weight of Conscience's "Tap two untapped creatures you
+-- control that share a creature type: Exile enchanted creature." alice's Aura
+-- enchants bob's War Mammoth; alice controls two Hill Giants and a Goblin Piker,
+-- so the cost's prompt is raised and the cases differ only in the pair named.
+weightOfConscienceSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+weightOfConscienceSpec s registry =
+  Spec.describe s "Weight of Conscience" $ do
+    Spec.it s "CR 205.3m the two creatures tapped must share a creature type" $ do
+      weight <- S.printingOf s registry "Weight of Conscience"
+      giant <- S.printingOf s registry "Hill Giant"
+      piker <- S.printingOf s registry "Goblin Piker"
+      elves <- S.printingOf s registry "Llanowar Elves"
+      mammoth <- S.printingOf s registry "War Mammoth"
+      let board mine =
+            let (mammothId, g0) = S.addPermanent mammoth S.bob (Setup.emptyGame S.bothPlayers)
+                (weightId, g1) = S.addPermanent weight S.alice g0
+                placed = List.foldl' (\(ids, g) p -> let (oid, g') = S.addPermanent p S.alice g in (ids <> [oid], g')) ([], S.attach weightId mammothId g1) mine
+             in (mammothId, weightId, fst placed, (snd placed) {GameState.priority = Just S.alice})
+          tappingBoth :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+          tappingBoth wanted p = case p of
+            Prompt.ChooseTaps _ _ _ candidates _ -> Set.fromList (filter (`elem` wanted) candidates)
+            _ -> S.identityAnswer p
+      case (board [giant, giant, piker], board [giant, piker, elves], Face.activatedAbilities (S.combinedFace weight)) of
+        ((mammothId, weightId, [giantA, giantB, pikerId], gs), (_, otherWeightId, _, unshared), [ability]) -> do
+          let activated wanted = S.runPure (tappingBoth wanted) gs (Activate.activateAbility S.alice weightId ability)
+              resolved wanted = S.runPure S.identityAnswer (activated wanted) Stack.resolveTop
+          -- THE GAMEPLAY-LEVEL ASSERTIONS first.
+          Spec.assertBool s (not (S.onBattlefield mammothId (resolved [giantA, giantB]))) "tapping the two Giants exiles the Mammoth"
+          Spec.assertBool s (S.onBattlefield mammothId (resolved [giantA, pikerId])) "tapping a Giant and the Goblin does not"
+          Spec.assertEqWith s "and that payment is reversed: nothing tapped" (S.tappedCount S.alice (activated [giantA, pikerId])) 0
+          -- CR 118.3's offer: with no two creatures sharing a type the cost
+          -- cannot be paid at all, where the shared pair can.
+          Spec.assertBool s (Activatable.activatable S.alice weightId ability gs) "two Giants: offered"
+          Spec.assertBool s (not (Activatable.activatable S.alice otherWeightId ability unshared)) "a Giant, a Goblin and an Elf: not offered"
+        _ -> Spec.assertFailure s "fixture should give alice three creatures and the Aura one ability"
 
 -- CR 601.2f / 205.3m: Synchronized Eviction ({4}{U}) "costs {2} less to cast if
 -- you control at least two creatures that share a creature type". alice holds it
@@ -4005,7 +4042,7 @@ springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
         -- The ONE thing the pair varies: both creatures tapped, which leaves
         -- the criterion's `Not IsTapped` with nothing to offer.
         unpayable = S.tapObject spotId (S.tapObject giantId payable)
-        component = CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You, Filter.Type.Not Filter.Type.IsTapped]))
+        component = CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You, Filter.Type.Not Filter.Type.IsTapped]) False)
     Spec.assertBool s (Cost.canPayComponent Map.empty S.alice drumId component payable) "two untapped creatures pay"
     Spec.assertBool s (not (Cost.canPayComponent Map.empty S.alice drumId component unpayable)) "two tapped ones do not"
     Spec.assertEqWith s "and the ability adds no mana" (pooledFrom S.identityAnswer drumId unpayable) 0

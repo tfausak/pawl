@@ -2963,7 +2963,7 @@ rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostCo
 rewriteComponent pairs component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n (rewrite pairs criterion))
-  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion))
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion sharing) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion) sharing)
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
   CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore criterion) -> CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore (rewrite pairs criterion))

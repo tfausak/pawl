@@ -61,7 +61,8 @@ spec s = Spec.describe s "Pawl.Codec.ModifiedRoll" $ do
                     [ CostComponent.TapPermanents
                         TapPermanents.MkTapPermanents
                           { TapPermanents.count = 1,
-                            TapPermanents.whichPermanents = Filter.HasSubtype Subtype.Wall
+                            TapPermanents.whichPermanents = Filter.HasSubtype Subtype.Wall,
+                            TapPermanents.sharingACreatureType = False
                           }
                     ]
                 },
