@@ -36,6 +36,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -76,6 +77,8 @@ import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectSnapshot as ObjectSnapshot
+import qualified Pawl.Types.PastActivation as PastActivation
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -1584,7 +1587,7 @@ spellCostAdjustments pid oid gs =
 -- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
 -- reduction lands.
 activationCostAdjustments :: Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustments targets stamp kind loyalty pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) targets stamp kind loyalty srcId gs
+activationCostAdjustments targets stamp kind loyalty pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) pid targets stamp kind loyalty srcId gs
 
 -- The same gather given the effect list the CALLER has already taken, which is
 -- the half a per-permanent loop wants: `applying` is a walk of everything in
@@ -1600,8 +1603,8 @@ activationCostAdjustments targets stamp kind loyalty pid srcId gs = activationCo
 -- The rows arrive PAIRED WITH THEIR SOURCE and not stripped to bare effects,
 -- because CR 303.4b's "enchanted" is a fact about the row's own permanent: the
 -- criterion is matched through matchesObjectFrom, which needs it.
-activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> ObjectId -> GameState -> CostAdjustments
-activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
+activationCostAdjustmentsGiven :: [(Maybe ObjectId, PlayerEffect)] -> PlayerId -> Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> ObjectId -> GameState -> CostAdjustments
+activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
   let -- CR 601.2c's chosen targets, asked of ReduceActivationCost's third
       -- criterion: Dwarven Mauler's "equip abilities you activate THAT TARGET
       -- THIS CREATURE". ANY rather than all, which is what the sentence says of
@@ -1613,7 +1616,32 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
       -- the filter is asked against the TARGET's projection with the reducer's own
       -- permanent as Pawl.Engine.Filter's source -- which is what makes
       -- Filter.IsSource read "this creature" here.
-      aims source criterion = any (\oid -> matchesObjectFrom source criterion oid gs) (Set.toList targets)
+      --
+      -- CR 109.5's "you" is the ACTIVATOR, `pid`, whose effects these are --
+      -- not the target's own controller, which would make Professor Hojo's "a
+      -- creature you control" true of every creature.
+      aims source criterion = any (\oid -> matchesObjectFor pid source criterion oid gs) (Set.toList targets)
+      -- The same four criteria asked of an activation already in
+      -- GameState.activationsThisTurn, against its snapshots rather than the
+      -- live board -- what "the first activated ability you activate" counts.
+      snapshotView snapshot =
+        (Count.viewOfSnapshot False (ObjectSnapshot.controller snapshot) (Just (ObjectSnapshot.owner snapshot)) False Map.empty (ObjectSnapshot.characteristics snapshot))
+          { Filter.identity = Just (ObjectSnapshot.object snapshot)
+          }
+      matchesSnapshot you source criterion snapshot = Filter.matches (contextFor you source gs) (snapshotView snapshot) criterion
+      admits source criterion granted wantedKind aimedAt past =
+        PastActivation.activator past == pid
+          && matchesSnapshot (ObjectSnapshot.controller (PastActivation.source past)) source criterion (PastActivation.source past)
+          && maybe True (\g -> any (Keyword.designates g) (PastActivation.keyword past)) granted
+          && maybe True (== PastActivation.kind past) wantedKind
+          && maybe True (\f -> any (matchesSnapshot (Just pid) source f) (PastActivation.targets past)) aimedAt
+      -- Professor Hojo's "the FIRST activated ability you activate during your
+      -- turn": in a turn the scope admits, and with no matching activation
+      -- earlier this turn -- reduced or not, and whether or not this reducer
+      -- existed yet (Tezzeret, Betrayer of Flesh's ruling).
+      isFirst source criterion granted wantedKind aimedAt scope =
+        Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
+          && not (any (admits source criterion granted wantedKind aimedAt) (GameState.activationsThisTurn gs))
       -- CR 601.2f's MANA increase, the half CostAdjustments.increases was an
       -- empty literal for until Oppressive Rays gave it a producer; see #1242.
       -- No family beside the criterion, IncreaseActivationCost's own reason --
@@ -1670,7 +1698,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       reductionOf (source, effect) = case effect of
-        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted wantedKind aimedAt amount floor_) ->
+        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion granted wantedKind aimedAt onlyFirst amount floor_) ->
           -- Never confined to coloured mana: no printed activation-cost reducer
           -- states Edgewalker's sentence, so CR 118.7b-d's spill stands.
           --
@@ -1680,7 +1708,7 @@ activationCostAdjustmentsGiven effects targets stamp kind loyalty srcId gs =
           -- being activated, which neither the source filter nor the rule-702
           -- family could answer. A reduction carrying no `whichKind` ignores it,
           -- which is every other reducer in `data/cards/`.
-          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> any (Keyword.designates g) stamp) granted && maybe True (== kind) wantedKind && maybe True (aims source) aimedAt
+          if matchesObjectFrom source criterion srcId gs && maybe True (\g -> any (Keyword.designates g) stamp) granted && maybe True (== kind) wantedKind && maybe True (aims source) aimedAt && maybe True (isFirst source criterion granted wantedKind aimedAt) onlyFirst
             then Just (AppliedReduction.MkAppliedReduction amount floor_ False)
             else Nothing
         -- The non-mana addition, gathered by `additionOf` below: CR 601.2f's

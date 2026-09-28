@@ -2984,11 +2984,9 @@ hauntSpellSpec s registry =
 -- 602.2b and CR 603.3d bring an activated and a triggered ability to the same
 -- rule 601.2c step, so one Ability constructor would have drawn off both.
 --
--- pawl's Hojo omits the card's FIRST line -- "the first activated ability you
--- activate during your turn that targets a creature you control costs {2} less
--- to activate" -- which no field of Pawl.Types.ReduceActivationCost can say
--- (#3416). The omission leaves the card STRICTER than printed: alice pays each
--- activation below in full, and no leg turns on what it cost.
+-- The card's FIRST line, its cost reduction, is proved by Pawl.ActivateSpec's
+-- ProfessorHojoFirstActivation group; seven lands pay every leg below with or
+-- without it, so no leg here turns on what an activation cost.
 --
 -- THE HAND SIZE IS THE SIGNAL, and nothing else: the payload is a draw, so "the
 -- trigger fired" and "it did not" are exactly one card apart. alice's hand holds

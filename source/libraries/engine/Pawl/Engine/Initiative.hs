@@ -31,8 +31,8 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
@@ -127,7 +127,7 @@ initiativeAbilities = [upkeepVenture, combatHandoff, takeVenture]
 beginsHoldersUpkeep :: PlayerId -> GameState -> LoggedEvent.LoggedEvent -> Bool
 beginsHoldersUpkeep holder gs logged = case (TriggeredAbility.condition upkeepVenture, LoggedEvent.event logged) of
   (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted _ scope), GameEvent.StepBegan (StepBegan.MkStepBegan began active)) ->
-    began == wanted && Event.turnScopeAdmits gs scope active holder
+    began == wanted && Turn.turnScopeAdmits gs scope active holder
   _ -> False
 
 -- CR 726.2: the inherent triggers that fire on this batch of events, as ordinary

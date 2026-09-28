@@ -4704,7 +4704,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- creature") asks about the ability's chosen TARGET rather than its source, but
   -- Pawl.Engine.PlayerEffect.matchesObjectFrom builds the same Context for it, so
   -- the same framing and the same atom vocabulary apply.
-  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _ targets _ _) -> f : Maybe.maybeToList targets
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _ targets _ _ _) -> f : Maybe.maybeToList targets
   -- CR 601.2f's addition carries a Filter in two places: its own criterion
   -- ("nontoken Rebels"), and one inside each component it adds ("sacrifice a
   -- land"). Both are authored by the card, so both are linted, and the inner

@@ -3446,6 +3446,7 @@ oneMountainState mountain ph =
           GameState.drawsThisTurn = mempty,
           GameState.departedThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
+          GameState.activationsThisTurn = mempty,
           GameState.castPermissionsUsedThisTurn = mempty,
           GameState.rollModifiersUsedThisTurn = mempty,
           GameState.triggeredThisGame = mempty,
