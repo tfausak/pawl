@@ -344,6 +344,8 @@ library codec
     Pawl.Codec.CostChoiceSpec
     Pawl.Codec.CostComponent
     Pawl.Codec.CostComponentSpec
+    Pawl.Codec.CostDirection
+    Pawl.Codec.CostDirectionSpec
     Pawl.Codec.CostReduction
     Pawl.Codec.CostReductionSpec
     Pawl.Codec.CostScale
@@ -576,6 +578,8 @@ library codec
     Pawl.Codec.ForbidBlock
     Pawl.Codec.ForbidBlockSpec
     Pawl.Codec.ForEach
+    Pawl.Codec.ForEachNumber
+    Pawl.Codec.ForEachNumberSpec
     Pawl.Codec.ForEachSpec
     Pawl.Codec.ForetellCost
     Pawl.Codec.ForetellCostSpec
@@ -1851,6 +1855,7 @@ library types
     Pawl.Types.CostBasis
     Pawl.Types.CostChoice
     Pawl.Types.CostComponent
+    Pawl.Types.CostDirection
     Pawl.Types.CostReduction
     Pawl.Types.CostScale
     Pawl.Types.Count
@@ -1977,6 +1982,7 @@ library types
     Pawl.Types.ForbidAttack
     Pawl.Types.ForbidBlock
     Pawl.Types.ForEach
+    Pawl.Types.ForEachNumber
     Pawl.Types.ForetellCost
     Pawl.Types.FromOutsideTheGame
     Pawl.Types.FromReference

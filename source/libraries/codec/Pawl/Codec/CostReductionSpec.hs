@@ -7,6 +7,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.EventShape as EventShape
@@ -15,6 +16,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CostReduction" $ do
@@ -33,7 +35,9 @@ spec s = Spec.describe s "Pawl.Codec.CostReduction" $ do
                     Count.filter = Filter.And [],
                     Count.aggregation = Aggregation.Members
                   },
-            CostReduction.condition = Nothing
+            CostReduction.condition = Nothing,
+            CostReduction.whichTargets = Nothing,
+            CostReduction.direction = CostDirection.Less
           }
       )
       " {\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InHistory\",\"value\":{\"type\":\"SpellCast\"}},\"filter\":{\"type\":\"And\",\"value\":[]},\"aggregation\":{\"type\":\"Members\"}}}} "
@@ -46,8 +50,39 @@ spec s = Spec.describe s "Pawl.Codec.CostReduction" $ do
       ( CostReduction.MkCostReduction
           { CostReduction.amount = ManaCost.MkManaCost [ManaSymbol.Generic 1],
             CostReduction.perEach = Quantity.Literal 1,
-            CostReduction.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.Literal 2) Comparison.AtLeast (Quantity.Literal 3)))
+            CostReduction.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.Literal 2) Comparison.AtLeast (Quantity.Literal 3))),
+            CostReduction.whichTargets = Nothing,
+            CostReduction.direction = CostDirection.Less
           }
       )
       " {\"amount\":[{\"type\":\"Generic\",\"value\":1}],\"perEach\":{\"type\":\"Literal\",\"value\":1},\"condition\":{\"type\":\"Compares\",\"value\":{\"measured\":{\"type\":\"Literal\",\"value\":2},\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":3}}}} "
+  -- CR 601.2c / 601.2f, as Bury in Books costs {2} less if it targets an
+  -- attacking creature.
+  Spec.it s "with a target filter" $
+    Common.assertCodec
+      s
+      CostReduction.codec
+      ( CostReduction.MkCostReduction
+          { CostReduction.amount = ManaCost.MkManaCost [ManaSymbol.Generic 2],
+            CostReduction.perEach = Quantity.Literal 1,
+            CostReduction.condition = Nothing,
+            CostReduction.whichTargets = Just Filter.IsAttacking,
+            CostReduction.direction = CostDirection.Less
+          }
+      )
+      " {\"amount\":[{\"type\":\"Generic\",\"value\":2}],\"perEach\":{\"type\":\"Literal\",\"value\":1},\"whichTargets\":{\"type\":\"IsAttacking\"}} "
+  -- CR 601.2f, as Dragon's Prey costs {2} more if it targets a Dragon.
+  Spec.it s "costing more" $
+    Common.assertCodec
+      s
+      CostReduction.codec
+      ( CostReduction.MkCostReduction
+          { CostReduction.amount = ManaCost.MkManaCost [ManaSymbol.Generic 2],
+            CostReduction.perEach = Quantity.Literal 1,
+            CostReduction.condition = Nothing,
+            CostReduction.whichTargets = Just (Filter.HasSubtype Subtype.Dragon),
+            CostReduction.direction = CostDirection.More
+          }
+      )
+      " {\"amount\":[{\"type\":\"Generic\",\"value\":2}],\"perEach\":{\"type\":\"Literal\",\"value\":1},\"whichTargets\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Dragon\"}},\"direction\":{\"type\":\"More\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s CostReduction.codec

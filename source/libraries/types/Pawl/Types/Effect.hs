@@ -41,6 +41,7 @@ import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -822,6 +823,9 @@ data Effect card ability
     -- applies itself across the set, so reach for those first. Ordered APNAP,
     -- then by the resolving controller's choice.
     ForEach (ForEach.ForEach (Effect card ability))
+  | -- | CR 608.2f: run the body once for each number from 1 up to the payload's
+    -- quantity, that number bound under the payload's slot.
+    ForEachNumber (ForEachNumber.ForEachNumber (Effect card ability))
   | -- | CR 701.69a: remove all marked damage from the permanents the ObjectRef
     -- names.
     Heal ObjectRef.ObjectRef

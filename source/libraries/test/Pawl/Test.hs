@@ -151,6 +151,7 @@ import qualified Pawl.Codec.CopyTargetsSpec
 import qualified Pawl.Codec.CostBasisSpec
 import qualified Pawl.Codec.CostChoiceSpec
 import qualified Pawl.Codec.CostComponentSpec
+import qualified Pawl.Codec.CostDirectionSpec
 import qualified Pawl.Codec.CostReductionSpec
 import qualified Pawl.Codec.CostScaleSpec
 import qualified Pawl.Codec.CostSpec
@@ -263,6 +264,7 @@ import qualified Pawl.Codec.FightSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
+import qualified Pawl.Codec.ForEachNumberSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.ForbidActivationSpec
 import qualified Pawl.Codec.ForbidAttackSpec
@@ -878,6 +880,7 @@ spec s registry = do
   Pawl.Codec.CostBasisSpec.spec s
   Pawl.Codec.CostChoiceSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
+  Pawl.Codec.CostDirectionSpec.spec s
   Pawl.Codec.CostReductionSpec.spec s
   Pawl.Codec.CostScaleSpec.spec s
   Pawl.Codec.CostSpec.spec s
@@ -997,6 +1000,7 @@ spec s registry = do
   Pawl.Codec.FlipCoinSpec.spec s
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
+  Pawl.Codec.ForEachNumberSpec.spec s
   Pawl.Codec.ForetellCostSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s
   Pawl.Codec.ForbidActivationSpec.spec s
