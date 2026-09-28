@@ -362,7 +362,11 @@ withOffering pid oid gs candidate =
 -- untagged.
 candidateCostsGiven :: Bool -> PlayerId -> CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
 candidateCostsGiven permitted pid name oid gs =
-  let -- The card-backed body the two printing-carrying arms above share. CR 601.2
+  let -- CR 613.1: the keywords the card HAS where it lies (CR 113.6f), read
+      -- once for every keyword-offered cost below rather than once per keyword
+      -- -- each read projects the card, and that gathers the whole board (#435).
+      keywords = Map.keysSet (Projection.keywordsOf oid gs)
+      -- The card-backed body the two printing-carrying arms above share. CR 601.2
       -- is why they share it rather than the copy getting a price of its own: a
       -- cast copy goes through that rule's steps like any other spell, so every
       -- alternative cost, every additional cost and every zone clause below reads
@@ -416,7 +420,7 @@ candidateCostsGiven permitted pid name oid gs =
               bestowed =
                 fmap
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Bestow cost)) (withAdditional cost))
-                  (Keyword.bestowCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  (Keyword.bestowCosts keywords)
               -- CR 702.160a / CR 718.3: prototype, offered from EVERY zone for
               -- bestow's reason -- CR 113.6e classes an ability that modifies how
               -- its own object can be cast as functioning "in any zone from which
@@ -435,7 +439,7 @@ candidateCostsGiven permitted pid name oid gs =
               prototyped =
                 fmap
                   (\prototype -> CandidateCost.plain (Just (Keyword.Type.Prototype prototype)) (withAdditional Cost.MkCost {Cost.mana = Just (Prototype.cost prototype), Cost.components = []}))
-                  (Keyword.prototypes (Map.keysSet (Projection.keywordsOf oid gs)))
+                  (Keyword.prototypes keywords)
               -- CR 702.140a: mutate, offered from EVERY zone for bestow's reason
               -- -- rule 702.140a's static ability "functions while the spell with
               -- mutate is on the stack", which CR 113.6e reaches from wherever the
@@ -453,7 +457,7 @@ candidateCostsGiven permitted pid name oid gs =
               mutated =
                 fmap
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Mutate cost)) (withAdditional cost))
-                  (Keyword.mutateCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  (Keyword.mutateCosts keywords)
               -- CR 702.74a, 702.109a, 702.113a, 702.148a and 702.152a: evoke,
               -- dash, blitz, cleave and awaken, offered from EVERY zone for
               -- bestow's reason -- "a static ability that functions in any zone
@@ -463,7 +467,7 @@ candidateCostsGiven permitted pid name oid gs =
               evoked =
                 fmap
                   (\(keyword, cost) -> CandidateCost.plain (Just keyword) (withAdditional cost))
-                  (Keyword.plainAlternativeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  (Keyword.plainAlternativeCosts keywords)
               -- CR 702.119a and CR 702.119b: emerge, evoked's offer with rule
               -- 702.119a's two clauses attached -- the sacrifice in the candidate's
               -- components, the generic reduction in `CandidateCost.reductions`.
@@ -527,7 +531,7 @@ candidateCostsGiven permitted pid name oid gs =
                         False
                  in concatMap
                       (\emerge -> fmap (offer emerge) (victims (Maybe.fromMaybe (Filter.Type.HasCardType CardType.Creature) (Emerge.quality emerge))))
-                      (Keyword.emergeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                      (Keyword.emergeCosts keywords)
               -- CR 702.117a and CR 702.137a: surge and spectacle, evoked's offer
               -- with a GATE -- read off the projection, wrapped by
               -- `withAdditional` and tagged with the keyword for that list's
@@ -546,11 +550,11 @@ candidateCostsGiven permitted pid name oid gs =
               -- and rule 702.137a's "you".
               surged =
                 if Game.yourTeamCastASpellThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Surge cost)) (withAdditional cost)) (Keyword.surgeCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Surge cost)) (withAdditional cost)) (Keyword.surgeCosts keywords)
                   else []
               spectacled =
                 if Game.opponentLostLifeThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Spectacle cost)) (withAdditional cost)) (Keyword.spectacleCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Spectacle cost)) (withAdditional cost)) (Keyword.spectacleCosts keywords)
                   else []
               -- CR 702.76a and CR 702.173a: prowl and freerunning, surged's shape
               -- with a clause of their own -- a player dealt combat damage this
@@ -567,11 +571,11 @@ candidateCostsGiven permitted pid name oid gs =
               -- to the comparison.
               prowled =
                 if Game.prowlDamageThisTurn pid (Set.filter Subtype.isCreatureType (Projection.subtypesOf oid gs)) gs
-                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Prowl cost)) (withAdditional cost)) (Keyword.prowlCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Prowl cost)) (withAdditional cost)) (Keyword.prowlCosts keywords)
                   else []
               freerun =
                 if Game.freerunningDamageThisTurn pid gs
-                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Freerunning cost)) (withAdditional cost)) (Keyword.freerunningCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  then fmap (\cost -> CandidateCost.plain (Just (Keyword.Type.Freerunning cost)) (withAdditional cost)) (Keyword.freerunningCosts keywords)
                   else []
               -- CR 702.185a: warp, evoked's offer with ONE ZONE. Rule 702.185a's
               -- first static ability says "you may cast this card FROM YOUR
@@ -588,7 +592,7 @@ candidateCostsGiven permitted pid name oid gs =
               warped =
                 fmap
                   (\cost -> CandidateCost.plain (Just (Keyword.Type.Warp cost)) (withAdditional cost))
-                  (Keyword.warpCosts (Map.keysSet (Projection.keywordsOf oid gs)))
+                  (Keyword.warpCosts keywords)
               -- CR 712.11d: the face this card may be cast TRANSFORMED or CONVERTED
               -- as, which is what Pawl.Engine.Card.convertedFace answers and what
               -- put that face in castableFaces. Asked through that function rather
@@ -687,11 +691,11 @@ candidateCostsGiven permitted pid name oid gs =
                 -- clause to gate, and rule 702.187b's own clause is asked here
                 -- rather than there, at the mayhem offer below.
                 Just Zone.Graveyard ->
-                  let -- CR 613.1: the keywords the card HAS in the graveyard, not
-                      -- the ones it prints, an ability granted there (CR 113.6f)
-                      -- stating rule 702.34a's cost as much as a printed one. Read
+                  let -- `keywords` is what the card HAS in the graveyard, not
+                      -- what it prints: an ability granted there (CR 113.6f)
+                      -- states rule 702.34a's cost as much as a printed one. Read
                       -- off the OBJECT, so the caller's CR 709.3a half is measured.
-                      keywords = Map.keysSet (Projection.keywordsOf oid gs)
+                      --
                       -- The flashback keyword AS IT WAS READ: rule 702.34a's ability
                       -- and its cost are one sentence, so the cost is what
                       -- distinguishes one instance from another.
