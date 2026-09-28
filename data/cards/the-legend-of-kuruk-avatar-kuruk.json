@@ -241,12 +241,7 @@
                 ]
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "OnlyOnce"
-            }
-          ]
+          }
         }
       ],
       "name": "Avatar Kuruk",

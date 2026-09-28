@@ -2896,8 +2896,11 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
         && not (ActivationProhibition.prohibited AbilityKind.ManaAbility oid gs)
         -- CR 602.5's player-axis prohibition (Sen Triplets), read here for
         -- detain's reason: the sentence carves no mana ability out where CR
-        -- 702.61b does, so both of CR 605.3a's windows owe it.
-        && not (PlayerEffect.prohibitsActivatingGiven effects)
+        -- 702.61b does, so both of CR 605.3a's windows owe it. The stamp is what
+        -- a row naming a keyword (Kang the Conqueror's power-up) compares; no
+        -- mana ability in data/cards/ is under power-up, so on this road that
+        -- is a regression fence rather than a proof.
+        && not (PlayerEffect.prohibitsActivatingGiven (ActivatedAbility.keyword =<< ability) effects)
         -- CR 602.5's printed "activate only ..." rider, which CR 605.1's own sentence
         -- keeps on a mana ability -- a timing restriction does not stop an ability
         -- being one. Here for sickness's and detain's reason, and it is the reason

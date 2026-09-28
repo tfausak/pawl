@@ -66,57 +66,7 @@
                 }
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "OnlyIf",
-              "value": {
-                "type": "Compares",
-                "value": {
-                  "comparison": {
-                    "type": "AtLeast"
-                  },
-                  "measured": {
-                    "type": "Count",
-                    "value": {
-                      "aggregation": {
-                        "type": "Members"
-                      },
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "IsSource"
-                          },
-                          {
-                            "type": "AttackedThisTurn"
-                          }
-                        ]
-                      },
-                      "scope": {
-                        "type": "InZone",
-                        "value": {
-                          "player": {
-                            "type": "EachPlayer"
-                          },
-                          "zone": {
-                            "type": "Battlefield"
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "threshold": {
-                    "type": "Literal",
-                    "value": 1
-                  }
-                }
-              }
-            },
-            {
-              "type": "OnlyOnceEachTurn"
-            }
-          ]
+          }
         }
       ],
       "keywords": [

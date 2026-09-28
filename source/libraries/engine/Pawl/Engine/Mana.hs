@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Modal as Modal
@@ -326,7 +327,7 @@ manaRoutesOfGiven pcs oid gs =
         fmap
           ( \clauses ->
               let offered clause = if applies clause then Maybe.mapMaybe ManaAbility.manaProduced (Foldable.toList (Clause.effects clause)) else []
-               in (ActivatedAbility.cost ability, ActivatedAbility.restrictions ability, Just ability, fmap (\clause -> (clause, offered clause)) clauses)
+               in (ActivatedAbility.cost ability, Keyword.Engine.restrictionsOf ability, Just ability, fmap (\clause -> (clause, offered clause)) clauses)
           )
           (Modal.selectionClauses (ActivatedAbility.modal ability))
       fromAbilities = concatMap selectionRoutes (filter ManaAbility.isManaAbility (Projection.abilitiesGiven pcs oid gs))

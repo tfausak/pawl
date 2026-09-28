@@ -12,6 +12,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -46,7 +47,11 @@ data PlayerEffect
     -- the sentence carves nothing out, so
     -- Pawl.Engine.Cost.manaActivationsGiven reads it beside detain for CR
     -- 605.3a's windows.
-    CantActivateAbilities
+    --
+    -- Nothing is every ability; Just a designator narrows it to the abilities
+    -- under that rule-702 keyword (Pawl.Types.ActivatedAbility.keyword), Kang the
+    -- Conqueror's "power-up abilities can't be activated".
+    CantActivateAbilities (Maybe KeywordDesignator.KeywordDesignator)
   | -- | CR 601.3 / Rule of Law: this player can't cast more than this many spells
     -- each turn.
     CantCastMoreThan Natural.Natural

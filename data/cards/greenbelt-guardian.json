@@ -102,12 +102,7 @@
                 ]
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "OnlyOnce"
-            }
-          ]
+          }
         }
       ],
       "keywords": [

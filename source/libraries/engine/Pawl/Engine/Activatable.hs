@@ -705,7 +705,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         -- neither carves a mana ability out -- so Cost.manaActivationsGiven
         -- carries this conjunct too, for the CR 605.3a windows that never reach
         -- this function.
-        && not (PlayerEffect.prohibitsActivating pid gs)
+        && not (PlayerEffect.prohibitsActivating (ActivatedAbility.keyword ability) pid gs)
         && sicknessOkGiven pcs pid srcId ability gs
         && ActivationRestriction.restrictionsOk pid srcId (Just ability) (Keyword.restrictionsOf ability) gs
         && loyaltyOk pid srcId ability gs
