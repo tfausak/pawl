@@ -514,7 +514,7 @@ aetherfluxReservoirSpec s registry =
 -- Approach of the Second Sun into its owner's library seventh from the top and
 -- you gain 7 life." (Oracle text verified against Scryfall 2026-09-28.)
 --
--- Every second cast happens on a LATER turn than the first, across two real
+-- Every second cast happens on a LATER turn than the first, across real
 -- handoffs, so a count that read only this turn's log answers 1 and loses the
 -- win. Three seats, so bob's Approach is an opponent's and not "the other
 -- player's". Future Sight sits under alice on every board, so the library-cast
@@ -559,10 +559,11 @@ approachSpec s registry =
           let (first, g1) = S.addHandCard approach S.alice (board plains sight)
               (second, g2) = S.addHandCard approach S.alice g1
               turnOne = castAndResolve S.alice first g2
-              turnThree = nextTurn (nextTurn turnOne)
-              after = castAndResolve S.alice second turnThree
+              turnFour = nextTurn (nextTurn (nextTurn turnOne))
+              after = castAndResolve S.alice second turnFour
           Spec.assertEqWith s "alice won" (GameState.result after) (Just (Result.Won S.alice))
-          Spec.assertEqWith s "the first cast is two turns back" (GameState.turnNumber after - GameState.turnNumber turnOne) 2
+          Spec.assertEqWith s "the first cast is three turns back" (GameState.turnNumber after - GameState.turnNumber turnOne) 3
+          Spec.assertEqWith s "on her own turn" (GameState.activePlayer turnFour) S.alice
           Spec.assertEqWith s "and alice gained no second 7" (S.lifeOf S.alice after) (Just 27)
 
         Spec.it s "CR 601.2a an OPPONENT's earlier Approach is not one you've cast" $ do
@@ -582,9 +583,10 @@ approachSpec s registry =
           let (first, g1) = S.addHandCard approach S.alice (board plains sight)
               turnOne = castAndResolve S.alice first g1
               (second, g2) = S.addLibraryCard approach S.alice turnOne
-              turnThree = nextTurn (nextTurn g2)
-              after = castAndResolve S.alice second turnThree
-          Spec.assertBool s (S.castable S.alice second turnThree) "Future Sight offers the top card"
+              turnFour = nextTurn (nextTurn (nextTurn g2))
+              after = castAndResolve S.alice second turnFour
+          Spec.assertEqWith s "it is alice's turn again" (GameState.activePlayer turnFour) S.alice
+          Spec.assertBool s (S.castable S.alice second turnFour) "Future Sight offers the top card"
           Spec.assertEqWith s "nobody has won" (GameState.result after) Nothing
           Spec.assertEqWith s "it went seventh from the top, above the first at eighth" (approachesIn S.alice after) [7, 8 :: Int]
           Spec.assertEqWith s "and alice gained a second 7" (S.lifeOf S.alice after) (Just 34)
