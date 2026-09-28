@@ -12,6 +12,7 @@ import qualified Pawl.Types.LifeGainR as LifeGainR
 import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.MillCountR as MillCountR
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
@@ -193,5 +194,8 @@ data ReplacementEffect card ability effect
     -- Carries no pattern beyond CR 109.5's relation, for CoinFlipR's reason --
     -- see Pawl.Types.DieRollR.
     DieRollR DieRollR.DieRollR
+  | -- | CR 701.34a / 614.1a: "if you would proliferate, proliferate twice
+    -- instead" (Tekuthal, Inquiry Dominus).
+    ProliferateR ProliferateR.ProliferateR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

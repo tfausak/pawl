@@ -427,6 +427,8 @@ import qualified Pawl.Codec.PrintingIdSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProductionTagSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
+import qualified Pawl.Codec.ProliferateRSpec
+import qualified Pawl.Codec.ProliferateRewriteSpec
 import qualified Pawl.Codec.ProtectionSpec
 import qualified Pawl.Codec.PrototypeSpec
 import qualified Pawl.Codec.PutCountersFromSpec
@@ -866,6 +868,8 @@ spec s registry = do
   Pawl.Codec.CoinFlippedSpec.spec s
   Pawl.Codec.CoinFlipRewriteSpec.spec s
   Pawl.Codec.CoinFlipRSpec.spec s
+  Pawl.Codec.ProliferateRewriteSpec.spec s
+  Pawl.Codec.ProliferateRSpec.spec s
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
   Pawl.Codec.CombatSpec.spec s

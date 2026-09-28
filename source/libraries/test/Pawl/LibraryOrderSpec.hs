@@ -74,6 +74,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -739,6 +740,132 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
     Spec.assertEqWith s "the counter was proliferated" (S.counterOf CounterKind.PlusOnePlusOne creature resolved) 2
     -- The spell left the hand and one card was drawn, so the hand is level.
     Spec.assertEqWith s "drew a card" (length (Game.zoneMembers Zone.Hand S.alice resolved)) handBefore
+  -- CR 614.1a / 701.34a: Tekuthal, Inquiry Dominus ("If you would proliferate,
+  -- proliferate twice instead.") under alice turns Steady Progress's one
+  -- proliferate into two, each its own choice: the first answer takes only the
+  -- Piker, the second the Piker and bob.
+  Spec.it s "CR 614.1a Tekuthal makes one proliferate two, each its own choice" $ do
+    (board, piker) <- tekuthalBoard s registry [("Tekuthal, Inquiry Dominus", S.alice)]
+    let (after, asked) = proliferateTwiceRun board
+    Spec.assertEqWith s "CR 701.34a: the Piker was proliferated twice" (S.counterOf CounterKind.PlusOnePlusOne piker after) 3
+    Spec.assertEqWith s "CR 701.34a: bob, chosen only the second time, once" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
+    Spec.assertEqWith s "two proliferate choices" asked 2
+  -- The pair, one thing different: no Tekuthal, so the second answer is never
+  -- reached.
+  Spec.it s "CR 701.34a without Tekuthal Steady Progress proliferates once" $ do
+    (board, piker) <- tekuthalBoard s registry []
+    let (after, asked) = proliferateTwiceRun board
+    Spec.assertEqWith s "the Piker was proliferated once" (S.counterOf CounterKind.PlusOnePlusOne piker after) 2
+    Spec.assertEqWith s "bob was never chosen" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 2
+    Spec.assertEqWith s "one proliferate choice" asked 1
+  -- CR 109.5: "you" is Tekuthal's controller, so bob's Tekuthal leaves alice's
+  -- proliferate alone.
+  Spec.it s "CR 109.5 an opponent's Tekuthal does not double your proliferate" $ do
+    (board, piker) <- tekuthalBoard s registry [("Tekuthal, Inquiry Dominus", S.bob)]
+    let (after, asked) = proliferateTwiceRun board
+    Spec.assertEqWith s "the Piker was proliferated once" (S.counterOf CounterKind.PlusOnePlusOne piker after) 2
+    Spec.assertEqWith s "one proliferate choice" asked 1
+  -- CR 614.5 / 616.1f: each Tekuthal gets one opportunity, the second on the
+  -- event the first made, so two double twice. Two under one controller is the
+  -- legend rule's to settle (CR 704.5j), so this drives the opcode directly with
+  -- no state-based-action pass between; a non-legendary copy reaches it in play.
+  Spec.it s "CR 614.5 two Tekuthals make one proliferate four" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    tekuthal <- S.printingOf s registry "Tekuthal, Inquiry Dominus"
+    let (src, g0) = S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)
+        (_, g1) = S.addPermanent tekuthal S.alice g0
+        (_, g2) = S.addPermanent tekuthal S.alice g1
+        gs = S.addCounter CounterKind.PlusOnePlusOne 1 src g2
+        counting :: Prompt.Prompt r -> State.State Int r
+        counting p = case p of
+          Prompt.ChooseProliferate _ _ oids pids -> do
+            State.modify (+ 1)
+            pure (Set.fromList oids, Set.fromList pids)
+          _ -> pure (S.identityAnswer p)
+        (after, asked) = State.runState (Engine.runGame counting gs (Resolve.applyEffect src src S.alice Map.empty Map.empty Effect.Proliferate)) 0
+    Spec.assertEqWith s "CR 701.34a: one counter became five" (S.counterOf CounterKind.PlusOnePlusOne src (snd after)) 5
+    Spec.assertEqWith s "four proliferate choices" asked 4
+  -- CR 701.34a: Scheming Aspirant ("Whenever you proliferate, each opponent
+  -- loses 2 life and you gain 2 life.") triggers once per proliferate, so
+  -- beside Tekuthal it triggers twice.
+  Spec.it s "CR 701.34a Scheming Aspirant triggers on each of Tekuthal's two proliferates" $ do
+    (board, _) <- tekuthalBoard s registry [("Tekuthal, Inquiry Dominus", S.alice), ("Scheming Aspirant", S.alice)]
+    (bare, _) <- tekuthalBoard s registry [("Scheming Aspirant", S.alice)]
+    let (after, _) = proliferateTwiceRun board
+        (baseline, _) = proliferateTwiceRun bare
+    Spec.assertEqWith s "bob lost 2 life twice" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "alice gained 2 life twice" (S.lifeOf S.alice after) (Just 24)
+    Spec.assertEqWith s "without Tekuthal, once" (S.lifeOf S.bob baseline) (Just 18)
+    Spec.assertEqWith s "the stack is empty, so the triggers resolved" (GameState.stack after) []
+  -- The card's ruling: "whenever you proliferate" triggers even when nothing
+  -- was chosen -- here, when nothing has a counter to choose.
+  Spec.it s "CR 701.34a a proliferate with nothing to choose still triggers" $ do
+    island <- S.printingOf s registry "Island"
+    steadyProgress <- S.printingOf s registry "Steady Progress"
+    aspirant <- S.printingOf s registry "Scheming Aspirant"
+    let (_, g1) = S.addPermanent aspirant S.alice (S.landsInPlay island 3)
+        (_, g2) = S.addLibraryCard island S.alice g1
+        (board, spell) = S.handOne steadyProgress g2
+        (after, asked) = proliferateTwiceRun (board {GameState.priority = Just S.alice}, spell)
+    Spec.assertEqWith s "bob lost 2 life" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "nobody was asked" asked 0
+  -- Ezuri, Stalker of Spheres: "When Ezuri enters, you may pay {3}. If you do,
+  -- proliferate twice. Whenever you proliferate, draw a card." Two proliferate
+  -- instructions, each doubled by Tekuthal, draw four.
+  Spec.it s "CR 614.1a Ezuri's two proliferates under Tekuthal are four, and draw four" $ do
+    let paying :: Prompt.Prompt r -> r
+        paying p = case p of
+          Prompt.ChooseToPay {} -> PaymentDecision.Pays
+          _ -> S.identityAnswer p
+        run withTekuthal = do
+          island <- S.printingOf s registry "Island"
+          forest <- S.printingOf s registry "Forest"
+          ezuri <- S.printingOf s registry "Ezuri, Stalker of Spheres"
+          tekuthal <- S.printingOf s registry "Tekuthal, Inquiry Dominus"
+          -- {2}{G}{U} to cast and {3} for the ability: one Forest, six Islands.
+          let g0 = S.landsFor forest S.alice 1 (S.landsInPlay island 6)
+              g1 = if withTekuthal then snd (S.addPermanent tekuthal S.alice g0) else g0
+              g2 = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) g1 [1 .. (5 :: Int)]
+              (board, spell) = S.handOne ezuri g2
+              cast = S.runPure paying (board {GameState.priority = Just S.alice}) (S.cast S.alice spell)
+          pure (S.runPure paying cast Engine.priorityLoop)
+    after <- run True
+    baseline <- run False
+    Spec.assertEqWith s "four proliferates drew four" (S.handSize S.alice after) 4
+    Spec.assertEqWith s "without Tekuthal, two" (S.handSize S.alice baseline) 2
+
+-- Steady Progress in alice's hand over three Islands and a card to draw, a
+-- Goblin Piker of hers with one +1/+1 counter, bob at two poison, and each named
+-- card on the battlefield under its seat.
+tekuthalBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [(String, PlayerId.PlayerId)] -> m ((GameState.GameState, ObjectId.ObjectId), ObjectId.ObjectId)
+tekuthalBoard s registry extras = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  steadyProgress <- S.printingOf s registry "Steady Progress"
+  placed <- traverse (\(name, pid) -> fmap (\printing -> (printing, pid)) (S.printingOf s registry name)) extras
+  let (creature, g1) = S.addPermanent piker S.alice (S.landsInPlay island 3)
+      g2 = S.addPlayerCounter PlayerCounterKind.Poison 2 S.bob (S.addCounter CounterKind.PlusOnePlusOne 1 creature g1)
+      (_, g3) = S.addLibraryCard island S.alice g2
+      g4 = List.foldl' (\g (printing, pid) -> snd (S.addPermanent printing pid g)) g3 placed
+      (board, spell) = S.handOne steadyProgress g4
+  pure ((board {GameState.priority = Just S.alice}, spell), creature)
+
+-- Cast Steady Progress and run priority until the stack is empty, answering the Nth ChooseProliferate by
+-- INDEX -- the first takes only the permanents offered, the second everything --
+-- so the engine cannot repair an answer after a mutation. Answers with the
+-- settled board and how many proliferate choices were asked.
+proliferateTwiceRun :: (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, Int)
+proliferateTwiceRun (board, spell) =
+  let answering :: Prompt.Prompt r -> State.State Int r
+      answering p = case p of
+        Prompt.ChooseProliferate _ _ oids pids -> do
+          n <- State.get
+          State.put (n + 1)
+          pure (Set.fromList oids, if n == 0 then Set.empty else Set.fromList pids)
+        _ -> pure (S.identityAnswer p)
+      run = Engine.runGame answering board (S.cast S.alice spell >> Engine.priorityLoop)
+      ((_, settled), asked) = State.runState run 0
+   in (S.settleSba settled, asked)
 
 -- CR 701.22a: "to 'scry N' means to look at the top N cards of your library,
 -- then put any number of them on the bottom of your library in any order and

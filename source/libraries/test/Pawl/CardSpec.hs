@@ -1084,6 +1084,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -2080,6 +2081,7 @@ replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
+  ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -2107,6 +2109,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
+  ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 111.1's token a replacement MINTS: TokenR's appended token (Queen Allenal
@@ -2132,6 +2135,7 @@ replacementMintedCards replacement = case replacement of
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
+  ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -3512,7 +3516,7 @@ costComponentFilters component = case component of
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower _ f) -> [f]
   -- CR 601.2f's "tapping permanents": Springleaf Drum's "an untapped creature
   -- you control".
-  CostComponent.TapPermanents (TapPermanents.MkTapPermanents _ f) -> [f]
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents _ f _) -> [f]
   -- CR 118.1 as a cost: Meloku the Clouded Mirror's "a land you control".
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents _ f) -> [f]
   -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".
@@ -4210,6 +4214,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerScries _ -> []
   TriggerCondition.RingTemptsPlayer _ -> []
   TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -4456,6 +4461,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PlayerFirebends _ -> []
   TriggerCondition.PlayerCompletesDungeon _ -> []
   TriggerCondition.PlayerSurveils _ -> []
+  TriggerCondition.PlayerProliferates _ -> []
   TriggerCondition.PlayerRollsDice _ -> []
   TriggerCondition.PlayerRollsResult _ -> []
   TriggerCondition.Visit -> []
@@ -4981,6 +4987,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.MillCountR {} -> []
   ReplacementEffect.CoinFlipR {} -> []
   ReplacementEffect.DieRollR {} -> []
+  ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 614.9's printed destination, the one Filter a damage REWRITE carries.
