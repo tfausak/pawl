@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Planechase as Planechase
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
@@ -27,11 +28,13 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
@@ -129,6 +132,34 @@ spec s registry = Spec.describe s "Pawl.Engine.Planechase" $ do
     Spec.assertBool s (all (\oid -> Maybe.isNothing (Game.lookupObject oid walked)) academyBefore) "CR 311.6 as a new object"
     Spec.assertEqWith s "a blank face leaves Academy face up" (names blank) [Just (CardName.MkCardName (Text.pack "Academy at Tolaria West"))]
 
+  -- CR 901.10 / 311.5 / 800.4p: bob, the active player, concedes in his main
+  -- phase while his Academy is the face-up plane. It leaves the game with him,
+  -- carol -- the next seat in turn order, not alice, the first by id -- becomes
+  -- planar controller, and her top planar card is turned up at once.
+  Spec.it s "CR 311.5 a departing active player's plane is replaced from the next seat's planar deck" $ do
+    board <- seatedPlanarBoard s registry S.bob [(S.alice, ["Tazeem", "Academy at Tolaria West"]), (S.bob, ["Academy at Tolaria West"]), (S.carol, ["Tazeem", "Academy at Tolaria West"])]
+    let gone = S.runPure (conceding S.bob) (inMain S.bob board) Engine.priorityLoop
+        tazeem = CardName.MkCardName (Text.pack "Tazeem")
+    Spec.assertEqWith s "CR 901.10 carol's Tazeem is face up in place of bob's Academy" (fmap (\oid -> (fmap Face.name (Game.faceOf oid gone), fmap Object.owner (Game.lookupObject oid gone))) (Planechase.faceUp gone)) [(Just tazeem, Just S.carol)]
+    Spec.assertEqWith s "CR 311.5 carol controls it" (fmap (`Projection.controllerOf` gone) (Planechase.faceUp gone)) [Just S.carol]
+    Spec.assertEqWith s "and alice's planar deck is untouched" (length (Planechase.deckOf S.alice gone), length (Planechase.deckOf S.carol gone)) (2, 1)
+
+  -- CR 901.10a: bob rolls the Planeswalker symbol, and while his planeswalking
+  -- ability is on the stack alice, whose Academy is face up, concedes. bob turns
+  -- up his Tazeem (CR 901.10) and the ability ceases to exist, so it does not
+  -- planeswalk him on to his Academy.
+  Spec.it s "CR 901.10a a plane leaving the game ends a pending planeswalking ability" $ do
+    board <- seatedPlanarBoard s registry S.alice [(S.alice, ["Academy at Tolaria West"]), (S.bob, ["Tazeem", "Academy at Tolaria West"]), (S.carol, [])]
+    let answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.RollDie _ -> 6
+          _ -> conceding S.alice p
+        gone = S.runPure answer (inMain S.bob board) (Planechase.roll Resolve.performManaAbility S.bob >> Engine.priorityLoop)
+        names = fmap (\oid -> fmap Face.name (Game.faceOf oid gone)) (Planechase.faceUp gone)
+    Spec.assertEqWith s "CR 901.10a bob's Tazeem is still the face-up plane" names [Just (CardName.MkCardName (Text.pack "Tazeem"))]
+    Spec.assertEqWith s "and his Academy is still in his planar deck" (length (Planechase.deckOf S.bob gone)) 1
+    Spec.assertBool s (notElem S.alice (Game.stillPlaying gone)) "alice has left the game"
+
 -- A two-player board with alice's planar deck stacked in the order named, top
 -- first, the top one face up (CR 103.7), and twenty Forests in each library.
 -- No opening hands are drawn, so both hands are empty.
@@ -142,6 +173,25 @@ planarBoard s registry order = do
       rank oid = maybe (length order) (\face -> Maybe.fromMaybe (length order) (List.elemIndex (Face.name face) (fmap (CardName.MkCardName . Text.pack) order))) (Game.faceOf oid built)
       stacked = built {GameState.planarDecks = Map.adjust (Seq.sortOn rank) S.alice (GameState.planarDecks built)}
   pure (S.runPure S.identityAnswer stacked (Planechase.setStartingPlane S.alice))
+
+-- A three-player board, each seat's planar deck stacked in the order named,
+-- top first, and `starter`'s top card face up (CR 103.7). Twenty Forests in
+-- each library; no opening hands.
+seatedPlanarBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> PlayerId.PlayerId -> [(PlayerId.PlayerId, [String])] -> m GameState.GameState
+seatedPlanarBoard s registry starter seats = do
+  forest <- S.printingOf s registry "Forest"
+  decks <- traverse (\(pid, order) -> (\planes -> (pid, (Deck.fromCards (Map.singleton forest 20)) {Deck.planes = Set.fromList planes})) <$> traverse (S.printingOf s registry) order) seats
+  let built = S.runPure S.identityAnswer (Setup.emptyGame S.threePlayers) (mapM_ (uncurry Setup.createDeck) decks)
+      rank order oid = maybe (length order) (\face -> Maybe.fromMaybe (length order) (List.elemIndex (Face.name face) (fmap (CardName.MkCardName . Text.pack) order))) (Game.faceOf oid built)
+      stacked = built {GameState.planarDecks = Map.mapWithKey (\pid deck -> maybe deck (\order -> Seq.sortOn (rank order) deck) (List.lookup pid seats)) (GameState.planarDecks built)}
+  pure (S.runPure S.identityAnswer stacked (Planechase.setStartingPlane starter))
+
+-- `who` concedes when asked; everyone else plays on, and every other prompt is
+-- answered by identity.
+conceding :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+conceding who p = case p of
+  Prompt.Concede asked -> if asked == who then Concession.Concedes else Concession.Continues
+  _ -> S.identityAnswer p
 
 -- `pid`'s precombat main phase with priority and an empty stack.
 inMain :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState

@@ -13,8 +13,6 @@
 --     nothing (#4309).
 --   * CR 901.11's planeswalk triggers and durations -- "when you planeswalk to"
 --     and "until a player planeswalks" (#4310).
---   * CR 901.10's replacement plane when a face-up card's owner leaves the game
---     (#4311).
 --   * CR 901.12's Two-Headed Giant, CR 901.14's Grand Melee and CR 901.15's
 --     single planar deck options, and CR 801.18's range-of-influence exemption
 --     (#4312).
@@ -23,6 +21,7 @@ module Pawl.Engine.Planechase where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -45,6 +44,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.InherentTriggerSource as InherentTriggerSource
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
@@ -67,6 +67,7 @@ import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -125,6 +126,33 @@ setStartingPlane pid = do
           Just oid | maybe False Plane.isPhenomenonFace (Game.faceOf oid g) -> toBottom oid >> go (n - 1)
           _ -> pure ()
   go (length (deckOf pid gs))
+
+-- | CR 901.10 / 901.10a, run as these players leave the game and read against
+-- `before`, the board as it was: if a face-up plane or phenomenon card they own
+-- left with them, the planar controller -- already CR 800.4p's heir -- turns up
+-- the top card of their planar deck, and if a face-up plane left, every
+-- planeswalking ability on the stack ceases to exist. Not a state-based action.
+-- A phenomenon leaving alone spares the ability, CR 901.10a naming a plane;
+-- nothing observes that gate while phenomena are inert (gap #4309).
+ownersLeft :: GameState -> [PlayerId] -> Game ()
+ownersLeft before pids = do
+  let owned oid = maybe False (\obj -> List.elem (Object.owner obj) pids) (Game.lookupObject oid before)
+      left = filter owned (faceUp before)
+      isPlane oid = maybe False (not . Plane.isPhenomenonFace) (Game.faceOf oid before)
+  Monad.unless (null left) $ do
+    Monad.when (any isPlane left) (State.modify' ceasePlaneswalking)
+    gs <- State.get
+    Monad.void (turnUpTop (Plane.planarController gs))
+
+-- CR 901.10a: every planeswalking ability on the stack ceases to exist. Read as
+-- CR 901.8's own inherent ability, which is the rule's and not a card's.
+ceasePlaneswalking :: GameState -> GameState
+ceasePlaneswalking gs =
+  let walking oid = case fmap Object.source (Game.lookupObject oid gs) of
+        Just (Source.OfInherentTrigger inherent) -> InherentTriggerSource.ability inherent == planeswalkingAbility
+        _ -> False
+      cease g oid = maybe g (\obj -> let g1 = Game.removeFromZones (Object.owner obj) oid g in g1 {GameState.objects = Map.delete oid (GameState.objects g1)}) (Game.lookupObject oid g)
+   in List.foldl' cease gs (filter walking (GameState.stack gs))
 
 -- CR 701.31b's second half: move the top card off the planar deck and turn it
 -- face up, which is joining GameState.command. A fresh timestamp, since its
