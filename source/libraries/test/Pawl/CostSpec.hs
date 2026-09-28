@@ -22,6 +22,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -1958,6 +1959,57 @@ hatredBoard swamp piker hatred life =
         gs {GameState.players = Map.adjust (\p -> p {Player.life = life}) S.alice (GameState.players gs)}
       )
 
+-- CR 119.4 / 107.1a: "Pay half your life, rounded up" (CostComponent.PayHalfLife),
+-- an amount measured against the payer. Odd life totals throughout, so a
+-- rounding down is visible.
+halfLifeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+halfLifeSpec s registry =
+  Spec.describe s "PayHalfLife" $ do
+    -- Murderous Betrayal's {B}{B} from a Swamp and a Mana Confluence, at 11 life.
+    -- CR 601.2f fixes the half at 6 before CR 601.2g's Confluence pays 1, so she
+    -- ends at 4; a half measured when the component is paid reads 10 and leaves
+    -- her at 5.
+    Spec.it s "CR 601.2f Murderous Betrayal's half is fixed before Mana Confluence's life is paid" $ do
+      let mine =
+            (S.battlefield S.alice [S.aliased "betrayal" (S.permanent "Murderous Betrayal"), S.settled "swamp" "Swamp", S.settled "confluence" "Mana Confluence"])
+              { S.setupLife = 11
+              }
+          setup = S.board (mine NonEmpty.:| [S.battlefield S.bob [S.aliased "piker" (S.permanent "Goblin Piker")]]) S.alice S.precombatMain
+          choices =
+            S.noChoices
+              { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "piker")],
+                S.choiceManaSources = Seq.fromList [Just (S.aliasRef "swamp"), Just (S.aliasRef "confluence")],
+                S.choiceManaYields = Seq.singleton (Mana.Type.MkMana [plainUnit (ManaType.Colored Color.Black)])
+              }
+          script = S.turn 1 [S.on S.precombatMain S.alice (S.activateAction (S.aliasRef "betrayal") choices)]
+      after <- S.play s registry setup script S.priorityGame
+      Spec.assertEqWith s "CR 601.2f: 11 - 1 for the Confluence - 6 for half of 11" (S.lifeOf S.alice after) (Just 4)
+      Spec.assertEqWith s "CR 701.8a: the Piker was destroyed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 0
+    -- Lurking Evil at 7 pays 4 and becomes the 4/4 flier, no longer an
+    -- enchantment (CR 205.1a).
+    Spec.it s "CR 119.4 Lurking Evil pays half of 7, rounded up, and becomes a 4/4 Phyrexian Horror with flying" $ do
+      let mine = (S.battlefield S.alice [S.aliased "evil" (S.permanent "Lurking Evil")]) {S.setupLife = 7}
+          setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
+          script = S.turn 1 [S.on S.precombatMain S.alice (S.activateAction (S.aliasRef "evil") S.noChoices)]
+      built <- S.buildBoardOrFail s registry setup
+      (_, after) <- S.runScriptOrFail s script built S.priorityGame
+      evil <- maybe (Spec.assertFailure s "no Lurking Evil") pure (Map.lookup (S.MkObjectAlias (Text.pack "evil")) (S.builtAliases built))
+      Spec.assertEqWith s "CR 107.1a: 7 - 4" (S.lifeOf S.alice after) (Just 3)
+      Spec.assertEqWith s "a 4/4" (S.powerToughnessOf evil after) (Just (4, 4))
+      Spec.assertEqWith s "CR 205.1a: a creature and not an enchantment" (Projection.cardTypesOf evil after) (Set.singleton CardType.Creature)
+      Spec.assertEqWith s "a Phyrexian Horror" (Projection.subtypesOf evil after) (Set.fromList [Subtype.Phyrexian, Subtype.Horror])
+      Spec.assertBool s (Map.member Keyword.Flying (Projection.keywordsOf evil after)) "with flying"
+  where
+    plainUnit manaType =
+      ManaUnit.MkManaUnit
+        { ManaUnit.manaType = manaType,
+          ManaUnit.tags = Set.empty,
+          ManaUnit.retention = ManaRetention.Ordinary,
+          ManaUnit.restriction = Nothing,
+          ManaUnit.rider = Nothing,
+          ManaUnit.sourceChosenSubtype = Nothing
+        }
+
 -- Hatred {3}{B}{B} Instant: "As an additional cost to cast this spell, pay X
 -- life. Target creature gets +X/+0 until end of turn."
 --
@@ -2981,6 +3033,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   jaradSpec s registry
   jaradDrainSpec s registry
   greedSpec s registry
+  halfLifeSpec s registry
   hatredSpec s registry
   villageRitesSpec s registry
   altarsReapSpec s registry

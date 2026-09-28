@@ -137,6 +137,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -1412,6 +1413,7 @@ substituteXInComponent x component = case component of
   CostComponent.PayLifeX -> CostComponent.PayLife x
   CostComponent.PayEnergyX -> CostComponent.PayEnergy x
   CostComponent.PayLife _ -> component
+  CostComponent.PayHalfLife _ -> component
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component
@@ -1485,6 +1487,7 @@ componentHasVariable component = case component of
   CostComponent.PayLifeX -> True
   CostComponent.PayEnergyX -> True
   CostComponent.PayLife _ -> False
+  CostComponent.PayHalfLife _ -> False
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
@@ -1583,6 +1586,7 @@ componentDemandGrowsWithX component = case component of
   -- CR 101.1's sentence alone.
   CostComponent.BlightX -> False
   CostComponent.PayLife _ -> False
+  CostComponent.PayHalfLife _ -> False
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
@@ -1678,7 +1682,8 @@ ceilingOf pid oid quantities gs =
 -- Pawl.Engine.Cast stores it: rule 702.150a asks about "the player who CAST it",
 -- so an activation's and a resolution-time payment's answers are discarded by
 -- their callers. `lifeOwedBy`'s sum also goes IN, as the life this cost owes OUTSIDE
--- its mana part -- without it a route the player cannot afford gets offered.
+-- its mana part -- without it a route the player cannot afford gets offered. A
+-- PayHalfLife is fixed to its number first (`fixHalfLife`).
 --
 -- `total` is CR 601.2f's totalling, the CALLER's to supply, and it must be the
 -- SAME cost the caller's own gate measured: against the printed cost a reduction
@@ -1686,22 +1691,24 @@ ceilingOf pid oid quantities gs =
 -- because CR 118.7e's choice of half is not made until CR 601.2f. `spending` is
 -- CR 118.14's permission, here for the same reason.
 announce :: PaymentSubject.PaymentSubject -> ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword, Natural)
-announce subject spending pid oid total_ cost = case Cost.mana cost of
-  -- CR 118.6: an object with no mana cost has no mana symbols to announce.
-  Nothing -> pure (cost, 0)
-  Just manaCost -> do
-    -- The claims are read here rather than inside Mana.announce, which cannot
-    -- reach claimOf -- this module imports that one, not the other way about.
-    gs <- State.get
-    (announced, life, paidWithLife) <- Mana.announce subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost
-    pure
-      ( cost
-          { Cost.mana = Just announced,
-            Cost.components =
-              Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
-          },
-        paidWithLife
-      )
+announce subject spending pid oid total_ printed = do
+  gs <- State.get
+  let cost = fixHalfLife pid gs printed
+  case Cost.mana cost of
+    -- CR 118.6: an object with no mana cost has no mana symbols to announce.
+    Nothing -> pure (cost, 0)
+    Just manaCost -> do
+      -- The claims are read here rather than inside Mana.announce, which cannot
+      -- reach claimOf -- this module imports that one, not the other way about.
+      (announced, life, paidWithLife) <- Mana.announce subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) spending pid oid total_ (lifeOwedBy pid gs (Cost.components cost)) (claimsOf Map.empty pid oid (Cost.components cost) gs) manaCost
+      pure
+        ( cost
+            { Cost.mana = Just announced,
+              Cost.components =
+                Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
+            },
+          paidWithLife
+        )
 
 -- CR 118.7e: the payer chooses one half of each hybrid symbol in a reduction, as
 -- the reduction is applied, and the answers come back as the adjustments
@@ -1878,6 +1885,7 @@ loyaltyAmountOf component = case component of
   CostComponent.SacrificeThis -> Nothing
   CostComponent.ReturnThis -> Nothing
   CostComponent.PayLife _ -> Nothing
+  CostComponent.PayHalfLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergyX -> Nothing
   CostComponent.Sacrifice {} -> Nothing
@@ -1973,6 +1981,7 @@ zoneOfComponent component = case component of
   CostComponent.SacrificeThis -> Nothing
   CostComponent.ExileThis -> Nothing
   CostComponent.PayLife _ -> Nothing
+  CostComponent.PayHalfLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergyX -> Nothing
   CostComponent.Sacrifice {} -> Nothing
@@ -2100,6 +2109,7 @@ componentStatesHiddenQuality component = case component of
   -- to find -- DiscardThis' answer above and for its reason.
   CostComponent.ReturnThis -> False
   CostComponent.PayLife _ -> False
+  CostComponent.PayHalfLife _ -> False
   CostComponent.PayLifeX -> False
   CostComponent.PayEnergyX -> False
   CostComponent.PayEnergy _ -> False
@@ -2686,6 +2696,7 @@ claimOf slots pid oid component gs =
         CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) ->
           claim (ClaimAxis.Removal Zone.Battlefield) (Set.fromList (returnCandidates slots pid oid criterion gs)) n
         CostComponent.PayLife _ -> Nothing
+        CostComponent.PayHalfLife _ -> Nothing
         CostComponent.PayLifeX -> Nothing
         CostComponent.PayEnergyX -> Nothing
         CostComponent.PayEnergy _ -> Nothing
@@ -2798,7 +2809,7 @@ canPayReading slots subject pid oid cost gs = case Cost.mana cost of
               -- 118.12's resolution-time payment -- so the mana is spent as it
               -- is. Which CR 106.6-restricted mana is a supply is the subject's
               -- question.
-              Mana.canPayCommitting subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) ManaSpending.AsProduced pid (lifeOwedBy components) (claimsOf slots pid oid components gs) residual gs
+              Mana.canPayCommitting subject (midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))) ManaSpending.AsProduced pid (lifeOwedBy pid gs components) (claimsOf slots pid oid components gs) residual gs
                 && all (\component -> canPayComponent slots pid oid component gs) components
                 && jointlyPayable slots pid oid components gs
      in any payableWith (waterbendSubstitutions (Cost.components cost) slots pid oid gs manaCost)
@@ -2926,7 +2937,7 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
               -- hand this function the same cost, so both get the same count.
               Activations.times = repeatsOf pid oid cost gs,
               Activations.claims = claimsOf Map.empty pid oid (Cost.components cost) gs,
-              Activations.life = lifeOwedBy (Cost.components cost)
+              Activations.life = lifeOwedBy pid gs (Cost.components cost)
             }
         else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0}
 
@@ -2992,7 +3003,7 @@ manaPartPayable effects adjustments pid oid cost gs = case Cost.mana cost of
             (manaActivationsGiven effects)
             ManaSpending.AsProduced
             pid
-            (lifeOwedBy (Cost.components cost))
+            (lifeOwedBy pid gs (Cost.components cost))
             (claimsOf Map.empty pid oid (Cost.components cost) gs)
             totalled
             gs
@@ -3036,7 +3047,7 @@ repeatsOf pid oid cost gs =
   let components = Cost.components cost
       claims = claimsOf Map.empty pid oid components gs
       objectCeiling = if null claims then [] else [Claim.repeats claims]
-      lifeCeiling = case lifeOwedBy components of
+      lifeCeiling = case lifeOwedBy pid gs components of
         0 -> []
         owed -> [div (lifeTotalOf pid gs) owed]
       counterCeiling = [div (countersOn kind oid gs) owed | (kind, owed) <- Map.toList (countersOwedBy components), owed > 0]
@@ -3079,6 +3090,7 @@ uncountedCeiling component = case component of
   CostComponent.MillCards _ -> Nothing
   -- Counted by `lifeCeiling`, CR 119.4.
   CostComponent.PayLife _ -> Nothing
+  CostComponent.PayHalfLife _ -> Nothing
   -- Zero, not the 1 the uncounted components take: an unannounced X cannot be
   -- paid even once (`canPayComponent`). Unreachable, since `manaActivations`
   -- asks canPayComponent of every component before reaching `repeatsOf`.
@@ -3278,7 +3290,7 @@ canPaySomeCompletionGiven :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> Pay
 canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ substitute cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
-    let outside = lifeOwedBy (Cost.components cost)
+    let outside = lifeOwedBy pid gs (Cost.components cost)
         claimed = claimsOf slots pid oid (Cost.components cost) gs
         -- CR 702.51b's and CR 702.66b's substitutes come with components of
         -- their own (`manaSubstitutions`), and CR 118.3 weighs those against the
@@ -3328,15 +3340,38 @@ canPaySomeCompletionGiven slots subject spending sources pcs pid oid total_ subs
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
 
+-- CR 107.1a / 107.1b: half the payer's life total, rounded as printed, and 0
+-- from a total at or below 0 -- Lurking Evil's ruling, "if you have zero or
+-- negative life, half your life is zero".
+halfLifeOf :: Rounding.Rounding -> PlayerId -> GameState -> Natural
+halfLifeOf rounding pid gs =
+  maybe 0 (Integer.toNaturalSaturating . Quantity.halve rounding . Player.life) (Map.lookup pid (GameState.players gs))
+
+-- CR 601.2f: a half-life cost is fixed to a number once, against the life total
+-- the payer has as the total cost is determined, so a CR 601.2g mana ability
+-- that pays life cannot move it. Applied by `announce`, the seam a cast, an
+-- activation and a CR 118.12 payment each pass before paying; Pawl.CostSpec's
+-- Murderous Betrayal case is the proof.
+fixHalfLife :: PlayerId -> GameState -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+fixHalfLife pid gs cost =
+  let fixed component = case component of
+        CostComponent.PayHalfLife rounding -> CostComponent.PayLife (halfLifeOf rounding pid gs)
+        _ -> component
+   in cost {Cost.components = fmap fixed (Cost.components cost)}
+
 -- CR 119.4's payments a cost owes OUTSIDE its mana part, added up -- what CR
 -- 118.3 makes the mana part's own life share a total with. Total, so a new
--- life-spending component cannot be added without answering here.
-lifeOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
-lifeOwedBy = sum . fmap lifeOwedByComponent
+-- life-spending component cannot be added without answering here. The payer and
+-- the board are PayHalfLife's, whose amount is measured against them.
+lifeOwedBy :: PlayerId -> GameState -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
+lifeOwedBy pid gs = sum . fmap (lifeOwedByComponent pid gs)
 
-lifeOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
-lifeOwedByComponent component = case component of
+lifeOwedByComponent :: PlayerId -> GameState -> CostComponent.CostComponent Keyword.Type.Keyword -> Natural
+lifeOwedByComponent pid gs component = case component of
   CostComponent.PayLife n -> n
+  -- A FENCE rather than proven behaviour: it shares a total only with a
+  -- Phyrexian symbol's life, and no card in `data/cards/` prints both.
+  CostComponent.PayHalfLife rounding -> halfLifeOf rounding pid gs
   -- 0, an unannounced X naming no amount to owe. Not a claim that this component
   -- is free: `canPayComponent` refuses it outright.
   CostComponent.PayLifeX -> 0
@@ -3399,6 +3434,7 @@ countersOwedByComponent component = case component of
   CostComponent.RemovePlusOneCountersX _ -> []
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.PayLife _ -> []
+  CostComponent.PayHalfLife _ -> []
   CostComponent.PayLifeX -> []
   CostComponent.PayEnergyX -> []
   CostComponent.TapThis -> []
@@ -3480,6 +3516,9 @@ canPayComponent slots pid oid component gs = case component of
   -- component ALONE, which is not CR 118.3's question -- canPay hands
   -- `lifeOwedBy`'s sum to the mana side, and this can only be the weaker check.
   CostComponent.PayLife n -> Event.canPayLife pid n gs
+  -- CR 119.4 over the amount `halfLifeOf` measures, which never exceeds the
+  -- total it halves -- so only CR 119.8's prohibition refuses it.
+  CostComponent.PayHalfLife rounding -> Event.canPayLife pid (halfLifeOf rounding pid gs) gs
   -- CR 601.2b: this is the component BEFORE X is announced, so there is no
   -- amount to measure against CR 119.4 -- CR 601.2 reverses a casting a player
   -- cannot comply with rather than choosing a value for them. Unreachable from
@@ -3763,6 +3802,7 @@ criteriaOf component = case component of
   CostComponent.SacrificeThis -> []
   CostComponent.ReturnThis -> []
   CostComponent.PayLife _ -> []
+  CostComponent.PayHalfLife _ -> []
   CostComponent.PayLifeX -> []
   CostComponent.PayEnergyX -> []
   CostComponent.DiscardThis _ -> []
@@ -4298,11 +4338,12 @@ payToll perform began pid charges =
 -- above, one charge at a time. Its Natural is discarded for Activate's reason:
 -- rule 702.150a asks about the player who CAST an object.
 announceToll :: PlayerId -> [(ObjectId, Cost Keyword.Type.Keyword)] -> Game [(ObjectId, Cost Keyword.Type.Keyword)]
-announceToll pid charges =
+announceToll pid charges = do
+  start <- State.get
   let symbolsOf = foldMap ManaCost.unwrap . Cost.mana . snd
       -- CR 118.3 makes the whole toll one demand on one life total, so every
       -- charge's own CR 119.4 payments ride on every route offered for any of them.
-      outside = sum (fmap (lifeOwedBy . Cost.components . snd) charges)
+      outside = sum (fmap (lifeOwedBy pid start . Cost.components . snd) charges)
       go done committed remaining = case remaining of
         [] -> pure (reverse done)
         (tag, cost) : rest -> case Cost.mana cost of
@@ -4341,7 +4382,7 @@ announceToll pid charges =
                       Cost.components = Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
                     }
             go ((tag, paid) : done) (committed + life) rest
-   in go [] 0 charges
+  go [] 0 charges
 
 -- CR 508.1j / 509.1f: can the payer tell one order of a toll's CHARGES from
 -- another? `orderObservable` below, one level up, and its two conditions read
@@ -4468,6 +4509,7 @@ paidInSecondPass component = case component of
   CostComponent.TapForTotalPower {} -> False
   CostComponent.TapPermanents {} -> False
   CostComponent.PayLife _ -> False
+  CostComponent.PayHalfLife _ -> False
   CostComponent.PayLifeX -> False
   CostComponent.PayEnergyX -> False
   CostComponent.PayEnergy _ -> False
@@ -4636,6 +4678,7 @@ orderSensitive component = case component of
   -- behaviour.
   CostComponent.MillCards _ -> True
   CostComponent.PayLife _ -> False
+  CostComponent.PayHalfLife _ -> False
   CostComponent.PayLifeX -> False
   CostComponent.PayEnergyX -> False
   CostComponent.PayEnergy _ -> False
@@ -5450,6 +5493,12 @@ payComponent moment slots pid oid component = case component of
         Event.payLife pid n
         pure bindsNothing
       else pure Payment.Unpaid
+  -- PayLife's arm over the live half: `announce` fixes the component first, so
+  -- only one joining after it (PayLife's caveat above) is measured here. A FENCE:
+  -- no card in `data/cards/` adds a half-life cost that way.
+  CostComponent.PayHalfLife rounding -> do
+    gs <- State.get
+    payComponent moment slots pid oid (CostComponent.PayLife (halfLifeOf rounding pid gs))
   -- Unpayable, `canPayComponent`'s answer and for its reason. Unpaid rather than
   -- a guessed 0, which CR 601.2h turns into the reversal of the whole casting.
   CostComponent.PayLifeX -> pure Payment.Unpaid

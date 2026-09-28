@@ -8,6 +8,7 @@ import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Codec.ExileMaterials as ExileMaterials
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.ReturnPermanents as ReturnPermanents
+import qualified Pawl.Codec.Rounding as Rounding
 import qualified Pawl.Codec.Sacrifice as Sacrifice
 import qualified Pawl.Codec.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Codec.TapPermanents as TapPermanents
@@ -36,6 +37,7 @@ codec keywordCodec =
       Arm.nullary "ReturnThis" CostComponent.ReturnThis,
       Arm.payload "PayLife" Common.natural CostComponent.PayLife (\x -> case x of CostComponent.PayLife y -> Just y; _ -> Nothing),
       Arm.nullary "PayLifeX" CostComponent.PayLifeX,
+      Arm.payload "PayHalfLife" Rounding.codec CostComponent.PayHalfLife (\x -> case x of CostComponent.PayHalfLife y -> Just y; _ -> Nothing),
       Arm.payload "Sacrifice" (Sacrifice.codec keywordCodec) CostComponent.Sacrifice (\x -> case x of CostComponent.Sacrifice y -> Just y; _ -> Nothing),
       Arm.payload "TapForTotalPower" (TapForTotalPower.codec keywordCodec) CostComponent.TapForTotalPower (\x -> case x of CostComponent.TapForTotalPower y -> Just y; _ -> Nothing),
       Arm.payload "TapPermanents" (TapPermanents.codec keywordCodec) CostComponent.TapPermanents (\x -> case x of CostComponent.TapPermanents y -> Just y; _ -> Nothing),
@@ -87,6 +89,7 @@ tagOf x = case x of
   CostComponent.ReturnThis {} -> "ReturnThis"
   CostComponent.PayLife {} -> "PayLife"
   CostComponent.PayLifeX {} -> "PayLifeX"
+  CostComponent.PayHalfLife {} -> "PayHalfLife"
   CostComponent.Sacrifice {} -> "Sacrifice"
   CostComponent.TapForTotalPower {} -> "TapForTotalPower"
   CostComponent.TapPermanents {} -> "TapPermanents"

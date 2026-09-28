@@ -3570,6 +3570,7 @@ costComponentFilters component = case component of
   CostComponent.SacrificeThis -> []
   CostComponent.ReturnThis -> []
   CostComponent.PayLife _ -> []
+  CostComponent.PayHalfLife _ -> []
   CostComponent.PayLifeX -> []
   CostComponent.PayEnergyX -> []
   CostComponent.DiscardThis _ -> []
