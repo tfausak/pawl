@@ -464,6 +464,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- sentence keeps a subtype swap off a name.
   PlayerEffect.HasProtectionFromChosenName -> effect
   PlayerEffect.CantBecomeMonarch -> effect
+  PlayerEffect.CantSetSchemesInMotion -> effect
   PlayerEffect.CantAttackWithCreatures -> effect
   PlayerEffect.CastOnlyAtSorcerySpeed -> effect
   PlayerEffect.PlayLandsFrom _ -> effect
@@ -1958,6 +1959,7 @@ rewriteDuration pairs duration = case duration of
   Duration.UntilEndOfNextTurnOf _ -> duration
   Duration.DuringNextTurnOf _ -> duration
   Duration.DuringYourNextTurn -> duration
+  Duration.DuringThatExtraTurn -> duration
   Duration.UntilEndOfCombat -> duration
   Duration.UntilEndOfCombatOnYourNextTurn -> duration
   -- CR 116.2c's price, which is a Cost and not a Condition. An activated
