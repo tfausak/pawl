@@ -390,6 +390,7 @@ manaProduced effect = case effect of
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing
   Effect.PayAnyEnergy _ -> Nothing
+  Effect.ChooseNumber _ -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
   Effect.Detain _ -> Nothing
@@ -462,6 +463,7 @@ manaProduced effect = case effect of
   -- (Pawl.Types.ManaAddition).
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
+  Effect.Repeat body -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.Heal _ -> Nothing
 
 -- CR 605.1a's fourth clause, asked of one effect: does it move a card to or from
@@ -647,6 +649,7 @@ movesLibraryCard effect = case effect of
   Effect.GainPlayerCounters {} -> False
   Effect.RemovePlayerCounters {} -> False
   Effect.PayAnyEnergy _ -> False
+  Effect.ChooseNumber _ -> False
   Effect.Tap _ -> False
   Effect.Untap _ -> False
   Effect.Detain _ -> False
@@ -724,6 +727,7 @@ movesLibraryCard effect = case effect of
   -- of THIS effect.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> any movesLibraryCard body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> any movesLibraryCard body
+  Effect.Repeat body -> any movesLibraryCard body
   Effect.Heal _ -> False
 
 -- Which zone an ObjectRef reaches, asked of libraries alone: does the ref name

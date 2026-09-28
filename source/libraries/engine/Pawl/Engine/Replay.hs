@@ -94,6 +94,7 @@ encode p answer = case p of
   Prompt.ChooseVote {} -> Response.ChoseVote answer
   Prompt.ChooseVoteWord {} -> Response.ChoseVoteWord answer
   Prompt.ChoosePaidEnergy {} -> Response.ChosePaidEnergy answer
+  Prompt.ChooseNumber {} -> Response.ChoseNumber answer
   Prompt.ChooseReadAheadChapter {} -> Response.ChoseReadAheadChapter answer
   Prompt.ChooseDamageSource {} -> Response.ChoseDamageSource answer
   Prompt.ChooseDelayedTriggerEvent {} -> Response.ChoseDelayedTriggerEvent answer
@@ -168,6 +169,7 @@ encode p answer = case p of
   Prompt.OrderComponentCards {} -> Response.OrderedComponentCards answer
   Prompt.OrderForEach {} -> Response.OrderedForEach answer
   Prompt.ChooseLoopMembers {} -> Response.ChoseLoopMembers answer
+  Prompt.ChooseRepeat {} -> Response.ChoseRepeat answer
   Prompt.OrderTimestamps {} -> Response.OrderedTimestamps answer
   Prompt.OrderManaActivations {} -> Response.OrderedManaActivations answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
@@ -521,6 +523,12 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseLoopMembers {} -> case response of
     Response.ChoseLoopMembers members -> Just members
+    _ -> Nothing
+  Prompt.ChooseRepeat {} -> case response of
+    Response.ChoseRepeat d -> Just d
+    _ -> Nothing
+  Prompt.ChooseNumber {} -> case response of
+    Response.ChoseNumber n -> Just n
     _ -> Nothing
   Prompt.OrderTimestamps {} -> case response of
     Response.OrderedTimestamps order -> Just order
@@ -960,6 +968,8 @@ defaultAnswer p = case p of
   -- CR 107.14's payment is "any amount", zero included, and paying nothing is
   -- how a transcript that ran out declines it.
   Prompt.ChoosePaidEnergy {} -> 0
+  -- CR 107.1c: zero is always a number the player may choose.
+  Prompt.ChooseNumber {} -> 0
   -- CR 702.155b's range opens at one, and Pawl.Engine.Event never raises this
   -- prompt for a Saga whose final chapter number is 0, so the floor is always
   -- legal. The smallest answer, for ChooseX's reason.
@@ -1070,6 +1080,8 @@ defaultAnswer p = case p of
   -- admits every subset here, so no answer can be illegal. A deterministic
   -- fallback, not a recommendation.
   Prompt.ChooseLoopMembers _ _ _ candidates -> Set.fromList candidates
+  -- Stopping, so a transcript that ran out cannot loop forever.
+  Prompt.ChooseRepeat {} -> OptionalDecision.Declines
   -- CR 613.7m: likewise, and it is the engine's own APNAP-then-ascending order --
   -- what pawl stamped in before the intra-seat key became that seat's to choose.
   Prompt.OrderTimestamps _ _ batch -> zipWith const [0 ..] batch

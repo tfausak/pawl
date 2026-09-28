@@ -4,8 +4,10 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 
@@ -137,28 +139,31 @@ data Action
     -- Pawl.Engine.Ignore.canIgnore.
     Ignore ObjectId.ObjectId AbilityName.AbilityName
   | -- | CR 116.2k / 702.170a: pay a card's plot cost and exile it from your hand,
-    -- making it a plotted card. "Any time you have priority during your main
-    -- phase while the stack is empty", and it does not use the stack (CR
-    -- 702.170b) -- so it is an Action rather than anything that goes through
-    -- Pawl.Engine.Stack, exactly as CR 116.2a's land play is.
+    -- or from the zone CR 702.170f lets plot function in, making it a plotted
+    -- card. "Any time you have priority during your main phase while the stack
+    -- is empty", and it does not use the stack (CR 702.170b) -- so it is an
+    -- Action rather than anything that goes through Pawl.Engine.Stack, exactly
+    -- as CR 116.2a's land play is.
     --
-    -- Carries only the card, Unlock's argument in reverse: CR 702.170a leaves
-    -- nothing to choose. What it costs is the keyword's own payload, which
-    -- Pawl.Engine.Plot reads off the card, and the destination is fixed at exile.
+    -- Carries the PLOT COST beside the card, TurnFaceUp's argument: a card with
+    -- two plot abilities (its own, and the one Fblthp, Lost on the Range grants
+    -- the top card of a library) offers two actions at two prices, and the
+    -- player picks one. Validated by membership in Pawl.Engine.Plot.plotCostsOf,
+    -- Activate's posture; two equal costs are one action.
     --
     -- WHICH HALF is not carried either, where Cast and Play both carry a name. CR
     -- 702.170a exiles "this card" rather than a half, and the keyword is a
     -- characteristic of a face rather than of the card -- so a split card with
     -- plot on one half would plot the whole card all the same. No printing has
     -- plot on a multi-faced card.
-    Plot ObjectId.ObjectId
+    Plot ObjectId.ObjectId (Cost.Cost Keyword.Keyword)
   | -- | CR 116.2h / 702.143a: pay {2} and exile a card with foretell from your
     -- hand face down, making it a foretold card. "Any time a player has priority
     -- during their turn", and it does not use the stack (CR 702.143b) -- so it is
     -- an Action rather than anything that goes through Pawl.Engine.Stack, exactly
     -- as CR 116.2a's land play is.
     --
-    -- Carries only the card, Plot's shape: rule 702.143a leaves nothing to
+    -- Carries only the card: rule 702.143a leaves nothing to
     -- choose. What it costs is not the keyword's payload but the rule's own {2},
     -- which Pawl.Engine.Foretell mints, and the destination is fixed at exile.
     --
@@ -173,7 +178,7 @@ data Action
     -- so it is an Action rather than anything that goes through
     -- Pawl.Engine.Stack, exactly as CR 116.2a's land play is.
     --
-    -- Carries only the card, Plot's and Foretell's shape: rule 702.62a leaves
+    -- Carries only the card, Foretell's shape: rule 702.62a leaves
     -- nothing to choose. What it costs and how many counters ride along are the
     -- keyword's own payload, which Pawl.Engine.Suspend reads off the card, and
     -- the destination is fixed at exile.

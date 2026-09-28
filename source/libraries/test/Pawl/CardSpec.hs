@@ -263,6 +263,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
@@ -717,12 +718,13 @@ playerRefPositions =
         -- RedirectDamage and this one.
         ("grant-play-from-exile-duration", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile (Duration.UntilEndOfNextTurnOf (plantedPlayer "gp-duration")) (plantedPlayer "gp-player") (plantedRef "gp-ref") ManaSpending.AsProduced False PermissionVerb.Play), [plantedPlayer "gp-duration", plantedPlayer "gp-player"]),
         -- CR 400.1's reference nested in the PLAYER EFFECT rather than in a field of
-        -- the opcode -- the two CR 601.3 / 305.1 permissions that name whose zone
-        -- (Sen Triplets). Both are planted, since Pawl.Engine.PlayerEffect's
+        -- the opcode -- the CR 601.3 / 305.1 / 702.170f permissions that name whose
+        -- zone (Sen Triplets). All three are planted, since Pawl.Engine.PlayerEffect's
         -- traversal is what the AffectPlayers arm delegates to and a missing arm
         -- there answers [] rather than failing to compile.
         ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []) PermissionLimit.Unlimited PermissionVerb.Cast)), [plantedPlayer "ap-cast"]),
         ("affect-players-play-lands-from", affecting (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (plantedPlayer "ap-land"))), [plantedPlayer "ap-land"]),
+        ("affect-players-plot-from", affecting (PlayerEffect.PlotFrom (PlotFromZone.MkPlotFromZone (InZone.MkInZone Zone.Library (plantedPlayer "ap-plot")) (Filter.Type.And []))), [plantedPlayer "ap-plot"]),
         -- And an arm carrying none, so the traversal is shown answering nothing where
         -- there is nothing to answer.
         ("affect-players-cant-cast", affecting PlayerEffect.CantCastSpells, [])
@@ -760,6 +762,7 @@ countQuantities count = case Count.Type.aggregation count of
   Aggregation.DistinctCardTypes -> []
   Aggregation.DistinctColors -> []
   Aggregation.MostSharingACreatureType -> []
+  Aggregation.MostSharingACardType -> []
   Aggregation.Greatest quantity -> [quantity]
   Aggregation.Total quantity -> [quantity]
 
@@ -1315,6 +1318,7 @@ ownCounts effect = case effect of
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -1392,6 +1396,7 @@ ownCounts effect = case effect of
   -- card's -- the rider's recursion one opcode over.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectCounts body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> quantityCounts upTo <> concatMap effectCounts body
+  Effect.Repeat body -> concatMap effectCounts body
   Effect.Heal _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
@@ -1657,6 +1662,7 @@ effectNestedEffects effect = case effect of
   -- CR 608.2f's body, run once per member of the fold.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Foldable.toList body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Foldable.toList body
+  Effect.Repeat body -> Foldable.toList body
   Effect.Heal _ -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
@@ -1748,6 +1754,7 @@ effectNestedEffects effect = case effect of
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap {} -> []
   Effect.Untap {} -> []
   Effect.Detain {} -> []
@@ -2242,6 +2249,7 @@ effectReplacements effect = case effect of
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectReplacements body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectReplacements body
+  Effect.Repeat body -> concatMap effectReplacements body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed replacement abilities.
@@ -2260,6 +2268,7 @@ effectReplacements effect = case effect of
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -2719,6 +2728,7 @@ effectMintedFaces effect = case effect of
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectMintedFaces body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectMintedFaces body
+  Effect.Repeat body -> concatMap effectMintedFaces body
   Effect.Heal _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
@@ -2739,6 +2749,7 @@ effectMintedFaces effect = case effect of
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -4795,6 +4806,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 305.1's play-side permission narrows nothing: a land play has already
   -- fixed the card type, and Crucible of Worlds' sentence says no more.
   PlayerEffect.PlayLandsFrom _ -> []
+  -- CR 702.170f's permission, narrowed by the card's own qualities exactly as
+  -- the cast-side one above is (Fblthp, Lost on the Range's "nonland cards").
+  PlayerEffect.PlotFrom grant -> [PlotFromZone.matching grant]
   -- CR 118.9's standing alternative cost, narrowed by the spell's own qualities
   -- exactly as the zone permission above is (Omniscience's is `And []`).
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> [f]
@@ -5774,6 +5788,7 @@ effectFilters effect = case effect of
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Untap ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Detain ref -> frame SourceHostFramed (objectRefFilters ref)
@@ -5893,6 +5908,7 @@ effectFilters effect = case effect of
   -- list is exactly what this traversal must not stop at.
   Effect.ForEach (ForEach.MkForEach ref _ _ body _ gate) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body <> concatMap payGateFilters (Maybe.maybeToList gate)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectFilters body
+  Effect.Repeat body -> concatMap effectFilters body
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so

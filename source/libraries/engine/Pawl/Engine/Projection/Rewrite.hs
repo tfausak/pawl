@@ -160,6 +160,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.PreventAllDamage as PreventAllDamage
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
@@ -435,6 +436,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- CR 305.1's play-side prohibition, narrowed by the same kind of Filter.
   PlayerEffect.CantPlayLands f -> PlayerEffect.CantPlayLands (Filter.rewrite pairs f)
   PlayerEffect.CastFrom grant -> PlayerEffect.CastFrom grant {CastFromZone.matching = Filter.rewrite pairs (CastFromZone.matching grant)}
+  PlayerEffect.PlotFrom grant -> PlayerEffect.PlotFrom grant {PlotFromZone.matching = Filter.rewrite pairs (PlotFromZone.matching grant)}
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
   -- CR 702.16a's quality where the CARD states it, so a subtype word in it is a
   -- word on the card and CR 612.1 swaps it; the chosen-name sibling below is the
@@ -806,6 +808,7 @@ rewriteEffect pairs effect = case effect of
   Effect.GainPlayerCounters x -> Effect.GainPlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
   Effect.RemovePlayerCounters x -> Effect.RemovePlayerCounters x {PlayerCounters.quantity = rewriteQuantity pairs (PlayerCounters.quantity x)}
   Effect.PayAnyEnergy _ -> effect
+  Effect.ChooseNumber _ -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   Effect.Detain ref -> Effect.Detain (rewriteObjectRef pairs ref)
@@ -979,6 +982,7 @@ rewriteEffect pairs effect = case effect of
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually (fmap (rewritePayGate pairs) gate))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) ->
     Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
+  Effect.Repeat body -> Effect.Repeat (fmap (rewriteEffect pairs) body)
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
 
 -- CR 612.2 over one word whose family a card's text names rather than a
@@ -2137,6 +2141,7 @@ rewriteAggregation pairs aggregation = case aggregation of
   Aggregation.DistinctCardTypes -> aggregation
   Aggregation.DistinctColors -> aggregation
   Aggregation.MostSharingACreatureType -> aggregation
+  Aggregation.MostSharingACardType -> aggregation
 
 -- CR 612.1 through CR 208.2a's characteristic-defining power and toughness. Both
 -- boxes are rewritten rather than only the one a card fills, since seedCharacteristicPT

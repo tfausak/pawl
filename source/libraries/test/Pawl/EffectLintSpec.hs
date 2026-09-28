@@ -333,6 +333,7 @@ ownQuantities effect = case effect of
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> [quantity]
   Effect.PayAnyEnergy _ -> []
+  Effect.ChooseNumber _ -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Detain _ -> []
@@ -398,6 +399,7 @@ ownQuantities effect = case effect of
   Effect.GrantPlayFromExile grant -> durationQuantities (GrantPlayFromExile.duration grant)
   Effect.ForEach {} -> []
   Effect.ForEachNumber loop -> [ForEachNumber.upTo loop]
+  Effect.Repeat _ -> []
   Effect.Heal _ -> []
 
 -- The shapes CR 208.1 and CR 208.2 allow in a printed power or toughness box:
@@ -1011,6 +1013,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantPlayLands _ -> False
   PlayerEffect.CastFrom _ -> False
   PlayerEffect.PlayLandsFrom _ -> False
+  PlayerEffect.PlotFrom _ -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
   PlayerEffect.StateCoinFlip _ -> False
@@ -1081,6 +1084,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantPlayLands _ -> False
   PlayerEffect.CastFrom _ -> False
   PlayerEffect.PlayLandsFrom _ -> False
+  PlayerEffect.PlotFrom _ -> False
   PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
   PlayerEffect.CantGetCounters _ -> False
   PlayerEffect.StateCoinFlip _ -> False
@@ -1417,6 +1421,7 @@ effectObjectRefs effect =
         Effect.GainPlayerCounters {} -> []
         Effect.RemovePlayerCounters {} -> []
         Effect.PayAnyEnergy {} -> []
+        Effect.ChooseNumber {} -> []
         Effect.Tap ref -> read_ [ref]
         Effect.Untap ref -> [(AsksTransformGather, ref)]
         Effect.Detain ref -> read_ [ref]
@@ -1488,6 +1493,7 @@ effectObjectRefs effect =
         Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
         Effect.ForEach (ForEach.MkForEach ref _ _ _ _ _) -> read_ [ref]
         Effect.ForEachNumber {} -> []
+        Effect.Repeat {} -> []
         Effect.Heal ref -> read_ [ref]
 
 -- The chooser-shaped refs one effect writes where nothing can ask for them: the

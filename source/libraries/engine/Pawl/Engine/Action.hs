@@ -237,7 +237,7 @@ legalActions pid gs =
       -- priority during your main phase while the stack is empty". That gate is
       -- Turn.sorcerySpeedWindow, asked inside Plot.canPlot beside the cost, so
       -- the clauses of one rule stay together.
-      plots = fmap Action.Plot (Plot.plottable pid gs)
+      plots = fmap (uncurry Action.Plot) (Plot.plottable pid gs)
       -- CR 116.2h / 702.143a: the seventh special action, and a THIRD window --
       -- "any time a player has priority during their turn", which is neither CR
       -- 116.2b's (any priority at all) nor CR 116.2a's sorcery speed. The gate is

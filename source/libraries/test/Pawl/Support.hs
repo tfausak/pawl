@@ -914,7 +914,7 @@ playLandAnswer p = case p of
           A.Unlock _ _ -> False
           A.Activate _ _ -> False
           A.DiscardFromHand _ -> False
-          A.Plot _ -> False
+          A.Plot {} -> False
           A.Foretell _ -> False
           A.Suspend _ -> False
           A.PutCompanionIntoHand -> False
@@ -2657,6 +2657,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseDistributedMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCounterOrNone decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePaidEnergy decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseNumber decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseReadAheadChapter decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDamageSource decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDelayedTriggerEvent decider _ _ _ -> Just (Decider.unwrap decider)
@@ -2743,6 +2744,7 @@ promptDecider prompt = case prompt of
   Prompt.OrderComponentCards decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderForEach decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLoopMembers decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseRepeat decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderTimestamps decider _ _ -> Just (Decider.unwrap decider)
   Prompt.OrderManaActivations decider _ _ -> Just (Decider.unwrap decider)
   Prompt.DeclareMulligan decider _ _ -> Just (Decider.unwrap decider)
@@ -2815,6 +2817,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.ChooseDistributedMovedCounters {} -> "ChooseDistributedMovedCounters"
   Prompt.ChooseMovedCounterOrNone {} -> "ChooseMovedCounterOrNone"
   Prompt.ChoosePaidEnergy {} -> "ChoosePaidEnergy"
+  Prompt.ChooseNumber {} -> "ChooseNumber"
   Prompt.ChooseReadAheadChapter {} -> "ChooseReadAheadChapter"
   Prompt.ChooseDamageSource {} -> "ChooseDamageSource"
   Prompt.ChooseDelayedTriggerEvent {} -> "ChooseDelayedTriggerEvent"
@@ -2901,6 +2904,7 @@ promptKind prompt = Text.pack $ case prompt of
   Prompt.OrderComponentCards {} -> "OrderComponentCards"
   Prompt.OrderForEach {} -> "OrderForEach"
   Prompt.ChooseLoopMembers {} -> "ChooseLoopMembers"
+  Prompt.ChooseRepeat {} -> "ChooseRepeat"
   Prompt.OrderTimestamps {} -> "OrderTimestamps"
   Prompt.OrderManaActivations {} -> "OrderManaActivations"
   Prompt.DeclareMulligan {} -> "DeclareMulligan"
@@ -3524,7 +3528,7 @@ isCastOf oid action = case action of
   A.TurnFaceUp {} -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
-  A.Plot _ -> False
+  A.Plot {} -> False
   A.Foretell _ -> False
   A.Suspend _ -> False
   A.PutCompanionIntoHand -> False

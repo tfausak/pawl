@@ -3063,6 +3063,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.GainPlayerCounters {} -> False
   Effect.RemovePlayerCounters {} -> False
   Effect.PayAnyEnergy {} -> False
+  Effect.ChooseNumber {} -> False
   -- CR 701.26a: "only untapped permanents can be tapped", which is what
   -- Pawl.Engine.Event.tap enforces, so a sweep whose every permanent is already
   -- tapped taps nothing.
@@ -3200,6 +3201,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.MakeWarped {} -> False
   Effect.ForEach {} -> False
   Effect.ForEachNumber {} -> False
+  Effect.Repeat {} -> False
   -- CR 701.69a removes marked damage, so permanents bearing none have nothing
   -- to lose. A regression fence: no printed "may" in data/cards reaches it.
   Effect.Heal ref ->
@@ -5454,6 +5456,34 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Event.simultaneously . Event.together . Monad.forM_ [1 .. count] $ \n -> do
       State.modify' (bindAmountSlot resolving source slot n)
       applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
+  -- CR 608.2d: the body in written order, then the resolving controller's "may
+  -- repeat", asked after each run and never in advance. No event bracket: each
+  -- run is its own process, so each run's damage is its own event. What the body
+  -- binds is rescoped per run, ForEach's reason: a run whose discard found an
+  -- empty hand must not read the card the previous run discarded.
+  --
+  -- Pawl.ZoneChangeSpec's Kindle the Carnage group proves both the second run and
+  -- the rescope.
+  Effect.Repeat body -> do
+    gs0 <- State.get
+    let bodyDefined = foldMap boundSlots body
+        bindingsOf gs = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+        beforeLoop = Map.restrictKeys (bindingsOf gs0) bodyDefined
+        rescope gs =
+          gs
+            { GameState.objects =
+                Map.adjust
+                  (\o -> o {Object.bindings = Map.union beforeLoop (Map.withoutKeys (Object.bindings o) bodyDefined)})
+                  resolving
+                  (GameState.objects gs)
+            }
+        run runs = do
+          State.modify' rescope
+          applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
+          gs <- State.get
+          again <- Game.choose (Prompt.ChooseRepeat (Decide.deciderFor controller gs) controller resolving runs)
+          Monad.when (again == OptionalDecision.Exercises) (run (runs + 1))
+    run 1
   Effect.Draw (Draw.MkDraw ref quantity mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -9170,6 +9200,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- count for its reason: zero is an answer, where an unbound slot would leave a
     -- later clause's quantity unevaluable instead.
     State.modify' (bindAmountSlot resolving source slot paid)
+  -- CR 107.1c: "any number" is any natural, so the answer is taken as given. A
+  -- number past what a later instruction can act on is that instruction's CR
+  -- 609.3 shortfall, not this prompt's. Bound even at zero, PayAnyEnergy's
+  -- reason.
+  Effect.ChooseNumber slot -> do
+    gs <- State.get
+    answer <- Game.choose (Prompt.ChooseNumber (Decide.deciderFor controller gs) controller resolving)
+    State.modify' (bindAmountSlot resolving source slot answer)
   -- CR 701.26a: turn each named permanent sideways. The victims are enumerated
   -- ONCE (CR 608.2f) and off the board as it stands before any of them is tapped,
   -- so an illegal slot (CR 608.2b), a player recipient and a set that matched
