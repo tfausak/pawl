@@ -6351,9 +6351,40 @@ glacialHalf, volcanicHalf :: CardName.CardName
 glacialHalf = CardName.MkCardName (Text.pack "Synthetic Glacial Half")
 volcanicHalf = CardName.MkCardName (Text.pack "Synthetic Volcanic Half")
 
+-- #435: castableSpells judges every card against one projection and one supply
+-- sweep of the board, where the plain `castable` builds its own per question.
+-- The two must agree on every proposal, whichever branch of `castable` it
+-- reaches: an instant, a fuse split card, a flashback card in the graveyard, a
+-- bestow creature and a morph creature, under Thalia's tax and an anthem, on a
+-- mana base roomy enough for some casts and too tight for others.
+sharedEnumerationSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+sharedEnumerationSpec s registry = Spec.describe s "SharedEnumeration" $ do
+  Spec.it s "#435 castableSpells agrees with the per-card castable on a mixed hand" $ do
+    let named = S.printingOf s registry
+    mountain <- named "Mountain"
+    island <- named "Island"
+    battlefield <- traverse named ["Glorious Anthem", "Thalia, Guardian of Thraben", "Goblin Piker"]
+    hand <- traverse named ["Lightning Bolt", "Wear", "Think Twice", "Nyxborn Rollicker", "Ainok Tracker", "Goblin Piker"]
+    thinkTwice <- named "Think Twice"
+    let place f printings gs = List.foldl' (\g p -> snd (f p S.alice g)) gs printings
+        board lands =
+          (place S.addGraveyardCard [thinkTwice] (place S.addHandCard hand (place S.addPermanent (battlefield <> lands) (Setup.emptyGame S.bothPlayers))))
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        plain gs = filter (\(oid, name, facing) -> Cast.castable S.alice oid name facing gs) (Cast.castProposals S.alice gs)
+        roomy = board (replicate 3 mountain <> replicate 2 island)
+        tight = board [mountain, island]
+    Spec.assertEqWith s "with five lands the shared enumeration offers what the plain one does" (Cast.castableSpells S.alice roomy) (plain roomy)
+    Spec.assertEqWith s "and with two" (Cast.castableSpells S.alice tight) (plain tight)
+    -- The boards discriminate: each offers some casts and refuses others.
+    Spec.assertBool s (not (null (plain tight)) && length (plain tight) < length (plain roomy) && length (plain roomy) < length (Cast.castProposals S.alice roomy)) "some casts are offered and some refused on each board"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
+  sharedEnumerationSpec s registry
   castEngineSpec s registry
   stackSpec s registry
   discardSpec s registry

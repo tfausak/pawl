@@ -1,18 +1,27 @@
 module Pawl.Benchmark where
 
 import qualified Control.Exception as Exception
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Map.Strict as Map.Strict
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Script as Script
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty.Bench as Bench
 
 -- Two players, seeded from the benchmark's argument.
@@ -40,6 +49,38 @@ fighting deck n =
   let players = playersFrom n
    in fst (Engine.runMatchPure Script.fighting (Setup.mirror deck players))
 {-# NOINLINE fighting #-}
+
+-- #435: the first player's precombat main phase with five Mountains, three
+-- Glorious Anthems, `n` of `spell` on the battlefield and `n` more in hand. The
+-- anthems make every projection gather something, which is what an enumeration
+-- building one per card in hand pays for. Both zones are filled by the
+-- hand-written move Pawl.Engine.Setup.createInCommandZone makes.
+anthemBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural -> GameState.GameState
+anthemBoard land anthem spell n =
+  let players = playersFrom 0
+      alice = NonEmpty.head players
+      place zone printing gs0 =
+        let (printingId, gs1) = Game.intern printing gs0
+            (oid, gs2) = Engine.runGamePure Script.declining gs1 (Setup.createCard alice printingId)
+            moved = Game.insertIntoZone zone LibraryPosition.defaultValue alice oid (Game.removeFromZones alice oid gs2)
+         in moved {GameState.objects = Map.Strict.adjust (\o -> o {Object.zone = zone}) oid (GameState.objects moved)}
+      times :: Natural -> (GameState.GameState -> GameState.GameState) -> GameState.GameState -> GameState.GameState
+      times k f = foldr (.) id (List.genericReplicate k f)
+      built = times n (place Zone.Hand spell) (times n (place Zone.Battlefield spell) (times 3 (place Zone.Battlefield anthem) (times 5 (place Zone.Battlefield land) (Setup.emptyGame players))))
+   in built {GameState.phase = Phase.PrecombatMain, GameState.priority = Just alice}
+
+-- How many casts the first player may propose on `anthemBoard`: through
+-- Cast.castableSpells when `shared`, and otherwise card by card through the
+-- plain Cast.castable, which builds its own board per question -- the paired
+-- control.
+castableCount :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural -> Int
+castableCount shared land anthem spell n =
+  let gs = anthemBoard land anthem spell n
+      pid = GameState.activePlayer gs
+   in if shared
+        then length (Cast.castableSpells pid gs)
+        else length (filter (\(oid, name, facing) -> Cast.castable pid oid name facing gs) (Cast.castProposals pid gs))
+{-# NOINLINE castableCount #-}
 
 -- The redDeck recipe (name -> count), loaded from the registry -- the proof
 -- that files -> parse -> a real game works end-to-end.
@@ -217,6 +258,9 @@ main = do
   noAuraDeck <- loadNoAuraDeck registry
   dependentDeck <- loadDependentDeck registry
   independentDeck <- loadIndependentDeck registry
+  mountain <- fetchOrThrow registry "Mountain"
+  anthem <- fetchOrThrow registry "Glorious Anthem"
+  piker <- fetchOrThrow registry "Goblin Piker"
   Bench.defaultMain
     [ Bench.bench "goldfish 2p" $ Bench.whnf (goldfish deck) 0,
       Bench.bench "casting 2p" $ Bench.whnf (casting deck) 0,
@@ -227,5 +271,9 @@ main = do
       Bench.bench "casting 2p dependent" $ Bench.whnf (casting dependentDeck) 0,
       -- The line above's paired control: same 13 cards, no movable layer
       -- (loadIndependentDeck).
-      Bench.bench "casting 2p independent" $ Bench.whnf (casting independentDeck) 0
+      Bench.bench "casting 2p independent" $ Bench.whnf (casting independentDeck) 0,
+      -- #435: every cast of 40 cards in hand over 40 creatures and 3 anthems.
+      Bench.bench "castable 40" $ Bench.whnf (castableCount True mountain anthem piker) 40,
+      -- The line above's paired control: the same question card by card.
+      Bench.bench "castable 40 unshared" $ Bench.whnf (castableCount False mountain anthem piker) 40
     ]
