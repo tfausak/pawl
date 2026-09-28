@@ -13,6 +13,7 @@ import qualified Pawl.Types.LifeLossR as LifeLossR
 import qualified Pawl.Types.MillCountR as MillCountR
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.ProliferateR as ProliferateR
+import qualified Pawl.Types.ScryR as ScryR
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
@@ -197,5 +198,8 @@ data ReplacementEffect card ability effect
   | -- | CR 701.34a / 614.1a: "if you would proliferate, proliferate twice
     -- instead" (Tekuthal, Inquiry Dominus).
     ProliferateR ProliferateR.ProliferateR
+  | -- | CR 701.22a / 614.1a: "if you would scry a number of cards, [...]
+    -- instead" (Kenessos, Priest of Thassa; Eligeth, Crossroads Augur).
+    ScryR ScryR.ScryR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)
