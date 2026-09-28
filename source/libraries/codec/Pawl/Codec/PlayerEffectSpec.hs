@@ -33,6 +33,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RollModifier as RollModifier
@@ -444,6 +445,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (PlayerRef.Relative PlayerRelation.You)))
       " {\"type\":\"PlayLandsFrom\",\"value\":{\"zone\":{\"type\":\"Graveyard\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}}} "
+  -- CR 702.170f / Fblthp, Lost on the Range.
+  Spec.it s "PlotFrom" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.PlotFrom (PlotFromZone.MkPlotFromZone (InZone.MkInZone Zone.Library (PlayerRef.Relative PlayerRelation.You)) (Filter.Not (Filter.HasCardType CardType.Land))))
+      " {\"type\":\"PlotFrom\",\"value\":{\"from\":{\"zone\":{\"type\":\"Library\"},\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}}},\"matching\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   -- CR 118.9 / Omniscience, whose sentence names no quality of the spell.
   Spec.it s "CastFromHandWithoutPayingManaCost, an empty filter" $
     Common.assertCodec

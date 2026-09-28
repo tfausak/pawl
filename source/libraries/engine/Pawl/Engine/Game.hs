@@ -813,8 +813,9 @@ printingOfComponent component = case component of
 --
 -- One reader for the four that asked it separately -- Pawl.Engine.Foretell's
 -- and Pawl.Engine.Plot's cost lookups, and Pawl.Engine.Action's land-play and
--- special-action scans. All four read a card in the hand, which pawl's
--- projection does not reach (#160), so all four go to the printed card.
+-- special-action scans. All four read a card in the hand -- Plot's in the top
+-- of a library too (CR 702.170f), which holds no emblem either -- and pawl's
+-- projection reaches neither zone (#160), so all four go to the printed card.
 cardOfHandMember :: ObjectId -> GameState -> Maybe Card
 cardOfHandMember oid gs = do
   obj <- lookupObject oid gs

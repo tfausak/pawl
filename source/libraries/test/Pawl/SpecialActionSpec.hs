@@ -11,8 +11,9 @@
 -- ONCE for the whole family, see #875; the CR 116.2b, CR 116.2d and CR 116.2m arms
 -- retain priority the same way and are not separately re-asserted.
 --
--- CR 116.2k's plot (Djinn of Fool's Fall) and CR 116.2h's foretell (Augury
--- Raven) are covered here too, each with its own board: the three windows rule
+-- CR 116.2k's plot (Djinn of Fool's Fall, and from a library under CR 702.170f
+-- with Fblthp, Lost on the Range) and CR 116.2h's foretell (Augury Raven) are
+-- covered here too, each with its own board: the three windows rule
 -- 116.2 states -- any priority, the owner's own turn, and sorcery speed -- are
 -- what the groups' offer cases tell apart.
 --
@@ -67,6 +68,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -78,6 +80,8 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
@@ -87,6 +91,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -156,7 +161,7 @@ isPlay action = case action of
   Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
-  Action.Type.Plot _ -> False
+  Action.Type.Plot {} -> False
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
@@ -293,7 +298,7 @@ playing wanted action = case action of
   Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
-  Action.Type.Plot _ -> False
+  Action.Type.Plot {} -> False
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
@@ -312,7 +317,7 @@ casting wanted action = case action of
   Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
-  Action.Type.Plot _ -> False
+  Action.Type.Plot {} -> False
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
@@ -470,6 +475,10 @@ plotBoard island djinn traveler =
           }
       )
 
+-- Djinn of Fool's Fall's printed plot cost, {3}{U}.
+djinnPlotCost :: Cost.Cost Keyword.Keyword
+djinnPlotCost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 3, ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
+
 -- The one exiled card on the board, and the assertion that there is exactly one:
 -- CR 400.7 mints a new object as the card leaves the hand, so no test can name
 -- the exiled incarnation by the id it plotted.
@@ -492,10 +501,10 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
         actions = Action.legalActions S.alice gs
         opponentsTurn = gs {GameState.activePlayer = S.bob}
         stackBusy = snd (S.spellOnStack bolt S.alice gs)
-    Spec.assertBool s (List.elem (Action.Type.Plot djinnId) actions) "the Djinn may be plotted"
-    Spec.assertBool s (List.notElem (Action.Type.Plot travelerId) actions) "the Doomed Traveler may not"
-    Spec.assertBool s (List.notElem (Action.Type.Plot djinnId) (Action.legalActions S.alice opponentsTurn)) "not on an opponent's turn"
-    Spec.assertBool s (List.notElem (Action.Type.Plot djinnId) (Action.legalActions S.alice stackBusy)) "and not with a spell on the stack"
+    Spec.assertBool s (List.elem (Action.Type.Plot djinnId djinnPlotCost) actions) "the Djinn may be plotted"
+    Spec.assertBool s (List.notElem (Action.Type.Plot travelerId djinnPlotCost) actions) "the Doomed Traveler may not"
+    Spec.assertBool s (List.notElem (Action.Type.Plot djinnId djinnPlotCost) (Action.legalActions S.alice opponentsTurn)) "not on an opponent's turn"
+    Spec.assertBool s (List.notElem (Action.Type.Plot djinnId djinnPlotCost) (Action.legalActions S.alice stackBusy)) "and not with a spell on the stack"
   -- CR 702.170a's "and pay [cost]": an action whose cost cannot be paid is not
   -- offered. The pair differs in the mana available and in nothing else -- three
   -- Islands against the four {3}{U} needs.
@@ -506,8 +515,8 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
     let (djinnId, _, gs) = plotBoard island djinn traveler
         (poorId, poor) = case S.addHandCard djinn S.alice (S.landsInPlay island 3) of
           (oid, g) -> (oid, g {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
-    Spec.assertBool s (List.elem (Action.Type.Plot djinnId) (Action.legalActions S.alice gs)) "four Islands pay {3}{U}"
-    Spec.assertBool s (List.notElem (Action.Type.Plot poorId) (Action.legalActions S.alice poor)) "three do not"
+    Spec.assertBool s (List.elem (Action.Type.Plot djinnId djinnPlotCost) (Action.legalActions S.alice gs)) "four Islands pay {3}{U}"
+    Spec.assertBool s (List.notElem (Action.Type.Plot poorId djinnPlotCost) (Action.legalActions S.alice poor)) "three do not"
   -- CR 702.170b: the action does not use the stack. The prompt log is what proves
   -- it -- alice acts and is asked AGAIN before bob is asked anything, so no player
   -- got a window to respond and nothing was put on the stack to respond to. CR
@@ -518,7 +527,7 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
     djinn <- S.printingOf s registry "Djinn of Fool's Fall"
     traveler <- S.printingOf s registry "Doomed Traveler"
     let (djinnId, _, gs) = plotBoard island djinn traveler
-        (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId)) gs Engine.priorityLoop) [] of
+        (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId djinnPlotCost)) gs Engine.priorityLoop) [] of
           ((_, g), log2) -> (log2, g)
     Spec.assertEqWith
       s
@@ -550,7 +559,7 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
     djinn <- S.printingOf s registry "Djinn of Fool's Fall"
     traveler <- S.printingOf s registry "Doomed Traveler"
     let (djinnId, _, gs) = plotBoard island djinn traveler
-        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId)) gs Engine.priorityLoop) [])
+        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId djinnPlotCost)) gs Engine.priorityLoop) [])
         later = after {GameState.turnNumber = GameState.turnNumber after + 1}
         unplotted = later {GameState.objects = Map.map (\o -> o {Object.plotted = Nothing}) (GameState.objects later)}
         -- CR 307.5's window belongs to whoever's turn it is, so bob's case has to
@@ -575,7 +584,7 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
     djinn <- S.printingOf s registry "Djinn of Fool's Fall"
     traveler <- S.printingOf s registry "Doomed Traveler"
     let (djinnId, _, gs) = plotBoard island djinn traveler
-        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId)) gs Engine.priorityLoop) [])
+        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId djinnPlotCost)) gs Engine.priorityLoop) [])
         later = after {GameState.turnNumber = GameState.turnNumber after + 1}
     Monad.forM_ (soleExile after) $ \exiledId -> do
       let resolved = S.runPure S.castAnswer later (S.cast S.alice exiledId >> Stack.resolveTop)
@@ -585,6 +594,148 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
         (S.countOnBattlefieldByName (S.printingName djinn) S.alice resolved)
         1
       Spec.assertEqWith s "and exile is empty" (length (GameState.exile resolved)) 0
+
+-- Fblthp, Lost on the Range (OTJ 48) on alice's battlefield, her precombat main
+-- with the stack empty -- CR 702.170a's window -- and FIVE Islands: enough for the
+-- Djinn of Fool's Fall's {4}{U} mana cost to the last mana, so every case that
+-- pays it leaves nothing untapped.
+--
+-- The library is stocked bottom first, so `top` is the card on top (CR 401.2)
+-- and a second Djinn sits under it. That Djinn is the top-card narrowing's
+-- control: it has plot of its own, so an implementation that opened the whole
+-- library would offer it.
+--
+-- `fblthp` is a Maybe so the paired board without it differs in exactly that.
+fblthpBoard ::
+  Printing.Printing ->
+  Maybe Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+fblthpBoard island fblthp djinn top =
+  let lands = S.landsInPlay island 5
+      withFblthp = case fblthp of
+        Nothing -> lands
+        Just printing -> snd (S.addPermanent printing S.alice lands)
+      (underId, g1) = S.addLibraryCard djinn S.alice withFblthp
+      (topId, g2) = S.addLibraryCard top S.alice g1
+   in ( topId,
+        underId,
+        g2
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Djinn of Fool's Fall's mana cost, {4}{U} -- the plot cost Fblthp grants it.
+djinnManaCost :: Cost.Cost Keyword.Keyword
+djinnManaCost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
+
+-- The plot actions on offer for one card.
+plotsOf :: ObjectId.ObjectId -> [Action.Type.Action] -> [Action.Type.Action]
+plotsOf oid = filter (\action -> case action of Action.Type.Plot target _ -> target == oid; _ -> False)
+
+plottingFromLibrary :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+plottingFromLibrary s registry = Spec.describe s "CR 702.170f Fblthp, Lost on the Range" $ do
+  -- CR 702.170f's plot from the top of a library, and the ruling that a card
+  -- with plot of its own may use either cost. The pair differs only in Fblthp.
+  Spec.it s "the top card may be plotted for its own plot cost or its mana cost" $ do
+    island <- S.printingOf s registry "Island"
+    fblthp <- S.printingOf s registry "Fblthp, Lost on the Range"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    let (topId, underId, gs) = fblthpBoard island (Just fblthp) djinn djinn
+        (bareTopId, _, bare) = fblthpBoard island Nothing djinn djinn
+        actions = Action.legalActions S.alice gs
+    Spec.assertEqWith
+      s
+      "both plot costs are offered for the top card"
+      (plotsOf topId actions)
+      [Action.Type.Plot topId djinnPlotCost, Action.Type.Plot topId djinnManaCost]
+    Spec.assertEqWith s "the card under it is not offered" (plotsOf underId actions) []
+    Spec.assertEqWith s "the control: without Fblthp nothing in the library is" (plotsOf bareTopId (Action.legalActions S.alice bare)) []
+  -- "You may plot NONLAND cards": a land on top is not offered. Twiddle ({U}, no
+  -- plot of its own) is the control on the same board, offered at its mana cost
+  -- -- the granted plot alone.
+  --
+  -- A REGRESSION FENCE for the nonland filter, not a proof of it: the Island's
+  -- granted plot cost is its absent mana cost, unpayable by CR 118.6, so the
+  -- refusal holds without the filter. Only a land with a mana cost can tell the
+  -- two apart -- Scryfall `t:land mv>0 -is:dfc`, 2026-09-28, answers Glade of
+  -- the Pump Spells alone, a playtest card whose "pay {2}{G} to play this land"
+  -- pawl cannot state.
+  Spec.it s "a land on top cannot be plotted, and a nonland card without plot can" $ do
+    island <- S.printingOf s registry "Island"
+    fblthp <- S.printingOf s registry "Fblthp, Lost on the Range"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    twiddle <- S.printingOf s registry "Twiddle"
+    let (landId, _, landTop) = fblthpBoard island (Just fblthp) djinn island
+        (twiddleId, _, twiddleTop) = fblthpBoard island (Just fblthp) djinn twiddle
+        twiddleCost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
+    Spec.assertEqWith s "the Island on top is not offered" (plotsOf landId (Action.legalActions S.alice landTop)) []
+    Spec.assertEqWith s "Twiddle on top is offered at {U}" (plotsOf twiddleId (Action.legalActions S.alice twiddleTop)) [Action.Type.Plot twiddleId twiddleCost]
+  -- CR 702.170a's window is unchanged by CR 702.170f.
+  Spec.it s "only at sorcery speed" $ do
+    island <- S.printingOf s registry "Island"
+    fblthp <- S.printingOf s registry "Fblthp, Lost on the Range"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (topId, _, gs) = fblthpBoard island (Just fblthp) djinn djinn
+        opponentsTurn = gs {GameState.activePlayer = S.bob}
+        stackBusy = snd (S.spellOnStack bolt S.alice gs)
+    Spec.assertEqWith s "not on an opponent's turn" (plotsOf topId (Action.legalActions S.alice opponentsTurn)) []
+    Spec.assertEqWith s "and not with a spell on the stack" (plotsOf topId (Action.legalActions S.alice stackBusy)) []
+  -- The action taken at the GRANTED cost: CR 702.170f's "exiled from the zone it
+  -- is in", CR 702.170b's no stack, and CR 702.170d's free cast a turn later.
+  -- {4}{U} taps all five Islands where the printed {3}{U} would leave one, so the
+  -- tapped count is what says which cost was paid.
+  Spec.it s "CR 702.170f plotting the top card exiles it from the library, and it is cast free later" $ do
+    island <- S.printingOf s registry "Island"
+    fblthp <- S.printingOf s registry "Fblthp, Lost on the Range"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    let (topId, underId, gs) = fblthpBoard island (Just fblthp) djinn djinn
+        (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Plot topId djinnManaCost)) gs Engine.priorityLoop) [] of
+          ((_, g), log2) -> (log2, g)
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+    Spec.assertEqWith
+      s
+      "the exiled card is plotted, stamped with this turn"
+      (soleExile after >>= \oid -> fmap Object.plotted (Game.lookupObject oid after))
+      (Just (Just (GameState.turnNumber after)))
+    Spec.assertEqWith s "the library's top card is now the Djinn that was under it" (Game.zoneMembers Zone.Library S.alice after) [underId]
+    Spec.assertEqWith s "all five Islands paid {4}{U}" (S.tappedCount S.alice after) 5
+    Spec.assertEqWith s "alice acts, alice is asked again, and only then is bob asked" asked [S.alice, S.alice, S.bob]
+    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      Spec.assertBool s (not (S.castable S.alice exiledId after)) "not castable on the turn it became plotted"
+      let resolved = S.runPure S.castAnswer later (S.cast S.alice exiledId >> Stack.resolveTop)
+      Spec.assertEqWith s "CR 702.170d cast free on a later turn, the Djinn is on the battlefield" (S.countOnBattlefieldByName (S.printingName djinn) S.alice resolved) 1
+  -- Plot from a hand is CR 702.170a's alone: Fblthp grants nothing there, so the
+  -- Djinn in hand is offered at {3}{U} and never at its mana cost.
+  Spec.it s "a card in hand keeps its own plot cost only" $ do
+    island <- S.printingOf s registry "Island"
+    fblthp <- S.printingOf s registry "Fblthp, Lost on the Range"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    let (_, _, stocked) = fblthpBoard island (Just fblthp) djinn djinn
+        (handId, gs) = S.addHandCard djinn S.alice stocked
+    Spec.assertEqWith s "the Djinn in hand is offered at {3}{U} alone" (plotsOf handId (Action.legalActions S.alice gs)) [Action.Type.Plot handId djinnPlotCost]
+  -- CR 107.3d: a granted plot cost is a mana cost, and Braingeyser's holds an X
+  -- the player names before paying. The pair differs only in the answer.
+  Spec.it s "CR 107.3d the X in a granted plot cost is the player's to name" $ do
+    island <- S.printingOf s registry "Island"
+    fblthp <- S.printingOf s registry "Fblthp, Lost on the Range"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    braingeyser <- S.printingOf s registry "Braingeyser"
+    let (topId, _, gs) = fblthpBoard island (Just fblthp) djinn braingeyser
+        geyserCost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Variable, ManaSymbol.OfType (ManaType.Colored Color.Blue), ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []
+        naming :: Natural.Natural -> Prompt.Prompt r -> r
+        naming x p = case p of
+          Prompt.ChooseX {} -> x
+          _ -> S.identityAnswer p
+        plottedWith x = S.runPure (naming x) gs (Plot.plot S.manaPerformer S.alice topId geyserCost)
+    Spec.assertEqWith s "X = 1 taps three Islands" (S.tappedCount S.alice (plottedWith 1)) 3
+    Spec.assertEqWith s "X = 3 taps all five" (S.tappedCount S.alice (plottedWith 3)) 5
+    Spec.assertBool s (Maybe.isJust (soleExile (plottedWith 1))) "and the card was plotted"
 
 -- Kellan Joins Up (OTJ 216) {G}{W}{U} Legendary Enchantment, "When Kellan Joins
 -- Up enters, you may exile a nonland card with mana value 3 or less from your
@@ -1811,6 +1962,7 @@ spec s registry = do
   leoninArbiter s registry
   volrathsCurse s registry
   plotting s registry
+  plottingFromLibrary s registry
   makePlotted s registry
   foretelling s registry
   makeForetold s registry
@@ -2140,7 +2292,7 @@ activating wanted action = case action of
   Action.Type.TurnFaceUp {} -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
-  Action.Type.Plot _ -> False
+  Action.Type.Plot {} -> False
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False

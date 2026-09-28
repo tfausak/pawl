@@ -1427,8 +1427,8 @@ priorityLoop = do
                                 loop
                               -- CR 116.2k / 702.170b: a special action too, the
                               -- TurnFaceUp arm's shape.
-                              Action.Type.Plot oid -> do
-                                Plot.plot Resolve.performManaAbility p oid
+                              Action.Type.Plot oid cost -> do
+                                Plot.plot Resolve.performManaAbility p oid cost
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop

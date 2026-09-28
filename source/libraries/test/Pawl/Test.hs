@@ -416,6 +416,7 @@ import qualified Pawl.Codec.PlayerSacrificesSpec
 import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PlayerSpec
 import qualified Pawl.Codec.PlayerStaticAbilitySpec
+import qualified Pawl.Codec.PlotFromZoneSpec
 import qualified Pawl.Codec.PlusSpec
 import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.PowerSpec
@@ -1155,6 +1156,7 @@ spec s registry = do
   Pawl.Codec.PlayerRelationSpec.spec s
   Pawl.Codec.PlayerSacrificesSpec.spec s
   Pawl.Codec.PlayerScopeSpec.spec s
+  Pawl.Codec.PlotFromZoneSpec.spec s
   Pawl.Codec.PlayerSpec.spec s
   Pawl.Codec.PlayerStaticAbilitySpec.spec s
   Pawl.Codec.PlusSpec.spec s

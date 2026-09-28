@@ -15,6 +15,7 @@ import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PlotFromZone as PlotFromZone
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.SpendManaAsThough as SpendManaAsThough
@@ -180,6 +181,9 @@ data PlayerEffect
     -- Pawl.Engine.Cast.pileCandidates states for both halves of Future Sight's
     -- sentence; Pawl.CastPermissionSpec's FutureSight group proves it.
     PlayLandsFrom InZone.InZone
+  | -- | CR 702.170f / Fblthp, Lost on the Range: a matching card in the named
+    -- zone may be plotted from there, for its own plot cost or its mana cost.
+    PlotFrom PlotFromZone.PlotFromZone
   | -- | CR 118.9 / Omniscience: this player may cast a matching spell from their
     -- hand without paying its mana cost.
     --

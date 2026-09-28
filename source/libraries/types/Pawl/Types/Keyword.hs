@@ -771,10 +771,6 @@ data Keyword
     Disguise (Cost.Cost Keyword)
   | -- | 702.170a: plot [cost] -- exile this card from hand for [cost] as CR
     -- 116.2k's special action, then cast it free on a later turn (CR 702.170d).
-    --
-    -- Not implemented: CR 702.170f's plot from a zone other than a hand (Fblthp,
-    -- Lost on the Range), which Pawl.Engine.Plot.canPlot's Zone.Hand test refuses
-    -- (#2091).
     Plot (Cost.Cost Keyword)
   | -- | 702.171a: "Tap any number of other untapped creatures you control with
     -- total power N or greater: This permanent becomes saddled until end of
