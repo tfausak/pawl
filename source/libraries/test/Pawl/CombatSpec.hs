@@ -1265,6 +1265,19 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     Spec.assertEqWith s "two Giants and a Goblin share no type three ways: illegal" (blockable [] piker) (Just False)
     Spec.assertEqWith s "CR 702.73a two Giants and a changeling: legal" (blockable [] changeling) (Just True)
     Spec.assertEqWith s "alice's Goblin is not the defending player's: still illegal" (blockable [piker] piker) (Just False)
+    -- Forest is a land type, not a creature type: a Dryad Arbor beside two
+    -- Forests made creatures (layer 4, withFear's stored-effect posture) holds
+    -- Forest three ways and a creature type only once.
+    arbor <- S.printingOf s registry "Dryad Arbor"
+    forest <- S.printingOf s registry "Forest"
+    let animate oid gs =
+          let (ts, gs1) = Game.freshTimestamp gs
+              eff = ContinuousEffect.MkContinuousEffect oid ts Expiry.AtCleanup (Modification.AddCardType CardType.Creature) (Affected.TheseObjects (Set.singleton oid))
+           in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+    case attacking [graxiplon] [arbor, forest, forest] of
+      (gs, a : _, [b, f1, f2]) ->
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (animate f2 (animate f1 gs)))) "CR 205.3m three creatures sharing only Forest: illegal"
+      _ -> Spec.assertFailure s "fixture should give bob a Dryad Arbor and two Forests"
   -- CR 702.16f: "Attacking creatures with protection can't be blocked by
   -- creatures that have the stated quality." Rule 702.16 stated as CR 509.1b's
   -- pairwise restriction, and the one clause of protection that is already a

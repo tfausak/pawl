@@ -720,17 +720,17 @@ littjaraKinseekersSpec s registry =
       giant <- S.printingOf s registry "Hill Giant"
       piker <- S.printingOf s registry "Goblin Piker"
       island <- S.printingOf s registry "Island"
+      -- The cast object is a new one on the battlefield (CR 400.7), so the
+      -- Kinseekers is found there by name.
       let cast second =
             let placed = List.foldl' (\g p -> snd (S.addPermanent p S.alice g)) (S.landsInPlay island 4) [giant, second]
                 (kid, gs) = S.addHandCard kinseekers S.alice placed
                 ready = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
                 onStack = S.runPure S.identityAnswer ready (S.cast S.alice kid)
-             in (kid, S.runPure S.identityAnswer onStack Engine.priorityLoop)
-          (giantsId, giants) = cast giant
-          (pikerId, pikers) = cast piker
-      Spec.assertEqWith s "with two Giants, three Giants: the trigger put a +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne giantsId giants) 1
-      Spec.assertEqWith s "with a Giant and a Goblin, no type is held three ways: no counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId pikers) 0
-      Spec.assertBool s (S.onBattlefield pikerId pikers) "and the Kinseekers did resolve onto the battlefield"
+             in S.runPure S.identityAnswer onStack Engine.priorityLoop
+          counters after = fmap (\oid -> S.counterOf CounterKind.PlusOnePlusOne oid after) (filter (`S.onBattlefield` after) (S.namedObjects (S.printingName kinseekers) after))
+      Spec.assertEqWith s "with two Giants, three Giants: the trigger put a +1/+1 counter" (counters (cast giant)) [1]
+      Spec.assertEqWith s "with a Giant and a Goblin, no type is held three ways: the Kinseekers entered without one" (counters (cast piker)) [0]
 
 screamingSwarmSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 screamingSwarmSpec s registry =
