@@ -139,6 +139,7 @@ codec cardCodec abilityCodec =
           Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
           Arm.nullary "OpenAttraction" Effect.OpenAttraction,
           Arm.nullary "Planeswalk" Effect.Planeswalk,
+          Arm.nullary "Abandon" Effect.Abandon,
           Arm.nullary "ClaimPrize" Effect.ClaimPrize,
           Arm.nullary "Forage" Effect.Forage,
           Arm.nullary "Populate" Effect.Populate,
@@ -296,6 +297,7 @@ tagOf x = case x of
   Effect.TemptWithTheRing {} -> "TemptWithTheRing"
   Effect.OpenAttraction {} -> "OpenAttraction"
   Effect.Planeswalk {} -> "Planeswalk"
+  Effect.Abandon {} -> "Abandon"
   Effect.ClaimPrize {} -> "ClaimPrize"
   Effect.Forage {} -> "Forage"
   Effect.Populate {} -> "Populate"

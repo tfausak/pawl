@@ -10,6 +10,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Archenemy as Archenemy
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Companion as Companion
@@ -21,6 +22,7 @@ import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Scheme as Scheme
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.Vanguard as Vanguard
 import qualified Pawl.Extra.Natural as Natural
@@ -196,6 +198,7 @@ emptyGame order =
           GameState.command = mempty,
           GameState.attractionDecks = Map.empty,
           GameState.planarDecks = Map.empty,
+          GameState.schemeDecks = Map.empty,
           GameState.stack = [],
           GameState.players = Map.fromList (fmap newPlayer order_),
           -- CR 729.4: nobody is nested inside another game here.
@@ -409,7 +412,7 @@ createDeck pid deck = do
           -- CR 400.11a: the sideboard is recorded on the player for the same
           -- reason and no object is minted for it either. CR 400.11c is what
           -- keeps anything else from reaching these until a card brings one in.
-          Map.adjust (\p -> p {Player.life = startingLife (GameState.settings gs) (length (GameState.turnOrder gs)) (Deck.commander deck) (Vanguard.lifeModifierOf pid gs), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
+          Map.adjust (\p -> p {Player.life = startingLife (GameState.settings gs) (length (GameState.turnOrder gs)) (Deck.commander deck) (Vanguard.lifeModifierOf pid gs + (if Map.null (Deck.schemes deck) then 0 else Archenemy.lifeBonus)), Player.dungeons = Set.fromList dungeonIds, Player.outsideTheGame = Map.fromList sideboardIds}) pid (GameState.players gs)
       }
   -- CR 717.2: the Attraction deck begins in the command zone, and is neither in
   -- the library nor, below, in the starting deck.
@@ -420,6 +423,10 @@ createDeck pid deck = do
   -- in the library.
   planeIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Deck.planes deck))
   Monad.forM_ planeIds (createInPlanarDeck pid)
+  -- CR 904.3 / 904.4: the scheme deck, likewise.
+  schemeIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.schemes deck))
+  Monad.forM_ schemeIds $ \(printingId, n) ->
+    Monad.replicateM_ (Natural.toIntSaturating n) (createInSchemeDeck pid printingId)
   cardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.cards deck))
   Monad.forM_ cardIds $ \(printingId, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
@@ -503,6 +510,18 @@ createInPlanarDeck pid printingId = do
             GameState.planarDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.planarDecks moved)
           }
 
+-- CR 904.3: mint one of this player's scheme cards onto the bottom of their
+-- scheme deck, createInPlanarDeck's move and for its reason.
+createInSchemeDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
+createInSchemeDeck pid printingId = do
+  oid <- createCard pid printingId
+  State.modify' $ \gs ->
+    let moved = Game.removeFromZones pid oid gs
+     in moved
+          { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
+            GameState.schemeDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.schemeDecks moved)
+          }
+
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
   -- CR 103.3: build and shuffle every library before any opening hand is drawn,
@@ -514,6 +533,8 @@ newGame perform matchup = do
     Event.shuffleAttractionDeck pid
     -- CR 901.3 / 103.3a.
     Planechase.shufflePlanarDeck pid
+    -- CR 904.3 / 103.3a.
+    Archenemy.shuffleSchemeDeck pid
   -- CR 103.2b: the companion reveal round, after every starting deck is recorded
   -- (CR 103.2a, createDeck above) and before CR 103.5's opening hands -- rule
   -- 103.2's steps come first, and rule 702.139b's condition reads the deck rather
@@ -626,12 +647,13 @@ startGameFromCards perform exemptions = do
       -- cannot be forgotten on one path and reset on the other.
       toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
       toCommandCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Command}
-      -- CR 311.2 / 312.2: a plane or phenomenon card never leaves the command
-      -- zone, so each stays where it is, in its planar deck or face up.
+      -- CR 311.2 / 312.2 / 314.2: a plane, phenomenon or scheme card never
+      -- leaves the command zone, so each stays where it is, in its deck or face
+      -- up.
       --
       -- Not implemented: CR 103.7's starting plane for the new game (#4313).
-      planar = Set.union (Set.fromList (foldMap Foldable.toList (GameState.planarDecks gs))) (Set.filter (`Plane.isPlanarCard` gs) (GameState.command gs))
-      rebuilt = Map.filter isCard (Map.withoutKeys (GameState.objects gs) (Set.union exempt planar))
+      heldInCommand = Set.unions [Set.fromList (foldMap Foldable.toList (GameState.planarDecks gs)), Set.fromList (foldMap Foldable.toList (GameState.schemeDecks gs)), Set.filter (\oid -> Plane.isPlanarCard oid gs || Scheme.isScheme oid gs) (GameState.command gs)]
+      rebuilt = Map.filter isCard (Map.withoutKeys (GameState.objects gs) (Set.union exempt heldInCommand))
       -- CR 903.6: "each player puts their commander from their deck face up into
       -- the command zone". Both callers start a new game following rule 103 (CR
       -- 727.1, CR 729.2), so rule 903.6 applies to each of them, and CR 729.2c
@@ -677,7 +699,7 @@ startGameFromCards perform exemptions = do
       attractionDeckOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) attractionCards))
   State.put
     gs
-      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) (Set.union exempt planar), cards, commandZoneCards, attractionCards],
+      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) (Set.union exempt heldInCommand), cards, commandZoneCards, attractionCards],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) owners)),
         GameState.hand = Map.empty,
@@ -685,7 +707,7 @@ startGameFromCards perform exemptions = do
         GameState.battlefield = mempty,
         GameState.phasedOut = mempty,
         GameState.exile = exempt,
-        GameState.command = Set.union inCommandIds (Set.intersection planar (GameState.command gs)),
+        GameState.command = Set.union inCommandIds (Set.intersection heldInCommand (GameState.command gs)),
         GameState.stack = []
       }
   Monad.forM_ owners Event.shuffleLibrary
@@ -818,7 +840,7 @@ restartGame perform exempt starter = do
             -- CR 902.4: the modifier is read off `gs`, the board the restart
             -- starts from, where CR 313.2 has kept every vanguard card since the
             -- game began -- and startGameFromCards leaves it there.
-            GameState.players = resetPlayers (GameState.settings gs) (length order) (\pid -> Vanguard.lifeModifierOf pid gs) (GameState.players gs),
+            GameState.players = resetPlayers (GameState.settings gs) (length order) (\pid -> Vanguard.lifeModifierOf pid gs + (if Archenemy.isArchenemy pid gs then Archenemy.lifeBonus else 0)) (GameState.players gs),
             GameState.manaPool = Map.empty,
             GameState.combat = Combat.emptyCombat,
             GameState.events = Seq.empty,
@@ -955,9 +977,10 @@ subgameStateFrom starter parent =
       -- cards in a main-game zone are moved" -- and their remaining sibling has no
       -- format here but one: CR 729.2a's supplementary decks of nontraditional
       -- cards are the Attraction deck (`attrIds` below), and the planar and
-      -- scheme (#935) decks CR 100.2d names.
+      -- scheme decks CR 100.2d names.
       --
-      -- Not implemented: the planar deck moving into the subgame (#4313).
+      -- Not implemented: the planar deck (#4313) and the scheme deck (#4316)
+      -- moving into the subgame.
       --
       -- The other command-zone residents pawl DOES have -- an emblem, a
       -- conspiracy, and a dungeon a player has ventured into -- stay in the

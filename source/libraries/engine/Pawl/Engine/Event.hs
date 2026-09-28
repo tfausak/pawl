@@ -667,6 +667,7 @@ damageOf event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -751,6 +752,7 @@ revealOf event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -8276,6 +8278,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
+  TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerOpensAttraction _ -> False
   TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
@@ -8840,6 +8843,7 @@ abilityTriggeredOf event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing

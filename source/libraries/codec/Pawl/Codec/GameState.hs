@@ -119,6 +119,7 @@ codec resolve = Fields.object $ do
   command <- Fields.defaulted "command" Set.empty (Common.set ObjectId.codec) GameState.command
   attractionDecks <- Fields.defaulted "attractionDecks" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.attractionDecks
   planarDecks <- Fields.defaulted "planarDecks" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.planarDecks
+  schemeDecks <- Fields.defaulted "schemeDecks" Map.empty (Common.naturalMap PlayerId.codec (Common.seq ObjectId.codec)) GameState.schemeDecks
   stack <- Fields.defaulted "stack" [] (Common.list ObjectId.codec) GameState.stack
   players <- Fields.required "players" (Common.naturalMap PlayerId.codec Player.codec) GameState.players
   outsideObjects <- Fields.defaulted "outsideObjects" Map.empty (Common.naturalMap ObjectId.codec OutsideObject.codec) GameState.outsideObjects
@@ -217,6 +218,7 @@ codec resolve = Fields.object $ do
         GameState.command = command,
         GameState.attractionDecks = attractionDecks,
         GameState.planarDecks = planarDecks,
+        GameState.schemeDecks = schemeDecks,
         GameState.stack = stack,
         GameState.players = players,
         GameState.outsideObjects = outsideObjects,

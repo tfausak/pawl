@@ -1,0 +1,134 @@
+-- | CR 904, the Archenemy variant: the scheme deck, CR 701.32's set in motion
+-- (CR 703.4e's turn-based action), CR 701.33's abandon, and CR 704.6e's
+-- state-based action for schemes, which CR 205.4h's ongoing schemes are exempt
+-- from.
+--
+-- No GameSettings field, Pawl.Engine.Vanguard's posture: every rule here is
+-- stated of the archenemy's scheme deck or a scheme card, so a player who
+-- brought a scheme deck is an archenemy (isArchenemy). CR 904.12b's Supervillain
+-- Rumble, where every player is one, is that same reading.
+--
+-- WHAT IS NOT IMPLEMENTED:
+--
+--   * CR 904.2's team structure and CR 904.6's first turn, which are the
+--     caller's settings and turn order (#4315).
+--   * CR 904.13's Archenemy Commander option (#4315).
+--   * The scheme deck into a subgame (#4316).
+--   * An effect that stops schemes being set in motion for a turn (#4318).
+module Pawl.Engine.Archenemy where
+
+import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
+import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Trigger as Trigger
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Scheme as Scheme
+import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
+
+-- | CR 904.3: this player's scheme deck, top first.
+deckOf :: PlayerId -> GameState -> [ObjectId]
+deckOf pid gs = foldMap Foldable.toList (Map.lookup pid (GameState.schemeDecks gs))
+
+-- | CR 904.2a / 904.12b: is this player an archenemy? They brought a scheme
+-- deck.
+isArchenemy :: PlayerId -> GameState -> Bool
+isArchenemy pid gs = Map.member pid (GameState.schemeDecks gs)
+
+-- | CR 904.5: the archenemy starts at 40 life where every other player starts
+-- at 20, so 20 more.
+lifeBonus :: Integer
+lifeBonus = 20
+
+-- | CR 314.4: the face-up scheme cards.
+faceUp :: GameState -> [ObjectId]
+faceUp gs = filter (`Scheme.isScheme` gs) (Set.toAscList (GameState.command gs))
+
+-- | CR 103.3a: shuffle this player's scheme deck.
+shuffleSchemeDeck :: PlayerId -> Game ()
+shuffleSchemeDeck pid = do
+  gs <- State.get
+  let ids = deckOf pid gs
+  Monad.unless (null ids) $ do
+    answer <- Game.ask (Prompt.Shuffle ids)
+    let shuffled = Game.honourShuffle ids answer
+    State.modify' (\g -> g {GameState.schemeDecks = Map.insert pid (Seq.fromList shuffled) (GameState.schemeDecks g)})
+
+-- | CR 701.32b / 904.9: move the top card of this archenemy's scheme deck off it
+-- and turn it face up, which is joining GameState.command. The event is what
+-- CR 904.9's "When you set this scheme in motion" triggers on. A fresh
+-- timestamp, Pawl.Engine.Planechase.turnUpTop's reason.
+setInMotion :: PlayerId -> Game ()
+setInMotion pid = do
+  gs <- State.get
+  case deckOf pid gs of
+    [] -> pure ()
+    top : rest -> do
+      ts <- State.state Game.freshTimestamp
+      State.modify' $ \g ->
+        Event.recordEvent
+          (GameEvent.SchemeSetInMotion (SchemeSetInMotion.MkSchemeSetInMotion pid top))
+          g
+            { GameState.schemeDecks = Map.insert pid (Seq.fromList rest) (GameState.schemeDecks g),
+              GameState.command = Set.insert top (GameState.command g),
+              GameState.objects = Map.adjust (\o -> o {Object.timestamp = ts}) top (GameState.objects g)
+            }
+
+-- | CR 701.33a: may this scheme be abandoned? Only a face-up ongoing one.
+canAbandon :: ObjectId -> GameState -> Bool
+canAbandon oid gs = Set.member oid (GameState.command gs) && Scheme.isScheme oid gs && Scheme.isOngoing oid gs
+
+-- | CR 701.33b: turn this scheme face down and put it on the bottom of its
+-- owner's scheme deck. Nothing for one CR 701.33a does not allow.
+abandon :: ObjectId -> Game ()
+abandon oid = do
+  gs <- State.get
+  Monad.when (canAbandon oid gs) (State.modify' (toBottom oid))
+
+-- | CR 701.33b / 704.6e: a face-up scheme goes to the bottom of its owner's
+-- scheme deck, face down. The same object: unlike a plane (CR 311.6), no rule
+-- makes a scheme turned face down a new one.
+toBottom :: ObjectId -> GameState -> GameState
+toBottom oid gs = case Game.lookupObject oid gs of
+  Nothing -> gs
+  Just obj ->
+    gs
+      { GameState.command = Set.delete oid (GameState.command gs),
+        GameState.schemeDecks = Map.insertWith (flip (Seq.><)) (Object.owner obj) (Seq.singleton oid) (GameState.schemeDecks gs)
+      }
+
+-- | CR 704.6e / 314.6: the face-up non-ongoing schemes to put on the bottom of
+-- their decks, when no triggered ability of any scheme is on the stack or
+-- waiting to be put on it. CR 205.4h exempts an ongoing scheme.
+--
+-- "Waiting" is asked of the trigger gather itself, over the events this settle
+-- has not scanned, Pawl.Engine.Dungeon.finished's reason: this pass runs before
+-- Engine.placePendingTriggers, so an ability triggered on such an event is in
+-- no stack and no batch yet.
+abandonedBySba :: GameState -> [ObjectId]
+abandonedBySba gs =
+  let spent = filter (\oid -> not (Scheme.isOngoing oid gs)) (faceUp gs)
+      schemeOnStack = any fromScheme (GameState.stack gs)
+      fromScheme stacked = case fmap Object.source (Game.lookupObject stacked gs) of
+        Just (Source.OfTrigger triggered) -> Scheme.isScheme (TriggeredAbilitySource.source triggered) gs
+        _ -> False
+      waiting = any pendingFromScheme (Trigger.eventTriggers (Event.unscannedGrouped gs) gs)
+      pendingFromScheme pending = case PendingTrigger.source pending of
+        TriggerSource.OfObject oid -> Scheme.isScheme oid gs
+        TriggerSource.Sourceless -> False
+   in if null spent || schemeOnStack || waiting then [] else spent

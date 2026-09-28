@@ -15,6 +15,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Archenemy as Archenemy
 import qualified Pawl.Engine.Attraction as Attraction
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
@@ -540,6 +541,10 @@ runTurnBasedActions phase = do
     -- CR 800.4j guard. Then CR 703.4g / 717.4's roll to visit, by each of those
     -- players who controls an Attraction.
     Phase.PrecombatMain -> do
+      -- CR 703.4e / 904.9: first, each archenemy sets a scheme in motion.
+      Monad.forM_ live $ \pid -> do
+        archenemy <- State.gets (Archenemy.isArchenemy pid)
+        Monad.when archenemy (Archenemy.setInMotion pid)
       Monad.mapM_ advanceSagas live
       Monad.forM_ live $ \pid -> do
         visits <- State.gets (Attraction.controlsAttraction pid)
@@ -2069,10 +2074,10 @@ playGame =
 -- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders and
 -- vanguards are the kinds Setup carries both ways, dungeons ride
 -- Player.dungeons rather than the command zone, and a conspiracy stays in the
--- main game, which is CR 729.2's "no other cards ... are moved"; schemes (#935)
--- do not exist.
+-- main game, which is CR 729.2's "no other cards ... are moved".
 --
--- Not implemented: CR 729.2a's planar deck moving into the subgame (#4313).
+-- Not implemented: CR 729.2a's planar deck (#4313) and scheme deck (#4316)
+-- moving into the subgame.
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get

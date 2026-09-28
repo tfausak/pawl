@@ -7,6 +7,7 @@ import qualified Pawl.ActivateSpec
 import qualified Pawl.ActivationProhibitionSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AirbendSpec
+import qualified Pawl.ArchenemySpec
 import qualified Pawl.AttackKeywordTriggerSpec
 import qualified Pawl.AttractionSpec
 import qualified Pawl.AuraSpec
@@ -463,6 +464,7 @@ import qualified Pawl.Codec.SacrificeSpec
 import qualified Pawl.Codec.SacrificerSpec
 import qualified Pawl.Codec.SaddlingSpec
 import qualified Pawl.Codec.ScalingSpec
+import qualified Pawl.Codec.SchemeSetInMotionSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SearchSpec
@@ -793,6 +795,7 @@ spec s registry = do
   Pawl.Codec.AttackOptionSpec.spec s
   Pawl.Codec.PlanarDieFaceSpec.spec s
   Pawl.Codec.PlanarDieRolledSpec.spec s
+  Pawl.Codec.SchemeSetInMotionSpec.spec s
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.AttackTargetKindSpec.spec s
   Pawl.Codec.AttackTargetSpec.spec s
@@ -1440,6 +1443,7 @@ spec s registry = do
   Pawl.Uri.FragmentSpec.spec s
   Pawl.VanguardSpec.spec s registry
   Pawl.PlanechaseSpec.spec s registry
+  Pawl.ArchenemySpec.spec s registry
   Pawl.VariableEffectSpec.spec s registry
   Pawl.VoteSpec.spec s registry
   Pawl.ZoneChangeSpec.spec s registry
