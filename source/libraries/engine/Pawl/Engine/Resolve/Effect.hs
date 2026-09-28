@@ -9583,6 +9583,7 @@ expandGrant resolving source gs modification = case modification of
           <> [Modification.GainAbility (GrantedAbility.Rules (PC.ruleAbilities pc)) | PC.ruleAbilities pc /= mempty]
           <> fmap (Modification.GainAbility . GrantedAbility.Replacement) (PC.replacementEffects pc)
           <> fmap (Modification.GainAbility . GrantedAbility.Player) (PC.playerAbilities pc)
+          <> fmap (Modification.GainAbility . GrantedAbility.SelfCostReduction) (PC.costReductions pc)
   _ -> [modification]
 
 -- The no-subgame executor (the ability path and every direct caller): a

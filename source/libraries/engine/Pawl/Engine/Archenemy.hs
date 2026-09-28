@@ -13,7 +13,6 @@
 --   * CR 904.2's team structure and CR 904.6's first turn, which are the
 --     caller's settings and turn order (#4315).
 --   * CR 904.13's Archenemy Commander option (#4315).
---   * The scheme deck into a subgame (#4316).
 --   * An effect that stops schemes being set in motion for a turn (#4318).
 module Pawl.Engine.Archenemy where
 

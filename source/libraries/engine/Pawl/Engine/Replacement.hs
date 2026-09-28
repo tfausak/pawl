@@ -2479,6 +2479,11 @@ applyCopyException this own snapshot exception = case exception of
     -- `except ... has "You`, no hit).
     GrantedAbility.Player player ->
       snapshot {PC.playerAbilities = PC.playerAbilities snapshot <> [player]}
+    -- Into the COPIABLE list, the Static arm's reason. A regression fence: no
+    -- copy exception grants one (MTGJSON 2026-08-23, `except ... has "This
+    -- spell costs`, no hit).
+    GrantedAbility.SelfCostReduction reduction ->
+      snapshot {PC.costReductions = PC.costReductions snapshot <> [reduction]}
   -- CR 707.9b / 205.1b: "in addition to its other types", so a UNION over the
   -- copied type line rather than the replacement CR 205.1a's own sentence would
   -- make. Phyrexian Metamorph copying a Goblin Piker is an artifact creature.

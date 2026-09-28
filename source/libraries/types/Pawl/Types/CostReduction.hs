@@ -8,7 +8,9 @@ import qualified Pawl.Types.Quantity as Quantity
 -- Thrasta, Tempest's Roar's "This spell costs {3} less to cast for each other
 -- spell cast this turn".
 --
--- A face may print that sentence out (Face.costReductions) or state it as a
+-- A face may print that sentence out (Face.costReductions), an effect may grant
+-- it (Pawl.Types.GrantedAbility.SelfCostReduction, Richlau, Headmaster), or a
+-- face may state it as a
 -- rule-702 keyword, which Pawl.Engine.Keyword.selfCostReductionsOf mints into
 -- this type: CR 702.41a's affinity and CR 702.125a's undaunted are the two, and
 -- neither reaches this type through a card's own text beyond affinity's quality.
@@ -22,10 +24,11 @@ import qualified Pawl.Types.Quantity as Quantity
 -- spells to match against, because the only spell it reduces is the one it is
 -- printed on, and it carries a Quantity where that one carries a literal amount.
 --
--- Read straight off the card, or its copy stamp (Pawl.Engine.Game.castingFaceOf),
--- by Pawl.Engine.Cost.selfReductions and NOT through the projection: the
--- ability is consulted while the object is in a hand or on the stack, where
--- this reader takes the printed card (#1859). CR 113.6d is the rule that makes
+-- A printed one is read straight off the card, or its copy stamp
+-- (Pawl.Engine.Game.castingFaceOf), by Pawl.Engine.Cost.selfReductions and NOT
+-- through the projection: the ability is consulted while the object is in a
+-- hand or on the stack, where this reader takes the printed card (#1859). A
+-- granted one is read off the projection. CR 113.6d is the rule that makes
 -- an ability modifying what its own object costs to cast function on the stack.
 data CostReduction = MkCostReduction
   { -- | What ONE of the things counted takes off -- Thrasta's {3}.
