@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -56,12 +57,14 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
@@ -3027,10 +3030,123 @@ exchangeZonesSpec s registry = Spec.describe s "ExchangeZones" $ do
       (sortedIn Zone.Library S.alice after, namesIn Zone.Graveyard S.alice after, namesIn Zone.Library S.bob after, namesIn Zone.Graveyard S.bob after)
       (List.sort [nameOf elves, nameOf growth], [nameOf shift], [nameOf island], [nameOf swamp])
 
+-- CR 107.1c / 701.9b: "discard any number of" matching cards -- the discarding
+-- player picks the subset, none included, out of the matching cards in their own
+-- hand (Pawl.Types.Discard's AnyNumber arm), and what moved is bound for the
+-- rest of the resolution to count.
+--
+-- A test-local answerer rather than the Board harness, whose vocabulary has no
+-- resolution-time subset choice: each leg pins the subset by position in the
+-- offer, so a fallback that happened to agree cannot answer for the engine.
+anyNumberDiscardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+anyNumberDiscardSpec s registry =
+  let -- Cast the card and run the priority loop out under one answerer, keeping
+      -- every response so "never asked" and "asked, answered nothing" differ.
+      runCast :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, [Response.Response])
+      runCast answer (withSpell, spell) =
+        let ((_, afterCast), castResponses) = Replay.record answer withSpell (S.cast S.alice spell)
+            ((_, after), loopResponses) = Replay.record answer afterCast Engine.priorityLoop
+         in (after, castResponses <> loopResponses)
+      -- Accepts every printed "may" and discards the offered cards `pick` keeps.
+      discarding :: ([ObjectId.ObjectId] -> [ObjectId.ObjectId]) -> (forall q. Prompt.Prompt q -> q) -> Prompt.Prompt r -> r
+      discarding pick fallback p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseAnyNumberToDiscard _ _ _ offered _ -> Set.fromList (pick offered)
+        _ -> fallback p
+      -- The rest of alice's hand, added AFTER S.handOne, which replaces it.
+      withHand fill (gs, spell) = (fill gs, spell)
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      onBattlefield name gs = List.find (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just name) (Set.toList (GameState.battlefield gs))
+      -- Aims the reflexive trigger at the one creature named, FILTERING the offer.
+      atWall :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      atWall wallId p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter (\r -> Recipient.objectOf r == Just wallId) offered) sets
+        _ -> S.identityAnswer p
+      askedForTargets :: [Response.Response] -> Bool
+      askedForTargets = any (\r -> case r of Response.ChoseTargets _ -> True; _ -> False)
+      sortedNames zone pid gs = List.sort (namesIn zone pid gs)
+   in Spec.describe s "CR 107.1c discard any number of cards" $ do
+        -- Borborygmos and Fblthp {2}{G}{U}{R}: "whenever Borborygmos and Fblthp
+        -- enters or attacks, draw a card, then you may discard any number of land
+        -- cards. When you discard one or more cards this way, Borborygmos and
+        -- Fblthp deals twice that much damage to target creature."
+        --
+        -- alice holds three Mountains and a Goblin Piker and draws a Piker, so the
+        -- offer is the three lands alone; bob's Wall of Stone is a 0/8, alive
+        -- under every amount below, so its marked damage IS the reading. Three
+        -- legs over one board, differing only in the subset: all three lands, one,
+        -- none. Twice three and twice one separate the count from a literal and
+        -- from the Times; none is CR 603.12's "when you discard one or more"
+        -- staying unarmed.
+        let borborygmosBoard = do
+              borborygmos <- S.printingOf s registry "Borborygmos and Fblthp"
+              forest <- S.printingOf s registry "Forest"
+              island <- S.printingOf s registry "Island"
+              mountain <- S.printingOf s registry "Mountain"
+              swamp <- S.printingOf s registry "Swamp"
+              piker <- S.printingOf s registry "Goblin Piker"
+              wall <- S.printingOf s registry "Wall of Stone"
+              let lands = List.foldl' (\g land -> snd (S.addPermanent land S.alice g)) (Setup.emptyGame S.bothPlayers) [forest, island, mountain, swamp, swamp]
+                  (wallId, withWall) = S.addPermanent wall S.bob lands
+                  staged = withHand (handCards piker S.alice 1 . handCards mountain S.alice 3) (S.handOne borborygmos (stockLibrary piker S.alice 3 withWall))
+              pure (wallId, staged, S.printingName mountain, S.printingName piker)
+        Spec.it s "CR 603.12 Borborygmos and Fblthp deals twice the lands discarded to the target" $ do
+          (wallId, staged, mountain, piker) <- borborygmosBoard
+          let (after, _) = runCast (discarding id (atWall wallId)) staged
+          Spec.assertEqWith s "the wall took twice three" (fmap Object.damage (Game.lookupObject wallId after)) (Just 6)
+          Spec.assertEqWith s "every land in hand was discarded" (sortedNames Zone.Graveyard S.alice after) (replicate 3 (Just mountain))
+          Spec.assertEqWith s "and the pikers were never offered" (sortedNames Zone.Hand S.alice after) (replicate 2 (Just piker))
+        Spec.it s "CR 107.1c Borborygmos and Fblthp discards only the chosen subset" $ do
+          (wallId, staged, mountain, piker) <- borborygmosBoard
+          let (after, _) = runCast (discarding (take 1) (atWall wallId)) staged
+          Spec.assertEqWith s "the wall took twice one" (fmap Object.damage (Game.lookupObject wallId after)) (Just 2)
+          Spec.assertEqWith s "one land discarded" (sortedNames Zone.Graveyard S.alice after) [Just mountain]
+          Spec.assertEqWith s "the other two kept" (sortedNames Zone.Hand S.alice after) [Just piker, Just piker, Just mountain, Just mountain]
+        Spec.it s "CR 603.12 Borborygmos and Fblthp discarding none arms no reflexive trigger" $ do
+          (wallId, staged, _, _) <- borborygmosBoard
+          let (after, responses) = runCast (discarding (const []) (atWall wallId)) staged
+          Spec.assertEqWith s "the wall took nothing" (fmap Object.damage (Game.lookupObject wallId after)) (Just 0)
+          Spec.assertBool s (not (askedForTargets responses)) "and no reflexive trigger asked for a target"
+          Spec.assertEqWith s "nothing discarded" (namesIn Zone.Graveyard S.alice after) []
+          Spec.assertBool s (any (\r -> case r of Response.ChoseAnyNumberToDiscard _ -> True; _ -> False) responses) "though the choice was put to alice"
+        -- Nantuko Cultivator {3}{G}: "when this creature enters, you may discard
+        -- any number of land cards. Put that many +1/+1 counters on this creature
+        -- and draw that many cards." Two of three lands, so "that many" is
+        -- neither the hand nor the offer.
+        Spec.it s "CR 107.1c Nantuko Cultivator counts and draws the lands discarded" $ do
+          cultivator <- S.printingOf s registry "Nantuko Cultivator"
+          forest <- S.printingOf s registry "Forest"
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let lands = List.foldl' (\g land -> snd (S.addPermanent land S.alice g)) (Setup.emptyGame S.bothPlayers) [forest, swamp, swamp, swamp]
+              staged = withHand (handCards mountain S.alice 3) (S.handOne cultivator (stockLibrary piker S.alice 3 lands))
+              (after, _) = runCast (discarding (take 2) S.identityAnswer) staged
+              cultivatorId = onBattlefield (S.printingName cultivator) after
+          Spec.assertEqWith s "two counters" (cultivatorId >>= \oid -> countersOn oid after) (Just 2)
+          Spec.assertEqWith s "two cards drawn beside the kept land" (sortedNames Zone.Hand S.alice after) [Just (S.printingName piker), Just (S.printingName piker), Just (S.printingName mountain)]
+          Spec.assertEqWith s "two lands discarded" (namesIn Zone.Graveyard S.alice after) (replicate 2 (Just (S.printingName mountain)))
+        -- Mind Maggots {3}{B}: "when this creature enters, discard any number of
+        -- creature cards. For each card discarded this way, put two +1/+1
+        -- counters on this creature." Every offered card taken, so the land in
+        -- hand staying put is the filter's doing.
+        Spec.it s "CR 107.1c Mind Maggots offers only creature cards and puts two counters per discard" $ do
+          maggots <- S.printingOf s registry "Mind Maggots"
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let staged = withHand (handCards mountain S.alice 1 . handCards piker S.alice 2) (S.handOne maggots (S.landsInPlay swamp 4))
+              (after, _) = runCast (discarding id S.identityAnswer) staged
+              maggotsId = onBattlefield (S.printingName maggots) after
+          Spec.assertEqWith s "four counters" (maggotsId >>= \oid -> countersOn oid after) (Just 4)
+          Spec.assertEqWith s "both creature cards discarded" (namesIn Zone.Graveyard S.alice after) (replicate 2 (Just (S.printingName piker)))
+          Spec.assertEqWith s "the land kept" (namesIn Zone.Hand S.alice after) [Just (S.printingName mountain)]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
   discardExceptionsSpec s registry
+  anyNumberDiscardSpec s registry
   elkinLairSpec s registry
   castTheCardSpec s registry
   nextUpkeepSpec s registry

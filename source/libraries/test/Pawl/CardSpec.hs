@@ -67,6 +67,7 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
@@ -1244,6 +1245,7 @@ ownCounts effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> quantityCounts quantity
     Discard.These {} -> []
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> foldMap quantityCounts atMost
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
@@ -5643,6 +5645,9 @@ effectFilters effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> frame Unframed (quantityFilters quantity)
     Discard.These ref -> frame SourceHostFramed (objectRefFilters ref)
+    -- The card filter is a position a card author writes -- Borborygmos and
+    -- Fblthp's "land" -- read as ObjectRef.AnyNumberMatching's is.
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ (AnyNumberMatching.MkAnyNumberMatching f atMost) _) -> unframed [f] <> frame Unframed (foldMap quantityFilters atMost)
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> frame LifeLossAmountFramed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> frame Unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
