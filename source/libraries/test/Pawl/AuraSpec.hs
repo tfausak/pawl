@@ -4739,7 +4739,7 @@ groupAttachSpec s registry =
               (angel, entered) = S.entersWithTrigger blademaster S.alice (S.attach strength carrier g5)
               answer :: Prompt.Prompt r -> r
               answer p = case p of
-                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered -> Set.fromList (filter (/= left) offered)
+                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered _ -> Set.fromList (filter (/= left) offered)
                 _ -> S.identityAnswer p
               after = S.runPure answer (settle answer entered) Stack.resolveTop
           Spec.assertEqWith s "Unholy Strength and Bonesplitter are on the Blademaster" (hostOf strength after, hostOf split after) (Just angel, Just angel)
@@ -4764,7 +4764,7 @@ groupAttachSpec s registry =
               answer :: Prompt.Prompt r -> r
               answer p = case p of
                 Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just carrier) . Recipient.objectOf) . snd) sets
-                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered -> Set.fromList offered
+                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered _ -> Set.fromList offered
                 _ -> S.identityAnswer p
               after = S.runPure answer (settle answer staged) Stack.resolveTop
           Spec.assertEqWith s "both Equipment are on the Piker" (hostOf split after, hostOf worn after) (Just carrier, Just carrier)
@@ -4904,7 +4904,7 @@ groupAttachCardsSpec s registry =
               answer p = case p of
                 Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just hitter) . Recipient.objectOf) . snd) sets
                 Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered -> Set.fromList (filter (/= left) offered)
+                Prompt.ChooseAnyNumberOfPermanents _ _ _ offered _ -> Set.fromList (filter (/= left) offered)
                 _ -> S.identityAnswer p
               run attacking =
                 let combat = GameState.combat g5

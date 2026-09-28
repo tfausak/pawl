@@ -67,6 +67,7 @@ import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -3752,7 +3753,7 @@ objectRefFilters ref = case ref of
   -- Tovolar's "any number of Human Werewolves you control": EachMatching's
   -- Filter position exactly -- same zone, same sweep, the chooser standing
   -- between the matches and the set -- so it is framed the same way.
-  ObjectRef.AnyNumberMatching f -> unframed [f]
+  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching f _) -> unframed [f]
   -- The Garrison in Hanweir Battlements' "If you both own and control this land
   -- and a creature named Hanweir Garrison": the arm above's Filter position, one
   -- permanent instead of a subset, so it is framed the same way -- and the

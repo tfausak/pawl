@@ -573,7 +573,7 @@ afterOneCast gs = gs {GameState.castsLastTurn = Map.singleton S.alice 1}
 -- CHOOSER said, so the fixture has to say it.
 namingAll :: Prompt.Prompt r -> r
 namingAll p = case p of
-  Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates -> Set.fromList candidates
+  Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates _ -> Set.fromList candidates
   _ -> S.identityAnswer p
 
 -- Names nothing, the empty answer CR 608.2d admits.

@@ -118,7 +118,8 @@ data TriggerCondition
     -- narrowed to Pawl.Types.DiscardCause.ToPayCyclingCost by CR 702.29a.
     PlayerCycles PlayerRelation.PlayerRelation
   | -- | CR 121.1: "whenever [a player] draws their Nth card each turn" (Erudite
-    -- Wizard), by equality on the ordinal the event carries.
+    -- Wizard), by equality on the ordinal the event carries; without an ordinal,
+    -- "whenever [a player] draws a card" (Teferi, Hero of Dominaria's emblem).
     PlayerDrawsNthCard PlayerDrawsNthCard.PlayerDrawsNthCard
   | -- | CR 508.3a: "whenever [a creature] attacks" (Hanweir Garrison).
     -- Self-scoped; the TriggerFrequency is Aurelia, the Warleader's "for the

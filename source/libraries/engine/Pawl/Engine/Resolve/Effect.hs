@@ -103,6 +103,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
@@ -722,7 +723,7 @@ attachTogether movers recipient = do
 -- The permanents an ObjectRef names, for an instruction that acts on them
 -- together: the one ref that is a CR 608.2d question rather than a read has to
 -- be answered in the Game monad, and every other is objectRefObjects' pure
--- sweep. Shared by turnPermanentsOver and Effect.AttachAll.
+-- sweep. Shared by turnPermanentsOver, Effect.AttachAll and Effect.Untap.
 permanentsGathered ::
   Map.Map SlotName (Set Recipient) ->
   ObjectId ->
@@ -736,28 +737,47 @@ permanentsGathered legal resolving controller source ref = case ref of
   -- EachMatching's sweep of the same Filter, read live off the board before the
   -- instruction acts (CR 608.2c) -- which for Tovolar is a board CR 702.145c has
   -- already turned him over on, so his own back face is no longer a Human
-  -- Werewolf to offer.
-  --
-  -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
-  -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
-  -- ONE, unlike the counted choices: "any number" leaves two distinguishable
-  -- answers there.
-  --
-  -- FILTERED, not trusted (#222): an answer naming a permanent that was never
-  -- offered would otherwise be acted on. Filtering rather than taking the
-  -- answer also keeps CR 608.2f's APNAP order, which the candidate list
-  -- already carries and a Set does not.
-  ObjectRef.AnyNumberMatching filter_ -> do
-    gs <- State.get
-    let candidates = battlefieldMatching legal resolving controller source gs filter_
-    if null candidates
-      then pure []
-      else do
-        answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
-        pure (filter (`Set.member` answer) candidates)
+  -- Werewolf to offer. anyNumberMatching is the ask.
+  ObjectRef.AnyNumberMatching choice -> anyNumberMatching legal resolving controller source choice
   _ -> do
     gs <- State.get
     pure (objectRefObjects legal resolving controller source gs ref)
+
+-- CR 608.2d: the permanents ObjectRef.AnyNumberMatching names, asked of the
+-- resolving controller (CR 608.2c) out of battlefieldMatching's sweep of the
+-- Filter, read live off the board before the instruction acts. The ceiling,
+-- where there is one, is evaluated here too -- Teferi, Hero of Dominaria's "up
+-- to two lands".
+--
+-- Skipped at no candidate and at a ceiling of zero, where the empty set is the
+-- only answer (CR 101.3, CR 609.3), and asked at ONE candidate, unlike the
+-- counted choices: "any number" and "up to two" both leave two distinguishable
+-- answers there.
+--
+-- FILTERED, not trusted (#222): an answer naming a permanent that was never
+-- offered would otherwise be acted on, and one naming more than the ceiling
+-- keeps only its first that many. Filtering rather than taking the answer also
+-- keeps CR 608.2f's APNAP order, which the candidate list carries and a Set does
+-- not.
+anyNumberMatching ::
+  Map.Map SlotName (Set Recipient) ->
+  ObjectId ->
+  PlayerId ->
+  ObjectId ->
+  AnyNumberMatching.AnyNumberMatching ->
+  Game [ObjectId]
+anyNumberMatching legal resolving controller source (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) = do
+  gs <- State.get
+  let candidates = battlefieldMatching legal resolving controller source gs filter_
+      context = effectContext gs controller source legal (slotBindings resolving gs)
+      ceiling_ = fmap (maybe 0 Integer.toNaturalSaturating . Quantity.evaluateFor (effectViewOf source legal gs) context gs resolving source) atMost
+      capped :: [a] -> [a]
+      capped = maybe id (take . Natural.toIntSaturating) ceiling_
+  if null candidates || ceiling_ == Just 0
+    then pure []
+    else do
+      answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates ceiling_)
+      pure (capped (filter (`Set.member` answer) candidates))
 
 -- CR 701.27a and CR 701.28a: turn each named permanent over. ONE function for
 -- both opcodes, which is CR 701.28a said as code -- "this follows rules
@@ -4861,24 +4881,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- you control", announced while the effect is applied and so asked
               -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
               -- the same question for CR 701.27a's turn, and this gather owes it the
-              -- same posture: candidates are battlefieldMatching's sweep of the same
-              -- Filter, read off the pre-move board (CR 608.2c) so the sweep and the
-              -- offer cannot disagree, ONE ask of the resolving controller, skipped
-              -- at no candidate where the empty set is the only answer (CR 101.3, CR
-              -- 609.3), and asked at ONE, where "any number" still leaves two
-              -- distinguishable answers.
-              --
-              -- FILTERED, not trusted (#222), the sibling arms' reason: an answer
-              -- naming a permanent that was never offered would otherwise be moved.
-              -- Filtering rather than taking the answer also keeps CR 608.2f's APNAP
-              -- order, which the candidate list carries and a Set does not.
-              ObjectRef.AnyNumberMatching filter_ -> do
-                gs <- State.get
-                case battlefieldMatching legal resolving controller source gs filter_ of
-                  [] -> pure []
-                  candidates -> do
-                    answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
-                    pure (filter (`Set.member` answer) candidates)
+              -- same posture, so both go through anyNumberMatching, read off the
+              -- pre-move board (CR 608.2c).
+              ObjectRef.AnyNumberMatching choice -> anyNumberMatching legal resolving controller source choice
               -- CR 608.2d's singular of the arm above: "a creature named Hanweir
               -- Garrison" in Hanweir Battlements' "exile them, then meld them",
               -- announced while the effect is applied. The candidates are
@@ -9137,9 +9142,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- reason one rule clause over: rule 701.26b's "only tapped permanents can be
   -- untapped" lives in that funnel, and CR 122.1d's replacement is offered the
   -- event there.
+  --
+  -- Through permanentsGathered, so CR 608.2d's "untap up to two lands" (Teferi,
+  -- Hero of Dominaria) is asked rather than read.
   Effect.Untap ref -> do
-    gs <- State.get
-    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) Event.untap
+    victims <- permanentsGathered legal resolving controller source ref
+    Monad.forM_ victims Event.untap
   Effect.Detain ref ->
     State.modify' $ \gs ->
       -- CR 701.35a: detain each named permanent until the next turn of this

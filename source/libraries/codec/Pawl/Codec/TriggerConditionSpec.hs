@@ -247,7 +247,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You 2))
+      (TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You (Just 2)))
       " {\"type\":\"PlayerDrawsNthCard\",\"value\":{\"player\":{\"type\":\"You\"},\"nth\":2}} "
   -- CR 508.3a. Both frequencies, since "for the first time each turn" is a
   -- payload on this condition rather than a sibling one.
