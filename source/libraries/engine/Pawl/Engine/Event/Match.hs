@@ -1831,11 +1831,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- with it.
   --
   -- Equality on the ordinal, which is what makes "your second card" fire once in
-  -- a turn with five draws.
+  -- a turn with five draws; no ordinal fires on every draw, one event per card
+  -- (CR 121.2).
   TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard relation nth) -> case event of
     GameEvent.Drew (Drew.MkDrew drawer ordinal) ->
-      ordinal
-        == nth
+      maybe True (== ordinal) nth
         && PlayerRelation.holds (Game.teams gs) relation you drawer
     GameEvent.Discarded {} -> False
     GameEvent.Moved {} -> False

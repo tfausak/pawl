@@ -7,6 +7,7 @@
 -- machinery.
 module Pawl.BoardEffectSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -3519,6 +3520,80 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
     Spec.assertEqWith s "no damage marked on the grounded Bird Maiden" (markedOn maidenId after) (Just 0)
     Spec.assertBool s (S.onBattlefield maidenId after) "so it survives"
 
+-- Teferi, Hero of Dominaria {3}{W}{U} Legendary Planeswalker -- Teferi, loyalty
+-- 4: "+1: Draw a card. At the beginning of the next end step, untap up to two
+-- lands." (Oracle text checked against api.scryfall.com 2026-09-27.) CR 608.2d's
+-- "up to two": ObjectRef.AnyNumberMatching with a ceiling, chosen as the delayed
+-- ability resolves rather than targeted.
+--
+-- Five tapped lands, three alice's Islands and two bob's Mountains -- the
+-- printed "lands" is not "lands you control" -- so more are eligible than the
+-- ceiling admits, and the choice is put to a player however many it names.
+teferiUntapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+teferiUntapSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      -- Records every ChooseAnyNumberOfPermanents as (candidates, ceiling) and
+      -- answers it with `pick` of the candidates -- offered or not, so an
+      -- engine that trusted the answer would act on it.
+      answering :: ([ObjectId.ObjectId] -> [ObjectId.ObjectId]) -> Prompt.Prompt r -> State.State [([ObjectId.ObjectId], Maybe Natural)] r
+      answering pick p = case p of
+        Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates atMost -> do
+          State.modify (<> [(candidates, atMost)])
+          pure (Set.fromList (pick candidates))
+        _ -> pure (S.identityAnswer p)
+      tapped gs oid = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Tapped
+      -- alice's Teferi at its printed loyalty, the five lands tapped in APNAP
+      -- order, and a stocked library for the +1's draw. Activates the +1,
+      -- resolves it, then begins the end step and resolves the delayed ability
+      -- under `answering pick`.
+      run pick = do
+        teferi <- S.printingOf s registry "Teferi, Hero of Dominaria"
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (teferiId, g0) = S.addPermanent teferi S.alice (Setup.emptyGame S.bothPlayers)
+            withLoyalty = S.addCounter CounterKind.Loyalty 4 teferiId g0
+            addLand (ids, g) (p, pid) = let (oid, g') = S.addPermanent p pid g in (ids <> [oid], S.tapObject oid g')
+            (lands, g1) = List.foldl' addLand ([], withLoyalty) [(island, S.alice), (island, S.alice), (island, S.alice), (mountain, S.bob), (mountain, S.bob)]
+            g2 = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g1 [1 .. (3 :: Int)]
+            gs = g2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice, GameState.turnNumber = 2}
+        pure $ case Face.activatedAbilities (S.combinedFace teferi) of
+          plus : _ ->
+            let armed = S.runPure S.identityAnswer gs (do Activate.activateAbility S.alice teferiId plus; Stack.resolveTop)
+                settled = S.runPure S.identityAnswer (beginEndStep armed) Engine.settleForPriority
+                (after, asked) = State.runState (fmap snd (Engine.runGame (answering pick) settled Engine.priorityLoop)) []
+             in Just (lands, armed, after, asked)
+          [] -> Nothing
+   in Spec.describe s "TeferiHeroOfDominaria" $ do
+        -- One of each seat's lands named: exactly those two untap, and the prompt
+        -- offered all five with a ceiling of two.
+        Spec.it s "CR 608.2d the delayed +1 untaps the two lands named, of five offered" $ do
+          let chosen cs = case cs of
+                a : _ : _ : m : _ -> [a, m]
+                _ -> []
+          result <- run chosen
+          case result of
+            Just (lands, armed, after, asked) -> do
+              Spec.assertEqWith s "the +1 armed one delayed ability" (length (GameState.delayedTriggers armed)) 1
+              Spec.assertEqWith s "alice's first Island and bob's first Mountain untapped, the other three did not" (fmap (tapped after) lands) [False, True, True, False, True]
+              Spec.assertEqWith s "asked once, offered every land, at most two" asked [(lands, Just 2)]
+            Nothing -> Spec.assertFailure s "Teferi prints a +1"
+        -- An answer naming all five: the ceiling holds anyway (#222's posture).
+        Spec.it s "CR 608.2d an answer naming more than two untaps only two" $ do
+          result <- run id
+          case result of
+            Just (lands, _, after, _) -> Spec.assertEqWith s "two of the five lands untapped" (length (filter (not . tapped after) lands)) 2
+            Nothing -> Spec.assertFailure s "Teferi prints a +1"
+        -- "Up to": none is an answer too.
+        Spec.it s "CR 608.2d naming none untaps nothing" $ do
+          result <- run (const [])
+          case result of
+            Just (lands, _, after, asked) -> do
+              Spec.assertEqWith s "all five lands still tapped" (fmap (tapped after) lands) [True, True, True, True, True]
+              Spec.assertEqWith s "the player was asked" (length asked) 1
+            Nothing -> Spec.assertFailure s "Teferi prints a +1"
+
 -- Come Back Wrong {2}{B} Sorcery (DSK 86): "Destroy target creature. If a
 -- creature card is put into a graveyard this way, return it to the battlefield
 -- under your control. Sacrifice it at the beginning of your next end step."
@@ -3988,6 +4063,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   skullwinderSpec s registry
   elvishPiperSpec s registry
   gloriousProtectorSpec s registry
+  teferiUntapSpec s registry
   banisherPriestSpec s registry
   levelerSpec s registry
   calderaBreakerSpec s registry

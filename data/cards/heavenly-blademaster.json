@@ -178,32 +178,34 @@
                           "subjects": {
                             "type": "AnyNumberMatching",
                             "value": {
-                              "type": "And",
-                              "value": [
-                                {
-                                  "type": "Or",
-                                  "value": [
-                                    {
-                                      "type": "HasSubtype",
-                                      "value": {
-                                        "type": "Aura"
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "Or",
+                                    "value": [
+                                      {
+                                        "type": "HasSubtype",
+                                        "value": {
+                                          "type": "Aura"
+                                        }
+                                      },
+                                      {
+                                        "type": "HasSubtype",
+                                        "value": {
+                                          "type": "Equipment"
+                                        }
                                       }
-                                    },
-                                    {
-                                      "type": "HasSubtype",
-                                      "value": {
-                                        "type": "Equipment"
-                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "ControlledBy",
+                                    "value": {
+                                      "type": "You"
                                     }
-                                  ]
-                                },
-                                {
-                                  "type": "ControlledBy",
-                                  "value": {
-                                    "type": "You"
                                   }
-                                }
-                              ]
+                                ]
+                              }
                             }
                           }
                         }

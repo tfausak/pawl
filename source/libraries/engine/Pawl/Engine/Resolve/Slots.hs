@@ -30,6 +30,7 @@ import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
@@ -477,8 +478,9 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- that arm's is, and the COUNT is TopOfLibrary's read.
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary _ _ count) -> quantitySlots count
   -- EachMatching's answer: the candidates come off the battlefield, so no slot
-  -- names them and the chooser is CR 608.2c's resolving controller.
-  ObjectRef.AnyNumberMatching _ -> Map.empty
+  -- names them and the chooser is CR 608.2c's resolving controller. The
+  -- CEILING is TopOfLibrary's read.
+  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching _ atMost) -> maybe Map.empty quantitySlots atMost
   -- The arm above's answer for the CANDIDATES, which come off the battlefield so
   -- that no slot names them; the CHOOSER's slots are the generic playerRefSlots
   -- fold this case is joined into, ChosenCardFromAmong's route above, which is
@@ -543,7 +545,9 @@ objectRefQuantities ref = case ref of
   -- How many cards a seek names -- the Gates' printed one. The arm above's
   -- regression fence, for its reason.
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary _ _ count) -> [count]
-  ObjectRef.AnyNumberMatching _ -> []
+  -- At most how many permanents are chosen -- Teferi, Hero of Dominaria's
+  -- printed two.
+  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching _ atMost) -> Foldable.toList atMost
   ObjectRef.ChosenPermanent _ -> []
   ObjectRef.SourceAndChosenPermanent _ -> []
   ObjectRef.AttachedToBound _ -> []
@@ -2649,10 +2653,11 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- A CR 608.2d question, so this pure sweep answers nothing for it: the
   -- candidates are battlefieldMatching's, but WHICH of them the instruction names
   -- is the chooser's, and two gathers reach the Game monad to ask --
-  -- turnPermanentsOver, the body Effect.Transform and Effect.Convert share, and
-  -- the Effect.MoveToZone gather. Under any other opcode this empty answer is an
-  -- inert card-data error, which Pawl.CardSpec's inertChoosers rejects at load
-  -- time -- ChosenCardInGraveyard's note below is the shape.
+  -- permanentsGathered, which Effect.Transform, Effect.Convert, Effect.AttachAll
+  -- and Effect.Untap share, and the Effect.MoveToZone gather. Under any other
+  -- opcode this empty answer is an inert card-data error, which
+  -- Pawl.EffectLintSpec's inertChoosers rejects at load time --
+  -- ChosenCardInGraveyard's note below is the shape.
   ObjectRef.AnyNumberMatching _ -> []
   -- The arm above's answer, for its reason: a CR 608.2d question, so this pure
   -- sweep answers nothing for it. The Effect.MoveToZone gather is the one arm

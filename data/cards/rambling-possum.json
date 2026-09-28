@@ -73,18 +73,20 @@
                           "ref": {
                             "type": "AnyNumberMatching",
                             "value": {
-                              "type": "And",
-                              "value": [
-                                {
-                                  "type": "HasCardType",
-                                  "value": {
-                                    "type": "Creature"
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Creature"
+                                    }
+                                  },
+                                  {
+                                    "type": "SaddledSourceThisTurn"
                                   }
-                                },
-                                {
-                                  "type": "SaddledSourceThisTurn"
-                                }
-                              ]
+                                ]
+                              }
                             }
                           },
                           "zone": {
