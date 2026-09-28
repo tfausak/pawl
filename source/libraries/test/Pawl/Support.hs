@@ -2688,7 +2688,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseForage decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseLearn decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseTimeTravel decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseClash decider _ _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseClash decider _ _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEntwine decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseBuyback decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseSplice decider _ _ _ -> Just (Decider.unwrap decider)

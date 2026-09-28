@@ -4850,6 +4850,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     ask asked = pick asked wanted
                 case chooser of
                   Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) legal controller gs scope filter_)
+                  -- Not implemented: a later seat is not told the earlier seats'
+                  -- picks (#4328).
                   Chooser.EachInScope ->
                     fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)) $
                       zoneScopePlayers legal controller gs scope
@@ -6265,6 +6267,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       filler = filter (\oid -> List.notElem oid valid) candidates
                   pure (victim, List.genericTake wanted (valid <> filler))
             _ -> pure (victim, [])
+    -- Not implemented: a later victim is not told the earlier victims' picks
+    -- (#4328).
     doomed <- traverse pickFor victims
     -- CR 101.4's "then the actions happen simultaneously", which its own Example
     -- writes out for this very instruction, so the picks from every seat go to the
@@ -10692,24 +10696,24 @@ clash source controller = do
             Nothing -> False
             Just value -> all (value >) others
       decisions <- case revealed of
-        [] -> pure []
+        [] -> pure Seq.empty
         first : rest -> do
           let public = first NonEmpty.:| rest
-          Monad.forM revealed $ \(pid, top) -> do
-            asked <- State.get
-            -- The engine never makes the player's choice, but does not ask a
-            -- question with one answer either: a revealed card that is the whole
-            -- library is already at both ends, decideScry's elision one card over.
-            --
-            -- Not implemented: the later decider is not told what the earlier one
-            -- chose, which CR 101.4b entitles them to; this prompt carries rule
-            -- 701.30c's reveal alone (#3893).
-            let alone = length (Game.zoneMembers Zone.Library pid asked) <= 1
-            position <-
-              if alone
-                then pure LibraryPosition.Top
-                else Game.choose (Prompt.ChooseClash (Decide.deciderFor pid asked) pid source top public)
-            pure (pid, top, position)
+          -- CR 101.4b: each decider is shown the decisions made before theirs.
+          let decide made (pid, top) = do
+                asked <- State.get
+                -- The engine never makes the player's choice, but does not ask a
+                -- question with one answer either: a revealed card that is the
+                -- whole library is already at both ends, decideScry's elision one
+                -- card over.
+                let alone = length (Game.zoneMembers Zone.Library pid asked) <= 1
+                    earlier = fmap (\(who, _, at) -> (who, at)) made
+                position <-
+                  if alone
+                    then pure LibraryPosition.Top
+                    else Game.choose (Prompt.ChooseClash (Decide.deciderFor pid asked) pid source top public earlier)
+                pure (made Seq.|> (pid, top, position))
+          Monad.foldM decide Seq.empty revealed
       Monad.forM_ decisions $ \(pid, top, position) ->
         Monad.when (position == LibraryPosition.Bottom) $ do
           moving <- State.get

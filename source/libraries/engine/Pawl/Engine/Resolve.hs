@@ -956,6 +956,8 @@ chosenBranch resolving controller idx cIdx legal eligible picked clause = case C
                  in Monad.foldM
                       ( \acc chooser -> do
                           gs1 <- State.get
+                          -- Not implemented: a later chooser is not told the
+                          -- earlier choosers' answers (#4328).
                           answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx live)
                           pure (Map.insert chooser (if elem answered live then answered else first) acc)
                       )
@@ -1099,6 +1101,8 @@ exercises resolving source controller idx cIdx bound legal announced clause = do
             Monad.foldM
               ( \acc pid -> do
                   gs1 <- State.get
+                  -- Not implemented: a later seat is not told the earlier
+                  -- seats' answers (#4328).
                   decision <- Game.choose (Prompt.ChooseOptional (Decide.deciderFor pid gs1) pid resolving idx cIdx)
                   pure $ case decision of
                     OptionalDecision.Exercises -> Set.insert pid acc

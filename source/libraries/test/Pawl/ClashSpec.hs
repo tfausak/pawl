@@ -83,14 +83,33 @@ board swamp teeth aliceTop bobTop filler =
 -- something legal.
 clashing :: Prompt.Prompt r -> State.State [Asked] r
 clashing p = case p of
-  Prompt.ChooseClash _ pid _ own public -> do
+  Prompt.ChooseClash _ pid _ own public _ -> do
     State.modify' (<> [(pid, own, NonEmpty.toList public)])
     pure (if pid == S.alice then LibraryPosition.Bottom else LibraryPosition.Top)
-  -- CR 701.30b's opponent, taken from the offered set rather than built: with
-  -- three seats it is a real choice, and the case is about bob rather than carol.
-  Prompt.ChooseOpponent _ _ _ opponents -> pure (Maybe.fromMaybe (NonEmpty.head opponents) (List.find (S.bob ==) (NonEmpty.toList opponents)))
-  Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring ((==) (Just S.carol) . Recipient.playerOf) sets)
-  _ -> pure (S.castAnswer p)
+  _ -> pure (casting p)
+
+-- Everything but the clash decisions: CR 701.30b's opponent, taken from the
+-- offered set rather than built -- with three seats it is a real choice, and the
+-- case is about bob rather than carol -- and carol as the discard's target.
+casting :: Prompt.Prompt r -> r
+casting p = case p of
+  Prompt.ChooseOpponent _ _ _ opponents -> Maybe.fromMaybe (NonEmpty.head opponents) (List.find (S.bob ==) (NonEmpty.toList opponents))
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring ((==) (Just S.carol) . Recipient.playerOf) sets
+  _ -> S.castAnswer p
+
+-- CR 101.4b's answerer: alice answers `hers`, and bob does whatever the prompt
+-- says alice did, keeping his card on top when it says nothing. Each clash
+-- prompt's earlier decisions are recorded in the order asked.
+mirroring :: LibraryPosition.LibraryPosition -> Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [(PlayerId.PlayerId, LibraryPosition.LibraryPosition)])] r
+mirroring hers p = case p of
+  Prompt.ChooseClash _ pid _ _ _ earlier -> do
+    State.modify' (<> [(pid, Foldable.toList earlier)])
+    pure
+      ( if pid == S.alice
+          then hers
+          else Maybe.fromMaybe LibraryPosition.Top (lookup S.alice (Foldable.toList earlier))
+      )
+  _ -> pure (casting p)
 
 -- alice casts Pulling Teeth at carol and it resolves, keeping the questions the
 -- clash asked beside the board it left.
@@ -121,8 +140,7 @@ spec s registry = Spec.describe s "Clash" $ do
     -- DECISIONS, and asserting one here would absorb that case's mutation.
     Spec.assertEqWith s "CR 701.30c both clashing players revealed their top card" (List.sort (fmap (fmap (: [])) (revealedIn after))) (List.sort [(S.alice, aliceTop), (S.bob, bobTop)])
     -- CR 701.30c's decisions, in APNAP order and each shown BOTH revealed cards:
-    -- alice is the active player, so she decides first, and neither question
-    -- carries what the other player decided.
+    -- alice is the active player, so she decides first.
     Spec.assertEqWith
       s
       "CR 701.30c each clashing player decides, in APNAP order, seeing both revealed cards"
@@ -146,3 +164,23 @@ spec s registry = Spec.describe s "Clash" $ do
     let (spell, before) = board swamp teeth bolt giant plains
         (after, _) = resolved spell before
     Spec.assertEqWith s "CR 701.30d the loser's clause discards one" (length (Game.zoneMembers Zone.Graveyard S.carol after)) 1
+  -- A pair of boards differing in ONE thing, alice's answer; bob copies whatever
+  -- his prompt says she chose, so where his card ends up is what he was told.
+  Spec.it s "CR 101.4b the later clashing player knows the earlier one's decision" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    teeth <- S.printingOf s registry "Pulling Teeth"
+    giant <- S.printingOf s registry "Hill Giant"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    plains <- S.printingOf s registry "Plains"
+    let (spell, before) = board swamp teeth giant bolt plains
+        bobTop = topOf S.bob before
+        run hers = State.runState (Engine.runGame (mirroring hers) before (S.cast S.alice spell >> Stack.resolveTop)) []
+        ((_, bottomed), askedBottomed) = run LibraryPosition.Bottom
+        ((_, topped), askedTopped) = run LibraryPosition.Top
+    -- THE gameplay reading, and first: told alice bottomed, bob bottomed too.
+    Spec.assertEqWith s "CR 101.4b bob, told alice bottomed her card, bottoms his" (fmap (\oid -> [oid] == bobTop) (Game.zoneMembers Zone.Library S.bob bottomed)) [False, True]
+    Spec.assertEqWith s "CR 101.4b bob, told alice kept hers on top, keeps his" (topOf S.bob topped) bobTop
+    -- The questions themselves: alice, deciding first, is told nothing; bob is
+    -- told her decision, whichever it was.
+    Spec.assertEqWith s "CR 101.4b bob's prompt carries alice's Bottom" askedBottomed [(S.alice, []), (S.bob, [(S.alice, LibraryPosition.Bottom)])]
+    Spec.assertEqWith s "CR 101.4b bob's prompt carries alice's Top" askedTopped [(S.alice, []), (S.bob, [(S.alice, LibraryPosition.Top)])]
