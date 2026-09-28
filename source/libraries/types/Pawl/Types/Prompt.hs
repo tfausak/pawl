@@ -667,6 +667,10 @@ data Prompt r where
   -- there is one; ChooseAnyNumberToSacrifice's shape. Not ChooseTargets (CR
   -- 115.1, CR 115.10a).
   ChooseAnyNumberOfPermanents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Maybe Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 701.9b / 107.1c: any number of the matching cards in the asked seat's
+  -- own hand that it discards (Pawl.Types.AnyNumberDiscard), at most the Natural
+  -- where there is one; the arm above one zone over.
+  ChooseAnyNumberToDiscard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Maybe Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 608.2d: which one of the matching permanents a resolving effect acts
   -- on (Pawl.Types.ObjectRef.ChosenPermanent); at none the instruction is
   -- impossible (CR 101.3). Not ChooseTargets (CR 115.1, CR 115.10a). Also CR
