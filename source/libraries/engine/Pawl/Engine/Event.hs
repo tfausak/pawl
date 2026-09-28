@@ -45,7 +45,7 @@ import qualified Pawl.Engine.CounterRestriction as CounterRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EntryRestriction as EntryRestriction
 import Pawl.Engine.Event.Match (matchesTriggerGiven)
-import Pawl.Engine.Event.Trigger (battlefieldAt, battlefieldCandidates, delayedArmed, delayedPending, eventTriggers, interveningHolds, isReflexive, reflexiveFiring, stateTriggers)
+import Pawl.Engine.Event.Trigger (battlefieldAt, battlefieldCandidates, delayedArmed, delayedPending, eventTriggers, interveningHolds, isReflexive, participants, reflexiveFiring, stateTriggers)
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -136,6 +136,7 @@ import qualified Pawl.Types.FromOutsideTheGame as FromOutsideTheGame
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.GameSettings as GameSettings
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility.Type
@@ -192,6 +193,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementBucket as ReplacementBucket
@@ -266,7 +268,7 @@ recordEvent event gs = recordEventOver gs event gs
 recordEventOver :: GameState -> GameEvent -> GameState -> GameState
 recordEventOver board event gs =
   let group = GameState.nextEventGroup gs
-   in gs
+   in (involveActedOn event gs)
         { GameState.events = GameState.events gs Seq.|> LoggedEvent.MkLoggedEvent {LoggedEvent.group = group, LoggedEvent.event = event},
           GameState.nextEventGroup =
             if GameState.eventGroupDepth gs == 0
@@ -275,6 +277,25 @@ recordEventOver board event gs =
           GameState.battlefieldWhenTriggered =
             Map.insert group (battlefieldCandidates board) (GameState.battlefieldWhenTriggered gs)
         }
+
+-- CR 801.16: every object an event acts on is involved in whatever the game is
+-- doing, so under limited range its controller is stamped (Game.involve) --
+-- CR 108.4a's owner off the battlefield and the stack, which
+-- Projection.controllerOf answers, and last known information for an id that
+-- left. The objects are CR 801.7's (Trigger.participants). Only a game using
+-- limited range reads the stamp, so only one looks the controllers up.
+--
+-- Pawl.RangeOfInfluenceSpec's Synthetic Spore Tithe loop proves the
+-- battlefield read. The last-known read is a regression fence: no loop in the
+-- suite moves an otherwise uninvolved player's permanent off the battlefield.
+involveActedOn :: GameEvent -> GameState -> GameState
+involveActedOn event gs
+  | GameSettings.rangeOfInfluence (GameState.settings gs) == RangeOfInfluence.unlimited = gs
+  | otherwise = foldr Game.involve gs (Maybe.mapMaybe controllerOf (fst (participants event)))
+  where
+    controllerOf oid = case Projection.controllerOf oid gs of
+      Just pid -> Just pid
+      Nothing -> LastKnown.controller <$> Map.lookup oid (GameState.lastKnown gs)
 
 -- CR 725.2 / CR 726.2: the creature that dealt this logged event's COMBAT damage
 -- to `victim`, paired with who controlled it. Nothing for any other event, and
