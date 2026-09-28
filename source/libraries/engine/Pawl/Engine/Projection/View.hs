@@ -998,8 +998,9 @@ copiableCharacteristicsTurned oid gs = copiableCharacteristicsFaceUp oid (Game.w
 -- Two of those seven have a producer over a copied door -- copiableReplacementsOf
 -- (Torture Pit, proved by Pawl.RoomSpec's "CR 707.2a a copy of a Room gathers the
 -- replacement effect behind the door IT unlocked") and playerAbilitiesOf
--- (Steaming Sauna). anyCopiableKeyword, copiableMintsType and copiableSpecialActionsOf
--- have none and are REGRESSION FENCES: no printed Room half prints a keyword,
+-- (Steaming Sauna). anyCopiableKeyword, copiableMintsType and
+-- copiableSpecialActionsOf have none and are REGRESSION FENCES: no printed Room
+-- half prints a keyword,
 -- none is a Saga, a planeswalker or a battle, and none grants a CR 116.2
 -- permission (Scryfall `t:room`, 2026-09-05), so nothing can redden if they are
 -- left behind again.
@@ -1240,11 +1241,12 @@ copiableSpecialActionsOf carrier gs =
 
 -- CR 613.11: the twelve rule-affecting ability families this object's copiable
 -- rules text gives it -- its copy snapshot's when it has one, its printed face's
--- otherwise. copiableSpecialActionsOf above in every respect, and split out for the same
--- two structural reasons.
+-- otherwise. copiableSpecialActionsOf above in every respect, and split out for
+-- the same two structural reasons.
 --
 -- THE reader for all twelve gatherer modules (Pawl.Engine.CombatRestriction and
--- its eleven siblings), through Pawl.Engine.Projection.ruleAbilitiesOf, which is what makes the two rules it settles settle once:
+-- its eleven siblings), through Pawl.Engine.Projection.ruleAbilitiesOf, which
+-- is what makes the two rules it settles settle once:
 -- CR 707.2a, so a permanent that became a copy of Silent Arbiter limits attackers
 -- and its own printed face is never consulted, and CR 702.140e with CR 730.2a, so
 -- a merged permanent answers with every component's -- Pawl.Engine.Event.merge
@@ -1268,7 +1270,8 @@ copiableRuleAbilitiesOf carrier gs =
         Nothing -> foldMap ruleAbilitiesOfFace (Game.faceOf oid gs)
 
 -- The thirteen lists a printed face declares. Its own function so that the seed
--- above and copiableRuleAbilitiesOf's fallback cannot drift on what a face contributes.
+-- above and copiableRuleAbilitiesOf's fallback cannot drift on what a face
+-- contributes.
 ruleAbilitiesOfFace :: Face.Face Card.Type.Card -> RuleAbilities.RuleAbilities
 ruleAbilitiesOfFace face =
   RuleAbilities.MkRuleAbilities
@@ -1479,8 +1482,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               PC.grantedPlayerAbilities = [],
               PC.grantedStaticAbilities = [],
               -- CR 116.2, in the seed for the same reason and read by
-              -- copiableSpecialActionsOf below: CR 707.2a copies the abilities a face's
-              -- rules text derives, and CR 116.2d's permission is one of them.
+              -- copiableSpecialActionsOf below: CR 707.2a copies the abilities a
+              -- face's rules text derives, and CR 116.2d's permission is one of
+              -- them.
               PC.specialActions = Face.specialActions face,
               PC.activatedAbilities = Face.activatedAbilities face,
               PC.replacementEffects = Face.replacementEffects face,

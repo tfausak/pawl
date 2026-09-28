@@ -2216,8 +2216,8 @@ gatherGiven stripped functioning seed gs =
 -- they take its own timestamp (CR 613.7a), go before its granted ones in the
 -- index, and answer to CR 613.1f's and CR 305.7's removals as a printed ability
 -- does (permanentParts) -- a regression fence, since Lord of Atlantis's
--- ability starts applying in layer 6, which neither removal reaches. The fold has already applied CR 612.1's word swaps to
--- them, so none is applied here. The generating ability itself goes on being
+-- ability starts applying in layer 6, which neither removal reaches. The fold
+-- has already applied CR 612.1's word swaps to them, so none is applied here. The generating ability itself goes on being
 -- gathered off the copiable values though its text is gone, which is CR 613.6.
 -- Pawl.ProjectionSpec's "CR 612.6 the Shapeshifter as Lord of Atlantis pumps
 -- the other Merfolk" proves it.
