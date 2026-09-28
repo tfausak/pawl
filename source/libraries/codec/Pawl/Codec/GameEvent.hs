@@ -115,6 +115,7 @@ codec =
       -- rule names no card, so there is nothing else to carry.
       Arm.payload "DungeonCompleted" PlayerId.codec GameEvent.DungeonCompleted (\x -> case x of GameEvent.DungeonCompleted y -> Just y; _ -> Nothing),
       Arm.payload "Surveiled" PlayerId.codec GameEvent.Surveiled (\x -> case x of GameEvent.Surveiled y -> Just y; _ -> Nothing),
+      Arm.payload "Proliferated" PlayerId.codec GameEvent.Proliferated (\x -> case x of GameEvent.Proliferated y -> Just y; _ -> Nothing),
       Arm.payload "DiceRolled" PlayerId.codec GameEvent.DiceRolled (\x -> case x of GameEvent.DiceRolled y -> Just y; _ -> Nothing),
       Arm.payload "DieResultSettled" (DieResult.codec PlayerId.codec) GameEvent.DieResultSettled (\x -> case x of GameEvent.DieResultSettled y -> Just y; _ -> Nothing),
       Arm.payload "RolledToVisit" (DieResult.codec PlayerId.codec) GameEvent.RolledToVisit (\x -> case x of GameEvent.RolledToVisit y -> Just y; _ -> Nothing),
@@ -209,6 +210,7 @@ tagOf x = case x of
   GameEvent.Scried {} -> "Scried"
   GameEvent.DungeonCompleted {} -> "DungeonCompleted"
   GameEvent.Surveiled {} -> "Surveiled"
+  GameEvent.Proliferated {} -> "Proliferated"
   GameEvent.DiceRolled {} -> "DiceRolled"
   GameEvent.DieResultSettled {} -> "DieResultSettled"
   GameEvent.RolledToVisit {} -> "RolledToVisit"
