@@ -1546,6 +1546,45 @@ spellCostAdjustments pid oid gs =
           CostAdjustments.components = concat (Maybe.mapMaybe additionOf effects)
         }
 
+-- Professor Hojo's "the FIRST activated ability you activate during your turn"
+-- and Kíli the Resourceful's "the first equip ability you activate each turn":
+-- in a turn the scope admits, is there no activation by `pid` earlier this turn
+-- matching the criteria? Reduced or not, and whether or not the effect asking
+-- existed yet (Tezzeret, Betrayer of Flesh's ruling). Asked of
+-- GameState.activationsThisTurn's snapshots rather than the live board, with the
+-- same four criteria Pawl.Types.ReduceActivationCost carries; `source` is the
+-- asking effect's own permanent, which Filter.IsSource reads.
+firstActivation :: PlayerId -> Maybe ObjectId -> Filter Keyword -> Maybe KeywordDesignator.KeywordDesignator -> Maybe AbilityKind.AbilityKind -> Maybe (Filter Keyword) -> GameState -> TurnScope.TurnScope -> Bool
+firstActivation pid source criterion granted wantedKind aimedAt gs scope =
+  let snapshotView snapshot =
+        (Count.viewOfSnapshot False (ObjectSnapshot.controller snapshot) (Just (ObjectSnapshot.owner snapshot)) False Map.empty (ObjectSnapshot.characteristics snapshot))
+          { Filter.identity = Just (ObjectSnapshot.object snapshot)
+          }
+      matchesSnapshot you criterion' snapshot = Filter.matches (contextFor you source gs) (snapshotView snapshot) criterion'
+      admits past =
+        PastActivation.activator past == pid
+          && matchesSnapshot (ObjectSnapshot.controller (PastActivation.source past)) criterion (PastActivation.source past)
+          && maybe True (\g -> any (Keyword.designates g) (PastActivation.keyword past)) granted
+          && maybe True (== PastActivation.kind past) wantedKind
+          && maybe True (\f -> any (matchesSnapshot (Just pid) f) (PastActivation.targets past)) aimedAt
+   in Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
+        && not (any admits (GameState.activationsThisTurn gs))
+
+-- CR 118.9 through CR 602.2b: the costs `pid` may pay RATHER THAN the
+-- activation cost of an ability stamped `stamp` -- Kíli the Resourceful's {0}
+-- for "the equip cost of the first equip ability you activate each turn".
+-- Offered at CR 601.2b by Pawl.Engine.Activatable.costsFor; CR 118.9d's
+-- increases and reductions then apply to whichever is chosen.
+alternativeActivationCosts :: PlayerId -> Maybe Keyword -> GameState -> [ManaCost.ManaCost]
+alternativeActivationCosts pid stamp gs =
+  let offered (source, effect) = case effect of
+        PlayerEffect.AlternativeActivationCost (AlternativeActivationCost.MkAlternativeActivationCost granted onlyFirst amount) ->
+          if any (Keyword.designates granted) stamp && maybe True (firstActivation pid source (Filter.Type.And []) (Just granted) Nothing Nothing gs) onlyFirst
+            then Just amount
+            else Nothing
+        _ -> Nothing
+   in Maybe.mapMaybe offered (applying pid gs)
+
 -- CR 613.11 / 601.2f: the cost reductions that apply to `pid` ACTIVATING an
 -- ability of `srcId`, with the floor those reductions impose (CR 101.1 card
 -- text), plus the additional non-mana components other effects add to that cost
@@ -1600,45 +1639,6 @@ spellCostAdjustments pid oid gs =
 -- sentence says "this effect", so an effect that states no floor is not bound by
 -- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
 -- reduction lands.
--- Professor Hojo's "the FIRST activated ability you activate during your turn"
--- and Kíli the Resourceful's "the first equip ability you activate each turn":
--- in a turn the scope admits, is there no activation by `pid` earlier this turn
--- matching the criteria? Reduced or not, and whether or not the effect asking
--- existed yet (Tezzeret, Betrayer of Flesh's ruling). Asked of
--- GameState.activationsThisTurn's snapshots rather than the live board, with the
--- same four criteria Pawl.Types.ReduceActivationCost carries; `source` is the
--- asking effect's own permanent, which Filter.IsSource reads.
-firstActivation :: PlayerId -> Maybe ObjectId -> Filter Keyword -> Maybe KeywordDesignator.KeywordDesignator -> Maybe AbilityKind.AbilityKind -> Maybe (Filter Keyword) -> GameState -> TurnScope.TurnScope -> Bool
-firstActivation pid source criterion granted wantedKind aimedAt gs scope =
-  let snapshotView snapshot =
-        (Count.viewOfSnapshot False (ObjectSnapshot.controller snapshot) (Just (ObjectSnapshot.owner snapshot)) False Map.empty (ObjectSnapshot.characteristics snapshot))
-          { Filter.identity = Just (ObjectSnapshot.object snapshot)
-          }
-      matchesSnapshot you criterion' snapshot = Filter.matches (contextFor you source gs) (snapshotView snapshot) criterion'
-      admits past =
-        PastActivation.activator past == pid
-          && matchesSnapshot (ObjectSnapshot.controller (PastActivation.source past)) criterion (PastActivation.source past)
-          && maybe True (\g -> any (Keyword.designates g) (PastActivation.keyword past)) granted
-          && maybe True (== PastActivation.kind past) wantedKind
-          && maybe True (\f -> any (matchesSnapshot (Just pid) f) (PastActivation.targets past)) aimedAt
-   in Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
-        && not (any admits (GameState.activationsThisTurn gs))
-
--- CR 118.9 through CR 602.2b: the costs `pid` may pay RATHER THAN the
--- activation cost of an ability stamped `stamp` -- Kíli the Resourceful's {0}
--- for "the equip cost of the first equip ability you activate each turn".
--- Offered at CR 601.2b by Pawl.Engine.Activatable.costsFor; CR 118.9d's
--- increases and reductions then apply to whichever is chosen.
-alternativeActivationCosts :: PlayerId -> Maybe Keyword -> GameState -> [ManaCost.ManaCost]
-alternativeActivationCosts pid stamp gs =
-  let offered (source, effect) = case effect of
-        PlayerEffect.AlternativeActivationCost (AlternativeActivationCost.MkAlternativeActivationCost granted onlyFirst amount) ->
-          if any (Keyword.designates granted) stamp && maybe True (firstActivation pid source (Filter.Type.And []) (Just granted) Nothing Nothing gs) onlyFirst
-            then Just amount
-            else Nothing
-        _ -> Nothing
-   in Maybe.mapMaybe offered (applying pid gs)
-
 activationCostAdjustments :: Set.Set ObjectId -> Maybe Keyword -> AbilityKind.AbilityKind -> LoyaltyKind.LoyaltyKind -> PlayerId -> ObjectId -> GameState -> CostAdjustments
 activationCostAdjustments targets stamp kind loyalty pid srcId gs = activationCostAdjustmentsGiven (applying pid gs) pid targets stamp kind loyalty srcId gs
 
