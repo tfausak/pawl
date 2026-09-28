@@ -277,6 +277,10 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
           -- Pawl.PlayerEffectSpec's NerdRage group proves it.
           GrantedAbility.Player p ->
             pc {PC.grantedPlayerAbilities = PC.grantedPlayerAbilities pc <> [(stamp, p)]}
+          -- CR 601.2f: recorded for Pawl.Engine.Cost.selfReductions, which reads
+          -- it off the projection of the card being cast.
+          GrantedAbility.SelfCostReduction r ->
+            pc {PC.grantedCostReductions = PC.grantedCostReductions pc <> [r]}
         -- CR 702.165a's grant never reaches a STORED effect: Resolve.Effect's
         -- expandGrant turns it into the ordinary GainKeyword and GainAbility arms
         -- above as the ability resolves, so nothing with this modification is ever
@@ -295,6 +299,9 @@ applyModification textBoxOf viewOf src stamp gs oid unitTypes affected m pc =
               -- fold knows; the copiable ones are gated outside it
               -- (abilityRemoval).
               PC.grantedPlayerAbilities = [],
+              -- The same for a granted cost reduction. Unproven: nothing in the
+              -- pool wipes the abilities of a card off the battlefield.
+              PC.grantedCostReductions = [],
               -- The same for a granted static ability: only an EARLIER grant is
               -- gone. Unproven: no card in data/cards/ grants a static ability
               -- to a permanent an ability wipe reaches.
@@ -5287,6 +5294,8 @@ grantedStaticWrites p g = case g of
   GrantedAbility.Replacement _ -> False
   -- CR 613.10: nor does a player ability.
   GrantedAbility.Player _ -> False
+  -- CR 601.2f: nor does a reduction of its own cost.
+  GrantedAbility.SelfCostReduction _ -> False
 
 -- Does this modification hand its affected objects a keyword satisfying `p`?
 -- Exhaustive rather than a catch-all: a modification added later that also hands

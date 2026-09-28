@@ -16,8 +16,11 @@ import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -26,6 +29,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -114,4 +118,11 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
       codec
       (GrantedAbility.Player (PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You Nothing Nothing PlayerEffect.NoMaximumHandSize))
       " {\"type\":\"Player\",\"value\":{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"NoMaximumHandSize\"}}} "
+  -- CR 601.2f: Richlau, Headmaster's "This spell costs {1} less to cast".
+  Spec.it s "SelfCostReduction" $
+    Common.assertCodec
+      s
+      codec
+      (GrantedAbility.SelfCostReduction (CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (Quantity.Literal 1) Nothing))
+      " {\"type\":\"SelfCostReduction\",\"value\":{\"amount\":[{\"type\":\"Generic\",\"value\":1}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
