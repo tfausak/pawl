@@ -2071,13 +2071,10 @@ playGame =
 -- ended -- exact rather than late, since CR 729.1a discontinued the main game
 -- throughout. Setup.applyCrossings carries that argument in full.
 --
--- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders and
--- vanguards are the kinds Setup carries both ways, dungeons ride
--- Player.dungeons rather than the command zone, and a conspiracy stays in the
--- main game, which is CR 729.2's "no other cards ... are moved".
---
--- Not implemented: CR 729.2a's planar deck (#4313) and scheme deck (#4316)
--- moving into the subgame.
+-- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders,
+-- vanguards and the supplementary decks are the kinds Setup carries both ways,
+-- dungeons ride Player.dungeons rather than the command zone, and a conspiracy
+-- stays in the main game, which is CR 729.2's "no other cards ... are moved".
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get
@@ -2138,8 +2135,10 @@ playSubgame = do
   -- own back to their main-game library and shuffles.
   seated <- State.gets Game.stillPlayingInOrder
   Monad.forM_ seated Event.shuffleLibrary
-  -- CR 729.5a: and their Attraction decks.
+  -- CR 729.5a: and their supplementary decks.
   Monad.forM_ seated Event.shuffleAttractionDeck
+  Monad.forM_ seated Planechase.shufflePlanarDeck
+  Monad.forM_ seated Archenemy.shuffleSchemeDeck
   pure result
 
 playFrom :: NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game Result

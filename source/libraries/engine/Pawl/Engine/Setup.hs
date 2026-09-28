@@ -647,13 +647,7 @@ startGameFromCards perform exemptions = do
       -- cannot be forgotten on one path and reset on the other.
       toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
       toCommandCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Command}
-      -- CR 311.2 / 312.2 / 314.2: a plane, phenomenon or scheme card never
-      -- leaves the command zone, so each stays where it is, in its deck or face
-      -- up.
-      --
-      -- Not implemented: CR 103.7's starting plane for the new game (#4313).
-      heldInCommand = Set.unions [Set.fromList (foldMap Foldable.toList (GameState.planarDecks gs)), Set.fromList (foldMap Foldable.toList (GameState.schemeDecks gs)), Set.filter (\oid -> Plane.isPlanarCard oid gs || Scheme.isScheme oid gs) (GameState.command gs)]
-      rebuilt = Map.filter isCard (Map.withoutKeys (GameState.objects gs) (Set.union exempt heldInCommand))
+      rebuilt = Map.filter isCard (Map.withoutKeys (GameState.objects gs) exempt)
       -- CR 903.6: "each player puts their commander from their deck face up into
       -- the command zone". Both callers start a new game following rule 103 (CR
       -- 727.1, CR 729.2), so rule 903.6 applies to each of them, and CR 729.2c
@@ -694,25 +688,47 @@ startGameFromCards perform exemptions = do
       -- game in its owner's Attraction deck; CR 729.2a's subgame pool holds only
       -- the decks.
       attractionCards = fmap toCommandCard (Map.filterWithKey (\oid _ -> Game.astrotoriumBack oid gs) (Map.withoutKeys rebuilt inCommandIds))
-      cards = fmap toLibraryCard (Map.withoutKeys rebuilt (Set.union inCommandIds (Map.keysSet attractionCards)))
-      libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
-      attractionDeckOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) attractionCards))
+      -- CR 311.2 / 312.2 / 314.2: a plane, phenomenon or scheme card never
+      -- leaves the command zone, and CR 727.2 / 103.3a start the new game with
+      -- each in its owner's supplementary deck, face up or not. A subgame's pool
+      -- holds only the decks (CR 729.2a).
+      planarCards = fmap toCommandCard (Map.filterWithKey (\oid _ -> Plane.isPlanarCard oid gs) (Map.withoutKeys rebuilt inCommandIds))
+      schemeCards = fmap toCommandCard (Map.filterWithKey (\oid _ -> Scheme.isScheme oid gs) (Map.withoutKeys rebuilt inCommandIds))
+      supplementary = Set.unions [Map.keysSet attractionCards, Map.keysSet planarCards, Map.keysSet schemeCards]
+      cards = fmap toLibraryCard (Map.withoutKeys rebuilt (Set.union inCommandIds supplementary))
+      ownedIn pool pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) pool))
+      libraryOf = ownedIn cards
+      attractionDeckOf = ownedIn attractionCards
+      -- Keyed by who had a deck as well as by who owns a card in one, so an
+      -- archenemy whose scheme deck moved into a subgame empty is still one
+      -- (Archenemy.isArchenemy).
+      decksOf old pool = Map.fromList [(pid, ownedIn pool pid) | pid <- owners, Map.member pid old || not (Seq.null (ownedIn pool pid))]
   State.put
     gs
-      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) (Set.union exempt heldInCommand), cards, commandZoneCards, attractionCards],
+      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards, planarCards, schemeCards],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) owners)),
+        GameState.planarDecks = decksOf (GameState.planarDecks gs) planarCards,
+        GameState.schemeDecks = decksOf (GameState.schemeDecks gs) schemeCards,
         GameState.hand = Map.empty,
         GameState.graveyard = Map.empty,
         GameState.battlefield = mempty,
         GameState.phasedOut = mempty,
         GameState.exile = exempt,
-        GameState.command = Set.union inCommandIds (Set.intersection heldInCommand (GameState.command gs)),
+        GameState.command = inCommandIds,
         GameState.stack = []
       }
   Monad.forM_ owners Event.shuffleLibrary
   Monad.forM_ owners Event.shuffleAttractionDeck
+  -- CR 103.3a / 729.2a.
+  Monad.forM_ owners Planechase.shufflePlanarDeck
+  Monad.forM_ owners Archenemy.shuffleSchemeDeck
   Mulligan.openingHands perform owners
+  -- CR 103.7, newGame's step: the new game's starting player sets a starting
+  -- plane after the opening hands.
+  starting <- State.gets GameState.activePlayer
+  planechase <- State.gets Planechase.isPlanechase
+  Monad.when planechase (Planechase.setStartingPlane starting)
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
 -- cyclic order. Total: a `starter` not in the order leaves it as-is.
@@ -946,9 +962,15 @@ restartGame perform exempt starter = do
           }
   startGameFromCards perform exempt
 
+-- CR 100.2d / 729.2a: every card in every player's Attraction (CR 717.2),
+-- planar (CR 901.3) and scheme (CR 904.3) deck.
+supplementaryDeckIds :: GameState -> Set.Set ObjectId
+supplementaryDeckIds gs =
+  Set.fromList (foldMap Foldable.toList (GameState.attractionDecks gs) <> foldMap Foldable.toList (GameState.planarDecks gs) <> foldMap Foldable.toList (GameState.schemeDecks gs))
+
 -- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards, plus
--- CR 729.2b's vanguards and CR 729.2c's commanders; no other main-game zone
--- enters. The object pool is
+-- CR 729.2a's supplementary decks, CR 729.2b's vanguards and CR 729.2c's
+-- commanders; no other main-game zone enters. The object pool is
 -- restricted to those objects; startGameFromCards (called by playSubgame) then
 -- rebuilds each subgame library from that pool, puts each of those back in the
 -- subgame's command zone (CR 903.6, CR 313.2), shuffles, and draws opening hands (CR
@@ -961,10 +983,6 @@ restartGame perform exempt starter = do
 -- Engine.skipsDraw (CR 103.8a) tests the HEAD of the turn order. Total: a
 -- `starter` outside the order leaves it alone, and activePlayer is read back
 -- off the rotated order, so the two cannot disagree.
--- CR 717.2: every card in every player's Attraction deck.
-attractionDeckIds :: GameState -> Set.Set ObjectId
-attractionDeckIds gs = Set.fromList (foldMap Foldable.toList (GameState.attractionDecks gs))
-
 subgameStateFrom :: PlayerId -> GameState -> GameState
 subgameStateFrom starter parent =
   let libIds =
@@ -976,16 +994,13 @@ subgameStateFrom starter parent =
       -- Nothing ELSE in the main-game command zone moves -- CR 729.2's "no other
       -- cards in a main-game zone are moved" -- and their remaining sibling has no
       -- format here but one: CR 729.2a's supplementary decks of nontraditional
-      -- cards are the Attraction deck (`attrIds` below), and the planar and
-      -- scheme decks CR 100.2d names.
-      --
-      -- Not implemented: the planar deck (#4313) and the scheme deck (#4316)
-      -- moving into the subgame.
+      -- cards are the Attraction, planar and scheme decks CR 100.2d names
+      -- (`suppIds` below).
       --
       -- The other command-zone residents pawl DOES have -- an emblem, a
       -- conspiracy, and a dungeon a player has ventured into -- stay in the
       -- parent, which is what CR 729.2 asks rather than an elision: `movedObjects` below restricts to the
-      -- libraries, CR 729.2b's vanguards and CR 729.2c's commanders, so nothing
+      -- libraries, CR 729.2a's supplementary decks, CR 729.2b's vanguards and CR 729.2c's commanders, so nothing
       -- else crosses.
       --
       -- The parent's own copy is deliberately left where it is: the parent is
@@ -997,10 +1012,10 @@ subgameStateFrom starter parent =
       -- 729.2c's "if it's there" because CR 313.2 has kept it in the command zone
       -- all along.
       cmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
-      -- CR 729.2a: each Attraction deck moves in, and startGameFromCards
-      -- shuffles it. The face-up Attractions stay behind.
-      attrIds = attractionDeckIds parent
-      movedObjects = Map.restrictKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, attrIds])
+      -- CR 729.2a: each supplementary deck moves in, and startGameFromCards
+      -- shuffles it. The face-up Attractions, planes and schemes stay behind.
+      suppIds = supplementaryDeckIds parent
+      movedObjects = Map.restrictKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, suppIds])
       -- Invariant: `libIds` here and funnelBack's `oldLibIds` MUST compute the
       -- identical id set, and so must `cmdIds` and funnelBack's `oldCmdIds`.
       -- Both draw from the parent's FULL roster
@@ -1021,7 +1036,7 @@ subgameStateFrom starter parent =
       -- CR 729.4: "all objects in the main game and all cards outside the main
       -- game are considered outside the subgame (except those specifically
       -- brought into the subgame)". The exception is `movedObjects` -- CR
-      -- 729.2's libraries, CR 729.2b's vanguards and CR 729.2c's commanders --
+      -- 729.2's libraries, CR 729.2a's supplementary decks, CR 729.2b's vanguards and CR 729.2c's commanders --
       -- which are IN the
       -- subgame and so are excluded here. Only Source.OfCard objects: CR
       -- 400.11c's "spells and abilities that allow those cards to be brought
@@ -1046,7 +1061,7 @@ subgameStateFrom starter parent =
       -- Shahrazad itself still finishes resolving with the winner it bound".
       outside =
         Map.union
-          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, attrIds])))
+          (Map.mapMaybe asOutside (Map.withoutKeys (GameState.objects parent) (Set.unions [libIds, cmdIds, suppIds])))
           (GameState.outsideObjects parent)
       -- CR 110.5's face-up/face-down status rides along with the printing, and
       -- is the one thing about the parent's object that does. It is not an
@@ -1078,7 +1093,8 @@ subgameStateFrom starter parent =
           -- CR 902.4 / CR 729.2b: read off the PARENT, whose command zone still
           -- holds every vanguard card at this point -- `cmdIds` below is what
           -- moves them into the subgame, and it is computed from the same board.
-          GameState.players = resetPlayers (GameState.settings parent) (length order) (\pid -> Vanguard.lifeModifierOf pid parent) (GameState.players parent),
+          -- CR 103.4e likewise: the archenemy's scheme deck is the one moving in.
+          GameState.players = resetPlayers (GameState.settings parent) (length order) (\pid -> Vanguard.lifeModifierOf pid parent + (if Archenemy.isArchenemy pid parent then Archenemy.lifeBonus else 0)) (GameState.players parent),
           GameState.outsideObjects = outside,
           -- CR 729.4a: nothing has crossed into this subgame yet.
           GameState.broughtIn = Seq.empty,
@@ -1443,17 +1459,22 @@ funnelBack finalSub parent =
       -- CR 729.5's own exclusion: "all traditional cards they own that are in the
       -- subgame OTHER THAN those in the subgame command zone". So the library
       -- funnel skips the subgame's command zone wholesale, and CR 729.5b and CR
-      -- 729.5c take back out of it exactly the vanguards and the commanders. Any
-      -- other CARD that ended there is covered by rule 729.5's "except as
-      -- specified in rules 729.5a-c, all other objects in the subgame cease to
-      -- exist", which is the literal reading; those two are the only cards a
-      -- subgame can put in that zone anyway (CR 903.9a, CR 313.2), and an emblem
-      -- there is not a card and never was in scope.
+      -- 729.5c take back out of it exactly the vanguards and the commanders, and
+      -- CR 729.5a each face-up plane and scheme (below). Any other CARD that
+      -- ended there is covered by rule 729.5's "except as specified in rules
+      -- 729.5a-c, all other objects in the subgame cease to exist", which is the
+      -- literal reading; those are the only cards a subgame can put in that zone
+      -- anyway (CR 903.9a, CR 313.2, CR 311.2, CR 314.2), and an emblem there is
+      -- not a card and never was in scope.
       subCmdIds = GameState.command finalSub
-      -- CR 729.5a: every Attraction card in the subgame began it in an
-      -- Attraction deck (subgameStateFrom's `attrIds`), and goes back to it.
+      -- CR 729.5a: every Attraction, plane, phenomenon and scheme card in the
+      -- subgame began it in a supplementary deck (subgameStateFrom's
+      -- `suppIds`), and goes back to it -- a face-up plane or scheme included,
+      -- turned face down.
       subAttractions = Map.filterWithKey (\oid obj -> isCard obj && Game.astrotoriumBack oid finalSub) (Map.withoutKeys subObjects subCmdIds)
-      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys subObjects (Set.union subCmdIds (Map.keysSet subAttractions))))
+      subPlanar = Map.filterWithKey (\oid obj -> isCard obj && Plane.isPlanarCard oid finalSub) subObjects
+      subSchemes = Map.filterWithKey (\oid obj -> isCard obj && Scheme.isScheme oid finalSub) subObjects
+      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys subObjects (Set.unions [subCmdIds, Map.keysSet subAttractions, Map.keysSet subPlanar, Map.keysSet subSchemes])))
       backFromSub =
         fmap
           toCommandCard
@@ -1469,19 +1490,23 @@ funnelBack finalSub parent =
       -- and into the library by `returned` if it ended the subgame anywhere else
       -- (CR 729.5's first sentence).
       oldCmdIds = Set.filter (\oid -> Commander.isCommander oid parent || Vanguard.isVanguard oid parent) (GameState.command parent)
-      oldAttrIds = attractionDeckIds parent
-      movedIds = Set.unions [oldLibIds, oldCmdIds, oldAttrIds]
+      oldSuppIds = supplementaryDeckIds parent
+      movedIds = Set.unions [oldLibIds, oldCmdIds, oldSuppIds]
       ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems subObjects))
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
         Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
       recoveredIds = Set.filter removedByDeparture movedIds
-      recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds (Set.union oldCmdIds oldAttrIds)))
-      -- An Attraction deck whose owner departed inside the subgame goes back to
-      -- being their deck, the commander's reason below.
-      recoveredAttr = Map.restrictKeys (GameState.objects parent) (Set.intersection recoveredIds oldAttrIds)
-      attractionsBack = Map.union (fmap toCommandCard subAttractions) (fmap toCommandCard recoveredAttr)
-      attractionDeckOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) attractionsBack))
+      recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds (Set.union oldCmdIds oldSuppIds)))
+      -- A supplementary deck whose owner departed inside the subgame goes back
+      -- to being their deck, the commander's reason below.
+      recoveredSupp = Map.restrictKeys (GameState.objects parent) (Set.intersection recoveredIds oldSuppIds)
+      backTo sub isKind = fmap toCommandCard (Map.union sub (Map.filterWithKey (\oid _ -> isKind oid parent) recoveredSupp))
+      attractionsBack = backTo subAttractions Game.astrotoriumBack
+      planarBack = backTo subPlanar Plane.isPlanarCard
+      schemesBack = backTo subSchemes Scheme.isScheme
+      ownedIn pool pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) pool))
+      attractionDeckOf = ownedIn attractionsBack
       -- A commander whose owner departed INSIDE the subgame is recovered to the
       -- zone it left the parent from, not to a library: CR 729.1b keeps the
       -- subgame's departure from meaning anything in the main game, where that
@@ -1546,11 +1571,13 @@ funnelBack finalSub parent =
           Status.Departed _ -> player
           Status.Playing -> player {Player.outsideTheGame = Player.outsideTheGame inSub}
    in parent
-        { GameState.objects = Map.unions [allReturned, toCommand, attractionsBack, keptParentObjects],
+        { GameState.objects = Map.unions [allReturned, toCommand, attractionsBack, planarBack, schemesBack, keptParentObjects],
           GameState.players = carriedPools,
           GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
           -- CR 729.5a; Engine.playSubgame shuffles them.
           GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) (GameState.turnOrder parent))),
+          GameState.planarDecks = Map.mapWithKey (\pid _ -> ownedIn planarBack pid) (GameState.planarDecks parent),
+          GameState.schemeDecks = Map.mapWithKey (\pid _ -> ownedIn schemesBack pid) (GameState.schemeDecks parent),
           -- CR 729.5c. The parent's other command-zone residents are untouched:
           -- CR 729.2c moved only the commanders, so only they can come back.
           GameState.command = Set.union (Set.difference (GameState.command parent) oldCmdIds) (Map.keysSet toCommand),
