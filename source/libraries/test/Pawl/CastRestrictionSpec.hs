@@ -722,15 +722,37 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
         (_, withInterdiction) = S.addPermanent interdiction S.alice withPrison
         (gs, oid) = S.handOne waxWane withInterdiction
         after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid waneName Facing.FaceUp))
-    -- Not asserted: what CR 601.2b-i do afterwards. castSpell announces, prices
-    -- and pays for a spell the redirect has already moved off the stack, and
-    -- which of the two defensible readings is right is not implemented (#816).
+    -- What CR 601.2b-i do afterwards is the next case's.
     Spec.assertEqWith s "the redirect fired, so nothing reached the stack" (length (GameState.stack after)) 0
     case Game.zoneMembers Zone.Exile S.alice after of
       [exiled] -> do
         Spec.assertEqWith s "in exile, CR 709.4's combined view has both names" (Projection.namesOf exiled after) (Set.fromList [waxName, waneName])
         Spec.assertEqWith s "and CR 709.4b's combined colours" (Projection.colorsOf exiled after) (Set.fromList [Color.Green, Color.White])
       _ -> Spec.assertFailure s "expected the redirected card in exile"
+  -- The same redirect, and what the cast does after it. Neither supported nor
+  -- refuted by the rules: CR 601.2a's "a rule or effect moves it elsewhere"
+  -- contemplates a spell LEAVING the stack, not one that never arrived, so no
+  -- rule rewinds the cast (CR 601.2e is for illegal casts) and none completes
+  -- it. The reading pinned here: only the arrival is replaced (CR 614.6), so
+  -- CR 601.2b-i run on -- Wax's target chosen, its {G} paid -- and the spell
+  -- WAS cast (CR 601.2i), which is what Young Pyromancer triggers on.
+  Spec.it s "CR 601.2i a cast redirected off the stack is still a cast" $ do
+    forest <- S.printingOf s registry "Forest"
+    pyromancer <- S.printingOf s registry "Young Pyromancer"
+    interdiction <- S.printingOf s registry "Synthetic Stack Interdiction"
+    waxWane <- S.printingOf s registry "Wax"
+    -- The Pyromancer is the only creature, so it is Wax's target (CR 601.2c).
+    let (forestId, withForest) = S.addPermanent forest S.alice (S.landsInPlay forest 0)
+        (_, withPyromancer) = S.addPermanent pyromancer S.alice withForest
+        (_, withInterdiction) = S.addPermanent interdiction S.alice withPyromancer
+        (gs, oid) = S.handOne waxWane (aliceOnTurn withInterdiction)
+        cast = S.runPure S.identityAnswer gs (Cast.castSpell S.manaPerformer S.alice oid waxName Facing.FaceUp)
+        after = S.runPure S.identityAnswer cast Engine.priorityLoop
+        elemental = CardName.MkCardName (Text.pack "Elemental Token")
+    Spec.assertEqWith s "the redirect fired, so nothing reached the stack" (length (GameState.stack cast)) 0
+    Spec.assertEqWith s "CR 601.2h the Forest paid Wax's {G}" (tapStateOf forestId cast) (Just TapState.Tapped)
+    Spec.assertEqWith s "CR 601.2i Young Pyromancer saw a cast" (S.countOnBattlefieldByName elemental S.alice after) 1
+    Spec.assertEqWith s "and the card stays in exile, never resolving" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
 
 -- Wear // Tear {1}{R} // {W}, the pool's first card with fuse (CR 702.102):
 -- Wear is "Destroy target artifact", Tear is "Destroy target enchantment", and
