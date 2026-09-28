@@ -1639,6 +1639,9 @@ beginTurn extra pid gs =
         gs
           { GameState.activePlayer = pid,
             GameState.turnNumber = GameState.turnNumber gs + 1,
+            -- CR 500.7: which extra turn this is, for a duration naming it
+            -- (Expiry.DuringExtraTurn); Nothing on an ordinary turn.
+            GameState.extraTurnUnderWay = extra,
             -- CR 608.2i is why a log exists at all. It does not say how far back;
             -- the ONE-turn scope is this engine's choice, every history-reading
             -- card in `data/cards/` asking "this turn". Cleared here and never at

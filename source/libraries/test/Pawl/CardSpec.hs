@@ -836,6 +836,7 @@ durationConditions duration = case duration of
   Duration.UntilEndOfNextTurnOf _ -> []
   Duration.DuringNextTurnOf _ -> []
   Duration.DuringYourNextTurn -> []
+  Duration.DuringThatExtraTurn -> []
   Duration.ForAsLongAs condition -> [condition]
   Duration.UntilEndOfCombat -> []
   Duration.UntilEndOfCombatOnYourNextTurn -> []
@@ -3938,6 +3939,7 @@ durationFilters duration =
           Duration.UntilEndOfNextTurnOf _ -> []
           Duration.DuringNextTurnOf _ -> []
           Duration.DuringYourNextTurn -> []
+          Duration.DuringThatExtraTurn -> []
           Duration.ForAsLongAs _ -> []
           Duration.UntilEndOfCombat -> []
           Duration.UntilEndOfCombatOnYourNextTurn -> []
@@ -4764,6 +4766,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 725 names no quality either: the designation has no parts (Jared
   -- Carthalion, True Heir).
   PlayerEffect.CantBecomeMonarch -> []
+  PlayerEffect.CantSetSchemesInMotion -> []
   PlayerEffect.CantAttackWithCreatures -> []
   -- CR 601.3a's Filter half, which is exactly a quality of the spell (Damping
   -- Engine's "artifact, creature, or enchantment spells").

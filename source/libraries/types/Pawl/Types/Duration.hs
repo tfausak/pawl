@@ -63,6 +63,11 @@ data Duration
     -- Nullary, as UntilYourNextTurn is: CR 109.5's "you" is the effect's
     -- controller, which Pawl.Engine.Expiry.arm already holds.
     DuringYourNextTurn
+  | -- | CR 611.2a / 500.7: "during that turn", the extra turn the same resolution
+    -- created (Alchemist's Gambit) -- named by its ExtraTurn.createdAt, as
+    -- Onset.FromThatExtraTurn names it, since a later-created extra turn is
+    -- taken first.
+    DuringThatExtraTurn
   | -- | CR 611.2b: "for as long as ...". The duration has a BEGINNING as well as
     -- an end -- "if the 'for as long as' duration never starts, the effect does
     -- nothing" -- which is why Pawl.Engine.Expiry.arm returns a Maybe.

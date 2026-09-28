@@ -90,6 +90,23 @@ spec s registry = Spec.describe s "Pawl.Engine.Archenemy" $ do
     Spec.assertEqWith s "and is on the bottom of alice's scheme deck" (names (Archenemy.deckOf S.alice died) died) ["Look Skyward and Despair", "The Very Soil Shall Shake"]
     Spec.assertEqWith s "so the surviving Piker is its printed 2/1 again" (S.powerToughnessOf survivor died) (Just (2, 1))
 
+  -- CR 500.7 / 611.2a / 101.2: All in Good Time ("When you set this scheme in
+  -- motion, take an extra turn after this one. Schemes can't be set in motion
+  -- that turn." -- Oracle verified on Scryfall 2026-09-28). Look Skyward and
+  -- Despair is next in the deck: the extra turn's CR 904.9 action sets nothing
+  -- in motion, and the prohibition ends with that turn, so alice's next
+  -- ordinary turn sets Look Skyward in motion and makes its Dragon.
+  Spec.it s "CR 904.9 no scheme is set in motion during All in Good Time's extra turn, and one is on alice's next turn" $ do
+    board <- schemeBoard s registry ["All in Good Time", "Look Skyward and Despair"]
+    let start = (inMain S.alice board) {GameState.remaining = S.phasesAfter Phase.PrecombatMain}
+        atExtra = throughTurn start
+        afterExtra = throughTurn atExtra
+        afterNext = throughTurn (throughTurn afterExtra)
+    Spec.assertEqWith s "during the extra turn nothing was set in motion, so alice has no Dragon" (creaturesOf S.alice afterExtra) []
+    Spec.assertEqWith s "and Look Skyward and Despair is still on top" (names (Archenemy.deckOf S.alice afterExtra) afterExtra) ["Look Skyward and Despair", "All in Good Time"]
+    Spec.assertEqWith s "on alice's next turn it is set in motion and makes its 5/5 Dragon" (fmap (`S.powerToughnessOf` afterNext) (creaturesOf S.alice afterNext)) [Just (5, 5)]
+    Spec.assertEqWith s "the extra turn is turn 2 and alice's, and the last read follows alice's turn 4" (fmap (\g -> (GameState.turnNumber g, GameState.activePlayer g)) [atExtra, afterNext]) [(2, S.alice), (5, S.bob)]
+
 -- A two-player board with alice's scheme deck stacked in the order named, top
 -- first, and twenty Forests in each library. No opening hands are drawn.
 schemeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m GameState.GameState
@@ -101,6 +118,16 @@ schemeBoard s registry order = do
       built = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice alices >> Setup.createDeck S.bob bobs)
       rank oid = maybe (length order) (\face -> Maybe.fromMaybe (length order) (List.elemIndex (Face.name face) (fmap (CardName.MkCardName . Text.pack) order))) (Game.faceOf oid built)
   pure built {GameState.schemeDecks = Map.adjust (Seq.sortOn rank) S.alice (GameState.schemeDecks built)}
+
+-- Step the game until the turn under way has ended and the next has begun.
+-- Bounded, so a schedule that never hands off stops rather than looping.
+throughTurn :: GameState.GameState -> GameState.GameState
+throughTurn gs =
+  let go n g =
+        if n <= (0 :: Int) || Maybe.isJust (GameState.result g) || GameState.turnNumber g /= GameState.turnNumber gs
+          then g
+          else go (n - 1) (S.runPure S.identityAnswer g Engine.runStep)
+   in go 64 gs
 
 -- `pid`'s precombat main phase with priority and an empty stack.
 inMain :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
