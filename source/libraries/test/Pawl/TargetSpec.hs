@@ -414,8 +414,84 @@ aimingBioshift giverId takerId p = case p of
   Prompt.ChooseMovedCounters _ _ _ _ offered -> offered
   _ -> S.identityAnswer p
 
+-- Unbury's second mode, answered `firstId` then `secondId`, each slot's offer
+-- FILTERED to its object for aimingBioshift's reason.
+aimingUnbury :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingUnbury firstId secondId p = case p of
+  Prompt.ChooseModes {} -> Seq.singleton (ModeIndex.MkModeIndex 1)
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot (_, offered) ->
+          let wanted = if slot == SlotName.MkSlotName (Text.pack "first") then firstId else secondId
+           in Set.filter ((==) (Just wanted) . Recipient.objectOf) offered
+      )
+      asked
+  _ -> S.identityAnswer p
+
+-- CR 601.2c / 205.3m: Unbury's "return two target creature cards that share a
+-- creature type from your graveyard to your hand". Its `second` slot is And
+-- [Not (IsBound "first"), SharesCreatureTypeWithBound "first"]. alice's graveyard
+-- holds two Hill Giants, a Goblin Piker and a Woodland Changeling; every board
+-- is the same, and the cases differ only in which pair is named.
+unburySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+unburySpec s registry = Spec.describe s "Unbury" $ do
+  let fixture = do
+        swamp <- S.printingOf s registry "Swamp"
+        giant <- S.printingOf s registry "Hill Giant"
+        piker <- S.printingOf s registry "Goblin Piker"
+        changeling <- S.printingOf s registry "Woodland Changeling"
+        unbury <- S.printingOf s registry "Unbury"
+        let lands = S.landsFor swamp S.alice 2 (Setup.emptyGame S.bothPlayers)
+            (giantA, g1) = S.addObjectIn Zone.Graveyard giant S.alice lands
+            (giantB, g2) = S.addObjectIn Zone.Graveyard giant S.alice g1
+            (pikerId, g3) = S.addObjectIn Zone.Graveyard piker S.alice g2
+            (changelingId, g4) = S.addObjectIn Zone.Graveyard changeling S.alice g3
+            (board, spellId) = S.handOne unbury g4
+        pure (unbury, board, spellId, giantA, giantB, pikerId, changelingId)
+      inHand oid gs = elem oid (Game.zoneMembers Zone.Hand S.alice gs)
+      -- A returned card is a new object in hand (CR 400.7), so the hand is
+      -- read by name.
+      handNames gs = List.sort (Maybe.mapMaybe (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand S.alice gs))
+      named = List.sort . fmap (CardName.MkCardName . Text.pack)
+  Spec.it s "CR 205.3m the two targets must hold a creature type in common" $ do
+    (_, board, spellId, giantA, giantB, pikerId, changelingId) <- fixture
+    let cast firstId secondId = S.runPure (aimingUnbury firstId secondId) board (S.cast S.alice spellId)
+        resolved firstId secondId = S.runPure (aimingUnbury firstId secondId) (cast firstId secondId) Stack.resolveTop
+        giants = resolved giantA giantB
+        mixed = resolved giantA pikerId
+        withChangeling = resolved pikerId changelingId
+    -- THE GAMEPLAY-LEVEL ASSERTIONS first.
+    Spec.assertEqWith s "two Giants share Giant: both return" (handNames giants) (named ["Hill Giant", "Hill Giant"])
+    Spec.assertEqWith s "a Giant and a Goblin share nothing: neither returns" (handNames mixed) (named ["Unbury"])
+    Spec.assertEqWith s "CR 702.73a a Goblin and a changeling share Goblin: both return" (handNames withChangeling) (named ["Goblin Piker", "Woodland Changeling"])
+    -- CR 601.2e behind the refusal: the announcement is reversed.
+    Spec.assertEqWith s "the Giant-and-Goblin cast is reversed" (length (GameState.stack (cast giantA pikerId))) 0
+    Spec.assertBool s (inHand spellId (cast giantA pikerId)) "and Unbury is back in alice's hand"
+  -- The rulings' case, CR 608.2b with CR 608.2h: one card leaves the graveyard
+  -- before Unbury resolves, and the other is still returned, since it shares a
+  -- type with the one that left as it last existed.
+  Spec.it s "CR 608.2b one target leaving does not strand the other" $ do
+    (_, board, spellId, giantA, giantB, _, _) <- fixture
+    let cast = S.runPure (aimingUnbury giantA giantB) board (S.cast S.alice spellId)
+        exiled = S.runPure S.identityAnswer cast (Event.changeZone giantA Zone.Exile)
+        after = S.runPure (aimingUnbury giantA giantB) exiled Stack.resolveTop
+    Spec.assertEqWith s "the Giant still in the graveyard returns, and the exiled one does not" (handNames after) (named ["Hill Giant"])
+  -- The union posture: before either target is chosen, the second slot is
+  -- offered every creature card, the Goblin included, and the joint check is
+  -- what narrows it.
+  Spec.it s "CR 601.2c the second slot's offer is every creature card" $ do
+    (unbury, board, _, giantA, giantB, pikerId, changelingId) <- fixture
+    let slots = Modal.allTargetSlots (Face.spell (S.combinedFace unbury))
+        offered = Target.legalSets (Just S.alice) False Map.empty S.noSource slots board
+    Spec.assertEqWith
+      s
+      "every creature card in alice's graveyard"
+      (Set.map Recipient.objectOf (Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack "second")) offered))
+      (Set.fromList (fmap Just [giantA, giantB, pikerId, changelingId]))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
+  unburySpec s registry
   -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
   -- player can't be the target of spells or abilities.'" Doom Blade is "target
   -- nonblack creature" and the Mongoose is green, so its Filter admits the

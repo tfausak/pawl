@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
+import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Binding as Binding.Type
@@ -412,10 +413,12 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- 205.2a's read of the subject's host is Pawl.Engine.Attach.hostsFor's
             -- to fill, and an announcement has no attach subject at all.
             Filter.subjectHostCardTypes = Set.empty,
-            -- Empty: CR 205.3m's comparison is filled only in a resolution's
-            -- own positions, and Pawl.FilterPositionLintSpec's lint refuses a
-            -- card that writes it in a target slot.
-            Filter.slotCreatureTypes = Map.empty,
+            -- CR 205.3m's creature types off the same objects and the same
+            -- CR 608.2h reader as slotControllers above, keyed per bound slot so
+            -- the atom widens for an unanswered one. The last-known read is the
+            -- rulings' (Unbury, Secret Tunnel): a target that has left still
+            -- lends its types to the one that stayed.
+            Filter.slotCreatureTypes = fmap (foldMap (foldMap (foldMap (Set.filter Subtype.isCreatureType . Filter.subtypes) . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
             Filter.slotToughnesses = Map.empty,
             -- CR 601.2c's PLAYERS out of the same environment, slotObjects' half
             -- one recipient kind over. Filled here for the symmetry rather than
