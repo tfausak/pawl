@@ -924,7 +924,7 @@ rewriteEffect pairs effect = case effect of
   -- The number of turns is the Quantity, FlipCoin's descent above; the
   -- PlayerRef and the skips no word rule 612 can swap.
   Effect.TakeExtraTurn x -> Effect.TakeExtraTurn x {TakeExtraTurn.count = rewriteQuantity pairs (TakeExtraTurn.count x)}
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named refs) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (fmap (rewriteObjectRef pairs) refs))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect
   -- THREE places, and all three descend. A Filter the ObjectRef carries is card
