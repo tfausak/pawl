@@ -1680,7 +1680,7 @@ combatReplaySpec s =
         -- CR 701.30c: so is which end of their library a clashing player put the
         -- card they revealed on.
         Spec.it s "ChooseClash round-trips through the transcript" $ do
-          let p = Prompt.ChooseClash decider S.alice oid (ObjectId.MkObjectId 7) ((S.alice, ObjectId.MkObjectId 7) NonEmpty.:| [(S.bob, ObjectId.MkObjectId 9)])
+          let p = Prompt.ChooseClash decider S.alice oid (ObjectId.MkObjectId 7) ((S.alice, ObjectId.MkObjectId 7) NonEmpty.:| [(S.bob, ObjectId.MkObjectId 9)]) Seq.empty
           Spec.assertEqWith s "bottoming it round trips" (Replay.decode p (Replay.encode p LibraryPosition.Bottom)) (Just LibraryPosition.Bottom)
           -- Discriminating: a decode that ignored the response and answered the
           -- short transcript's Top would pass one leg by accident.
