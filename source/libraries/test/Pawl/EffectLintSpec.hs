@@ -1455,7 +1455,7 @@ effectObjectRefs effect =
         Effect.RollDie {} -> []
         Effect.FlipCoin {} -> []
         Effect.TakeExtraTurn {} -> []
-        Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> read_ [ref]
+        Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> read_ (NonEmpty.toList refs)
         -- No ObjectRef at all: the opcode names a library.
         Effect.Shuffle {} -> []
         -- Nor here: the opcode names cards by name.
