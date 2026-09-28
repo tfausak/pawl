@@ -429,8 +429,9 @@ aimingUnbury firstId secondId p = case p of
   _ -> S.identityAnswer p
 
 -- CR 601.2c / 205.3m: Unbury's "return two target creature cards that share a
--- creature type from your graveyard to your hand". Its `second` slot is And
--- [Not (IsBound "first"), SharesCreatureTypeWithBound "first"]. alice's graveyard
+-- creature type from your graveyard to your hand". Each slot names the other
+-- with SharesCreatureTypeWithBound, since the condition binds both targets alike
+-- (CR 608.2b re-checks each), and `second` adds Not (IsBound "first"). alice's graveyard
 -- holds two Hill Giants, a Goblin Piker and a Woodland Changeling; every board
 -- is the same, and the cases differ only in which pair is named.
 unburySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -2584,6 +2585,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "naming alice's other Wall, all three counters cross to it" (fmap (`counters` ontoMine) [giverId, mineId]) [0, 3]
     Spec.assertEqWith s "naming bob's Wall, it receives none" (counters theirsId ontoTheirs) 0
     Spec.assertEqWith s "and alice's first Wall still bears all three" (counters giverId ontoTheirs) 3
+    -- CR 608.2b: the `from` Wall changes controller in response (a SetController
+    -- effect, Act of Treason's layer-2 half). "With the same controller" is the
+    -- `to` target's condition, re-checked against `from`'s controller NOW, so
+    -- `to` is illegal and nothing crosses -- the constraint needs no mirror on
+    -- `from`, whose own text asks nothing of its sibling.
+    let (castMine, _) = run mineId
+        stolen = S.runPure (aimingBioshift giverId mineId) (S.giveControl giverId S.bob castMine) Stack.resolveTop
+    Spec.assertEqWith s "CR 608.2b the giver was stolen in response: no counter crosses" (fmap (`counters` stolen) [giverId, mineId]) [3, 0]
     -- CR 601.2e, behind the behaviour: the announcement was not one the rule
     -- allows, so the game returned to before the spell was proposed.
     Spec.assertEqWith s "the cast is reversed" (length (GameState.stack castAtTheirs)) 0

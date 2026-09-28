@@ -1361,7 +1361,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         restricted = face {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching atom) Nothing]}
     Spec.assertEqWith s "Mudbutton Clanger's one atom is in its clause's gate" (sharesCreatureTypeCounts face) (1, 0)
     unbury <- S.printingOf s registry "Unbury"
-    Spec.assertEqWith s "Unbury's one atom is in its second target slot" (sharesCreatureTypeCounts (S.combinedFace unbury)) (1, 0)
+    Spec.assertEqWith s "Unbury's two atoms are in its target slots, one naming each sibling" (sharesCreatureTypeCounts (S.combinedFace unbury)) (2, 0)
     -- The lint's own proof, the pair differing in one position: the same atom in
     -- a static restriction's affected set, read through a bare contextFor.
     Spec.assertBool s (sharesCreatureTypeOffends restricted) "the atom in an affected set offends"

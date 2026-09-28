@@ -3568,7 +3568,8 @@ overBoundSlots f predicate = case predicate of
   Filter.SameControllerAsHostOfBound slot -> fmap Filter.SameControllerAsHostOfBound (f slot)
   -- Named for SameControllerAsBound's reason, and BEHAVIOURAL in the same way:
   -- the offer widens for it, and Pawl.Engine.Target.jointlyJudged, firing on
-  -- this report, is what narrows Unbury's second target to the first's types.
+  -- this report, is what narrows each of Unbury's two targets to the other's
+  -- types.
   Filter.SharesCreatureTypeWithBound slot -> fmap Filter.SharesCreatureTypeWithBound (f slot)
   -- Named for the arm above's reason: the slot names an OBJECT, whose toughness
   -- the context reads.
