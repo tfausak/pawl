@@ -15,4 +15,5 @@ codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec
 codec keywordCodec = Fields.object $ do
   count <- Fields.required "count" Common.natural TapPermanents.count
   whichPermanents <- Fields.required "whichPermanents" (Filter.codec keywordCodec) TapPermanents.whichPermanents
-  pure TapPermanents.MkTapPermanents {TapPermanents.count = count, TapPermanents.whichPermanents = whichPermanents}
+  sharingACreatureType <- Fields.defaulted "sharingACreatureType" False Common.boolean TapPermanents.sharingACreatureType
+  pure TapPermanents.MkTapPermanents {TapPermanents.count = count, TapPermanents.whichPermanents = whichPermanents, TapPermanents.sharingACreatureType = sharingACreatureType}

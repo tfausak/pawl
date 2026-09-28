@@ -24,6 +24,11 @@ import qualified Pawl.Types.Filter as Filter
 -- and the other with a tap, and no reader wants to be told they are the same.
 data TapPermanents keyword = MkTapPermanents
   { count :: Natural.Natural,
-    whichPermanents :: Filter.Filter keyword
+    whichPermanents :: Filter.Filter keyword,
+    -- | CR 205.3m: the permanents tapped must hold one creature type in common
+    -- -- Weight of Conscience's "two untapped creatures you control that share
+    -- a creature type". A joint condition on the chosen set, which no
+    -- per-candidate Filter can state.
+    sharingACreatureType :: Bool
   }
   deriving (Eq, Ord, Show)

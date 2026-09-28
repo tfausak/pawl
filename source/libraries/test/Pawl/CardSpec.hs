@@ -3513,7 +3513,7 @@ costComponentFilters component = case component of
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower _ f) -> [f]
   -- CR 601.2f's "tapping permanents": Springleaf Drum's "an untapped creature
   -- you control".
-  CostComponent.TapPermanents (TapPermanents.MkTapPermanents _ f) -> [f]
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents _ f _) -> [f]
   -- CR 118.1 as a cost: Meloku the Clouded Mirror's "a land you control".
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents _ f) -> [f]
   -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".

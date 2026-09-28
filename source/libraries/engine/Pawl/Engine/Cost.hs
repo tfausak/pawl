@@ -140,6 +140,7 @@ import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
 import qualified Pawl.Types.TapState as TapState
@@ -767,7 +768,7 @@ candidateCostsGiven permitted pid name oid gs =
                             tappingOne cost (vid, n) =
                               CandidateCost.MkCandidateCost
                                 (Just (Keyword.Type.Harmonize cost))
-                                (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (criterion vid))]})
+                                (withAdditional cost {Cost.components = Cost.components cost <> [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (criterion vid) False)]})
                                 [ManaCost.MkManaCost [ManaSymbol.Generic (Integer.toNaturalSaturating n)]]
                                 False
                             tappingNone cost = CandidateCost.plain (Just (Keyword.Type.Harmonize cost)) (withAdditional cost)
@@ -1278,7 +1279,7 @@ substituteCandidates slots pid oid substitute gs = case substitute of
 -- Prompt.ChooseExilesFromGraveyard for the other.
 substituteComponent :: Keyword.Substitute -> Natural -> CostComponent.CostComponent Keyword.Type.Keyword
 substituteComponent substitute n = case substitute of
-  Keyword.TapUntapped criterion -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion)
+  Keyword.TapUntapped criterion -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion False)
   Keyword.ExileFromGraveyard criterion -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion)
 
 -- A SUBSTITUTION's mana halves folded into a TOTALLING, which is the shape
@@ -2453,6 +2454,24 @@ dividesMixedRemoval spread owed offered division =
 tapPower :: ObjectId -> GameState -> Integer
 tapPower candidate gs = Maybe.fromMaybe 0 (Projection.powerOf candidate gs)
 
+-- CR 205.3m: a tap candidate's creature types, off its projection -- so a
+-- changeling holds every one (CR 702.73a) and a land type none.
+tapCreatureTypes :: ObjectId -> GameState -> Set.Set Subtype.Type.Subtype
+tapCreatureTypes candidate gs = Set.filter Subtype.isCreatureType (Filter.subtypes (Projection.viewsOf gs candidate))
+
+-- CR 205.3m: do these permanents hold one creature type in common? False for
+-- none at all, since no type is held.
+shareACreatureType :: [ObjectId] -> GameState -> Bool
+shareACreatureType chosen gs = case fmap (`tapCreatureTypes` gs) chosen of
+  [] -> False
+  first : rest -> not (Set.null (List.foldl' Set.intersection first rest))
+
+-- CR 205.3m: the most of these permanents that hold one creature type in
+-- common, Pawl.Engine.Count's MostSharingACreatureType over tap candidates.
+largestSharingGroup :: [ObjectId] -> GameState -> Natural
+largestSharingGroup candidates gs =
+  Foldable.foldl' max 0 (Map.fromListWith (+) [(subtype, 1) | candidate <- candidates, subtype <- Set.toList (tapCreatureTypes candidate gs)])
+
 -- CR 701.26a: tap one permanent, through Pawl.Engine.Event's funnel so that
 -- paying a tap cost is a becomes-tapped event like any other route. Shared by
 -- every component that taps -- see payComponent's TapThis arm -- which is what
@@ -2633,7 +2652,11 @@ claimOf slots pid oid component gs =
         -- (Heritage Druid, Springleaf Drum) and minted alike
         -- (Pawl.Engine.Keyword's conspire and station), so the division is exact
         -- for all of them.
-        CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
+        --
+        -- A SUPERSET where the component asks for a shared creature type: the
+        -- claim pools every candidate, and `payable`'s arm is what narrows to a
+        -- group holding one type (Weight of Conscience states no other claim).
+        CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion _) ->
           claim ClaimAxis.Tapping (Set.fromList (tapCandidates slots pid oid criterion gs)) n
         -- The battlefield pool SacrificeThis and ReturnThis draw on, on their axis
         -- and not the tapping one: a permanent returned to hand is as gone from the
@@ -3469,8 +3492,12 @@ canPayComponent slots pid oid component gs = case component of
   -- (Springleaf Drum's criterion carries `Not IsTapped`). This component ALONE,
   -- Sacrifice's caveat; ManaSpec's "one creature cannot pay for both Drums" is
   -- the test that `jointlyPayable` asks them together.
-  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) ->
-    Natural.length (tapCandidates slots pid oid criterion gs) >= n
+  --
+  -- CR 205.3m where the permanents must share a creature type: payable iff n
+  -- candidates hold ONE type in common, the largest such group.
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion sharing) ->
+    let candidates = tapCandidates slots pid oid criterion gs
+     in if sharing then largestSharingGroup candidates gs >= n else Natural.length candidates >= n
   -- CR 118.3: this player must have at least `n` permanents the criterion
   -- admits to return. TapPermanents' arm above over a different action, and
   -- WITHOUT CR 101.2's sacrifice prohibition for the reason ReturnThis' arm
@@ -5509,7 +5536,10 @@ payComponent moment slots pid oid component = case component of
   -- The taps are ONE event group, Sacrifice's reason; Pawl.CostSpec's "CR 601.2h
   -- Adaptive Gemguard's two tapped Merfolk make one Deeproot Pilgrimage token"
   -- proves it.
-  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> do
+  --
+  -- A shared creature type (CR 205.3m) is asked of the CHOSEN set, reject-not-
+  -- repair: a set holding no type in common is unpaid.
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion sharing) -> do
     gs <- State.get
     let candidates = tapCandidates slots pid oid criterion gs
         decider = Decide.deciderFor pid gs
@@ -5517,7 +5547,7 @@ payComponent moment slots pid oid component = case component of
       if Natural.length candidates <= n
         then pure (Set.fromList candidates)
         else Game.choose (Prompt.ChooseTaps decider pid oid candidates n)
-    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
+    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n && (not sharing || shareACreatureType (Set.toList chosen) gs)
       then do
         Event.simultaneously (Monad.mapM_ tapObject (Set.toAscList chosen))
         pure (Payment.Paid (Binding.paidObjects Binding.tappedPermanent (Set.map Recipient.ToObject chosen)))

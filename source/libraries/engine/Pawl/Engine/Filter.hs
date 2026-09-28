@@ -1256,14 +1256,15 @@ data Context = MkContext
     -- animated into a land, and a land Song of the Dryads has turned into one,
     -- are the type the rule asks about.
     subjectHostCardTypes :: Set.Set CardType.CardType,
-    -- CR 205.3m: the CREATURE TYPES of the objects the resolution's slots hold,
-    -- for SharesCreatureTypeWithBound -- Heirloom Blade's "shares a creature type
-    -- with it", and through Binding.triggerSource a kinship card's "with this
-    -- creature". `slotNames` above in every respect but its one filler,
-    -- Pawl.Engine.Resolve.Slots.effectContext: empty elsewhere, where the atom
-    -- is False, and Pawl.FilterPositionLintSpec's "CR 205.3m no card asks
-    -- SharesCreatureTypeWithBound outside a resolution's own positions" keeps a
-    -- card out of those.
+    -- CR 205.3m: the CREATURE TYPES of the objects the slots hold, for
+    -- SharesCreatureTypeWithBound -- Heirloom Blade's "shares a creature type
+    -- with it", through Binding.triggerSource a kinship card's "with this
+    -- creature", and a sibling target slot's (Unbury). Filled by
+    -- Pawl.Engine.Resolve.Slots.effectContext and Pawl.Engine.Target.slotContext;
+    -- empty elsewhere, where the atom widens, and
+    -- Pawl.FilterPositionLintSpec's "CR 205.3m no card asks
+    -- SharesCreatureTypeWithBound outside a resolution's own positions or a
+    -- target slot" keeps a card out of those.
     slotCreatureTypes :: Map.Map SlotName.SlotName (Set.Set Subtype.Subtype),
     -- CR 208.1: the TOUGHNESS of the object a resolution's slot holds, for the one
     -- atom that compares a candidate's against it (ToughnessLessThanBound --
@@ -1906,8 +1907,14 @@ matches context view predicate = case predicate of
   Filter.SameControllerAsHostOfBound slot -> maybe False (`Set.member` Map.findWithDefault Set.empty slot (slotHostControllers context)) (controller view)
   -- CR 205.3m at both ends, SameNameAsBound's intersection: the context holds
   -- only the bound objects' creature types, so a shared land type (Dryad Arbor's
-  -- Forest) is not a match, and an unfilled slot answers False.
-  Filter.SharesCreatureTypeWithBound slot -> not (Set.disjoint (subtypes view) (Map.findWithDefault Set.empty slot (slotCreatureTypes context)))
+  -- Forest) is not a match. VACUOUSLY TRUE where the slot is unbound,
+  -- SameControllerAsBound's posture and for its reason: CR 601.2c's offer is
+  -- made before the sibling target is chosen, and
+  -- Pawl.Engine.Target.selectionLegal's joint check narrows it (Unbury's "two
+  -- target creature cards that share a creature type").
+  Filter.SharesCreatureTypeWithBound slot -> case Map.lookup slot (slotCreatureTypes context) of
+    Nothing -> True
+    Just types -> not (Set.disjoint (subtypes view) types)
   -- CR 208.1 against the toughness the context read off the bound object, the
   -- atom above's shape one characteristic over. STRICT, and vacuously False if
   -- either side is absent -- PowerLessThanSource's pair of postures.
@@ -2956,7 +2963,7 @@ rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostCo
 rewriteComponent pairs component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n (rewrite pairs criterion))
-  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion))
+  CostComponent.TapPermanents (TapPermanents.MkTapPermanents n criterion sharing) -> CostComponent.TapPermanents (TapPermanents.MkTapPermanents n (rewrite pairs criterion) sharing)
   CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n criterion) -> CostComponent.ReturnPermanents (ReturnPermanents.MkReturnPermanents n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
   CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore criterion) -> CostComponent.ExileMaterials (ExileMaterials.MkExileMaterials n orMore (rewrite pairs criterion))
@@ -3559,10 +3566,10 @@ overBoundSlots f predicate = case predicate of
   -- here: this atom's offer never widens, so CR 601.2c's joint check has
   -- nothing to narrow, and the report is the dataflow lint's alone.
   Filter.SameControllerAsHostOfBound slot -> fmap Filter.SameControllerAsHostOfBound (f slot)
-  -- Named for SameNameAsBound's reason, one Context field over. A regression
-  -- fence until a card names a mode-declared slot with it, as Killer's "shares
-  -- a creature type with it" would: the reserved slots it names today are
-  -- neither renamed nor dataflow-linted.
+  -- Named for SameControllerAsBound's reason, and BEHAVIOURAL in the same way:
+  -- the offer widens for it, and Pawl.Engine.Target.jointlyJudged, firing on
+  -- this report, is what narrows each of Unbury's two targets to the other's
+  -- types.
   Filter.SharesCreatureTypeWithBound slot -> fmap Filter.SharesCreatureTypeWithBound (f slot)
   -- Named for the arm above's reason: the slot names an OBJECT, whose toughness
   -- the context reads.

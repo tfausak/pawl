@@ -778,12 +778,13 @@ sharesCreatureTypeTag = Text.pack "SharesCreatureTypeWithBound"
 -- How many CR 205.3m atoms this card carries in a resolution's own positions --
 -- an effect's ObjectRef (Heirloom Blade), a clause's "if" (Mudbutton Clanger), a
 -- search, a mill tally or a hand sweep, each read through
--- Pawl.Engine.Resolve.Slots.effectContext, the one filler of
--- Filter.Context.slotCreatureTypes -- and how many anywhere else, where the atom
--- is a silent False. The second number is the offence.
+-- Pawl.Engine.Resolve.Slots.effectContext -- or in a target slot (Unbury), read
+-- through Pawl.Engine.Target.slotContext: the two fillers of
+-- Filter.Context.slotCreatureTypes. And how many anywhere else, where the atom
+-- is a silent True. The second number is the offence.
 sharesCreatureTypeCounts :: Face.Face Card.Type.Card -> (Int, Int)
 sharesCreatureTypeCounts card =
-  let total wanted = sum (fmap (\(_, f) -> filterAtoms sharesCreatureTypeTag f) (filter (\(framing, _) -> elem framing [SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed] == wanted) (cardFilters card)))
+  let total wanted = sum (fmap (\(_, f) -> filterAtoms sharesCreatureTypeTag f) (filter (\(framing, _) -> elem framing [SourceHostFramed, ClauseGateFramed, SearchFramed, MillTallyFramed, HandSweepFramed, InTargetSlot] == wanted) (cardFilters card)))
    in (total True, total False)
 
 -- The atom outside those positions, or the traversal and the codec disagreeing
@@ -1344,12 +1345,13 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (length (filter ((== InTargetSlot) . fst) positions) > 10) "and target slot filters for the accepted side to be about"
     Spec.assertBool s (length (filter ((== SearchFramed) . fst) positions) > 10) "and search filters, the accepted side's other half"
   -- CR 205.3m's bound comparison in SameNameAsBound's frame, one field over:
-  -- answerable only where effectContext fills Filter.Context.slotCreatureTypes.
-  -- See sharesCreatureTypeOffends for the two offences.
-  Spec.it s "CR 205.3m no card asks SharesCreatureTypeWithBound outside a resolution's own positions" $ do
+  -- answerable only where effectContext or Target.slotContext fills
+  -- Filter.Context.slotCreatureTypes. See sharesCreatureTypeOffends for the two
+  -- offences.
+  Spec.it s "CR 205.3m no card asks SharesCreatureTypeWithBound outside a resolution's own positions or a target slot" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace sharesCreatureTypeOffends . Printing.card) ps
-    Spec.assertEqWith s "the atom sits only where the resolution fills the creature types" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "the atom sits only where a resolution or a target slot fills the creature types" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous: one card per admitted position the pool uses is ACCEPTED.
     blade <- S.printingOf s registry "Heirloom Blade"
     Spec.assertEqWith s "Heirloom Blade's two atoms are in its ObjectRefs" (sharesCreatureTypeCounts (S.combinedFace blade)) (2, 0)
@@ -1358,6 +1360,8 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
         atom = Filter.Type.SharesCreatureTypeWithBound (SlotName.MkSlotName (Text.pack "self"))
         restricted = face {Face.counterRestrictions = [CounterRestriction.MkCounterRestriction (Affected.Matching atom) Nothing]}
     Spec.assertEqWith s "Mudbutton Clanger's one atom is in its clause's gate" (sharesCreatureTypeCounts face) (1, 0)
+    unbury <- S.printingOf s registry "Unbury"
+    Spec.assertEqWith s "Unbury's two atoms are in its target slots, one naming each sibling" (sharesCreatureTypeCounts (S.combinedFace unbury)) (2, 0)
     -- The lint's own proof, the pair differing in one position: the same atom in
     -- a static restriction's affected set, read through a bare contextFor.
     Spec.assertBool s (sharesCreatureTypeOffends restricted) "the atom in an affected set offends"

@@ -2235,7 +2235,7 @@ station =
               { -- CR 118.5, crew's note above: no mana part is `Just` an empty one
                 -- and not the Nothing that means unpayable.
                 Cost.mana = Just (ManaCost.MkManaCost []),
-                Cost.components = [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 criterion)]
+                Cost.components = [CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 criterion False)]
               },
           ActivatedAbility.modal =
             Modal.MkModal
@@ -3645,6 +3645,7 @@ conspireCost =
                       Filter.SharesColorWithSource
                     ]
                 )
+                False
             )
         ]
     }

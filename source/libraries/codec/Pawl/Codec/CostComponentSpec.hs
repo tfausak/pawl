@@ -90,7 +90,7 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (Filter.HasCardType CardType.Creature)))
+      (CostComponent.TapPermanents (TapPermanents.MkTapPermanents 1 (Filter.HasCardType CardType.Creature) False))
       " {\"type\":\"TapPermanents\",\"value\":{\"count\":1,\"whichPermanents\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- TapPermanents' payload shape spelled over a return to hand -- Meloku the
   -- Clouded Mirror's one land.
