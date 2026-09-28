@@ -9551,6 +9551,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.Scried _ -> False
     GameEvent.DungeonCompleted _ -> False
     GameEvent.Surveiled _ -> False
+    GameEvent.Proliferated _ -> False
     GameEvent.DiceRolled _ -> False
     GameEvent.DieResultSettled _ -> False
     GameEvent.RolledToVisit _ -> False
