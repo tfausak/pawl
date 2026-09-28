@@ -564,6 +564,8 @@ gathered gs =
         any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Projection.staticAbilitiesOf oid gs)
           || Projection.anyCopiableKeyword Keyword.mintsCombatRestriction oid gs
           || any countedKeywordMints (Map.keys (Projection.countersOf oid gs))
+          -- CR 612.6: a keyword the full text brought is on no copiable value.
+          || Maybe.isJust (Projection.fullTextOf oid gs)
       -- CR 122.1b: the keyword a keyword counter grants, asked of the counters
       -- themselves rather than of the projection that turns them into layer-6
       -- grants -- this is the SHORT-CIRCUIT, and projecting the permanent is the
@@ -652,7 +654,7 @@ gathered gs =
             if keepsAbilities source
               then
                 -- CR 612.1's word swap over the source's own text, computed HERE
-                -- rather than hoisted beside setEffs: textChangesAffecting folds
+                -- rather than hoisted beside setEffs: readerTextChanges folds
                 -- the whole continuous-effect list, and the empty case above
                 -- already turned away every permanent that prints no restriction,
                 -- so the fold runs once per restriction-bearing permanent instead
@@ -661,7 +663,7 @@ gathered gs =
                 -- The SOURCE's changes and not the restricted creature's: CR
                 -- 612.1 changes the words printed on THAT object, and the gate
                 -- is printed on the card stating the restriction.
-                let changes = Projection.textChangesAffecting source gs
+                let changes = Projection.readerTextChanges source gs
                  in fmap (\restriction -> (source, changes, restriction)) restrictions
               else []
       -- CR 114.4: "abilities of emblems function in the command zone", which is

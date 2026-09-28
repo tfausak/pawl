@@ -25,6 +25,7 @@ import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
@@ -630,6 +631,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted x -> Effect.Discard (Discard.Counted x {CountedDiscard.quantity = rewriteQuantity pairs (CountedDiscard.quantity x)})
     Discard.These ref -> Effect.Discard (Discard.These (rewriteObjectRef pairs ref))
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching f n) mDiscarded) ->
+      Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n)) mDiscarded))
   Effect.LoseLife x -> Effect.LoseLife x {LifeLoss.quantity = rewriteQuantity pairs (LifeLoss.quantity x)}
   Effect.GainLife x -> Effect.GainLife (rewritePlayerQuantity pairs x)
   Effect.ExchangeLifeTotals _ -> effect
@@ -924,7 +927,7 @@ rewriteEffect pairs effect = case effect of
   -- The number of turns is the Quantity, FlipCoin's descent above; the
   -- PlayerRef and the skips no word rule 612 can swap.
   Effect.TakeExtraTurn x -> Effect.TakeExtraTurn x {TakeExtraTurn.count = rewriteQuantity pairs (TakeExtraTurn.count x)}
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named refs) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (fmap (rewriteObjectRef pairs) refs))
   -- No ObjectRef to rewrite: the opcode names a library and no objects.
   Effect.Shuffle {} -> effect
   -- THREE places, and all three descend. A Filter the ObjectRef carries is card

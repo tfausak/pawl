@@ -64,10 +64,12 @@
                       {
                         "type": "ShuffleIntoLibrary",
                         "value": {
-                          "ref": {
-                            "type": "InSlot",
-                            "value": "self"
-                          }
+                          "refs": [
+                            {
+                              "type": "InSlot",
+                              "value": "self"
+                            }
+                          ]
                         }
                       }
                     ]

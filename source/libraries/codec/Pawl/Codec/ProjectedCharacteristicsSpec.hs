@@ -90,6 +90,7 @@ testCharacteristics =
       -- True rather than the default, so an arm that dropped the field would not
       -- round trip to the same JSON.
       PC.lostAllAbilities = True,
+      PC.hasFullText = True,
       PC.subtypeWordChanges = [ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Spirit Subtype.Elf],
       -- A different keyword from `keywords` above, so a codec arm reading the
       -- wrong field would not round trip to the same JSON.
@@ -139,6 +140,7 @@ testCharacteristicsJson =
     <> RuleAbilitiesSpec.testRuleAbilitiesJson
     <> ","
     <> "\"lostAllAbilities\":true,"
+    <> "\"hasFullText\":true,"
     <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}],"
     <> "\"textChangedKeywords\":[{\"key\":{\"type\":\"Trample\"},\"value\":1}],"
     <> "\"assignsCombatDamageWithToughness\":true,"
@@ -183,6 +185,7 @@ minimalCharacteristics =
       PC.castingPermissions = [],
       PC.ruleAbilities = mempty,
       PC.lostAllAbilities = False,
+      PC.hasFullText = False,
       PC.subtypeWordChanges = [],
       PC.textChangedKeywords = Map.empty,
       PC.assignsCombatDamageWithToughness = False,

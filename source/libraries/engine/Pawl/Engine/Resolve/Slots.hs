@@ -30,6 +30,7 @@ import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
+import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -678,6 +679,7 @@ effectObjectRefs effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted {} -> []
     Discard.These ref -> [ref]
+    Discard.AnyNumber {} -> []
   Effect.LoseLife {} -> []
   Effect.GainLife {} -> []
   Effect.ExchangeLifeTotals {} -> []
@@ -818,7 +820,7 @@ effectObjectRefs effect = case effect of
   Effect.PlayerSacrifices {} -> []
   Effect.Vote {} -> []
   Effect.TakeExtraTurn {} -> []
-  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> [ref]
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ refs) -> NonEmpty.toList refs
   Effect.Shuffle {} -> []
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
@@ -1182,6 +1184,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
     -- resolution arm below folds over every player the slot names.
     Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
     Discard.These {} -> Map.empty
+    -- Counted's read, the ceiling standing where its count does, joined with
+    -- what the card filter reads.
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) _) ->
+      joinSlots [Map.singleton slot SlotArity.Many, maybe Map.empty quantitySlots atMost, filterSlotsOf filter_]
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> quantitySlots quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
@@ -1850,6 +1856,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.slotsAreExhaustive quantity
     Discard.These {} -> True
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> all Quantity.slotsAreExhaustive atMost
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
@@ -2110,6 +2117,7 @@ readsX =
         Effect.Discard subject -> case subject of
           Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> Quantity.readsX quantity
           Discard.These {} -> False
+          Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> any Quantity.readsX atMost
         Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> Quantity.readsX quantity
         Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.ExchangeLifeTotals _ -> False
@@ -2350,6 +2358,7 @@ boundSlots effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded) -> foldMap Set.singleton mDiscarded
     Discard.These _ -> Set.empty
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ _ mDiscarded) -> foldMap Set.singleton mDiscarded
   -- How much life was ACTUALLY lost, summed over the players the instruction
   -- named, for rule 702.101a's "that much" (Pawl.Types.LifeLoss.tally).
   Effect.LoseLife (LifeLoss.MkLifeLoss _ _ _ mTally) -> foldMap Set.singleton mTally

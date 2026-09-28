@@ -65,7 +65,7 @@ cantCrew candidates gs =
         restrictions ->
           if (null setEffs || Projection.liveAfterLayers setEffs source gs)
             && not (removed source)
-            then concatMap (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+            then concatMap (fromRestriction source (Projection.readerTextChanges source gs)) restrictions
             else []
       fromRestriction source changes restriction =
         let affected = CrewRestriction.affected restriction

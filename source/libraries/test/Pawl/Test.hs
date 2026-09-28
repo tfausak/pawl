@@ -55,6 +55,7 @@ import qualified Pawl.Codec.AgainstSlotSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AimedAtSpec
 import qualified Pawl.Codec.AlternativeCostSpec
+import qualified Pawl.Codec.AnyNumberDiscardSpec
 import qualified Pawl.Codec.AnyNumberMatchingSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
 import qualified Pawl.Codec.AsCopySpec
@@ -787,6 +788,7 @@ spec s registry = do
   Pawl.Codec.AgainstSlotSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s
+  Pawl.Codec.AnyNumberDiscardSpec.spec s
   Pawl.Codec.AnyNumberMatchingSpec.spec s
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
   Pawl.Codec.AsCopySpec.spec s
