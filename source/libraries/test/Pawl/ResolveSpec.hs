@@ -118,6 +118,7 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayOffer as PayOffer
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -5201,6 +5202,15 @@ rhysticSpec s registry =
             (gs, dashId) = S.handOne dash withPiker
             onStack = S.runPure S.identityAnswer gs (S.cast S.alice dashId >> Engine.settleForPriority)
         pure onStack
+      -- alice: four Swamps and Temporal Extortion, its cast trigger settled on
+      -- top. bob at 15 and carol at 9, so each half rounds up.
+      extortionBoard = do
+        swamp <- S.printingOf s registry "Swamp"
+        extortion <- S.printingOf s registry "Temporal Extortion"
+        let lives = Map.adjust (\p -> p {Player.life = 15}) S.bob . Map.adjust (\p -> p {Player.life = 9}) S.carol
+            base = S.landsFor swamp S.alice 4 S.threePlayerGame
+            (gs, extortionId) = S.handOne extortion base {GameState.players = lives (GameState.players base)}
+        pure (S.runPure S.identityAnswer gs (S.cast S.alice extortionId >> Engine.settleForPriority))
       -- By NAME: casting made Dash Hopes a new object on the stack (CR 400.7).
       stackNames gs = List.sort (fmap (`S.soleFaceName` gs) (GameState.stack gs))
       named = CardName.MkCardName . Text.pack
@@ -5267,6 +5277,19 @@ rhysticSpec s registry =
           let after = S.runPure (paysFor Nothing) onStack Stack.resolveTop
           Spec.assertEqWith s "CR 118.12: Dash Hopes and the Piker are both still on the stack" (stackNames after) [named "Dash Hopes", named "Goblin Piker"]
           Spec.assertEqWith s "nobody paid life" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
+        -- CR 119.4 / 107.1a: "half their life, rounded up" is each payer's own
+        -- half, bob 8 of 15 and carol 5 of 9 -- and carol is still asked after
+        -- bob paid, Temporal Extortion's ruling.
+        Spec.it s "CR 118.12 bob and carol each pay half their own life, so Temporal Extortion is countered" $ do
+          onStack <- extortionBoard
+          let bothPay p = case p of
+                Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+                  | d == player && player /= S.alice -> PaymentDecision.Pays
+                _ -> paysFor Nothing p
+              after = S.runPure bothPay onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 119.4: each paid half their own life, rounded up" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) [Just 20, Just 7, Just 4]
+          Spec.assertEqWith s "CR 118.12: Temporal Extortion left the stack" (stackNames after) []
+          Spec.assertEqWith s "into alice's graveyard" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Graveyard S.alice after)) [named "Temporal Extortion"]
 
 -- CR 118.12a inside CR 608.2f's loop: Cleansing's "for each land, destroy that
 -- land unless any player pays 1 life" is one offer PER LAND, each land's

@@ -94,8 +94,19 @@ evaluate viewOf quantityOf context gs count =
         -- animated land died as a creature. The shape whose unit is the CARD that
         -- ARRIVED reads the arriving object instead (see arrivedView), which is why
         -- the fold hands snapshotView the same reader the zone arm uses.
+        --
+        -- SpellCastThisGame's window reaches back past the log to the earlier
+        -- turns' casts, which GameState.castsBeforeThisTurn keeps as the same
+        -- record the log's SpellCast entries carry.
         Scope.InHistory shape ->
-          let views = Maybe.mapMaybe (snapshotView viewOf gs shape . LoggedEvent.event) (Foldable.toList (GameState.events gs))
+          let logged = fmap LoggedEvent.event (Foldable.toList (GameState.events gs))
+              earlier = case shape of
+                EventShape.SpellCastThisGame -> fmap GameEvent.SpellCast (Foldable.toList (GameState.castsBeforeThisTurn gs))
+                EventShape.SpellCast -> []
+                EventShape.MovedBetween {} -> []
+                EventShape.MovedFrom {} -> []
+                EventShape.CardArrivedIn {} -> []
+              views = Maybe.mapMaybe (snapshotView viewOf gs shape) (earlier <> logged)
               kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
            in aggregate quantityOf aggregation kept
         -- CR 102.1: the players themselves. Candidates come from the same
@@ -777,6 +788,7 @@ snapshotView viewOf gs shape event = case event of
         then Just (Maybe.fromMaybe (departedView gs zc snapshot) (arrivedView viewOf gs (ZoneChange.object zc)))
         else Nothing
     EventShape.SpellCast -> Nothing
+    EventShape.SpellCastThisGame -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   -- CR 615.13's record names two ids, a recipient and an amount, and snapshots no
   -- characteristics, so there is nothing for a Filter to look at.
@@ -805,13 +817,16 @@ snapshotView viewOf gs shape event = case event of
     -- CR 108.3's owner comes from castOwner below, and is NOT `caster` again:
     -- Dire Fleet Daredevil casts a card its owner never touched
     -- (Pawl.CountSpec).
-    EventShape.SpellCast -> Just (viewOfSnapshot False (Just caster) (castOwner gs spell) False Map.empty snapshot)
+    EventShape.SpellCast -> Just castView
+    EventShape.SpellCastThisGame -> Just castView
     EventShape.MovedBetween {} -> Nothing
     EventShape.MovedFrom {} -> Nothing
     -- CR 601.2a moves a card to the STACK, so a cast IS a card arriving there --
     -- but the Moved event the same cast emits is what says so, and answering here
     -- too would count one cast twice.
     EventShape.CardArrivedIn {} -> Nothing
+    where
+      castView = viewOfSnapshot False (Just caster) (castOwner gs spell) False Map.empty snapshot
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.TookInitiative _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
@@ -956,6 +971,7 @@ snapshotView viewOf gs shape event = case event of
     EventShape.MovedBetween {} -> Nothing
     EventShape.MovedFrom {} -> Nothing
     EventShape.SpellCast -> Nothing
+    EventShape.SpellCastThisGame -> Nothing
 
 -- CR 400.7: the view of the object that ARRIVED, for the one shape whose unit is
 -- the CARD. A permanent's characteristics on the battlefield are not the card's:

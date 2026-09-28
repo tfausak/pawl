@@ -61,6 +61,7 @@ import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.ReturnWatch as ReturnWatch
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Timestamp as Timestamp
 
 data GameState = MkGameState
@@ -397,6 +398,11 @@ data GameState = MkGameState
     -- just ended, sparse, snapshotted at the same handoff; spellsCastLastTurn
     -- is read out of it by Engine.beginTurnOf so the two cannot disagree.
     castsLastTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- | CR 601.2i / 608.2i: every spell cast this game BEFORE the turn in
+    -- progress, oldest first, appended at the turn handoff from the log it
+    -- clears. Pawl.Engine.Count's EventShape.SpellCastThisGame fold joins it
+    -- to the live log.
+    castsBeforeThisTurn :: Seq.Seq SpellWasCast.SpellWasCast,
     -- | CR 725: objects exiled "until an opponent becomes the monarch", keyed
     -- by the exiled incarnation, swept by
     -- Pawl.Engine.Monarch.returnExiledForMonarch. Not an Expiry, which cannot

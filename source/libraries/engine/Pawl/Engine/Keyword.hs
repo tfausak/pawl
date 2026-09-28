@@ -8220,9 +8220,8 @@ isSpellCard types = Set.member CardType.Instant types || Set.member CardType.Sor
 -- Not narrowed by Not IsSource, which is rule 702.59a's own wording -- "a
 -- creature", with no exception for the card the ability is on. Garza's Assassin
 -- is the one printed creature with recover and its Oracle reminder text says
--- "another" instead; that card is not in data/cards/ (its recover cost is half
--- its controller's life rather than mana), so nothing here reads the difference
--- and the rule's wording is what this follows.
+-- "another" instead; that card is not in data/cards/, so nothing here reads the
+-- difference and the rule's wording is what this follows.
 --
 -- TWO CLAUSES over ONE offer (CR 118.12, Pawl.Types.PayGate.offeredAt): the
 -- return is the PayBranch.IfPaid branch and the exile the IfNotPaid branch of

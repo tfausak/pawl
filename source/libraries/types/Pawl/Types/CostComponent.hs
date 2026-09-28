@@ -9,6 +9,7 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.ExileMaterials as ExileMaterials
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
+import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapPermanents as TapPermanents
@@ -47,6 +48,9 @@ data CostComponent keyword
   | -- | CR 107.3a / 601.2b / Hatred: X as an amount of life, announced by the
     -- caster and rewritten to a PayLife by Pawl.Engine.Cost.substituteX.
     PayLifeX
+  | -- | CR 119.4 / 107.1a / Lurking Evil: pay half the paying player's life,
+    -- rounded as printed, fixed to a PayLife by Pawl.Engine.Cost.announce.
+    PayHalfLife Rounding.Rounding
   | -- | CR 701.21a / Village Rites, Fireblast: sacrifice this many permanents
     -- matching the Filter, which the payer chooses.
     Sacrifice (Sacrifice.Sacrifice keyword)

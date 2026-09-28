@@ -102,7 +102,9 @@ representatives pcs gs candidates =
 --     GameState.extraTurns and the per-player counters (landsPlayed,
 --     drawsThisTurn, departedThisTurn, spellsCastLastTurn, castsLastTurn) are
 --     keyed by or valued at a PLAYER and name no object.
---   * GameState.lastKnown is about objects that have LEFT.
+--   * GameState.lastKnown is about objects that have LEFT, and so is
+--     GameState.castsBeforeThisTurn: its spells were cast on an earlier turn,
+--     and CR 500.2 ends no step while the stack holds one.
 --   * GameState.events, GameState.controlSample and
 --     GameState.battlefieldWhenTriggered are bookkeeping, and pawl has neither a
 --     tap game event nor a tap trigger condition, so nothing scans them because
