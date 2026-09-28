@@ -85,6 +85,10 @@ data GameState = MkGameState
     -- the command zone (Object.zone) but not in `command`, which holds what is
     -- face up there.
     attractionDecks :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
+    -- | CR 901.3 / 901.4: each player's planar deck, head on top, held as the
+    -- Attraction deck above is: in the command zone but not in `command`,
+    -- which holds the face-up plane.
+    planarDecks :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     stack :: [ObjectId.ObjectId],
     players :: Map.Map PlayerId.PlayerId Player.Player,
     -- | CR 729.4: the cards outside this game that sit in a game on hold; empty

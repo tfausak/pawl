@@ -33,6 +33,7 @@ import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
+import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Saddling as Saddling
@@ -442,7 +443,7 @@ data GameEvent
     -- recordRoll after CR 706.2's result is settled. No result and no die kind: a reader wanting
     -- the number takes it from Pawl.Types.RollDie's own slot or DieResultSettled
     -- below, CR 706.7's planar die being ignored by every effect reading a
-    -- numerical result while still firing this trigger (#934).
+    -- numerical result while still firing this trigger (CR 901.9d).
     --
     -- ONE ENTRY PER INSTRUCTION and not per die, however many CR 706.1's count
     -- threw, where CoinFlipped records one per coin: the condition reading this
@@ -457,6 +458,10 @@ data GameEvent
   | -- | CR 701.52a: a player rolled to visit their Attractions, with the result
     -- the Visit triggers read (CR 702.159a).
     RolledToVisit (DieResult.DieResult PlayerId.PlayerId)
+  | -- | CR 901.9: a player rolled the planar die. DiceRolled above is recorded
+    -- beside it (CR 901.9d); DieResultSettled is not, since the planar die has
+    -- no numerical result.
+    PlanarDieRolled PlanarDieRolled.PlanarDieRolled
   | -- | CR 701.51c: this player opened an Attraction, recorded by
     -- Pawl.Engine.Attraction.open only when the card reached the battlefield.
     AttractionOpened PlayerId.PlayerId

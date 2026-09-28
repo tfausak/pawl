@@ -2242,6 +2242,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.OpenAttraction
       " {\"type\":\"OpenAttraction\"} "
+  -- CR 701.31: nullary, the rule fixing whose deck and which card.
+  Spec.it s "Planeswalk" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Planeswalk
+      " {\"type\":\"Planeswalk\"} "
   -- CR 702.159b: nullary, the prize's actions being the effects after it.
   Spec.it s "ClaimPrize" $
     Common.assertJsonCodec

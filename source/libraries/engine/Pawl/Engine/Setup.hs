@@ -17,6 +17,8 @@ import qualified Pawl.Engine.Conspiracy as Conspiracy
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.Plane as Plane
+import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Turn as Turn
@@ -193,6 +195,7 @@ emptyGame order =
           GameState.exile = mempty,
           GameState.command = mempty,
           GameState.attractionDecks = Map.empty,
+          GameState.planarDecks = Map.empty,
           GameState.stack = [],
           GameState.players = Map.fromList (fmap newPlayer order_),
           -- CR 729.4: nobody is nested inside another game here.
@@ -413,6 +416,10 @@ createDeck pid deck = do
   attractionIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.attractions deck))
   Monad.forM_ attractionIds $ \(printingId, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createInAttractionDeck pid printingId)
+  -- CR 901.3 / 901.4: the planar deck, likewise in the command zone and not
+  -- in the library.
+  planeIds <- Monad.mapM (State.state . Game.intern) (Set.toAscList (Deck.planes deck))
+  Monad.forM_ planeIds (createInPlanarDeck pid)
   cardIds <- Monad.mapM (\(printing, n) -> fmap (\i -> (i, n)) (State.state (Game.intern printing))) (Map.toAscList (Deck.cards deck))
   Monad.forM_ cardIds $ \(printingId, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
@@ -484,6 +491,18 @@ createInAttractionDeck pid printingId = do
             GameState.attractionDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.attractionDecks moved)
           }
 
+-- CR 901.3: mint one of this player's plane or phenomenon cards onto the
+-- bottom of their planar deck, createInAttractionDeck's move and for its reason.
+createInPlanarDeck :: PlayerId -> PrintingId.PrintingId -> Game ()
+createInPlanarDeck pid printingId = do
+  oid <- createCard pid printingId
+  State.modify' $ \gs ->
+    let moved = Game.removeFromZones pid oid gs
+     in moved
+          { GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved),
+            GameState.planarDecks = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.planarDecks moved)
+          }
+
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
   -- CR 103.3: build and shuffle every library before any opening hand is drawn,
@@ -493,6 +512,8 @@ newGame perform matchup = do
     Event.shuffleLibrary pid
     -- CR 717.2 / 103.3a.
     Event.shuffleAttractionDeck pid
+    -- CR 901.3 / 103.3a.
+    Planechase.shufflePlanarDeck pid
   -- CR 103.2b: the companion reveal round, after every starting deck is recorded
   -- (CR 103.2a, createDeck above) and before CR 103.5's opening hands -- rule
   -- 103.2's steps come first, and rule 702.139b's condition reads the deck rather
@@ -503,6 +524,11 @@ newGame perform matchup = do
   -- observable today.
   Monad.forM_ (NonEmpty.toList matchup) (Companion.reveal . fst)
   Mulligan.openingHands perform (fmap fst (NonEmpty.toList matchup))
+  -- CR 103.7: in a Planechase game the starting player sets the starting plane,
+  -- after every opening hand is kept (CR 901.5).
+  starting <- State.gets GameState.activePlayer
+  planechase <- State.gets Planechase.isPlanechase
+  Monad.when planechase (Planechase.setStartingPlane starting)
 
 -- CR 712.21 / CR 108.2: a melded permanent is ONE object represented by TWO
 -- cards, so a funnel that carries cards over -- CR 727.2's restart and CR
@@ -600,7 +626,12 @@ startGameFromCards perform exemptions = do
       -- cannot be forgotten on one path and reset on the other.
       toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
       toCommandCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Command}
-      rebuilt = Map.filter isCard (Map.withoutKeys (GameState.objects gs) exempt)
+      -- CR 311.2 / 312.2: a plane or phenomenon card never leaves the command
+      -- zone, so each stays where it is, in its planar deck or face up.
+      --
+      -- Not implemented: CR 103.7's starting plane for the new game (#4313).
+      planar = Set.union (Set.fromList (foldMap Foldable.toList (GameState.planarDecks gs))) (Set.filter (`Plane.isPlanarCard` gs) (GameState.command gs))
+      rebuilt = Map.filter isCard (Map.withoutKeys (GameState.objects gs) (Set.union exempt planar))
       -- CR 903.6: "each player puts their commander from their deck face up into
       -- the command zone". Both callers start a new game following rule 103 (CR
       -- 727.1, CR 729.2), so rule 903.6 applies to each of them, and CR 729.2c
@@ -646,7 +677,7 @@ startGameFromCards perform exemptions = do
       attractionDeckOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) attractionCards))
   State.put
     gs
-      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commandZoneCards, attractionCards],
+      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) (Set.union exempt planar), cards, commandZoneCards, attractionCards],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.attractionDecks = Map.filter (not . Seq.null) (Map.fromList (fmap (\pid -> (pid, attractionDeckOf pid)) owners)),
         GameState.hand = Map.empty,
@@ -654,7 +685,7 @@ startGameFromCards perform exemptions = do
         GameState.battlefield = mempty,
         GameState.phasedOut = mempty,
         GameState.exile = exempt,
-        GameState.command = inCommandIds,
+        GameState.command = Set.union inCommandIds (Set.intersection planar (GameState.command gs)),
         GameState.stack = []
       }
   Monad.forM_ owners Event.shuffleLibrary
@@ -923,8 +954,10 @@ subgameStateFrom starter parent =
       -- Nothing ELSE in the main-game command zone moves -- CR 729.2's "no other
       -- cards in a main-game zone are moved" -- and their remaining sibling has no
       -- format here but one: CR 729.2a's supplementary decks of nontraditional
-      -- cards are the Attraction deck (`attrIds` below), and the planar (#934)
-      -- and scheme (#935) decks CR 100.2d names, neither of them implemented.
+      -- cards are the Attraction deck (`attrIds` below), and the planar and
+      -- scheme (#935) decks CR 100.2d names.
+      --
+      -- Not implemented: the planar deck moving into the subgame (#4313).
       --
       -- The other command-zone residents pawl DOES have -- an emblem, a
       -- conspiracy, and a dungeon a player has ventured into -- stay in the

@@ -918,6 +918,7 @@ playLandAnswer p = case p of
           A.Foretell _ -> False
           A.Suspend _ -> False
           A.PutCompanionIntoHand -> False
+          A.RollPlanarDie -> False
           A.Ignore _ _ -> False
           A.EndEffect _ -> False
           A.ActivateManaAbility _ -> False
@@ -3377,6 +3378,7 @@ oneMountainState mountain ph =
           GameState.exile = mempty,
           GameState.command = mempty,
           GameState.attractionDecks = Map.empty,
+          GameState.planarDecks = Map.empty,
           GameState.stack = [],
           GameState.players = Map.empty,
           GameState.stackArchive = Map.empty,
@@ -3521,6 +3523,7 @@ isCastOf oid action = case action of
   A.Foretell _ -> False
   A.Suspend _ -> False
   A.PutCompanionIntoHand -> False
+  A.RollPlanarDie -> False
   A.Ignore _ _ -> False
   A.EndEffect _ -> False
   A.ActivateManaAbility _ -> False

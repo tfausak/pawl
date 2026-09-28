@@ -80,9 +80,8 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
       Layout.Meld
       " {\"type\":\"Meld\"} "
   -- Card layouts name more frames than have landed. A file naming one must
-  -- fail loudly rather than fall back to Normal, which would silently play a
-  -- plane card as an ordinary one -- in a deck rather than in the planar deck
-  -- CR 901.3 puts it in.
+  -- fail loudly rather than fall back to Normal. A plane card needs no layout:
+  -- Deck.planes is what puts it in the planar deck (CR 901.3).
   Spec.it s "a layout that has not landed is rejected" $
     Spec.assertBool
       s

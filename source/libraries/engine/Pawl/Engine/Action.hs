@@ -12,6 +12,7 @@ import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
+import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
@@ -259,6 +260,9 @@ legalActions pid gs =
       -- A list of at most one, where the two above are a list per card: rule
       -- 116.2g's subject is the one companion CR 103.2b let this player reveal.
       companions = if Companion.canTake pid gs then [Action.PutCompanionIntoHand] else []
+      -- CR 116.2i / 901.9: rolling the planar die, on CR 116.2a's window with a
+      -- cost that rises each time. Both are asked inside Planechase.canRoll.
+      planarRolls = if Planechase.canRoll pid gs then [Action.RollPlanarDie] else []
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
@@ -345,4 +349,4 @@ legalActions pid gs =
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
       manaAbilityActivations = fmap Action.ActivateManaAbility manaSources
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> endings <> plots <> foretells <> suspends <> companions <> activations <> manaAbilityActivations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> endings <> plots <> foretells <> suspends <> companions <> planarRolls <> activations <> manaAbilityActivations

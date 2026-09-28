@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
@@ -205,13 +206,14 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 -- card that is not on the battlefield: "that permanent's controller (or that
 -- card's owner, if it isn't on the battlefield)". CR 108.4 leaves such a card
 -- with no controller to ask about, so activatorOf below answers the owner for the
--- same reason and the two cannot disagree.
+-- same reason, and the condition reads activatorOf so the two cannot disagree.
+-- A face-up plane card is the exception CR 901.6 makes: its planar controller.
 --
 -- The VIEW is Projection.fullView, matching Projection.abilitiesGiven: nothing
 -- here is inside the layer fold, so there is no circularity to bound against.
 zoneAbilitiesOf :: Map.Map ObjectId PC.ProjectedCharacteristics -> Zone.Zone -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)]
 zoneAbilitiesOf pcs zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs) of
-  (Just face, Just obj) ->
+  (Just face, Just _) ->
     let delayed = Face.delayedAbilities face
         -- CR 113.6p, the limb beside CR 113.6b that reads the OBJECT rather than
         -- the ability: an emblem's abilities function in the command zone (CR
@@ -231,7 +233,7 @@ zoneAbilitiesOf pcs zone oid gs = case (Game.faceOf oid gs, Game.lookupObject oi
                )
         granted ability = case ActivatedAbility.condition ability of
           Nothing -> True
-          Just cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just (Object.owner obj)) (Just oid)) gs oid cond
+          Just cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (activatorOf oid gs) (Just oid)) gs oid cond
      in filter (\ability -> functionsHere ability && granted ability) (PC.activatedAbilities (Projection.projectGiven pcs oid gs))
   _ -> []
 
@@ -340,7 +342,8 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
     Zone.Battlefield -> Projection.controllerOfGiven grants oid gs
     Zone.Hand -> Just (Object.owner obj)
     Zone.Graveyard -> Just (Object.owner obj)
-    Zone.Command -> Just (Object.owner obj)
+    -- CR 901.6: a face-up plane card's abilities are the planar controller's.
+    Zone.Command -> Just (Plane.commandControllerOf oid obj gs)
     _ -> Nothing
 
 -- CR 602.2's whole permission conjunct: its default, and the "unless the object

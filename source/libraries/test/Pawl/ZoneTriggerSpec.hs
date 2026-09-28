@@ -116,6 +116,8 @@ import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
+import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -981,8 +983,8 @@ commandZoneTriggerSpec s registry =
 -- printing reaches it: MTGJSON's 2026-08-23 dump, every emblem text and every
 -- Emblem, Vanguard, Conspiracy, Dungeon, Plane and Scheme card scanned for a line
 -- opening "When " that is not an event, finds only the plane Aretopolis ("When
--- Aretopolis has ten or more scroll counters on it, planeswalk."), which pawl
--- cannot put into the command zone (#934).
+-- Aretopolis has ten or more scroll counters on it, planeswalk."), which needs
+-- counters on a plane (#4310).
 --
 -- Three seats, and only alice's hand decides: bob's and carol's are empty on
 -- both boards, so a scan reading "you" as any player would fire on the negative.
@@ -2860,6 +2862,8 @@ representativeEvents cond =
         TriggerCondition.PlayerRollsResult watched -> one (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = DieResult.result watched})
         -- CR 701.52a's own event, and the only one this condition admits.
         TriggerCondition.Visit -> one (GameEvent.RolledToVisit DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = 3})
+        -- CR 901.9b's own event, a planar die showing the chaos symbol.
+        TriggerCondition.ChaosEnsues -> one (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled S.bob PlanarDieFace.Chaos))
         -- CR 701.51c's and CR 702.159b's own events, each the only one its
         -- condition admits.
         TriggerCondition.PlayerOpensAttraction _ -> one (GameEvent.AttractionOpened S.bob)
@@ -3120,6 +3124,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6},
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.Opponent, DieResult.result = 6},
     TriggerCondition.Visit,
+    TriggerCondition.ChaosEnsues,
     TriggerCondition.PlayerOpensAttraction PlayerRelation.You,
     TriggerCondition.PlayerOpensAttraction PlayerRelation.Opponent,
     TriggerCondition.PlayerClaimsPrize PlayerRelation.You,

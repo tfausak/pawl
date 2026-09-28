@@ -828,6 +828,10 @@ library codec
     Pawl.Codec.PhaseSpec
     Pawl.Codec.Pile
     Pawl.Codec.PileSpec
+    Pawl.Codec.PlanarDieFace
+    Pawl.Codec.PlanarDieFaceSpec
+    Pawl.Codec.PlanarDieRolled
+    Pawl.Codec.PlanarDieRolledSpec
     Pawl.Codec.Player
     Pawl.Codec.PlayerAttacksPlayer
     Pawl.Codec.PlayerAttacksPlayerSpec
@@ -1237,6 +1241,8 @@ library engine
     Pawl.Engine.MoveDuration
     Pawl.Engine.Mulligan
     Pawl.Engine.Phasing
+    Pawl.Engine.Plane
+    Pawl.Engine.Planechase
     Pawl.Engine.PlayerDesignation
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Plot
@@ -1628,6 +1634,7 @@ library test
     Pawl.OmenSpec
     Pawl.OutsideTheGameSpec
     Pawl.PhasingSpec
+    Pawl.PlanechaseSpec
     Pawl.PlaneswalkerCombatSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerDesignationSpec
@@ -2114,6 +2121,8 @@ library types
     Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
     Pawl.Types.Pile
+    Pawl.Types.PlanarDieFace
+    Pawl.Types.PlanarDieRolled
     Pawl.Types.Player
     Pawl.Types.PlayerAttacksPlayer
     Pawl.Types.PlayerAttacksWith

@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
@@ -90,6 +91,7 @@ import qualified Pawl.Types.OwnedZone as OwnedZone
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
+import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -226,6 +228,7 @@ movedOf event = case event of
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
+  GameEvent.PlanarDieRolled _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -368,6 +371,7 @@ participants event =
         GameEvent.DiceRolled pid -> player pid
         GameEvent.DieResultSettled r -> player (DieResult.roller r)
         GameEvent.RolledToVisit r -> player (DieResult.roller r)
+        GameEvent.PlanarDieRolled r -> player (PlanarDieRolled.roller r)
         GameEvent.ClassLevelSet c -> one (ClassLevelChange.object c)
         GameEvent.Plotted oid -> one oid
         GameEvent.Explored oid -> one oid
@@ -451,6 +455,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
+  TriggerCondition.ChaosEnsues -> False
   TriggerCondition.PlayerOpensAttraction _ -> False
   TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
@@ -756,6 +761,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerRollsDice _ -> False
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
+  TriggerCondition.ChaosEnsues -> False
   TriggerCondition.PlayerOpensAttraction _ -> False
   TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
@@ -1238,6 +1244,7 @@ eventTriggers events gs =
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
+        GameEvent.PlanarDieRolled _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -1602,6 +1609,7 @@ eventTriggers events gs =
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
+        GameEvent.PlanarDieRolled _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -1860,6 +1868,7 @@ eventTriggers events gs =
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
+        GameEvent.PlanarDieRolled _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -1924,7 +1933,9 @@ eventTriggers events gs =
       -- is not a creature, so the pool's CR 613.1f removers never reach it.
       -- CR 902.6 gives the vanguard card the same owner-is-controller answer CR
       -- 114.2 gives an emblem, so the two share this line as well: rule 902.6's
-      -- "the controller of a face-up vanguard card is its owner".
+      -- "the controller of a face-up vanguard card is its owner". A face-up
+      -- plane card's is the planar controller instead (CR 901.6), which
+      -- Plane.commandControllerOf answers.
       commandCandidate oid = case Game.lookupObject oid gs of
         Nothing -> Nothing
         Just obj ->
@@ -1934,7 +1945,7 @@ eventTriggers events gs =
               Nothing -> Nothing
               Just face -> case Face.triggeredAbilities face of
                 [] -> Nothing
-                abilities -> Just (oid, (Object.owner obj, fmap whole abilities))
+                abilities -> Just (oid, (Plane.commandControllerOf oid obj gs, fmap whole abilities))
       inCommand =
         Map.fromList
           (Maybe.mapMaybe commandCandidate (Set.toAscList (GameState.command gs)))
@@ -2025,6 +2036,7 @@ eventTriggers events gs =
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
+        GameEvent.PlanarDieRolled _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -2468,6 +2480,8 @@ zonesTriggeredFrom cond =
         -- battlefield.
         TriggerCondition.PlayerRollsDice _ -> battlefield
         TriggerCondition.PlayerRollsResult _ -> battlefield
+        -- CR 311.7 / 901.7: a chaos ability triggers from the face-up plane.
+        TriggerCondition.ChaosEnsues -> Set.singleton Zone.Command
         TriggerCondition.Visit -> battlefield
         TriggerCondition.PlayerOpensAttraction _ -> battlefield
         TriggerCondition.PlayerClaimsPrize _ -> battlefield
@@ -2871,7 +2885,7 @@ stateTriggers gs
     -- as controller (CR 114.2, CR 902.6), and the printed abilities (CR 114.3).
     inCommand oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
       (Just obj, Just face)
-        | Vanguard.functionsFromCommandZone oid gs -> forOne oid (Object.owner obj) (Face.triggeredAbilities face)
+        | Vanguard.functionsFromCommandZone oid gs -> forOne oid (Plane.commandControllerOf oid obj gs) (Face.triggeredAbilities face)
       _ -> []
     -- The same hoist eventTriggers' `grants` binding makes.
     grants = Projection.controlGrants gs
@@ -2936,6 +2950,7 @@ stateTriggers gs
             TriggerCondition.PlayerRollsDice _ -> False
             TriggerCondition.PlayerRollsResult _ -> False
             TriggerCondition.Visit -> False
+            TriggerCondition.ChaosEnsues -> False
             TriggerCondition.PlayerOpensAttraction _ -> False
             TriggerCondition.PlayerClaimsPrize _ -> False
             TriggerCondition.PlayerWinsCoinFlip _ -> False
@@ -3690,6 +3705,7 @@ resnapshot gs without event =
         GameEvent.DiceRolled {} -> Just event
         GameEvent.DieResultSettled {} -> Just event
         GameEvent.RolledToVisit {} -> Just event
+        GameEvent.PlanarDieRolled {} -> Just event
         GameEvent.ClassLevelSet {} -> Just event
         GameEvent.Plotted {} -> Just event
         GameEvent.Explored {} -> Just event

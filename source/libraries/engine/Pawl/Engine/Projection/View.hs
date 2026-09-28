@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Star as Star
 import qualified Pawl.Engine.Subtype as Subtype
@@ -1934,7 +1935,11 @@ controllerOf oid gs = controllerOfGiven (controlGrants gs) oid gs
 controllerOfGiven :: [ControlGrant] -> ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerOfGiven grants oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
-  Just obj -> Just (Maybe.fromMaybe (defaultControllerOf obj) (Map.lookup oid (layerTwo grants gs)))
+  Just obj
+    -- CR 901.6: a face-up plane or phenomenon card's controller is the planar
+    -- controller.
+    | Object.zone obj == Zone.Command && Plane.isPlanarCard oid gs -> Just (Plane.planarController gs)
+    | otherwise -> Just (Maybe.fromMaybe (defaultControllerOf obj) (Map.lookup oid (layerTwo grants gs)))
 
 -- One layer-2 control effect as the fold applies it: a stored
 -- Modification.SetController names its player, a control-granting static
