@@ -5,7 +5,6 @@
 -- Pawl.Engine.Resolve for size; nothing here resolves anything.
 module Pawl.Engine.Resolve.Slots where
 
-import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -835,7 +834,7 @@ effectObjectRefs effect = case effect of
   Effect.MakeForetold x -> [MakeForetold.cards x]
   Effect.MakeWarped ref -> [ref]
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
-  Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> [ref]
+  Effect.ForEach (ForEach.MkForEach ref _ _ _ _ _) -> [ref]
   Effect.ForEachNumber {} -> []
   Effect.Heal ref -> [ref]
 
@@ -1409,9 +1408,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.OfferNamedCopy {} -> Map.empty
   Effect.OfferNotedCopy {} -> Map.empty
   Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)
-  -- Everything the BODY reads. The loop's own slot is NOT subtracted as the
+  -- Everything the BODY reads, and what its per-member gate reads (modeSlots'
+  -- payer, multiplier and basis). The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> joinSlots (fmap slotsOf (Foldable.toList body))
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ gate) -> joinSlots (maybe Map.empty payGateSlots gate : fmap slotsOf (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> joinTwo (quantitySlots upTo) (joinSlots (fmap slotsOf (Foldable.toList body)))
   Effect.Heal _ -> Map.empty
 
@@ -2011,7 +2011,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
   -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
   -- nested in the DEPTH is one slotsOf cannot see.
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> all slotsAreExhaustive body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ gate) -> all slotsAreExhaustive body && all (all Quantity.slotsAreExhaustive . PayGate.perEach) gate
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.slotsAreExhaustive upTo && all slotsAreExhaustive body
   Effect.Heal _ -> True
 
@@ -2233,7 +2233,7 @@ readsX =
         Effect.OfferNotedCopy {} -> False
         Effect.GrantPlayFromExile {} -> False
         -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
-        Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> readsX (Foldable.toList body)
+        Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> readsX (Foldable.toList body)
         Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.readsX upTo || readsX (Foldable.toList body)
         Effect.Heal _ -> False
    in any effectReadsX
@@ -2467,7 +2467,7 @@ boundSlots effect = case effect of
   -- The loop's member slot, plus every name the BODY authors -- which the loop
   -- really does leave bound once it is over, to the union across its members
   -- (Pawl.Engine.Resolve.Effect's arm).
-  Effect.ForEach (ForEach.MkForEach _ _ slot body _) -> Set.insert slot (foldMap boundSlots body)
+  Effect.ForEach (ForEach.MkForEach _ _ slot body _ _) -> Set.insert slot (foldMap boundSlots body)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ slot body) -> Set.insert slot (foldMap boundSlots body)
   Effect.Heal _ -> Set.empty
 
@@ -3280,21 +3280,8 @@ targetSlotSlots slot =
 -- reads would otherwise dangle.
 modeSlots :: Mode.Mode Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Map.Map SlotName SlotArity
 modeSlots mode =
-  let -- Every clause's payer: CR 118.12 scopes a resolution cost to its clause.
-      payerSlot = maybe Map.empty (playerRefSlots . PayGate.payer) . Clause.payGate
-      -- And the gate's OTHER slot-reading position, its "for each" multiplier
-      -- (Pawl.Types.PayGate.perEach): a cost scaled by what a bound object names is
-      -- a read the payer field need not repeat, and payGatePaidBy evaluates it
-      -- against this resolution's own context, so the slot really is asked for.
-      -- quantitySlots' WHOLE answer, targetSlotSlots' computed bound's reason.
-      multiplierSlot = maybe Map.empty quantitySlots . (Clause.payGate Monad.>=> PayGate.perEach)
-      -- And the slot a gate's DESCRIBED cost reads its mana part off
-      -- (Pawl.Types.CostBasis): Flash's "its mana cost reduced by {2}" names the
-      -- creature its first clause put onto the battlefield, a read no other
-      -- field of the clause repeats. At arity ONE -- a slot naming several names
-      -- no one mana cost, and `describedCost` answers Nothing there rather than
-      -- picking.
-      basisSlot = maybe Map.empty (oneSlot . CostBasis.slot) . (Clause.payGate Monad.>=> PayGate.basis)
+  let -- Every clause's gate: CR 118.12 scopes a resolution cost to its clause.
+      gateSlot = maybe Map.empty payGateSlots . Clause.payGate
       -- And every clause's ASKER, for its reason: CR 603.5's "may" is scoped to a
       -- clause too, and Jungle Wayfinder's names the table rather than a slot --
       -- but a card may name one, and an asker slot no effect also reads would
@@ -3314,14 +3301,28 @@ modeSlots mode =
       conditionSlot = maybe Map.empty conditionSlots . Clause.condition
    in joinSlots
         [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
-          joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
-          joinSlots (fmap multiplierSlot (Foldable.toList (Mode.clauses mode))),
-          joinSlots (fmap basisSlot (Foldable.toList (Mode.clauses mode))),
+          joinSlots (fmap gateSlot (Foldable.toList (Mode.clauses mode))),
           joinSlots (fmap askerSlot (Foldable.toList (Mode.clauses mode))),
           joinSlots (fmap chooserSlot (Foldable.toList (Mode.clauses mode))),
           joinSlots (fmap conditionSlot (Foldable.toList (Mode.clauses mode))),
           joinSlots (fmap targetSlotSlots (Map.elems (Mode.targetSlots mode)))
         ]
+
+-- Every slot a CR 118.12 gate reads, wherever it rides (a clause, or a CR
+-- 608.2f loop's ForEach.payGate). Its payer; its "for each" multiplier
+-- (Pawl.Types.PayGate.perEach), which payGatePaidBy evaluates against the
+-- resolution's own context, reported whole for targetSlotSlots' computed
+-- bound's reason; and the slot a DESCRIBED cost reads its mana part off
+-- (Pawl.Types.CostBasis, Flash's "its mana cost reduced by {2}"), at arity ONE
+-- since a slot naming several names no one mana cost and `describedCost`
+-- answers Nothing there rather than picking.
+payGateSlots :: PayGate.PayGate -> Map.Map SlotName SlotArity
+payGateSlots gate =
+  joinSlots
+    [ playerRefSlots (PayGate.payer gate),
+      maybe Map.empty quantitySlots (PayGate.perEach gate),
+      maybe Map.empty (oneSlot . CostBasis.slot) (PayGate.basis gate)
+    ]
 
 -- The slot a target pool draws its candidates from, if it draws them from one
 -- (CR 400.1's per-player graveyard), read singly.

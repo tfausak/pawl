@@ -2132,6 +2132,7 @@ library types
     Pawl.Types.PaymentMoment
     Pawl.Types.PaymentSubject
     Pawl.Types.PayObligation
+    Pawl.Types.PayOffer
     Pawl.Types.PendingDamageEffect
     Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger

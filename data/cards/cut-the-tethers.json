@@ -1,0 +1,96 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Cut the Tethers",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ForEach",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "MoveToZone",
+                          "value": {
+                            "ref": {
+                              "type": "InSlot",
+                              "value": "spirit"
+                            },
+                            "zone": {
+                              "type": "Hand"
+                            }
+                          }
+                        }
+                      ],
+                      "payGate": {
+                        "branch": {
+                          "type": "IfNotPaid"
+                        },
+                        "cost": {
+                          "mana": [
+                            {
+                              "type": "Generic",
+                              "value": 3
+                            }
+                          ]
+                        },
+                        "payer": {
+                          "type": "OwnerOfBound",
+                          "value": "spirit"
+                        }
+                      },
+                      "ref": {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "HasSubtype",
+                          "value": {
+                            "type": "Spirit"
+                          }
+                        }
+                      },
+                      "slot": "spirit"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

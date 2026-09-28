@@ -272,6 +272,7 @@ import qualified Pawl.Types.OutsideDestination as OutsideDestination
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.PayObligation as PayObligation
+import qualified Pawl.Types.PayOffer as PayOffer
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
@@ -5308,7 +5309,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             { GameState.objects =
                 foldr (Map.adjust heal) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
-  Effect.ForEach (ForEach.MkForEach ref membership slot body individually) -> do
+  Effect.ForEach (ForEach.MkForEach ref membership slot body individually gate) -> do
     gs0 <- State.get
     -- CR 608.2f: WHICH members, swept ONCE from the pre-loop board and then fixed,
     -- so the body can neither shorten the batch nor add to it. Recipients rather
@@ -5328,7 +5329,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         | otherwise -> do
             answer <- Game.choose (Prompt.ChooseLoopMembers (Decide.deciderFor controller gs0) controller resolving swept)
             pure (filter (`Set.member` answer) swept)
-    members <- forEachOrder resolving (const (Just controller)) picked
+    ordered <- forEachOrder resolving (const (Just controller)) picked
+    -- CR 118.12a per member: every offer is made before the first body runs.
+    members <- maybe (pure ordered) (loopOffers resolving source controller slot legal ordered) gate
     let -- The slots the BODY defines, computed off the instruction rather than the
         -- board: a body effect binds into the resolving object's live bindings and
         -- the next body effect must see it. Restricted to those names so a target
@@ -10939,13 +10942,47 @@ branchSelects branch asked = case branch of
 payGatePaid :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Maybe (Set PlayerId) -> PayGate.PayGate -> Game (Map.Map PlayerId Bool)
 payGatePaid resolving source controller idx cIdx legal announced gate = do
   gs <- State.get
-  Monad.foldM
-    ( \acc payer -> do
-        paid <- payGatePaidBy resolving source controller idx cIdx legal payer gate
-        pure (Map.insert payer paid acc)
-    )
-    Map.empty
-    (announcedOnly announced (apnapPlayersOf (PayGate.payer gate) legal controller gs))
+  answered <-
+    Monad.foldM
+      ( \earlier payer -> do
+          paid <- payGatePaidBy resolving source controller (PayOffer.AtClause idx cIdx) earlier legal payer gate
+          pure (earlier Seq.|> (payer, paymentDecisionOf paid))
+      )
+      Seq.empty
+      (announcedOnly announced (apnapPlayersOf (PayGate.payer gate) legal controller gs))
+  pure (Map.fromList [(payer, decision == PaymentDecision.Pays) | (payer, decision) <- Foldable.toList answered])
+
+-- CR 101.4b: an answer as a later payer is told it -- Pays exactly when the
+-- payment went through, so a payer who could not pay (CR 118.3) or had left
+-- (CR 800.4f) reads as having declined.
+paymentDecisionOf :: Bool -> PaymentDecision.PaymentDecision
+paymentDecisionOf paid = if paid then PaymentDecision.Pays else PaymentDecision.Declines
+
+-- CR 118.12a over CR 608.2f's loop: the members whose ForEach.payGate branch
+-- selects anybody, in the loop's own order. Each member is its own offer, read
+-- through the loop's slot, so a payment for one member buys nothing for
+-- another. CR 101.4: every payer makes all of their offers, one per member,
+-- before the next payer in APNAP order makes theirs -- Killing Wave's and
+-- Whirlwind Denial's rulings -- and is told what the payers before them
+-- answered for THAT member (CR 101.4b). Nothing is destroyed until every offer
+-- is answered, which is CR 608.2e's choices-then-action.
+loopOffers :: ObjectId -> ObjectId -> PlayerId -> SlotName -> Map.Map SlotName (Set Recipient) -> [Recipient] -> PayGate.PayGate -> Game [Recipient]
+loopOffers resolving source controller slot legal members gate = do
+  gs <- State.get
+  let legalFor member = Map.insert slot (Set.singleton member) legal
+      payersOf member = apnapPlayersOf (PayGate.payer gate) (legalFor member) controller gs
+      offers = [(payer, member) | payer <- Game.apnapOrder gs, member <- members, elem payer (payersOf member)]
+  answered <-
+    Monad.foldM
+      ( \acc (payer, member) -> do
+          let earlier = Seq.fromList [(p, d) | (p, m, d) <- Foldable.toList acc, m == member]
+          paid <- payGatePaidBy resolving source controller (PayOffer.ForMember member) earlier (legalFor member) payer gate
+          pure (acc Seq.|> (payer, member, paymentDecisionOf paid))
+      )
+      Seq.empty
+      offers
+  let askedAbout member = Map.fromList [(p, d == PaymentDecision.Pays) | (p, m, d) <- Foldable.toList answered, m == member]
+  pure (filter (not . Set.null . branchSelects (PayGate.branch gate) . askedAbout) members)
 
 -- One player's answer to one gate. The cost is the PRINTED one with CR 107.3's X
 -- resolved (`announcedXOn`) and then multiplied by the gate's "for each"
@@ -10990,8 +11027,8 @@ payGatePaid resolving source controller idx cIdx legal announced gate = do
 -- opposite answer: the controller of the object picks another player to make it,
 -- which Pawl.Engine.Resolve.Effect.askedChooser does. Not here -- a cost is the
 -- whole of what this function asks about.
-payGatePaidBy :: ObjectId -> ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
-payGatePaidBy resolving source controller idx cIdx legal payer gate = do
+payGatePaidBy :: ObjectId -> ObjectId -> PlayerId -> PayOffer.PayOffer -> Seq.Seq (PlayerId, PaymentDecision.PaymentDecision) -> Map.Map SlotName (Set Recipient) -> PlayerId -> PayGate.PayGate -> Game Bool
+payGatePaidBy resolving source controller offer earlier legal payer gate = do
   gs <- State.get
   let multiplier = case PayGate.perEach gate of
         Nothing -> 1
@@ -11010,7 +11047,7 @@ payGatePaidBy resolving source controller idx cIdx legal payer gate = do
     else do
       decision <- case PayGate.obligation gate of
         PayObligation.Mandatory -> pure PaymentDecision.Pays
-        PayObligation.Optional -> Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
+        PayObligation.Optional -> Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving offer cost earlier)
       case decision of
         PaymentDecision.Declines -> pure False
         PaymentDecision.Pays -> do
