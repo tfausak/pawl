@@ -801,6 +801,7 @@ effectObjectRefs effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.OpenAttraction -> []
   Effect.Planeswalk -> []
+  Effect.Abandon -> []
   Effect.ClaimPrize -> []
   Effect.Forage -> []
   Effect.Populate -> []
@@ -988,6 +989,7 @@ effectPlayerRefs effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.OpenAttraction -> []
   Effect.Planeswalk -> []
+  Effect.Abandon -> []
   Effect.ClaimPrize -> []
   Effect.Forage -> []
   Effect.Populate -> []
@@ -1116,6 +1118,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.TemptWithTheRing -> Map.empty
   Effect.OpenAttraction -> Map.empty
   Effect.Planeswalk -> Map.empty
+  Effect.Abandon -> Map.empty
   Effect.ClaimPrize -> Map.empty
   Effect.Forage -> Map.empty
   Effect.Populate -> Map.empty
@@ -1800,6 +1803,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.TemptWithTheRing -> True
   Effect.OpenAttraction -> True
   Effect.Planeswalk -> True
+  Effect.Abandon -> True
   Effect.ClaimPrize -> True
   Effect.Forage -> True
   Effect.Populate -> True
@@ -2058,6 +2062,7 @@ readsX =
         Effect.TemptWithTheRing -> False
         Effect.OpenAttraction -> False
         Effect.Planeswalk -> False
+        Effect.Abandon -> False
         Effect.ClaimPrize -> False
         Effect.Forage -> False
         Effect.Populate -> False
@@ -2295,6 +2300,7 @@ boundSlots effect = case effect of
   Effect.TemptWithTheRing -> Set.empty
   Effect.OpenAttraction -> Set.empty
   Effect.Planeswalk -> Set.empty
+  Effect.Abandon -> Set.empty
   Effect.ClaimPrize -> Set.empty
   Effect.Forage -> Set.empty
   Effect.Populate -> Set.empty

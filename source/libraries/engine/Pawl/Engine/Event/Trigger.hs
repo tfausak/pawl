@@ -100,6 +100,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Saddling as Saddling
+import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
@@ -229,6 +230,7 @@ movedOf event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -372,6 +374,7 @@ participants event =
         GameEvent.DieResultSettled r -> player (DieResult.roller r)
         GameEvent.RolledToVisit r -> player (DieResult.roller r)
         GameEvent.PlanarDieRolled r -> player (PlanarDieRolled.roller r)
+        GameEvent.SchemeSetInMotion e -> ([SchemeSetInMotion.scheme e], [SchemeSetInMotion.player e])
         GameEvent.ClassLevelSet c -> one (ClassLevelChange.object c)
         GameEvent.Plotted oid -> one oid
         GameEvent.Explored oid -> one oid
@@ -456,6 +459,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
+  TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerOpensAttraction _ -> False
   TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
@@ -762,6 +766,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerRollsResult _ -> False
   TriggerCondition.Visit -> False
   TriggerCondition.ChaosEnsues -> False
+  TriggerCondition.SetInMotion -> False
   TriggerCondition.PlayerOpensAttraction _ -> False
   TriggerCondition.PlayerClaimsPrize _ -> False
   TriggerCondition.PlayerWinsCoinFlip _ -> False
@@ -1245,6 +1250,7 @@ eventTriggers events gs =
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
         GameEvent.PlanarDieRolled _ -> Map.empty
+        GameEvent.SchemeSetInMotion _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -1610,6 +1616,7 @@ eventTriggers events gs =
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
         GameEvent.PlanarDieRolled _ -> Map.empty
+        GameEvent.SchemeSetInMotion _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -1869,6 +1876,7 @@ eventTriggers events gs =
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
         GameEvent.PlanarDieRolled _ -> Map.empty
+        GameEvent.SchemeSetInMotion _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -2037,6 +2045,7 @@ eventTriggers events gs =
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
         GameEvent.PlanarDieRolled _ -> Map.empty
+        GameEvent.SchemeSetInMotion _ -> Map.empty
         GameEvent.ClassLevelSet _ -> Map.empty
         GameEvent.Plotted _ -> Map.empty
         GameEvent.Explored _ -> Map.empty
@@ -2482,6 +2491,9 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerRollsResult _ -> battlefield
         -- CR 311.7 / 901.7: a chaos ability triggers from the face-up plane.
         TriggerCondition.ChaosEnsues -> Set.singleton Zone.Command
+        -- CR 701.32b / 904.9: a scheme's set-in-motion ability triggers from the
+        -- scheme face up in the command zone.
+        TriggerCondition.SetInMotion -> Set.singleton Zone.Command
         TriggerCondition.Visit -> battlefield
         TriggerCondition.PlayerOpensAttraction _ -> battlefield
         TriggerCondition.PlayerClaimsPrize _ -> battlefield
@@ -2951,6 +2963,7 @@ stateTriggers gs
             TriggerCondition.PlayerRollsResult _ -> False
             TriggerCondition.Visit -> False
             TriggerCondition.ChaosEnsues -> False
+            TriggerCondition.SetInMotion -> False
             TriggerCondition.PlayerOpensAttraction _ -> False
             TriggerCondition.PlayerClaimsPrize _ -> False
             TriggerCondition.PlayerWinsCoinFlip _ -> False
@@ -3706,6 +3719,7 @@ resnapshot gs without event =
         GameEvent.DieResultSettled {} -> Just event
         GameEvent.RolledToVisit {} -> Just event
         GameEvent.PlanarDieRolled {} -> Just event
+        GameEvent.SchemeSetInMotion {} -> Just event
         GameEvent.ClassLevelSet {} -> Just event
         GameEvent.Plotted {} -> Just event
         GameEvent.Explored {} -> Just event

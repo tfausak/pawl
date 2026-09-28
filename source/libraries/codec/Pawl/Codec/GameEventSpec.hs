@@ -69,6 +69,7 @@ import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Saddling as Saddling
+import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StackObjectKind as StackObjectKind
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -557,6 +558,13 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.RolledToVisit DieResult.MkDieResult {DieResult.roller = PlayerId.MkPlayerId 2, DieResult.result = 5})
       " {\"type\":\"RolledToVisit\",\"value\":{\"roller\":2,\"result\":5}} "
+  -- CR 701.32.
+  Spec.it s "SchemeSetInMotion" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.SchemeSetInMotion (SchemeSetInMotion.MkSchemeSetInMotion (PlayerId.MkPlayerId 1) (ObjectId.MkObjectId 7)))
+      " {\"type\":\"SchemeSetInMotion\",\"value\":{\"player\":1,\"scheme\":7}} "
   -- CR 901.9.
   Spec.it s "PlanarDieRolled" $
     Common.assertCodec

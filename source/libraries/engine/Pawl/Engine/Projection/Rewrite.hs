@@ -555,6 +555,7 @@ rewriteEffect pairs effect = case effect of
   Effect.TemptWithTheRing -> effect
   Effect.OpenAttraction -> effect
   Effect.Planeswalk -> effect
+  Effect.Abandon -> effect
   Effect.ClaimPrize -> effect
   Effect.Forage -> effect
   Effect.Populate -> effect
@@ -1864,6 +1865,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerRollsResult _ -> condition
   TriggerCondition.Visit -> condition
   TriggerCondition.ChaosEnsues -> condition
+  TriggerCondition.SetInMotion -> condition
   TriggerCondition.PlayerOpensAttraction _ -> condition
   TriggerCondition.PlayerClaimsPrize _ -> condition
   TriggerCondition.PlayerWinsCoinFlip _ -> condition

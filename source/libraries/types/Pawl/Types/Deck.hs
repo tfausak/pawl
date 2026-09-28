@@ -106,7 +106,10 @@ data Deck = MkDeck
     attractions :: Map.Map Printing.Printing Natural.Natural,
     -- | CR 901.3: the planar deck, plane and phenomenon cards. A set, since
     -- each card in it must have a different English name.
-    planes :: Set.Set Printing.Printing
+    planes :: Set.Set Printing.Printing,
+    -- | CR 904.3: the scheme deck. A multiset: CR 904.3 allows two cards of a
+    -- name.
+    schemes :: Map.Map Printing.Printing Natural.Natural
   }
   deriving (Eq, Ord, Show)
 
@@ -115,4 +118,4 @@ data Deck = MkDeck
 -- every game nobody ventures in, every game nobody wishes in, and every game
 -- outside Conspiracy Draft.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty, attractions = Map.empty, planes = Set.empty}
+fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty, attractions = Map.empty, planes = Set.empty, schemes = Map.empty}

@@ -982,6 +982,8 @@ library codec
     Pawl.Codec.SaddlingSpec
     Pawl.Codec.Scaling
     Pawl.Codec.ScalingSpec
+    Pawl.Codec.SchemeSetInMotion
+    Pawl.Codec.SchemeSetInMotionSpec
     Pawl.Codec.Scope
     Pawl.Codec.ScopeSpec
     Pawl.Codec.Search
@@ -1172,6 +1174,7 @@ library engine
     Pawl.Engine.ActivationRestriction
     Pawl.Engine.Airbend
     Pawl.Engine.Amass
+    Pawl.Engine.Archenemy
     Pawl.Engine.Attach
     Pawl.Engine.AttachRestriction
     Pawl.Engine.AttackCost
@@ -1268,6 +1271,7 @@ library engine
     Pawl.Engine.SacrificeRestriction
     Pawl.Engine.Saga
     Pawl.Engine.Sba
+    Pawl.Engine.Scheme
     Pawl.Engine.Script
     Pawl.Engine.Setup
     Pawl.Engine.Soulbond
@@ -1547,6 +1551,7 @@ library test
     Pawl.ActivationProhibitionSpec
     Pawl.AdventureSpec
     Pawl.AirbendSpec
+    Pawl.ArchenemySpec
     Pawl.AttackKeywordTriggerSpec
     Pawl.AttractionSpec
     Pawl.AuraSpec
@@ -2209,6 +2214,7 @@ library types
     Pawl.Types.SacrificeRestriction
     Pawl.Types.Saddling
     Pawl.Types.Scaling
+    Pawl.Types.SchemeSetInMotion
     Pawl.Types.Scope
     Pawl.Types.Search
     Pawl.Types.SearchDestination

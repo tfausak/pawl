@@ -169,6 +169,7 @@ codec =
           Arm.payload "PlayerRollsResult" (DieResult.codec PlayerRelation.codec) TriggerCondition.PlayerRollsResult (\x -> case x of TriggerCondition.PlayerRollsResult y -> Just y; _ -> Nothing),
           Arm.nullary "Visit" TriggerCondition.Visit,
           Arm.nullary "ChaosEnsues" TriggerCondition.ChaosEnsues,
+          Arm.nullary "SetInMotion" TriggerCondition.SetInMotion,
           Arm.payload "PlayerOpensAttraction" PlayerRelation.codec TriggerCondition.PlayerOpensAttraction (\x -> case x of TriggerCondition.PlayerOpensAttraction y -> Just y; _ -> Nothing),
           Arm.payload "PlayerClaimsPrize" PlayerRelation.codec TriggerCondition.PlayerClaimsPrize (\x -> case x of TriggerCondition.PlayerClaimsPrize y -> Just y; _ -> Nothing),
           Arm.payload "PlayerWinsCoinFlip" PlayerRelation.codec TriggerCondition.PlayerWinsCoinFlip (\x -> case x of TriggerCondition.PlayerWinsCoinFlip y -> Just y; _ -> Nothing),
@@ -323,6 +324,7 @@ tagOf x = case x of
   TriggerCondition.PlayerRollsResult {} -> "PlayerRollsResult"
   TriggerCondition.Visit {} -> "Visit"
   TriggerCondition.ChaosEnsues {} -> "ChaosEnsues"
+  TriggerCondition.SetInMotion {} -> "SetInMotion"
   TriggerCondition.PlayerOpensAttraction {} -> "PlayerOpensAttraction"
   TriggerCondition.PlayerClaimsPrize {} -> "PlayerClaimsPrize"
   TriggerCondition.PlayerWinsCoinFlip {} -> "PlayerWinsCoinFlip"

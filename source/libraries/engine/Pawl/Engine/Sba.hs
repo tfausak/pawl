@@ -10,6 +10,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Archenemy as Archenemy
 import qualified Pawl.Engine.AttachRestriction as AttachRestriction
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Card as Card
@@ -730,6 +731,9 @@ performStateBasedActions = Event.simultaneously $ do
       -- triggered but not yet left the stack, and a trigger this settle has not
       -- scanned is on no stack yet.
       finishedDungeons = Dungeon.finished gs
+      -- CR 704.6e / 314.6: face-up non-ongoing schemes with no scheme ability
+      -- pending.
+      spentSchemes = Archenemy.abandonedBySba gs
       -- CR 704.5s / 714.4, from the SAME pre-pass state as everything above.
       -- Lives in Pawl.Engine.Saga with the rest of rule 714, the way CR 704.5aa
       -- lives in Pawl.Engine.Speed.
@@ -1039,12 +1043,12 @@ performStateBasedActions = Event.simultaneously $ do
       -- CR 704.5t / 309.6: "the dungeon card's owner removes it from the game",
       -- applied to the dungeons classified from the pre-pass board. Applied late
       -- like every other action in this pass.
-      undungeoned = List.foldl' (flip Dungeon.remove) revved finishedDungeons
+      undungeoned = List.foldl' (flip Archenemy.toBottom) (List.foldl' (flip Dungeon.remove) revved finishedDungeons) spentSchemes
       -- A state-based action was performed iff any of the classifications above
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null unbestowing) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders) || not (null finishedDungeons) || not (null routed)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null unbestowing) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders) || not (null finishedDungeons) || not (null spentSchemes) || not (null routed)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

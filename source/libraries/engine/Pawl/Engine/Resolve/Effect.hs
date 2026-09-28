@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Engine.Airbend as Airbend
 import qualified Pawl.Engine.Amass as Amass
+import qualified Pawl.Engine.Archenemy as Archenemy
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Attraction as Attraction
 import qualified Pawl.Engine.Binding as Binding
@@ -3075,6 +3076,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.OpenAttraction -> null (Attraction.deckOf controller gs)
   -- CR 701.31a: only the planar controller of a Planechase game planeswalks.
   Effect.Planeswalk -> not (Planechase.canPlaneswalk controller gs)
+  -- CR 701.33a: only a face-up ongoing scheme may be abandoned.
+  Effect.Abandon -> not (Archenemy.canAbandon source gs)
   Effect.ClaimPrize -> False
   -- CR 701.61a: neither half of forage can be carried out by a player holding
   -- fewer than three cards in their graveyard who controls no Food, which is
@@ -9001,6 +9004,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   Effect.TemptWithTheRing -> Ring.tempt controller
   Effect.OpenAttraction -> Attraction.open controller
   Effect.Planeswalk -> Planechase.planeswalk controller
+  Effect.Abandon -> Archenemy.abandon source
   -- CR 702.159b: the prize's actions are the effects after this one, so the
   -- claim itself is only the event "whenever you claim the prize" reads.
   Effect.ClaimPrize -> State.modify' (Event.recordEvent (GameEvent.PrizeClaimed controller))

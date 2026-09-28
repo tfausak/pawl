@@ -58,6 +58,7 @@ withoutAnnouncement before entry closed = do
   command <- setOf GameState.command
   attractionDecks <- libraries GameState.attractionDecks
   planarDecks <- libraries GameState.planarDecks
+  schemeDecks <- libraries GameState.schemeDecks
   stack <- listOf GameState.stack
   players <- mapOf GameState.players
   outsideObjects <- mapOf GameState.outsideObjects
@@ -161,6 +162,7 @@ withoutAnnouncement before entry closed = do
         GameState.command = command,
         GameState.attractionDecks = attractionDecks,
         GameState.planarDecks = planarDecks,
+        GameState.schemeDecks = schemeDecks,
         GameState.stack = stack,
         GameState.players = players,
         GameState.outsideObjects = outsideObjects,

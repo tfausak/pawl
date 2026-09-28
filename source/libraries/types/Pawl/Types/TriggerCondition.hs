@@ -565,6 +565,9 @@ data TriggerCondition
   | -- | CR 311.7: "whenever chaos ensues", a plane's chaos ability, against a
     -- GameEvent.PlanarDieRolled showing the chaos symbol (CR 901.9b).
     ChaosEnsues
+  | -- | CR 701.32 / 904.9: "When you set this scheme in motion", against a
+    -- GameEvent.SchemeSetInMotion naming the ability's own scheme.
+    SetInMotion
   | -- | CR 706.2: "whenever you roll a 6" (Night Shift of the Living Dead), once
     -- per die whose result, after every modifier, is the stated number.
     PlayerRollsResult (DieResult.DieResult PlayerRelation.PlayerRelation)

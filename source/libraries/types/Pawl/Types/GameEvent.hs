@@ -37,6 +37,7 @@ import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Saddling as Saddling
+import qualified Pawl.Types.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TappedForMana as TappedForMana
@@ -462,6 +463,8 @@ data GameEvent
     -- beside it (CR 901.9d); DieResultSettled is not, since the planar die has
     -- no numerical result.
     PlanarDieRolled PlanarDieRolled.PlanarDieRolled
+  | -- | CR 701.32 / 904.9: the archenemy set a scheme in motion.
+    SchemeSetInMotion SchemeSetInMotion.SchemeSetInMotion
   | -- | CR 701.51c: this player opened an Attraction, recorded by
     -- Pawl.Engine.Attraction.open only when the card reached the battlefield.
     AttractionOpened PlayerId.PlayerId

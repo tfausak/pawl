@@ -43,6 +43,7 @@ import qualified Pawl.Codec.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Revealed as Revealed
 import qualified Pawl.Codec.Saddling as Saddling
+import qualified Pawl.Codec.SchemeSetInMotion as SchemeSetInMotion
 import qualified Pawl.Codec.SpellWasCast as SpellWasCast
 import qualified Pawl.Codec.StepBegan as StepBegan
 import qualified Pawl.Codec.TappedForMana as TappedForMana
@@ -118,6 +119,7 @@ codec =
       Arm.payload "DieResultSettled" (DieResult.codec PlayerId.codec) GameEvent.DieResultSettled (\x -> case x of GameEvent.DieResultSettled y -> Just y; _ -> Nothing),
       Arm.payload "RolledToVisit" (DieResult.codec PlayerId.codec) GameEvent.RolledToVisit (\x -> case x of GameEvent.RolledToVisit y -> Just y; _ -> Nothing),
       Arm.payload "PlanarDieRolled" PlanarDieRolled.codec GameEvent.PlanarDieRolled (\x -> case x of GameEvent.PlanarDieRolled y -> Just y; _ -> Nothing),
+      Arm.payload "SchemeSetInMotion" SchemeSetInMotion.codec GameEvent.SchemeSetInMotion (\x -> case x of GameEvent.SchemeSetInMotion y -> Just y; _ -> Nothing),
       Arm.payload "AttractionOpened" PlayerId.codec GameEvent.AttractionOpened (\x -> case x of GameEvent.AttractionOpened y -> Just y; _ -> Nothing),
       Arm.payload "PrizeClaimed" PlayerId.codec GameEvent.PrizeClaimed (\x -> case x of GameEvent.PrizeClaimed y -> Just y; _ -> Nothing),
       Arm.payload "ClassLevelSet" ClassLevelChange.codec GameEvent.ClassLevelSet (\x -> case x of GameEvent.ClassLevelSet y -> Just y; _ -> Nothing),
@@ -211,6 +213,7 @@ tagOf x = case x of
   GameEvent.DieResultSettled {} -> "DieResultSettled"
   GameEvent.RolledToVisit {} -> "RolledToVisit"
   GameEvent.PlanarDieRolled {} -> "PlanarDieRolled"
+  GameEvent.SchemeSetInMotion {} -> "SchemeSetInMotion"
   GameEvent.AttractionOpened {} -> "AttractionOpened"
   GameEvent.PrizeClaimed {} -> "PrizeClaimed"
   GameEvent.ClassLevelSet {} -> "ClassLevelSet"

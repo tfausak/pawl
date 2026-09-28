@@ -576,6 +576,7 @@ removeFromZones pid oid gs =
       GameState.command = Set.delete oid (GameState.command gs),
       GameState.attractionDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.attractionDecks gs),
       GameState.planarDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.planarDecks gs),
+      GameState.schemeDecks = Map.adjust (Seq.filter (/= oid)) pid (GameState.schemeDecks gs),
       GameState.stack = filter (/= oid) (GameState.stack gs)
     }
 
@@ -2375,6 +2376,7 @@ castOf event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2477,6 +2479,7 @@ abilityResolved event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2575,6 +2578,7 @@ discardOf event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2702,6 +2706,7 @@ movedChange event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -2819,6 +2824,7 @@ damageDealt event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
@@ -3100,6 +3106,7 @@ lifeGainOf event = case event of
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
   GameEvent.PlanarDieRolled _ -> Nothing
+  GameEvent.SchemeSetInMotion _ -> Nothing
   GameEvent.ClassLevelSet _ -> Nothing
   GameEvent.Plotted _ -> Nothing
   GameEvent.Explored _ -> Nothing
