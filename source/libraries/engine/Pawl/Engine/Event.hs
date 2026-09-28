@@ -5195,8 +5195,9 @@ changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
 -- the stack", so the CR 400.7 incarnation must never exist without it -- and,
 -- since only a writer inside the move knows where the move actually landed, a
 -- CR 616.1 redirect to another zone drops the face instead of carrying it there.
--- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
--- redirected off the stack keeps both halves" for the case that proves it.
+-- See the `face` note in changeZoneAttaching's mkObj, and
+-- Pawl.CastRestrictionSpec's "a cast redirected off the stack keeps both halves"
+-- for the case that proves it.
 --
 -- CR 110.2's entry controller rides along, because the one caller is a LAND
 -- PLAY and rule 305.1's player is not always the card's owner: Sen Triplets lets
