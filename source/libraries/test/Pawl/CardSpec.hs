@@ -1561,14 +1561,22 @@ spellCostsOf face =
     <> concatMap (NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices face)
 
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
--- every clause. A READER of X rather than a declarer: Clash of Wills' "unless its
--- controller pays {X}" spends the value its own {X}{U} announced (CR 107.3a),
--- which is what Pawl.Engine.Resolve.Effect.announcedXOn substitutes in.
+-- every clause, and every CR 608.2f loop's per-member offer. A READER of X
+-- rather than a declarer: Clash of Wills' "unless its controller pays {X}" and
+-- Killing Wave's "unless they pay X life" spend the value their own {X}
+-- announced (CR 107.3a), which is what Pawl.Engine.Resolve.Effect.announcedXOn
+-- substitutes in.
 payGateCostsOf :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Cost.Type.Cost Keyword.Keyword]
-payGateCostsOf =
-  fmap PayGate.cost
-    . concatMap (Maybe.mapMaybe Clause.payGate . Foldable.toList . Mode.clauses)
-    . Modal.modes
+payGateCostsOf modal =
+  fmap
+    PayGate.cost
+    ( concatMap (Maybe.mapMaybe Clause.payGate . Foldable.toList . Mode.clauses) (Modal.modes modal)
+        <> concatMap loopGates (Modal.allEffects modal)
+    )
+  where
+    loopGates effect = case effect of
+      Effect.ForEach loop -> Maybe.maybeToList (ForEach.payGate loop) <> concatMap loopGates (ForEach.body loop)
+      _ -> []
 
 -- Every Count reachable from a combat restriction: only CR 508.1c's / CR
 -- 509.1b's "unless some condition is met" carries one, and the subject beside it
