@@ -79,6 +79,7 @@ codec = Fields.object $ do
   additionalCostChoices <- Fields.defaulted "additionalCostChoices" [] (Common.list CostChoice.codec) PC.additionalCostChoices
   alternativeCosts <- Fields.defaulted "alternativeCosts" [] (Common.list AlternativeCost.codec) PC.alternativeCosts
   costReductions <- Fields.defaulted "costReductions" [] (Common.list CostReduction.codec) PC.costReductions
+  grantedCostReductions <- Fields.defaulted "grantedCostReductions" [] (Common.list CostReduction.codec) PC.grantedCostReductions
   halves <- Fields.defaulted "halves" Nothing (Common.maybe Card.codec) PC.halves
   prepare <- Fields.defaulted "prepare" Nothing (Common.maybe (Face.codec Card.codec)) PC.prepare
   alternativeSpell <- Fields.defaulted "alternativeSpell" Nothing (Common.maybe (Face.codec Card.codec)) PC.alternativeSpell
@@ -119,6 +120,7 @@ codec = Fields.object $ do
         PC.additionalCostChoices = additionalCostChoices,
         PC.alternativeCosts = alternativeCosts,
         PC.costReductions = costReductions,
+        PC.grantedCostReductions = grantedCostReductions,
         PC.halves = halves,
         PC.prepare = prepare,
         PC.alternativeSpell = alternativeSpell,

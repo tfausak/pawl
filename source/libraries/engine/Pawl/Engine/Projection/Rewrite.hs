@@ -66,6 +66,7 @@ import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CopyOriginal as CopyOriginal
 import qualified Pawl.Types.CopyStackObject as CopyStackObject
 import qualified Pawl.Types.CopyTargets as CopyTargets
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Counter as Counter
@@ -1274,6 +1275,12 @@ rewriteGrantedAbility pairs granted = case granted of
   GrantedAbility.Rules rules -> GrantedAbility.Rules rules
   GrantedAbility.Replacement r -> GrantedAbility.Replacement (rewritePrintedReplacement pairs r)
   GrantedAbility.Player p -> GrantedAbility.Player (rewritePlayerStaticAbility pairs p)
+  GrantedAbility.SelfCostReduction r ->
+    GrantedAbility.SelfCostReduction
+      r
+        { CostReduction.perEach = rewriteQuantity pairs (CostReduction.perEach r),
+          CostReduction.condition = fmap (rewriteCondition pairs) (CostReduction.condition r)
+        }
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not
 -- just the payload: the CR 603.8 condition is where the word usually is, and CR

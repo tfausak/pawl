@@ -869,6 +869,9 @@ modificationCounts modification = case modification of
     GrantedAbility.Rules rules -> ruleAbilitiesCounts rules
     GrantedAbility.Replacement ability -> concatMap conditionCounts (Maybe.maybeToList (PrintedReplacement.condition ability))
     GrantedAbility.Player ability -> concatMap conditionCounts (Maybe.maybeToList (PlayerStaticAbility.condition ability))
+    GrantedAbility.SelfCostReduction reduction ->
+      quantityCounts (CostReduction.perEach reduction)
+        <> concatMap conditionCounts (Maybe.maybeToList (CostReduction.condition reduction))
   -- Rule 702.165a's grant names the source, and the keywords it carries are
   -- minted from the card's Backup keyword, swept there.
   Modification.GainAbilitiesOfSource _ -> []
@@ -5960,6 +5963,17 @@ grantedPlayerAbilities card =
     )
     (grantedModifications card)
 
+-- The COST-REDUCTION kind of the same grant (CR 601.2f), swept for the same
+-- reason.
+grantedCostReductions :: Face.Face Card.Type.Card -> [CostReduction.CostReduction]
+grantedCostReductions card =
+  Maybe.mapMaybe
+    ( \modification -> case modification of
+        Modification.GainAbility (GrantedAbility.SelfCostReduction reduction) -> Just reduction
+        _ -> Nothing
+    )
+    (grantedModifications card)
+
 -- CR 708.2: a face-down listing's quoted abilities, as the grant they amount to.
 listedGrants :: FaceDownCharacteristics.FaceDownCharacteristics (GrantedAbility.GrantedAbility Card.Type.Card) -> [Projection.Modification]
 listedGrants = fmap Modification.GainAbility . FaceDownCharacteristics.abilities
@@ -6220,6 +6234,9 @@ cardFilters card =
     -- permanent holding it, exactly as a printed one above is.
     <> concatMap (frame StandingHostFramed . concatMap conditionFilters . Maybe.maybeToList . PlayerStaticAbility.condition) (grantedPlayerAbilities card)
     <> concatMap (standingHosted . playerEffectFilters . PlayerStaticAbility.effect) (grantedPlayerAbilities card)
+    -- A granted reduction of its own cost, Unframed for the printed one's reason.
+    <> frame Unframed (concatMap (quantityFilters . CostReduction.perEach) (grantedCostReductions card))
+    <> frame Unframed (concatMap (concatMap conditionFilters . Maybe.maybeToList . CostReduction.condition) (grantedCostReductions card))
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)

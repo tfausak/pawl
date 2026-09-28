@@ -332,6 +332,11 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- | CR 707.2 / 601.2f: the printed reductions of its own cost
     -- (Face.costReductions), read by Game.castingFaceOf.
     costReductions :: [CostReduction.CostReduction],
+    -- | CR 613.1f / 601.2f: the reductions of its own cost layer 6 GRANTED the
+    -- object (Richlau, Headmaster's perpetual "This spell costs {1} less to
+    -- cast"). Apart from costReductions for grantedPlayerAbilities' reason: that
+    -- list is copiable and read off Game.castingFaceOf, and a grant is neither.
+    grantedCostReductions :: [CostReduction.CostReduction],
     -- | CR 709.5: the card whose HALVES this object has, and Nothing for an
     -- object with no shared type line. The one field here that is not a
     -- characteristic: rule 709.5's last sentence makes the shared type line's

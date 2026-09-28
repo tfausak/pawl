@@ -949,10 +949,13 @@ spellAdjustments pid oid gs =
 -- with no arithmetic. A NEGATIVE or UNDETERMINABLE Quantity contributes nothing,
 -- the direction that leaves the spell dearer.
 --
--- The face comes straight off the object rather than through a projection, for
--- Pawl.Types.CostReduction's reason (#1859): it is the half Cast.asProposed
--- already stamped (CR 709.3b), with its copy stamp's costs laid over it
--- (Game.castingFaceOf, CR 707.2).
+-- The PRINTED reductions come straight off the object rather than through a
+-- projection: it is the half Cast.asProposed already stamped (CR 709.3b), with
+-- its copy stamp's costs laid over it (Game.castingFaceOf, CR 707.2). The
+-- GRANTED ones (CR 613.1f) are read off the projection, which is where layer 6
+-- records them -- Pawl.CostSpec's Richlau, Headmaster group proves it. Not
+-- implemented: an effect removing a printed reduction from a card off the
+-- battlefield (#1859).
 selfReductions :: PlayerId -> ObjectId -> GameState -> [ManaCost.ManaCost]
 selfReductions pid oid gs =
   let -- CR 109.5: the perspective is the would-be controller, `pid` -- not
@@ -971,7 +974,8 @@ selfReductions pid oid gs =
    in case (Game.lookupObject oid gs, Game.cardOf oid gs, Game.faceOf oid gs) of
         (Just obj, Just card, Just printedFace) ->
           let face = Game.castingFaceOf obj card printedFace
-           in Maybe.mapMaybe scaled (filter applies (Face.costReductions face <> Keyword.selfCostReductionsOf (Face.keywordSet face)))
+              granted = PC.grantedCostReductions (Projection.project oid gs)
+           in Maybe.mapMaybe scaled (filter applies (Face.costReductions face <> granted <> Keyword.selfCostReductionsOf (Face.keywordSet face)))
         _ -> []
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes
