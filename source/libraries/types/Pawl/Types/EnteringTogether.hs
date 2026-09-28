@@ -9,7 +9,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 data EnteringTogether = MkEnteringTogether
   { -- | The arrivals Pawl.Engine.Restamp.settle was handed, in arrival order.
     arrivals :: Seq.Seq ObjectId.ObjectId,
-    -- | The tokens among them whose CR 111.2 entry event waits for that order.
+    -- | The tokens (CR 111.2) and conjured cards among them, whose entry
+    -- events wait for that order.
     minted :: Seq.Seq ObjectId.ObjectId
   }
   deriving (Eq, Ord, Show)

@@ -55,6 +55,7 @@ import qualified Pawl.Codec.AgainstSlotSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AimedAtSpec
 import qualified Pawl.Codec.AlternativeCostSpec
+import qualified Pawl.Codec.AnyNumberMatchingSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
 import qualified Pawl.Codec.AsCopySpec
 import qualified Pawl.Codec.AttachAllSpec
@@ -263,6 +264,7 @@ import qualified Pawl.Codec.FightSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.FlipCoinSpec
 import qualified Pawl.Codec.FloatingCandidateSpec
+import qualified Pawl.Codec.ForEachNumberSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.ForbidActivationSpec
 import qualified Pawl.Codec.ForbidAttackSpec
@@ -785,6 +787,7 @@ spec s registry = do
   Pawl.Codec.AgainstSlotSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s
+  Pawl.Codec.AnyNumberMatchingSpec.spec s
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
   Pawl.Codec.AsCopySpec.spec s
   Pawl.Codec.AttachAllSpec.spec s
@@ -997,6 +1000,7 @@ spec s registry = do
   Pawl.Codec.FlipCoinSpec.spec s
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
+  Pawl.Codec.ForEachNumberSpec.spec s
   Pawl.Codec.ForetellCostSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s
   Pawl.Codec.ForbidActivationSpec.spec s

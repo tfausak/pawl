@@ -1,6 +1,7 @@
 module Pawl.Types.ObjectRef where
 
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -154,14 +155,15 @@ data ObjectRef
     -- Prompt.RandomObject -- no search, no reveal, no shuffle. Carried out by
     -- Effect.MoveToZone's gather, through randomCardsInLibrary.
     RandomCardInLibrary RandomCardInLibrary.RandomCardInLibrary
-  | -- | CR 608.2d / Tovolar, Dire Overlord: any number of the permanents on the
-    -- battlefield matching the Filter, offered rather than swept, the empty answer
+  | -- | CR 608.2d / Tovolar, Dire Overlord, Teferi, Hero of Dominaria: any number
+    -- of the permanents on the battlefield matching the payload's Filter, up to
+    -- its ceiling where it has one, offered rather than swept, the empty answer
     -- legal.
     --
     -- Not implemented: a chooser other than CR 608.2c's resolving controller,
     -- which the arm below carries -- Oracle en-Vec's "target opponent chooses any
     -- number of creatures they control" (#3023).
-    AnyNumberMatching (Filter.Filter Keyword.Keyword)
+    AnyNumberMatching AnyNumberMatching.AnyNumberMatching
   | -- | CR 608.2d / 701.42a / Hanweir Battlements, Wormfang Crab: exactly one of the
     -- permanents on the battlefield matching the payload's Filter, chosen as the
     -- effect runs by the seat its chooser names and not asked at a single

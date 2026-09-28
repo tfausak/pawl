@@ -71,21 +71,23 @@
                           "subjects": {
                             "type": "AnyNumberMatching",
                             "value": {
-                              "type": "And",
-                              "value": [
-                                {
-                                  "type": "HasSubtype",
-                                  "value": {
-                                    "type": "Equipment"
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasSubtype",
+                                    "value": {
+                                      "type": "Equipment"
+                                    }
+                                  },
+                                  {
+                                    "type": "ControlledBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
                                   }
-                                },
-                                {
-                                  "type": "ControlledBy",
-                                  "value": {
-                                    "type": "You"
-                                  }
-                                }
-                              ]
+                                ]
+                              }
                             }
                           }
                         }

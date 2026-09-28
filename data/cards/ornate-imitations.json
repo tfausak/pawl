@@ -1,0 +1,93 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Variable"
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "minimumX": 1,
+      "name": "Ornate Imitations",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ForEachNumber",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "Conjure",
+                          "value": {
+                            "cards": {
+                              "type": "Reference",
+                              "value": {
+                                "amount": {
+                                  "type": "InSlot",
+                                  "value": "number"
+                                },
+                                "filter": {
+                                  "type": "And",
+                                  "value": [
+                                    {
+                                      "type": "HasCardType",
+                                      "value": {
+                                        "type": "Creature"
+                                      }
+                                    },
+                                    {
+                                      "type": "ManaValueEqualToAmount"
+                                    }
+                                  ]
+                                }
+                              }
+                            },
+                            "destination": {
+                              "type": "Battlefield"
+                            }
+                          }
+                        }
+                      ],
+                      "slot": "number",
+                      "upTo": {
+                        "type": "InSlot",
+                        "value": "X"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

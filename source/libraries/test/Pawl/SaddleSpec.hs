@@ -313,5 +313,5 @@ returnSaddlersSpec s registry = Spec.describe s "ReturnSaddlers" $ do
 returningAll :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 returningAll attacker p = case p of
   Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
-  Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates -> Set.fromList candidates
+  Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates _ -> Set.fromList candidates
   _ -> S.aggressiveAnswer p

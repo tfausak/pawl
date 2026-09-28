@@ -40,6 +40,7 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -460,6 +461,7 @@ manaProduced effect = case effect of
   -- mana for each ..." being the ManaAddition COUNT rather than a repeated body
   -- (Pawl.Types.ManaAddition).
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.Heal _ -> Nothing
 
 -- CR 605.1a's fourth clause, asked of one effect: does it move a card to or from
@@ -721,6 +723,7 @@ movesLibraryCard effect = case effect of
   -- Descended into for `manaProduced`'s reason: rule 608.2f's body runs as part
   -- of THIS effect.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> any movesLibraryCard body
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> any movesLibraryCard body
   Effect.Heal _ -> False
 
 -- Which zone an ObjectRef reaches, asked of libraries alone: does the ref name

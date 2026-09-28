@@ -53,6 +53,7 @@ import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Fight as Fight
 import qualified Pawl.Codec.FlipCoin as FlipCoin
 import qualified Pawl.Codec.ForEach as ForEach
+import qualified Pawl.Codec.ForEachNumber as ForEachNumber
 import qualified Pawl.Codec.ForbidActivation as ForbidActivation
 import qualified Pawl.Codec.ForbidAttack as ForbidAttack
 import qualified Pawl.Codec.ForbidBlock as ForbidBlock
@@ -118,6 +119,7 @@ codec cardCodec abilityCodec =
       preventCodec = PreventNextDamage.codec (codec cardCodec abilityCodec)
       preventAllCodec = PreventAllDamage.codec (codec cardCodec abilityCodec)
       forEachCodec = ForEach.codec (codec cardCodec abilityCodec)
+      forEachNumberCodec = ForEachNumber.codec (codec cardCodec abilityCodec)
    in Arm.tagged
         tagOf
         [ Arm.payload "DealDamage" DealDamage.codec Effect.DealDamage (\x -> case x of Effect.DealDamage y -> Just y; _ -> Nothing),
@@ -273,6 +275,7 @@ codec cardCodec abilityCodec =
           Arm.payload "MakeForetold" MakeForetold.codec Effect.MakeForetold (\x -> case x of Effect.MakeForetold y -> Just y; _ -> Nothing),
           Arm.payload "MakeWarped" ObjectRef.codec Effect.MakeWarped (\x -> case x of Effect.MakeWarped y -> Just y; _ -> Nothing),
           Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing),
+          Arm.payload "ForEachNumber" forEachNumberCodec Effect.ForEachNumber (\x -> case x of Effect.ForEachNumber y -> Just y; _ -> Nothing),
           Arm.payload "Heal" ObjectRef.codec Effect.Heal (\x -> case x of Effect.Heal y -> Just y; _ -> Nothing)
         ]
 
@@ -431,4 +434,5 @@ tagOf x = case x of
   Effect.MakeForetold {} -> "MakeForetold"
   Effect.MakeWarped {} -> "MakeWarped"
   Effect.ForEach {} -> "ForEach"
+  Effect.ForEachNumber {} -> "ForEachNumber"
   Effect.Heal {} -> "Heal"

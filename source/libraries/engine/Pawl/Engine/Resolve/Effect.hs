@@ -103,6 +103,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
@@ -208,6 +209,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -721,7 +723,7 @@ attachTogether movers recipient = do
 -- The permanents an ObjectRef names, for an instruction that acts on them
 -- together: the one ref that is a CR 608.2d question rather than a read has to
 -- be answered in the Game monad, and every other is objectRefObjects' pure
--- sweep. Shared by turnPermanentsOver and Effect.AttachAll.
+-- sweep. Shared by turnPermanentsOver, Effect.AttachAll and Effect.Untap.
 permanentsGathered ::
   Map.Map SlotName (Set Recipient) ->
   ObjectId ->
@@ -735,28 +737,47 @@ permanentsGathered legal resolving controller source ref = case ref of
   -- EachMatching's sweep of the same Filter, read live off the board before the
   -- instruction acts (CR 608.2c) -- which for Tovolar is a board CR 702.145c has
   -- already turned him over on, so his own back face is no longer a Human
-  -- Werewolf to offer.
-  --
-  -- ONE ask, of the resolving controller (CR 608.2c). Skipped at no candidate,
-  -- where the empty set is the only answer (CR 101.3, CR 609.3), and asked at
-  -- ONE, unlike the counted choices: "any number" leaves two distinguishable
-  -- answers there.
-  --
-  -- FILTERED, not trusted (#222): an answer naming a permanent that was never
-  -- offered would otherwise be acted on. Filtering rather than taking the
-  -- answer also keeps CR 608.2f's APNAP order, which the candidate list
-  -- already carries and a Set does not.
-  ObjectRef.AnyNumberMatching filter_ -> do
-    gs <- State.get
-    let candidates = battlefieldMatching legal resolving controller source gs filter_
-    if null candidates
-      then pure []
-      else do
-        answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
-        pure (filter (`Set.member` answer) candidates)
+  -- Werewolf to offer. anyNumberMatching is the ask.
+  ObjectRef.AnyNumberMatching choice -> anyNumberMatching legal resolving controller source choice
   _ -> do
     gs <- State.get
     pure (objectRefObjects legal resolving controller source gs ref)
+
+-- CR 608.2d: the permanents ObjectRef.AnyNumberMatching names, asked of the
+-- resolving controller (CR 608.2c) out of battlefieldMatching's sweep of the
+-- Filter, read live off the board before the instruction acts. The ceiling,
+-- where there is one, is evaluated here too -- Teferi, Hero of Dominaria's "up
+-- to two lands".
+--
+-- Skipped at no candidate and at a ceiling of zero, where the empty set is the
+-- only answer (CR 101.3, CR 609.3), and asked at ONE candidate, unlike the
+-- counted choices: "any number" and "up to two" both leave two distinguishable
+-- answers there.
+--
+-- FILTERED, not trusted (#222): an answer naming a permanent that was never
+-- offered would otherwise be acted on, and one naming more than the ceiling
+-- keeps only its first that many. Filtering rather than taking the answer also
+-- keeps CR 608.2f's APNAP order, which the candidate list carries and a Set does
+-- not.
+anyNumberMatching ::
+  Map.Map SlotName (Set Recipient) ->
+  ObjectId ->
+  PlayerId ->
+  ObjectId ->
+  AnyNumberMatching.AnyNumberMatching ->
+  Game [ObjectId]
+anyNumberMatching legal resolving controller source (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) = do
+  gs <- State.get
+  let candidates = battlefieldMatching legal resolving controller source gs filter_
+      context = effectContext gs controller source legal (slotBindings resolving gs)
+      ceiling_ = fmap (maybe 0 Integer.toNaturalSaturating . Quantity.evaluateFor (effectViewOf source legal gs) context gs resolving source) atMost
+      capped :: [a] -> [a]
+      capped = maybe id (take . Natural.toIntSaturating) ceiling_
+  if null candidates || ceiling_ == Just 0
+    then pure []
+    else do
+      answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates ceiling_)
+      pure (capped (filter (`Set.member` answer) candidates))
 
 -- CR 701.27a and CR 701.28a: turn each named permanent over. ONE function for
 -- both opcodes, which is CR 701.28a said as code -- "this follows rules
@@ -3128,6 +3149,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.MakeForetold {} -> False
   Effect.MakeWarped {} -> False
   Effect.ForEach {} -> False
+  Effect.ForEachNumber {} -> False
   -- CR 701.69a removes marked damage, so permanents bearing none have nothing
   -- to lose. A regression fence: no printed "may" in data/cards reaches it.
   Effect.Heal ref ->
@@ -4859,24 +4881,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               -- you control", announced while the effect is applied and so asked
               -- HERE rather than read by objectRefObjects. turnPermanentsOver asks
               -- the same question for CR 701.27a's turn, and this gather owes it the
-              -- same posture: candidates are battlefieldMatching's sweep of the same
-              -- Filter, read off the pre-move board (CR 608.2c) so the sweep and the
-              -- offer cannot disagree, ONE ask of the resolving controller, skipped
-              -- at no candidate where the empty set is the only answer (CR 101.3, CR
-              -- 609.3), and asked at ONE, where "any number" still leaves two
-              -- distinguishable answers.
-              --
-              -- FILTERED, not trusted (#222), the sibling arms' reason: an answer
-              -- naming a permanent that was never offered would otherwise be moved.
-              -- Filtering rather than taking the answer also keeps CR 608.2f's APNAP
-              -- order, which the candidate list carries and a Set does not.
-              ObjectRef.AnyNumberMatching filter_ -> do
-                gs <- State.get
-                case battlefieldMatching legal resolving controller source gs filter_ of
-                  [] -> pure []
-                  candidates -> do
-                    answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates)
-                    pure (filter (`Set.member` answer) candidates)
+              -- same posture, so both go through anyNumberMatching, read off the
+              -- pre-move board (CR 608.2c).
+              ObjectRef.AnyNumberMatching choice -> anyNumberMatching legal resolving controller source choice
               -- CR 608.2d's singular of the arm above: "a creature named Hanweir
               -- Garrison" in Hanweir Battlements' "exile them, then meld them",
               -- announced while the effect is applied. The candidates are
@@ -5377,6 +5384,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Map.empty
           members
     State.modify' (bindAcross accumulated . rescope)
+  -- CR 608.2f over numbers: the bound read once off the pre-loop board, and each
+  -- number bound on the source (bindAmountSlot) for its iteration's body to
+  -- read. One action, so ForEach's bracket: one event group, and one CR 613.7m
+  -- batch for everything the loop puts onto the battlefield. Pawl.RestampSpec's
+  -- Ornate Imitations board proves the batch.
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) -> do
+    gs0 <- State.get
+    let viewOf = effectViewOf source legal gs0
+        context = effectContext gs0 controller source legal (slotBindings resolving gs0)
+        count = maybe 0 Integer.toNaturalSaturating (evaluateForRecipient viewOf context gs0 resolving source controller upTo)
+    Event.simultaneously . Event.together . Monad.forM_ [1 .. count] $ \n -> do
+      State.modify' (bindAmountSlot resolving source slot n)
+      applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
   Effect.Draw (Draw.MkDraw ref quantity mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -6537,8 +6557,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- loop and by every CR 603.6a watcher of the entry.
             -- One batch per pick, which on the written road is the one pick the
             -- whole count is minted from and on the duplicate road is one batch
-            -- of `n` per named object.
-            ConjureDestination.Battlefield entry -> case cards of
+            -- of `n` per named object. Every batch enters at one moment, so
+            -- Event.together orders them all as one CR 613.7m batch -- a
+            -- regression fence, since no card in data/cards/ conjures a duplicate
+            -- of two or more objects onto the battlefield.
+            ConjureDestination.Battlefield entry -> Event.together $ case cards of
               ConjureCards.Written written -> pickWritten written >>= onto entry n
               ConjureCards.Duplicate ref -> concat <$> Monad.mapM (onto entry n) (duplicatesOf ref)
               ConjureCards.Reference from -> referencePickers from 1 >>= fmap concat . Monad.mapM (\p -> p >>= fmap concat . Monad.mapM (onto entry n) . Maybe.maybeToList)
@@ -9119,9 +9142,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- reason one rule clause over: rule 701.26b's "only tapped permanents can be
   -- untapped" lives in that funnel, and CR 122.1d's replacement is offered the
   -- event there.
+  --
+  -- Through permanentsGathered, so CR 608.2d's "untap up to two lands" (Teferi,
+  -- Hero of Dominaria) is asked rather than read.
   Effect.Untap ref -> do
-    gs <- State.get
-    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) Event.untap
+    victims <- permanentsGathered legal resolving controller source ref
+    Monad.forM_ victims Event.untap
   Effect.Detain ref ->
     State.modify' $ \gs ->
       -- CR 701.35a: detain each named permanent until the next turn of this
