@@ -6209,6 +6209,7 @@ cardFilters card =
         <> concatMap (frame Unframed . alternativeCostFilters) (Face.alternativeCosts card)
         <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
         <> concatMap (concatMap conditionFilters . Maybe.maybeToList . CostReduction.condition) (Face.costReductions card)
+        <> unframed (Maybe.mapMaybe CostReduction.whichTargets (Face.costReductions card))
         <> concatMap (slotlessCost . specialActionFilters) (Face.specialActions card)
         <> ruleAbilitiesFilters (Projection.ruleAbilitiesOfFace card)
     )
@@ -6239,6 +6240,7 @@ cardFilters card =
     -- A granted reduction of its own cost, Unframed for the printed one's reason.
     <> frame Unframed (concatMap (quantityFilters . CostReduction.perEach) (grantedCostReductions card))
     <> frame Unframed (concatMap (concatMap conditionFilters . Maybe.maybeToList . CostReduction.condition) (grantedCostReductions card))
+    <> unframed (Maybe.mapMaybe CostReduction.whichTargets (grantedCostReductions card))
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)

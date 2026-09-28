@@ -54,6 +54,7 @@ import qualified Pawl.Types.CopyTargets as CopyTargets
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Counter as Counter
@@ -3332,7 +3333,9 @@ oneLessPerEach count =
   CostReduction.MkCostReduction
     { CostReduction.amount = ManaCost.MkManaCost [ManaSymbol.Generic 1],
       CostReduction.perEach = Quantity.Count count,
-      CostReduction.condition = Nothing
+      CostReduction.condition = Nothing,
+      CostReduction.whichTargets = Nothing,
+      CostReduction.direction = CostDirection.Less
     }
 
 -- CR 702.160a / CR 718.1: the PROTOTYPE inset frames -- the second mana cost,
