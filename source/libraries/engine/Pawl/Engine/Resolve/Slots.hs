@@ -194,6 +194,7 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.TheseDiscard as TheseDiscard
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -678,7 +679,7 @@ effectObjectRefs effect = case effect of
   Effect.Connive (Connive.MkConnive _ ref) -> [ref]
   Effect.Discard subject -> case subject of
     Discard.Counted {} -> []
-    Discard.These ref -> [ref]
+    Discard.These (TheseDiscard.MkTheseDiscard ref _) -> [ref]
     Discard.AnyNumber {} -> []
   Effect.LoseLife {} -> []
   Effect.GainLife {} -> []
@@ -2348,8 +2349,7 @@ boundSlots effect = case effect of
   -- CR 121.1's cards "drawn this way", as CR 400.7's incarnations in the hand
   -- they arrived in.
   Effect.Draw (Draw.MkDraw _ _ mSlot) -> foldMap Set.singleton mSlot
-  -- CR 701.9a's cards "discarded this way", as CR 400.7's incarnations. The
-  -- These arm has none, for the reason its type carries.
+  -- CR 701.9a's cards "discarded this way", as CR 400.7's incarnations.
   --
   -- PROVEN rather than fenced: Psychic Miasma's second clause counts over CR
   -- 400.7j's fold of this slot, Resolve.modeSlots folds a clause's condition and
@@ -2357,7 +2357,7 @@ boundSlots effect = case effect of
   -- Pawl.CardSpec's "no dangling or unused slots".
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded) -> foldMap Set.singleton mDiscarded
-    Discard.These _ -> Set.empty
+    Discard.These (TheseDiscard.MkTheseDiscard _ mDiscarded) -> foldMap Set.singleton mDiscarded
     Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ _ mDiscarded) -> foldMap Set.singleton mDiscarded
   -- How much life was ACTUALLY lost, summed over the players the instruction
   -- named, for rule 702.101a's "that much" (Pawl.Types.LifeLoss.tally).

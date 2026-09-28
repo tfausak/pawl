@@ -1072,6 +1072,8 @@ library codec
     Pawl.Codec.TeamIdSpec
     Pawl.Codec.Teams
     Pawl.Codec.TeamsSpec
+    Pawl.Codec.TheseDiscard
+    Pawl.Codec.TheseDiscardSpec
     Pawl.Codec.Times
     Pawl.Codec.TimesSpec
     Pawl.Codec.Timestamp
@@ -2269,6 +2271,7 @@ library types
     Pawl.Types.TargetSlot
     Pawl.Types.TeamId
     Pawl.Types.Teams
+    Pawl.Types.TheseDiscard
     Pawl.Types.Times
     Pawl.Types.Timestamp
     Pawl.Types.TimeTravelChoice

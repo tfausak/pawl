@@ -2,7 +2,7 @@ module Pawl.Types.Discard where
 
 import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
-import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.TheseDiscard as TheseDiscard
 
 -- | The payload of Pawl.Types.Effect's Discard arm: WHICH cards CR 701.9a moves
 -- from their owner's hand to their graveyard.
@@ -27,7 +27,7 @@ data Discard
     -- player is per card: rule 701.9a moves each one from its OWNER's hand, and a
     -- ref reaching several hands (Pawl.Types.EachCardInHand) can name cards
     -- belonging to several owners at once.
-    These ObjectRef.ObjectRef
+    These TheseDiscard.TheseDiscard
   | -- | CR 701.9b / 107.1c: the slot names the players, each of whom picks any
     -- number of matching cards, none included.
     AnyNumber AnyNumberDiscard.AnyNumberDiscard

@@ -347,6 +347,7 @@ import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.TheseDiscard as TheseDiscard
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -780,8 +781,8 @@ anyNumberMatching legal resolving controller source (AnyNumberMatching.MkAnyNumb
       answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates ceiling_)
       pure (capped (filter (`Set.member` answer) candidates))
 
--- CR 701.9a's move for Effect.Discard's choosing arms, once every seat has
--- picked: each seat's cards through the shared discard funnel, so the discard is
+-- CR 701.9a's move for every Effect.Discard arm, once the cards are named:
+-- each seat's cards through the shared discard funnel, so the discard is
 -- recorded for a trigger to read. The funnel's own answers come back for the
 -- binding below; a move that did not complete answers Nothing and is dropped.
 -- One event group across the seats, CR 101.4's "simultaneously".
@@ -2981,7 +2982,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Connive {} -> False
   -- "Discard THESE cards" names the cards themselves, so a sweep matching none
   -- is the naming-nobody case; only a chosen card can be impossible.
-  Effect.Discard (Discard.These ref) -> choosesFromNothing ref
+  Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard ref _)) -> choosesFromNothing ref
   -- CR 107.1c: zero is a legal answer, so no hand makes it impossible.
   Effect.Discard (Discard.AnyNumber {}) -> False
   Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _)) ->
@@ -5799,18 +5800,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- hand, and a ref over CR 400.1's per-player zone can name several owners'
   -- cards at once. A card whose owner cannot be read is skipped rather than
   -- filed under the controller.
-  Effect.Discard (Discard.These ref) -> do
+  Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard ref mDiscarded)) -> do
     named <- case ref of
       ObjectRef.RandomCardInHand random -> fmap (fmap snd) (randomCardsInHand resolving source controller legal random)
       ObjectRef.ChosenCardFromAmong from -> chooseCardFromAmong resolving source controller legal chosen from
       _ -> State.gets (\gs -> objectRefObjects legal resolving controller source gs ref)
     gs <- State.get
-    let owned oid = fmap ((,) oid . Object.owner) (Game.lookupObject oid gs)
-    -- One event group, CR 608.2f.
-    Event.simultaneously $
-      Monad.mapM_
-        (\(oid, owner) -> Event.discard DiscardCause.Ordinary owner oid)
-        (Maybe.mapMaybe owned named)
+    let owned oid = fmap (\obj -> (Object.owner obj, [oid])) (Game.lookupObject oid gs)
+    -- One event group, CR 608.2f, through the other arms' burial, so what
+    -- moved is bound the same way.
+    buryDiscards resolving mDiscarded (Maybe.mapMaybe owned named)
   Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity mDiscarded)) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
