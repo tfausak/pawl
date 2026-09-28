@@ -814,26 +814,21 @@ data Keyword
     -- "Exhaust -- [Cost]: [Effect]" means "[Cost]: [Effect]. Activate only once".
     -- PRINTED rather than minted, so a card writes this on the ability itself
     -- through Pawl.Types.ActivatedAbility.keyword, which is what lets Boom
-    -- Scholar's "exhaust abilities of other permanents you control" name it.
+    -- Scholar's "exhaust abilities of other permanents you control" name it; the
+    -- rider is Pawl.Engine.Keyword.printedRiders'.
     --
-    -- Not implemented: the rewriting itself, so a card carrying this keyword
-    -- writes CR 702.177a's "activate only once" as its own
-    -- ActivationRestriction.OnlyOnce rather than having the keyword add it
-    -- (#3044). Not implemented either: CR 702.177b's "as long as you haven't
-    -- activated an exhaust ability this turn" (#3044).
+    -- Not implemented: CR 702.177b's "as long as you haven't activated an
+    -- exhaust ability this turn" (#4368).
     Exhaust
   | -- | 702.142a: boast adds rules to the activated ability printed AFTER it --
     -- "Boast -- [Cost]: [Effect]" means "[Cost]: [Effect]. Activate only if this
     -- creature attacked this turn and only once each turn". Exhaust's shape one
-    -- rule over: PRINTED rather than minted, so the card writes this on the
-    -- ability through Pawl.Types.ActivatedAbility.keyword, which is what CR
-    -- 702.142b's "a creature boasting" would name.
-    --
-    -- Not implemented: the rewriting itself, so Varragoth, Bloodsky Sire writes
-    -- rule 702.142a's two riders as its own ActivationRestriction.OnlyIf and
-    -- ActivationRestriction.OnlyOnceEachTurn rather than having the keyword add
-    -- them (#3044).
+    -- rule over, its riders Pawl.Engine.Keyword.printedRiders'.
     Boast
+  | -- | 702.193a: power-up adds rules to the activated ability printed AFTER it
+    -- -- exhaust's "activate only once", plus a reduction by the permanent's mana
+    -- cost if it entered this turn (Pawl.Engine.PlayerEffect's activation gather).
+    PowerUp
   | -- | 702.57a: a forecast ability is the activated ability printed after it,
     -- activatable only from a hand, during its owner's upkeep, once each turn
     -- (CR 702.57b); written on Pawl.Types.ActivatedAbility.keyword.

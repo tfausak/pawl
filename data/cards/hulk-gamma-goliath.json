@@ -7,7 +7,7 @@
             "mana": [
               {
                 "type": "Generic",
-                "value": 4
+                "value": 6
               },
               {
                 "type": "OfType",
@@ -30,7 +30,7 @@
             ]
           },
           "keyword": {
-            "type": "Exhaust"
+            "type": "PowerUp"
           },
           "modal": {
             "modes": [
@@ -39,51 +39,6 @@
                   {
                     "effects": [
                       {
-                        "type": "ModifyTarget",
-                        "value": {
-                          "duration": {
-                            "type": "UntilEndOfTurn"
-                          },
-                          "modification": {
-                            "type": "GainKeyword",
-                            "value": {
-                              "type": "Trample"
-                            }
-                          },
-                          "ref": {
-                            "type": "EachMatching",
-                            "value": {
-                              "type": "And",
-                              "value": [
-                                {
-                                  "type": "ControlledBy",
-                                  "value": {
-                                    "type": "You"
-                                  }
-                                },
-                                {
-                                  "type": "Or",
-                                  "value": [
-                                    {
-                                      "type": "HasCardType",
-                                      "value": {
-                                        "type": "Creature"
-                                      }
-                                    },
-                                    {
-                                      "type": "HasSubtype",
-                                      "value": {
-                                        "type": "Vehicle"
-                                      }
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        }
-                      },
-                      {
                         "type": "PutCounters",
                         "value": {
                           "kind": {
@@ -91,7 +46,7 @@
                           },
                           "quantity": {
                             "type": "Literal",
-                            "value": 2
+                            "value": 5
                           },
                           "ref": {
                             "type": "InSlot",
@@ -109,13 +64,19 @@
       ],
       "keywords": [
         {
-          "type": "Exhaust"
+          "type": "Reach"
+        },
+        {
+          "type": "Trample"
+        },
+        {
+          "type": "PowerUp"
         }
       ],
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1
+          "value": 3
         },
         {
           "type": "OfType",
@@ -136,7 +97,7 @@
           }
         }
       ],
-      "name": "Boom Scholar",
+      "name": "Hulk, Gamma Goliath",
       "playerAbilities": [
         {
           "effect": {
@@ -146,13 +107,13 @@
               "grantedBy": {
                 "type": "OfNullary",
                 "value": {
-                  "type": "Exhaust"
+                  "type": "PowerUp"
                 }
               },
               "reduction": [
                 {
                   "type": "Generic",
-                  "value": 2
+                  "value": 3
                 }
               ],
               "whichAbilities": {
@@ -169,6 +130,12 @@
                     "value": {
                       "type": "You"
                     }
+                  },
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
                   }
                 ]
               }
@@ -181,19 +148,27 @@
       ],
       "power": {
         "type": "Literal",
-        "value": 3
+        "value": 6
       },
       "toughness": {
         "type": "Literal",
-        "value": 3
+        "value": 5
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Advisor"
+            "type": "Berserker"
           },
           {
-            "type": "Goblin"
+            "type": "Gamma"
+          },
+          {
+            "type": "Hero"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
           }
         ],
         "types": [

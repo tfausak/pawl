@@ -76,6 +76,7 @@ import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LoyaltyKind as LoyaltyKind
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.ModifiedRoll as ModifiedRoll
 import qualified Pawl.Types.Object as Object
@@ -583,7 +584,7 @@ prohibitsCasting pid oid name variable gs =
   let cast = castsThisTurn pid gs
       prohibits (source, effect) = case effect of
         PlayerEffect.CantCastSpells -> True
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan limit -> cast >= limit
         -- CR 601.3a / 614.1c: the quality is the name chosen as the SOURCE
         -- entered, so an ability whose permanent has chosen nothing prohibits
@@ -693,24 +694,29 @@ prohibitsCasting pid oid name variable gs =
    in any prohibits (applying pid gs)
 
 -- CR 602.5 / 101.2 / Sen Triplets: does an effect stop this player activating
--- abilities at all? The activation-side twin of prohibitsCasting above, and its
--- own question rather than a widening of that one: CR 602.1 makes an activated
--- ability neither a spell nor a special action, so nothing on the cast axis
--- reaches it and Silence stops no activation.
+-- an ability under this rule-702 stamp (Pawl.Types.ActivatedAbility.keyword)?
+-- The activation-side twin of prohibitsCasting above, and its own question
+-- rather than a widening of that one: CR 602.1 makes an activated ability
+-- neither a spell nor a special action, so nothing on the cast axis reaches it
+-- and Silence stops no activation.
 --
--- A MEMBERSHIP TEST rather than a case, which is what the arm carrying no payload
--- buys: there is nothing to read off it, so the question is whether such a row
--- applies at all. Pawl.Engine.Cast.permitsCastFromGraveyard reads the
--- object-scoped permission the same way.
+-- A row naming no designator refuses every ability (Sen Triplets); one naming
+-- a designator refuses only the abilities it designates, Kang the Conqueror's
+-- "power-up abilities" -- a citation compared to a citation, as
+-- ReduceActivationCost.grantedBy is.
 --
 -- Given the rows the caller has already gathered, which is what lets
 -- Pawl.Engine.Cost.manaActivationsGiven ask it inside its own hoisted sweep
 -- (#1073); `prohibitsActivating` is the wrapper for a caller holding no list.
-prohibitsActivatingGiven :: [(Maybe ObjectId, PlayerEffect)] -> Bool
-prohibitsActivatingGiven effects = List.elem PlayerEffect.CantActivateAbilities (fmap snd effects)
+prohibitsActivatingGiven :: Maybe Keyword -> [(Maybe ObjectId, PlayerEffect)] -> Bool
+prohibitsActivatingGiven stamp effects =
+  let bars effect = case effect of
+        PlayerEffect.CantActivateAbilities designator -> maybe True (\d -> any (Keyword.designates d) stamp) designator
+        _ -> False
+   in any (bars . snd) effects
 
-prohibitsActivating :: PlayerId -> GameState -> Bool
-prohibitsActivating pid gs = prohibitsActivatingGiven (applying pid gs)
+prohibitsActivating :: Maybe Keyword -> PlayerId -> GameState -> Bool
+prohibitsActivating stamp pid gs = prohibitsActivatingGiven stamp (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING this land?
 -- The play-side twin of prohibitsCasting above, and a separate question rather
@@ -772,7 +778,7 @@ prohibitsPlayingLand pid names oid gs =
         -- land, which is all this one asks.
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.IncreaseSpellCost {} -> False
         PlayerEffect.IncreaseActivationCost {} -> False
@@ -857,7 +863,7 @@ prohibitsSearching pid owner causeController gs =
         -- them reaches it -- Silence stops the spell, never the search a
         -- resolved one performs.
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -926,7 +932,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.HasProtectionFromChosenName -> False
         PlayerEffect.HasProtectionFrom _ -> False
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -993,7 +999,7 @@ prohibitsBecomingMonarch pid gs =
         -- and no prohibition on casting reaches an effect that has already
         -- resolved.
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -1052,7 +1058,7 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantAttackWithCreatures -> False
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -1106,7 +1112,7 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantSetSchemesInMotion -> False
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -1397,7 +1403,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1448,7 +1454,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1502,7 +1508,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.AddActivationCost {} -> Nothing
         PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1706,7 +1712,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.AlternativeActivationCost {} -> Nothing
         PlayerEffect.AddSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1770,7 +1776,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1833,7 +1839,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.IncreaseActivationCost {} -> Nothing
         PlayerEffect.ReduceSpellCost {} -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -1870,9 +1876,20 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.AdditionalVotes _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
+      -- CR 702.193a/b: power-up's own reduction by "this permanent's mana cost",
+      -- the rule's and not an effect's, so it is asked of the ability's stamp
+      -- rather than gathered off a row. Read off the projection, so a copy
+      -- reduces by the mana cost it copied (CR 707.2); CR 107.3g's {X} is 0.
+      -- Pawl.ActivateSpec's "Power-up (CR 702.193)" group proves it.
+      ruleReduction
+        | any Keyword.reducesByManaCostOnEntry stamp && matchesObjectFrom (Just srcId) Filter.Type.EnteredThisTurn srcId gs =
+            [ AppliedReduction.MkAppliedReduction (ManaCost.MkManaCost (filter (/= ManaSymbol.Variable) (ManaCost.unwrap manaCost))) 0 False
+            | manaCost <- Maybe.maybeToList (PC.manaCost (Projection.project srcId gs))
+            ]
+        | otherwise = []
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
-          CostAdjustments.reductions = Maybe.mapMaybe reductionOf effects,
+          CostAdjustments.reductions = ruleReduction <> Maybe.mapMaybe reductionOf effects,
           CostAdjustments.components = concat (Maybe.mapMaybe additionOf effects)
         }
 
@@ -1945,7 +1962,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.MayPlayAsThoughItHadFlash criterion -> Just criterion
   PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
   PlayerEffect.CantCastSpells -> Nothing
-  PlayerEffect.CantActivateAbilities -> Nothing
+  PlayerEffect.CantActivateAbilities _ -> Nothing
   PlayerEffect.CantCastMoreThan _ -> Nothing
   PlayerEffect.CantCastChosenName -> Nothing
   PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -2195,7 +2212,7 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -2425,7 +2442,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.PlotFrom _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -2505,7 +2522,7 @@ playLandPiles pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> []
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> []
         PlayerEffect.CantCastSpells -> []
-        PlayerEffect.CantActivateAbilities -> []
+        PlayerEffect.CantActivateAbilities _ -> []
         PlayerEffect.CantCastMoreThan _ -> []
         PlayerEffect.CantCastChosenName -> []
         PlayerEffect.CantPlayLandChosenName -> []
@@ -2594,7 +2611,7 @@ protectedFromTargeting rows caster pid gs =
             -- sourceless spell or ability is nobody, so it is not that player.
             PlayerScope.ControllingMostPermanents -> False
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -2693,7 +2710,7 @@ protectedFromGiven rows oid gs =
         -- anything about which objects may reach this player.
         PlayerEffect.CantSearchLibraries _ -> False
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -2776,7 +2793,7 @@ protectionCarriers gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantSearchLibraries _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -2851,7 +2868,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         -- CR 305.1's name-based prohibition stops ONE land rather than changing
@@ -2917,7 +2934,7 @@ votesAllowed :: PlayerId -> GameState -> Natural
 votesAllowed pid gs =
   let grantOf effect = case effect of
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan {} -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -3012,7 +3029,7 @@ maximumHandSize pid gs =
         PlayerEffect.IncreaseMaximumHandSize extra -> fmap (extra +) current
         PlayerEffect.ReduceMaximumHandSize fewer -> fmap (\limit -> if fewer >= limit then 0 else limit - fewer) current
         PlayerEffect.CantCastSpells -> current
-        PlayerEffect.CantActivateAbilities -> current
+        PlayerEffect.CantActivateAbilities _ -> current
         PlayerEffect.CantCastMoreThan _ -> current
         PlayerEffect.CantCastChosenName -> current
         PlayerEffect.CantPlayLandChosenName -> current
@@ -3087,7 +3104,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -3152,7 +3169,7 @@ losesLifeForUnspentMana :: PlayerId -> GameState -> Bool
 losesLifeForUnspentMana pid gs =
   let charges effect = case effect of
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -3221,7 +3238,7 @@ prohibitsGainingLife pid gs =
         -- searching, paying, keeping mana, rule 702 protection, how a coin flip
         -- came out or losing life. CR 119.7's restriction is none of those.
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -3285,7 +3302,7 @@ prohibitsLosingLife pid gs =
         -- LoseLifeForUnspentMana included, which CHARGES life rather than saying
         -- anything about whether a charge may land.
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -3353,7 +3370,7 @@ spendManaAsThough pid gs =
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.LoseLifeForUnspentMana -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -3432,7 +3449,7 @@ cantBeCountered pid oid gs =
   let stops (source, effect) = case effect of
         PlayerEffect.CantBeCountered criterion -> matchesObjectFrom source criterion oid gs
         PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantActivateAbilities -> False
+        PlayerEffect.CantActivateAbilities _ -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantPlayLandChosenName -> False
@@ -3548,7 +3565,7 @@ unpreventable gs =
         PlayerEffect.CantLoseLife -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -3622,7 +3639,7 @@ unredirectable gs =
         PlayerEffect.CantLoseLife -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -3676,7 +3693,7 @@ statedFlips pid gs =
         -- it happens while an instruction that already resolved is being
         -- followed, or inside an entry replacement.
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -3746,7 +3763,7 @@ rollModifiers pid gs =
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
-        PlayerEffect.CantActivateAbilities -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
@@ -3836,7 +3853,7 @@ consume rows gs = gs {GameState.playerEffects = filter (`notElem` rows) (GameSta
 overPlayerRefs :: (Applicative f) => (PlayerRef.PlayerRef -> f PlayerRef.PlayerRef) -> PlayerEffect -> f PlayerEffect
 overPlayerRefs f effect = case effect of
   PlayerEffect.CantCastSpells -> pure effect
-  PlayerEffect.CantActivateAbilities -> pure effect
+  PlayerEffect.CantActivateAbilities _ -> pure effect
   PlayerEffect.CantCastMoreThan _ -> pure effect
   PlayerEffect.CantCastChosenName -> pure effect
   PlayerEffect.CantPlayLandChosenName -> pure effect
@@ -3908,7 +3925,7 @@ mapPlayerRefs f = Functor.runIdentity . overPlayerRefs (Functor.Identity . f)
 overDamagePatterns :: (Applicative f) => (DamagePattern.DamagePattern -> f DamagePattern.DamagePattern) -> PlayerEffect -> f PlayerEffect
 overDamagePatterns f effect = case effect of
   PlayerEffect.CantCastSpells -> pure effect
-  PlayerEffect.CantActivateAbilities -> pure effect
+  PlayerEffect.CantActivateAbilities _ -> pure effect
   PlayerEffect.CantCastMoreThan _ -> pure effect
   PlayerEffect.CantCastChosenName -> pure effect
   PlayerEffect.CantPlayLandChosenName -> pure effect

@@ -550,6 +550,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Forecast -> []
+  Keyword.PowerUp -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
@@ -799,6 +800,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Forecast -> []
+  Keyword.PowerUp -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -1374,6 +1376,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Forecast -> []
+  Keyword.PowerUp -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -2031,6 +2034,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Forecast -> []
+  Keyword.PowerUp -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
   -- rather than the stack.
   Keyword.Exert -> []
@@ -2807,6 +2811,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Forecast -> []
+  Keyword.PowerUp -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -4592,6 +4597,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Forecast -> []
+  Keyword.PowerUp -> []
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
   -- writes Object.exertedBy directly.
   Keyword.Exert -> []
@@ -4883,6 +4889,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Forecast -> []
+  Keyword.PowerUp -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
   -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
@@ -5188,6 +5195,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Exhaust -> []
   Keyword.Boast -> []
   Keyword.Forecast -> []
+  Keyword.PowerUp -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -5226,30 +5234,59 @@ mintedAttachRestrictionsFor keyword = case keyword of
 -- is the closed direction -- a keyword of this shape that is not named here makes
 -- the lint reject the first card that writes it, which is where it would be
 -- noticed.
---
--- CR 702.193a's power-up is the rule's other keyword of this shape, and it has no
--- Pawl.Types.Keyword constructor yet (#3044).
 addsRulesToPrintedAbility :: Keyword -> Bool
 addsRulesToPrintedAbility keyword = case keyword of
   Keyword.Exhaust -> True
   Keyword.Boast -> True
   Keyword.Forecast -> True
+  Keyword.PowerUp -> True
   _ -> False
 
 -- CR 602.5b: the riders rule 702 adds to the printed ability a keyword is
 -- written on. Forecast's are CR 702.57b's "only during the upkeep step of the
 -- card's owner and only once each turn"; ControllersTurn reads the activator, who
--- for a card in a hand is its owner (CR 602.2, CR 108.4a).
---
--- Not implemented: exhaust's and boast's riders, which their cards state
--- themselves (#3044).
+-- for a card in a hand is its owner (CR 602.2, CR 108.4a). Exhaust's and
+-- power-up's is CR 702.177a's and CR 702.193a's "activate only once"; boast's
+-- are CR 702.142a's two. Power-up's cost reduction is no rider, and
+-- reducesByManaCostOnEntry below answers for it.
 printedRiders :: Keyword -> [ActivationRestriction.ActivationRestriction]
 printedRiders keyword = case keyword of
   Keyword.Forecast ->
     [ ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase (PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep)) TurnScope.ControllersTurn),
       ActivationRestriction.OnlyOnceEachTurn
     ]
+  Keyword.Exhaust -> [ActivationRestriction.OnlyOnce]
+  Keyword.PowerUp -> [ActivationRestriction.OnlyOnce]
+  -- "This creature attacked this turn" is a count of the source among the
+  -- battlefield's permanents that did (Filter.AttackedThisTurn), EachPlayer's
+  -- battlefield because CR 400.1 makes it one shared zone.
+  Keyword.Boast ->
+    [ ActivationRestriction.OnlyIf
+        ( Condition.Compares
+            ( Compares.MkCompares
+                ( Quantity.Count
+                    ( Count.MkCount
+                        (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+                        (Filter.And [Filter.IsSource, Filter.AttackedThisTurn])
+                        Aggregation.Members
+                    )
+                )
+                Comparison.AtLeast
+                (Quantity.Literal 1)
+            )
+        ),
+      ActivationRestriction.OnlyOnceEachTurn
+    ]
   _ -> []
+
+-- CR 702.193a: is the printed ability this keyword is written on reduced by its
+-- permanent's mana cost when that permanent entered this turn? CR 702.193b's
+-- arithmetic is CR 118.7c's spill, which Pawl.Types.AppliedReduction already
+-- performs for a reduction not confined to coloured mana.
+reducesByManaCostOnEntry :: Keyword -> Bool
+reducesByManaCostOnEntry keyword = case keyword of
+  Keyword.PowerUp -> True
+  _ -> False
 
 -- Every rider the ability is bound by: the ones it prints plus printedRiders.
 restrictionsOf :: ActivatedAbility Card (GrantedAbility.GrantedAbility Card) -> [ActivationRestriction.ActivationRestriction]
@@ -5491,6 +5528,7 @@ familyOf keyword = case keyword of
   Keyword.Exhaust -> Nothing
   Keyword.Boast -> Nothing
   Keyword.Forecast -> Nothing
+  Keyword.PowerUp -> Nothing
   Keyword.Exert -> Nothing
   Keyword.Enlist -> Nothing
   Keyword.Persist -> Nothing

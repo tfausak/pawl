@@ -47,12 +47,7 @@
                 ]
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "OnlyOnce"
-            }
-          ]
+          }
         },
         {
           "cost": {
@@ -102,12 +97,7 @@
                 ]
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "OnlyOnce"
-            }
-          ]
+          }
         },
         {
           "cost": {
@@ -166,12 +156,7 @@
                 }
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "OnlyOnce"
-            }
-          ]
+          }
         }
       ],
       "keywords": [

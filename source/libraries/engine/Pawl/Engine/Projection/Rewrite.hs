@@ -448,7 +448,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- could not touch a card name even if they did. A count, a mana filter and a
   -- player scope are not words either.
   PlayerEffect.CantCastSpells -> effect
-  PlayerEffect.CantActivateAbilities -> effect
+  PlayerEffect.CantActivateAbilities _ -> effect
   PlayerEffect.CantCastMoreThan _ -> effect
   PlayerEffect.CantCastChosenName -> effect
   PlayerEffect.CantPlayLandChosenName -> effect

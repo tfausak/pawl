@@ -607,6 +607,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
   exhaustSpec s registry
   boastSpec s registry
   forecastSpec s registry
+  powerUpSpec s registry
   reinforceSpec s registry
   ninjutsuSpec s registry
   authoredHandAbilitySpec s registry
@@ -1274,13 +1275,8 @@ equipBoard s registry withHeadmaster = do
 -- PRINTED rather than minted -- "Exhaust -- [Cost]: [Effect]" means "[Cost]:
 -- [Effect]. Activate only once", so rule 702.177a adds rules to an ability the
 -- card wrote and no minter ever sees it. Greenbelt Guardian's card file carries
--- the stamp on the ability itself for that reason, and CR 702.177a's rider beside
--- it as an ActivationRestriction.OnlyOnce.
---
--- Not implemented: the rewriting, so a card carrying the keyword states that
--- rider itself rather than having the keyword add it (#3044). Not implemented:
--- CR 702.193a's power-up, the same shape plus a cost reduction of its own
--- (#3044).
+-- the stamp on the ability itself for that reason, and the keyword adds CR
+-- 702.177a's rider (Keyword.printedRiders).
 --
 -- Boom Scholar is the card that NAMES them: "Exhaust abilities of other
 -- permanents you control cost {2} less to activate", which reaches
@@ -1389,12 +1385,11 @@ boastBoard duskwielder swamp sorcerer =
 -- [Effect]" means "[Cost]: [Effect]. Activate only if this creature attacked this
 -- turn and only once each turn" (CR 702.142a). The ability is PRINTED rather than
 -- minted, so Duskwielder's card file carries the stamp on the ability itself and
--- rule 702.142a's two riders beside it: an ActivationRestriction.OnlyIf counting
--- the source under Filter.AttackedThisTurn (CR 608.2i's look-back, which outlives
--- CR 511.3's wipe of Combat.attackers), and ActivationRestriction.OnlyOnceEachTurn.
---
--- Not implemented: the rewriting, so the card states those two riders itself
--- rather than having the keyword add them (#3044).
+-- the keyword adds rule 702.142a's two riders (Keyword.printedRiders): an
+-- ActivationRestriction.OnlyIf counting the source under Filter.AttackedThisTurn
+-- (CR 608.2i's look-back, which outlives CR 511.3's wipe of Combat.attackers),
+-- and ActivationRestriction.OnlyOnceEachTurn. The card file states neither, so
+-- both cases below are the keyword's.
 --
 -- Duskwielder (Kaldheim) is the producer: a {B} 1\/2 Elf Berserker, "Boast --
 -- {1}: Target opponent loses 1 life and you gain 1 life."
@@ -1435,6 +1430,107 @@ boastSpec s registry = Spec.describe s "Boast (CR 702.142)" $ do
     -- The attacking Duskwielder (CR 508.1f) plus exactly one Swamp: the other
     -- Swamp is untapped, so a second {1} was there to be paid.
     Spec.assertEqWith s "one Swamp is still untapped, so the mana is not what refused it" (S.tappedCount S.alice after) 2
+
+-- The offer carrying CR 702.193a's keyword, told apart by the stamp the CARD wrote.
+isPowerUp :: A.Action -> Bool
+isPowerUp a = case a of
+  A.Activate _ ability -> ActivatedAbility.keyword ability == Just Keyword.PowerUp
+  _ -> False
+
+-- Takes the power-up activation whenever it is offered and passes otherwise, so
+-- a second one is refused by CR 702.193a's rider rather than declined here.
+powerUpAnswer :: Prompt.Prompt r -> r
+powerUpAnswer p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isPowerUp options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
+
+-- alice's precombat main phase with `n` Forests and Hulk, Gamma Goliath -- put
+-- onto the battlefield THIS TURN from her hand when `entered`, by a zone change
+-- the turn's log records (CR 400.7), and otherwise placed as a permanent the log
+-- never saw arrive. That is the one thing the legs vary.
+hulkBoard :: Bool -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+hulkBoard entered hulk forest n =
+  let lands = S.landsInPlay forest n
+      (hulkId, placed)
+        | entered =
+            let (inHand, g1) = S.addHandCard hulk S.alice lands
+                (moved, g2) = S.runPureWith S.identityAnswer g1 (Event.changeZoneReturning inHand Zone.Battlefield)
+             in (case moved of b Seq.:<| _ -> b; _ -> S.noSource, g2)
+        | otherwise = S.addPermanent hulk S.alice lands
+   in (hulkId, placed {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice, GameState.remaining = Seq.empty})
+
+-- CR 702.193: power-up. The ability is PRINTED, stamped Keyword.PowerUp, and the
+-- keyword supplies the rest: CR 702.193a's "activate only once"
+-- (Keyword.printedRiders) and its reduction by the permanent's mana cost on the
+-- turn it entered (Keyword.reducesByManaCostOnEntry).
+--
+-- Hulk, Gamma Goliath (MSH) is the producer: {3}{R}{G}, "Reach, trample / Power-up
+-- abilities of other creatures you control cost {3} less to activate. /
+-- Power-up -- {6}{R}{G}: Put five +1\/+1 counters on Hulk." Kang the Conqueror
+-- ({2}{U}{U}, "Power-up -- {5}{U}{U}{U}: ...") is the other creature.
+powerUpSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+powerUpSpec s registry = Spec.describe s "Power-up (CR 702.193)" $ do
+  -- CR 702.193a/b: {6}{R}{G} less {3}{R}{G} is {3}, which three Forests pay; the
+  -- full cost they cannot. Two boards differing only in whether Hulk entered
+  -- this turn.
+  Spec.it s "CR 702.193a the power-up cost is reduced by Hulk's mana cost only on the turn he entered" $ do
+    hulk <- S.printingOf s registry "Hulk, Gamma Goliath"
+    forest <- S.printingOf s registry "Forest"
+    let (enteredId, entered) = hulkBoard True hulk forest 3
+        (settledId, settled) = hulkBoard False hulk forest 3
+        offered oid gs = length (filter isPowerUp (activationsOf oid (Action.legalActions S.alice gs)))
+    Spec.assertEqWith s "three Forests pay the power-up of a Hulk that entered this turn" (offered enteredId entered) 1
+    Spec.assertEqWith s "and not that of a Hulk that was already there" (offered settledId settled) 0
+    Spec.assertEqWith s "both Hulks are on the battlefield" (fmap (\(oid, gs) -> Set.member oid (GameState.battlefield gs)) [(enteredId, entered), (settledId, settled)]) [True, True]
+
+  -- The gameplay-level proof (design.md section 4), through the priority loop.
+  -- Six Forests pay the reduced {3} twice, so the second activation is refused by
+  -- CR 702.193a's "activate this ability only once" and not by the mana.
+  Spec.it s "CR 702.193a whole card: Hulk powers up once, for {3}, and is refused the second time" $ do
+    hulk <- S.printingOf s registry "Hulk, Gamma Goliath"
+    forest <- S.printingOf s registry "Forest"
+    let (hulkId, board) = hulkBoard True hulk forest 6
+        after = S.runPure powerUpAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "Hulk is an 11/10, so five counters went on and not ten" (S.powerToughnessOf hulkId after) (Just (11, 10))
+    Spec.assertEqWith s "exactly three Forests were tapped, so three remain to pay a second activation" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "and the power-up is not offered again" (filter isPowerUp (activationsOf hulkId (Action.legalActions S.alice after))) []
+
+  -- Hulk's second line, a Pawl.Types.ReduceActivationCost narrowed to power-up:
+  -- Kang's {5}{U}{U}{U} less {3} is {2}{U}{U}{U}, which five Islands pay. Kang
+  -- did not enter this turn, so the reduction is Hulk's alone.
+  Spec.it s "CR 118.7 Hulk's reduction reaches another creature's power-up ability" $ do
+    hulk <- S.printingOf s registry "Hulk, Gamma Goliath"
+    kang <- S.printingOf s registry "Kang the Conqueror"
+    island <- S.printingOf s registry "Island"
+    let build withHulk =
+          let (theKang, g1) = S.addPermanent kang S.alice (S.landsInPlay island 5)
+              g2 = if withHulk then snd (S.addPermanent hulk S.alice g1) else g1
+           in (theKang, g2 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+        (kangId, withIt) = build True
+        (kangWithoutId, withoutIt) = build False
+        offered oid gs = length (filter isPowerUp (activationsOf oid (Action.legalActions S.alice gs)))
+    Spec.assertEqWith s "five Islands pay Kang's power-up beside Hulk" (offered kangId withIt) 1
+    Spec.assertEqWith s "and not without him" (offered kangWithoutId withoutIt) 0
+
+  -- Advancing the Spirit ({2}{G} Enchantment, MSC): "You may pay {0} rather than
+  -- pay the power-up cost of the first power-up ability you activate during each
+  -- of your turns." -- Oracle verified on Scryfall 2026-09-28. No lands at all, so
+  -- only CR 118.9's {0} can pay; three legs differing in the enchantment and in
+  -- whose turn it is.
+  Spec.it s "CR 118.9 Advancing the Spirit pays a power-up cost with {0} during its controller's turn" $ do
+    hulk <- S.printingOf s registry "Hulk, Gamma Goliath"
+    spirit <- S.printingOf s registry "Advancing the Spirit"
+    let build withSpirit active =
+          let (hulkId, g1) = S.addPermanent hulk S.alice (Setup.emptyGame S.bothPlayers)
+              g2 = if withSpirit then snd (S.addPermanent spirit S.alice g1) else g1
+           in (hulkId, g2 {GameState.activePlayer = active, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+        offered (oid, gs) = length (filter isPowerUp (activationsOf oid (Action.legalActions S.alice gs)))
+    Spec.assertEqWith s "with the Spirit on alice's turn, Hulk's power-up is offered for {0}" (offered (build True S.alice)) 1
+    Spec.assertEqWith s "without it, it is not" (offered (build False S.alice)) 0
+    Spec.assertEqWith s "nor on bob's turn" (offered (build True S.bob)) 0
 
 -- The offer carrying CR 702.57a's keyword, told apart by the stamp the CARD wrote.
 isForecast :: A.Action -> Bool
@@ -5661,9 +5757,8 @@ printedActivationThresholdReductionSpec s registry = Spec.describe s "PrintedAct
 -- abilities of other permanents you control" names -- the Exhaust group above is
 -- where that pair is proved.
 --
--- Not implemented: rule 702.177a's rewriting, so the card states the rider it
--- rewrites into directly (ActivationRestriction.OnlyOnce) rather than having the
--- keyword add it (#3044).
+-- The card file states no rider: the keyword adds rule 702.177a's
+-- (Keyword.printedRiders), so the refusal below is the keyword's.
 --
 -- EIGHT Forests, which is exactly two activations of {3}{G}: the rider is the
 -- only thing standing between alice and the second one, so a board that ignored
@@ -5681,13 +5776,14 @@ guardianBoard guardian forest =
           }
       )
 
--- The offer carrying CR 602.5's once-only rider, told from the same permanent's
--- other ability by the rider itself rather than by an index into the face: the
--- ability rides on the action (Action.Activate), so this filters the offered set
--- instead of building one.
+-- The offer carrying CR 702.177a's once-only rider, told from the same
+-- permanent's other ability by the exhaust stamp the card wrote rather than by an
+-- index into the face: the ability rides on the action (Action.Activate), so this
+-- filters the offered set instead of building one. Not by the rider, which the
+-- keyword adds -- a keyword that added none must leave this ability offered.
 isOnlyOnce :: A.Action -> Bool
 isOnlyOnce a = case a of
-  A.Activate _ ability -> elem ActivationRestriction.OnlyOnce (ActivatedAbility.restrictions ability)
+  A.Activate _ ability -> ActivatedAbility.keyword ability == Just Keyword.Exhaust
   _ -> False
 
 -- Takes the once-only activation whenever the engine offers it and passes
@@ -5771,8 +5867,8 @@ locustBoard swarm forest =
       )
 
 -- The offer carrying CR 602.5b's per-turn rider, told from the same permanent's
--- other ability by the rider itself rather than by an index into the face, as
--- isOnlyOnce above is.
+-- other ability by the rider the card printed rather than by an index into the
+-- face.
 isOnlyOnceEachTurn :: A.Action -> Bool
 isOnlyOnceEachTurn a = case a of
   A.Activate _ ability -> elem ActivationRestriction.OnlyOnceEachTurn (ActivatedAbility.restrictions ability)
