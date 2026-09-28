@@ -2020,9 +2020,11 @@ sourceOptions clauses admitting contended supplies =
 -- and a mana creature, each claiming only itself -- is still one board, and a
 -- repeatable source's colour choices cost options in its repeat count and not in
 -- the number of colours.
--- `any` short-circuits, so a payable cost stops at the first board that pays it;
--- an unpayable one walks every board, and neither a domination prune nor a cheap
--- necessary-condition prefilter is implemented (#595).
+-- `any` short-circuits, so a payable cost stops at the first board that pays it,
+-- and a relaxation refuses most unpayable ones before the walk starts
+-- (payableResolutionsGiven's `bounded`). One the relaxation admits still walks
+-- every board: it ignores claims, so a Springleaf Drum beside n Llanowar Elves
+-- asked for n + 1 is not refused, and no domination prune is implemented (#595).
 --
 -- Clause 1 is Hall's condition: a saturating matching exists iff no set of
 -- demands outruns the supplies that could serve it. Checked directly rather than
@@ -2177,6 +2179,11 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
             Map.fromList ((costPosition, subject) : fmap (\(k, (oid, _)) -> (k, PaymentSubject.Activating oid)) ranked),
             sum (fmap (optionLife . snd) taken)
           )
+      -- Whether there is a walk for the relaxation below to save: one option per
+      -- source, and at most one of them eating mana, is one board.
+      searching = not (all (null . drop 1) options) || length (filter (not . all (null . optionDemands . snd)) options) > 1
+      -- CR 119.4's floor, asked of every board: the player effects walked once.
+      affordable = Event.lifePayable pid gs
       payable (demands, generic, life) =
         let fits (supplies, eaten, costPosition, subjectAt, spent) =
               let -- Both sides tagged with their position, so Hall's condition
@@ -2211,13 +2218,49 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
                   couldServe subset = length (filter (\supply -> any (admits supply) subset) supplies)
                   demandedIn subset = length (filter (`elem` subset) wanted_)
                   hallHolds subset = demandedIn subset <= couldServe subset
-               in Event.canPayLife pid (committed + life + spent) gs
+               in affordable (committed + life + spent)
                     -- A cheap necessary condition, and nothing more: Hall's own
                     -- clause over the whole demand set implies it, since a supply
                     -- serving nothing is still counted here.
                     && Natural.length supplies >= Natural.length wanted_
                     && all hallHolds (List.subsequences (Set.toList (Set.fromList wanted_)))
-         in any fits boards
+            -- CR 118.3 asked of a RELAXATION first, which no board beats: each
+            -- source takes whichever option serves the clause at hand best, with
+            -- only CR 119.4's one life total holding them together and every
+            -- claim ignored. `best` is that choice for one clause -- a knapsack
+            -- over the life the options pay -- and Nothing when no choice at all
+            -- clears the life clause.
+            --
+            -- Asked of Hall's condition over the cost's OWN demands, every supply
+            -- sitting before `costPosition`; and of the count every board is held
+            -- to below, where an option counts its supplies less the mana it eats.
+            -- A cost this refuses fails on every board, so only one it admits pays
+            -- for the walk.
+            bounded =
+              let wanted_ = demands <> List.genericReplicate generic anyTypeDemand
+                  best value =
+                    let step sofar choices =
+                          Map.fromListWith
+                            max
+                            [ (spent + optionLife option, total + value option)
+                            | (spent, total) <- Map.toList sofar,
+                              (_, option) <- choices,
+                              affordable (committed + life + spent + optionLife option)
+                            ]
+                        start :: Map.Map Natural Integer
+                        start = if affordable (committed + life) then Map.singleton 0 0 else Map.empty
+                        reached = Foldable.foldl' step start options
+                     in if Map.null reached then Nothing else Just (maximum (Map.elems reached))
+                  count :: [a] -> Integer
+                  count = toInteger . length
+                  admits supply subset = Set.member subject (supplyAdmits supply) && any (serves supply) subset
+                  servedBy subset = count . filter (`admits` subset)
+                  demandedIn subset = count (filter (`elem` subset) wanted_)
+                  hallBound subset = maybe False (\most -> demandedIn subset <= servedBy subset pooled + most) (best (servedBy subset . optionSupplies))
+                  net option = count (optionSupplies option) - count (optionDemands option)
+               in maybe False (\most -> count wanted_ <= count pooled + most) (best net)
+                    && all hallBound (List.subsequences (Set.toList (Set.fromList wanted_)))
+         in (not searching || bounded) && any fits boards
    in filter payable (resolutions spending cost)
 
 -- The least life any payable resolution of this cost costs, or Nothing when none
