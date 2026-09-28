@@ -178,6 +178,7 @@ encode p answer = case p of
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
   Prompt.ChooseAnyNumberToReveal {} -> Response.ChoseReveals answer
   Prompt.ChooseAnyNumberOfPermanents {} -> Response.ChoseAnyNumberOfPermanents answer
+  Prompt.ChooseAnyNumberToDiscard {} -> Response.ChoseAnyNumberToDiscard answer
   Prompt.ChoosePermanent {} -> Response.ChosePermanent answer
   Prompt.ChooseTapsForTotalPower {} -> Response.ChoseTaps answer
   Prompt.ChooseTaps {} -> Response.ChoseTaps answer
@@ -550,6 +551,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseAnyNumberOfPermanents {} -> case response of
     Response.ChoseAnyNumberOfPermanents ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseAnyNumberToDiscard {} -> case response of
+    Response.ChoseAnyNumberToDiscard ids -> Just ids
     _ -> Nothing
   Prompt.ChoosePermanent {} -> case response of
     Response.ChosePermanent oid -> Just oid
@@ -1101,6 +1105,9 @@ defaultAnswer p = case p of
   -- 608.2d admits every subset no larger than the ceiling, so no answer can be
   -- illegal. A deterministic fallback, not a recommendation.
   Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates atMost -> Set.fromList (maybe id (take . Natural.toIntSaturating) atMost candidates)
+  -- None: CR 107.1c admits zero, and discarding spends cards the fallback has
+  -- no reason to give up. A deterministic fallback, not a recommendation.
+  Prompt.ChooseAnyNumberToDiscard {} -> Set.empty
   -- CR 608.2d: the head of the offer, ChooseCardInGraveyard's fallback. Every
   -- candidate was pre-filtered by the engine, so the head is a legal answer. A
   -- deterministic fallback, not a recommendation.

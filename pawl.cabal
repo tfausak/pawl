@@ -142,6 +142,8 @@ library codec
     Pawl.Codec.AlternativeCost
     Pawl.Codec.AlternativeCostSpec
     Pawl.Codec.Amass
+    Pawl.Codec.AnyNumberDiscard
+    Pawl.Codec.AnyNumberDiscardSpec
     Pawl.Codec.AnyNumberMatching
     Pawl.Codec.AnyNumberMatchingSpec
     Pawl.Codec.ArmDelayedTrigger
@@ -1735,6 +1737,7 @@ library types
     Pawl.Types.AimedAt
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass
+    Pawl.Types.AnyNumberDiscard
     Pawl.Types.AnyNumberMatching
     Pawl.Types.AppliedReduction
     Pawl.Types.ArmDelayedTrigger
