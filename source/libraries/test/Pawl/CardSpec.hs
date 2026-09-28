@@ -2911,13 +2911,11 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- exemptions below.
 --
 -- Compared against every PERMUTATION of the subtypes rather than one rendering,
--- and that is forced rather than chosen: TypeLine.subtypes is a Set, so a
--- multi-subtype token's printed word order ("Zombie Berserker Token", not
--- "Berserker Zombie Token") is not recoverable from the card. The lint therefore
--- pins which subtypes appear and never their order (#477). Permuting also keeps
--- it correct for CR 205.3b's two-WORD creature types, which splitting the name
--- on spaces would not. The factorial is bounded by a token's subtype count, at
--- most two here.
+-- because rule 111.4 names the subtypes and not their order: "Zombie Berserker
+-- Token" over "Berserker Zombie Token" is Oracle convention, recorded only in
+-- the name the card data writes. Permuting also keeps the lint correct for CR
+-- 205.3b's two-WORD creature types, which splitting the name on spaces would
+-- not. The factorial is bounded by a token's subtype count, at most two here.
 --
 -- EXEMPT: CR 111.9's legendary tokens, "create [name], a . . ." -- Tomb of
 -- Annihilation's "create The Atropal, a legendary 4/4 black God Horror creature

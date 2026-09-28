@@ -512,7 +512,10 @@ numberInstances =
 applicable :: Maybe GameState -> GameState -> ProposedEvent -> [ReplacementCandidate]
 applicable asOf gs event =
   let sources = Maybe.fromMaybe gs asOf
-   in filter (applies sources event) (collect sources (GameState.replacements gs))
+      -- One gather and one grant walk, shared by every candidate asked.
+      viewOf = Projection.viewsOf sources
+      grants = Projection.controlGrants sources
+   in filter (applies viewOf grants sources event) (collect sources (GameState.replacements gs))
 
 -- CR 614.1: does this instance apply to this proposed event? The arms must agree
 -- on the EVENT CLASS -- which the type already rules out for the impossible
@@ -647,8 +650,8 @@ admitsRecipient src rewrite de = case rewrite of
 
 -- CR 614.1: does this replacement apply to this event -- its printed pattern
 -- matches (`matchesPrinted`), and CR 801.13a lets it reach (`reaches`)?
-applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
-applies gs event candidate = matchesPrinted gs event candidate && reaches gs event candidate
+applies :: (ObjectId -> Filter.View) -> [Projection.ControlGrant] -> GameState -> ProposedEvent -> ReplacementCandidate -> Bool
+applies viewOf grants gs event candidate = matchesPrinted viewOf gs event candidate && reaches grants gs event candidate
 
 -- CR 801.13a: a replacement that would affect an object or player outside its
 -- controller's range does nothing to it -- so a row whose event affects one is
@@ -665,14 +668,14 @@ applies gs event candidate = matchesPrinted gs event candidate && reaches gs eve
 -- permanent whose controller left this turn is still in range of the rows
 -- that were in range of that seat. Pawl.DepartureSpec's "CR 801.2c a survivor's
 -- exile replacement still reaches a departing neighbour's permanent" proves it.
-reaches :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
-reaches gs event candidate = case (ReplacementCandidate.controller candidate, ReplacementCandidate.effect candidate) of
+reaches :: [Projection.ControlGrant] -> GameState -> ProposedEvent -> ReplacementCandidate -> Bool
+reaches grants gs event candidate = case (ReplacementCandidate.controller candidate, ReplacementCandidate.effect candidate) of
   (Nothing, _) -> True
   (Just _, ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _))
     | prevents rewrite || redirects rewrite -> True
   (Just you, _) ->
     let (objects, players) = affected event
-     in all (\oid -> Projection.objectWasInRangeGiven (Projection.controlGrants gs) you oid gs) objects
+     in all (\oid -> Projection.objectWasInRangeGiven grants you oid gs) objects
           && all (\pid -> Game.inRangeOf you pid gs) players
 
 -- CR 801.13a: the objects and players a replaced event would affect. A moving
@@ -704,8 +707,8 @@ affected event = case event of
   ProposedEvent.WouldScry pid _ -> ([], [pid])
 
 -- CR 614.1: does this replacement's printed pattern match this event?
-matchesPrinted :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
-matchesPrinted gs event candidate =
+matchesPrinted :: (ObjectId -> Filter.View) -> GameState -> ProposedEvent -> ReplacementCandidate -> Bool
+matchesPrinted viewOf gs event candidate =
   let src = ReplacementCandidate.source candidate
    in case (ReplacementCandidate.effect candidate, event) of
         -- CR 614.1a: which zone changes this redirect intercepts -- the
@@ -718,7 +721,7 @@ matchesPrinted gs event candidate =
         (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _), ProposedEvent.WouldChangeZone zc) ->
           maybe True (== ZoneChange.to zc) (ZoneChangePattern.whenDestination pat)
             && matchesZoneOwner gs src (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
-            && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
+            && matchesFiltered viewOf gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
         -- plus the one fact about the ROW rather than the event -- a shield
         -- spent to nothing is no longer a prevention effect.
@@ -727,23 +730,23 @@ matchesPrinted gs event candidate =
         -- which is the asymmetry `redirectable` below derives: a redirection a
         -- card forbids is not applicable, so it never reaches CR 616.1's choice.
         (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _), ProposedEvent.WouldDealDamage de) ->
-          matchesDamagePattern gs (candidateContext gs candidate) pat de
+          matchesDamagePattern viewOf gs (candidateContext gs candidate) pat de
             && unspent rewrite
             && admitsRecipient src rewrite de
-            && (not (redirects rewrite) || redirectable gs de)
+            && (not (redirects rewrite) || redirectable viewOf gs de)
             && (not (prevents rewrite) || preventsInRange gs (ReplacementCandidate.controller candidate) pat rewrite de)
         -- CR 614.1a: a printed subject (Pyramids' "target land") is matched as
         -- a Filter; absent one, the rewrite names its subject by identity or by
         -- attachment, which `scopes` reads off the board.
         (ReplacementEffect.DestructionR (DestructionR.MkDestructionR matching rewrite), ProposedEvent.WouldBeDestroyed oid regenerability cause) ->
-          maybe (scopes gs rewrite src oid) (\f -> matchesFiltered gs candidate f oid) matching && admits regenerability cause rewrite
+          maybe (scopes gs rewrite src oid) (\f -> matchesFiltered viewOf gs candidate f oid) matching && admits regenerability cause rewrite
         (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldPutCounters cause oid kind _) ->
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.
           maybe True (== kind) (CounterPattern.whichKind pat)
             && matchesPutter gs src (CounterPattern.subject pat) cause
             && matchesController gs src (CounterPattern.whose pat) oid
-            && matchesPermanent gs Map.empty Nothing (CounterPattern.onWhat pat) oid
+            && matchesPermanent viewOf gs Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 122.1 / 614.1: the same pattern against a PLAYER recipient. A
         -- pattern naming a kind admits none of these: `whichKind` is the object
         -- kinds, and a player can hold no counter of one (see
@@ -770,7 +773,7 @@ matchesPrinted gs event candidate =
               not (Map.null (matchingEnteringCounters gs pat oid))
                 && matchesPutter gs src (CounterPattern.subject pat) (CounterCause.ByEffect putter)
                 && matchesController gs src (CounterPattern.whose pat) oid
-                && matchesPermanent gs Map.empty Nothing (CounterPattern.onWhat pat) oid
+                && matchesPermanent viewOf gs Map.empty Nothing (CounterPattern.onWhat pat) oid
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
         -- effect source's controller. CR 102.2's Opponents has no producer today.
         --
@@ -806,7 +809,7 @@ matchesPrinted gs event candidate =
         -- Filter over the entering object (see Pawl.Types.ReplacementEffect).
         -- 614.1c's self-scope is Filter.IsSource; 614.1d's is a characteristic
         -- filter.
-        (ReplacementEffect.EntryR (EntryR.MkEntryR pat rewrite), ProposedEvent.WouldEnter oid) -> matchesFiltered gs candidate pat oid && admitsEntry gs oid rewrite
+        (ReplacementEffect.EntryR (EntryR.MkEntryR pat rewrite), ProposedEvent.WouldEnter oid) -> matchesFiltered viewOf gs candidate pat oid && admitsEntry gs oid rewrite
         -- CR 614.1e: which permanents turning face up this replacement watches.
         -- The same Filter language the entry arm above uses, and every producer
         -- writes Filter.IsSource -- CR 614.1e's printed wording is always "as
@@ -835,7 +838,7 @@ matchesPrinted gs event candidate =
         -- authors a `requiring` at all, which is what keeps a card's row
         -- unconditional here.
         (ReplacementEffect.TurnUpR turnUpR, ProposedEvent.WouldTurnFaceUp oid procedure) ->
-          matchesFiltered gs candidate (TurnUpR.matching turnUpR) oid
+          matchesFiltered viewOf gs candidate (TurnUpR.matching turnUpR) oid
             && maybe True (\required -> procedure == Just required) (TurnUpR.requiring turnUpR)
         -- CR 122.1d's "a permanent with a stun counter on it" is the self-scope
         -- DestructionR's arm reads one event class over: the row is minted onto
@@ -1361,10 +1364,10 @@ matchesController gs src rel oid = relationHolds gs src (Projection.controllerOf
 -- controller it last had (CR 113.7a), not by CR 108.4a's owner fallback for the
 -- card it left behind. Proved by Pawl.DamageSpec's "a stolen Fire-Eater sacrificed at a
 -- Nemesis naming its owner still deals its damage".
-matchesDamageSource :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> DamageEvent.DamageEvent -> Bool
-matchesDamageSource gs context filter_ de =
+matchesDamageSource :: (ObjectId -> Filter.View) -> GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> DamageEvent.DamageEvent -> Bool
+matchesDamageSource viewOf gs context filter_ de =
   let oid = DamageEvent.source de
-      view = Maybe.fromMaybe (Projection.viewOfObject oid gs) (Projection.viewWithLastKnownAnywhere gs oid)
+      view = Maybe.fromMaybe (viewOf oid) (Projection.viewWithLastKnownAnywhere gs oid)
    in Filter.matches context view filter_
 
 -- CR 615.1 / 614.1a: does this damage event have the qualities the pattern
@@ -1392,11 +1395,11 @@ matchesDamageSource gs context filter_ de =
 -- The rewrite is NOT asked about here, though `applies` asks `unspent` right
 -- after: a spent shield is a row that no longer exists as a prevention effect,
 -- which is a fact about the ROW and not about which events the pattern admits.
-matchesDamagePattern :: GameState -> Filter.Context -> DamagePattern.DamagePattern -> DamageEvent.DamageEvent -> Bool
-matchesDamagePattern gs context pat de =
+matchesDamagePattern :: (ObjectId -> Filter.View) -> GameState -> Filter.Context -> DamagePattern.DamagePattern -> DamageEvent.DamageEvent -> Bool
+matchesDamagePattern viewOf gs context pat de =
   maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
-    && matchesDamageSource gs context (DamagePattern.whatSource pat) de
-    && matchesPrintedRecipient gs context de pat
+    && matchesDamageSource viewOf gs context (DamagePattern.whatSource pat) de
+    && matchesPrintedRecipient viewOf context de pat
     && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
     && maybe True (== DamageEvent.source de) (DamagePattern.whichSource pat)
 
@@ -1414,11 +1417,11 @@ matchesDamagePattern gs context pat de =
 -- carries Nothing on BOTH halves and admits every recipient, which is the
 -- unrestricted reading DamagePattern documents and the empty disjunction would
 -- get backwards.
-matchesPrintedRecipient :: GameState -> Filter.Context -> DamageEvent.DamageEvent -> DamagePattern.DamagePattern -> Bool
-matchesPrintedRecipient gs context de pat = case (DamagePattern.whatRecipient pat, DamagePattern.whoRecipient pat) of
+matchesPrintedRecipient :: (ObjectId -> Filter.View) -> Filter.Context -> DamageEvent.DamageEvent -> DamagePattern.DamagePattern -> Bool
+matchesPrintedRecipient viewOf context de pat = case (DamagePattern.whatRecipient pat, DamagePattern.whoRecipient pat) of
   (Nothing, Nothing) -> True
   (what, who) ->
-    maybe False (matchesDamageRecipient gs context de) what
+    maybe False (matchesDamageRecipient viewOf context de) what
       || maybe False (matchesRecipientPlayer context de) who
 
 -- CR 120.3a / 109.5: is this damage addressed to a PLAYER the pattern's printed
@@ -1451,10 +1454,10 @@ matchesRecipientPlayer context de relation = case Recipient.playerOf (DamageEven
 -- filter, so this is reached only where a card really did describe an object, and
 -- a pattern whose sentence ALSO names a player says so in `whoRecipient`, which
 -- matchesPrintedRecipient asks beside this one.
-matchesDamageRecipient :: GameState -> Filter.Context -> DamageEvent.DamageEvent -> Filter.Type.Filter Keyword.Type.Keyword -> Bool
-matchesDamageRecipient gs context de filter_ = case Recipient.objectOf (DamageEvent.target de) of
+matchesDamageRecipient :: (ObjectId -> Filter.View) -> Filter.Context -> DamageEvent.DamageEvent -> Filter.Type.Filter Keyword.Type.Keyword -> Bool
+matchesDamageRecipient viewOf context de filter_ = case Recipient.objectOf (DamageEvent.target de) of
   Nothing -> False
-  Just oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_
+  Just oid -> Filter.matches context (viewOf oid) filter_
 
 -- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
 --
@@ -1512,9 +1515,9 @@ matchesZoneOwner gs src you rel oid = relationHolds gs src you rel (fmap Object.
 -- criterion that names one of them -- "a creature other than the target",
 -- Filter.IsBound. A counter pattern is read off a static ability with nothing
 -- announced, so its two callers hand over none.
-matchesPermanent :: GameState -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesPermanent gs slots source filter_ oid =
-  Filter.matches (Filter.contextWithSlots (Game.teams gs) Nothing source slots) (Projection.viewOfObject oid gs) filter_
+matchesPermanent :: (ObjectId -> Filter.View) -> GameState -> Map.Map SlotName.SlotName (Set ObjectId) -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesPermanent viewOf gs slots source filter_ oid =
+  Filter.matches (Filter.contextWithSlots (Game.teams gs) Nothing source slots) (viewOf oid) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
 -- the order Prompt.ChooseSacrifices and Prompt.ChooseAnyNumberToSacrifice offer
@@ -1548,7 +1551,8 @@ matchesPermanent gs slots source filter_ oid =
 -- as-enters offer has nothing to hand, no announcement being in flight there.
 sacrificeCandidates :: Map.Map SlotName.SlotName (Set ObjectId) -> PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 sacrificeCandidates slots pid source filter_ gs =
-  let matching = List.sort (filter (matchesPermanent gs slots source filter_) (Projection.controls pid gs))
+  let viewOf = Projection.viewsOf gs
+      matching = List.sort (filter (matchesPermanent viewOf gs slots source filter_) (Projection.controls pid gs))
       forbidden = SacrificeRestriction.cantBeSacrificed matching gs
    in filter (\oid -> not (Set.member oid forbidden)) matching
 
@@ -1579,7 +1583,8 @@ sacrificeCandidates slots pid source filter_ gs =
 graveyardCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 graveyardCandidates pid filter_ gs =
   let context = Filter.contextFor (Game.teams gs) (Just pid) Nothing
-   in List.sort (filter (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_) (Game.zoneMembers Zone.Graveyard pid gs))
+      viewOf = Projection.viewsOf gs
+   in List.sort (filter (\oid -> Filter.matches context (viewOf oid) filter_) (Game.zoneMembers Zone.Graveyard pid gs))
 
 -- CR 614.1a / 614.1c-d: does the event's subject satisfy this replacement's
 -- Filter? Both the ENTERING object of an entry replacement and the MOVING object
@@ -1609,9 +1614,9 @@ graveyardCandidates pid filter_ gs =
 -- `gs` and is read as it last existed there rather than as the card it becomes in
 -- the graveyard (CR 400.7). For a CR 608.2f batch `gs` is the pre-batch board
 -- Replacement.applicable passed down, which is that same reading.
-matchesFiltered :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesFiltered gs candidate filter_ oid =
-  Filter.matches (candidateContext gs candidate) (Projection.viewOfObject oid gs) filter_
+matchesFiltered :: (ObjectId -> Filter.View) -> GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesFiltered viewOf gs candidate filter_ oid =
+  Filter.matches (candidateContext gs candidate) (viewOf oid) filter_
 
 -- The Context a candidate's own Filters are read in: CR 109.5's "you" is the
 -- ROW's controller -- the baked one for a floating row, since deriving it from
@@ -3149,8 +3154,8 @@ printedDestination gs context filter_ =
 -- source to derive it from -- the printed static ability's permanent, and the
 -- object a CR 611.2c stored effect resolved off (Lava Burst's own spell, still on
 -- the stack while the damage it deals is proposed).
-preventable :: GameState -> DamageEvent.DamageEvent -> Bool
-preventable gs de = not (any (\(src, pat) -> matchesDamagePattern gs (patternContext gs src) pat de) (PlayerEffect.unpreventable gs))
+preventable :: (ObjectId -> Filter.View) -> GameState -> DamageEvent.DamageEvent -> Bool
+preventable viewOf gs de = not (any (\(src, pat) -> matchesDamagePattern viewOf gs (patternContext gs src) pat de) (PlayerEffect.unpreventable gs))
 
 -- CR 109.5's Context for a CR 613.10/613.11 pattern: the perspective is the
 -- controller of the effect's own source, derived off the board rather than
@@ -3203,8 +3208,8 @@ redirects rewrite = case rewrite of
 --
 -- Delegated to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11 axis:
 -- this module sees a DamagePattern and never a PlayerEffect constructor.
-redirectable :: GameState -> DamageEvent.DamageEvent -> Bool
-redirectable gs de = not (any (\(src, pat) -> matchesDamagePattern gs (patternContext gs src) pat de) (PlayerEffect.unredirectable gs))
+redirectable :: (ObjectId -> Filter.View) -> GameState -> DamageEvent.DamageEvent -> Bool
+redirectable viewOf gs de = not (any (\(src, pat) -> matchesDamagePattern viewOf gs (patternContext gs src) pat de) (PlayerEffect.unredirectable gs))
 
 -- CR 615.12: is this the pairing the rule describes -- a PREVENTION effect
 -- chosen against damage that CAN'T BE PREVENTED? Just means the application
@@ -3231,7 +3236,7 @@ redirectable gs de = not (any (\(src, pat) -> matchesDamagePattern gs (patternCo
 inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Maybe Rewrite
 inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate, event) of
   (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de)
-    | prevents rewrite && not (preventable gs de) ->
+    | prevents rewrite && not (preventable (Projection.viewsOf gs) gs de) ->
         Just rewrite
   _ -> Nothing
 
@@ -3517,10 +3522,12 @@ allocations :: GameState -> [DamageEvent.DamageEvent] -> [(CandidateId, Natural,
 allocations gs events =
   let indexed :: [(Natural, DamageEvent.DamageEvent)]
       indexed = zip [0 ..] events
+      viewOf = Projection.viewsOf gs
+      grants = Projection.controlGrants gs
       allocationsBy candidate = Maybe.fromMaybe [] $ do
         rewrite <- damageRewriteOf candidate
         left <- remainingOf rewrite
-        let hits = hitsOf gs indexed candidate
+        let hits = hitsOf viewOf grants gs indexed candidate
         Monad.guard (length hits >= 2)
         Monad.guard (left < sum (fmap (DamageEvent.amount . snd) hits))
         pure
@@ -3544,15 +3551,15 @@ damageRewriteOf candidate = case ReplacementCandidate.effect candidate of
 -- CR 615.12's filter is a PREVENTION's: a redirect never prevents, so
 -- unpreventable damage contends for Harm's Way's 2 exactly as any other damage
 -- does, and `applies` alone says whether the row reaches it.
-hitsOf :: GameState -> [(Natural, DamageEvent.DamageEvent)] -> ReplacementCandidate -> [(Natural, DamageEvent.DamageEvent)]
-hitsOf gs indexed candidate =
+hitsOf :: (ObjectId -> Filter.View) -> [Projection.ControlGrant] -> GameState -> [(Natural, DamageEvent.DamageEvent)] -> ReplacementCandidate -> [(Natural, DamageEvent.DamageEvent)]
+hitsOf viewOf grants gs indexed candidate =
   let contends event = case damageRewriteOf candidate of
-        Just rewrite -> not (prevents rewrite) || preventable gs event || spentInertly rewrite
+        Just rewrite -> not (prevents rewrite) || preventable viewOf gs event || spentInertly rewrite
         Nothing -> False
    in filter
         ( \entry ->
             contends (snd entry)
-              && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate
+              && applies viewOf grants gs (ProposedEvent.WouldDealDamage (snd entry)) candidate
         )
         indexed
 
@@ -3648,6 +3655,8 @@ contested :: GameState -> [DamageEvent.DamageEvent] -> [(PlayerId, [Natural])]
 contested gs events =
   let indexed :: [(Natural, DamageEvent.DamageEvent)]
       indexed = zip [0 ..] events
+      viewOf = Projection.viewsOf gs
+      grants = Projection.controlGrants gs
       -- CR 615.7's chooser is CR 616.1's, read off each hit's own shielded
       -- recipient and GROUPED, since one shield can cover recipients with
       -- different choosers: Divine Deflection's covers a player and the
@@ -3660,7 +3669,7 @@ contested gs events =
       -- by one seat's share of it.
       contestedBy candidate = Maybe.fromMaybe [] $ do
         (left, demand) <- contestedResource gs candidate
-        case hitsOf gs indexed candidate of
+        case hitsOf viewOf grants gs indexed candidate of
           hits@(_ : _ : _)
             | left < demand (fmap snd hits) ->
                 pure
