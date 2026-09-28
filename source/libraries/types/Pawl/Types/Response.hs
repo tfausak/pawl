@@ -258,6 +258,9 @@ data Response
     -- Hatred-style announcement would be a silent wrong answer rather than a
     -- desync.
     ChosePaidEnergy Natural.Natural
+  | -- | CR 107.1c / 608.2d: the number a player chose for an Effect.ChooseNumber.
+    -- Its own constructor for ChosePaidEnergy's reason.
+    ChoseNumber Natural.Natural
   | -- | CR 702.155b / 714.3b: the chapter a player chose for an entering Saga
     -- with read ahead.
     --
@@ -566,6 +569,10 @@ data Response
   | -- | CR 608.2d: the members of a per-member loop a resolving spell's
     -- controller chose for its body to run for.
     ChoseLoopMembers (Set.Set Recipient.Recipient)
+  | -- | CR 608.2d: whether an Effect.Repeat's controller ran its body again. Its
+    -- own constructor for ChoseRiot's reason: no other OptionalDecision answer
+    -- may replay as this one.
+    ChoseRepeat OptionalDecision.OptionalDecision
   | -- | CR 613.7m: the relative order a player chose for the timestamps their own
     -- objects receive at one moment, as a permutation of the offered indices. A
     -- separate constructor from the ones above for their reason: replaying a

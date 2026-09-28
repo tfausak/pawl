@@ -292,6 +292,9 @@ data Prompt r where
   -- and zero declines the "may". Not raised for a bound of 0, where that same
   -- rule leaves 0 as the only payable amount.
   ChoosePaidEnergy :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
+  -- | CR 107.1c / 608.2d: the number an Effect.ChooseNumber binds as the object
+  -- resolves, zero included. Answers as Response.ChoseNumber.
+  ChooseNumber :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Natural.Natural
   -- | CR 702.155b / 714.3b: which chapter a Saga with read ahead enters on; the
   -- Natural is the final chapter (CR 714.2d), the answer clamped into the
   -- range. Not raised for a range of one, nor for a bound of 0.
@@ -767,6 +770,10 @@ data Prompt r where
   -- candidate, skipped at zero. ChooseAnyNumberOfPermanents' shape over the
   -- loop's own member type. Answers as Response.ChoseLoopMembers.
   ChooseLoopMembers :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt (Set.Set Recipient.Recipient)
+  -- | CR 608.2d: whether an Effect.Repeat runs its body again; the Natural is how
+  -- many times it has run, so two asks of one loop differ. Answers as
+  -- Response.ChoseRepeat.
+  ChooseRepeat :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt OptionalDecision.OptionalDecision
   -- | CR 613.7m: the relative order of the timestamps one player's objects
   -- receive at one moment, first named stamped earlier; asked by
   -- Pawl.Engine.Restamp.order, per group in APNAP order, for two or more.

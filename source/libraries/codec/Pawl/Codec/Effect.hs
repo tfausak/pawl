@@ -209,6 +209,7 @@ codec cardCodec abilityCodec =
           Arm.payload "GainPlayerCounters" PlayerCounters.codec Effect.GainPlayerCounters (\x -> case x of Effect.GainPlayerCounters y -> Just y; _ -> Nothing),
           Arm.payload "RemovePlayerCounters" PlayerCounters.codec Effect.RemovePlayerCounters (\x -> case x of Effect.RemovePlayerCounters y -> Just y; _ -> Nothing),
           Arm.payload "PayAnyEnergy" SlotName.codec Effect.PayAnyEnergy (\x -> case x of Effect.PayAnyEnergy y -> Just y; _ -> Nothing),
+          Arm.payload "ChooseNumber" SlotName.codec Effect.ChooseNumber (\x -> case x of Effect.ChooseNumber y -> Just y; _ -> Nothing),
           Arm.payload "Tap" ObjectRef.codec Effect.Tap (\x -> case x of Effect.Tap y -> Just y; _ -> Nothing),
           Arm.payload "Untap" ObjectRef.codec Effect.Untap (\x -> case x of Effect.Untap y -> Just y; _ -> Nothing),
           Arm.payload "Detain" ObjectRef.codec Effect.Detain (\x -> case x of Effect.Detain y -> Just y; _ -> Nothing),
@@ -276,6 +277,7 @@ codec cardCodec abilityCodec =
           Arm.payload "MakeWarped" ObjectRef.codec Effect.MakeWarped (\x -> case x of Effect.MakeWarped y -> Just y; _ -> Nothing),
           Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing),
           Arm.payload "ForEachNumber" forEachNumberCodec Effect.ForEachNumber (\x -> case x of Effect.ForEachNumber y -> Just y; _ -> Nothing),
+          Arm.payload "Repeat" (Common.seq (codec cardCodec abilityCodec)) Effect.Repeat (\x -> case x of Effect.Repeat y -> Just y; _ -> Nothing),
           Arm.payload "Heal" ObjectRef.codec Effect.Heal (\x -> case x of Effect.Heal y -> Just y; _ -> Nothing)
         ]
 
@@ -368,6 +370,7 @@ tagOf x = case x of
   Effect.GainPlayerCounters {} -> "GainPlayerCounters"
   Effect.RemovePlayerCounters {} -> "RemovePlayerCounters"
   Effect.PayAnyEnergy {} -> "PayAnyEnergy"
+  Effect.ChooseNumber {} -> "ChooseNumber"
   Effect.Tap {} -> "Tap"
   Effect.Untap {} -> "Untap"
   Effect.Detain {} -> "Detain"
@@ -435,4 +438,5 @@ tagOf x = case x of
   Effect.MakeWarped {} -> "MakeWarped"
   Effect.ForEach {} -> "ForEach"
   Effect.ForEachNumber {} -> "ForEachNumber"
+  Effect.Repeat {} -> "Repeat"
   Effect.Heal {} -> "Heal"

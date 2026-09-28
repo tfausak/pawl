@@ -505,6 +505,11 @@ aggregate quantityOf aggregation members = case aggregation of
   Aggregation.MostSharingACreatureType ->
     let tally = Map.fromListWith (+) [(subtype, 1 :: Integer) | (_, view) <- members, subtype <- Set.toList (Filter.subtypes view), Subtype.isCreatureType subtype]
      in Just (Foldable.foldl' max 0 tally)
+  -- CR 205.2a / 205.2b: the same largest-group reading over card types, where an
+  -- artifact creature joins both groups. 0 over an empty set.
+  Aggregation.MostSharingACardType ->
+    let tally = Map.fromListWith (+) [(cardType, 1 :: Integer) | (_, view) <- members, cardType <- Set.toList (Filter.cardTypes view)]
+     in Just (Foldable.foldl' max 0 tally)
   -- Undeterminable in both directions. A member whose quantity cannot be
   -- determined makes the whole maximum undeterminable rather than being dropped, which
   -- would report the maximum of a set the card never named; and an EMPTY

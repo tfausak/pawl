@@ -736,6 +736,7 @@ effectObjectRefs effect = case effect of
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.PayAnyEnergy {} -> []
+  Effect.ChooseNumber {} -> []
   Effect.Tap ref -> [ref]
   Effect.Untap ref -> [ref]
   Effect.Detain ref -> [ref]
@@ -837,6 +838,7 @@ effectObjectRefs effect = case effect of
   -- CR 608.2f's set, swept once; the body's own refs are the caller's recursion.
   Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> [ref]
   Effect.ForEachNumber {} -> []
+  Effect.Repeat {} -> []
   Effect.Heal ref -> [ref]
 
 -- Every PlayerRef this ONE effect holds in a field of its own: not the ones
@@ -933,6 +935,7 @@ effectPlayerRefs effect = case effect of
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ _) -> [ref]
   Effect.PayAnyEnergy {} -> []
+  Effect.ChooseNumber {} -> []
   Effect.Tap {} -> []
   Effect.Untap {} -> []
   Effect.Detain {} -> []
@@ -1028,6 +1031,7 @@ effectPlayerRefs effect = case effect of
   Effect.MakeWarped {} -> []
   Effect.ForEach {} -> []
   Effect.ForEachNumber {} -> []
+  Effect.Repeat {} -> []
   Effect.Heal {} -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
@@ -1300,6 +1304,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantitySlots quantity
   -- The SlotName is a DEFINITION, not a read; it belongs to boundSlots below.
   Effect.PayAnyEnergy _ -> Map.empty
+  Effect.ChooseNumber _ -> Map.empty
   Effect.Tap _ -> Map.empty
   Effect.Untap _ -> Map.empty
   Effect.Detain _ -> Map.empty
@@ -1413,6 +1418,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- rider's reserved slot is: boundSlots below defines it.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> joinSlots (fmap slotsOf (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> joinTwo (quantitySlots upTo) (joinSlots (fmap slotsOf (Foldable.toList body)))
+  Effect.Repeat body -> joinSlots (fmap slotsOf (Foldable.toList body))
   Effect.Heal _ -> Map.empty
 
 -- Every PlayerRef nested in a Duration: the seat CR 611.2a's window is counted
@@ -1926,6 +1932,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.PayAnyEnergy _ -> True
+  Effect.ChooseNumber _ -> True
   Effect.Tap _ -> True
   Effect.Untap _ -> True
   Effect.Detain _ -> True
@@ -2017,6 +2024,7 @@ ownSlotsAreExhaustive effect = case effect of
   -- nested in the DEPTH is one slotsOf cannot see.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> all slotsAreExhaustive body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.slotsAreExhaustive upTo && all slotsAreExhaustive body
+  Effect.Repeat body -> all slotsAreExhaustive body
   Effect.Heal _ -> True
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
@@ -2169,6 +2177,7 @@ readsX =
         -- CR 107.14's amount is asked for as the spell resolves, never CR
         -- 601.2b's announced X.
         Effect.PayAnyEnergy _ -> False
+        Effect.ChooseNumber _ -> False
         Effect.Tap _ -> False
         Effect.Untap _ -> False
         Effect.Detain _ -> False
@@ -2240,6 +2249,7 @@ readsX =
         -- CR 608.2f's body is an effect list like any other, so an X inside it counts.
         Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> readsX (Foldable.toList body)
         Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.readsX upTo || readsX (Foldable.toList body)
+        Effect.Repeat body -> readsX (Foldable.toList body)
         Effect.Heal _ -> False
    in any effectReadsX
 
@@ -2410,6 +2420,7 @@ boundSlots effect = case effect of
   -- CR 107.14: how much {E} the payer paid, for a later effect of the same
   -- resolution to read as Quantity.InSlot.
   Effect.PayAnyEnergy slot -> Set.singleton slot
+  Effect.ChooseNumber slot -> Set.singleton slot
   Effect.Tap _ -> Set.empty
   Effect.Untap _ -> Set.empty
   Effect.Detain _ -> Set.empty
@@ -2474,6 +2485,7 @@ boundSlots effect = case effect of
   -- (Pawl.Engine.Resolve.Effect's arm).
   Effect.ForEach (ForEach.MkForEach _ _ slot body _) -> Set.insert slot (foldMap boundSlots body)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ slot body) -> Set.insert slot (foldMap boundSlots body)
+  Effect.Repeat body -> foldMap boundSlots body
   Effect.Heal _ -> Set.empty
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take

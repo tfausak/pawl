@@ -1,6 +1,7 @@
 module Pawl.Types.Effect where
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Sequence as Seq
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Amass as Amass
@@ -417,6 +418,10 @@ data Effect card ability
     -- Pawl.VariableEffectSpec's "CR 118.12 paying nothing declines the offer" is
     -- what proves paying zero does not take a gate hung off this opcode.
     PayAnyEnergy SlotName.SlotName
+  | -- | CR 107.1c / 608.2d: the resolving controller chooses any number, zero
+    -- included, bound to this SlotName for a later effect to read -- Rites of
+    -- Initiation's "discard any number of cards at random".
+    ChooseNumber SlotName.SlotName
   | -- | CR 701.26a: tap the permanents the ObjectRef names, leaving an already
     -- tapped one alone.
     Tap ObjectRef.ObjectRef
@@ -826,6 +831,10 @@ data Effect card ability
   | -- | CR 608.2f: run the body once for each number from 1 up to the payload's
     -- quantity, that number bound under the payload's slot.
     ForEachNumber (ForEachNumber.ForEachNumber (Effect card ability))
+  | -- | CR 608.2d: run the body, then ask the resolving controller whether to
+    -- run it again, until they decline -- Kindle the Carnage's "you may repeat
+    -- this process any number of times".
+    Repeat (Seq.Seq (Effect card ability))
   | -- | CR 701.69a: remove all marked damage from the permanents the ObjectRef
     -- names.
     Heal ObjectRef.ObjectRef

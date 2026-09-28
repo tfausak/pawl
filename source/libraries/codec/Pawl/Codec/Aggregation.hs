@@ -23,6 +23,7 @@ codec quantityCodec =
       Arm.nullary "DistinctCardTypes" Aggregation.DistinctCardTypes,
       Arm.nullary "DistinctColors" Aggregation.DistinctColors,
       Arm.nullary "MostSharingACreatureType" Aggregation.MostSharingACreatureType,
+      Arm.nullary "MostSharingACardType" Aggregation.MostSharingACardType,
       Arm.payload "Greatest" quantityCodec Aggregation.Greatest (\x -> case x of Aggregation.Greatest y -> Just y; _ -> Nothing),
       Arm.payload "Total" quantityCodec Aggregation.Total (\x -> case x of Aggregation.Total y -> Just y; _ -> Nothing)
     ]
@@ -33,5 +34,6 @@ tagOf x = case x of
   Aggregation.DistinctCardTypes {} -> "DistinctCardTypes"
   Aggregation.DistinctColors {} -> "DistinctColors"
   Aggregation.MostSharingACreatureType {} -> "MostSharingACreatureType"
+  Aggregation.MostSharingACardType {} -> "MostSharingACardType"
   Aggregation.Greatest {} -> "Greatest"
   Aggregation.Total {} -> "Total"

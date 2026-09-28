@@ -3244,11 +3244,141 @@ anyNumberDiscardSpec s registry =
           Spec.assertEqWith s "both creature cards discarded" (namesIn Zone.Graveyard S.alice after) (replicate 2 (Just (S.printingName piker)))
           Spec.assertEqWith s "the land kept" (namesIn Zone.Hand S.alice after) [Just (S.printingName mountain)]
 
+-- Random discards that need more than the discard itself, and a repeat loop.
+-- Checked against api.scryfall.com, 2026-09-28:
+--
+-- Rowdy Crew {2}{R}{R} Creature -- Human Pirate 3/3, trample -- "When this
+-- creature enters, draw three cards, then discard two cards at random. If two
+-- cards that share a card type are discarded this way, put two +1/+1 counters on
+-- this creature."
+--
+-- Rites of Initiation {R} Instant -- "Discard any number of cards at random.
+-- Creatures you control get +1/+0 until end of turn for each card discarded this
+-- way."
+--
+-- Kindle the Carnage {1}{R}{R} Sorcery -- "Discard a card at random. If you do,
+-- Kindle the Carnage deals damage equal to that card's mana value to each
+-- creature. You may repeat this process any number of times."
+randomDiscardProcessSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+randomDiscardProcessSpec s registry = Spec.describe s "CR 701.9b random discards that share, announce or repeat" $ do
+  let named = Just . CardName.MkCardName . Text.pack
+      onBattlefieldNamed name gs = List.find (\oid -> fmap S.nameOf (Game.cardOf oid gs) == named name) (Set.toList (GameState.battlefield gs))
+      plusCounters oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- Rowdy Crew cast off four Mountains, alice's library exactly the three
+      -- cards it draws, so her hand holds those three and nothing else when the
+      -- random discard picks two. Answered through its trigger.
+      crew drawn = do
+        mountain <- S.printingOf s registry "Mountain"
+        crewCard <- S.printingOf s registry "Rowdy Crew"
+        drawnCards <- traverse (S.printingOf s registry) drawn
+        let lands = S.landsFor mountain S.alice 4 S.threePlayerGame
+            (withCrew, crewId) = S.handOne crewCard lands
+            stocked = List.foldl' (\gs p -> snd (S.addLibraryCard p S.alice gs)) withCrew drawnCards
+            cast = S.runPure S.identityAnswer stocked (S.cast S.alice crewId)
+            onStack = S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+        pure (onStack, S.runPure S.identityAnswer onStack Stack.resolveTop)
+  -- Three creature cards: whichever two randomness takes share a card type.
+  Spec.it s "CR 205.2a Rowdy Crew gets two counters when the two cards discarded share a card type" $ do
+    (onStack, after) <- crew ["Goblin Piker", "Hill Giant", "Llanowar Elves"]
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the enters trigger really reached the stack"
+    Spec.assertEqWith s "two +1/+1 counters on the Crew" (onBattlefieldNamed "Rowdy Crew" after >>= \oid -> plusCounters oid after) (Just 2)
+    Spec.assertEqWith s "two cards discarded, one kept" (length (namesIn Zone.Graveyard S.alice after), S.handSize S.alice after) (2, 1)
+  -- The same board with a land, an instant and a creature: no two share a card
+  -- type, whichever two are taken, though the two taken span two card TYPES.
+  Spec.it s "CR 205.2a Rowdy Crew gets no counters when no two cards discarded share a card type" $ do
+    (onStack, after) <- crew ["Mountain", "Lightning Bolt", "Goblin Piker"]
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the enters trigger really reached the stack"
+    Spec.assertEqWith s "no counters on the Crew" (onBattlefieldNamed "Rowdy Crew" after >>= \oid -> plusCounters oid after) (Just 0)
+    Spec.assertEqWith s "two cards discarded, one kept" (length (namesIn Zone.Graveyard S.alice after), S.handSize S.alice after) (2, 1)
+  -- Rites of Initiation off one Mountain. alice holds three other cards and
+  -- controls a Goblin Piker (2/1); bob controls a Llanowar Elves (1/1), which
+  -- "creatures you control" must not reach.
+  let rites number = do
+        mountain <- S.printingOf s registry "Mountain"
+        ritesCard <- S.printingOf s registry "Rites of Initiation"
+        piker <- S.printingOf s registry "Goblin Piker"
+        elves <- S.printingOf s registry "Llanowar Elves"
+        held <- traverse (S.printingOf s registry) ["Hill Giant", "Lightning Bolt", "Mountain"]
+        let lands = S.landsFor mountain S.alice 1 S.threePlayerGame
+            (pikerId, withPiker) = S.addPermanent piker S.alice lands
+            (elvesId, withElves) = S.addPermanent elves S.bob withPiker
+            (withRites, ritesId) = S.handOne ritesCard withElves
+            stocked = List.foldl' (\gs p -> snd (S.addHandCard p S.alice gs)) withRites held
+            named_ :: Natural
+            named_ = number
+            answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              Prompt.ChooseNumber {} -> named_
+              _ -> S.identityAnswer p
+            cast = S.runPure answer stocked (S.cast S.alice ritesId)
+            ((_, after), transcript) = Replay.record answer cast Stack.resolveTop
+            numbers = filter (\r -> case r of Response.ChoseNumber _ -> True; _ -> False) transcript
+        pure (fmap fst (S.powerToughnessOf pikerId after), fmap fst (S.powerToughnessOf elvesId after), S.handSize S.alice after, numbers)
+  Spec.it s "CR 107.1c Rites of Initiation discards the two cards alice names and pumps her creature by two" $ do
+    (pikerPower, elvesPower, handLeft, numbers) <- rites 2
+    Spec.assertEqWith s "the Piker gets +2/+0" pikerPower (Just 4)
+    Spec.assertEqWith s "one card left in alice's hand" handLeft 1
+    Spec.assertEqWith s "bob's Elves are untouched" elvesPower (Just 1)
+    Spec.assertEqWith s "CR 608.2d alice named the number" numbers [Response.ChoseNumber 2]
+  -- Five named, three held: CR 609.3 discards the three, and the bonus counts
+  -- the cards discarded rather than the number named.
+  Spec.it s "CR 609.3 Rites of Initiation counts the cards discarded, not the number named" $ do
+    (pikerPower, _, handLeft, _) <- rites 5
+    Spec.assertEqWith s "the Piker gets +3/+0" pikerPower (Just 5)
+    Spec.assertEqWith s "alice's hand is empty" handLeft 0
+  Spec.it s "CR 107.1c Rites of Initiation with zero named discards nothing" $ do
+    (pikerPower, _, handLeft, _) <- rites 0
+    Spec.assertEqWith s "the Piker is unchanged" pikerPower (Just 2)
+    Spec.assertEqWith s "alice keeps all three cards" handLeft 3
+  -- Kindle the Carnage off three Mountains. alice holds a Goblin Piker (mana
+  -- value 2) and a Hill Giant (4), and randomness takes the first card it is
+  -- offered, the Piker; bob controls a Platinum Emperion (8/8), which survives all of it.
+  -- `runs` is how many times alice runs the process before declining.
+  let kindle runs = do
+        mountain <- S.printingOf s registry "Mountain"
+        kindleCard <- S.printingOf s registry "Kindle the Carnage"
+        emperion <- S.printingOf s registry "Platinum Emperion"
+        held <- traverse (S.printingOf s registry) ["Hill Giant", "Goblin Piker"]
+        let lands = S.landsFor mountain S.alice 3 S.threePlayerGame
+            (emperionId, withEmperion) = S.addPermanent emperion S.bob lands
+            (withKindle, kindleId) = S.handOne kindleCard withEmperion
+            stocked = List.foldl' (\gs p -> snd (S.addHandCard p S.alice gs)) withKindle held
+            -- Pinned by the run count the prompt carries, so each ask is told
+            -- apart.
+            limit :: Natural
+            limit = runs
+            answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              Prompt.ChooseRepeat _ _ _ done -> if done < limit then OptionalDecision.Exercises else OptionalDecision.Declines
+              _ -> S.identityAnswer p
+            cast = S.runPure answer stocked (S.cast S.alice kindleId)
+            ((_, after), transcript) = Replay.record answer cast Stack.resolveTop
+            repeats = filter (\r -> case r of Response.ChoseRepeat _ -> True; _ -> False) transcript
+        pure (S.damageOf emperionId after, S.handSize S.alice after, length repeats)
+  Spec.it s "CR 608.2d Kindle the Carnage run once deals the one discarded card's mana value" $ do
+    (damage, handLeft, asked) <- kindle 1
+    Spec.assertEqWith s "the Emperion took the Piker's 2" damage (Just 2)
+    Spec.assertEqWith s "the Hill Giant stays in alice's hand" handLeft 1
+    Spec.assertEqWith s "alice was asked once" asked 1
+  Spec.it s "CR 608.2d Kindle the Carnage repeated deals each discarded card's mana value" $ do
+    (damage, handLeft, asked) <- kindle 2
+    Spec.assertEqWith s "the Emperion took 2 then 4" damage (Just 6)
+    Spec.assertEqWith s "alice's hand is empty" handLeft 0
+    Spec.assertEqWith s "alice was asked after each run" asked 2
+  -- A third run finds an empty hand: it discards nothing, so it deals nothing,
+  -- rather than the Hill Giant's 4 again.
+  Spec.it s "CR 608.2d a Kindle the Carnage run over an empty hand deals nothing" $ do
+    (damage, handLeft, asked) <- kindle 3
+    Spec.assertEqWith s "the Emperion took only 2 then 4" damage (Just 6)
+    Spec.assertEqWith s "alice's hand is empty" handLeft 0
+    Spec.assertEqWith s "alice was asked after each of three runs" asked 3
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
   discardExceptionsSpec s registry
   discardedThisWaySpec s registry
+  randomDiscardProcessSpec s registry
   anyNumberDiscardSpec s registry
   elkinLairSpec s registry
   castTheCardSpec s registry

@@ -331,6 +331,21 @@ combatReplaySpec s =
           Monad.forM_ [OptionalDecision.Declines, OptionalDecision.Exercises] $ \decision ->
             Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p decision)) (Just decision)
           Spec.assertEqWith s "a printed may is not an answer to it" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        -- CR 608.2d: a repeat's "may" has the same payload as riot's, so its own
+        -- constructor keeps one from replaying as the other; a short transcript
+        -- stops the loop.
+        Spec.it s "ChooseRepeat records and replays an OptionalDecision, and rejects riot's" $ do
+          let p = Prompt.ChooseRepeat decider S.alice oid 1
+          Monad.forM_ [OptionalDecision.Declines, OptionalDecision.Exercises] $ \decision ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p decision)) (Just decision)
+          Spec.assertEqWith s "a riot answer is not an answer to it" (Replay.decode p (Response.ChoseRiot OptionalDecision.Exercises)) Nothing
+          Spec.assertEqWith s "a short transcript stops" (Replay.defaultAnswer p) OptionalDecision.Declines
+        -- CR 107.1c: any number, zero included, and not a paid-energy answer.
+        Spec.it s "ChooseNumber records and replays a Natural, and rejects a paid-energy answer" $ do
+          let p = Prompt.ChooseNumber decider S.alice oid
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 7)) (Just (7 :: Natural.Natural))
+          Spec.assertEqWith s "a paid-energy answer is not an answer to it" (Replay.decode p (Response.ChosePaidEnergy 7)) Nothing
+          Spec.assertEqWith s "a short transcript names zero" (Replay.defaultAnswer p) 0
         -- CR 702.136a: a transcript that runs short takes the half that puts no
         -- counter on the board.
         Spec.it s "defaultAnswer declines riot's counter" $
