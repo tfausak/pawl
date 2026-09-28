@@ -31,7 +31,8 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 -- (Pawl.Types.TargetSlot's `amount`), so every other slot in the corpus renders
 -- unchanged. The chooser key is omitted on the same terms: CR 115.1's default is
 -- the ability's controller, which every slot but Cuombajj Witches' second takes.
--- The perPlayer key likewise: only CR 601.2c's "for each opponent" slots name one.
+-- The perPlayer key likewise: only CR 601.2c's "for each opponent" and "for each
+-- player" slots name one.
 codec :: Codec.Codec TargetSlot.TargetSlot
 codec = Fields.object $ do
   pool <- Fields.required "pool" Pool.codec TargetSlot.pool
