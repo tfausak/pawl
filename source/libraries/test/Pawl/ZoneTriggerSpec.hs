@@ -2858,6 +2858,7 @@ representativeEvents cond =
         -- is what keeps this pin honest: an arm matching a scry here would claim
         -- the floor for the wrong keyword action.
         TriggerCondition.PlayerSurveils _ -> one (GameEvent.Surveiled S.bob)
+        TriggerCondition.PlayerProliferates _ -> one (GameEvent.Proliferated S.bob)
         TriggerCondition.PlayerRollsDice _ -> one (GameEvent.DiceRolled S.bob)
         -- CR 706.2's per-die event, carrying the number the condition states.
         TriggerCondition.PlayerRollsResult watched -> one (GameEvent.DieResultSettled DieResult.MkDieResult {DieResult.roller = S.bob, DieResult.result = DieResult.result watched})
@@ -3123,6 +3124,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerScries PlayerRelation.Opponent,
     TriggerCondition.PlayerSurveils PlayerRelation.You,
     TriggerCondition.PlayerSurveils PlayerRelation.Opponent,
+    TriggerCondition.PlayerProliferates PlayerRelation.You,
+    TriggerCondition.PlayerProliferates PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsDice PlayerRelation.You,
     TriggerCondition.PlayerRollsDice PlayerRelation.Opponent,
     TriggerCondition.PlayerRollsResult DieResult.MkDieResult {DieResult.roller = PlayerRelation.You, DieResult.result = 6},

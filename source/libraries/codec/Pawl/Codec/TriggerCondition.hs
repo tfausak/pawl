@@ -165,6 +165,7 @@ codec =
           -- CR 309.7's "whenever you complete a dungeon", PlayerScries' shape above.
           Arm.payload "PlayerCompletesDungeon" PlayerRelation.codec TriggerCondition.PlayerCompletesDungeon (\x -> case x of TriggerCondition.PlayerCompletesDungeon y -> Just y; _ -> Nothing),
           Arm.payload "PlayerSurveils" PlayerRelation.codec TriggerCondition.PlayerSurveils (\x -> case x of TriggerCondition.PlayerSurveils y -> Just y; _ -> Nothing),
+          Arm.payload "PlayerProliferates" PlayerRelation.codec TriggerCondition.PlayerProliferates (\x -> case x of TriggerCondition.PlayerProliferates y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsDice" PlayerRelation.codec TriggerCondition.PlayerRollsDice (\x -> case x of TriggerCondition.PlayerRollsDice y -> Just y; _ -> Nothing),
           Arm.payload "PlayerRollsResult" (DieResult.codec PlayerRelation.codec) TriggerCondition.PlayerRollsResult (\x -> case x of TriggerCondition.PlayerRollsResult y -> Just y; _ -> Nothing),
           Arm.nullary "Visit" TriggerCondition.Visit,
@@ -320,6 +321,7 @@ tagOf x = case x of
   TriggerCondition.PlayerScries {} -> "PlayerScries"
   TriggerCondition.PlayerCompletesDungeon {} -> "PlayerCompletesDungeon"
   TriggerCondition.PlayerSurveils {} -> "PlayerSurveils"
+  TriggerCondition.PlayerProliferates {} -> "PlayerProliferates"
   TriggerCondition.PlayerRollsDice {} -> "PlayerRollsDice"
   TriggerCondition.PlayerRollsResult {} -> "PlayerRollsResult"
   TriggerCondition.Visit {} -> "Visit"
