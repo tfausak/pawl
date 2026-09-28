@@ -442,7 +442,7 @@ data Face card = MkFace
     -- Pawl.Types.ProjectedCharacteristics: CR 707.2 names rules text among the
     -- copiable values, so a copy answers with the copied face's list and a merged
     -- permanent with every component's (CR 702.140e). The gatherers read it
-    -- through Pawl.Engine.Projection.View.ruleAbilitiesOf rather than off a face.
+    -- through Pawl.Engine.Projection.ruleAbilitiesOf rather than off a face.
     blockRequirements :: [BlockRequirement.BlockRequirement],
     -- | CR 604.1/604.2 / 509.1a: this face's printed BLOCKING PERMISSIONS --
     -- "this creature can block an additional creature each combat" (Foriysian
@@ -607,7 +607,7 @@ data Face card = MkFace
     -- functions in the HAND (CR 113.6), where
     -- Pawl.Engine.Action.discardableCards takes the printed card
     -- (#1859). CR 116.2d's is read off the copiable snapshot
-    -- (Pawl.Engine.Projection.View.specialActionsOf), since a permanent that is
+    -- (Pawl.Engine.Projection.specialActionsOf), since a permanent that is
     -- a copy grants what it copied (CR 707.2a).
     --
     -- A LIST rather than a flag, matching every neighbouring permission field:

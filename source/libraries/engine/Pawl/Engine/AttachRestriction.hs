@@ -147,7 +147,7 @@ barredBy mint pcs subject host gs =
         restrictions ->
           (null setEffs || Projection.liveAfterLayers setEffs source gs)
             && not (removed source)
-            && any (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
+            && any (fromRestriction source (Projection.readerTextChanges source gs)) restrictions
       fromRestriction source changes restriction =
         let affected = AttachRestriction.affected restriction
             attachers = AttachRestriction.attachers restriction

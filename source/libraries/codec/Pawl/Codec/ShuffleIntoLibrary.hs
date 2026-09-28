@@ -19,9 +19,9 @@ import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 codec :: Codec.Codec ShuffleIntoLibrary.ShuffleIntoLibrary
 codec = Fields.object $ do
   library <- Fields.defaulted "library" Nothing (Common.maybe PlayerRef.codec) ShuffleIntoLibrary.library
-  ref <- Fields.required "ref" ObjectRef.codec ShuffleIntoLibrary.ref
+  refs <- Fields.required "refs" (Common.nonEmpty ObjectRef.codec) ShuffleIntoLibrary.refs
   pure
     ShuffleIntoLibrary.MkShuffleIntoLibrary
       { ShuffleIntoLibrary.library = library,
-        ShuffleIntoLibrary.ref = ref
+        ShuffleIntoLibrary.refs = refs
       }

@@ -24,7 +24,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import Pawl.Engine.Projection.Rewrite (Modification, rewriteActivatedAbility, rewriteAffected, rewriteCharacteristicPT, rewriteCondition, rewriteModification, rewritePlayerStaticAbility, rewritePrintedReplacement, rewriteRuleAbilities, rewriteStaticAbility, rewriteTriggeredAbility)
-import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableSnapshotOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
+import Pawl.Engine.Projection.View (ControlGrant, abilitiesFromCharacteristics, abilitySources, baseCharacteristics, controlGrants, controllerOf, controllerOfGiven, copiableCharacteristics, copiableRuleAbilitiesOf, copiableSnapshotOf, copiableSpecialActionsOf, countersOf, definesColorless, definesEveryCreatureType, enchantedPlayerOf, functionsFromZone, grantedStaticAbilitiesOf, hostOf, inSourceRangeGiven, lastKnownView, staticAbilitiesOf, staticTimestampOf, viewOfCard, viewOfCharacteristics, withAnnouncedX)
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -88,6 +88,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
 import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
+import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
@@ -694,10 +695,11 @@ exchangePartner oid a = case a of
 -- (CR 612.5), and the ones this object's own text took go with that text.
 -- textChangesAffecting reads the list back for the gather.
 --
--- The four ability lists no layer writes move here too, though nothing reads
--- them off the projection: each is gathered from the copiable characteristics
--- of Pawl.Engine.Projection.View.textBoxHolderOf, which answers the same
--- exchange from the stored effects, so the record agrees with the gather.
+-- The four ability lists no other layer writes move here too, though an
+-- exchange's are not read off the projection: each is gathered from the
+-- copiable characteristics of Pawl.Engine.Projection.View.textBoxHolderOf,
+-- which answers the same exchange from the stored effects, so the record agrees
+-- with the gather.
 exchangeTextBoxFrom :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
 exchangeTextBoxFrom from pc =
   pc
@@ -724,9 +726,10 @@ exchangeTextBoxFrom from pc =
 -- loyalty and defense boxes. A mana cost the card does not have is kept, per the
 -- card's ruling that an undefined characteristic is not acquired.
 --
--- Not implemented: the static abilities, player abilities, special actions and
--- rule-affecting abilities of the card whose full text an object has, which are
--- gathered off the object's own copiable values rather than this fold (#4307).
+-- The four ability lists exchangeTextBoxFrom moves are the card's too, and
+-- PC.hasFullText marks them as this record's: nothing gathers them off the
+-- copiable values, so withStaticGrants gathers the static abilities off this
+-- record and fullTextOf hands the other three to their readers.
 fullTextFrom :: ProjectedCharacteristics -> ProjectedCharacteristics -> ProjectedCharacteristics
 fullTextFrom from pc =
   (exchangeTextBoxFrom from pc)
@@ -741,11 +744,45 @@ fullTextFrom from pc =
       PC.toughness = PC.toughness from,
       PC.loyalty = PC.loyalty from,
       PC.defense = PC.defense from,
-      PC.staticAbilities = PC.staticAbilities pc,
-      PC.playerAbilities = PC.playerAbilities pc,
-      PC.specialActions = PC.specialActions pc,
-      PC.ruleAbilities = PC.ruleAbilities pc
+      PC.hasFullText = True
     }
+
+-- CR 612.6: the finished projection of an object whose text a full-text effect
+-- replaced, which is where the three lists read after the layers (CR 613.10,
+-- 613.11 and 116.2) are the card's it read -- Nothing for every other object,
+-- whose lists are its copiable values'. Projected only for an object whose own
+-- static ability can give it full text: CR 612.6 names the one card that does,
+-- Volrath's Shapeshifter, and it gives it to itself.
+fullTextOf :: ObjectId -> GameState -> Maybe ProjectedCharacteristics
+fullTextOf oid gs =
+  let givesFullText m = case m of
+        Modification.HasFullText _ -> True
+        _ -> False
+   in if any (any givesFullText . StaticAbility.modifications) (staticAbilitiesOf oid gs)
+        then let pc = project oid gs in if PC.hasFullText pc then Just pc else Nothing
+        else Nothing
+
+-- CR 613.11: the rule-affecting abilities the object's rules text gives it --
+-- the copiable values' (View.copiableRuleAbilitiesOf), or CR 612.6's card's.
+-- Pawl.ProjectionSpec's "CR 612.6 the Shapeshifter as Silent Arbiter bounds the
+-- attack" proves the second.
+ruleAbilitiesOf :: ObjectId -> GameState -> RuleAbilities.RuleAbilities
+ruleAbilitiesOf oid gs = maybe (copiableRuleAbilitiesOf oid gs) PC.ruleAbilities (fullTextOf oid gs)
+
+-- CR 116.2: ruleAbilitiesOf's shape for special actions. Pawl.ProjectionSpec's
+-- "CR 612.6 the Shapeshifter as Leonin Arbiter offers its {2}" proves the
+-- full-text read.
+specialActionsOf :: ObjectId -> GameState -> [SpecialAction.SpecialAction]
+specialActionsOf oid gs = maybe (copiableSpecialActionsOf oid gs) PC.specialActions (fullTextOf oid gs)
+
+-- CR 612.1: the word swaps a reader outside the fold applies to what
+-- ruleAbilitiesOf, specialActionsOf or PlayerEffect.playerAbilitiesOf handed
+-- it -- none for CR 612.6's full text, whose lists the fold has already
+-- rewritten in CR 613.7 order, and textChangesAffecting's for the copiable
+-- lists, which no fold touched. Pawl.ProjectionSpec's "CR 612.6 two Hacks
+-- rewrite the Shapeshifter's Glacial Crasher gate once" proves the first.
+readerTextChanges :: ObjectId -> GameState -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
+readerTextChanges oid gs = if Maybe.isJust (fullTextOf oid gs) then [] else textChangesAffecting oid gs
 
 -- CR 305.7's strip, shared by both modifications that set a land's subtype. It
 -- does the subtype and ability clauses; the new basic type's mana ability rides
@@ -1891,6 +1928,10 @@ carriesCondition :: StaticAbility.StaticAbility (GrantedAbility.GrantedAbility c
 carriesCondition sa =
   let grantsConditional m = case m of
         Modification.GainAbility (GrantedAbility.Static inner) -> carriesCondition inner
+        -- CR 612.6: the top card's static abilities are gathered too, and any
+        -- of them may carry a clause. A regression fence: Volrath's
+        -- Shapeshifter's own ability is conditional, so the gate is on anyway.
+        Modification.HasFullText _ -> True
         _ -> False
    in Maybe.isJust (StaticAbility.condition sa) || any grantsConditional (StaticAbility.modifications sa)
 
@@ -2146,7 +2187,7 @@ gatherGiven stripped functioning seed gs =
       bestows = bestowGathered gs
       castGrants = castGrantGathered gs
       encodings = encodedGathered gs
-   in withStaticGrants functioning gs (stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants <> encodings)
+   in withStaticGrants stripped setStripped functioning gs (stored <> static <> inCommand <> spells <> graveyards <> hands <> libraries <> exiles <> counters <> designations <> bestows <> castGrants <> encodings)
 
 -- CR 613.1f / 113.7: `base` with the effects of the static abilities that other
 -- static abilities grant appended -- Rune of Flight's "Equipped creature has
@@ -2176,13 +2217,27 @@ gatherGiven stripped functioning seed gs =
 -- Pawl.ProjectionSpec's StaticGrantedStatic group proves the grant and its
 -- timestamp through Rune of Flight and Armed with Proof, and the receiver's
 -- "you" through Sedge Sliver.
-withStaticGrants :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered] -> [Gathered]
-withStaticGrants functioning gs base =
-  if any grantsStatic base then settle staticGrantRounds (receivedGiven base) else base
+--
+-- CR 612.6 is read back the same way: a full-text effect writes the top card's
+-- static abilities into the receiver's record (fullTextFrom), which only the
+-- fold can answer, since the static ability generating it carries a condition
+-- the fold judges. They are the receiver's rules text rather than a grant, so
+-- they take its own timestamp (CR 613.7a), go before its granted ones in the
+-- index, and answer to CR 613.1f's and CR 305.7's removals as a printed ability
+-- does (permanentParts) -- a regression fence, since Lord of Atlantis's
+-- ability starts applying in layer 6, which neither removal reaches. The fold
+-- has already applied CR 612.1's word swaps to them, so none is applied here. The generating ability itself goes on being
+-- gathered off the copiable values though its text is gone, which is CR 613.6.
+-- Pawl.ProjectionSpec's "CR 612.6 the Shapeshifter as Lord of Atlantis pumps
+-- the other Merfolk" proves it.
+withStaticGrants :: ((Gathered -> Bool) -> ObjectId -> Bool) -> (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered] -> [Gathered]
+withStaticGrants stripped setStripped functioning gs base =
+  if any readsBack base then settle staticGrantRounds (receivedGiven base) else base
   where
     -- A stored grant's set is fixed (CR 611.2c), and permanentParts has
     -- already gathered its effect through View.grantedStaticAbilitiesOf.
-    grantsStatic c = case (gModification c, gAffected c) of
+    readsBack c = case (gModification c, gAffected c) of
+      (Modification.HasFullText _, _) -> True
       (_, Affected.TheseObjects _) -> False
       (Modification.GainAbility (GrantedAbility.Static _), _) -> True
       _ -> False
@@ -2192,20 +2247,32 @@ withStaticGrants functioning gs base =
           -- battlefield unless it states otherwise, and every such grant in
           -- data/cards/ reaches permanents, so the battlefield bounds the
           -- candidates.
-          reachable = Set.intersection (GameState.battlefield gs) (foldMap (\c -> candidatesFor (gAffected c) gs) (filter grantsStatic cands))
-       in Map.filter (not . null) (Map.fromSet (\oid -> PC.grantedStaticAbilities (forObject oid gs)) reachable)
+          reachable = Set.intersection (GameState.battlefield gs) (foldMap (\c -> candidatesFor (gAffected c) gs) (filter readsBack cands))
+          -- CR 702.161a: a keyword the full text brought mints its static
+          -- ability as staticAbilitiesOf mints a printed one, off the keywords
+          -- as layer 3 left them.
+          record pc =
+            ( if PC.hasFullText pc then PC.staticAbilities pc <> Keyword.mintedStaticAbilitiesOf (Map.keysSet (PC.textChangedKeywords pc)) else [],
+              PC.grantedStaticAbilities pc
+            )
+       in Map.filter (\(text, granted) -> not (null text && null granted)) (Map.fromSet (\oid -> record (forObject oid gs)) reachable)
     partsOf received = concatMap (uncurry partsFor) (Map.toList received)
     -- Indexed after the printed and the stored-grant lists permanentParts
     -- indexes, so CR 613.6's decision memo key names one ability.
-    partsFor oid abilities = case Game.lookupObject oid gs of
+    partsFor oid (text, abilities) = case Game.lookupObject oid gs of
       Nothing -> []
       Just obj ->
         let offset = List.genericLength (staticAbilitiesOf oid gs) + List.genericLength (grantedStaticAbilitiesOf oid gs) :: Natural
+            removed lowest = (lowest > Layer.Ability && stripped (const True) oid) || (lowest > Layer.Type && setStripped oid)
+            fromText n sa =
+              if functionsFromZone Zone.Battlefield sa
+                then gatherStatic (functioning oid) oid (staticTimestampOf oid obj gs) [] removed n sa
+                else []
             one n (stamp, sa) =
               if functionsFromZone Zone.Battlefield sa
                 then gatherStatic (functioning oid) oid (max (Object.timestamp obj) stamp) [] (const False) n sa
                 else []
-         in concat (zipWith one [offset ..] abilities)
+         in concat (zipWith fromText [offset ..] text) <> concat (zipWith one [offset + List.genericLength text ..] abilities)
     settle rounds received =
       let granted = partsOf received
           cands = base <> granted
@@ -5436,7 +5503,10 @@ grantsMintingType m = case m of
   Modification.ExchangeTextBoxes -> False
   Modification.AddNamesMatching _ -> False
   -- Writes whatever type line the top card prints, which this function cannot
-  -- see; True, since a wrong True costs only a projection.
+  -- see; True, since a wrong True costs only a projection. It is also what
+  -- opens replacementsAffecting's gate to the top card's replacement effects,
+  -- which Pawl.ProjectionSpec's "CR 612.6 the Shapeshifter as Anafenza exiles
+  -- bob's dying creature" proves.
   Modification.HasFullText _ -> True
   -- Neither marker writes a card type or subtype.
   Modification.AssignCombatDamageWithToughness -> False

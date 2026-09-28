@@ -71,6 +71,7 @@ codec = Fields.object $ do
   castingPermissions <- Fields.defaulted "castingPermissions" [] (Common.list CastingPermission.codec) PC.castingPermissions
   ruleAbilities <- Fields.defaulted "ruleAbilities" mempty RuleAbilities.codec PC.ruleAbilities
   lostAllAbilities <- Fields.defaulted "lostAllAbilities" False Common.boolean PC.lostAllAbilities
+  hasFullText <- Fields.defaulted "hasFullText" False Common.boolean PC.hasFullText
   subtypeWordChanges <- Fields.defaulted "subtypeWordChanges" [] (Common.list ChangeSubtypeWord.codec) PC.subtypeWordChanges
   textChangedKeywords <- Fields.defaulted "textChangedKeywords" Map.empty (Common.multiset Keyword.codec) PC.textChangedKeywords
   assignsCombatDamageWithToughness <- Fields.defaulted "assignsCombatDamageWithToughness" False Common.boolean PC.assignsCombatDamageWithToughness
@@ -112,6 +113,7 @@ codec = Fields.object $ do
         PC.castingPermissions = castingPermissions,
         PC.ruleAbilities = ruleAbilities,
         PC.lostAllAbilities = lostAllAbilities,
+        PC.hasFullText = hasFullText,
         PC.subtypeWordChanges = subtypeWordChanges,
         PC.textChangedKeywords = textChangedKeywords,
         PC.assignsCombatDamageWithToughness = assignsCombatDamageWithToughness,
