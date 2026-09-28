@@ -869,7 +869,7 @@ defaultAnswer p = case p of
   Prompt.ChooseMovedCounterOrNone {} -> Nothing
   -- CR 608.2d: the prompt is only raised with two or more matching cards in the
   -- named graveyards, and every one of them is a legal choice.
-  Prompt.ChooseCardInGraveyard _ _ _ candidates -> NonEmpty.head candidates
+  Prompt.ChooseCardInGraveyard _ _ _ candidates _ -> NonEmpty.head candidates
   -- CR 608.2d again: the prompt is only raised with two or more cards in the
   -- chooser's own hand, and every one of them is a legal choice.
   Prompt.ChooseCardInHand _ _ _ candidates -> NonEmpty.head candidates
@@ -1080,7 +1080,7 @@ defaultAnswer p = case p of
   -- CR 616.1: the bucket is non-empty when this is asked, so index 0 is legal.
   Prompt.ChooseReplacement {} -> 0
   -- The first `count` candidates, which the engine offers in ascending order.
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  Prompt.ChooseSacrifices _ _ _ candidates count _ -> Set.fromList (List.genericTake count candidates)
   -- CR 406.2: the first `count` candidates, the arm above's rule over the
   -- graveyard pool the engine offers in that zone's own order.
   Prompt.ChooseExilesFromGraveyard _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
@@ -1158,7 +1158,7 @@ defaultAnswer p = case p of
   -- Deliberate rather than arbitrary: Pawl.Engine.Script.declining routes every
   -- unattended game and Pawl.Support.identityAnswer most of the suite through
   -- this, so a Twiddle they never answer taps rather than untaps.
-  Prompt.ChooseClause _ _ _ _ branches -> NonEmpty.head branches
+  Prompt.ChooseClause _ _ _ _ branches _ -> NonEmpty.head branches
   -- CR 608.2g: declining an offered cast is always legal, and it leaves the card
   -- exactly where the resolving effect put it.
   Prompt.OfferedCast {} -> OptionalDecision.Declines

@@ -713,7 +713,7 @@ spitefulBoard place swamp giant piker spiteful pikers =
 spitefulAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 spitefulAnswer victim p = case p of
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((==) (Just victim) . Recipient.objectOf) offered) asked
-  Prompt.ChooseSacrifices _ _ _ offered _ ->
+  Prompt.ChooseSacrifices _ _ _ offered _ _ ->
     if List.elem victim offered
       then Set.singleton victim
       else Set.fromList (take 1 offered)

@@ -1117,7 +1117,7 @@ chooseDamageSourceOf src p = case p of
 payingGate :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 payingGate fodder p = case p of
   Prompt.ChooseToPay {} -> PaymentDecision.Pays
-  Prompt.ChooseSacrifices _ _ _ offered _ -> Set.fromList (filter (== fodder) offered)
+  Prompt.ChooseSacrifices _ _ _ offered _ _ -> Set.fromList (filter (== fodder) offered)
   _ -> S.identityAnswer p
 
 -- chooseDamageSourceOf with every target slot aimed at one PLAYER: aimAndChoose's

@@ -5443,7 +5443,7 @@ payComponent moment slots pid oid component = case component of
     chosen <-
       if Natural.length candidates <= n
         then pure (Set.fromList candidates)
-        else Game.choose (Prompt.ChooseSacrifices decider pid oid candidates n)
+        else Game.choose (Prompt.ChooseSacrifices decider pid oid candidates n Seq.empty)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Event.simultaneously (Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen))

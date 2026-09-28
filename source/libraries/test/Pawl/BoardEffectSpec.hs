@@ -201,7 +201,7 @@ exhumeSpec s registry =
               -- alice and carol take their second candidate and bob his last, so
               -- no one answer can stand in for another's.
               choosing p = case p of
-                Prompt.ChooseCardInGraveyard _ pid _ offered ->
+                Prompt.ChooseCardInGraveyard _ pid _ offered _ ->
                   if pid == S.bob then NonEmpty.last offered else secondOf offered
                 _ -> S.identityAnswer p
               (after, responses) = run choosing spell gs
@@ -227,6 +227,35 @@ exhumeSpec s registry =
               List.sort [named "Ogre Sentry", named "Benalish Cavalry", named "Day of Judgment"],
               List.sort [named "Benalish Hero", named "Forest"]
             )
+        -- CR 101.4b: a pair of casts differing only in alice's pick. bob takes his
+        -- LAST candidate when his prompt says alice took her Bird Maiden and his
+        -- first otherwise, so what comes back for him is what he was told.
+        Spec.it s "CR 101.4b a later player knows the cards the earlier players took" $ do
+          exhume <- S.printingOf s registry "Exhume"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(piker, S.alice), (maiden, S.alice), (sentry, S.bob), (wraith, S.bob), (hero, S.carol)]
+              (spell, gs) = board exhume swamp buried
+              maidens = filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == named "Bird Maiden") (Game.zoneMembers Zone.Graveyard S.alice gs)
+              choosing :: (NonEmpty.NonEmpty ObjectId.ObjectId -> ObjectId.ObjectId) -> Prompt.Prompt r -> r
+              choosing hers p = case p of
+                Prompt.ChooseCardInGraveyard _ pid _ offered earlier
+                  | pid == S.alice -> hers offered
+                  | pid == S.bob ->
+                      if any (\(who, oid) -> who == S.alice && elem oid maidens) earlier
+                        then NonEmpty.last offered
+                        else NonEmpty.head offered
+                _ -> S.identityAnswer p
+              bobs after = filter ((== Just S.bob) . snd) (arrivals after)
+              (toldMaiden, _) = run (choosing secondOf) spell gs
+              (toldPiker, _) = run (choosing NonEmpty.head) spell gs
+          Spec.assertEqWith s "CR 101.4b told alice took her Bird Maiden, bob took his last candidate" (bobs toldMaiden) [(named "Bog Wraith", Just S.bob)]
+          Spec.assertEqWith s "CR 101.4b told alice took her Goblin Piker, bob took his first" (bobs toldPiker) [(named "Ogre Sentry", Just S.bob)]
+          Spec.assertEqWith s "and alice's own pick came back each time" (fmap (filter ((== Just S.alice) . snd) . arrivals) [toldMaiden, toldPiker]) [[(named "Bird Maiden", Just S.alice)], [(named "Goblin Piker", Just S.alice)]]
         -- The paired control, and the whole reason each graveyard buries TWO
         -- creature cards: the same cast on the same board with the DEFAULT
         -- answerer brings back the other one in every seat. If the engine were
@@ -282,7 +311,7 @@ exhumeSpec s registry =
           let buried = [(piker, S.alice), (maiden, S.alice), (sentry, S.bob), (forest, S.carol)]
               (spell, gs) = board exhume swamp buried
               choosing p = case p of
-                Prompt.ChooseCardInGraveyard _ _ _ offered -> secondOf offered
+                Prompt.ChooseCardInGraveyard _ _ _ offered _ -> secondOf offered
                 _ -> S.identityAnswer p
               (after, responses) = run choosing spell gs
           Spec.assertEqWith s "only alice, who had two candidates, was asked" (choices responses) 1
@@ -380,7 +409,7 @@ bloodForBonesSpec s registry =
               -- return cannot grant, so the fallback is the pinned Piker.
               choosing :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
               choosing sentryId pikerId p = case p of
-                Prompt.ChooseCardInGraveyard _ _ _ offered ->
+                Prompt.ChooseCardInGraveyard _ _ _ offered _ ->
                   if List.elem sentryId (NonEmpty.toList offered) then sentryId else pikerId
                 _ -> S.identityAnswer p
               afterCast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
@@ -535,7 +564,7 @@ skullwinderSpec s registry =
       -- lands a different card in a different hand.
       choosing p = case p of
         Prompt.ChooseOpponent _ _ _ offered -> NonEmpty.last offered
-        Prompt.ChooseCardInGraveyard _ pid _ offered ->
+        Prompt.ChooseCardInGraveyard _ pid _ offered _ ->
           if pid == S.carol then thirdOf offered else NonEmpty.head offered
         _ -> S.identityAnswer p
       -- alice's two, bob's three and carol's three, all distinct names so no

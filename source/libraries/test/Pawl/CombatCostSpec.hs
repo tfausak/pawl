@@ -1339,7 +1339,7 @@ aetherAnswer ::
   r
 aetherAnswer plasm golem evangel decide p = case p of
   Prompt.DeclareBlockers {} -> Map.singleton plasm (Set.singleton golem)
-  Prompt.ChooseOptional _ _ _ _ cIdx -> decide cIdx
+  Prompt.ChooseOptional _ _ _ _ cIdx _ -> decide cIdx
   Prompt.ChooseCardInHand _ _ _ offered ->
     Maybe.fromMaybe (NonEmpty.head offered) (List.find (== evangel) (NonEmpty.toList offered))
   _ -> S.aggressiveAnswer p

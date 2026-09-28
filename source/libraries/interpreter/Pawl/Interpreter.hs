@@ -112,7 +112,7 @@ policingCardNames ::
   Asked.Asked a ->
   m a
 policingCardNames registry answer asked = case Asked.prompt asked of
-  Prompt.ChooseCardName _ chooser _ restriction ->
+  Prompt.ChooseCardName _ chooser _ restriction _ ->
     let again = do
           name <- answer asked
           legal <- legalCardName registry (Asked.game asked) chooser restriction name

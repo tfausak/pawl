@@ -73,7 +73,7 @@ namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zo
 -- is sacrificed, rather than the order the candidates are enumerated in.
 sacrifices :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 sacrifices wanted p = case p of
-  Prompt.ChooseSacrifices _ _ _ candidates _ ->
+  Prompt.ChooseSacrifices _ _ _ candidates _ _ ->
     if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
   Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates

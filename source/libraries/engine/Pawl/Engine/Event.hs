@@ -2428,12 +2428,12 @@ apply batch candidate event =
             -- CR 101.4: the active player chooses first, then the rest in turn
             -- order. Both names are chosen as one event, so the order is the
             -- rule's and not the card's reading order.
-            --
-            -- Not implemented: the later chooser is not told the earlier one's
-            -- name (#4328).
+            -- The later chooser is told the earlier one's name (CR 101.4b).
             let choosers = filter (\pid -> pid == controller || Just pid == opponent) (Game.apnapOrder gs)
-                ask pid = Game.choose (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction) >>= Game.lookUpChosenName
-            fmap Set.fromList (Monad.mapM ask choosers)
+                ask made pid = do
+                  name <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction made) >>= Game.lookUpChosenName
+                  pure (made Seq.|> (pid, name))
+            fmap (Set.fromList . fmap snd . Foldable.toList) (Monad.foldM ask Seq.empty choosers)
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
           let stamp o = o {Object.chosenNames = picked}
@@ -2450,7 +2450,7 @@ apply batch candidate event =
           -- Oracle card reference.
           Nothing -> pure Set.empty
           Just controller ->
-            fmap Set.singleton (Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller oid restriction) >>= Game.lookUpChosenName)
+            fmap Set.singleton (Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller oid restriction Seq.empty) >>= Game.lookUpChosenName)
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
           let stamp o = o {Object.chosenNames = picked}
@@ -2801,7 +2801,7 @@ apply batch candidate event =
               Nothing -> pure Nothing
               Just (only NonEmpty.:| []) -> pure (Just only)
               Just candidates -> do
-                answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor controller gs) controller oid candidates)
+                answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor controller gs) controller oid candidates Seq.empty)
                 -- FILTERED, NOT TRUSTED (#222): an answer naming a card that was
                 -- never offered would otherwise exile a card the printed
                 -- criterion excludes.

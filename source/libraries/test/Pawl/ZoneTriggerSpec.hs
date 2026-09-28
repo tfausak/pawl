@@ -333,7 +333,7 @@ graveyardTriggerSpec s registry =
       -- -- a blanket yes would conflate the two.
       returnsIt :: Prompt.Prompt r -> r
       returnsIt p = case p of
-        Prompt.ChooseOptional _ _ _ _ clause
+        Prompt.ChooseOptional _ _ _ _ clause _
           | clause == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
       -- alice: two Swamps, Corpse Churn in hand, a one-Swamp library to mill,
@@ -354,7 +354,7 @@ graveyardTriggerSpec s registry =
       churnReturning chosen gs spellId =
         let answer :: Prompt.Prompt r -> r
             answer p = case p of
-              Prompt.ChooseCardInGraveyard _ _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== chosen) (NonEmpty.toList offered))
+              Prompt.ChooseCardInGraveyard _ _ _ offered _ -> Maybe.fromMaybe (NonEmpty.head offered) (List.find (== chosen) (NonEmpty.toList offered))
               _ -> returnsIt p
             cast = S.runPure answer gs (S.cast S.alice spellId)
             placed = S.runPure answer (S.runPure answer cast Stack.resolveTop) Engine.settleForPriority
@@ -583,7 +583,7 @@ graveyardTriggerSpec s registry =
                   | voter == S.alice -> NonEmpty.head choices
                   | otherwise -> NonEmpty.last choices
                 Prompt.Search _ _ matches cap -> List.genericTake cap matches
-                Prompt.ChooseCardInGraveyard _ _ _ offered -> NonEmpty.head offered
+                Prompt.ChooseCardInGraveyard _ _ _ offered _ -> NonEmpty.head offered
                 Prompt.ChooseOptional {} -> OptionalDecision.Exercises
                 _ -> S.identityAnswer p
               cast = S.runPure answer gs (S.cast S.alice spellId)
