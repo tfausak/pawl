@@ -692,6 +692,17 @@ spec s registry = Spec.describe s "Range of influence" $ do
     -- his neighbour erin draws too.
     let withNecrosynthesis sporemoundId gs = let (auraId, g) = S.addPermanent necrosynthesis frank gs in S.attach auraId sporemoundId g
     Spec.assertEqWith s "CR 801.16 with frank's Necrosynthesis on Sporemound only dave is still playing" (Game.stillPlaying (loopedBeside withNecrosynthesis S.alice S.bob (S.withRange 1))) [S.dave]
+    -- The first board with frank's Hill Giant, and then with alice's Synthetic
+    -- Spore Tithe (Sporemound, plus "and put a +1/+1 counter on each creature
+    -- your opponents control") in Sporemound's place: nothing of frank's
+    -- triggers or shapes a trigger, but the Tithe acts on his Giant every
+    -- cycle, so the Giant is in the loop and his neighbour erin draws too.
+    giant <- S.printingOf s registry "Hill Giant"
+    tithe <- S.printingOf s registry "Synthetic Spore Tithe"
+    let withGiant _ gs = snd (S.addPermanent giant frank gs)
+        tithed = resolveAll (S.withRange 1 (loopBoard flash limb tithe forest withGiant S.alice S.bob))
+    Spec.assertEqWith s "CR 801.16 with alice's Spore Tithe on frank's Hill Giant only dave is still playing" (Game.stillPlaying tithed) [S.dave]
+    Spec.assertEqWith s "CR 801.16 with Sporemound beside frank's Hill Giant dave and erin are still playing" (Game.stillPlaying (loopedBeside withGiant S.alice S.bob (S.withRange 1))) [S.dave, erin]
     Spec.assertEqWith s "CR 104.4b at an unlimited range the game is a draw" (GameState.result (looped S.bob id)) (Just Result.Drawn)
 
   -- CR 801.16's "involved in that loop", at the guard itself: carol's stamp
