@@ -1985,6 +1985,22 @@ halfLifeSpec s registry =
       after <- S.play s registry setup script S.priorityGame
       Spec.assertEqWith s "CR 601.2f: 11 - 1 for the Confluence - 6 for half of 11" (S.lifeOf S.alice after) (Just 4)
       Spec.assertEqWith s "CR 701.8a: the Piker was destroyed" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 0
+    -- CR 118.3: the half and Mana Confluence's 1 life share one life total.
+    -- At 1 life the pair owes 2, so the activation is not offered; at 3 it owes
+    -- 3 and is. The pair differs in life alone.
+    Spec.it s "CR 118.3 Murderous Betrayal's half and Mana Confluence's life are weighed together" $ do
+      let boardAt life = do
+            let mine =
+                  (S.battlefield S.alice [S.aliased "betrayal" (S.permanent "Murderous Betrayal"), S.settled "swamp" "Swamp", S.settled "confluence" "Mana Confluence"])
+                    { S.setupLife = life
+                    }
+            built <- S.buildBoardOrFail s registry (S.board (mine NonEmpty.:| [S.battlefield S.bob [S.permanent "Goblin Piker"]]) S.alice S.precombatMain)
+            betrayal <- maybe (Spec.assertFailure s "no Murderous Betrayal") pure (Map.lookup (S.MkObjectAlias (Text.pack "betrayal")) (S.builtAliases built))
+            pure (betrayal, (S.builtState built) {GameState.priority = Just S.alice})
+      (atOne, one) <- boardAt 1
+      (atThree, three) <- boardAt 3
+      Spec.assertBool s (not (any (isActivateOf atOne) (Action.legalActions S.alice one))) "CR 118.3: at 1 life, half (1) plus the Confluence's 1 is unpayable, so the activation is not offered"
+      Spec.assertBool s (any (isActivateOf atThree) (Action.legalActions S.alice three)) "and at 3 life, half (2) plus 1 is payable, so it is"
     -- Lurking Evil at 7 pays 4 and becomes the 4/4 flier, no longer an
     -- enchantment (CR 205.1a).
     Spec.it s "CR 119.4 Lurking Evil pays half of 7, rounded up, and becomes a 4/4 Phyrexian Horror with flying" $ do

@@ -3369,8 +3369,9 @@ lifeOwedBy pid gs = sum . fmap (lifeOwedByComponent pid gs)
 lifeOwedByComponent :: PlayerId -> GameState -> CostComponent.CostComponent Keyword.Type.Keyword -> Natural
 lifeOwedByComponent pid gs component = case component of
   CostComponent.PayLife n -> n
-  -- A FENCE rather than proven behaviour: it shares a total only with a
-  -- Phyrexian symbol's life, and no card in `data/cards/` prints both.
+  -- CR 118.3: shares a total with the life a mana ability spends. Pawl.CostSpec's
+  -- "CR 118.3 Murderous Betrayal's half and Mana Confluence's life are weighed
+  -- together" is the proof.
   CostComponent.PayHalfLife rounding -> halfLifeOf rounding pid gs
   -- 0, an unannounced X naming no amount to owe. Not a claim that this component
   -- is free: `canPayComponent` refuses it outright.
