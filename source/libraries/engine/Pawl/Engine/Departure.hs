@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Initiative as Initiative
 import qualified Pawl.Engine.Monarch as Monarch
+import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
@@ -97,7 +98,10 @@ departTogether reason named = do
       -- CR 800.4a's first three clauses, in the rule's order.
       clauses pid = if continues then nonCardStackObjectsCease pid . controlEffectsEnd pid . objectsLeaveWith pid else id
   Monad.forM_ departing (\(why, pid) -> State.modify' (leave why pid . clauses pid))
-  Monad.when continues (Monad.mapM_ remainingControlledExiled pids)
+  Monad.when continues $ do
+    Monad.mapM_ remainingControlledExiled pids
+    -- CR 901.10: the replacement plane, once CR 800.4a is done.
+    Planechase.ownersLeft before pids
   Monad.forM_ pids $ \pid -> do
     Monarch.reassignOnDeparture pid
     -- CR 726.4, the same clause one rule over and for the same reason: the

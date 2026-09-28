@@ -3,14 +3,10 @@
 --
 -- A card type and not a format, Pawl.Engine.Vanguard's posture: the planar
 -- controller is read off the game, and a card of either type announces itself.
---
--- WHAT IS NOT IMPLEMENTED:
---
---   * CR 311.5's retention: a planar controller who would leave the game hands
---     the designation to the next player in turn order, who keeps it until the
---     active player changes (#4311).
 module Pawl.Engine.Plane where
 
+import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.Card as Card
@@ -41,9 +37,19 @@ isPlanarCard :: ObjectId -> GameState -> Bool
 isPlanarCard oid gs = maybe False isPlanarFace (Game.faceOf oid gs)
 
 -- | CR 311.5 / 312.4 / 901.6: the planar controller, normally the active
--- player.
+-- player. While that seat has left (CR 800.4j keeps it active), CR 800.4p's
+-- heir: the next still-playing seat in turn order. Derived, not stored: the
+-- designation moves only off a departing holder and reverts at the next turn,
+-- so the walk from the active seat always finds it. Pawl.PlanechaseSpec's "CR
+-- 311.5 a departing active player's plane is replaced from the next seat's
+-- planar deck" proves it.
 planarController :: GameState -> PlayerId
-planarController = GameState.activePlayer
+planarController gs =
+  let active = GameState.activePlayer gs
+      playing = Game.stillPlaying gs
+      order = GameState.turnOrder gs
+      after = drop 1 (List.dropWhile (/= active) order) <> order
+   in if List.elem active playing then active else Maybe.fromMaybe active (List.find (`List.elem` playing) after)
 
 -- | CR 109.4 for a command-zone object: the planar controller controls a
 -- face-up plane or phenomenon card (CR 901.6), and the owner controls
