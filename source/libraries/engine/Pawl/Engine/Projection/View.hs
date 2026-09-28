@@ -1358,6 +1358,7 @@ noCharacteristics =
       PC.additionalCostChoices = [],
       PC.alternativeCosts = [],
       PC.costReductions = [],
+      PC.grantedCostReductions = [],
       -- CR 709.5: no characteristics, so no halves either.
       PC.halves = Nothing,
       -- CR 722.2b, for the same reason one line up.
@@ -1517,6 +1518,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
               PC.additionalCostChoices = Face.additionalCostChoices face,
               PC.alternativeCosts = Face.alternativeCosts face,
               PC.costReductions = Face.costReductions face,
+              -- CR 613.1's starting point, before layer 6 has run.
+              PC.grantedCostReductions = [],
               -- CR 709.5 / 709.5b: the halves this object has, which -- like the
               -- names above -- `face` cannot carry, a Face being one half's worth
               -- of characteristics. Game.halvesOf decides, and it reads the copy

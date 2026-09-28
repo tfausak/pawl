@@ -55,6 +55,7 @@ sampleSnapshot =
       PC.additionalCostChoices = [],
       PC.alternativeCosts = [],
       PC.costReductions = [],
+      PC.grantedCostReductions = [],
       PC.halves = Nothing,
       PC.prepare = Nothing,
       PC.alternativeSpell = Nothing,

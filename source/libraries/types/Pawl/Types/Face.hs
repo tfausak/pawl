@@ -414,9 +414,12 @@ data Face card = MkFace
     --
     -- The third member of the additionalCosts/alternativeCosts family above, and
     -- read the way they are: straight off the card or its copy stamp
-    -- (Game.castingFaceOf), never through the projection (#1859). Pawl.Engine.Cost.selfReductions is the one reader, and it folds these in
+    -- (Game.castingFaceOf), never through the projection, so an effect removing
+    -- one from a card off the battlefield is not seen (#1859). A GRANTED one is
+    -- read off the projection instead (ProjectedCharacteristics.grantedCostReductions).
+    -- Pawl.Engine.Cost.selfReductions is the one reader, and it folds both in
     -- alongside the CR 613.11 reductions other permanents generate, so CR
-    -- 601.2f's "minus all cost reductions" is applied once over both.
+    -- 601.2f's "minus all cost reductions" is applied once over all of them.
     --
     -- A LIST because nothing in CR 601.2f caps how many such lines a face may
     -- print; every one of them applies (Edgewalker's ruling, one type over).

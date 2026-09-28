@@ -3004,6 +3004,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   thrastaSpec s registry
   ertaisScornSpec s registry
   deemInferiorSpec s registry
+  richlauSpec s registry
   frogmiteSpec s registry
   exhalationSpec s registry
   omniscienceSpec s registry
@@ -3292,6 +3293,75 @@ deemInferiorSpec s registry =
           (oneId, one) = board [(S.alice, 1), (S.bob, 2)]
       Spec.assertBool s (S.castable S.alice twoId two) "alice drew two, so it costs {1}{U} and is offered"
       Spec.assertBool s (not (S.castable S.alice oneId one)) "alice drew one and bob two, so it costs {2}{U} and is refused"
+
+-- Richlau, Headmaster {1}{W}{U} Legendary Creature -- Human Advisor 2/4 (YBRO,
+-- digital; data/cards/richlau-headmaster.json, Oracle text checked against
+-- Scryfall 2026-09-27): "At the beginning of your end step, you may pay {1}.
+-- When you do, target artifact card in your graveyard perpetually gains 'This
+-- spell costs {1} less to cast.' If it's a creature or Vehicle card, it
+-- perpetually gets +2/+2. Put it into your library second from the top."
+--
+-- alice has Richlau and one Island, Venser's Sliver ({5} Artifact Creature 3/3)
+-- and Consulate Dreadnought ({1} Artifact -- Vehicle 7/11) in her graveyard, and
+-- three cards in her library. She pays {1} and aims at `aim`; the two boards
+-- differ only in which card that is. The Sliver then goes to her hand, she gets
+-- four fresh Islands, and her main phase begins.
+richlauBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Bool -> Maybe (ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+richlauBoard island richlau sliver dreadnought library aimAtSliver =
+  let (_, g1) = S.addPermanent richlau S.alice (S.landsInPlay island 1)
+      (sliverId, g2) = S.addGraveyardCard sliver S.alice g1
+      (dreadnoughtId, g3) = S.addGraveyardCard dreadnought S.alice g2
+      g4 = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) g3 library
+      aim = if aimAtSliver then sliverId else dreadnoughtId
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseToPay {} -> PaymentDecision.Pays
+        Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((==) (Just aim) . Recipient.objectOf) offered) asked
+        _ -> S.identityAnswer p
+      endStep = Phase.Ending EndingStep.EndStep
+      begun = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (g4 {GameState.phase = endStep, GameState.activePlayer = S.alice})
+      atEnd = S.runPure answer (S.runPure answer begun Engine.settleForPriority) Engine.priorityLoop
+   in do
+        sliverNow <- List.find (\oid -> fmap S.nameOf (Game.cardOf oid atEnd) == Just (S.printingName sliver)) (Game.zoneMembers Zone.Library S.alice atEnd <> Game.zoneMembers Zone.Graveyard S.alice atEnd)
+        let inHand = S.runPure S.identityAnswer atEnd (Event.changeZone sliverNow Zone.Hand)
+        handId <- Maybe.listToMaybe (Game.zoneMembers Zone.Hand S.alice inHand)
+        pure (handId, atEnd, (S.landsFor island S.alice 4 inHand) {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+
+-- CR 613.1f / 601.2f: a cost reduction GRANTED to a card off the battlefield
+-- reaches the cast, through the projection (Pawl.Engine.Cost.selfReductions).
+richlauSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+richlauSpec s registry =
+  Spec.describe s "Richlau, Headmaster" $ do
+    let fixture aimAtSliver = do
+          island <- S.printingOf s registry "Island"
+          richlau <- S.printingOf s registry "Richlau, Headmaster"
+          sliver <- S.printingOf s registry "Venser's Sliver"
+          dreadnought <- S.printingOf s registry "Consulate Dreadnought"
+          library <- traverse (S.printingOf s registry) ["Lightning Bolt", "Unsummon", "Griptide"]
+          pure (sliver, richlauBoard island richlau sliver dreadnought library aimAtSliver)
+        named = Just . CardName.MkCardName . Text.pack
+        libraryNames gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Library S.alice gs)
+    Spec.it s "CR 601.2f the perpetually discounted Sliver is cast off four Islands and enters a 5/5" $ do
+      (sliver, board) <- fixture True
+      case board of
+        Nothing -> Spec.assertFailure s "the Sliver should reach alice's hand"
+        Just (sliverId, atEnd, main) -> do
+          let cast = S.runPure S.identityAnswer main (S.cast S.alice sliverId)
+              resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+              entered = filter (\oid -> fmap S.nameOf (Game.cardOf oid resolved) == Just (S.printingName sliver)) (Game.zoneMembers Zone.Battlefield S.alice resolved)
+          Spec.assertEqWith s "it entered a 5/5" (fmap (`S.powerToughnessOf` resolved) entered) [Just (5, 5)]
+          Spec.assertEqWith s "four Islands paid {4}, besides the one that paid Richlau's {1}" (S.tappedCount S.alice resolved) 5
+          Spec.assertBool s (S.castable S.alice sliverId main) "the Sliver was offered off four Islands"
+          Spec.assertEqWith s "CR 401.7 it went in second from the top" (libraryNames atEnd) (fmap named ["Griptide", "Venser's Sliver", "Unsummon", "Lightning Bolt"])
+    Spec.it s "CR 601.2f aimed at the Dreadnought instead, the Sliver keeps its {5}, and the Vehicle gets +2/+2" $ do
+      (_, board) <- fixture False
+      case board of
+        Nothing -> Spec.assertFailure s "the Sliver should reach alice's hand"
+        Just (sliverId, atEnd, main) -> do
+          Spec.assertBool s (not (S.castable S.alice sliverId main)) "the undiscounted Sliver is refused off the same four Islands"
+          Spec.assertEqWith s "the Sliver in hand is a 3/3" (S.powerToughnessOf sliverId main) (Just (3, 3))
+          let dreadnoughts = filter (\oid -> fmap S.nameOf (Game.cardOf oid atEnd) == named "Consulate Dreadnought") (Game.zoneMembers Zone.Library S.alice atEnd)
+          Spec.assertEqWith s "the Dreadnought in the library is a 9/13" (fmap (`S.powerToughnessOf` atEnd) dreadnoughts) [Just (9, 13)]
 
 -- alice holds Thrasta, Tempest's Roar ({10}{G}{G}) and `elves` copies of
 -- Glistener Elf ({G}), with `forests` untapped Forests and priority in her own
