@@ -3487,7 +3487,7 @@ chthonianPlan :: Natural.Type.Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r 
 chthonianPlan x bait p = case p of
   Prompt.ChooseX {} -> x
   Prompt.ChooseTargets _ _ _ asked -> S.preferring (maybe False (`elem` bait) . Recipient.objectOf) asked
-  Prompt.ChooseSacrifices _ _ _ offered n -> Set.fromList (List.genericTake n offered)
+  Prompt.ChooseSacrifices _ _ _ offered n _ -> Set.fromList (List.genericTake n offered)
   _ -> S.identityAnswer p
 
 -- CR 603.3d's announcement for Itzquinth's reflexive ability, threaded through a

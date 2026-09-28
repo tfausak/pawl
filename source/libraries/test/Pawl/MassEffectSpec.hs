@@ -893,7 +893,7 @@ graspingTentaclesSpec s registry =
       answering pick p = case p of
         Prompt.ChooseTargets _ _ _ slots -> fmap (Set.filter (== Recipient.ToPlayer S.bob) . snd) slots
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-        Prompt.ChooseCardInGraveyard _ _ _ offered -> pick offered
+        Prompt.ChooseCardInGraveyard _ _ _ offered _ -> pick offered
         _ -> S.identityAnswer p
       named = Just . CardName.MkCardName . Text.pack
       -- The whole battlefield minus alice's six lands, by NAME and CONTROLLER:
@@ -1031,9 +1031,9 @@ midnightTillingSpec s registry =
       -- mill -- and answers the graveyard choice with the nth card offered.
       taking :: Int -> Prompt.Prompt r -> r
       taking n p = case p of
-        Prompt.ChooseOptional _ _ _ _ clause
+        Prompt.ChooseOptional _ _ _ _ clause _
           | clause == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
-        Prompt.ChooseCardInGraveyard _ _ _ offered -> nth n offered
+        Prompt.ChooseCardInGraveyard _ _ _ offered _ -> nth n offered
         _ -> S.identityAnswer p
       cast :: (forall r. Prompt.Prompt r -> r) -> (ObjectId.ObjectId, GameState.GameState) -> GameState.GameState
       cast answer (spellId, gs) =
@@ -1151,7 +1151,7 @@ communeWithTheGodsSpec s registry =
       -- card offered.
       taking :: Int -> Prompt.Prompt r -> r
       taking n p = case p of
-        Prompt.ChooseOptional _ _ _ _ clause
+        Prompt.ChooseOptional _ _ _ _ clause _
           | clause == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
         Prompt.ChooseCardFromAmong _ _ _ offered -> nth n offered
         _ -> S.identityAnswer p
@@ -1292,7 +1292,7 @@ fallOfTheThranSpec s registry =
       -- the wrong candidates are both visible.
       taking :: Prompt.Prompt r -> State.State ([Int], [Int]) r
       taking p = case p of
-        Prompt.ChooseCardInGraveyard _ _ _ offered -> do
+        Prompt.ChooseCardInGraveyard _ _ _ offered _ -> do
           (indices, sizes) <- State.get
           State.put (drop 1 indices, sizes <> [length (NonEmpty.toList offered)])
           pure (nth (Maybe.fromMaybe 0 (Maybe.listToMaybe indices)) offered)
@@ -2187,7 +2187,7 @@ carthTheLionSpec s registry =
       -- batch it offered.
       answering :: Maybe Int -> Maybe [ObjectId.ObjectId] -> Prompt.Prompt r -> r
       answering mTake order p = case p of
-        Prompt.ChooseOptional _ _ _ _ clause
+        Prompt.ChooseOptional _ _ _ _ clause _
           | clause == ClauseIndex.MkClauseIndex 1 && Maybe.isJust mTake -> OptionalDecision.Exercises
         Prompt.ChooseCardFromAmong _ _ _ offered -> nth (Maybe.fromMaybe 0 mTake) offered
         Prompt.Shuffle offered -> Maybe.fromMaybe offered order

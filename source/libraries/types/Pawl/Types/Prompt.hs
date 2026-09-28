@@ -307,8 +307,10 @@ data Prompt r where
   -- | CR 608.2d: which graveyard card a Pawl.Types.ObjectRef.ChosenCardInGraveyard
   -- takes; the PlayerId is the chooser, who need not own the graveyard, asked
   -- in APNAP order (CR 101.4). ONE of these per card the ref's count names, each
-  -- over the candidates the earlier asks left.
-  ChooseCardInGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- over the candidates the earlier asks left. The Seq is every card the pass
+  -- has already taken, beside who took it, which CR 101.4b lets a later chooser
+  -- know.
+  ChooseCardInGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Seq.Seq (PlayerId.PlayerId, ObjectId.ObjectId) -> Prompt ObjectId.ObjectId
   -- | CR 608.2d: which card of their own hand a Pawl.Types.ObjectRef.ChosenCardInHand
   -- takes; also CostComponent.PutCardFromHandOntoBattlefield's question while a
   -- CR 118.12 cost is paid, and CostComponent.ExileCardFromHand's and
@@ -464,14 +466,14 @@ data Prompt r where
   --
   -- The NonEmpty carries EVERY card revealed in the clash beside the player who
   -- revealed it, because rule 701.30c's reveal is simultaneous and public: a
-  -- decider sees the other card as well as their own. It is the reveal alone,
-  -- which rule 701.30c has the decisions follow; what that leaves out is stated
-  -- at Pawl.Engine.Resolve.Effect's clash (#3893).
+  -- decider sees the other card as well as their own. The Seq is the decisions
+  -- the clashing players before this one already made, in APNAP order, which CR
+  -- 101.4b lets a later decider know.
   --
   -- Asked of each clashing player in APNAP order (CR 101.4), and elided only
   -- where the revealed card is that player's whole library: both ends are then
   -- the same position (Pawl.Engine.Resolve.Effect's clash).
-  ChooseClash :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (PlayerId.PlayerId, ObjectId.ObjectId) -> Prompt LibraryPosition.LibraryPosition
+  ChooseClash :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (PlayerId.PlayerId, ObjectId.ObjectId) -> Seq.Seq (PlayerId.PlayerId, LibraryPosition.LibraryPosition) -> Prompt LibraryPosition.LibraryPosition
   -- | CR 601.2b: how many times the optional additional cost of that keyword --
   -- kicker, multikicker, squad, offspring, replicate or casualty (CR 702.33a/c,
   -- 702.157a, 702.175a, 702.56a, 702.153a) --
@@ -566,14 +568,15 @@ data Prompt r where
   ChooseManaType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ManaType.ManaType -> Prompt ManaType.ManaType
   -- | CR 201.4: the card name a player chooses, as an object enters (CR 614.1c)
   -- or as a resolution instructs (CR 608.2c); the Filter is CR 201.4a's
-  -- restriction, and the PlayerId is the chooser, asked in APNAP order.
+  -- restriction, and the PlayerId is the chooser, asked in APNAP order. The Seq
+  -- is the names the choosers before this one already chose (CR 101.4b).
   --
   -- No candidate list: rule 201.4's offer is every card in the Oracle card
   -- reference, which is not a set the engine holds. The answer is judged on the
   -- far side of Pawl.Engine.Engine.runGameAsked instead, by
   -- Pawl.Interpreter.policingCardNames, which resolves the name and matches the
   -- Filter against it.
-  ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Prompt CardName.CardName
+  ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Seq.Seq (PlayerId.PlayerId, CardName.CardName) -> Prompt CardName.CardName
   -- | Which opponent a card's text names, as a permanent enters (CR 614.12a),
   -- at resolution for CR 701.29a's fateseal, for a resolving
   -- Pawl.Types.Effect.ChoosePlayer whose scope leaves the chooser out
@@ -629,8 +632,9 @@ data Prompt r where
   -- | CR 701.21a: which of the payer's matching permanents are sacrificed to
   -- pay a cost, the Natural how many; asked only with more candidates than the
   -- count. Not ChooseTargets: CR 115.1 makes a target only what the word
-  -- names.
-  ChooseSacrifices :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- names. The Seq is what the players before this one in an edict's APNAP pass
+  -- already chose (CR 101.4b).
+  ChooseSacrifices :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Seq.Seq (PlayerId.PlayerId, Set.Set ObjectId.ObjectId) -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 406.2: which cards are exiled from the payer's graveyard to pay a
   -- cost; ChooseSacrifices' payload, posture and elision.
   ChooseExilesFromGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
@@ -793,8 +797,9 @@ data Prompt r where
   -- (Pawl.Engine.Resolve.clauseIsInert) and where CR 608.2d leaves nothing to
   -- choose because its instructions cannot be carried out at all
   -- (Pawl.Engine.Resolve.Effect.clauseIsImpossible), both off the effects'
-  -- classification.
-  ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Prompt OptionalDecision.OptionalDecision
+  -- classification. The Seq is the answers the players before this one already
+  -- gave (CR 101.4b).
+  ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Seq.Seq (PlayerId.PlayerId, OptionalDecision.OptionalDecision) -> Prompt OptionalDecision.OptionalDecision
   -- | CR 608.2d's "or": which of a mode's mutually exclusive clauses happens,
   -- announced at resolution once per group and per chooser
   -- (Pawl.Types.OrElse.chooser), before ChooseOptional. Carries only the
@@ -804,8 +809,9 @@ data Prompt r where
   -- puts both branches and elides nothing and rule 701.55d puts this question to
   -- one seat at a time, its answer performed before the next seat is asked
   -- (Pawl.Engine.Resolve.villainousPass). Not ChooseModes, which CR 700.2 fixes
-  -- at cast.
-  ChooseClause :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> NonEmpty.NonEmpty ClauseIndex.ClauseIndex -> Prompt ClauseIndex.ClauseIndex
+  -- at cast. The Seq is the branches the choosers before this one already
+  -- announced (CR 101.4b).
+  ChooseClause :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> NonEmpty.NonEmpty ClauseIndex.ClauseIndex -> Seq.Seq (PlayerId.PlayerId, ClauseIndex.ClauseIndex) -> Prompt ClauseIndex.ClauseIndex
   -- | CR 608.2g: whether the player casts the card a resolving effect allows
   -- them to (CR 310.12b), the CardName being the half CR 712.11a puts on the
   -- stack; never elided, and not raised for CR 608.2g's "instructs".

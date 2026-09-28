@@ -3187,7 +3187,7 @@ veneratedRotpriestSpec s registry =
       aiming fodder wanted p = case p of
         Prompt.ChooseTargets _ _ _ sets ->
           fmap (\(_, legal) -> let hit = Set.intersection legal wanted in if Set.null hit then Set.take 1 legal else hit) sets
-        Prompt.ChooseSacrifices _ _ _ offered _ -> Set.fromList (filter (== fodder) offered)
+        Prompt.ChooseSacrifices _ _ _ offered _ _ -> Set.fromList (filter (== fodder) offered)
         _ -> S.identityAnswer p
       board spellName landName = do
         land <- S.printingOf s registry landName
