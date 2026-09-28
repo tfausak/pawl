@@ -663,9 +663,10 @@ data Prompt r where
   -- Answers as Response.ChoseReveals.
   ChooseAnyNumberToReveal :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 608.2d: any number of the matching permanents a resolving effect acts
-  -- on (Pawl.Types.ObjectRef's AnyNumberMatching); ChooseAnyNumberToSacrifice's
-  -- shape. Not ChooseTargets (CR 115.1, CR 115.10a).
-  ChooseAnyNumberOfPermanents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
+  -- on (Pawl.Types.ObjectRef's AnyNumberMatching), at most the Natural where
+  -- there is one; ChooseAnyNumberToSacrifice's shape. Not ChooseTargets (CR
+  -- 115.1, CR 115.10a).
+  ChooseAnyNumberOfPermanents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Maybe Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 608.2d: which one of the matching permanents a resolving effect acts
   -- on (Pawl.Types.ObjectRef.ChosenPermanent); at none the instruction is
   -- impossible (CR 101.3). Not ChooseTargets (CR 115.1, CR 115.10a). Also CR

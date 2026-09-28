@@ -8,6 +8,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AttachedToBound as AttachedToBound
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
@@ -388,17 +389,16 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       (Either.isLeft (Common.parse (Text.pack " {\"type\":\"RandomCardInHand\",\"value\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"}} ") >>= Codec.decode ObjectRef.codec))
       "a bare player reference is rejected"
   -- The one Arm.tagged risk this file exists for -- a tag its tag function names
-  -- with no arm beside it: the arm's payload is a
-  -- bare Filter, exactly EachMatching's above, so a MISSING codec arm would
-  -- compile and only this case would notice. The distinct-tag case below is what
-  -- catches the other half -- an arm copying EachMatching's tag, which would turn
-  -- Tovolar's choice into a sweep of every match.
+  -- with no arm beside it: a MISSING codec arm would compile and only this case
+  -- would notice. The distinct-tag case below is what catches the other half --
+  -- an arm copying EachMatching's tag, which would turn Tovolar's choice into a
+  -- sweep of every match.
   Spec.it s "AnyNumberMatching" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature))
-      " {\"type\":\"AnyNumberMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+      (ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching (Filter.HasCardType CardType.Creature) Nothing))
+      " {\"type\":\"AnyNumberMatching\",\"value\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}} "
   -- The arm above's singular, and the same Arm.tagged risk: a missing
   -- codec arm would compile and only this case would notice, and a tag copied
   -- from a sibling would turn one permanent into a sweep or into a subset.
@@ -475,7 +475,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) (Filter.And []) (Quantity.Literal 1))),
                 Codec.encode ObjectRef.codec (ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) (Filter.And []) (Quantity.Literal 1))),
-                Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (Filter.HasCardType CardType.Creature)),
+                Codec.encode ObjectRef.codec (ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching (Filter.HasCardType CardType.Creature) Nothing)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.HasCardType CardType.Creature) (PlayerRef.Relative PlayerRelation.You))),
                 Codec.encode ObjectRef.codec (ObjectRef.SourceAndChosenPermanent (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature)))

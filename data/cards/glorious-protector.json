@@ -85,30 +85,32 @@
                           "ref": {
                             "type": "AnyNumberMatching",
                             "value": {
-                              "type": "And",
-                              "value": [
-                                {
-                                  "type": "HasCardType",
-                                  "value": {
-                                    "type": "Creature"
-                                  }
-                                },
-                                {
-                                  "type": "ControlledBy",
-                                  "value": {
-                                    "type": "You"
-                                  }
-                                },
-                                {
-                                  "type": "Not",
-                                  "value": {
-                                    "type": "HasSubtype",
+                              "filter": {
+                                "type": "And",
+                                "value": [
+                                  {
+                                    "type": "HasCardType",
                                     "value": {
-                                      "type": "Angel"
+                                      "type": "Creature"
+                                    }
+                                  },
+                                  {
+                                    "type": "ControlledBy",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  },
+                                  {
+                                    "type": "Not",
+                                    "value": {
+                                      "type": "HasSubtype",
+                                      "value": {
+                                        "type": "Angel"
+                                      }
                                     }
                                   }
-                                }
-                              ]
+                                ]
+                              }
                             }
                           },
                           "zone": {
