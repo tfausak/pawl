@@ -1676,6 +1676,9 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- each arrives: a member still in its old zone is not on the battlefield for a
 -- sweep to find, and one that has arrived is. Either way a later member's entry
 -- loop would otherwise find its siblings already sitting on the battlefield.
+-- Across CALLS, inside one CR 608.2f action (`together`), runEntry adds every
+-- arrival the action has already settled, so a loop's later iterations see its
+-- earlier ones as siblings too.
 --
 -- Where the CR says the cards are NOT simultaneous the set is empty again and a
 -- sibling is a plain battlefield permanent, which is the whole of what CR
@@ -4181,7 +4184,13 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- board each collects from. That a contained event keeps its own footing is this
 -- engine's reading, resting on CR 614.12; no rule states it outright.
 runEntry :: Set ObjectId -> ObjectId -> Game ()
-runEntry batch oid = do
+runEntry given oid = do
+  -- CR 608.2f / 614.12: inside one action (`together`), what an EARLIER call
+  -- put onto the battlefield entered at the same moment as this object, so it
+  -- is a sibling too -- Ornate Imitations' later numbers and Mirror Match's later
+  -- tokens. Pawl.RestampSpec's Tayam boards prove both.
+  open <- State.gets GameState.enteringTogether
+  let batch = Set.delete oid (given <> foldMap (Set.fromList . Foldable.toList . EnteringTogether.arrivals) open)
   -- CR 113.6 / 614.12: for the span of this loop, the batch's OTHER members are
   -- materialized but not entered, so Pawl.Engine.Projection gathers no continuous
   -- effect from their static abilities (see GameState.enteringBeside). The

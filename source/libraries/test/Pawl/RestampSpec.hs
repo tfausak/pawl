@@ -46,6 +46,7 @@ import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -63,6 +64,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
   tokenOrderSpec s registry
   simultaneousCopiesSpec s registry
   conjuredOrderSpec s registry
+  mirrorMatchSiblingSpec s registry
 
 -- | The producer is a synthetic pair, and no printing reaches the rule; see
 -- #2571 for the search behind that. Observing which of two simultaneous CR
@@ -427,27 +429,41 @@ mirrorMatch caster permutation gs =
 -- two write base P/T in layer 7b (1/1 and 3/3), and bob's Goblin Piker (2/1)
 -- reads whichever is later. The Godhead is conjured first, so the arrival order
 -- stamps the Archon later; the two boards differ only in alice's answer.
-conjuredOrderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+conjuredOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 conjuredOrderSpec s registry =
   Spec.describe s "Conjure" $ do
     Spec.it s "CR 613.7m / 608.2f the controller orders every card one conjure loop made" $ do
-      (board, pikerId, fixture) <- ornateBoard s registry
+      (board, pikerId, fixture) <- ornateBoard s registry ["Godhead of Awe", "Harmonious Archon"] False
       let (after, asked) = ornateImitations fixture (Just [1, 0]) board
           (canonical, _) = ornateImitations fixture Nothing board
       Spec.assertEqWith s "CR 613.7m alice stamped the Godhead last, so bob's Goblin Piker is 1/1" (S.powerToughnessOf pikerId after) (Just (1, 1))
       Spec.assertEqWith s "while the arrival order leaves the Archon last, so it is 3/3" (S.powerToughnessOf pikerId canonical) (Just (3, 3))
       Spec.assertEqWith s "and alice was asked once, over both cards" asked [(S.alice, 2)]
+    -- CR 614.12 over the same loop: Tayam, Luminous Enigma (mana value 4, "Each
+    -- other creature you control enters with an additional vigilance counter on
+    -- it.") is conjured at 4 and the Godhead at 5. Entering at the same moment,
+    -- the Godhead gets nothing from Tayam; the pair's one difference is a Tayam
+    -- alice already controls, which does give it one.
+    Spec.it s "CR 614.12 / 608.2f a card one conjure loop made later enters beside the earlier ones, not after them" $ do
+      (together, _, fixture) <- ornateBoard s registry ["Tayam, Luminous Enigma", "Godhead of Awe"] False
+      (before, _, _) <- ornateBoard s registry ["Tayam, Luminous Enigma", "Godhead of Awe"] True
+      let vigilanceOnGodhead g = fmap (\oid -> S.counterOf (CounterKind.Keyword Keyword.Vigilance) oid g) (S.namedObjects (CardName.MkCardName (Text.pack "Godhead of Awe")) g)
+      Spec.assertEqWith s "CR 614.12 the conjured Tayam entered with the Godhead, so the Godhead has no vigilance counter" (vigilanceOnGodhead (fst (ornateImitations fixture Nothing together))) [0]
+      Spec.assertEqWith s "while a Tayam already on the battlefield gives it one" (vigilanceOnGodhead (fst (ornateImitations fixture Nothing before))) [1]
 
--- alice holds Ornate Imitations and eight lands in her precombat main; bob
--- controls a Goblin Piker. Hands back the fixture reference beside the board.
-ornateBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, Registry.Registry (State.State [(PlayerId.PlayerId, Int)]))
-ornateBoard s registry = do
+-- alice holds Ornate Imitations and eight lands in her precombat main, and a
+-- Tayam, Luminous Enigma where `withTayam` says so; bob controls a Goblin Piker.
+-- Hands back the fixture reference, the named cards, beside the board.
+ornateBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> Bool -> m (GameState.GameState, ObjectId.ObjectId, Registry.Registry (State.State [(PlayerId.PlayerId, Int)]))
+ornateBoard s registry names withTayam = do
+  tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
   island <- S.printingOf s registry "Island"
   forest <- S.printingOf s registry "Forest"
   piker <- S.printingOf s registry "Goblin Piker"
   ornate <- S.printingOf s registry "Ornate Imitations"
-  reference <- mapM (S.cardOf s registry) ["Godhead of Awe", "Harmonious Archon"]
-  let lands = S.landsFor forest S.alice 4 (S.landsFor island S.alice 4 (Setup.emptyGame S.bothPlayers))
+  reference <- mapM (S.cardOf s registry) names
+  let base = S.landsFor forest S.alice 4 (S.landsFor island S.alice 4 (Setup.emptyGame S.bothPlayers))
+      lands = if withTayam then snd (S.addPermanent tayam S.alice base) else base
       (pikerId, withPiker) = S.addPermanent piker S.bob lands
       (_, withSpell) = S.addHandCard ornate S.alice withPiker
       fixture =
@@ -483,3 +499,41 @@ ornateImitations fixture permutation gs =
         [] -> ObjectId.MkObjectId 0
       ((_, after), asked) = State.runState (Engine.runGameAsked (Interpreter.lookingUpCards fixture answer) gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)) []
    in (after, asked)
+
+-- | CR 614.12 over Mirror Match's CR 608.2f loop: alice attacks bob with Tayam,
+-- Luminous Enigma and a Goblin Piker, and bob's Mirror Match makes a token copy
+-- of each. The tokens enter at one moment, so bob's Tayam token gives bob's
+-- Piker token no vigilance counter, whichever member the loop takes first. Both
+-- orders are answered, since the one that takes Tayam first is the one a
+-- per-call sibling set gets wrong.
+mirrorMatchSiblingSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+mirrorMatchSiblingSpec s registry =
+  Spec.describe s "ForEach" $ do
+    Spec.it s "CR 614.12 / 608.2f a token one loop made later enters beside the earlier ones, not after them" $ do
+      island <- S.printingOf s registry "Island"
+      tayam <- S.printingOf s registry "Tayam, Luminous Enigma"
+      piker <- S.printingOf s registry "Goblin Piker"
+      mirror <- S.printingOf s registry "Mirror Match"
+      let (tayamId, g1) = S.addPermanent tayam S.alice (S.landsFor island S.bob 6 (Setup.emptyGame S.bothPlayers))
+          (pikerId, g2) = S.addPermanent piker S.alice g1
+          (_, g3) = S.addHandCard mirror S.bob g2
+          attacking = Map.fromList [(tayamId, AttackTarget.OfPlayer S.bob), (pikerId, AttackTarget.OfPlayer S.bob)]
+          board =
+            g3
+              { GameState.activePlayer = S.alice,
+                GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+                GameState.priority = Just S.bob,
+                GameState.combat = Combat.emptyCombat {Combat.Type.attackers = attacking, Combat.Type.defenders = [S.bob]}
+              }
+          run reversed =
+            let answer :: Prompt.Prompt r -> State.State () r
+                answer p = case p of
+                  Prompt.OrderForEach _ _ _ members -> pure ((if reversed then reverse else id) (zipWith const [0 ..] members))
+                  _ -> pure (S.identityAnswer p)
+                spell = case Game.zoneMembers Zone.Hand S.bob board of
+                  oid : _ -> oid
+                  [] -> ObjectId.MkObjectId 0
+             in snd (fst (State.runState (Engine.runGame answer board (S.cast S.bob spell >> Stack.resolveTop >> Engine.settleForPriority)) ()))
+          pikerTokens g = filter (\oid -> Projection.controllerOf oid g == Just S.bob) (S.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) g)
+          vigilance g = fmap (\oid -> S.counterOf (CounterKind.Keyword Keyword.Vigilance) oid g) (pikerTokens g)
+      Spec.assertEqWith s "CR 614.12 in either order, bob's Piker token entered beside his Tayam token and has no vigilance counter" (vigilance (run False), vigilance (run True)) ([0], [0])
