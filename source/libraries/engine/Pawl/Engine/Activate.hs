@@ -227,7 +227,7 @@ activateAbility pid srcId ability = do
           -- a cost the targets can still change, so it is handed what they could
           -- be (aimingSomewhere). Read off `gs`, the same pre-stack board
           -- Target.chooseTargets is offered from, so one binding serves both.
-          slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
+          slots = Target.announcedSlots pid srcId gs (Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability))
           -- The PRE-X map, and it says so: `unannounced` is True, so a slot's CR
           -- 202.3 computed bound reading the X states no bound rather than an
           -- unmeetable one, and the lookahead measures the cost against every
