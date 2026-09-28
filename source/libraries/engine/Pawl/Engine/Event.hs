@@ -481,13 +481,15 @@ closeEventGroup gs =
 -- can't be paid -- has no site: Pawl.Types.CostComponent has no life-gain
 -- component for one to be written with.
 canPayLife :: PlayerId -> Natural -> GameState -> Bool
-canPayLife pid n gs =
-  n == 0
-    || ( not (PlayerEffect.prohibitsLosingLife pid gs)
-           && case Map.lookup pid (GameState.players gs) of
-             Nothing -> False
-             Just player -> Player.life player >= toInteger n
-       )
+canPayLife pid n gs = lifePayable pid gs n
+
+-- The same question with the amount last, so a caller asking it of many amounts
+-- walks the player effects once: a partial application shares `prohibited`.
+lifePayable :: PlayerId -> GameState -> Natural -> Bool
+lifePayable pid gs =
+  let prohibited = PlayerEffect.prohibitsLosingLife pid gs
+      total = fmap Player.life (Map.lookup pid (GameState.players gs))
+   in \n -> n == 0 || (not prohibited && maybe False (>= toInteger n) total)
 
 -- CR 119.4: the payment is subtracted from the player's life total. The CR 704.5a
 -- state-based action that may follow is the existing one in Pawl.Engine.Sba --

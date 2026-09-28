@@ -1,26 +1,36 @@
 module Pawl.Benchmark where
 
 import qualified Control.Exception as Exception
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
-import qualified Data.Map.Strict as Map.Strict
+import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Script as Script
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Deck as Deck
+import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import Pawl.Types.ManaCost (ManaCost)
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Zone as Zone
 import qualified Test.Tasty.Bench as Bench
 
@@ -63,7 +73,7 @@ anthemBoard land anthem spell n =
         let (printingId, gs1) = Game.intern printing gs0
             (oid, gs2) = Engine.runGamePure Script.declining gs1 (Setup.createCard alice printingId)
             moved = Game.insertIntoZone zone LibraryPosition.defaultValue alice oid (Game.removeFromZones alice oid gs2)
-         in moved {GameState.objects = Map.Strict.adjust (\o -> o {Object.zone = zone}) oid (GameState.objects moved)}
+         in moved {GameState.objects = Map.adjust (\o -> o {Object.zone = zone}) oid (GameState.objects moved)}
       times :: Natural -> (GameState.GameState -> GameState.GameState) -> GameState.GameState -> GameState.GameState
       times k f = foldr (.) id (List.genericReplicate k f)
       built = times n (place Zone.Hand spell) (times n (place Zone.Battlefield spell) (times 3 (place Zone.Battlefield anthem) (times 5 (place Zone.Battlefield land) (Setup.emptyGame players))))
@@ -249,6 +259,63 @@ loadIndependentDeck registry = do
   swamp <- fetchOrThrow registry "Swamp"
   pure (Deck.fromCards (Map.fromList [(myr, 2), (forest, 5), (swamp, 6)]))
 
+-- Puts each printing onto the battlefield under the first player, untapped and
+-- settled (CR 302.6), in their precombat main phase with nothing else going on:
+-- the board a mana-payability question is asked about, with no game played to
+-- reach it.
+onBattlefield :: NonEmpty.NonEmpty PlayerId -> [Printing.Printing] -> GameState
+onBattlefield players printings =
+  let pid = NonEmpty.head players
+      place gs printing =
+        let (printingId, interned) = Game.intern printing gs
+            (oid, created) = Engine.runGamePure Script.passing interned (Setup.createCard pid printingId)
+            settled =
+              created
+                { GameState.objects = Map.adjust (\object -> object {Object.zone = Zone.Battlefield, Object.sickness = Sickness.Settled pid}) oid (GameState.objects created),
+                  GameState.library = Map.adjust (Seq.filter (/= oid)) pid (GameState.library created)
+                }
+         in Game.insertIntoZone Zone.Battlefield LibraryPosition.Bottom pid oid settled
+      board = Foldable.foldl' place (Setup.emptyGame players) printings
+   in board {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+
+-- Mana.canPay's answer for one cost on one board. Parameterized for the reason
+-- 'goldfish' gives: the board depends on the argument, so nothing floats out.
+payable :: [Printing.Printing] -> ManaCost -> Natural -> Bool
+payable printings cost n = Mana.canPay Cost.manaActivations (PlayerId.MkPlayerId n) cost (onBattlefield (playersFrom n) printings)
+{-# NOINLINE payable #-}
+
+-- Every shape #595 names that keeps a source plural, on one board: Treasonous
+-- Ogre pays life, Springleaf Drum's tap claim contends with every Llanowar Elves,
+-- and Transmogrant Altar and Chromatic Star eat mana, whose orderings a board
+-- also walks: thousands of boards in all. An unpayable cost walked every one
+-- until the relaxation in Mana.payableResolutionsGiven, which refuses the three
+-- here first: "short" is one mana past the board's thirteen, "far short" far
+-- past it, and "off colour" a third blue. "payable" is the control, stopping at
+-- the first board that pays.
+loadPluralBoard :: Registry.Registry IO -> IO [Printing.Printing]
+loadPluralBoard registry = do
+  ogre <- fetchOrThrow registry "Treasonous Ogre"
+  drum <- fetchOrThrow registry "Springleaf Drum"
+  elves <- fetchOrThrow registry "Llanowar Elves"
+  altar <- fetchOrThrow registry "Transmogrant Altar"
+  star <- fetchOrThrow registry "Chromatic Star"
+  pure ([ogre, ogre, drum, altar, star] <> replicate 4 elves)
+
+-- What that relaxation cannot refuse: it ignores claims, so it counts the Drum's
+-- mana on top of all eight Elves', where the Drum's tap takes one of them. A {9}
+-- still walks every board (#595).
+loadDrumBoard :: Registry.Registry IO -> IO [Printing.Printing]
+loadDrumBoard registry = do
+  drum <- fetchOrThrow registry "Springleaf Drum"
+  elves <- fetchOrThrow registry "Llanowar Elves"
+  pure (drum : replicate 8 elves)
+
+generic :: Natural -> ManaCost
+generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
+
+colored :: Color.Color -> Int -> ManaCost
+colored color n = ManaCost.MkManaCost (replicate n (ManaSymbol.OfType (ManaType.Colored color)))
+
 main :: IO ()
 main = do
   root <- Registry.defaultRoot
@@ -261,6 +328,8 @@ main = do
   mountain <- fetchOrThrow registry "Mountain"
   anthem <- fetchOrThrow registry "Glorious Anthem"
   piker <- fetchOrThrow registry "Goblin Piker"
+  plural <- loadPluralBoard registry
+  drum <- loadDrumBoard registry
   Bench.defaultMain
     [ Bench.bench "goldfish 2p" $ Bench.whnf (goldfish deck) 0,
       Bench.bench "casting 2p" $ Bench.whnf (casting deck) 0,
@@ -275,5 +344,10 @@ main = do
       -- #435: every cast of 40 cards in hand over 40 creatures and 3 anthems.
       Bench.bench "castable 40" $ Bench.whnf (castableCount True mountain anthem piker) 40,
       -- The line above's paired control: the same question card by card.
-      Bench.bench "castable 40 unshared" $ Bench.whnf (castableCount False mountain anthem piker) 40
+      Bench.bench "castable 40 unshared" $ Bench.whnf (castableCount False mountain anthem piker) 40,
+      Bench.bench "payable plural payable" $ Bench.whnf (payable plural (generic 4)) 0,
+      Bench.bench "payable plural short" $ Bench.whnf (payable plural (generic 14)) 0,
+      Bench.bench "payable plural far short" $ Bench.whnf (payable plural (generic 40)) 0,
+      Bench.bench "payable plural off colour" $ Bench.whnf (payable plural (colored Color.Blue 3)) 0,
+      Bench.bench "payable drum short" $ Bench.whnf (payable drum (generic 9)) 0
     ]

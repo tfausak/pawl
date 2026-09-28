@@ -591,10 +591,10 @@ data Face card = MkFace
     -- mulligan process is complete), and a card that acts at one must not be
     -- offered at the other.
     --
-    -- No card grants two of these, so the two-action offer is proved on the CR
-    -- 103.5b window only (#803). Unlike that window, this one offers each card
-    -- at most once -- CR 103.6b, and Pawl.Types.HandWindowCap for why the cap
-    -- covers a rule 103.6a action too.
+    -- Unlike that window, this one reveals each card at most once -- CR 103.6b,
+    -- and Pawl.Types.HandWindowCap for why the cap spares a rule 103.6a action.
+    -- Proved on a card granting one of each by MulliganSpec's "CR 103.6: a card
+    -- revealed first may still begin the game on the battlefield".
     --
     -- Gemstone Caverns is the printing that writes a HandAction's gate: "you're
     -- not the starting player" allows the action to some players and not others,
