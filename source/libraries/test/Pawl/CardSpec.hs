@@ -4711,6 +4711,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- ones go through costComponentFilters so an added component and a printed
   -- one are held to one standard.
   PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f _ components _) -> f : concatMap costComponentFilters components
+  PlayerEffect.AlternativeActivationCost _ -> []
   -- The spell-side twin, whose Filter names the SPELL (Drought's is universal)
   -- and whose components carry one of their own ("sacrifice a SWAMP").
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components _) -> f : concatMap costComponentFilters components

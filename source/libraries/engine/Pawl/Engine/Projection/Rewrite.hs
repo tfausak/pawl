@@ -425,6 +425,8 @@ rewritePlayerEffect pairs effect = case effect of
   -- the activation arm carries beside it: CR 606.2's classification is not a
   -- word on the card.
   PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f loyalty components scale) -> PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.rewrite pairs f) loyalty (fmap (Filter.rewriteComponent pairs) components) scale)
+  -- No filter to rewrite: a rule-702 designator is not a word CR 612.1 swaps.
+  PlayerEffect.AlternativeActivationCost _ -> effect
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.MayPlayAsThoughItHadFlash f -> PlayerEffect.MayPlayAsThoughItHadFlash (Filter.rewrite pairs f)
