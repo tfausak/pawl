@@ -226,6 +226,7 @@ movedOf event = case event of
   GameEvent.Scried _ -> Nothing
   GameEvent.DungeonCompleted _ -> Nothing
   GameEvent.Surveiled _ -> Nothing
+  GameEvent.Proliferated _ -> Nothing
   GameEvent.DiceRolled _ -> Nothing
   GameEvent.DieResultSettled _ -> Nothing
   GameEvent.RolledToVisit _ -> Nothing
@@ -370,6 +371,7 @@ participants event =
         GameEvent.Scried pid -> player pid
         GameEvent.DungeonCompleted pid -> player pid
         GameEvent.Surveiled pid -> player pid
+        GameEvent.Proliferated pid -> player pid
         GameEvent.DiceRolled pid -> player pid
         GameEvent.DieResultSettled r -> player (DieResult.roller r)
         GameEvent.RolledToVisit r -> player (DieResult.roller r)
@@ -439,6 +441,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerScries _ -> False
   TriggerCondition.RingTemptsPlayer _ -> False
   TriggerCondition.PlayerSurveils _ -> False
+  TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
@@ -757,6 +760,7 @@ batchScoped condition = case condition of
   TriggerCondition.PlayerFirebends _ -> False
   TriggerCondition.PlayerCompletesDungeon _ -> False
   TriggerCondition.PlayerSurveils _ -> False
+  TriggerCondition.PlayerProliferates _ -> False
   TriggerCondition.SelfBecomesPlotted -> False
   TriggerCondition.PermanentExplores _ -> False
   TriggerCondition.PermanentConnives _ -> False
@@ -1251,6 +1255,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.Proliferated _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
@@ -1617,6 +1622,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.Proliferated _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
@@ -1877,6 +1883,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.Proliferated _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
@@ -2046,6 +2053,7 @@ eventTriggers events gs =
         GameEvent.Scried _ -> Map.empty
         GameEvent.DungeonCompleted _ -> Map.empty
         GameEvent.Surveiled _ -> Map.empty
+        GameEvent.Proliferated _ -> Map.empty
         GameEvent.DiceRolled _ -> Map.empty
         GameEvent.DieResultSettled _ -> Map.empty
         GameEvent.RolledToVisit _ -> Map.empty
@@ -2466,6 +2474,7 @@ zonesTriggeredFrom cond =
         TriggerCondition.PlayerScries _ -> battlefield
         TriggerCondition.RingTemptsPlayer _ -> battlefield
         TriggerCondition.PlayerSurveils _ -> battlefield
+        TriggerCondition.PlayerProliferates _ -> battlefield
         TriggerCondition.PermanentExplores _ -> battlefield
         TriggerCondition.PermanentConnives _ -> battlefield
         -- CR 113.6's default again: Synthetic Blight Chronicler is an ordinary
@@ -2951,6 +2960,7 @@ stateTriggers gs
             TriggerCondition.PlayerScries _ -> False
             TriggerCondition.RingTemptsPlayer _ -> False
             TriggerCondition.PlayerSurveils _ -> False
+            TriggerCondition.PlayerProliferates _ -> False
             TriggerCondition.SelfBecomesPlotted -> False
             TriggerCondition.PermanentExplores _ -> False
             TriggerCondition.PermanentConnives _ -> False
@@ -3724,6 +3734,7 @@ resnapshot gs without event =
         GameEvent.Scried {} -> Just event
         GameEvent.DungeonCompleted {} -> Just event
         GameEvent.Surveiled {} -> Just event
+        GameEvent.Proliferated {} -> Just event
         GameEvent.DiceRolled {} -> Just event
         GameEvent.DieResultSettled {} -> Just event
         GameEvent.RolledToVisit {} -> Just event

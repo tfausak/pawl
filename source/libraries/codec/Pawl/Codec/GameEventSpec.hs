@@ -534,6 +534,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Surveiled (PlayerId.MkPlayerId 2))
       " {\"type\":\"Surveiled\",\"value\":2} "
+  Spec.it s "Proliferated" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Proliferated (PlayerId.MkPlayerId 3))
+      " {\"type\":\"Proliferated\",\"value\":3} "
   -- CR 706.1. One player id and no result: CR 706.7's planar die fires the
   -- trigger while every reader of a numerical result ignores it, so the number
   -- is not part of this entry.

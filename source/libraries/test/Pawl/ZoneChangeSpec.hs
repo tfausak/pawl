@@ -42,6 +42,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -2967,6 +2969,106 @@ discardExceptionsSpec s registry = Spec.describe s "CR 701.9b discard exceptions
       (List.sort (S.revealsOf after))
       (List.sort (fmap (\p -> (S.bob, Set.singleton (S.printingName p))) cards))
 
+-- CR 701.9a's "discarded this way" over Discard.These, the random discard's
+-- look-back. Aether Rift {1}{R}{G} Enchantment -- "At the beginning of your
+-- upkeep, discard a card at random. If you discard a creature card this way,
+-- return it from your graveyard to the battlefield unless any player pays 5
+-- life." Cragganwick Cremator {2}{R}{R} Creature -- Giant Shaman 5/4 -- "When
+-- this creature enters, discard a card at random. If you discard a creature card
+-- this way, this creature deals damage equal to that card's power to target
+-- player or planeswalker." (both checked against api.scryfall.com, 2026-09-28).
+--
+-- THREE seats, so "any player" is not "an opponent". alice holds exactly one
+-- card, so randomness has one answer and the card discarded is the one the
+-- board names. A Hill Giant already in her graveyard is a creature card "it"
+-- must not reach, so a return over the whole graveyard is caught.
+discardedThisWaySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+discardedThisWaySpec s registry = Spec.describe s "CR 701.9a discarded this way" $ do
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- Aether Rift on alice's battlefield, `held` her one card, a Hill Giant in
+      -- her graveyard, `redirect` (if any) on bob's battlefield, and alice's
+      -- upkeep begun with the trigger on the stack.
+      riftBoard redirect held = do
+        rift <- S.printingOf s registry "Aether Rift"
+        giant <- S.printingOf s registry "Hill Giant"
+        heldCard <- S.printingOf s registry held
+        redirecting <- traverse (S.printingOf s registry) redirect
+        let (_, withRift) = S.addPermanent rift S.alice S.threePlayerGame
+            withRedirect = maybe withRift (\p -> snd (S.addPermanent p S.bob withRift)) redirecting
+            (_, withGiant) = S.addGraveyardCard giant S.alice withRedirect
+            (_, withHand) = S.addHandCard heldCard S.alice withGiant
+            begun = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (withHand {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+            onStack = S.runPure S.identityAnswer begun Engine.settleForPriority
+        pure onStack
+      -- The one seat that pays 5 life, if any.
+      paysFor :: Maybe PlayerId.PlayerId -> Prompt.Prompt r -> r
+      paysFor who p = case p of
+        Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+          | Just d == who && Just player == who -> PaymentDecision.Pays
+        _ -> S.identityAnswer p
+      payResponses = filter (\r -> case r of Response.ChoseToPay _ -> True; _ -> False)
+      named = Just . CardName.MkCardName . Text.pack
+      battlefieldNames gs = List.sort (fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Set.toList (GameState.battlefield gs)))
+  Spec.it s "CR 701.9a Aether Rift returns the creature card it discarded when nobody pays" $ do
+    onStack <- riftBoard Nothing "Goblin Piker"
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the upkeep trigger really reached the stack"
+    let ((_, after), transcript) = Replay.record (paysFor Nothing) onStack Stack.resolveTop
+    Spec.assertEqWith s "the discarded Piker is on the battlefield beside the Rift" (battlefieldNames after) [named "Aether Rift", named "Goblin Piker"]
+    Spec.assertEqWith s "and the Hill Giant already there stays in the graveyard" (namesIn Zone.Graveyard S.alice after) [named "Hill Giant"]
+    Spec.assertEqWith s "alice's hand is empty" (S.handSize S.alice after) 0
+    -- Every player is offered, in APNAP order.
+    Spec.assertEqWith s "CR 118.12a: all three were offered and declined" (payResponses transcript) (replicate 3 (Response.ChoseToPay PaymentDecision.Declines))
+    Spec.assertEqWith s "and nobody lost life" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
+  -- The same board, differing only in carol's answer.
+  Spec.it s "CR 118.12a carol pays 5 life, so the discarded creature stays in the graveyard" $ do
+    onStack <- riftBoard Nothing "Goblin Piker"
+    let ((_, after), transcript) = Replay.record (paysFor (Just S.carol)) onStack Stack.resolveTop
+    Spec.assertEqWith s "the Piker stays in alice's graveyard" (List.sort (namesIn Zone.Graveyard S.alice after)) [named "Goblin Piker", named "Hill Giant"]
+    Spec.assertEqWith s "and only the Rift is on the battlefield" (battlefieldNames after) [named "Aether Rift"]
+    Spec.assertEqWith s "carol paid 5 life" (S.lifeOf S.carol after) (Just 15)
+    Spec.assertEqWith s "CR 101.4: alice and bob declined before carol paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines, Response.ChoseToPay PaymentDecision.Declines, Response.ChoseToPay PaymentDecision.Pays]
+  -- The same board with a noncreature card held: the "if" is false, so nobody
+  -- is even offered the payment.
+  Spec.it s "CR 701.9a a noncreature card discarded by Aether Rift stays put and nobody is asked to pay" $ do
+    onStack <- riftBoard Nothing "Lightning Bolt"
+    let ((_, after), transcript) = Replay.record (paysFor Nothing) onStack Stack.resolveTop
+    Spec.assertEqWith s "the Bolt is in alice's graveyard" (List.sort (namesIn Zone.Graveyard S.alice after)) [named "Hill Giant", named "Lightning Bolt"]
+    Spec.assertEqWith s "and only the Rift is on the battlefield" (battlefieldNames after) [named "Aether Rift"]
+    Spec.assertEqWith s "nobody was offered the payment" (payResponses transcript) []
+  -- CR 701.9c through a CR 614 redirect: Rest in Peace exiles the discarded
+  -- Piker. It was still discarded, so the "if" holds and the payment is still
+  -- offered, but "return it from your graveyard" finds nothing there -- and must
+  -- not take the Hill Giant that is.
+  Spec.it s "CR 701.9c a creature card Aether Rift discarded into exile is not returned" $ do
+    onStack <- riftBoard (Just "Rest in Peace") "Goblin Piker"
+    let ((_, after), transcript) = Replay.record (paysFor Nothing) onStack Stack.resolveTop
+    Spec.assertEqWith s "the Piker is in exile" (namesIn Zone.Exile S.alice after) [named "Goblin Piker"]
+    Spec.assertEqWith s "and nothing of alice's reached the battlefield" (battlefieldNames after) [named "Aether Rift", named "Rest in Peace"]
+    Spec.assertEqWith s "the Hill Giant stays in the graveyard" (namesIn Zone.Graveyard S.alice after) [named "Hill Giant"]
+    Spec.assertEqWith s "the discard still counted: all three were offered" (payResponses transcript) (replicate 3 (Response.ChoseToPay PaymentDecision.Declines))
+  -- Cragganwick Cremator: two boards differing in the one card alice holds once
+  -- the Cremator is cast. The Piker's power, 2, is not the Cremator's own 5.
+  let cremate held = do
+        mountain <- S.printingOf s registry "Mountain"
+        cremator <- S.printingOf s registry "Cragganwick Cremator"
+        heldCard <- S.printingOf s registry held
+        let lands = S.landsFor mountain S.alice 4 S.threePlayerGame
+            (withCremator, crematorId) = S.handOne cremator lands
+            (_, ready) = S.addHandCard heldCard S.alice withCremator
+            cast = S.runPure atBobAnswer ready (S.cast S.alice crematorId)
+            resolved = S.runPure atBobAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+        pure (resolved, S.runPure atBobAnswer resolved Stack.resolveTop)
+  Spec.it s "CR 701.9a Cragganwick Cremator deals the discarded creature card's power" $ do
+    (onStack, after) <- cremate "Goblin Piker"
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the enters trigger really reached the stack"
+    Spec.assertEqWith s "bob took the Piker's 2" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "the Piker is in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [named "Goblin Piker"]
+  Spec.it s "CR 701.9a Cragganwick Cremator deals nothing for a noncreature card" $ do
+    (onStack, after) <- cremate "Lightning Bolt"
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the enters trigger really reached the stack"
+    Spec.assertEqWith s "bob took nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "the Bolt is in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [named "Lightning Bolt"]
+
 -- CR 701.12d / 701.12f on Harness Infinity and Morality Shift. alice is on her
 -- own main phase with the lands to pay; bob holds a different card in each
 -- zone the exchange names, so one reaching past "your" is caught.
@@ -3146,6 +3248,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
   discardExceptionsSpec s registry
+  discardedThisWaySpec s registry
   anyNumberDiscardSpec s registry
   elkinLairSpec s registry
   castTheCardSpec s registry

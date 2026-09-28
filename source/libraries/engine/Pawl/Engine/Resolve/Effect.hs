@@ -347,6 +347,7 @@ import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.TheseDiscard as TheseDiscard
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -782,8 +783,8 @@ anyNumberMatching legal resolving controller source (AnyNumberMatching.MkAnyNumb
       answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates ceiling_)
       pure (capped (filter (`Set.member` answer) candidates))
 
--- CR 701.9a's move for Effect.Discard's choosing arms, once every seat has
--- picked: each seat's cards through the shared discard funnel, so the discard is
+-- CR 701.9a's move for every Effect.Discard arm, once the cards are named:
+-- each seat's cards through the shared discard funnel, so the discard is
 -- recorded for a trigger to read. The funnel's own answers come back for the
 -- binding below; a move that did not complete answers Nothing and is dropped.
 -- One event group across the seats, CR 101.4's "simultaneously".
@@ -1912,6 +1913,7 @@ referentsOfReplacement re = case re of
   ReplacementEffect.MillCountR _ -> []
   ReplacementEffect.CoinFlipR _ -> []
   ReplacementEffect.DieRollR _ -> []
+  ReplacementEffect.ProliferateR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The recipients a damage REWRITE bakes, which is CR 614.9's redirect destination
@@ -2986,7 +2988,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.Connive {} -> False
   -- "Discard THESE cards" names the cards themselves, so a sweep matching none
   -- is the naming-nobody case; only a chosen card can be impossible.
-  Effect.Discard (Discard.These ref) -> choosesFromNothing ref
+  Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard ref _)) -> choosesFromNothing ref
   -- CR 107.1c: zero is a legal answer, so no hand makes it impossible.
   Effect.Discard (Discard.AnyNumber {}) -> False
   Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _)) ->
@@ -5803,18 +5805,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- hand, and a ref over CR 400.1's per-player zone can name several owners'
   -- cards at once. A card whose owner cannot be read is skipped rather than
   -- filed under the controller.
-  Effect.Discard (Discard.These ref) -> do
+  Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard ref mDiscarded)) -> do
     named <- case ref of
       ObjectRef.RandomCardInHand random -> fmap (fmap snd) (randomCardsInHand resolving source controller legal random)
       ObjectRef.ChosenCardFromAmong from -> chooseCardFromAmong resolving source controller legal chosen from
       _ -> State.gets (\gs -> objectRefObjects legal resolving controller source gs ref)
     gs <- State.get
-    let owned oid = fmap ((,) oid . Object.owner) (Game.lookupObject oid gs)
-    -- One event group, CR 608.2f.
-    Event.simultaneously $
-      Monad.mapM_
-        (\(oid, owner) -> Event.discard DiscardCause.Ordinary owner oid)
-        (Maybe.mapMaybe owned named)
+    let owned oid = fmap (\obj -> (Object.owner obj, [oid])) (Game.lookupObject oid gs)
+    -- One event group, CR 608.2f, through the other arms' burial, so what
+    -- moved is bound the same way.
+    buryDiscards resolving mDiscarded (Maybe.mapMaybe owned named)
   Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity mDiscarded)) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -8867,32 +8867,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- The roster is Game.stillPlaying, not the keys of GameState.players, whose
   -- departed seats keep counters CR 800.4a does not remove.
+  --
+  -- CR 614.1a: the instruction is first proposed as WouldProliferate, so a row
+  -- like Tekuthal, Inquiry Dominus's can make it several proliferates -- each its
+  -- own CR 701.34a choice, read off the board the previous one left. No
+  -- ProliferateRewrite cancels the event; a cancelled one proliferates nothing.
   Effect.Proliferate -> do
-    gs <- State.get
-    let everyone = Game.reachableBy controller gs
-        grants = Projection.controlGrants gs
-        kindsOn oid = foldMap (Map.keys . Map.filter (> 0) . Object.counters) (Game.lookupObject oid gs)
-        kindsFor pid = foldMap (Map.keys . Map.filter (> 0) . Player.counters) (Map.lookup pid (GameState.players gs))
-        -- zoneMembers slices the shared battlefield by OWNER, so the union over
-        -- every seat is every permanent in play (CR 701.34a).
-        onBattlefield = concatMap (\pid -> Game.zoneMembers Zone.Battlefield pid gs) (Game.stillPlaying gs)
-        -- CR 801.10: a permanent in range, whoever owns it.
-        permanents = filter (\oid -> not (null (kindsOn oid)) && Projection.objectInRangeGiven grants controller oid gs) onBattlefield
-        players = filter (not . null . kindsFor) everyone
-    Monad.unless (null permanents && null players) $ do
-      (pickedPermanents, pickedPlayers) <-
-        Game.choose (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players)
-      -- FILTERED, NOT TRUSTED: an answer naming something not offered is dropped.
-      let keptPermanents = filter (\oid -> Set.member oid pickedPermanents) permanents
-          keptPlayers = filter (\pid -> Set.member pid pickedPlayers) players
-      -- CR 122.6: object counters through the single funnel, so CR 614's counter
-      -- replacements apply to a proliferated counter as to a placed one.
-      Monad.forM_ keptPermanents $ \oid ->
-        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters (CounterCause.ByEffect controller) oid kind 1
-      -- CR 122.1: and player counters through their own funnel.
-      Monad.forM_ keptPlayers $ \pid ->
-        Monad.forM_ (kindsFor pid) $ \kind ->
-          Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
+    outcome <- Event.applyReplacements (ProposedEvent.WouldProliferate controller 1)
+    Monad.forM_ (outcome >>= Replacement.asProliferate) $ \(_, times) ->
+      Monad.replicateM_ (Natural.toIntSaturating times) (proliferateOnce controller)
   -- CR 701.39a: "bolster N" -- put N +1/+1 counters on a creature you control
   -- with the least toughness, or tied for least. The prompt is raised only for a
   -- TIE; CR 101.3 ignores the instruction when the pool is empty. Targetless: no
@@ -9584,6 +9567,39 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
            in g1 {GameState.extraTurns = entry : GameState.extraTurns g1}
         pushRound g = List.foldl' push g takers
     State.modify' (\g -> List.foldl' (\acc _ -> pushRound acc) g [1 .. turns])
+
+-- CR 701.34a: one proliferate by `controller`. The Effect.Proliferate arm's
+-- body, once per proliferate its CR 614.1a replacements left standing.
+proliferateOnce :: PlayerId -> Game ()
+proliferateOnce controller = do
+  gs <- State.get
+  let everyone = Game.reachableBy controller gs
+      grants = Projection.controlGrants gs
+      kindsOn oid = foldMap (Map.keys . Map.filter (> 0) . Object.counters) (Game.lookupObject oid gs)
+      kindsFor pid = foldMap (Map.keys . Map.filter (> 0) . Player.counters) (Map.lookup pid (GameState.players gs))
+      -- zoneMembers slices the shared battlefield by OWNER, so the union over
+      -- every seat is every permanent in play (CR 701.34a).
+      onBattlefield = concatMap (\pid -> Game.zoneMembers Zone.Battlefield pid gs) (Game.stillPlaying gs)
+      -- CR 801.10: a permanent in range, whoever owns it.
+      permanents = filter (\oid -> not (null (kindsOn oid)) && Projection.objectInRangeGiven grants controller oid gs) onBattlefield
+      players = filter (not . null . kindsFor) everyone
+  Monad.unless (null permanents && null players) $ do
+    (pickedPermanents, pickedPlayers) <-
+      Game.choose (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players)
+    -- FILTERED, NOT TRUSTED: an answer naming something not offered is dropped.
+    let keptPermanents = filter (\oid -> Set.member oid pickedPermanents) permanents
+        keptPlayers = filter (\pid -> Set.member pid pickedPlayers) players
+    -- CR 122.6: object counters through the single funnel, so CR 614's counter
+    -- replacements apply to a proliferated counter as to a placed one.
+    Monad.forM_ keptPermanents $ \oid ->
+      Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters (CounterCause.ByEffect controller) oid kind 1
+    -- CR 122.1: and player counters through their own funnel.
+    Monad.forM_ keptPlayers $ \pid ->
+      Monad.forM_ (kindsFor pid) $ \kind ->
+        Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
+  -- "Whenever you proliferate" fires even when nothing was chosen (Tekuthal,
+  -- Inquiry Dominus's ruling), so the event is recorded outside the guard.
+  State.modify' (Event.recordEvent (GameEvent.Proliferated controller))
 
 -- CR 603.7c: stamp the land an earthbend animated onto the resolving object, so
 -- the environment the arming opcode captures next carries it. Pawl.Engine.Earthbend's
