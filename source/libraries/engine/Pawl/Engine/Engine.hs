@@ -930,7 +930,7 @@ placeBorne srcId pending = do
         Nothing -> fmap Seq.sort (Game.choose (Prompt.ChooseModes decider controller abilId legal selection))
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability is
       -- placed. A mode with no target slots asks nothing.
-      let slots = Modal.modesTargetSlots chosenModes modal
+      let slots = Target.announcedSlots controller srcId gs (Modal.modesTargetSlots chosenModes modal)
           sets = Target.legalSets (Just controller) False bound srcId slots gs
           -- CR 603.3d's "identical to the process ... listed in rules 601.2c-d",
           -- and 601.2c's "all at once": an answer whose slots read each other is

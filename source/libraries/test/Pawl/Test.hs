@@ -484,6 +484,7 @@ import qualified Pawl.Codec.SicknessSpec
 import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotCountSpec
 import qualified Pawl.Codec.SlotNameSpec
+import qualified Pawl.Codec.SlotPerPlayerSpec
 import qualified Pawl.Codec.SourceSpec
 import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
@@ -684,6 +685,7 @@ import qualified Pawl.SpeedSpec
 import qualified Pawl.SplitSecondSpec
 import qualified Pawl.StationSpec
 import qualified Pawl.SupportSpec
+import qualified Pawl.TargetPerPlayerSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TeamSpec
 import qualified Pawl.TimeTravelSpec
@@ -1219,6 +1221,7 @@ spec s registry = do
   Pawl.Codec.SkipNextPhaseSpec.spec s
   Pawl.Codec.SlotCountSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
+  Pawl.Codec.SlotPerPlayerSpec.spec s
   Pawl.Codec.SourceSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s
   Pawl.Codec.SpeedDecreaseSpec.spec s
@@ -1446,6 +1449,7 @@ spec s registry = do
   Pawl.StationSpec.spec s registry
   Pawl.SupportSpec.spec s registry
   Pawl.TargetSpec.spec s registry
+  Pawl.TargetPerPlayerSpec.spec s registry
   Pawl.RangeOfInfluenceSpec.spec s registry
   Pawl.TeamSpec.spec s registry
   Pawl.TransformSpec.spec s registry

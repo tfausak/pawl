@@ -19,11 +19,13 @@ import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Exile as Exile
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal.Engine
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.QuantitySlot as QuantitySlot
+import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Binding as Binding.Type
@@ -54,6 +56,7 @@ import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotCount as SlotCount
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.SlotPerPlayer as SlotPerPlayer
 import qualified Pawl.Types.TargetCount as TargetCount
 import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -412,10 +415,12 @@ slotContext pcs perspective unannounced bindings source amount gs =
             -- 205.2a's read of the subject's host is Pawl.Engine.Attach.hostsFor's
             -- to fill, and an announcement has no attach subject at all.
             Filter.subjectHostCardTypes = Set.empty,
-            -- Empty: CR 205.3m's comparison is filled only in a resolution's
-            -- own positions, and Pawl.FilterPositionLintSpec's lint refuses a
-            -- card that writes it in a target slot.
-            Filter.slotCreatureTypes = Map.empty,
+            -- CR 205.3m's creature types off the same objects and the same
+            -- CR 608.2h reader as slotControllers above, keyed per bound slot so
+            -- the atom widens for an unanswered one. The last-known read is the
+            -- rulings' (Unbury, Secret Tunnel): a target that has left still
+            -- lends its types to the one that stayed.
+            Filter.slotCreatureTypes = fmap (foldMap (foldMap (foldMap (Set.filter Subtype.isCreatureType . Filter.subtypes) . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) targets,
             Filter.slotToughnesses = Map.empty,
             -- CR 601.2c's PLAYERS out of the same environment, slotObjects' half
             -- one recipient kind over. Filled here for the symmetry rather than
@@ -1975,7 +1980,7 @@ fillableModesGiven pcs grants pools perspective seed source extra modal gs =
   let counting = countingByGiven pcs perspective source gs
       ms = Foldable.toList (Modal.modes modal)
       fillable i m =
-        let slots = Map.union extra (Mode.targetSlots m)
+        let slots = maybe id (\p -> announcedSlots p source gs) perspective (Map.union extra (Mode.targetSlots m))
             -- CR 601.2b's other FLOOR, the one `short` below cannot spell: a
             -- slot's CR 202.3 computed bound that reads a number the seed cannot
             -- supply states no bound at all rather than an unmeetable one (see
@@ -2066,6 +2071,49 @@ bakeSlot players slot =
       -- -- so no board today tells the two readings apart.
       TargetSlot.count = SlotCount.mapQuantity (Quantity.bakeBound players) (TargetSlot.count slot)
     }
+
+-- CR 601.2c's "for each opponent, ... up to one target ... that player controls"
+-- at announcement: every perPlayer slot replaced by one copy per player its
+-- relation names from `controller` (CR 801.5a's range included), each under
+-- Modal.perPlayerSlot's name and baked against its own player. Every other slot
+-- passes through.
+--
+-- A player with nothing the copy could target gets no copy, so "target
+-- permanent that player controls" asks only of the players who control one
+-- (Sylvan Primordial's ruling: "If an opponent has any legal permanents to
+-- target, you must target one of them"). Pawl.TargetPerPlayerSpec proves both.
+announcedSlots :: PlayerId -> ObjectId -> GameState -> Map SlotName TargetSlot -> Map SlotName TargetSlot
+announcedSlots controller source gs =
+  splitPerPlayer
+    (\_ each -> List.filter (PlayerRelation.holds (Game.teams gs) (SlotPerPlayer.players each) controller) (Game.reachableBy controller gs))
+    (\copy -> not (Set.null (legalRecipients (Just controller) source copy gs)))
+
+-- CR 608.2b: the copies an announcement BOUND, read back off the binding names,
+-- so each target is re-judged against the player it was chosen for. By name
+-- rather than by relation: "that player" was fixed at CR 601.2c, whoever controls
+-- the ability now.
+boundCopies :: Set SlotName -> Map SlotName TargetSlot -> Map SlotName TargetSlot
+boundCopies bound =
+  let copies = Maybe.mapMaybe Modal.Engine.perPlayerOf (Set.toList bound)
+   in splitPerPlayer (\slot _ -> [pid | (base, pid) <- copies, base == slot]) (const True)
+
+-- Every perPlayer slot as its copies, one per player `playersOf` names and kept
+-- where `keep` holds of it -- all of them when it holds of none, so a spell with
+-- nothing to target anywhere still has a slot it cannot fill (CR 601.2c). Every
+-- other slot unchanged.
+splitPerPlayer :: (SlotName -> SlotPerPlayer.SlotPerPlayer -> [PlayerId]) -> (TargetSlot -> Bool) -> Map SlotName TargetSlot -> Map SlotName TargetSlot
+splitPerPlayer playersOf keep =
+  let split name slot = case TargetSlot.perPlayer slot of
+        Nothing -> Map.singleton name slot
+        Just each ->
+          let copies =
+                Map.fromList
+                  [ (Modal.Engine.perPlayerSlot name pid, bakeSlot (Map.singleton (SlotPerPlayer.slot each) pid) slot {TargetSlot.perPlayer = Nothing})
+                  | pid <- playersOf name each
+                  ]
+              kept = Map.filter keep copies
+           in if Map.null kept then copies else kept
+   in Map.unions . Map.mapWithKey split
 
 -- bakeSlots over a whole modal payload, for the caller that must bake BEFORE the
 -- modes are chosen: CR 700.2b's mode selection asks which modes are fillable

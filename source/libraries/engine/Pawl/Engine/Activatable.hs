@@ -567,7 +567,9 @@ recipientObjects = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
 -- a target this activation could name.
 candidateSlotsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Target.Pools -> PlayerId -> ObjectId -> Modal.Type.Modal Card.Card (GrantedAbility.GrantedAbility Card.Card) -> Set.Set ModeIndex.ModeIndex -> GameState -> [Map.Map SlotName (Set.Set ObjectId)]
 candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
-  let slotsOf mi = Modal.modesTargetSlots (Seq.singleton mi) modal
+  let -- CR 601.2c's per-player copies, as the announcement will offer them. A
+      -- REGRESSION FENCE: no card pairs a per-player slot with a target-reading cost.
+      slotsOf mi = Target.announcedSlots pid srcId gs (Modal.modesTargetSlots (Seq.singleton mi) modal)
       -- CR 601.2b's announcement has NOT been made at this point, which is what
       -- `unannounced` says: a slot's CR 202.3 computed bound reading the X states
       -- no bound here rather than an unmeetable one, so the gate is measured

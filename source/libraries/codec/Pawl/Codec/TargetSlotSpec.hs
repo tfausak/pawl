@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotName as SlotName
@@ -75,6 +76,14 @@ spec s = Spec.describe s "Pawl.Codec.TargetSlot" $ do
       TargetSlot.codec
       (TargetSlot.announcedX Pool.Creatures Nothing)
       " {\"pool\":{\"type\":\"Creatures\"},\"count\":{\"type\":\"AnnouncedX\"}} "
+  -- CR 601.2c's "for each opponent": the one case that spends the perPlayer key
+  -- (Riptide Gearhulk).
+  Spec.it s "a per-opponent spec" $
+    Common.assertCodec
+      s
+      TargetSlot.codec
+      (TargetSlot.forEachPlayer PlayerRelation.Opponent (SlotName.MkSlotName (Text.pack "thatPlayer")) (TargetSlot.upTo 1 Pool.Permanents Nothing))
+      " {\"pool\":{\"type\":\"Permanents\"},\"count\":{\"type\":\"Printed\",\"value\":{\"least\":0,\"most\":1}},\"perPlayer\":{\"players\":{\"type\":\"Opponent\"},\"slot\":\"thatPlayer\"}} "
   -- The slot-keyed map is a JSON OBJECT keyed by the slot name (#1303). The two
   -- entries are inserted in DESCENDING slot-name order, so a trip that emitted
   -- the map's incidental traversal order rather than Map.toAscList fails this
