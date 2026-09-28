@@ -49,6 +49,7 @@ import qualified Pawl.Types.MutateSide as MutateSide
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.OutsideCard as OutsideCard
+import qualified Pawl.Types.PayOffer as PayOffer
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -841,8 +842,9 @@ data Prompt r where
   -- offers, once per payment in APNAP order. Not asked where CR 118.3 leaves
   -- only declining, nor for CR 118.12's mandatory limb
   -- (Pawl.Types.PayObligation). Pawl.ResolveSpec's PayGate group fails if this
-  -- prompt is raised there.
-  ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
+  -- prompt is raised there. The Seq is what the payers before this one answered
+  -- to the same offer (CR 101.4b).
+  ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> PayOffer.PayOffer -> Cost.Cost Keyword.Keyword -> Seq.Seq (PlayerId.PlayerId, PaymentDecision.PaymentDecision) -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: whether 2 life or mana pays each Phyrexian symbol, one prompt
   -- per symbol in printed order at CR 118.13's moments and for a combat toll
   -- (Pawl.Engine.Cost.announceToll); a hybrid Phyrexian symbol (CR 107.4f)

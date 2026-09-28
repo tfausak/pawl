@@ -6,9 +6,18 @@ import qualified Pawl.Codec.ForEach as ForEach
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.LoopMembers as LoopMembers
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PayBranch as PayBranch
+import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | The @effect@ parameter is instantiated at 'Text.Text' rather than at
@@ -32,7 +41,8 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
             ForEach.body = Seq.fromList [Text.pack "first", Text.pack "second"],
             -- CR 608.2f's second sentence, which that rule's Soulfire Eruption
             -- example states outright.
-            ForEach.individually = True
+            ForEach.individually = True,
+            ForEach.payGate = Nothing
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"victims\"},\"slot\":\"victim\",\"body\":[\"first\",\"second\"],\"individually\":true} "
@@ -50,7 +60,8 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
             ForEach.body = Seq.empty,
             -- The default CR 608.2f's "in most cases" gives, so the key is absent
             -- from the wire.
-            ForEach.individually = False
+            ForEach.individually = False,
+            ForEach.payGate = Nothing
           }
       )
       " {\"ref\":{\"type\":\"EachPlayer\"},\"slot\":\"victim\",\"body\":[]} "
@@ -65,8 +76,35 @@ spec s = Spec.describe s "Pawl.Codec.ForEach" $ do
             ForEach.members = LoopMembers.AnyNumber,
             ForEach.slot = SlotName.MkSlotName (Text.pack "opponent"),
             ForEach.body = Seq.singleton (Text.pack "mint"),
-            ForEach.individually = False
+            ForEach.individually = False,
+            ForEach.payGate = Nothing
           }
       )
       " {\"ref\":{\"type\":\"EachOpponent\"},\"members\":{\"type\":\"AnyNumber\"},\"slot\":\"opponent\",\"body\":[\"mint\"]} "
+  -- Cleansing's "for each land, destroy that land unless any player pays 1
+  -- life": CR 118.12a's gate offered per member.
+  Spec.it s "MkForEach with a pay gate" $
+    Common.assertCodec
+      s
+      codec
+      ( ForEach.MkForEach
+          { ForEach.ref = ObjectRef.EachMatching (Filter.HasCardType CardType.Land),
+            ForEach.members = LoopMembers.Every,
+            ForEach.slot = SlotName.MkSlotName (Text.pack "land"),
+            ForEach.body = Seq.singleton (Text.pack "destroy"),
+            ForEach.individually = False,
+            ForEach.payGate =
+              Just
+                PayGate.MkPayGate
+                  { PayGate.payer = PlayerRef.EachPlayer,
+                    PayGate.cost = Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.PayLife 1],
+                    PayGate.basis = Nothing,
+                    PayGate.branch = PayBranch.IfNonePaid,
+                    PayGate.obligation = PayObligation.Optional,
+                    PayGate.perEach = Nothing,
+                    PayGate.offeredAt = Nothing
+                  }
+          }
+      )
+      " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}},\"slot\":\"land\",\"body\":[\"destroy\"],\"payGate\":{\"payer\":{\"type\":\"EachPlayer\"},\"cost\":{\"mana\":[],\"components\":[{\"type\":\"PayLife\",\"value\":1}]},\"branch\":{\"type\":\"IfNonePaid\"}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec

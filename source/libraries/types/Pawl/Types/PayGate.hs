@@ -33,7 +33,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- Pawl.Types.Optionality's reason carried over: it gates an instruction list on
 -- an answer given as the effect is applied, and an Effect arm holding other
 -- effects would put a BRANCH inside the ISA, which design.md section 1 keeps
--- out.
+-- out. The one other place it rides is a CR 608.2f loop's per-member offer,
+-- Pawl.Types.ForEach.payGate, a field of that loop for the same reason.
 --
 -- The clause is CR 608.2e's span, so a gate governing only some of an ability's
 -- instructions is representable -- Stymied Hopes' "counter target spell unless

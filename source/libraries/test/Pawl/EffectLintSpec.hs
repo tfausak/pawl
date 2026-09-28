@@ -1491,7 +1491,7 @@ effectObjectRefs effect =
         Effect.OfferNotedCopy {} -> []
         Effect.OfferCast offer -> read_ [OfferCast.ref offer]
         Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
-        Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> read_ [ref]
+        Effect.ForEach (ForEach.MkForEach ref _ _ _ _ _) -> read_ [ref]
         Effect.ForEachNumber {} -> []
         Effect.Repeat {} -> []
         Effect.Heal ref -> read_ [ref]

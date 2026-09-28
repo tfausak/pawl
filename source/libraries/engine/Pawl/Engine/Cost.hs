@@ -1351,6 +1351,18 @@ plus base extra =
           Cost.components = Cost.components base <> Cost.components extra
         }
 
+-- CR 101.4's "Then the actions happen simultaneously" for one player's several
+-- CR 118.12 payments: `plus` over them, with every fixed life payment summed
+-- into ONE PayLife, so the life is paid as one event rather than one per offer
+-- -- Killing Wave's ruling, "each player pays life and sacrifices creatures at
+-- the same time".
+together :: NonEmpty.NonEmpty (Cost Keyword.Type.Keyword) -> Cost Keyword.Type.Keyword
+together costs =
+  let summed = foldr1 plus costs
+      life = sum [n | CostComponent.PayLife n <- Cost.components summed]
+      others = filter (\component -> case component of CostComponent.PayLife _ -> False; _ -> True) (Cost.components summed)
+   in summed {Cost.components = others <> [CostComponent.PayLife life | life > 0]}
+
 -- CR 702.24a's "[cost] for each age counter on it": N whole copies of this cost,
 -- as ONE cost. `plus` folded over itself, so the mana parts concatenate and the
 -- components are appended in order -- which is also rule 702.24a's "each choice
