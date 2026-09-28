@@ -39,6 +39,7 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterRestriction as CounterRestriction
@@ -288,7 +289,7 @@ populatedFace =
       Face.maximumX = [Quantity.ManaValue],
       Face.minimumX = 1,
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
-      Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing],
+      Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less],
       Face.counterability = Counterability.CantBeCountered,
       Face.mulliganActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw]],
       Face.openingHandActions = [HandAction.MkHandAction Nothing [Effect.ExileHandThenDraw]],
@@ -635,7 +636,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing]}
+        baseFace {Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less]}
         (init baseFaceJson <> ",\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}]}")
     Spec.it s "counterability" $
       Common.assertJsonCodec

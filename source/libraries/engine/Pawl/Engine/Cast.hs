@@ -454,11 +454,15 @@ payableCost extra spending pid oid gs = payableCostAt (maybe 0 Face.minimumX (Ga
 --
 -- CR 601.2c's targets do not exist at any moment this gate is asked -- every
 -- caller sits at CR 601.3 or inside CR 601.2b -- and a cost whose criterion NAMES one cannot be measured without them
--- (Cost.readsBoundSlot). Such a cost is asked of every announcement still open
+-- (Cost.readsBoundSlot), nor can a spell whose own cost sentence reads them
+-- (Cost.selfReadsTargets, Bury in Books' "if it targets an attacking
+-- creature"). Such a cost is asked of every announcement still open
 -- instead -- CR 601.2 makes a casting legal when the player can comply with
 -- every step, so the gate's question is whether SOME aiming complies, exactly
--- as Activatable.aimingSomewhere asks it. A cost naming no slot answers the same
--- under every aiming and skips the search.
+-- as Activatable.aimingSomewhere asks it. Whole aimings rather than one
+-- candidate at a time, because a "costs more" sentence (Vanish into Eternity)
+-- is not monotone in the targets. A cost reading neither answers the same under
+-- every aiming and skips the search.
 --
 -- Not implemented: Cost.readsBoundSlot is asked of the PRINTED cost, so a
 -- criterion arriving on a component CR 601.2f's adjustments add is not seen here
@@ -478,12 +482,13 @@ payableCost extra spending pid oid gs = payableCostAt (maybe 0 Face.minimumX (Ga
 -- player holding seven Plains. Off the FACE being cast, as castProposed reads it.
 payableCostAt :: Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x extra spending pid oid gs cost =
-  let adjustments = Cost.plusReductions extra (Cost.spellAdjustments pid oid gs)
-      substituted = Cost.substituteX x cost
-      totalled = Cost.plusComponents adjustments substituted
+  let substituted = Cost.substituteX x cost
       assisted = Cost.assistable (Game.castingKeywordsOf oid gs) (PaymentSubject.Casting oid) pid oid gs
-      ask slots = Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
-   in if Cost.readsBoundSlot substituted
+      ask slots =
+        let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems slots)) pid oid gs)
+            totalled = Cost.plusComponents adjustments substituted
+         in Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
+   in if Cost.readsBoundSlot substituted || Cost.selfReadsTargets oid gs
         then any (any ask . Target.aimings) (castAimable pid oid gs)
         else ask Map.empty
 
@@ -3095,7 +3100,14 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                   -- proof: no printing states assist beside a hybrid or
                   -- Phyrexian symbol (Scryfall keyword:assist, 2026-09-23), so
                   -- no announcement here has a choice it could change.
-                  let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments pid sid announcedBoard)
+                  --
+                  -- No targets yet, so a spell's own sentence reading them
+                  -- (Cost.selfReadsTargets) is not in this total, and the routes
+                  -- are offered as if it did not apply. A fence, not a proof:
+                  -- no printing states such a sentence beside a hybrid or
+                  -- Phyrexian symbol (MTGJSON 2026-08-23, "costs .* (less|more)
+                  -- to cast if it targets").
+                  let gathered = Cost.plusReductions chosenReductions (Cost.spellAdjustments Set.empty pid sid announcedBoard)
                   let totalledCost = Cost.plusComponents gathered announcedAtX
                       assistedTotal = Cost.assistable (Game.castingKeywordsOf sid announcedBoard) (PaymentSubject.Casting sid) pid sid announcedBoard
                   (announcedCost, phyrexianLifePaid) <- Cost.announce (PaymentSubject.Casting sid) spending pid sid (Cost.substitutedManas (Cost.manaSubstitutions (Cost.Type.components totalledCost) Map.empty pid sid announcedBoard) (fmap assistedTotal . Cost.totalManas gathered)) totalledCost
@@ -3226,7 +3238,10 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       -- group is the proof (Baral pays the sacrifice, and the
                       -- Reap still costs {B}).
                       pricedGs <- State.get
-                      adjustments <- Cost.announceReductions pid sid pricedGs announcedCost (Cost.plusReductions chosenReductions (Cost.spellAdjustments pid sid pricedGs))
+                      -- CR 601.2c's targets are fixed by now, so the spell's own
+                      -- sentence reading them (Bury in Books) is asked here.
+                      let announced = Set.fromList (Maybe.mapMaybe Recipient.objectOf (Set.toList (Set.unions (Map.elems chosen))))
+                      adjustments <- Cost.announceReductions pid sid pricedGs announcedCost (Cost.plusReductions chosenReductions (Cost.spellAdjustments announced pid sid pricedGs))
                       -- CR 601.2f's "plus all additional costs", gathered NOW
                       -- that the targets are fixed, where `gathered` at CR
                       -- 601.2b above could not see them: a component read off

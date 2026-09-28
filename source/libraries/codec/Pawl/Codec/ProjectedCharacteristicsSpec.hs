@@ -21,6 +21,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostChoice as CostChoice
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Face as Face.Type
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -99,8 +100,8 @@ testCharacteristics =
       PC.additionalCosts = [CostComponent.TapThis],
       PC.additionalCostChoices = [CostChoice.MkCostChoice (Cost.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.TapThis] NonEmpty.:| [Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []])],
       PC.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
-      PC.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing],
-      PC.grantedCostReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (Quantity.Literal 1) Nothing],
+      PC.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less],
+      PC.grantedCostReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less],
       -- Synthetic like the rest of this value: a Mountain has no halves, and
       -- what the case is about is that the field carries a whole card through
       -- the wire (CR 709.5).
