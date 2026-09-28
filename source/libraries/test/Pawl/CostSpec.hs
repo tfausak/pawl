@@ -49,12 +49,16 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Asked as Asked
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterChange as CounterChange
@@ -3005,6 +3009,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   ertaisScornSpec s registry
   deemInferiorSpec s registry
   richlauSpec s registry
+  targetCostSpec s registry
   frogmiteSpec s registry
   exhalationSpec s registry
   omniscienceSpec s registry
@@ -3426,6 +3431,8 @@ thrastaSpec s registry =
             (ManaCost.MkManaCost [ManaSymbol.Generic 3])
             (Quantity.Type.Count (Count.Type.MkCount (Scope.InHistory EventShape.SpellCast) (Filter.Type.And []) Aggregation.Members))
             Nothing
+            Nothing
+            CostDirection.Less
         ]
     -- Nine Forests. Two Elves tap two of them and leave seven, so an UNREDUCED
     -- Thrasta (twelve) is out of reach and a once-reduced one ({4}{G}{G}, six) is
@@ -7186,3 +7193,135 @@ reversingAssist alice bob forestId plainsIds p = case p of
     State.modify' (<> [player])
     pure (if player == S.bob then bob else alice)
   _ -> pure (assisting (Just S.bob) (Natural.Extra.length plainsIds) forestId plainsIds p)
+
+-- A spell whose own cost sentence reads its CR 601.2c targets. Oracle
+-- text checked against Scryfall 2026-09-27:
+--
+--   Bury in Books {4}{U} Instant: "This spell costs {2} less to cast if it
+--   targets an attacking creature. Put target creature into its owner's library
+--   second from the top."
+--   Vanish into Eternity {2}{W} Instant: "This spell costs {3} more to cast if
+--   it targets a creature. Exile target nonland permanent."
+--   Dragon's Prey {2}{B} Instant: "This spell costs {2} more to cast if it
+--   targets a Dragon. Destroy target creature."
+--   Seized from Slumber {4}{W} Instant: "This spell costs {3} less to cast if it
+--   targets a tapped creature. Destroy target creature."
+--
+-- alice holds `spell` and `lands` untapped copies of `land`, and has priority;
+-- bob controls `victims` and has Lightning Bolt under Unsummon in his library.
+-- Each pair of boards differs in one thing: the target, or the one fact about
+-- the board the sentence reads.
+targetCostBoard :: Printing.Printing -> Int -> Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+targetCostBoard land lands spell victims library =
+  let g0 = S.landsFor land S.alice lands (Setup.emptyGame S.bothPlayers)
+      (spellId, g1) = S.addHandCard spell S.alice g0
+      (victimIds, g2) = List.foldl' (\(ids, g) p -> let (oid, g') = S.addPermanent p S.bob g in (ids <> [oid], g')) ([], g1) victims
+      g3 = List.foldl' (\g p -> snd (S.addLibraryCard p S.bob g)) g2 library
+   in (spellId, victimIds, g3 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice})
+
+-- The answerer pinning CR 601.2c's announcement to `aim`, filtering the offered
+-- set rather than building a recipient.
+aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAt aim p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter ((==) (Just aim) . Recipient.objectOf) offered) asked
+  _ -> S.identityAnswer p
+
+-- CR 601.2c / 601.2f: the total is determined after the targets are chosen, so
+-- a spell's own sentence may read them; CR 601.2 makes the cast legal when SOME
+-- aiming can be paid for (Pawl.Engine.Cast.payableCostAt).
+targetCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+targetCostSpec s registry =
+  Spec.describe s "a cost that reads the spell's targets" $ do
+    let named = Just . CardName.MkCardName . Text.pack
+        libraryNames gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Library S.bob gs)
+        onBattlefield oid gs = Game.zoneOf oid gs == Just Zone.Battlefield
+        -- bob attacks alice with the first Giant when `attacking`; the second
+        -- stays home. Declare blockers, alice to act.
+        buryBoard lands attacking = do
+          island <- S.printingOf s registry "Island"
+          bury <- S.printingOf s registry "Bury in Books"
+          giant <- S.printingOf s registry "Hill Giant"
+          library <- traverse (S.printingOf s registry) ["Lightning Bolt", "Unsummon"]
+          let (buryId, giants, gs) = targetCostBoard island lands bury [giant, giant] library
+              attackers = if attacking then Map.fromList [(oid, AttackTarget.OfPlayer S.alice) | oid <- take 1 giants] else Map.empty
+          pure
+            ( buryId,
+              giants,
+              gs
+                { GameState.activePlayer = S.bob,
+                  GameState.phase = Phase.Combat CombatStep.DeclareBlockers,
+                  GameState.combat = Combat.emptyCombat {Combat.Type.attackers = attackers, Combat.Type.defenders = [S.alice]}
+                }
+            )
+    Spec.it s "CR 601.2f Bury in Books aimed at the attacking Giant is cast off three Islands" $ do
+      (buryId, giants, gs) <- buryBoard 3 True
+      case giants of
+        [attacker, _] -> do
+          let resolved = S.runPure (aimAt attacker) (S.runPure (aimAt attacker) gs (S.cast S.alice buryId)) Stack.resolveTop
+          Spec.assertEqWith s "CR 401.7 the attacker went in second from the top" (libraryNames resolved) (fmap named ["Unsummon", "Hill Giant", "Lightning Bolt"])
+          Spec.assertEqWith s "three Islands paid {2}{U}" (S.tappedCount S.alice resolved) 3
+          Spec.assertBool s (S.castable S.alice buryId gs) "it was offered off three Islands"
+        _ -> Spec.assertFailure s "two Giants"
+    Spec.it s "CR 601.2 with no creature attacking, the same three Islands cannot cast it" $ do
+      (buryId, giants, gs) <- buryBoard 3 False
+      case giants of
+        [first, _] -> do
+          let attempted = S.runPure (aimAt first) gs (S.cast S.alice buryId)
+          Spec.assertBool s (onBattlefield first attempted) "the Giant is still on the battlefield"
+          Spec.assertEqWith s "the spell went back to alice's hand" (Game.zoneOf buryId attempted) (Just Zone.Hand)
+          Spec.assertBool s (not (S.castable S.alice buryId gs)) "it is not offered"
+        _ -> Spec.assertFailure s "two Giants"
+    Spec.it s "CR 601.2f on one board, aiming at the Giant at home costs all five Islands and the attacker three" $ do
+      (buryId, giants, gs) <- buryBoard 5 True
+      case giants of
+        [attacker, home] -> do
+          let run aim = S.runPure (aimAt aim) (S.runPure (aimAt aim) gs (S.cast S.alice buryId)) Stack.resolveTop
+          Spec.assertEqWith s "Islands tapped aiming at the Giant at home, then at the attacker" (S.tappedCount S.alice (run home), S.tappedCount S.alice (run attacker)) (5, 3)
+          Spec.assertBool s (not (onBattlefield home (run home))) "the Giant at home was put into the library"
+        _ -> Spec.assertFailure s "two Giants"
+    let vanishBoard lands victims = do
+          plains <- S.printingOf s registry "Plains"
+          vanish <- S.printingOf s registry "Vanish into Eternity"
+          ps <- traverse (S.printingOf s registry) victims
+          pure (targetCostBoard plains lands vanish ps [])
+    Spec.it s "CR 601.2f Vanish into Eternity costs {3} more aimed at a creature than at an artifact" $ do
+      (vanishId, victims, gs) <- vanishBoard 6 ["Hill Giant", "Sol Ring"]
+      case victims of
+        [giant, ring] -> do
+          let run aim = S.runPure (aimAt aim) (S.runPure (aimAt aim) gs (S.cast S.alice vanishId)) Stack.resolveTop
+          Spec.assertEqWith s "Plains tapped aiming at the Giant, then at Sol Ring" (S.tappedCount S.alice (run giant), S.tappedCount S.alice (run ring)) (6, 3)
+          Spec.assertEqWith s "CR 406.2 the Giant was exiled" (fmap (\oid -> fmap S.nameOf (Game.cardOf oid (run giant))) (Game.zoneMembers Zone.Exile S.bob (run giant))) [named "Hill Giant"]
+        _ -> Spec.assertFailure s "a Giant and a Sol Ring"
+    Spec.it s "CR 601.2 three Plains cast Vanish into Eternity at Sol Ring, and refuse it with only the Giant to aim at" $ do
+      (withRing, _, ringBoard) <- vanishBoard 3 ["Hill Giant", "Sol Ring"]
+      (withoutRing, _, giantBoard) <- vanishBoard 3 ["Hill Giant"]
+      Spec.assertEqWith s "offered beside Sol Ring, refused without it" (S.castable S.alice withRing ringBoard, S.castable S.alice withoutRing giantBoard) (True, False)
+    let preyBoard lands victims = do
+          swamp <- S.printingOf s registry "Swamp"
+          prey <- S.printingOf s registry "Dragon's Prey"
+          ps <- traverse (S.printingOf s registry) victims
+          pure (targetCostBoard swamp lands prey ps [])
+    Spec.it s "CR 601.2f Dragon's Prey costs {2} more aimed at a Dragon" $ do
+      (preyId, victims, gs) <- preyBoard 5 ["Shivan Dragon", "Hill Giant"]
+      case victims of
+        [dragon, giant] -> do
+          let run aim = S.runPure (aimAt aim) (S.runPure (aimAt aim) gs (S.cast S.alice preyId)) Stack.resolveTop
+          Spec.assertEqWith s "Swamps tapped aiming at the Dragon, then at the Giant" (S.tappedCount S.alice (run dragon), S.tappedCount S.alice (run giant)) (5, 3)
+          Spec.assertBool s (not (onBattlefield dragon (run dragon))) "CR 701.8a the Dragon was destroyed"
+        _ -> Spec.assertFailure s "a Dragon and a Giant"
+    Spec.it s "CR 601.2 three Swamps cannot cast Dragon's Prey with only a Dragon to aim at" $ do
+      (withGiant, _, giantBoard) <- preyBoard 3 ["Shivan Dragon", "Hill Giant"]
+      (onlyDragon, _, dragonBoard) <- preyBoard 3 ["Shivan Dragon"]
+      Spec.assertEqWith s "offered beside the Giant, refused without it" (S.castable S.alice withGiant giantBoard, S.castable S.alice onlyDragon dragonBoard) (True, False)
+    Spec.it s "CR 601.2f Seized from Slumber is cast off two Plains at a tapped Giant, and refused at an untapped one" $ do
+      plains <- S.printingOf s registry "Plains"
+      seized <- S.printingOf s registry "Seized from Slumber"
+      giant <- S.printingOf s registry "Hill Giant"
+      let (seizedId, giants, gs) = targetCostBoard plains 2 seized [giant] []
+          tapAll g = g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.tapped = TapState.Tapped}))) (GameState.objects g) giants}
+      case giants of
+        [target] -> do
+          let run board = S.runPure (aimAt target) (S.runPure (aimAt target) board (S.cast S.alice seizedId)) Stack.resolveTop
+          Spec.assertEqWith s "the Giant is destroyed when tapped, and survives untapped" (onBattlefield target (run (tapAll gs)), onBattlefield target (run gs)) (False, True)
+          Spec.assertEqWith s "offered at the tapped Giant, refused at the untapped one" (S.castable S.alice seizedId (tapAll gs), S.castable S.alice seizedId gs) (True, False)
+        _ -> Spec.assertFailure s "one Giant"

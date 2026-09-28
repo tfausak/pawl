@@ -342,6 +342,8 @@ library codec
     Pawl.Codec.CostChoiceSpec
     Pawl.Codec.CostComponent
     Pawl.Codec.CostComponentSpec
+    Pawl.Codec.CostDirection
+    Pawl.Codec.CostDirectionSpec
     Pawl.Codec.CostReduction
     Pawl.Codec.CostReductionSpec
     Pawl.Codec.CostScale
@@ -1848,6 +1850,7 @@ library types
     Pawl.Types.CostBasis
     Pawl.Types.CostChoice
     Pawl.Types.CostComponent
+    Pawl.Types.CostDirection
     Pawl.Types.CostReduction
     Pawl.Types.CostScale
     Pawl.Types.Count

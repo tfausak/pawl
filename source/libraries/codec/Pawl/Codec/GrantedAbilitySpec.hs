@@ -16,6 +16,7 @@ import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostDirection as CostDirection
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
@@ -123,6 +124,6 @@ spec s = Spec.describe s "Pawl.Codec.GrantedAbility" $ do
     Common.assertCodec
       s
       codec
-      (GrantedAbility.SelfCostReduction (CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (Quantity.Literal 1) Nothing))
+      (GrantedAbility.SelfCostReduction (CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (Quantity.Literal 1) Nothing Nothing CostDirection.Less))
       " {\"type\":\"SelfCostReduction\",\"value\":{\"amount\":[{\"type\":\"Generic\",\"value\":1}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s codec
