@@ -133,6 +133,12 @@ data PlayerEffect
   | -- | CR 601.1a / 601.3b / Scout's Warning: this player may PLAY a matching card
     -- as though it had flash, which reaches a land where the arm above does not.
     MayPlayAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
+  | -- | CR 602.5d / 602.5e / Leonin Shikari: this player may activate abilities
+    -- under this rule-702 keyword any time they could cast an instant.
+    ActivateKeywordAtInstantSpeed KeywordDesignator.KeywordDesignator
+  | -- | CR 606.3 / The Wandering Emperor: this player may activate the loyalty
+    -- abilities of a matching permanent any time they could cast an instant.
+    ActivateLoyaltyAtInstantSpeed (Filter.Filter Keyword.Keyword)
   | -- | CR 701.6a / 613.11 / Spider-Punk: the matching spells and abilities on the
     -- stack controlled by the players this effect's scope names can't be
     -- countered.

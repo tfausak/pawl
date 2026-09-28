@@ -165,6 +165,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   presenceOfGondSpec s registry
   retractionHelixSpec s registry
   anyPlayerActivationSpec s registry
+  instantSpeedEquipSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -6113,3 +6114,58 @@ craftSpec s registry = Spec.describe s "Craft (CR 702.167)" $ do
         Spec.assertBool s (Set.member hillGiantName (craftBattlefieldNames after)) "CR 702.167a and the Hill Giant, which the payer did not choose, is still on the battlefield"
         Spec.assertBool s (Set.member dinosaurHeaddress (craftBattlefieldNames after)) "CR 702.167a the card the cost exiled came back TRANSFORMED, as Dinosaur Headdress"
       abilities -> Spec.assertFailure s ("expected one craft ability, got " <> show (length abilities))
+
+-- Leonin Shikari {1}{W} Creature -- Cat Soldier 2/2: "You may activate equip
+-- abilities any time you could cast an instant." Forge Anew {2}{W} Enchantment
+-- prints the same sentence behind "During your turn". CR 702.6a's equip is
+-- "Activate only as a sorcery" (CR 602.5d), which each card reads as CR 602.5e.
+--
+-- Every run is the same script on boards differing in one thing, and the
+-- Bonesplitter's {1} is payable on all of them, so a refusal is the timing's.
+instantSpeedEquipSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+instantSpeedEquipSpec s registry = Spec.describe s "InstantSpeedEquip" $ do
+  let splitter = S.aliasRef "splitter"
+      piker = S.aliasRef "piker"
+      setup active step extras =
+        S.board
+          ( S.battlefield S.alice ([S.settled "splitter" "Bonesplitter", S.settled "piker" "Goblin Piker", S.settled "mana" "Mountain"] <> fmap S.permanent extras)
+              NonEmpty.:| [S.playerSetup S.bob]
+          )
+          active
+          step
+      onPiker = S.noChoices {S.choiceTargets = Just [S.MkObjectTarget piker]}
+      paying = onPiker {S.choiceManaSources = Seq.singleton (Just (S.aliasRef "mana"))}
+      equipAt step choices = S.turn 1 [S.on step S.alice (S.activateAction splitter choices)]
+      attachedTo built after =
+        ( do
+            splitterId <- Map.lookup (S.MkObjectAlias (Text.pack "splitter")) (S.builtAliases built)
+            pikerId <- Map.lookup (S.MkObjectAlias (Text.pack "piker")) (S.builtAliases built)
+            object <- Game.lookupObject splitterId after
+            pure (Object.attachedTo object == Just (Recipient.ToCreature pikerId))
+        )
+      refused script board = case S.runScript script board S.priorityGame of
+        Left (S.MkActionNotOffered _ (S.MkActivate {}) _) -> pure ()
+        Left failure -> Spec.assertFailure s (S.renderFailure failure)
+        Right _ -> Spec.assertFailure s "the equip was offered anyway"
+  Spec.it s "CR 602.5e with Leonin Shikari alice equips during bob's turn" $ do
+    built <- S.buildBoardOrFail s registry (setup S.bob S.precombatMain ["Leonin Shikari"])
+    (_, after) <- S.runScriptOrFail s (equipAt S.precombatMain paying) built S.priorityGame
+    Spec.assertEqWith s "the Bonesplitter is on the Piker" (attachedTo built after) (Just True)
+    Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
+  Spec.it s "CR 602.5d without it the same equip is not offered" $ do
+    bare <- S.buildBoardOrFail s registry (setup S.bob S.precombatMain [])
+    refused (equipAt S.precombatMain paying) bare
+  -- "During your turn": alice's beginning of combat, outside CR 307.1's main
+  -- phase, is inside Forge Anew's window and bob's main phase is not. Its last
+  -- line makes the turn's first equip cost {0}, which the script chooses.
+  Spec.it s "CR 602.5e with Forge Anew alice equips in her own beginning of combat" $ do
+    built <- S.buildBoardOrFail s registry (setup S.alice S.beginningOfCombat ["Forge Anew"])
+    (_, after) <- S.runScriptOrFail s (equipAt S.beginningOfCombat onPiker {S.choiceCost = Just (ManaCost.MkManaCost []), S.choiceManaSources = Seq.singleton Nothing}) built S.priorityGame
+    Spec.assertEqWith s "the Bonesplitter is on the Piker" (attachedTo built after) (Just True)
+    Spec.assertEqWith s "CR 118.9 the {0} was paid: nothing tapped" (S.tappedCount S.alice after) 0
+  Spec.it s "CR 602.5d without Forge Anew it is not offered there" $ do
+    bare <- S.buildBoardOrFail s registry (setup S.alice S.beginningOfCombat [])
+    refused (equipAt S.beginningOfCombat paying) bare
+  Spec.it s "CR 602.5d Forge Anew opens no window on bob's turn" $ do
+    board <- S.buildBoardOrFail s registry (setup S.bob S.precombatMain ["Forge Anew"])
+    refused (equipAt S.precombatMain paying) board
