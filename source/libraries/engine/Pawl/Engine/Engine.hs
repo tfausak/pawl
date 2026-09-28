@@ -1639,6 +1639,9 @@ beginTurn extra pid gs =
         gs
           { GameState.activePlayer = pid,
             GameState.turnNumber = GameState.turnNumber gs + 1,
+            -- CR 500.7: which extra turn this is, for a duration naming it
+            -- (Expiry.DuringExtraTurn); Nothing on an ordinary turn.
+            GameState.extraTurnUnderWay = extra,
             -- CR 608.2i is why a log exists at all. It does not say how far back;
             -- the ONE-turn scope is this engine's choice, every history-reading
             -- card in `data/cards/` asking "this turn". Cleared here and never at
@@ -1656,6 +1659,9 @@ beginTurn extra pid gs =
             -- object, and a permanent whose controller is not the active player
             -- gets its activation back here just the same.
             GameState.activatedThisTurn = Map.empty,
+            -- CR 602.2's activation history, which "the first activated ability
+            -- you activate each turn" reads: a turn's, for every player.
+            GameState.activationsThisTurn = Seq.empty,
             -- CR 601.3's "Once each turn, you may cast ..." (Johann, Apprentice
             -- Sorcerer), cleared for every object beside the activation-side
             -- rider above and for its reason: the budget is the permission's

@@ -27,7 +27,8 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- into its owner's graveyard long before then.
 --
 -- `createdAt` is the turn's identity, so a delayed ability armed for "that
--- turn" (Onset.FromThatExtraTurn, Final Fortune) can name it: CR 500.7's stack
+-- turn" (Onset.FromThatExtraTurn, Final Fortune) and an effect lasting during it
+-- (Duration.DuringThatExtraTurn, Alchemist's Gambit) can name it: CR 500.7's stack
 -- means "your next turn" is a different turn once a later effect creates
 -- another.
 data ExtraTurn = MkExtraTurn

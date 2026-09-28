@@ -6,7 +6,7 @@
 -- from there: Pawl.Engine.Activate refuses a mana ability outright (CR 605.3b),
 -- so a rider printed on one is asked at Cost.manaActivations instead, and that
 -- module cannot import Pawl.Engine.Activate. Every window an arm reads is
--- Pawl.Engine.Turn's or Pawl.Engine.Event's for the same reason:
+-- Pawl.Engine.Turn's for the same reason:
 -- Pawl.Engine.Combat imports Pawl.Engine.Cost, so the two combat-record readers
 -- CR 506.7g and CR 508.3b share with the casting side moved down to
 -- Pawl.Engine.Turn, beside the other two windows these arms ask about.
@@ -23,14 +23,16 @@ module Pawl.Engine.ActivationRestriction where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
-import qualified Pawl.Engine.Event.Match as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Types.AbilityKind as AbilityKind
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Card as Card
@@ -38,8 +40,11 @@ import qualified Pawl.Types.DuringPhase as DuringPhase
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.ObjectSnapshot as ObjectSnapshot
+import qualified Pawl.Types.PastActivation as PastActivation
 import Pawl.Types.PlayerId (PlayerId)
 
 -- CR 602.5: does every clause of this ability's printed "activate only ..."
@@ -114,13 +119,13 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- mana ability -- so a stolen permanent's rider follows the thief.
   ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
-      && Event.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
+      && Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
   -- CR 102.1 alone, with no window beside it: the rider names a turn and every
   -- phase and step of that turn is inside it. The same second conjunct
   -- DuringPhase reads above, standing on its own -- so this is not DuringPhase
   -- with a wildcard window but the absence of that axis.
   ActivationRestriction.DuringTurn scope ->
-    Event.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
+    Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
   -- CR 508.3b's question, asked of the ACTIVATING player, and the same reader the
   -- casting side's clause of this name uses -- see Turn.attackedThisStep for
   -- why it is the declaration record and not Combat.attacked.
@@ -232,6 +237,41 @@ recordActivation srcId ability gs =
         g {GameState.activatedThisTurn = Map.insertWith Set.union srcId (Set.singleton ability) (GameState.activatedThisTurn g)}
    in (if prints ActivationRestriction.OnlyOnceEachTurn then perTurn else id)
         ((if prints ActivationRestriction.OnlyOnce then perGame else id) gs)
+
+-- CR 602.2: log that `pid` began activating an ability of `srcId` aimed at
+-- `targets`, for Pawl.Types.ReduceActivationCost.onlyFirst to count. The source
+-- and targets are snapshotted off `asOf`, the board the activation began on, so
+-- a cost that sacrificed the source still leaves it recorded as it was.
+--
+-- Every activation, of every kind, from all three roads: Pawl.Engine.Activate's
+-- stack ability, Pawl.Engine.Cost's mana ability and Pawl.Engine.Resolve.Effect's
+-- mid-roll one. The latter two are a regression fence: Professor Hojo, the one
+-- first-limited reducer in data/cards/, names a target, which neither road's
+-- abilities have. Tezzeret, Betrayer of Flesh would observe the mana road.
+logActivation :: GameState -> PlayerId -> ObjectId -> Maybe Keyword.Type.Keyword -> AbilityKind.AbilityKind -> Set.Set ObjectId -> GameState -> GameState
+logActivation asOf pid srcId stamp kind targets gs =
+  let snapshotOf oid =
+        fmap
+          ( \o ->
+              ObjectSnapshot.MkObjectSnapshot
+                { ObjectSnapshot.object = oid,
+                  ObjectSnapshot.characteristics = Projection.project oid asOf,
+                  ObjectSnapshot.controller = Projection.controllerOf oid asOf,
+                  ObjectSnapshot.owner = Object.owner o
+                }
+          )
+          (Game.lookupObject oid asOf)
+      logged source =
+        PastActivation.MkPastActivation
+          { PastActivation.activator = pid,
+            PastActivation.source = source,
+            PastActivation.keyword = stamp,
+            PastActivation.kind = kind,
+            PastActivation.targets = Maybe.mapMaybe snapshotOf (Set.toList targets)
+          }
+   in case snapshotOf srcId of
+        Nothing -> gs
+        Just source -> gs {GameState.activationsThisTurn = GameState.activationsThisTurn gs Seq.|> logged source}
 
 -- CR 307.5's empty-stack conjunct asked ABOUT THE RIDER rather than about the
 -- board: does this clause need an empty stack to be met?

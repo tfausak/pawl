@@ -3450,6 +3450,7 @@ oneMountainState mountain ph =
           GameState.drawsThisTurn = mempty,
           GameState.departedThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
+          GameState.activationsThisTurn = mempty,
           GameState.castPermissionsUsedThisTurn = mempty,
           GameState.rollModifiersUsedThisTurn = mempty,
           GameState.triggeredThisGame = mempty,
@@ -3470,6 +3471,7 @@ oneMountainState mountain ph =
           GameState.extraTurns = [],
           GameState.subgamesThisMatch = 0,
           GameState.turnAnchor = Nothing,
+          GameState.extraTurnUnderWay = Nothing,
           GameState.rollingDie = Nothing,
           GameState.rerolledTo = Nothing
         }

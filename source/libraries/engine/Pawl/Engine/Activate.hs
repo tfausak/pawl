@@ -422,6 +422,13 @@ activateAbility pid srcId ability = do
                   targeted = Cost.activationAdjustments aimedAt stamp AbilityKind.NonManaAbility (Cost.loyaltyKindOf (ActivatedAbility.cost ability)) pid srcId gs
               adjustments <- Cost.announceReductions pid srcId gs announcedCost targeted
               let paidCost = Cost.totalWith adjustments announcedCost
+              -- CR 602.2: log the activation as BEGUN, before its payment, so a
+              -- mana ability activated to pay it is logged after it (Tezzeret,
+              -- Betrayer of Flesh's ruling) -- and off `announced`, CR 601.2c's
+              -- board, before a cost can sacrifice the source. A payment that
+              -- reverses restores `before`, and CR 733.1's partial reversal
+              -- drops the announcement's segment (Pawl.Engine.Reversal).
+              State.modify' (ActivationRestriction.logActivation announced pid srcId stamp AbilityKind.NonManaAbility aimedAt)
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
               -- components. The gates above prove SOME sequence of choices pays for
               -- this ability -- but Unpaid is reachable all the same, because the

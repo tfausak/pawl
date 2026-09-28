@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -90,6 +91,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sickness as Sickness
@@ -1089,6 +1091,137 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
         after = S.runPure (scryAnswer ([], [])) board zero
     Spec.assertEqWith s "not asked" asked 0
     Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
+  -- CR 614.1a: Kenessos, Priest of Thassa ("If you would scry a number of cards,
+  -- scry that many cards plus one instead.") makes Crystal Ball's scry 2 look at
+  -- three. Everything looked at goes under, so the library shows how many.
+  Spec.it s "CR 614.1a Kenessos makes Crystal Ball's scry 2 a scry 3" $ do
+    (ids, ballId, board) <- scryBoard s registry 4
+    withKenessos <- withScryRow s registry ["Kenessos, Priest of Thassa"] board
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let (after, looked) = scryBottomingAll ballId (fst withKenessos)
+            (baseline, _) = scryBottomingAll ballId board
+        Spec.assertEqWith s "CR 701.22a: three cards went under" (scryLibrary after) [forest, piker, maiden, mountain]
+        Spec.assertEqWith s "without Kenessos, two" (scryLibrary baseline) [mountain, forest, piker, maiden]
+        Spec.assertEqWith s "one scry of three cards" looked [[piker, maiden, mountain]]
+        Spec.assertBool s (elem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 701.22d the scry still happened"
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- CR 109.5: "you" is Kenessos's controller, so bob's leaves alice's scry at two.
+  Spec.it s "CR 109.5 an opponent's Kenessos does not enlarge your scry" $ do
+    (ids, ballId, board) <- scryBoard s registry 4
+    kenessos <- S.printingOf s registry "Kenessos, Priest of Thassa"
+    let (after, _) = scryBottomingAll ballId (snd (S.addPermanent kenessos S.bob board))
+    case ids of
+      [piker, maiden, mountain, forest] ->
+        Spec.assertEqWith s "two cards went under" (scryLibrary after) [mountain, forest, piker, maiden]
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- CR 614.6: Eligeth, Crossroads Augur ("If you would scry a number of cards,
+  -- draw that many cards instead.") replaces the scry outright: two cards drawn,
+  -- nothing looked at, and no CR 701.22d event for "whenever you scry".
+  Spec.it s "CR 614.6 Eligeth draws two instead of Crystal Ball's scry 2" $ do
+    (ids, ballId, board) <- scryBoard s registry 4
+    withEligeth <- withScryRow s registry ["Eligeth, Crossroads Augur"] board
+    case ids of
+      [_, _, mountain, forest] -> do
+        let (after, looked) = scryBottomingAll ballId (fst withEligeth)
+        Spec.assertEqWith s "CR 614.6: two cards were drawn" (S.handSize S.alice after) 2
+        Spec.assertEqWith s "and the rest stayed put" (scryLibrary after) [mountain, forest]
+        Spec.assertEqWith s "nothing was looked at" looked []
+        Spec.assertBool s (notElem (GameEvent.Scried S.alice) (S.eventsOf after)) "CR 614.6 no scry happened"
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- CR 701.22b: scry 0 is no scry event, so there is nothing for Kenessos to
+  -- enlarge: nothing is looked at. Scry 1 is the pair's other half, enlarged to
+  -- two.
+  Spec.it s "CR 701.22b Kenessos does not turn a scry 0 into a scry 1" $ do
+    (_, ballId, board) <- scryBoard s registry 4
+    (withKenessos, _) <- withScryRow s registry ["Kenessos, Priest of Thassa"] board
+    let scryN n = Resolve.applyEffect ballId ballId S.alice Map.empty Map.empty (Effect.Scry (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal n)))
+        offered n =
+          let answering :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+              answering p = case p of
+                Prompt.ChooseScry _ _ cards -> State.modify' (<> [cards]) >> pure (cards, [])
+                _ -> pure (S.identityAnswer p)
+           in fmap length (State.execState (Engine.runGame answering withKenessos (scryN n)) [])
+    Spec.assertEqWith s "scry 0: nothing looked at" (offered 0) []
+    Spec.assertEqWith s "scry 1: two looked at" (offered 1) [2]
+  -- CR 616.1e: with both, the scryer orders them. Kenessos first leaves a scry 3
+  -- for Eligeth to turn into three draws; Eligeth first leaves no scry for
+  -- Kenessos to enlarge, so two.
+  Spec.it s "CR 616.1 Eligeth and Kenessos: the scryer orders them" $ do
+    (_, ballId, board) <- scryBoard s registry 4
+    (both, placed) <- withScryRow s registry ["Eligeth, Crossroads Augur", "Kenessos, Priest of Thassa"] board
+    case placed of
+      [eligeth, kenessos] -> do
+        let first chosen = fst (scryPicking chosen ballId both)
+        Spec.assertEqWith s "Kenessos first: three drawn" (S.handSize S.alice (first kenessos)) 3
+        Spec.assertEqWith s "Eligeth first: two drawn" (S.handSize S.alice (first eligeth)) 2
+        Spec.assertEqWith s "and the scryer was asked" (snd (scryPicking kenessos ballId both)) 1
+      _ -> Spec.assertFailure s "expected two permanents"
+
+  -- Kenessos's activated ability, the rest of the card: an Octopus creature on
+  -- top may go onto the battlefield; anything else may go to the bottom.
+  Spec.it s "Kenessos whole card: an Octopus on top enters, a Piker goes under" $ do
+    let board top = do
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          kenessos <- S.printingOf s registry "Kenessos, Priest of Thassa"
+          topCard <- S.printingOf s registry top
+          let (kenessosId, g0) = S.addPermanent kenessos S.alice (S.landsInPlay forest 4)
+              (under, g1) = S.addLibraryCard mountain S.alice g0
+              (topId, g2) = S.addLibraryCard topCard S.alice g1
+          pure (kenessosId, under, topId, g2 {GameState.priority = Just S.alice})
+        exercising :: Prompt.Prompt r -> r
+        exercising p = case p of
+          Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+          _ -> S.identityAnswer p
+        activate (kenessosId, _, _, gs) = case Activatable.abilitiesFor kenessosId gs of
+          [ability] -> S.runPure exercising gs (Activate.activateAbility S.alice kenessosId ability >> Stack.resolveTop)
+          _ -> gs
+    octopus@(_, under, _, _) <- board "Bubble Smuggler"
+    piker@(_, underPiker, _, _) <- board "Goblin Piker"
+    let entered = activate octopus
+        bottomed = activate piker
+    Spec.assertEqWith s "the Octopus left the library for the battlefield" (scryLibrary entered) [under]
+    Spec.assertEqWith s "alice now has Kenessos, the Octopus and four Forests" (length (Projection.controls S.alice entered)) 6
+    Spec.assertEqWith s "the Piker went under the Mountain" (fmap (take 1) [scryLibrary bottomed], length (scryLibrary bottomed)) ([[underPiker]], 2)
+
+-- Each named card on the battlefield under alice, and their ids in order.
+withScryRow :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> GameState.GameState -> m (GameState.GameState, [ObjectId.ObjectId])
+withScryRow s registry names board = do
+  printings <- traverse (S.printingOf s registry) names
+  let place (g, acc) printing = let (oid, g2) = S.addPermanent printing S.alice g in (g2, acc <> [oid])
+  pure (List.foldl' place (board, []) printings)
+
+-- Crystal Ball's scry, bottoming every card looked at in the order offered.
+-- Answers with the board and each ChooseScry's offered cards, in order.
+scryBottomingAll :: ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [[ObjectId.ObjectId]])
+scryBottomingAll ballId gs =
+  let answering :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+      answering p = case p of
+        Prompt.ChooseScry _ _ offered -> State.modify' (<> [offered]) >> pure (offered, [])
+        _ -> pure (S.identityAnswer p)
+      run = case Activatable.abilitiesFor ballId gs of
+        [ability] -> Activate.activateAbility S.alice ballId ability >> Stack.resolveTop
+        _ -> pure ()
+      ((_, after), looked) = State.runState (Engine.runGame answering gs run) []
+   in (after, looked)
+
+-- Crystal Ball's scry with CR 616.1's choice answered by the entry whose source
+-- is `chosen`, pinned by identity. Answers with the board and how many times the
+-- choice was asked.
+scryPicking :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Int)
+scryPicking chosen ballId gs =
+  let answering :: Prompt.Prompt r -> State.State Int r
+      answering p = case p of
+        Prompt.ChooseReplacement _ _ entries -> do
+          State.modify' (+ 1)
+          pure (maybe 0 Int.toNaturalSaturating (List.findIndex ((== chosen) . ReplacementEntry.source) entries))
+        _ -> pure (S.identityAnswer p)
+      run = case Activatable.abilitiesFor ballId gs of
+        [ability] -> Activate.activateAbility S.alice ballId ability >> Stack.resolveTop
+        _ -> pure ()
+      ((_, after), asked) = State.runState (Engine.runGame answering gs run) 0
+   in (after, asked)
 
 -- CR 701.25a: "to 'surveil N' means to look at the top N cards of your library,
 -- then put any number of them into your graveyard and the rest on top of your

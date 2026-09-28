@@ -92,6 +92,14 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       Duration.DuringYourNextTurn
       " {\"type\":\"DuringYourNextTurn\"} "
+  -- CR 611.2a / 500.7: the extra turn the same resolution created (Alchemist's
+  -- Gambit).
+  Spec.it s "DuringThatExtraTurn" $
+    Common.assertCodec
+      s
+      Duration.codec
+      Duration.DuringThatExtraTurn
+      " {\"type\":\"DuringThatExtraTurn\"} "
   -- CR 611.2b, carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
     Common.assertCodec

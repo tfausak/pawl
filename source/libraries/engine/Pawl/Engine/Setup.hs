@@ -264,6 +264,7 @@ emptyGame order =
           GameState.drawsThisTurn = mempty,
           GameState.departedThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
+          GameState.activationsThisTurn = mempty,
           GameState.castPermissionsUsedThisTurn = mempty,
           GameState.rollModifiersUsedThisTurn = mempty,
           GameState.triggeredThisGame = mempty,
@@ -287,6 +288,7 @@ emptyGame order =
           -- belongs to has had no subgame yet.
           GameState.subgamesThisMatch = 0,
           GameState.turnAnchor = Nothing,
+          GameState.extraTurnUnderWay = Nothing,
           GameState.rollingDie = Nothing,
           GameState.rerolledTo = Nothing
         }
@@ -919,6 +921,7 @@ restartGame perform exempt starter = do
             GameState.drawsThisTurn = mempty,
             GameState.departedThisTurn = mempty,
             GameState.activatedThisTurn = mempty,
+            GameState.activationsThisTurn = mempty,
             GameState.castPermissionsUsedThisTurn = mempty,
             GameState.rollModifiersUsedThisTurn = mempty,
             GameState.triggeredThisGame = mempty,
@@ -957,6 +960,7 @@ restartGame perform exempt starter = do
             -- nextTimestamp is preserved: the question is not about this game.
             GameState.subgamesThisMatch = GameState.subgamesThisMatch gs,
             GameState.turnAnchor = Nothing,
+            GameState.extraTurnUnderWay = Nothing,
             GameState.rollingDie = Nothing,
             GameState.rerolledTo = Nothing
           }
@@ -1162,6 +1166,7 @@ subgameStateFrom starter parent =
           GameState.drawsThisTurn = mempty,
           GameState.departedThisTurn = mempty,
           GameState.activatedThisTurn = mempty,
+          GameState.activationsThisTurn = mempty,
           GameState.castPermissionsUsedThisTurn = mempty,
           GameState.rollModifiersUsedThisTurn = mempty,
           GameState.triggeredThisGame = mempty,
@@ -1192,6 +1197,7 @@ subgameStateFrom starter parent =
           -- state. CR 729.6's nested subgame therefore counts them all.
           GameState.subgamesThisMatch = GameState.subgamesThisMatch parent,
           GameState.turnAnchor = Nothing,
+          GameState.extraTurnUnderWay = Nothing,
           GameState.rollingDie = Nothing,
           GameState.rerolledTo = Nothing
         }

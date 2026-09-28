@@ -125,6 +125,9 @@ withoutAnnouncement before entry closed = do
   drawsThisTurn <- mapOf GameState.drawsThisTurn
   departedThisTurn <- setOf GameState.departedThisTurn
   activatedThisTurn <- mapOfSets GameState.activatedThisTurn
+  -- An append-only log, `events`' shape: the announcement's own activation
+  -- goes and the window's mana abilities stand.
+  activationsThisTurn <- eventsOf GameState.activationsThisTurn
   castPermissionsUsedThisTurn <- mapOfSets GameState.castPermissionsUsedThisTurn
   rollModifiersUsedThisTurn <- mapOfSets GameState.rollModifiersUsedThisTurn
   triggeredThisGame <- setOf GameState.triggeredThisGame
@@ -147,6 +150,7 @@ withoutAnnouncement before entry closed = do
   -- nextTimestamp's treatment. Nothing a CR 733.1 reversal undoes can reach it.
   subgamesThisMatch <- newest GameState.subgamesThisMatch
   turnAnchor <- one GameState.turnAnchor
+  extraTurnUnderWay <- one GameState.extraTurnUnderWay
   rollingDie <- one GameState.rollingDie
   rerolledTo <- one GameState.rerolledTo
   pure
@@ -227,6 +231,7 @@ withoutAnnouncement before entry closed = do
         GameState.drawsThisTurn = drawsThisTurn,
         GameState.departedThisTurn = departedThisTurn,
         GameState.activatedThisTurn = activatedThisTurn,
+        GameState.activationsThisTurn = activationsThisTurn,
         GameState.castPermissionsUsedThisTurn = castPermissionsUsedThisTurn,
         GameState.rollModifiersUsedThisTurn = rollModifiersUsedThisTurn,
         GameState.triggeredThisGame = triggeredThisGame,
@@ -247,6 +252,7 @@ withoutAnnouncement before entry closed = do
         GameState.extraTurns = extraTurns,
         GameState.subgamesThisMatch = subgamesThisMatch,
         GameState.turnAnchor = turnAnchor,
+        GameState.extraTurnUnderWay = extraTurnUnderWay,
         GameState.rollingDie = rollingDie,
         GameState.rerolledTo = rerolledTo
       }
