@@ -139,7 +139,7 @@ takesOnce srcId fodder victim p = case p of
   -- the targets at resolution, and a hand-built recipient of the same permanent
   -- is a different one and would be dropped there with no error.
   Prompt.ChooseTargets _ _ _ sets -> pure (fmap (Set.filter (== Recipient.ToCreature victim) . snd) sets)
-  Prompt.ChooseSacrifices _ _ _ candidates _ -> pure (Set.fromList (filter (== fodder) candidates))
+  Prompt.ChooseSacrifices _ _ _ candidates _ _ -> pure (Set.fromList (filter (== fodder) candidates))
   _ -> pure (S.identityAnswer p)
 
 -- One noncombat hit, the shape Pawl.Engine.Damage.applyDamage takes.

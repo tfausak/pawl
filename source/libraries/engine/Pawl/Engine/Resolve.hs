@@ -958,16 +958,17 @@ chosenBranch resolving controller idx cIdx legal eligible picked clause = case C
               [forced] -> pure (Map.fromList (fmap (\chooser -> (chooser, forced)) (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)))
               first : rest ->
                 let live = first NonEmpty.:| rest
-                 in Monad.foldM
-                      ( \acc chooser -> do
-                          gs1 <- State.get
-                          -- Not implemented: a later chooser is not told the
-                          -- earlier choosers' answers (#4328).
-                          answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx live)
-                          pure (Map.insert chooser (if elem answered live then answered else first) acc)
-                      )
-                      Map.empty
-                      (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+                 in -- CR 101.4b: each chooser is told the branches the choosers
+                    -- before them announced.
+                    fmap (Map.fromList . Foldable.toList) $
+                      Monad.foldM
+                        ( \made chooser -> do
+                            gs1 <- State.get
+                            answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx live made)
+                            pure (made Seq.|> (chooser, if elem answered live then answered else first))
+                        )
+                        Seq.empty
+                        (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
             pure (won answers, Map.insert key answers picked)
 
 -- CR 608.2d's pair, in CR 608.2c's printed order. A clause naming ITSELF is one
@@ -1037,16 +1038,20 @@ facedVillainously picked cIdx clause = case Clause.orElse clause of
 villainousPass :: ObjectId -> PlayerId -> ModeIndex -> Map.Map SlotName (Set Recipient) -> OrElse.OrElse -> NonEmpty.NonEmpty ClauseIndex -> (ClauseIndex -> Set PlayerId -> acc -> Game acc) -> acc -> Game acc
 villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
   gs <- State.get
-  Monad.foldM
-    ( \acc chooser -> do
-        gs1 <- State.get
-        answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs)
-        let chosen = if elem answered limbs then answered else NonEmpty.head limbs
-        State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
-        performLimb chosen (Set.singleton chooser) acc
-    )
-    acc0
-    (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+  -- CR 101.4b: each seat is told the choices the seats before it made. No test
+  -- drives two seats through this pass, so the payload is unproven here.
+  fmap fst $
+    Monad.foldM
+      ( \(acc, made) chooser -> do
+          gs1 <- State.get
+          answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs made)
+          let chosen = if elem answered limbs then answered else NonEmpty.head limbs
+          State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
+          performed <- performLimb chosen (Set.singleton chooser) acc
+          pure (performed, made Seq.|> (chooser, chosen))
+      )
+      (acc0, Seq.empty)
+      (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made
@@ -1102,19 +1107,17 @@ exercises resolving source controller idx cIdx bound legal announced clause = do
       | impossible || clauseIsInert (Set.insert Binding.mayPlayers bound) legal clause -> pure False
       | otherwise -> do
           gs <- State.get
-          accepted <-
+          -- CR 101.4b: each seat is told the answers the seats before it gave.
+          answers <-
             Monad.foldM
-              ( \acc pid -> do
+              ( \made pid -> do
                   gs1 <- State.get
-                  -- Not implemented: a later seat is not told the earlier
-                  -- seats' answers (#4328).
-                  decision <- Game.choose (Prompt.ChooseOptional (Decide.deciderFor pid gs1) pid resolving idx cIdx)
-                  pure $ case decision of
-                    OptionalDecision.Exercises -> Set.insert pid acc
-                    OptionalDecision.Declines -> acc
+                  decision <- Game.choose (Prompt.ChooseOptional (Decide.deciderFor pid gs1) pid resolving idx cIdx made)
+                  pure (made Seq.|> (pid, decision))
               )
-              Set.empty
+              Seq.empty
               (announcedOnly announced (apnapPlayersOf asker legal controller gs))
+          let accepted = Set.fromList [pid | (pid, OptionalDecision.Exercises) <- Foldable.toList answers]
           State.modify' (bindPlayersSlot resolving Binding.mayPlayers accepted)
           pure (not (Set.null accepted))
 

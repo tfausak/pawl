@@ -367,7 +367,7 @@ annihilatorSpec s registry =
         Prompt.ChooseAttackTarget {} -> S.attackTo who p
         Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
         Prompt.DeclareBlockers {} -> Map.empty
-        Prompt.ChooseSacrifices _ _ _ candidates _ -> Set.fromList (take 1 (reverse candidates))
+        Prompt.ChooseSacrifices _ _ _ candidates _ _ -> Set.fromList (take 1 (reverse candidates))
         _ -> S.aggressiveAnswer p
       -- alice fields Slivdrazi Monstrosity and a Slaughter Drone; bob and carol
       -- each field a Goblin Piker and a Mountain.
@@ -4181,7 +4181,7 @@ atCarolSearching p = case p of
     fmap
       (\(n, legal) -> Set.fromList (take (Natural.Extra.toIntSaturating n) (ListUtils.nubOrd (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
-  Prompt.ChooseOptional _ pid _ _ _ -> if pid == S.carol then OptionalDecision.Exercises else OptionalDecision.Declines
+  Prompt.ChooseOptional _ pid _ _ _ _ -> if pid == S.carol then OptionalDecision.Exercises else OptionalDecision.Declines
   Prompt.Search _ pid matches cap -> if pid == S.carol then List.genericTake cap matches else []
   _ -> S.identityAnswer p
 

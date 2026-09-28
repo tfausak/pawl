@@ -4841,24 +4841,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                 gs <- State.get
                 let viewOf = effectViewOf source legal gs
                     wanted = maybe 0 Integer.toNaturalSaturating (Quantity.evaluateFor viewOf (chooseContext gs) gs resolving source count)
-                    pick asked n candidates
-                      | n <= (0 :: Natural) = pure []
+                    -- `made` is every card this pass has taken so far, beside
+                    -- who took it: CR 101.4b lets a later chooser know them.
+                    pick made asked n candidates
+                      | n <= (0 :: Natural) = pure made
                       | otherwise = case candidates of
-                          [] -> pure []
-                          [only] -> pure [only]
+                          [] -> pure made
+                          [only] -> pure (made Seq.|> (asked, only))
                           first : second : more -> do
                             let offered = first NonEmpty.:| (second : more)
-                            answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered)
+                            answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered made)
                             let taken = if List.elem answer (NonEmpty.toList offered) then answer else first
-                            rest <- pick asked (n - 1) (List.delete taken candidates)
-                            pure (taken : rest)
-                    ask asked = pick asked wanted
+                            pick (made Seq.|> (asked, taken)) asked (n - 1) (List.delete taken candidates)
+                    ask asked = fmap (fmap snd . Foldable.toList) . pick Seq.empty asked wanted
                 case chooser of
                   Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) legal controller gs scope filter_)
-                  -- Not implemented: a later seat is not told the earlier seats'
-                  -- picks (#4328).
                   Chooser.EachInScope ->
-                    fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)) $
+                    fmap (fmap snd . Foldable.toList) . Monad.foldM (\made pid -> pick made pid wanted (graveyardCardsOf (chooseContext gs) gs pid filter_)) Seq.empty $
                       zoneScopePlayers legal controller gs scope
                   -- ONE chooser, read out of the slot a ChoosePlayer bound,
                   -- choosing out of their own graveyard. Through playerRefPlayers so
@@ -5180,7 +5179,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       [] -> pure Nothing
       [only] -> pure (Just only)
       _ -> do
-        answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller source (Filter.Type.Or (fmap Filter.Type.HasName remaining)))
+        answer <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor controller gs) controller source (Filter.Type.Or (fmap Filter.Type.HasName remaining)) Seq.empty)
         pure (List.find (== answer) remaining)
     Monad.forM_ picked $ \name -> do
       State.modify' $ \g -> g {GameState.namedCopyChoices = Map.insertWith Set.union source (Set.singleton name) (GameState.namedCopyChoices g)}
@@ -6243,7 +6242,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Every player the reference names, in APNAP order.
         named = playerRefPlayers legal controller gs players
         victims = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-        pickFor victim =
+        -- `made` is every earlier victim's pick, which CR 101.4b lets a later
+        -- victim know.
+        pickFor made victim = fmap (made Seq.|>) $
           -- Read against the VICTIM: "half the permanents they control" is a
           -- number of the sacrificing player's own.
           case evaluateForRecipient viewOf context gs resolving source victim quantity of
@@ -6261,7 +6262,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   picked <-
                     if Natural.length candidates <= count
                       then pure (Set.fromList candidates)
-                      else Game.choose (Prompt.ChooseSacrifices decider victim source candidates count)
+                      else Game.choose (Prompt.ChooseSacrifices decider victim source candidates count (fmap (Bifunctor.second Set.fromList) made))
                   -- FILTERED AND COMPLETED, not merely filtered: an edict is not
                   -- "may", so an answer naming too few would cheat it, and CR 609.3
                   -- caps it at "as much as possible". Valid picks are honoured
@@ -6272,9 +6273,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       filler = filter (\oid -> List.notElem oid valid) candidates
                   pure (victim, List.genericTake wanted (valid <> filler))
             _ -> pure (victim, [])
-    -- Not implemented: a later victim is not told the earlier victims' picks
-    -- (#4328).
-    doomed <- traverse pickFor victims
+    doomed <- fmap Foldable.toList (Monad.foldM pickFor Seq.empty victims)
     -- CR 101.4's "then the actions happen simultaneously", which its own Example
     -- writes out for this very instruction, so the picks from every seat go to the
     -- funnel as ONE batch against one board. Pawl.EventSpec's Rishadan Cutpurse
@@ -8232,10 +8231,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- they chose" would read every chooser's (#3316).
   Effect.ChooseCardName (ChooseCardName.MkChooseCardName ref restriction) -> do
     gs <- State.get
-    let ask chooser = do
+    -- CR 101.4b: each chooser is told the names the choosers before them chose.
+    -- No test drives two choosers through this arm, so the payload is unproven
+    -- here; Null Chamber's entry twin in Pawl.Engine.Event is the proven one.
+    let ask made chooser = do
           g <- State.get
-          Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction) >>= Game.lookUpChosenName
-    picked <- fmap Set.fromList (Monad.mapM ask (apnapPlayersOf ref legal controller gs))
+          name <- Game.choose (Prompt.ChooseCardName (Decide.deciderFor chooser g) chooser source restriction made) >>= Game.lookUpChosenName
+          pure (made Seq.|> (chooser, name))
+    picked <- fmap (Set.fromList . fmap snd . Foldable.toList) (Monad.foldM ask Seq.empty (apnapPlayersOf ref legal controller gs))
     -- CR 101.3: a reference naming NOBODY leaves nothing to do, so the write is
     -- skipped rather than assigning the empty set -- which would clear a name an
     -- earlier instruction chose, and the assignment above is the whole reason
