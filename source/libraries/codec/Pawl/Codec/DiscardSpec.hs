@@ -12,6 +12,8 @@ import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.EachCardInHand as EachCardInHand
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TheseDiscard as TheseDiscard
@@ -40,17 +42,17 @@ spec s = Spec.describe s "Pawl.Codec.Discard" $ do
       Discard.codec
       (Discard.These (TheseDiscard.MkTheseDiscard (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Just (Filter.Not (Filter.HasCardType CardType.Land))))) Nothing))
       " {\"type\":\"These\",\"value\":{\"cards\":{\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"InSlot\",\"value\":\"target\"},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}}}} "
-  -- CR 107.1c: the player the slot names discards any number of matching cards.
+  -- CR 107.1c: the players the reference names discard any number of matching cards.
   Spec.it s "AnyNumber" $
     Common.assertCodec
       s
       Discard.codec
       ( Discard.AnyNumber
           AnyNumberDiscard.MkAnyNumberDiscard
-            { AnyNumberDiscard.slot = SlotName.MkSlotName (Text.pack "you"),
+            { AnyNumberDiscard.player = PlayerRef.Relative PlayerRelation.You,
               AnyNumberDiscard.cards = AnyNumberMatching.MkAnyNumberMatching (Filter.HasCardType CardType.Land) Nothing,
               AnyNumberDiscard.discarded = Nothing
             }
       )
-      " {\"type\":\"AnyNumber\",\"value\":{\"slot\":\"you\",\"cards\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
+      " {\"type\":\"AnyNumber\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"cards\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Discard.codec

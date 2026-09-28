@@ -3243,6 +3243,59 @@ anyNumberDiscardSpec s registry =
           Spec.assertEqWith s "four counters" (maggotsId >>= \oid -> countersOn oid after) (Just 4)
           Spec.assertEqWith s "both creature cards discarded" (namesIn Zone.Graveyard S.alice after) (replicate 2 (Just (S.printingName piker)))
           Spec.assertEqWith s "the land kept" (namesIn Zone.Hand S.alice after) [Just (S.printingName mountain)]
+        -- Flux {2}{U}: "each player discards any number of cards, then draws that
+        -- many cards. Draw a card." Three seats discarding one, three and none, so
+        -- "that many" is each drawer's own: the union of four read by every seat
+        -- would give alice five, bob four and carol four.
+        Spec.it s "CR 107.1c Flux draws each player the number THEY discarded" $ do
+          flux <- S.printingOf s registry "Flux"
+          island <- S.printingOf s registry "Island"
+          piker <- S.printingOf s registry "Goblin Piker"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let stocked = List.foldl' (\g pid -> stockLibrary piker pid 6 g) (S.landsFor island S.alice 3 S.threePlayerGame) [S.alice, S.bob, S.carol]
+              staged = withHand (handCards rats S.carol 2 . handCards sentry S.bob 4 . handCards piker S.alice 2) (S.handOne flux stocked)
+              perSeat :: Prompt.Prompt r -> r
+              perSeat p = case p of
+                Prompt.ChooseAnyNumberToDiscard _ victim _ offered _
+                  | victim == S.alice -> Set.fromList (take 1 offered)
+                  | victim == S.bob -> Set.fromList (take 3 offered)
+                  | otherwise -> Set.empty
+                _ -> S.identityAnswer p
+              (after, _) = runCast perSeat staged
+              drew pid = 6 - length (Game.zoneMembers Zone.Library pid after)
+          Spec.assertEqWith s "alice drew her one and Flux's one" (drew S.alice) 2
+          Spec.assertEqWith s "bob drew his three" (drew S.bob) 3
+          Spec.assertEqWith s "carol drew none" (drew S.carol) 0
+          Spec.assertEqWith s "bob discarded three sentries" (namesIn Zone.Graveyard S.bob after) (replicate 3 (Just (S.printingName sentry)))
+          Spec.assertEqWith s "carol kept both rats" (namesIn Zone.Hand S.carol after) (replicate 2 (Just (S.printingName rats)))
+        -- Steal the Show {2}{R}: "choose one or both -- target player discards any
+        -- number of cards, then draws that many cards; Steal the Show deals damage
+        -- equal to the number of instant and sorcery cards in your graveyard to
+        -- target creature or planeswalker." Both modes: bob discards two of three,
+        -- and alice's graveyard holds three instants and sorceries beside a land,
+        -- so the 0/8 wall's damage is neither the discard count nor the graveyard.
+        Spec.it s "CR 700.2 Steal the Show's discard draws that many and its damage counts instants and sorceries" $ do
+          steal <- S.printingOf s registry "Steal the Show"
+          mountain <- S.printingOf s registry "Mountain"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          divination <- S.printingOf s registry "Divination"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          wall <- S.printingOf s registry "Wall of Stone"
+          let (wallId, withWall) = S.addPermanent wall S.bob (S.landsInPlay mountain 3)
+              graveyard = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) withWall [bolt, bolt, divination, mountain]
+              staged = withHand (handCards sentry S.bob 3) (S.handOne steal (stockLibrary rats S.bob 4 graveyard))
+              bothAtBob :: Prompt.Prompt r -> r
+              bothAtBob p = case p of
+                Prompt.ChooseModes _ _ _ offered _ -> Seq.fromList (Set.toList offered)
+                Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter (\r -> Recipient.playerOf r == Just S.bob || Recipient.objectOf r == Just wallId) offered) sets
+                Prompt.ChooseAnyNumberToDiscard _ _ _ offered _ -> Set.fromList (take 2 offered)
+                _ -> S.identityAnswer p
+              (after, _) = runCast bothAtBob staged
+          Spec.assertEqWith s "the wall took three" (fmap Object.damage (Game.lookupObject wallId after)) (Just 3)
+          Spec.assertEqWith s "bob drew two" (length (Game.zoneMembers Zone.Library S.bob after)) 2
+          Spec.assertEqWith s "bob holds his kept sentry and two drawn rats" (sortedNames Zone.Hand S.bob after) (List.sort [Just (S.printingName sentry), Just (S.printingName rats), Just (S.printingName rats)])
 
 -- Random discards that need more than the discard itself, and a repeat loop.
 -- Checked against api.scryfall.com, 2026-09-28:

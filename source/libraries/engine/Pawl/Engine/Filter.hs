@@ -1808,6 +1808,11 @@ matches context view predicate = case predicate of
   Filter.OwnedBy relation -> case (owner view, perspective context) of
     (Just o, Just p) -> PlayerRelation.holds (teams context) relation p o
     _ -> False
+  -- ControlledByRecipient's comparison against CR 108.3's owner, for its
+  -- reasons: False unless both are readable.
+  Filter.OwnedByRecipient -> case (owner view, recipient context) of
+    (Just o, Just r) -> o == r
+    _ -> False
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
     _ -> False
@@ -2330,6 +2335,7 @@ rewrite pairs predicate = case predicate of
   -- Untouched for ControlledBy's reason: CR 612.1 swaps a WORD in the text, and
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
+  Filter.OwnedByRecipient -> predicate
   Filter.IsSource -> predicate
   Filter.IsObject _ -> predicate
   -- Untouched for IsSource's reason: a target relation is not a word CR 612.1
@@ -3073,6 +3079,7 @@ bakeBound players predicate = case predicate of
   Filter.ControlledBy _ -> predicate
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
+  Filter.OwnedByRecipient -> predicate
   Filter.IsSource -> predicate
   Filter.IsObject _ -> predicate
   -- Untouched for IsSource's reason: both read the Context, and neither names a
@@ -3253,6 +3260,7 @@ manaValueThresholds predicate = case predicate of
   Filter.ControlledByPlayer _ -> []
   Filter.ControlledByRecipient -> []
   Filter.OwnedBy _ -> []
+  Filter.OwnedByRecipient -> []
   Filter.IsSource -> []
   Filter.IsObject _ -> []
   Filter.TargetsSource -> []
@@ -3418,6 +3426,7 @@ statesAQuality predicate = case predicate of
   Filter.ControlledByPlayer _ -> True
   Filter.ControlledByRecipient -> True
   Filter.OwnedBy _ -> True
+  Filter.OwnedByRecipient -> True
   Filter.IsSource -> True
   Filter.IsObject _ -> True
   -- CR 701.23b for IsSource's reason, and unreachable from a search besides: a

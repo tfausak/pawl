@@ -638,8 +638,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted x -> Effect.Discard (Discard.Counted x {CountedDiscard.quantity = rewriteQuantity pairs (CountedDiscard.quantity x)})
     Discard.These (TheseDiscard.MkTheseDiscard ref mDiscarded) -> Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard (rewriteObjectRef pairs ref) mDiscarded))
-    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching f n) mDiscarded) ->
-      Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n)) mDiscarded))
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard player (AnyNumberMatching.MkAnyNumberMatching f n) mDiscarded) ->
+      Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard player (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n)) mDiscarded))
   Effect.LoseLife x -> Effect.LoseLife x {LifeLoss.quantity = rewriteQuantity pairs (LifeLoss.quantity x)}
   Effect.GainLife x -> Effect.GainLife (rewritePlayerQuantity pairs x)
   Effect.ExchangeLifeTotals _ -> effect
