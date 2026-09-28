@@ -20,6 +20,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.While as While
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -104,6 +105,14 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
             }
       )
       " {\"type\":\"DuringTurnOf\",\"value\":{\"player\":1,\"turn\":3}} "
+  -- CR 500.7: the extra turn's creation stamp, the identity a later-created
+  -- extra turn cannot share.
+  Spec.it s "DuringExtraTurn carries its creation stamp" $
+    Common.assertCodec
+      s
+      Expiry.codec
+      (Expiry.DuringExtraTurn (Timestamp.MkTimestamp 12))
+      " {\"type\":\"DuringExtraTurn\",\"value\":12} "
   -- CR 500.5, carrying the PhaseSelector window. Both grains -- a stepless
   -- phase and a step -- because Pawl.Engine.Expiry.dropAtEndOf tells them apart
   -- by EQUALITY, so a codec that collapsed them would let the end of a combat
