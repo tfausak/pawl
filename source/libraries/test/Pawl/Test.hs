@@ -512,6 +512,7 @@ import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TeamIdSpec
 import qualified Pawl.Codec.TeamsSpec
+import qualified Pawl.Codec.TheseDiscardSpec
 import qualified Pawl.Codec.TimesSpec
 import qualified Pawl.Codec.TimestampSpec
 import qualified Pawl.Codec.TokenPatternSpec
@@ -793,6 +794,7 @@ spec s registry = do
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s
   Pawl.Codec.AnyNumberDiscardSpec.spec s
+  Pawl.Codec.TheseDiscardSpec.spec s
   Pawl.Codec.AnyNumberMatchingSpec.spec s
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
   Pawl.Codec.AsCopySpec.spec s

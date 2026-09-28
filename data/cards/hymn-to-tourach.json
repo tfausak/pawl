@@ -33,15 +33,17 @@
                     "value": {
                       "type": "These",
                       "value": {
-                        "type": "RandomCardInHand",
-                        "value": {
-                          "count": {
-                            "type": "Literal",
-                            "value": 2
-                          },
-                          "player": {
-                            "type": "InSlot",
-                            "value": "target"
+                        "cards": {
+                          "type": "RandomCardInHand",
+                          "value": {
+                            "count": {
+                              "type": "Literal",
+                              "value": 2
+                            },
+                            "player": {
+                              "type": "InSlot",
+                              "value": "target"
+                            }
                           }
                         }
                       }
