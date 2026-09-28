@@ -1075,6 +1075,7 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.CantPlayLands _ -> False
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
+        PlayerEffect.PlotFrom _ -> False
         PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
         PlayerEffect.CantGetCounters _ -> False
         PlayerEffect.StateCoinFlip _ -> False
