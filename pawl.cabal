@@ -1016,6 +1016,8 @@ library codec
     Pawl.Codec.SlotCountSpec
     Pawl.Codec.SlotName
     Pawl.Codec.SlotNameSpec
+    Pawl.Codec.SlotPerPlayer
+    Pawl.Codec.SlotPerPlayerSpec
     Pawl.Codec.Source
     Pawl.Codec.SourceSpec
     Pawl.Codec.SpecialAction
@@ -1680,6 +1682,7 @@ library test
     Pawl.StationSpec
     Pawl.Support
     Pawl.SupportSpec
+    Pawl.TargetPerPlayerSpec
     Pawl.TargetSpec
     Pawl.TeamSpec
     Pawl.Test
@@ -2239,6 +2242,7 @@ library types
     Pawl.Types.SlotArity
     Pawl.Types.SlotCount
     Pawl.Types.SlotName
+    Pawl.Types.SlotPerPlayer
     Pawl.Types.Source
     Pawl.Types.SpecialAction
     Pawl.Types.SpeedDecrease

@@ -526,7 +526,9 @@ castAimable pid oid gs = case Game.faceOf oid gs of
         -- CR 702.140a's slot beside CR 303.4a's, `targetable` above's union: a
         -- mutating creature spell aims at the creature it will merge with.
         enchant = Map.union (Card.enchantSlotMapGiven (Projection.enchantOf oid gs)) (Card.mutateSlotMapGiven (maybe False Object.mutating (Game.lookupObject oid gs)))
-        slotsOf mi = Map.union enchant (Modal.modesTargetSlots (Seq.singleton mi) modal)
+        -- CR 601.2c's per-player copies, as castProposed offers them. A REGRESSION
+        -- FENCE: no card pairs a per-player slot with a target-reading cost.
+        slotsOf mi = Target.announcedSlots pid oid gs (Map.union enchant (Modal.modesTargetSlots (Seq.singleton mi) modal))
         objectsOf = Set.fromList . Maybe.mapMaybe Recipient.objectOf . Set.toList
         setsOf slots = Target.legalSets (Just pid) True Map.empty oid slots gs
      in fmap (fmap objectsOf . setsOf . slotsOf) (Set.toList (Target.fillableModes (Just pid) Map.empty oid enchant modal gs))
@@ -2996,9 +2998,10 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
                       else
                         -- CR 702.47d: the spliced text's targets are chosen here
                         -- beside the spell's own.
-                        Map.union
-                          (Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes faceForTargets)
-                          (maybe Map.empty (`Game.splicedTargetSlots` bestowedGs) (Game.lookupObject sid bestowedGs))
+                        Target.announcedSlots pid sid bestowedGs $
+                          Map.union
+                            (Card.modesTargetSlotsGiven (Projection.enchantOf sid bestowedGs) (maybe False Object.mutating (Game.lookupObject sid bestowedGs)) chosenModes faceForTargets)
+                            (maybe Map.empty (`Game.splicedTargetSlots` bestowedGs) (Game.lookupObject sid bestowedGs))
                   -- CR 101.1: the ceiling this card's own words put on the value
                   -- about to be announced -- "X can't be greater than the
                   -- greatest toughness among creatures you control". Read HERE

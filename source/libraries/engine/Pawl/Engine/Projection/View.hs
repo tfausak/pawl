@@ -1837,7 +1837,11 @@ targetsOfStackObject gs oid = maybe Set.empty targetsOf (Game.lookupObject oid g
                 Source.OfMerge _ -> Set.empty
                 Source.OfToken _ -> Set.empty
                 Source.OfEmblem _ -> Set.empty
-           in Set.unions (Map.elems (Map.restrictKeys (Binding.targetsOf bindings) declared))
+              -- A "for each opponent" slot binds per-player copies
+              -- (Modal.perPlayerSlot), each a target of its printed slot. A
+              -- REGRESSION FENCE: no test asks a target atom of such an object.
+              isDeclared slot _ = Set.member (maybe slot fst (Modal.perPlayerOf slot)) declared
+           in Set.unions (Map.elems (Map.filterWithKey isDeclared (Binding.targetsOf bindings)))
 
 -- CR 115.1 one indirection along: a VIEW of each thing the stack object above
 -- targets, which is what Filter.TargetsOnlyOne's and TargetsMatching's nests

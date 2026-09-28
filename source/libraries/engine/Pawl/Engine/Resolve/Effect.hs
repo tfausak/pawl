@@ -477,17 +477,19 @@ targetSlotsOf obj oid gs face =
       -- would observe it, and no test copies an overloaded spell.
       Map.empty
     else
-      fmap
-        (Projection.rewriteTargetSlot (Projection.textChangesAffecting oid gs))
-        -- CR 303.4a's slot comes off the PROJECTION and not off `face`, which is
-        -- the only reading that sees a granted enchant ability -- CR 702.103b
-        -- gives a spell cast bestowed one, and its printed face declares none. A
-        -- printed Aura's projection is seeded from that same printed list, so
-        -- this is the wider read rather than a different one.
-        --
-        -- CR 702.47d's slots ride beside the face's: the spliced text is the
-        -- spell's own (CR 702.47c), so its targets are re-checked with the rest.
-        (Map.union (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Object.mutating obj) (Binding.modesOf (Object.bindings obj)) face) (Game.splicedTargetSlots obj gs))
+      -- CR 608.2b: a "for each opponent" slot is re-judged per copy it bound.
+      Target.boundCopies (Map.keysSet (Object.bindings obj)) $
+        fmap
+          (Projection.rewriteTargetSlot (Projection.textChangesAffecting oid gs))
+          -- CR 303.4a's slot comes off the PROJECTION and not off `face`, which is
+          -- the only reading that sees a granted enchant ability -- CR 702.103b
+          -- gives a spell cast bestowed one, and its printed face declares none. A
+          -- printed Aura's projection is seeded from that same printed list, so
+          -- this is the wider read rather than a different one.
+          --
+          -- CR 702.47d's slots ride beside the face's: the spliced text is the
+          -- spell's own (CR 702.47c), so its targets are re-checked with the rest.
+          (Map.union (Card.modesTargetSlotsGiven (Projection.enchantOf oid gs) (Object.mutating obj) (Binding.modesOf (Object.bindings obj)) face) (Game.splicedTargetSlots obj gs))
 
 -- CR 608.2c: one clause's instructions, in written order, carrying the one thing
 -- a later instruction can ask about an earlier one -- whether it HAPPENED. CR
@@ -2534,10 +2536,13 @@ stackTargetSlots obj oid gs =
       -- elided as "settled" while the copy silently kept the original's target
       -- (Questing Beast's "that player" under Lithoform Engine).
       baked = Target.bakeModal (Binding.playerSlots (Object.bindings obj))
+      -- The per-player copies the announcement bound, as CR 608.2b reads them. A
+      -- REGRESSION FENCE: no test copies or re-targets a per-player ability.
+      copies = Target.boundCopies (Map.keysSet (Object.bindings obj))
    in case Object.source obj of
-        Source.OfAbility a -> Modal.modesTargetSlots chosen (baked (ActivatedAbility.modal (ActivatedAbilitySource.ability a)))
-        Source.OfTrigger t -> Modal.modesTargetSlots chosen (baked (TriggeredAbility.modal (TriggeredAbilitySource.ability t)))
-        Source.OfInherentTrigger t -> Modal.modesTargetSlots chosen (baked (TriggeredAbility.modal (InherentTriggerSource.ability t)))
+        Source.OfAbility a -> copies (Modal.modesTargetSlots chosen (baked (ActivatedAbility.modal (ActivatedAbilitySource.ability a))))
+        Source.OfTrigger t -> copies (Modal.modesTargetSlots chosen (baked (TriggeredAbility.modal (TriggeredAbilitySource.ability t))))
+        Source.OfInherentTrigger t -> copies (Modal.modesTargetSlots chosen (baked (TriggeredAbility.modal (InherentTriggerSource.ability t))))
         Source.OfCard _ -> fromFace
         Source.OfSpellCopy _ -> fromFace
         Source.OfCardCopy _ -> fromFace
