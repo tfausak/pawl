@@ -603,8 +603,8 @@ looksBack condition = case condition of
   -- exploiting itself still triggers".
   TriggerCondition.SelfExploits -> True
   TriggerCondition.CreatureExploits {} -> True
-  -- Not on the list: rule 702.122e's Vehicle is on the battlefield when its own crew
-  -- ability resolves, so there is no departure to look back past.
+  -- Not on the list: rule 702.122e's Vehicle is on the battlefield when its own
+  -- crew ability resolves, so there is no departure to look back past.
   TriggerCondition.SelfBecomesCrewed {} -> False
   -- Nor here: rule 702.122a's cost taps the crewer, which is not a departure
   -- either.

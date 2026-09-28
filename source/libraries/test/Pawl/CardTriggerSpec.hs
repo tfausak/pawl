@@ -4142,7 +4142,7 @@ creatureExploitsSpec s registry =
         Spec.it s "CR 702.110b Skull Skaab exploiting a token makes nothing" $ do
           (giantId, tokenId, staged) <- skaabBoard
           let after = played (exploiting (== tokenId)) staged
-          Spec.assertEqWith s "CR 111.6 no Zombie for a token" (zombies after) 0
+          Spec.assertEqWith s "CR 111.1 no Zombie for a token" (zombies after) 0
           Spec.assertBool s (not (S.onBattlefield tokenId after)) "CR 702.110a the token was the creature sacrificed"
           Spec.assertBool s (S.onBattlefield giantId after) "and the Hill Giant stayed"
         -- The Colonel Autumn ruling: a creature that exploits ITSELF still
