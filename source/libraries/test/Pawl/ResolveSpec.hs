@@ -5321,7 +5321,7 @@ cleansingSpec s registry =
                 | otherwise = PaymentDecision.Declines
               ((_, after), asked) = resolveWith policy onStack
           Spec.assertEqWith s "CR 118.12a the three lands somebody paid for stand, and every other land was destroyed" (permanentsOf after) (List.sort [islandA, islandB, forestC])
-          Spec.assertEqWith s "CR 119.4 bob paid 1 life and carol 2" (lives after) [Just 20, Just 19, Just 18]
+          Spec.assertEqWith s "CR 118.3b bob paid 1 life and carol 2" (lives after) [Just 20, Just 19, Just 18]
           Spec.assertEqWith s "CR 701.8a Forest D went to carol's graveyard though she paid for Forest C" (length (Game.zoneMembers Zone.Graveyard S.carol after), elem forestD (permanentsOf after)) (1, False)
           -- CR 101.4: every offer alice makes, then every one bob makes, then
           -- carol's -- seven lands each.

@@ -79,7 +79,7 @@ data ForEach effect = MkForEach
     -- order over the payers (each payer's offers in member order), since the
     -- offers are the choices and the body the action (CR 608.2e). Nothing is the
     -- ungated loop. PayGate.offeredAt is not read here: a loop offers its own.
-    -- Proved by Pawl.ResolveSpec's Cleansing group.
+    -- Proved by Pawl.ResolveSpec's "an offer per member" group (Cleansing).
     payGate :: Maybe PayGate.PayGate
   }
   deriving (Eq, Ord, Show)

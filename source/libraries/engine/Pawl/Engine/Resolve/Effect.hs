@@ -10972,7 +10972,7 @@ paymentDecisionOf paid = if paid then PaymentDecision.Pays else PaymentDecision.
 -- another. CR 101.4: every payer makes all of their offers, one per member,
 -- before the next payer in APNAP order makes theirs -- Killing Wave's and
 -- Whirlwind Denial's rulings -- and is told what the payers before them
--- answered for THAT member (CR 101.4b). Nothing is destroyed until every offer
+-- answered for THAT member (CR 101.4b). No body runs until every offer
 -- is answered, which is CR 608.2e's choices-then-action.
 loopOffers :: ObjectId -> ObjectId -> PlayerId -> SlotName -> Map.Map SlotName (Set Recipient) -> [Recipient] -> PayGate.PayGate -> Game [Recipient]
 loopOffers resolving source controller slot legal members gate = do
