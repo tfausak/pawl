@@ -61,6 +61,8 @@ import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentWasSacrificed as PermanentWasSacrificed
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlanarDieFace as PlanarDieFace
+import qualified Pawl.Types.PlanarDieRolled as PlanarDieRolled
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
@@ -555,6 +557,13 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.RolledToVisit DieResult.MkDieResult {DieResult.roller = PlayerId.MkPlayerId 2, DieResult.result = 5})
       " {\"type\":\"RolledToVisit\",\"value\":{\"roller\":2,\"result\":5}} "
+  -- CR 901.9.
+  Spec.it s "PlanarDieRolled" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.PlanarDieRolled (PlanarDieRolled.MkPlanarDieRolled (PlayerId.MkPlayerId 2) PlanarDieFace.Chaos))
+      " {\"type\":\"PlanarDieRolled\",\"value\":{\"roller\":2,\"face\":{\"type\":\"Chaos\"}}} "
   -- CR 701.51c.
   Spec.it s "AttractionOpened" $
     Common.assertCodec

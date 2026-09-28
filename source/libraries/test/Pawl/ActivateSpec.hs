@@ -5082,6 +5082,7 @@ activationsIn =
         A.Foretell _ -> False
         A.Suspend _ -> False
         A.PutCompanionIntoHand -> False
+        A.RollPlanarDie -> False
         A.Ignore _ _ -> False
         A.EndEffect _ -> False
    in filter isActivation

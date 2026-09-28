@@ -559,8 +559,12 @@ data TriggerCondition
     -- The printed "one or more" is the whole of one instruction's throw:
     -- Pawl.Engine.Resolve records one GameEvent.DiceRolled per throw, however
     -- many dice it named, and a reroll is a separate later throw, so the batch
-    -- and per-occurrence readings coincide. See #934 for the planar die.
+    -- and per-occurrence readings coincide. The planar die records one too
+    -- (CR 901.9d).
     PlayerRollsDice PlayerRelation.PlayerRelation
+  | -- | CR 311.7: "whenever chaos ensues", a plane's chaos ability, against a
+    -- GameEvent.PlanarDieRolled showing the chaos symbol (CR 901.9b).
+    ChaosEnsues
   | -- | CR 706.2: "whenever you roll a 6" (Night Shift of the Living Dead), once
     -- per die whose result, after every modifier, is the stated number.
     PlayerRollsResult (DieResult.DieResult PlayerRelation.PlayerRelation)

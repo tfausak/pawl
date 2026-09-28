@@ -690,6 +690,9 @@ data Effect card ability
   | -- | CR 701.51b: the resolving controller opens an Attraction, performed by
     -- Pawl.Engine.Attraction.open.
     OpenAttraction
+  | -- | CR 701.31: the resolving controller planeswalks, performed by
+    -- Pawl.Engine.Planechase.planeswalk.
+    Planeswalk
   | -- | CR 702.159b: the resolving controller claims the prize; the actions
     -- after the long dash are the effects that follow this one.
     ClaimPrize

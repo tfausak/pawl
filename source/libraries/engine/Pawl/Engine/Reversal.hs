@@ -57,6 +57,7 @@ withoutAnnouncement before entry closed = do
   exile <- setOf GameState.exile
   command <- setOf GameState.command
   attractionDecks <- libraries GameState.attractionDecks
+  planarDecks <- libraries GameState.planarDecks
   stack <- listOf GameState.stack
   players <- mapOf GameState.players
   outsideObjects <- mapOf GameState.outsideObjects
@@ -159,6 +160,7 @@ withoutAnnouncement before entry closed = do
         GameState.exile = exile,
         GameState.command = command,
         GameState.attractionDecks = attractionDecks,
+        GameState.planarDecks = planarDecks,
         GameState.stack = stack,
         GameState.players = players,
         GameState.outsideObjects = outsideObjects,

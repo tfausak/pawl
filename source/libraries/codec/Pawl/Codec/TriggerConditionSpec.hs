@@ -1191,6 +1191,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.Visit
       " {\"type\":\"Visit\"} "
+  -- CR 311.7: nullary, chaos ensuing for the whole table.
+  Spec.it s "ChaosEnsues" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.ChaosEnsues
+      " {\"type\":\"ChaosEnsues\"} "
   -- CR 701.51c and CR 702.159b, PlayerForages' shape.
   Spec.it s "PlayerOpensAttraction round-trips" $
     Common.assertCodec

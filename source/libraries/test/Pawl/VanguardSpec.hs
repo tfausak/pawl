@@ -64,7 +64,8 @@ deckOf mountain vanguard =
       Deck.dungeons = Set.empty,
       Deck.sideboard = Map.empty,
       Deck.conspiracies = Map.empty,
-      Deck.attractions = Map.empty
+      Deck.attractions = Map.empty,
+      Deck.planes = Set.empty
     }
 
 -- Alice brings `vanguard`, bob brings none. Bob's deck is built too, so his
@@ -114,6 +115,7 @@ isActivationOf oid action = case action of
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
+  Action.Type.RollPlanarDie -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
 

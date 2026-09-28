@@ -1450,6 +1450,7 @@ isActivation a = case a of
   A.Foretell _ -> False
   A.Suspend _ -> False
   A.PutCompanionIntoHand -> False
+  A.RollPlanarDie -> False
   A.ActivateManaAbility _ -> False
   A.Ignore _ _ -> False
   A.EndEffect _ -> False

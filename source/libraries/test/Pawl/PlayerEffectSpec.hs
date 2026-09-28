@@ -332,6 +332,7 @@ isCast action = case action of
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
+  Action.Type.RollPlanarDie -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
@@ -2818,6 +2819,7 @@ isSilenceActivate action = case action of
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
+  Action.Type.RollPlanarDie -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False
@@ -2994,6 +2996,7 @@ isActivate a = case a of
   Action.Type.Foretell {} -> False
   Action.Type.Suspend {} -> False
   Action.Type.PutCompanionIntoHand -> False
+  Action.Type.RollPlanarDie -> False
   Action.Type.ActivateManaAbility {} -> False
   Action.Type.Ignore {} -> False
   Action.Type.EndEffect {} -> False

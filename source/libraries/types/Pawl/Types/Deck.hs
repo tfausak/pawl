@@ -103,7 +103,10 @@ data Deck = MkDeck
     -- | CR 717.2: the supplementary Attraction deck, which begins in the command
     -- zone rather than among `cards`. A multiset: CR 717.2b lets a limited deck
     -- repeat a name.
-    attractions :: Map.Map Printing.Printing Natural.Natural
+    attractions :: Map.Map Printing.Printing Natural.Natural,
+    -- | CR 901.3: the planar deck, plane and phenomenon cards. A set, since
+    -- each card in it must have a different English name.
+    planes :: Set.Set Printing.Printing
   }
   deriving (Eq, Ord, Show)
 
@@ -112,4 +115,4 @@ data Deck = MkDeck
 -- every game nobody ventures in, every game nobody wishes in, and every game
 -- outside Conspiracy Draft.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty, attractions = Map.empty}
+fromCards m = MkDeck {cards = m, commander = Set.empty, vanguard = Nothing, dungeons = Set.empty, sideboard = Map.empty, conspiracies = Map.empty, attractions = Map.empty, planes = Set.empty}

@@ -1171,6 +1171,7 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PlayerRollsDice _ -> Set.empty
   TriggerCondition.PlayerRollsResult _ -> Set.empty
   TriggerCondition.Visit -> Set.empty
+  TriggerCondition.ChaosEnsues -> Set.empty
   TriggerCondition.PlayerOpensAttraction _ -> Set.empty
   TriggerCondition.PlayerClaimsPrize _ -> Set.empty
   TriggerCondition.PlayerWinsCoinFlip _ -> Set.empty

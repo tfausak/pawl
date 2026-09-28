@@ -42,6 +42,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Phasing as Phasing
+import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
@@ -624,6 +625,9 @@ placePendingTriggers = do
       -- CR 728.1, another, gathered for the same reason. At most one entry, and
       -- only for the active player.
       irradiated = Rad.inherentPending evs gs
+      -- CR 901.8's planeswalking ability, another inherent one with no source,
+      -- gathered for the same reason.
+      planeswalking = Planechase.inherentPending evs gs
       -- CR 309.4c's room abilities, gathered separately because
       -- Event.gatherTriggers reads the command zone for CR 113.6p's list -- an
       -- emblem and a vanguard card -- and a dungeon card is on neither. Unlike the
@@ -665,7 +669,7 @@ placePendingTriggers = do
   -- CR 605.5a: the EVENT that fired it decides too, so a trigger watching mana
   -- added by an ability that resolved (Caged Sun off Crumbling Vestige) is no
   -- mana ability and is placed here like any other.
-  gathered <- reactions (filter (\p -> not (ManaAbility.isTriggeredManaAbility (PendingTrigger.firedBy p) (PendingTrigger.ability p))) pending <> inherent <> initiative <> revving <> irradiated <> entered)
+  gathered <- reactions (filter (\p -> not (ManaAbility.isTriggeredManaAbility (PendingTrigger.firedBy p) (PendingTrigger.ability p))) pending <> inherent <> initiative <> revving <> irradiated <> planeswalking <> entered)
   -- CR 603.3b's two sentences, run one after the other rather than ordered
   -- together and placed at the end: the rule's first sentence PUTS its abilities
   -- on the stack before its second is reached, which is observable both in the
@@ -1446,6 +1450,14 @@ priorityLoop = do
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop
+                              -- CR 116.2i / 901.9: a special action too, and one
+                              -- that takes no object; CR 901.9a-c give the roller
+                              -- priority afterwards whatever the die shows.
+                              Action.Type.RollPlanarDie -> do
+                                Planechase.roll Resolve.performManaAbility p
+                                State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
+                                settleForPriority
+                                loop
                               -- CR 116.2c: a special action too, and the one whose
                               -- permission came from a resolution rather than
                               -- from printed text. CR 613.1's next projection is
@@ -2057,8 +2069,10 @@ playGame =
 -- Of CR 729.2a-c and CR 729.5a-c's command-zone residents, commanders and
 -- vanguards are the kinds Setup carries both ways, dungeons ride
 -- Player.dungeons rather than the command zone, and a conspiracy stays in the
--- main game, which is CR 729.2's "no other cards ... are moved"; planes and
--- phenomena (#934) and schemes (#935) do not exist.
+-- main game, which is CR 729.2's "no other cards ... are moved"; schemes (#935)
+-- do not exist.
+--
+-- Not implemented: CR 729.2a's planar deck moving into the subgame (#4313).
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get

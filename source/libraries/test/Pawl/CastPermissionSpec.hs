@@ -840,6 +840,7 @@ playing wanted action = case action of
   Action.Type.Foretell _ -> False
   Action.Type.Suspend _ -> False
   Action.Type.PutCompanionIntoHand -> False
+  Action.Type.RollPlanarDie -> False
   Action.Type.Ignore _ _ -> False
   Action.Type.EndEffect _ -> False
   Action.Type.ActivateManaAbility _ -> False

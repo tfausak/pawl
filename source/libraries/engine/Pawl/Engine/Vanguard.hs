@@ -40,11 +40,13 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Conspiracy as Conspiracy
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Plane as Plane
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -97,13 +99,15 @@ isVanguard oid gs = maybe False isVanguardFace (Game.faceOf oid gs)
 -- CR 315.3 keep it in this zone, so no rule pawl implements can turn one over.
 -- Pawl.ConspiracySpec's Sentinel Dispatch case proves the conspiracy arm.
 --
--- Not implemented: rule 113.6p's plane cards (#934) and scheme cards (#935),
--- neither of which pawl can put into a command zone at all, so each answers
--- False here by never arriving.
+-- A plane or phenomenon card's do only while it is face up (CR 901.7), which is
+-- membership in GameState.command rather than in a planar deck.
+--
+-- Not implemented: rule 113.6p's scheme cards (#935), which pawl cannot put
+-- into a command zone at all, so each answers False here by never arriving.
 functionsFromCommandZone :: ObjectId -> GameState -> Bool
 functionsFromCommandZone oid gs = case fmap Object.source (Game.lookupObject oid gs) of
   Just (Source.OfEmblem _) -> True
-  Just (Source.OfCard _) -> isVanguard oid gs || Conspiracy.isConspiracy oid gs
+  Just (Source.OfCard _) -> isVanguard oid gs || Conspiracy.isConspiracy oid gs || (Plane.isPlanarCard oid gs && Set.member oid (GameState.command gs))
   _ -> False
 
 -- | CR 902.3 \/ 902.6: this player's vanguard card, which is theirs to own and

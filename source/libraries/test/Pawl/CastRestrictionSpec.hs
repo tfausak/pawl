@@ -1047,6 +1047,7 @@ offeredPlays pid gs =
         A.Foretell _ -> False
         A.Suspend _ -> False
         A.PutCompanionIntoHand -> False
+        A.RollPlanarDie -> False
         A.Ignore _ _ -> False
         A.EndEffect _ -> False
         A.ActivateManaAbility _ -> False
@@ -2236,6 +2237,7 @@ manaActivationOffer action = case action of
   A.Foretell _ -> False
   A.Suspend _ -> False
   A.PutCompanionIntoHand -> False
+  A.RollPlanarDie -> False
   A.EndEffect _ -> False
 
 -- Take ONE named action and pass at every other prompt. Pinned to the action

@@ -58,6 +58,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.MoveDuration as MoveDuration
 import qualified Pawl.Engine.Phasing as Phasing
+import qualified Pawl.Engine.Planechase as Planechase
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Populate as Populate
@@ -3072,6 +3073,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.TemptWithTheRing {} -> False
   -- CR 609.3: an empty Attraction deck opens nothing.
   Effect.OpenAttraction -> null (Attraction.deckOf controller gs)
+  -- CR 701.31a: only the planar controller of a Planechase game planeswalks.
+  Effect.Planeswalk -> not (Planechase.canPlaneswalk controller gs)
   Effect.ClaimPrize -> False
   -- CR 701.61a: neither half of forage can be carried out by a player holding
   -- fewer than three cards in their graveyard who controls no Food, which is
@@ -8997,6 +9000,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.Engine.Ring.tempt's.
   Effect.TemptWithTheRing -> Ring.tempt controller
   Effect.OpenAttraction -> Attraction.open controller
+  Effect.Planeswalk -> Planechase.planeswalk controller
   -- CR 702.159b: the prize's actions are the effects after this one, so the
   -- claim itself is only the event "whenever you claim the prize" reads.
   Effect.ClaimPrize -> State.modify' (Event.recordEvent (GameEvent.PrizeClaimed controller))

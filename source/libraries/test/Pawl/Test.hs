@@ -389,6 +389,8 @@ import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PhasedOutSpec
 import qualified Pawl.Codec.PileSpec
+import qualified Pawl.Codec.PlanarDieFaceSpec
+import qualified Pawl.Codec.PlanarDieRolledSpec
 import qualified Pawl.Codec.PlayPermissionOriginSpec
 import qualified Pawl.Codec.PlayerAttacksPlayerSpec
 import qualified Pawl.Codec.PlayerAttacksWithSpec
@@ -637,6 +639,7 @@ import qualified Pawl.MutateSpec
 import qualified Pawl.OmenSpec
 import qualified Pawl.OutsideTheGameSpec
 import qualified Pawl.PhasingSpec
+import qualified Pawl.PlanechaseSpec
 import qualified Pawl.PlaneswalkerCombatSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerDesignationSpec
@@ -788,6 +791,8 @@ spec s registry = do
   Pawl.Codec.AttachTargetSpec.spec s
   Pawl.Codec.AttackCostSpec.spec s
   Pawl.Codec.AttackOptionSpec.spec s
+  Pawl.Codec.PlanarDieFaceSpec.spec s
+  Pawl.Codec.PlanarDieRolledSpec.spec s
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.AttackTargetKindSpec.spec s
   Pawl.Codec.AttackTargetSpec.spec s
@@ -1434,6 +1439,7 @@ spec s registry = do
   Pawl.UntapRestrictionSpec.spec s registry
   Pawl.Uri.FragmentSpec.spec s
   Pawl.VanguardSpec.spec s registry
+  Pawl.PlanechaseSpec.spec s registry
   Pawl.VariableEffectSpec.spec s registry
   Pawl.VoteSpec.spec s registry
   Pawl.ZoneChangeSpec.spec s registry

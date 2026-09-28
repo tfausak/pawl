@@ -554,6 +554,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Airbend ref -> Effect.Airbend (rewriteObjectRef pairs ref)
   Effect.TemptWithTheRing -> effect
   Effect.OpenAttraction -> effect
+  Effect.Planeswalk -> effect
   Effect.ClaimPrize -> effect
   Effect.Forage -> effect
   Effect.Populate -> effect
@@ -1862,6 +1863,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerRollsDice _ -> condition
   TriggerCondition.PlayerRollsResult _ -> condition
   TriggerCondition.Visit -> condition
+  TriggerCondition.ChaosEnsues -> condition
   TriggerCondition.PlayerOpensAttraction _ -> condition
   TriggerCondition.PlayerClaimsPrize _ -> condition
   TriggerCondition.PlayerWinsCoinFlip _ -> condition
