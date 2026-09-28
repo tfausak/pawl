@@ -5,7 +5,8 @@ import qualified Pawl.Types.SlotName as SlotName
 
 -- | CR 601.2c: "for each opponent, ... up to one target ... that player
 -- controls" (Riptide Gearhulk) -- one target slot announced once per player the
--- relation names, with `slot` naming that player for the slot's own Filter.
+-- relation names, with `slot` naming that player for the slot's own Filter and
+-- its pool's ZoneScope ("from that player's graveyard", Sepulchral Primordial).
 data SlotPerPlayer = MkSlotPerPlayer
   { players :: PlayerRelation.PlayerRelation,
     slot :: SlotName.SlotName

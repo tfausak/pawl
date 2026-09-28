@@ -2393,6 +2393,23 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- CR 601.2c's baked "that player's graveyard", for ControlledByPlayer's reason:
+  -- Pawl.Engine.Target.bakePerPlayer writes it, and no card may name a seat.
+  Spec.it s "CR 601.2c no card writes ZoneScope.BoundPlayer" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "BoundPlayer") (Codec.encode (Face.Codec.codec Card.codec) c)
+        offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
+    Spec.assertEqWith s "the baked scope is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    piker <- S.printingOf s registry "Goblin Piker"
+    let targetSlot = TargetSlot.required (Pool.CardsInGraveyard (ZoneScope.BoundPlayer (PlayerId.MkPlayerId 1))) Nothing
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted scope is seen" (atoms planted) 1
   -- CR 702.119c's baked half, in the position the atom above holds: an ObjectId
   -- that only a cast can know, written by Pawl.Engine.Cost.candidateCostsGiven
   -- into an emerge candidate's sacrifice criterion and round-tripped by a total

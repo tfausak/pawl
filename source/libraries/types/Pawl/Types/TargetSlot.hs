@@ -147,6 +147,6 @@ chosenBy :: PlayerRelation.PlayerRelation -> TargetSlot -> TargetSlot
 chosenBy relation slot = slot {chooser = Just relation}
 
 -- CR 601.2c's "for each opponent": the same slot announced once per player the
--- relation names, `thatPlayer` naming that player for the slot's own Filter.
+-- relation names, `thatPlayer` naming that player for the slot's own Filter and pool.
 forEachPlayer :: PlayerRelation.PlayerRelation -> SlotName.SlotName -> TargetSlot -> TargetSlot
 forEachPlayer relation thatPlayer slot = slot {perPlayer = Just (SlotPerPlayer.MkSlotPerPlayer relation thatPlayer)}

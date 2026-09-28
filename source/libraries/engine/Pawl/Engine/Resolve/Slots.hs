@@ -394,6 +394,8 @@ zoneScopeSlots scope = case scope of
   -- aimed here would have no singular answer -- PlayerRef.ControllerOfBound's
   -- reading, one type over.
   ZoneScope.ControllerOfBound slot -> Map.singleton slot SlotArity.One
+  -- Already resolved: names no slot.
+  ZoneScope.BoundPlayer _ -> Map.empty
 
 -- The slots an ObjectRef reads. InSlot names one directly, and
 -- EachCardInGraveyard and EachCardInHand name one through their scope; the other
@@ -3335,12 +3337,14 @@ poolSlot pool = case pool of
     ZoneScope.Scoped _ -> Map.empty
     ZoneScope.InSlot slot -> oneSlot slot
     ZoneScope.ControllerOfBound slot -> oneSlot slot
+    ZoneScope.BoundPlayer _ -> Map.empty
   Pool.CardsInExile -> Map.empty
   -- The graveyard half's scope; the battlefield half names no slot.
   Pool.CreaturesAndCardsInGraveyard scope -> case scope of
     ZoneScope.Scoped _ -> Map.empty
     ZoneScope.InSlot slot -> oneSlot slot
     ZoneScope.ControllerOfBound slot -> oneSlot slot
+    ZoneScope.BoundPlayer _ -> Map.empty
 
 -- Every slot a TRIGGERED ability reads: each mode's (modeSlots) and its CR
 -- 603.4 intervening "if"'s. CR 805.4d's "refers to that player" is asked of it.
