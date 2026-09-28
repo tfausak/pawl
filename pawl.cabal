@@ -903,6 +903,10 @@ library codec
     Pawl.Codec.ProductionTagSpec
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.ProjectedCharacteristicsSpec
+    Pawl.Codec.ProliferateR
+    Pawl.Codec.ProliferateRewrite
+    Pawl.Codec.ProliferateRewriteSpec
+    Pawl.Codec.ProliferateRSpec
     Pawl.Codec.Protection
     Pawl.Codec.ProtectionSpec
     Pawl.Codec.Prototype
@@ -2176,6 +2180,8 @@ library types
     Pawl.Types.ProductionTag
     Pawl.Types.Program
     Pawl.Types.ProjectedCharacteristics
+    Pawl.Types.ProliferateR
+    Pawl.Types.ProliferateRewrite
     Pawl.Types.Prompt
     Pawl.Types.ProposedEvent
     Pawl.Types.Protection

@@ -48,6 +48,8 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProliferateR as ProliferateR
+import qualified Pawl.Types.ProliferateRewrite as ProliferateRewrite
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
@@ -237,6 +239,13 @@ spec s =
             codec
             (ReplacementEffect.DieRollR (DieRollR.MkDieRollR ControllerRelation.Yours DieRollRewrite.ExtraIgnoringLowest))
             " {\"type\":\"DieRollR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"ExtraIgnoringLowest\"}}} "
+        -- CR 701.34a: Tekuthal, Inquiry Dominus.
+        Spec.it s "ProliferateR (Tekuthal, Inquiry Dominus)" $
+          Common.assertCodec
+            s
+            codec
+            (ReplacementEffect.ProliferateR (ProliferateR.MkProliferateR ControllerRelation.Yours ProliferateRewrite.Doubled))
+            " {\"type\":\"ProliferateR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"Doubled\"}}} "
         -- A fixed kind, a real filter, and CR 614.16's AddMore.
         Spec.it s "CounterR (Hardened Scales)" $
           Common.assertCodec
