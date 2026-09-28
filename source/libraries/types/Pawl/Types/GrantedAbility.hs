@@ -1,6 +1,7 @@
 module Pawl.Types.GrantedAbility where
 
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
@@ -43,4 +44,7 @@ data GrantedAbility card
   | -- | CR 113.3d / 613.10: a static ability that affects players, Nerd Rage's
     -- "You have no maximum hand size".
     Player PlayerStaticAbility.PlayerStaticAbility
+  | -- | CR 113.3d / 601.2f: a static ability reducing its own object's cost to
+    -- cast, Richlau, Headmaster's "This spell costs {1} less to cast".
+    SelfCostReduction CostReduction.CostReduction
   deriving (Eq, Ord, Show)
