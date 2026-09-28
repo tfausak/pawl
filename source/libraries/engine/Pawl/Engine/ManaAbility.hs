@@ -461,7 +461,7 @@ manaProduced effect = case effect of
   -- addition: a body holding several is a shape no printing writes, "add one
   -- mana for each ..." being the ManaAddition COUNT rather than a repeated body
   -- (Pawl.Types.ManaAddition).
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.Repeat body -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.Heal _ -> Nothing
@@ -725,7 +725,7 @@ movesLibraryCard effect = case effect of
   Effect.GrantPlayFromExile {} -> False
   -- Descended into for `manaProduced`'s reason: rule 608.2f's body runs as part
   -- of THIS effect.
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> any movesLibraryCard body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> any movesLibraryCard body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> any movesLibraryCard body
   Effect.Repeat body -> any movesLibraryCard body
   Effect.Heal _ -> False

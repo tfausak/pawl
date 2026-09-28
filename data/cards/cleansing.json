@@ -1,0 +1,101 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Cleansing",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ForEach",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "Destroy",
+                          "value": {
+                            "ref": {
+                              "type": "InSlot",
+                              "value": "land"
+                            },
+                            "regenerability": {
+                              "type": "Regenerable"
+                            }
+                          }
+                        }
+                      ],
+                      "payGate": {
+                        "branch": {
+                          "type": "IfNonePaid"
+                        },
+                        "cost": {
+                          "components": [
+                            {
+                              "type": "PayLife",
+                              "value": 1
+                            }
+                          ],
+                          "mana": []
+                        },
+                        "payer": {
+                          "type": "EachPlayer"
+                        }
+                      },
+                      "ref": {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Land"
+                          }
+                        }
+                      },
+                      "slot": "land"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

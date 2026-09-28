@@ -1012,7 +1012,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               -- CR 608.2f's second sentence, which that rule's own Soulfire
               -- Eruption example states: the library cannot be exiled from twice
               -- at the same time.
-              ForEach.individually = True
+              ForEach.individually = True,
+              ForEach.payGate = Nothing
             }
       )
       " {\"type\":\"ForEach\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"victims\"},\"slot\":\"victim\",\"body\":[{\"type\":\"DealDamage\",\"value\":{\"parts\":[{\"ref\":{\"type\":\"InSlot\",\"value\":\"victim\"},\"quantity\":{\"type\":\"AgainstSlot\",\"value\":{\"slot\":\"exiled\",\"quantity\":{\"type\":\"ManaValue\"}}}}]}}],\"individually\":true}} "

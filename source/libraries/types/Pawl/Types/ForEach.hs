@@ -3,6 +3,7 @@ module Pawl.Types.ForEach where
 import qualified Data.Sequence as Seq
 import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | CR 608.2f's per-object loop: the objects and players the ObjectRef names,
@@ -69,6 +70,16 @@ data ForEach effect = MkForEach
     -- whose body draws or reads a library top says it is not simultaneous",
     -- which is where CR 121.2 and rule 608.2f's Soulfire Eruption example are
     -- kept as rules rather than as a card's default.
-    individually :: Bool
+    individually :: Bool,
+    -- | CR 118.12a's "unless [a player] pays", offered once PER MEMBER, the body
+    -- running for a member only where the gate's branch selects someone --
+    -- Cleansing's "for each land, destroy that land unless any player pays 1
+    -- life". The gate's references read the member through `slot`. Every offer
+    -- for every member is made before the first body runs, in CR 101.4's APNAP
+    -- order over the payers (each payer's offers in member order), since the
+    -- offers are the choices and the body the action (CR 608.2e). Nothing is the
+    -- ungated loop. PayGate.offeredAt is not read here: a loop offers its own.
+    -- Proved by Pawl.ResolveSpec's "an offer per member" group (Cleansing).
+    payGate :: Maybe PayGate.PayGate
   }
   deriving (Eq, Ord, Show)

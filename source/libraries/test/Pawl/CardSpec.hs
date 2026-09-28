@@ -656,7 +656,7 @@ objectRefPositions =
         ("make-plotted", Effect.MakePlotted (plantedRef "mp"), [plantedRef "mp"]),
         ("make-foretold", Effect.MakeForetold (MakeForetold.MkMakeForetold (plantedRef "mf") Nothing), [plantedRef "mf"]),
         ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
-        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") LoopMembers.Every (SlotName.MkSlotName (Text.pack "each")) Seq.empty False), [plantedRef "fe"]),
+        ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") LoopMembers.Every (SlotName.MkSlotName (Text.pack "each")) Seq.empty False Nothing), [plantedRef "fe"]),
         ("heal", Effect.Heal (plantedRef "he"), [plantedRef "he"]),
         ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.Power (plantedRef "xv-power")) (ExchangedValue.Toughness (plantedRef "xv-toughness")) Duration.Indefinite), [plantedRef "xv-power", plantedRef "xv-toughness"])
       ]
@@ -1394,7 +1394,7 @@ ownCounts effect = case effect of
   Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectCounts body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectCounts body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> quantityCounts upTo <> concatMap effectCounts body
   Effect.Repeat body -> concatMap effectCounts body
   Effect.Heal _ -> []
@@ -1566,14 +1566,22 @@ spellCostsOf face =
     <> concatMap (NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices face)
 
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
--- every clause. A READER of X rather than a declarer: Clash of Wills' "unless its
--- controller pays {X}" spends the value its own {X}{U} announced (CR 107.3a),
--- which is what Pawl.Engine.Resolve.Effect.announcedXOn substitutes in.
+-- every clause, and every CR 608.2f loop's per-member offer. A READER of X
+-- rather than a declarer: Clash of Wills' "unless its controller pays {X}" and
+-- Killing Wave's "unless they pay X life" spend the value their own {X}
+-- announced (CR 107.3a), which is what Pawl.Engine.Resolve.Effect.announcedXOn
+-- substitutes in.
 payGateCostsOf :: Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> [Cost.Type.Cost Keyword.Keyword]
-payGateCostsOf =
-  fmap PayGate.cost
-    . concatMap (Maybe.mapMaybe Clause.payGate . Foldable.toList . Mode.clauses)
-    . Modal.modes
+payGateCostsOf modal =
+  fmap
+    PayGate.cost
+    ( concatMap (Maybe.mapMaybe Clause.payGate . Foldable.toList . Mode.clauses) (Modal.modes modal)
+        <> concatMap loopGates (Modal.allEffects modal)
+    )
+  where
+    loopGates effect = case effect of
+      Effect.ForEach loop -> Maybe.maybeToList (ForEach.payGate loop) <> concatMap loopGates (ForEach.body loop)
+      _ -> []
 
 -- Every Count reachable from a combat restriction: only CR 508.1c's / CR
 -- 509.1b's "unless some condition is met" carries one, and the subject beside it
@@ -1652,7 +1660,7 @@ effectNestedEffects effect = case effect of
   -- CR 615.8's shield carries no rider at all.
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body, run once per member of the fold.
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> Foldable.toList body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Foldable.toList body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Foldable.toList body
   Effect.Repeat body -> Foldable.toList body
   Effect.Heal _ -> []
@@ -2239,7 +2247,7 @@ effectReplacements effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectReplacements rider
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectReplacements body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectReplacements body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectReplacements body
   Effect.Repeat body -> concatMap effectReplacements body
   Effect.Heal _ -> []
@@ -2718,7 +2726,7 @@ effectMintedFaces effect = case effect of
   Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage _ _ _ _ _ _ _ rider) -> concatMap effectMintedFaces rider
   Effect.PreventNextDamageInstance {} -> []
   -- CR 608.2f's body can too, for the same reason.
-  Effect.ForEach (ForEach.MkForEach _ _ _ body _) -> concatMap effectMintedFaces body
+  Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectMintedFaces body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectMintedFaces body
   Effect.Repeat body -> concatMap effectMintedFaces body
   Effect.Heal _ -> []
@@ -5898,7 +5906,7 @@ effectFilters effect = case effect of
   Effect.GrantPlayFromExile grant -> frame Unframed (durationFilters (GrantPlayFromExile.duration grant)) <> frame SourceHostFramed (objectRefFilters (GrantPlayFromExile.ref grant))
   -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
   -- list is exactly what this traversal must not stop at.
-  Effect.ForEach (ForEach.MkForEach ref _ _ body _) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body
+  Effect.ForEach (ForEach.MkForEach ref _ _ body _ gate) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body <> concatMap payGateFilters (Maybe.maybeToList gate)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectFilters body
   Effect.Repeat body -> concatMap effectFilters body
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)

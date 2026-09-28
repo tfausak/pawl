@@ -115,6 +115,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PayOffer as PayOffer
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -5247,14 +5248,175 @@ rhysticSpec s registry =
           Spec.assertEqWith s "CR 118.12: Dash Hopes left the stack and the Piker did not" (stackNames after) [named "Goblin Piker"]
           Spec.assertEqWith s "into alice's graveyard" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Graveyard S.alice after)) [named "Dash Hopes"]
           Spec.assertEqWith s "bob paid the 5 life" (S.lifeOf S.bob after) (Just 15)
+        -- A pair differing only in bob's answer; carol pays exactly when her
+        -- prompt says bob did.
+        Spec.it s "CR 101.4b a later payer is told what the payers before it answered" $ do
+          onStack <- dashBoard
+          let copying :: Bool -> Prompt.Prompt r -> r
+              copying bobPays p = case p of
+                Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ earlier
+                  | d == player && player == S.bob -> if bobPays then PaymentDecision.Pays else PaymentDecision.Declines
+                  | d == player && player == S.carol -> Maybe.fromMaybe PaymentDecision.Declines (lookup S.bob (Foldable.toList earlier))
+                _ -> paysFor Nothing p
+              paid = S.runPure (copying True) onStack Stack.resolveTop
+              declined = S.runPure (copying False) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 101.4b told bob paid, carol paid too" (fmap (`S.lifeOf` paid) [S.alice, S.bob, S.carol]) [Just 20, Just 15, Just 15]
+          Spec.assertEqWith s "CR 101.4b told bob declined, carol declined" (fmap (`S.lifeOf` declined) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
         Spec.it s "CR 118.12 nobody pays, so Dash Hopes stays on the stack" $ do
           onStack <- dashBoard
           let after = S.runPure (paysFor Nothing) onStack Stack.resolveTop
           Spec.assertEqWith s "CR 118.12: Dash Hopes and the Piker are both still on the stack" (stackNames after) [named "Dash Hopes", named "Goblin Piker"]
           Spec.assertEqWith s "nobody paid life" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) (replicate 3 (Just 20))
 
+-- CR 118.12a inside CR 608.2f's loop: Cleansing's "for each land, destroy that
+-- land unless any player pays 1 life" is one offer PER LAND, each land's
+-- destruction bought off by any one payment for THAT land. THREE SEATS and two
+-- lands per non-caster, so a payment for one land can be seen not to save its
+-- neighbour, and a seat can be seen paying for a land it does not control.
+--
+-- The answerer is a State log of every ChooseToPay, so the APNAP order of the
+-- offers and what each one told its payer are read off what the engine asked.
+cleansingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cleansingSpec s registry =
+  let -- alice: three Plains and Cleansing in hand. bob: two Islands. carol: two
+      -- Forests. Every land by id, so each offer is attributable to its land.
+      board = do
+        plains <- S.printingOf s registry "Plains"
+        island <- S.printingOf s registry "Island"
+        forest <- S.printingOf s registry "Forest"
+        cleansing <- S.printingOf s registry "Cleansing"
+        let withPlains = S.landsFor plains S.alice 3 S.threePlayerGame
+            (islandA, g1) = S.addPermanent island S.bob withPlains
+            (islandB, g2) = S.addPermanent island S.bob g1
+            (forestC, g3) = S.addPermanent forest S.carol g2
+            (forestD, g4) = S.addPermanent forest S.carol g3
+            (gs, cleansingId) = S.handOne cleansing g4
+            onStack = S.runPure S.identityAnswer gs (S.cast S.alice cleansingId)
+        pure ((islandA, islandB, forestC, forestD), onStack)
+      -- One ChooseToPay: who was asked, about which land, told what.
+      logging ::
+        (PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Seq.Seq (PlayerId.PlayerId, PaymentDecision.PaymentDecision) -> PaymentDecision.PaymentDecision) ->
+        Prompt.Prompt r ->
+        State.State [(PlayerId.PlayerId, Maybe ObjectId.ObjectId, [(PlayerId.PlayerId, PaymentDecision.PaymentDecision)])] r
+      logging policy p = case p of
+        Prompt.ChooseToPay (Decider.MkDecider d) player _ offer _ earlier | d == player -> do
+          let land = case offer of
+                PayOffer.ForMember member -> Recipient.objectOf member
+                PayOffer.AtClause {} -> Nothing
+          State.modify' (<> [(player, land, Foldable.toList earlier)])
+          pure (policy player land earlier)
+        _ -> pure (S.identityAnswer p)
+      resolveWith policy onStack = State.runState (Engine.runGame (logging policy) onStack Stack.resolveTop) []
+      -- Everything on the battlefield, in id order.
+      permanentsOf gs = List.sort (concatMap (\pid -> Game.zoneMembers Zone.Battlefield pid gs) [S.alice, S.bob, S.carol])
+      lives gs = fmap (`S.lifeOf` gs) [S.alice, S.bob, S.carol]
+   in Spec.describe s "CR 118.12a an offer per member of a CR 608.2f loop" $ do
+        Spec.it s "CR 118.12a each land is its own offer, and any player's payment saves only that land" $ do
+          ((islandA, islandB, forestC, forestD), onStack) <- board
+          -- bob pays for his Island A; carol pays for bob's Island B and her
+          -- own Forest C. Nobody pays for Forest D or for any Plains.
+          let policy player land _
+                | player == S.bob && land == Just islandA = PaymentDecision.Pays
+                | player == S.carol && land `elem` [Just islandB, Just forestC] = PaymentDecision.Pays
+                | otherwise = PaymentDecision.Declines
+              ((_, after), asked) = resolveWith policy onStack
+          Spec.assertEqWith s "CR 118.12a the three lands somebody paid for stand, and every other land was destroyed" (permanentsOf after) (List.sort [islandA, islandB, forestC])
+          Spec.assertEqWith s "CR 118.3b bob paid 1 life and carol 2" (lives after) [Just 20, Just 19, Just 18]
+          Spec.assertEqWith s "CR 701.8a Forest D went to carol's graveyard though she paid for Forest C" (length (Game.zoneMembers Zone.Graveyard S.carol after), elem forestD (permanentsOf after)) (1, False)
+          -- CR 101.4: every offer alice makes, then every one bob makes, then
+          -- carol's -- seven lands each.
+          Spec.assertEqWith s "CR 101.4 the offers go alice, bob, carol, each seat answering for every land" (fmap (\(who, _, _) -> who) asked) (replicate 7 S.alice <> replicate 7 S.bob <> replicate 7 S.carol)
+          Spec.assertEqWith s "each offer named its land" (all (\(_, land, _) -> Maybe.isJust land) asked) True
+          Spec.assertEqWith
+            s
+            "CR 101.4b carol, asked about Island A, was told alice declined and bob paid"
+            [earlier | (who, land, earlier) <- asked, who == S.carol, land == Just islandA]
+            [[(S.alice, PaymentDecision.Declines), (S.bob, PaymentDecision.Pays)]]
+        -- A pair differing only in bob's answer for Island A: carol pays for a
+        -- land exactly when her prompt says bob paid for it.
+        Spec.it s "CR 101.4b a later seat knows what the seats before it answered for that land" $ do
+          ((islandA, _, _, _), onStack) <- board
+          let copying bobPays player land earlier
+                | player == S.bob = if bobPays && land == Just islandA then PaymentDecision.Pays else PaymentDecision.Declines
+                | player == S.carol = Maybe.fromMaybe PaymentDecision.Declines (lookup S.bob (Foldable.toList earlier))
+                | otherwise = PaymentDecision.Declines
+              ((_, paid), _) = resolveWith (copying True) onStack
+              ((_, declined), _) = resolveWith (copying False) onStack
+          Spec.assertEqWith s "CR 101.4b told bob paid for Island A, carol paid for it too" (lives paid) [Just 20, Just 19, Just 19]
+          Spec.assertEqWith s "CR 101.4b told bob declined everything, carol paid for nothing" (lives declined) [Just 20, Just 20, Just 20]
+          Spec.assertEqWith s "and with nobody paying, every land is gone" (permanentsOf declined) []
+        -- Killing Wave: the payer is each creature's own controller, and the
+        -- cost is the X its caster announced (CR 107.3a).
+        Spec.it s "CR 118.12a Killing Wave asks each creature's controller, and a paid creature alone survives" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          wave <- S.printingOf s registry "Killing Wave"
+          let (hers, g1) = S.addPermanent piker S.alice (S.landsFor swamp S.alice 3 S.threePlayerGame)
+              (kept, g2) = S.addPermanent piker S.bob g1
+              (lost, g3) = S.addPermanent piker S.bob g2
+              (gs, waveId) = S.handOne wave g3
+              xTwo :: Prompt.Prompt r -> r
+              xTwo p = case p of
+                Prompt.ChooseX {} -> 2
+                _ -> S.identityAnswer p
+              onStack = S.runPure xTwo gs (S.cast S.alice waveId)
+              policy player creature _ = if player == S.bob && creature == Just kept then PaymentDecision.Pays else PaymentDecision.Declines
+              ((_, after), asked) = resolveWith policy onStack
+              standing = filter (`elem` [hers, kept, lost]) (permanentsOf after)
+          Spec.assertEqWith s "CR 701.21a the Piker bob paid for stands, and the other two were sacrificed" standing [kept]
+          Spec.assertEqWith s "CR 107.3a bob paid X = 2 life, once" (lives after) [Just 20, Just 18, Just 20]
+          Spec.assertEqWith s "CR 101.4 alice answered for her Piker, then bob for each of his, and carol controls none" (fmap (\(who, creature, _) -> (who, creature)) asked) [(S.alice, Just hers), (S.bob, Just kept), (S.bob, Just lost)]
+        -- CR 101.4's "then the actions happen simultaneously", and Killing
+        -- Wave's ruling that each player "pays life and sacrifices creatures at
+        -- the same time": bob's three payments are ONE loss of 3 life. carol's
+        -- Exquisite Blood sees one opponent losing life, so her Ajani's
+        -- Pridemate sees one gain and gets one counter -- three separate
+        -- payments would make it three.
+        Spec.it s "CR 101.4 Killing Wave: a payer's agreed payments are one life loss" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          blood <- S.printingOf s registry "Exquisite Blood"
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          wave <- S.printingOf s registry "Killing Wave"
+          let (_, g1) = S.addPermanent piker S.bob (S.landsFor swamp S.alice 2 S.threePlayerGame)
+              (_, g2) = S.addPermanent piker S.bob g1
+              (_, g3) = S.addPermanent piker S.bob g2
+              (_, g4) = S.addPermanent blood S.carol g3
+              (mateId, g5) = S.addPermanent pridemate S.carol g4
+              (gs, waveId) = S.handOne wave g5
+              xOne :: Prompt.Prompt r -> r
+              xOne p = case p of
+                Prompt.ChooseX {} -> 1
+                _ -> S.identityAnswer p
+              onStack = S.runPure xOne gs (S.cast S.alice waveId)
+              policy player _ _ = if player == S.alice then PaymentDecision.Declines else PaymentDecision.Pays
+              ((_, resolved), _) = resolveWith policy onStack
+              settled = S.runPure S.identityAnswer resolved Engine.priorityLoop
+          Spec.assertEqWith s "CR 603.2 one life-loss event, one Exquisite Blood gain, one Pridemate counter" (S.counterOf CounterKind.PlusOnePlusOne mateId settled) 1
+          Spec.assertEqWith s "bob paid 3, carol paid 1 and gained 3" (lives settled) [Just 20, Just 17, Just 22]
+          Spec.assertEqWith s "every creature was paid for: two Swamps, three Pikers, the Blood and the Pridemate stand" (length (permanentsOf settled)) 7
+        -- Cut the Tethers: the payer is each Spirit's OWNER, paying mana, and
+        -- the board is re-read per offer -- bob's {3} for one Spirit leaves him
+        -- nothing for the other, so CR 118.3 asks him nothing about it.
+        Spec.it s "CR 118.12a Cut the Tethers asks each Spirit's owner, and an unaffordable offer is not made" $ do
+          island <- S.printingOf s registry "Island"
+          spirit <- S.printingOf s registry "Clarion Spirit"
+          tethers <- S.printingOf s registry "Cut the Tethers"
+          let (hers, g1) = S.addPermanent spirit S.alice (S.landsFor island S.bob 3 (S.landsFor island S.alice 4 S.threePlayerGame))
+              (kept, g2) = S.addPermanent spirit S.bob g1
+              (lost, g3) = S.addPermanent spirit S.bob g2
+              (gs, tethersId) = S.handOne tethers g3
+              onStack = S.runPure S.identityAnswer gs (S.cast S.alice tethersId)
+              policy player _ _ = if player == S.bob then PaymentDecision.Pays else PaymentDecision.Declines
+              ((_, after), asked) = resolveWith policy onStack
+          Spec.assertEqWith s "CR 118.12a the Spirit bob paid for stands, and the other two left the battlefield" (filter (`elem` [hers, kept, lost]) (permanentsOf after)) [kept]
+          Spec.assertEqWith s "into their owners' hands" (S.handSize S.alice after, S.handSize S.bob after) (1, 1)
+          -- alice tapped all four Islands for the spell, so she is never asked either.
+          Spec.assertEqWith s "CR 118.3 bob was asked about his first Spirit only, and alice about nothing" (fmap (\(who, spiritId, _) -> (who, spiritId)) asked) [(S.bob, Just kept)]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
+  cleansingSpec s registry
   targetSpec s registry
   resolveSpec s registry
   wormsSpec s registry

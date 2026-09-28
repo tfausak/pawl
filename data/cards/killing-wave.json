@@ -1,0 +1,86 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Variable"
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Killing Wave",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ForEach",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "Sacrifice",
+                          "value": {
+                            "ref": {
+                              "type": "InSlot",
+                              "value": "creature"
+                            },
+                            "sacrificer": {
+                              "type": "PermanentController"
+                            }
+                          }
+                        }
+                      ],
+                      "payGate": {
+                        "branch": {
+                          "type": "IfNotPaid"
+                        },
+                        "cost": {
+                          "components": [
+                            {
+                              "type": "PayLifeX"
+                            }
+                          ],
+                          "mana": []
+                        },
+                        "payer": {
+                          "type": "ControllerOfBound",
+                          "value": "creature"
+                        }
+                      },
+                      "ref": {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        }
+                      },
+                      "slot": "creature"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}
