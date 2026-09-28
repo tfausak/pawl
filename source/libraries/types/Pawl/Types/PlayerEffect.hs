@@ -3,6 +3,7 @@ module Pawl.Types.PlayerEffect where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AddSpellCost as AddSpellCost
+import qualified Pawl.Types.AlternativeActivationCost as AlternativeActivationCost
 import qualified Pawl.Types.CantSearchLibraries as CantSearchLibraries
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -73,6 +74,9 @@ data PlayerEffect
   | -- | CR 118.8 / 602.2b / Brutal Suppression: the activated abilities of
     -- matching permanents cost these additional non-mana components to activate.
     AddActivationCost AddActivationCost.AddActivationCost
+  | -- | CR 118.9 / 602.2b / Kíli the Resourceful: this player may pay this cost
+    -- rather than the activation cost of a matching keyword ability.
+    AlternativeActivationCost AlternativeActivationCost.AlternativeActivationCost
   | -- | CR 118.8 / Drought: matching spells cost these additional non-mana
     -- components to cast.
     AddSpellCost AddSpellCost.AddSpellCost

@@ -987,6 +987,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.AlternativeActivationCost {} -> False
   PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities -> False
@@ -1057,6 +1058,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
+  PlayerEffect.AlternativeActivationCost {} -> False
   PlayerEffect.AddSpellCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantActivateAbilities -> False

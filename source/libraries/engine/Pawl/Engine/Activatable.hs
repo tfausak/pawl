@@ -1,6 +1,7 @@
 module Pawl.Engine.Activatable where
 
 import Control.Applicative ((<|>))
+import qualified Data.Containers.ListUtils as ListUtils
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -596,6 +597,17 @@ candidateSlotsGiven pcs grants pools pid srcId modal fillable gs =
 affordableX :: Maybe Natural -> [Map.Map SlotName (Set.Set ObjectId)] -> Maybe Keyword -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
 affordableX mCeiling aimable stamp pid srcId gs cost = Cost.greatestPayableX mCeiling (\x -> payableCostAt aimable x stamp pid srcId gs cost) cost
 
+-- CR 601.2b / 118.9 through CR 602.2b: the costs a player may announce for this
+-- activation -- its printed activation cost, then each alternative an effect
+-- offers in its place (Kíli the Resourceful's {0} for an equip cost), duplicates
+-- dropped. The gate offers the activation if any is payable, and
+-- Pawl.Engine.Activate.activateAbility asks which one when two are.
+costsFor :: PlayerId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> [Cost Keyword]
+costsFor pid ability gs =
+  let printed = ActivatedAbility.cost ability
+      alternatives = fmap (\m -> Cost.Type.MkCost (Just m) []) (PlayerEffect.alternativeActivationCosts pid (ActivatedAbility.keyword ability) gs)
+   in ListUtils.nubOrd (printed : alternatives)
+
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability, the whole activation cost is payable
 -- at the least X it permits (CR 118.3, CR 101.1), the {T} sickness gate holds, the
@@ -698,4 +710,4 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         && ActivationRestriction.restrictionsOk pid srcId (Just ability) (Keyword.restrictionsOf ability) gs
         && loyaltyOk pid srcId ability gs
         && Modal.selectionPossible fillable (Modal.Type.selection modal)
-        && payableCostAtGiven aimable sources pcs (ActivatedAbility.minimumX ability) (ActivatedAbility.keyword ability) pid srcId gs (ActivatedAbility.cost ability)
+        && any (payableCostAtGiven aimable sources pcs (ActivatedAbility.minimumX ability) (ActivatedAbility.keyword ability) pid srcId gs) (costsFor pid ability gs)

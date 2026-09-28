@@ -78,7 +78,9 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerDesignation as PlayerDesignation
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
@@ -155,6 +157,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   outlastSpec s registry
   activationCostReductionSpec s registry
   professorHojoFirstActivationSpec s registry
+  kiliTheResourcefulSpec s registry
   unflooredActivationCostReductionSpec s registry
   activationCostAdditionSpec s registry
   droughtActivationSpec s registry
@@ -4040,6 +4043,116 @@ professorHojoFirstActivationSpec s registry = Spec.describe s "ProfessorHojoFirs
     Spec.assertEqWith s "setup: both activations were made last turn" (S.tappedCount S.alice spent) 3
     Spec.assertEqWith s "setup: the untap step untapped everything" (S.tappedCount S.alice nextTurn) 0
     Spec.assertEqWith s "and the first activation of the new turn pays nothing" (S.tappedCount S.alice again) 1
+
+-- Answers CR 601.2b's ChooseCost with `pick` and aims every target at `victim`.
+payingAt :: ([Cost.Type.Cost Keyword.Keyword] -> Cost.Type.Cost Keyword.Keyword) -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+payingAt pick victim p = case p of
+  Prompt.ChooseCost _ _ _ costs -> pick costs
+  _ -> aimAtOffered victim p
+
+-- Kíli the Resourceful, checked against Scryfall on 2026-09-28: "As long as you
+-- have an enduring story, you may pay {0} rather than pay the equip cost of the
+-- first equip ability you activate each turn." CR 118.9's alternative cost,
+-- reached through CR 602.2b, and announced at CR 601.2b by Prompt.ChooseCost.
+--
+-- WHY AEGIS OF THE LEGION AND BONESPLITTER. Equip {3} and equip {1}, so a {0}
+-- paid, a {3} paid and a {1} paid are three different tapped counts. Four
+-- Mountains pay both printed costs, so every leg is payable either way and what
+-- discriminates is what was PAID. The enduring story is written onto alice
+-- directly: storied's own check is Pawl.PlayerDesignationSpec's, and the pair
+-- here differs in the designation alone.
+kiliTheResourcefulSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kiliTheResourcefulSpec s registry = Spec.describe s "KiliTheResourceful" $ do
+  let board storied = do
+        kili <- S.printingOf s registry "Kíli the Resourceful"
+        aegis <- S.printingOf s registry "Aegis of the Legion"
+        splitter <- S.printingOf s registry "Bonesplitter"
+        mammoth <- S.printingOf s registry "War Mammoth"
+        mountain <- S.printingOf s registry "Mountain"
+        let (kiliId, g0) = S.addPermanent kili S.alice (S.landsFor mountain S.alice 4 (Setup.emptyGame S.bothPlayers))
+            (aegisId, g1) = S.addPermanent aegis S.alice g0
+            (splitterId, g2) = S.addPermanent splitter S.alice g1
+            (mammothId, g3) = S.addPermanent mammoth S.alice g2
+            story = if storied then Set.insert PlayerDesignation.EnduringStory else id
+            ready =
+              g3
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice,
+                  GameState.players = Map.adjust (\p -> p {Player.designations = story (Player.designations p)}) S.alice (GameState.players g3)
+                }
+        pure (aegisId, splitterId, mammothId, kiliId, ready)
+      -- Equip one Equipment onto the Mammoth, answering the cost prompt with
+      -- `pick`, and resolve it.
+      equip pick equipmentId mammothId gs = case Projection.abilitiesOf equipmentId gs of
+        [ability] -> S.runPure (payingAt pick mammothId) (S.runPure (payingAt pick mammothId) gs (Activate.activateAbility S.alice equipmentId ability)) Stack.resolveTop
+        _ -> gs
+      -- By what each cost IS rather than by position: the {0}, or the printed one.
+      zero = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []
+      pickBy wanted costs = Maybe.fromMaybe zero (List.find wanted costs)
+      alternative, printed :: [Cost.Type.Cost Keyword.Keyword] -> Cost.Type.Cost Keyword.Keyword
+      alternative = pickBy (== zero)
+      printed = pickBy (/= zero)
+      attachedTo equipmentId gs = fmap Object.attachedTo (Game.lookupObject equipmentId gs)
+  Spec.it s "CR 118.9 whole card: the first equip may be paid with {0}, and the second may not" $ do
+    (aegisId, splitterId, mammothId, _, gs) <- board True
+    let first = equip alternative aegisId mammothId gs
+        second = equip alternative splitterId mammothId first
+    Spec.assertEqWith s "CR 118.9 the Aegis's equip {3} was paid with {0}: nothing tapped" (S.tappedCount S.alice first) 0
+    Spec.assertEqWith s "and the Bonesplitter's equip, the turn's second, pays its printed {1}" (S.tappedCount S.alice second) 1
+    Spec.assertEqWith s "the Aegis is on the Mammoth" (attachedTo aegisId second) (Just (Just (Recipient.ToCreature mammothId)))
+    Spec.assertEqWith s "and so is the Bonesplitter" (attachedTo splitterId second) (Just (Just (Recipient.ToCreature mammothId)))
+  -- CR 118.9b: "Alternative costs are generally optional". The same board, the
+  -- printed cost chosen.
+  Spec.it s "CR 118.9b the player may decline the alternative and pay the printed cost" $ do
+    (aegisId, _, mammothId, _, gs) <- board True
+    let paid = equip printed aegisId mammothId gs
+    Spec.assertEqWith s "the Aegis's equip paid its printed {3}" (S.tappedCount S.alice paid) 3
+    Spec.assertEqWith s "and the Aegis is on the Mammoth" (attachedTo aegisId paid) (Just (Just (Recipient.ToCreature mammothId)))
+  -- "The first equip ability you activate each turn" counts an equip whose
+  -- controller declined the {0}: the Bonesplitter's, paid in full, was first.
+  Spec.it s "CR 118.9 a declined first equip still spends the turn's first" $ do
+    (aegisId, splitterId, mammothId, _, gs) <- board True
+    let first = equip printed splitterId mammothId gs
+        second = equip alternative aegisId mammothId first
+    Spec.assertEqWith s "the Bonesplitter's equip paid its printed {1}" (S.tappedCount S.alice first) 1
+    Spec.assertEqWith s "and the Aegis's, no longer the first, pays its printed {3} too" (S.tappedCount S.alice second) 4
+  -- "As long as you have an enduring story": the same board without one.
+  Spec.it s "CR 118.9 without an enduring story there is no alternative" $ do
+    (aegisId, _, mammothId, _, gs) <- board False
+    let paid = equip alternative aegisId mammothId gs
+    Spec.assertEqWith s "the Aegis's equip paid its printed {3}" (S.tappedCount S.alice paid) 3
+  -- "Each turn": alice's next turn has a first equip again.
+  Spec.it s "CR 118.9 the next turn has a first equip again" $ do
+    (aegisId, splitterId, mammothId, kiliId, gs) <- board True
+    let spent = equip alternative splitterId mammothId (equip alternative aegisId mammothId gs)
+        nextTurn = (nextTurnOfAlice spent) {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+        again = equip alternative splitterId kiliId nextTurn
+    Spec.assertEqWith s "setup: last turn's second equip paid {1}" (S.tappedCount S.alice spent) 1
+    Spec.assertEqWith s "setup: the untap step untapped everything" (S.tappedCount S.alice nextTurn) 0
+    Spec.assertEqWith s "and the new turn's first equip is paid with {0}" (S.tappedCount S.alice again) 0
+    Spec.assertEqWith s "moving the Bonesplitter onto Kili" (attachedTo splitterId again) (Just (Just (Recipient.ToCreature kiliId)))
+  -- The card's last line: "Whenever another Dwarf or Equipment you control
+  -- enters, draw a card. This ability triggers only once each turn." Two
+  -- Bonesplitters cast in turn; the first draws and the second does not.
+  Spec.it s "CR 603.2 whole card: an Equipment entering draws a card, once each turn" $ do
+    kili <- S.printingOf s registry "Kíli the Resourceful"
+    splitter <- S.printingOf s registry "Bonesplitter"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, g0) = S.addPermanent kili S.alice (S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers))
+        (firstId, g1) = S.addHandCard splitter S.alice g0
+        (secondId, g2) = S.addHandCard splitter S.alice g1
+        stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g2 [1 :: Int .. 3]
+        ready = stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        castAndResolve oid g =
+          let cast = S.runPure S.identityAnswer g (S.cast S.alice oid)
+              resolved = S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+           in S.runPure S.identityAnswer resolved (Stack.resolveTop >> Engine.settleForPriority)
+        afterFirst = castAndResolve firstId ready
+        afterSecond = castAndResolve secondId afterFirst
+    Spec.assertEqWith s "the first Bonesplitter's entry drew a card, leaving the second in hand beside it" (S.handSize S.alice afterFirst) 2
+    Spec.assertEqWith s "and the second's entry drew nothing" (S.handSize S.alice afterSecond) 1
+    Spec.assertEqWith s "both Bonesplitters are on the battlefield" (S.countOnBattlefieldByName (S.printingName splitter) S.alice afterSecond) 2
 
 -- `owner`'s board: `lands` Mountains and the permanent whose ability is under
 -- test, plus Heartstone under ALICE's control when one is passed. The positive and

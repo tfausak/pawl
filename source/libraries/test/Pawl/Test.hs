@@ -54,6 +54,7 @@ import qualified Pawl.Codec.AfterTurnSpec
 import qualified Pawl.Codec.AgainstSlotSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AimedAtSpec
+import qualified Pawl.Codec.AlternativeActivationCostSpec
 import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.AnyNumberDiscardSpec
 import qualified Pawl.Codec.AnyNumberMatchingSpec
@@ -771,6 +772,7 @@ spec s registry = do
   Pawl.CoinSpec.spec s registry
   Pawl.Codec.AbilityAddsManaSpec.spec s
   Pawl.Codec.AbilityKindSpec.spec s
+  Pawl.Codec.AlternativeActivationCostSpec.spec s
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.AbilityTriggeredSpec.spec s
   Pawl.Codec.ActivatedAbilitySourceSpec.spec s
