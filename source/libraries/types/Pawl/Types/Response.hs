@@ -618,6 +618,10 @@ data Response
     -- ChoseTaps' reason: replaying a transcript against the wrong one would
     -- sacrifice what it should have transformed.
     ChoseAnyNumberOfPermanents (Set.Set ObjectId.ObjectId)
+  | -- | CR 701.9b / 107.1c: the cards a player chose to discard from their hand
+    -- where the effect stated no count. A separate constructor from
+    -- ChoseAnyNumberOfPermanents above, for ChoseTaps' reason.
+    ChoseAnyNumberToDiscard (Set.Set ObjectId.ObjectId)
   | -- | CR 701.20a: the cards a player chose to reveal from their hand as a
     -- permanent entered (CR 702.38a). A separate constructor from
     -- ChoseAnyNumberOfPermanents above, though the payload has the same shape,

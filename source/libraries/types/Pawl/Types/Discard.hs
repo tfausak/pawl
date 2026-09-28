@@ -1,12 +1,13 @@
 module Pawl.Types.Discard where
 
+import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- | The payload of Pawl.Types.Effect's Discard arm: WHICH cards CR 701.9a moves
 -- from their owner's hand to their graveyard.
 --
--- Two arms because CR 701.9b's default choice -- "effects that cause a player to
+-- Counted and These are two arms because CR 701.9b's default choice -- "effects that cause a player to
 -- discard a card allow the affected player to choose which card to discard" --
 -- only arises where the effect states a NUMBER and leaves the cards unsaid. A
 -- card that names the SET instead, Amnesia's "discards all nonland cards", has
@@ -27,4 +28,7 @@ data Discard
     -- ref reaching several hands (Pawl.Types.EachCardInHand) can name cards
     -- belonging to several owners at once.
     These ObjectRef.ObjectRef
+  | -- | CR 701.9b / 107.1c: the slot names the players, each of whom picks any
+    -- number of matching cards, none included.
+    AnyNumber AnyNumberDiscard.AnyNumberDiscard
   deriving (Eq, Ord, Show)

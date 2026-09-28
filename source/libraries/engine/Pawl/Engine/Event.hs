@@ -2428,6 +2428,9 @@ apply batch candidate event =
             -- CR 101.4: the active player chooses first, then the rest in turn
             -- order. Both names are chosen as one event, so the order is the
             -- rule's and not the card's reading order.
+            --
+            -- Not implemented: the later chooser is not told the earlier one's
+            -- name (#4328).
             let choosers = filter (\pid -> pid == controller || Just pid == opponent) (Game.apnapOrder gs)
                 ask pid = Game.choose (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction) >>= Game.lookUpChosenName
             fmap Set.fromList (Monad.mapM ask choosers)

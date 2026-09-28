@@ -464,14 +464,14 @@ data Prompt r where
   --
   -- The NonEmpty carries EVERY card revealed in the clash beside the player who
   -- revealed it, because rule 701.30c's reveal is simultaneous and public: a
-  -- decider sees the other card as well as their own. It is the reveal alone,
-  -- which rule 701.30c has the decisions follow; what that leaves out is stated
-  -- at Pawl.Engine.Resolve.Effect's clash (#3893).
+  -- decider sees the other card as well as their own. The Seq is the decisions
+  -- the clashing players before this one already made, in APNAP order, which CR
+  -- 101.4b lets a later decider know.
   --
   -- Asked of each clashing player in APNAP order (CR 101.4), and elided only
   -- where the revealed card is that player's whole library: both ends are then
   -- the same position (Pawl.Engine.Resolve.Effect's clash).
-  ChooseClash :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (PlayerId.PlayerId, ObjectId.ObjectId) -> Prompt LibraryPosition.LibraryPosition
+  ChooseClash :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> NonEmpty.NonEmpty (PlayerId.PlayerId, ObjectId.ObjectId) -> Seq.Seq (PlayerId.PlayerId, LibraryPosition.LibraryPosition) -> Prompt LibraryPosition.LibraryPosition
   -- | CR 601.2b: how many times the optional additional cost of that keyword --
   -- kicker, multikicker, squad, offspring, replicate or casualty (CR 702.33a/c,
   -- 702.157a, 702.175a, 702.56a, 702.153a) --
@@ -667,6 +667,10 @@ data Prompt r where
   -- there is one; ChooseAnyNumberToSacrifice's shape. Not ChooseTargets (CR
   -- 115.1, CR 115.10a).
   ChooseAnyNumberOfPermanents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Maybe Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 701.9b / 107.1c: any number of the matching cards in the asked seat's
+  -- own hand that it discards (Pawl.Types.AnyNumberDiscard), at most the Natural
+  -- where there is one; the arm above one zone over.
+  ChooseAnyNumberToDiscard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Maybe Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 608.2d: which one of the matching permanents a resolving effect acts
   -- on (Pawl.Types.ObjectRef.ChosenPermanent); at none the instruction is
   -- impossible (CR 101.3). Not ChooseTargets (CR 115.1, CR 115.10a). Also CR

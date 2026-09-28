@@ -103,6 +103,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Amass as Amass.Type
+import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -780,6 +781,44 @@ anyNumberMatching legal resolving controller source (AnyNumberMatching.MkAnyNumb
     else do
       answer <- Game.choose (Prompt.ChooseAnyNumberOfPermanents (Decide.deciderFor controller gs) controller source candidates ceiling_)
       pure (capped (filter (`Set.member` answer) candidates))
+
+-- CR 701.9a's move for Effect.Discard's choosing arms, once every seat has
+-- picked: each seat's cards through the shared discard funnel, so the discard is
+-- recorded for a trigger to read. The funnel's own answers come back for the
+-- binding below; a move that did not complete answers Nothing and is dropped.
+-- One event group across the seats, CR 101.4's "simultaneously".
+buryDiscards :: ObjectId -> Maybe SlotName -> [(PlayerId, [ObjectId])] -> Game ()
+buryDiscards resolving mDiscarded doomed = do
+  moved <-
+    Event.simultaneously . fmap concat . Monad.forM doomed $ \(victim, oids) ->
+      fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
+  -- The cards "discarded this way", for a later effect of the same resolution
+  -- to look back at -- Psychic Miasma's "if a land card is discarded this way".
+  -- The CR 400.7 incarnations the funnel MINTED, never the hand ids it was
+  -- handed: the hand incarnation no longer exists, so a reader of the
+  -- destination zone could match none of them. Destroy's `buried` slot binds
+  -- on exactly that argument.
+  --
+  -- The UNION across seats, since the slot is already a GROUP binding and a
+  -- multi-seat discard is one event batch (CR 608.2f); at one seat that is the
+  -- singleton it always was, so Psychic Miasma is unchanged.
+  --
+  -- No board filter of `buried`'s kind: CR 701.9c takes a card put somewhere
+  -- other than its owner's graveyard to have been discarded all the same, so
+  -- what the funnel moved is what was discarded wherever it landed. CR 400.7j
+  -- then decides whether a later part of the effect can FIND it -- a public
+  -- destination yes, a hidden one only if the card was revealed on the way
+  -- (CR 701.9c) -- which is a question about the reader.
+  --
+  -- Bound onto `resolving` and as a GROUP, `buried`'s shape and for its reason:
+  -- slotBindings reads live GameState unconditionally, which is what puts the
+  -- slot in front of Filter.IsBound when the NEXT clause's gate is evaluated. A
+  -- single binding would land in the target half of the context instead, where
+  -- gateHolds does not look. Nothing is bound when nothing moved, so the gate
+  -- finds an unbound slot and the "if" is false -- which is what the rider asks
+  -- for.
+  Monad.forM_ mDiscarded $ \bound ->
+    Monad.unless (null moved) (State.modify' (bindObjectsSlot resolving bound (Seq.fromList moved)))
 
 -- CR 701.27a and CR 701.28a: turn each named permanent over. ONE function for
 -- both opcodes, which is CR 701.28a said as code -- "this follows rules
@@ -2948,6 +2987,8 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   -- "Discard THESE cards" names the cards themselves, so a sweep matching none
   -- is the naming-nobody case; only a chosen card can be impossible.
   Effect.Discard (Discard.These ref) -> choosesFromNothing ref
+  -- CR 107.1c: zero is a legal answer, so no hand makes it impossible.
+  Effect.Discard (Discard.AnyNumber {}) -> False
   Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _)) ->
     -- CR 701.9a: the victims are the slot's player recipients, read through
     -- legalMany and Recipient.playerOf as the executing arm reads them, and the
@@ -4814,6 +4855,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                     ask asked = pick asked wanted
                 case chooser of
                   Chooser.TheController -> ask controller (graveyardCards (chooseContext gs) legal controller gs scope filter_)
+                  -- Not implemented: a later seat is not told the earlier seats'
+                  -- picks (#4328).
                   Chooser.EachInScope ->
                     fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf (chooseContext gs) gs pid filter_)) $
                       zoneScopePlayers legal controller gs scope
@@ -5822,40 +5865,36 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- another player's hand. The ORDER is proven -- ZoneChangeSpec's "CR 101.4:
     -- asked in turn order from the active player" reads the sequence of prompts.
     doomed <- traverse pickFor victims
-    -- CR 701.9a's move, through the shared discard funnel, so the discard is
-    -- recorded for a trigger to read. The funnel's own answers come back for the
-    -- binding below; a move that did not complete answers Nothing and is dropped.
-    -- One event group across the seats, CR 101.4's "simultaneously".
-    moved <-
-      Event.simultaneously . fmap concat . Monad.forM doomed $ \(victim, oids) ->
-        fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
-    -- The cards "discarded this way", for a later effect of the same resolution
-    -- to look back at -- Psychic Miasma's "if a land card is discarded this way".
-    -- The CR 400.7 incarnations the funnel MINTED, never the hand ids it was
-    -- handed: the hand incarnation no longer exists, so a reader of the
-    -- destination zone could match none of them. Destroy's `buried` slot binds
-    -- on exactly that argument.
-    --
-    -- The UNION across seats, since the slot is already a GROUP binding and a
-    -- multi-seat discard is one event batch (CR 608.2f); at one seat that is the
-    -- singleton it always was, so Psychic Miasma is unchanged.
-    --
-    -- No board filter of `buried`'s kind: CR 701.9c takes a card put somewhere
-    -- other than its owner's graveyard to have been discarded all the same, so
-    -- what the funnel moved is what was discarded wherever it landed. CR 400.7j
-    -- then decides whether a later part of the effect can FIND it -- a public
-    -- destination yes, a hidden one only if the card was revealed on the way
-    -- (CR 701.9c) -- which is a question about the reader.
-    --
-    -- Bound onto `resolving` and as a GROUP, `buried`'s shape and for its reason:
-    -- slotBindings reads live GameState unconditionally, which is what puts the
-    -- slot in front of Filter.IsBound when the NEXT clause's gate is evaluated. A
-    -- single binding would land in the target half of the context instead, where
-    -- gateHolds does not look. Nothing is bound when nothing moved, so the gate
-    -- finds an unbound slot and the "if" is false -- which is what the rider asks
-    -- for.
-    Monad.forM_ mDiscarded $ \bound ->
-      Monad.unless (null moved) (State.modify' (bindObjectsSlot resolving bound (Seq.fromList moved)))
+    buryDiscards resolving mDiscarded doomed
+  -- CR 107.1c: each player the slot names picks any number of the matching
+  -- cards in their own hand, none included (CR 701.9b's chooser), and the picks
+  -- are then discarded together -- the Counted arm's two phases and burial, for
+  -- its reasons. The candidates are read off one `gs` (CR 608.2f), the filter in
+  -- this effect's context, so its "you" is CR 109.5's.
+  --
+  -- Skipped at no candidate and at a ceiling of zero, where the empty set is the
+  -- only answer, and asked at ONE, anyNumberMatching's posture: "any number"
+  -- leaves two distinguishable answers there. FILTERED, not trusted (#222), and
+  -- capped at the ceiling.
+  Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) mDiscarded)) -> do
+    gs <- State.get
+    let viewOf = effectViewOf source legal gs
+        context = effectContext gs controller source legal (slotBindings resolving gs)
+        named = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+        victims = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+        pickFor victim = do
+          let candidates = handCardsOf context gs victim filter_
+              -- Read against the VICTIM, the Counted arm's count's reason.
+              ceiling_ = fmap (maybe 0 Integer.toNaturalSaturating . evaluateForRecipient viewOf context gs resolving source victim) atMost
+              capped :: [a] -> [a]
+              capped = maybe id (take . Natural.toIntSaturating) ceiling_
+          if null candidates || ceiling_ == Just 0
+            then pure (victim, [])
+            else do
+              answer <- Game.choose (Prompt.ChooseAnyNumberToDiscard (Decide.deciderFor victim gs) victim source candidates ceiling_)
+              pure (victim, capped (filter (`Set.member` answer) candidates))
+    doomed <- traverse pickFor victims
+    buryDiscards resolving mDiscarded doomed
   Effect.LoseLife (LifeLoss.MkLifeLoss ref quantity cause mTally) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -6233,6 +6272,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                       filler = filter (\oid -> List.notElem oid valid) candidates
                   pure (victim, List.genericTake wanted (valid <> filler))
             _ -> pure (victim, [])
+    -- Not implemented: a later victim is not told the earlier victims' picks
+    -- (#4328).
     doomed <- traverse pickFor victims
     -- CR 101.4's "then the actions happen simultaneously", which its own Example
     -- writes out for this very instruction, so the picks from every seat go to the
@@ -10660,24 +10701,24 @@ clash source controller = do
             Nothing -> False
             Just value -> all (value >) others
       decisions <- case revealed of
-        [] -> pure []
+        [] -> pure Seq.empty
         first : rest -> do
           let public = first NonEmpty.:| rest
-          Monad.forM revealed $ \(pid, top) -> do
-            asked <- State.get
-            -- The engine never makes the player's choice, but does not ask a
-            -- question with one answer either: a revealed card that is the whole
-            -- library is already at both ends, decideScry's elision one card over.
-            --
-            -- Not implemented: the later decider is not told what the earlier one
-            -- chose, which CR 101.4b entitles them to; this prompt carries rule
-            -- 701.30c's reveal alone (#3893).
-            let alone = length (Game.zoneMembers Zone.Library pid asked) <= 1
-            position <-
-              if alone
-                then pure LibraryPosition.Top
-                else Game.choose (Prompt.ChooseClash (Decide.deciderFor pid asked) pid source top public)
-            pure (pid, top, position)
+          -- CR 101.4b: each decider is shown the decisions made before theirs.
+          let decide made (pid, top) = do
+                asked <- State.get
+                -- The engine never makes the player's choice, but does not ask a
+                -- question with one answer either: a revealed card that is the
+                -- whole library is already at both ends, decideScry's elision one
+                -- card over.
+                let alone = length (Game.zoneMembers Zone.Library pid asked) <= 1
+                    earlier = fmap (\(who, _, at) -> (who, at)) made
+                position <-
+                  if alone
+                    then pure LibraryPosition.Top
+                    else Game.choose (Prompt.ChooseClash (Decide.deciderFor pid asked) pid source top public earlier)
+                pure (made Seq.|> (pid, top, position))
+          Monad.foldM decide Seq.empty revealed
       Monad.forM_ decisions $ \(pid, top, position) ->
         Monad.when (position == LibraryPosition.Bottom) $ do
           moving <- State.get

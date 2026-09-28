@@ -45,6 +45,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
 import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
@@ -286,6 +287,7 @@ ownQuantities effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted (CountedDiscard.MkCountedDiscard _ quantity _) -> [quantity]
     Discard.These {} -> []
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ (AnyNumberMatching.MkAnyNumberMatching _ atMost) _) -> Foldable.toList atMost
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> [quantity]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.ExchangeLifeTotals _ -> []
@@ -1340,6 +1342,7 @@ effectObjectRefs effect =
         Effect.Discard subject -> case subject of
           Discard.Counted {} -> []
           Discard.These ref -> [(AsksDiscardArm, ref)]
+          Discard.AnyNumber {} -> []
         Effect.LoseLife {} -> []
         Effect.GainLife {} -> []
         Effect.ExchangeLifeTotals {} -> []
@@ -1950,8 +1953,10 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- reason: the counted discard's arm binds the group however few cards
           -- moved, so no ref test and no count test. Psychic Miasma's "if a land
           -- card is discarded this way" is one that writes it. Discard.These
-          -- binds nothing at all and so is not here.
+          -- binds nothing at all and so is not here; Discard.AnyNumber binds
+          -- through the same burial.
           Effect.Discard (Discard.Counted (CountedDiscard.MkCountedDiscard _ _ mDiscarded)) -> Maybe.maybeToList mDiscarded
+          Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ _ mDiscarded)) -> Maybe.maybeToList mDiscarded
           -- CR 111.1's minted tokens. No count test and no seat test, unlike
           -- the mill's and the draw's: Resolve.bindMinted binds every token the
           -- effect created whatever the printed count says, so CR 614.16 makes

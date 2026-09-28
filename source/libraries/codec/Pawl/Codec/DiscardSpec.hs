@@ -4,6 +4,8 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Discard as Discard
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AnyNumberDiscard as AnyNumberDiscard
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CountedDiscard as CountedDiscard
 import qualified Pawl.Types.Discard as Discard
@@ -37,4 +39,17 @@ spec s = Spec.describe s "Pawl.Codec.Discard" $ do
       Discard.codec
       (Discard.These (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Just (Filter.Not (Filter.HasCardType CardType.Land))))))
       " {\"type\":\"These\",\"value\":{\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"InSlot\",\"value\":\"target\"},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}}} "
+  -- CR 107.1c: the player the slot names discards any number of matching cards.
+  Spec.it s "AnyNumber" $
+    Common.assertCodec
+      s
+      Discard.codec
+      ( Discard.AnyNumber
+          AnyNumberDiscard.MkAnyNumberDiscard
+            { AnyNumberDiscard.slot = SlotName.MkSlotName (Text.pack "you"),
+              AnyNumberDiscard.cards = AnyNumberMatching.MkAnyNumberMatching (Filter.HasCardType CardType.Land) Nothing,
+              AnyNumberDiscard.discarded = Nothing
+            }
+      )
+      " {\"type\":\"AnyNumber\",\"value\":{\"slot\":\"you\",\"cards\":{\"filter\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s Discard.codec
