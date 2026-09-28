@@ -7258,7 +7258,7 @@ targetCostSpec s registry =
       case giants of
         [attacker, _] -> do
           let resolved = S.runPure (aimAt attacker) (S.runPure (aimAt attacker) gs (S.cast S.alice buryId)) Stack.resolveTop
-          Spec.assertEqWith s "CR 401.7 the attacker went in second from the top" (libraryNames resolved) (fmap named ["Unsummon", "Hill Giant", "Lightning Bolt"])
+          Spec.assertEqWith s "the attacker went in second from the top" (libraryNames resolved) (fmap named ["Unsummon", "Hill Giant", "Lightning Bolt"])
           Spec.assertEqWith s "three Islands paid {2}{U}" (S.tappedCount S.alice resolved) 3
           Spec.assertBool s (S.castable S.alice buryId gs) "it was offered off three Islands"
         _ -> Spec.assertFailure s "two Giants"
