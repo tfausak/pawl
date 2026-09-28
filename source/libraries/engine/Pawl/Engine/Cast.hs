@@ -480,13 +480,24 @@ payableCost extra spending pid oid gs = payableCostAt (maybe 0 Face.minimumX (Ga
 -- (Cost.assistable): a caster with one Forest may propose Charging Binox beside a
 -- player holding seven Plains. Off the FACE being cast, as castProposed reads it.
 payableCostAt :: Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x extra spending pid oid gs cost =
+payableCostAt x extra spending pid oid gs =
+  let pcs = Projection.projectAll gs
+   in payableCostAtGiven pcs (Cost.supplyManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) x extra spending pid oid gs
+
+-- `payableCost` with the board's projection and CR 601.2g supply sweep handed
+-- in, so an enumeration over a hand builds the projection once (#435).
+payableCostGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostGiven pcs sources extra spending pid oid gs = payableCostAtGiven pcs sources (maybe 0 Face.minimumX (Game.faceOf oid gs)) extra spending pid oid gs
+
+-- `payableCostAt` with the projection and sweep handed in.
+payableCostAtGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> Natural -> [ManaCost.ManaCost] -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAtGiven pcs sources x extra spending pid oid gs cost =
   let substituted = Cost.substituteX x cost
       assisted = Cost.assistable (Game.castingKeywordsOf oid gs) (PaymentSubject.Casting oid) pid oid gs
       ask slots =
         let adjustments = Cost.plusReductions extra (Cost.spellAdjustments (Set.unions (Map.elems slots)) pid oid gs)
             totalled = Cost.plusComponents adjustments substituted
-         in Cost.canPaySomeCompletion slots (PaymentSubject.Casting oid) spending pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
+         in Cost.canPaySomeCompletionGiven slots (PaymentSubject.Casting oid) spending sources pcs pid oid (fmap assisted . Cost.totalManas adjustments) (Cost.manaSubstitutions (Cost.Type.components totalled) slots pid oid gs) totalled gs
    in if Cost.readsBoundSlot substituted || Cost.selfReadsTargets oid gs
         then any (any ask . Target.aimings) (castAimable pid oid gs)
         else ask Map.empty
@@ -1638,8 +1649,26 @@ turnedUpForPlay oid facing gs = case facing of
 -- casting this object". Every conjunct below reads the face-down face once the
 -- stamp is on, so none of them names morph.
 castable :: PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> GameState -> Bool
-castable pid oid name facing gs =
+castable = castableGiven Nothing
+
+-- `castable` with the board's control grants and projection handed in, which
+-- castableSpells builds once for a whole hand (#435). Nothing is the plain path,
+-- every payability question building its own -- kept so a differential test can
+-- hold the two against each other.
+--
+-- Both are exact on a proposal's board: `asProposed` and `proposedFor` stamp
+-- only the card being cast, which is off the battlefield, and
+-- Projection.projectGiven projects such a card afresh whatever the map holds.
+-- The supply SWEEP is not shared: CR 601.2a's move is part of the proposal
+-- (Game.withoutBeingCast), and a mana ability's rider may read it -- Pawl.ManaSpec's
+-- Synthetic Hollow Spring is the board -- so it is taken on each proposal's
+-- board, off the shared projection.
+castableGiven :: Maybe ([Projection.ControlGrant], Map.Map ObjectId PC.ProjectedCharacteristics) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> GameState -> Bool
+castableGiven shared pid oid name facing gs =
   let proposed = asProposed oid name facing gs
+      payable extra spending board cost = case shared of
+        Just (grants, pcs) -> payableCostGiven pcs (Cost.supplyManaSourcesGiven grants pcs pid board) extra spending pid oid board cost
+        Nothing -> payableCost extra spending pid oid board cost
       -- CR 708.2a's "no name", where the name is used AS A NAME. Taken off the
       -- proposed face rather than from the argument, so a face-down proposal
       -- carries the empty name CR 708.4 gives it and a face-up one carries the
@@ -1666,7 +1695,7 @@ castable pid oid name facing gs =
       candidateOk candidate =
         candidateAllowed pid oid proposedName proposed candidate
           && candidateFillable pid oid name proposed candidate
-          && payableCost (CandidateCost.reductions candidate) (spendingFor pid oid proposed) pid oid (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
+          && payable (CandidateCost.reductions candidate) (spendingFor pid oid proposed) (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
    in cardGatesOk pid oid name proposed
         -- Gated HERE, upstream of Action.legalActions, because the engine never
         -- offers an illegal action and then rejects it.
@@ -1779,6 +1808,17 @@ castFacings face =
 -- the same way for the same reason -- see `fusedProposals` below.
 castableSpells :: PlayerId -> GameState -> [(ObjectId, CardName.CardName, Facing.Facing)]
 castableSpells pid gs =
+  let -- ONE control-grant walk and one projection for the whole enumeration
+      -- (#435).
+      shared = (Projection.controlGrants gs, Projection.projectAll gs)
+   in filter (\(oid, name, facing) -> castableGiven (Just shared) pid oid name facing gs) (castProposals pid gs)
+
+-- Every cast castableSpells asks `castable` about, in castZones' order: each
+-- castable face of each card in a zone this player could cast from, in each
+-- facing it may be cast in, plus a hand's fuse card. Unfiltered, so a test can
+-- hold castableSpells against the plain per-card `castable`.
+castProposals :: PlayerId -> GameState -> [(ObjectId, CardName.CardName, Facing.Facing)]
+castProposals pid gs =
   let proposals oid = do
         face <- Game.castableFacesOfId oid gs
         facing <- castFacings face
@@ -1809,8 +1849,7 @@ castableSpells pid gs =
         card <- Maybe.maybeToList (Game.cardOf oid gs)
         face <- Maybe.maybeToList (Card.fusedFace card)
         pure (oid, Face.name face, Facing.FaceUp)
-      offered zone oid = filter (\(_, name, facing) -> castable pid oid name facing gs) (proposals oid <> fusedProposals zone oid)
-      inZone zone = concatMap (offered zone) (zoneCandidates zone pid gs)
+      inZone zone = concatMap (\oid -> proposals oid <> fusedProposals zone oid) (zoneCandidates zone pid gs)
    in concatMap inZone castZones
 
 -- CR 601.3 (Panglacial): may this card be cast from the library while its

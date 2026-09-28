@@ -2,10 +2,12 @@ module Pawl.Benchmark where
 
 import qualified Control.Exception as Exception
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -57,6 +59,38 @@ fighting deck n =
   let players = playersFrom n
    in fst (Engine.runMatchPure Script.fighting (Setup.mirror deck players))
 {-# NOINLINE fighting #-}
+
+-- #435: the first player's precombat main phase with five Mountains, three
+-- Glorious Anthems, `n` of `spell` on the battlefield and `n` more in hand. The
+-- anthems make every projection gather something, which is what an enumeration
+-- building one per card in hand pays for. Both zones are filled by the
+-- hand-written move Pawl.Engine.Setup.createInCommandZone makes.
+anthemBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural -> GameState.GameState
+anthemBoard land anthem spell n =
+  let players = playersFrom 0
+      alice = NonEmpty.head players
+      place zone printing gs0 =
+        let (printingId, gs1) = Game.intern printing gs0
+            (oid, gs2) = Engine.runGamePure Script.declining gs1 (Setup.createCard alice printingId)
+            moved = Game.insertIntoZone zone LibraryPosition.defaultValue alice oid (Game.removeFromZones alice oid gs2)
+         in moved {GameState.objects = Map.adjust (\o -> o {Object.zone = zone}) oid (GameState.objects moved)}
+      times :: Natural -> (GameState.GameState -> GameState.GameState) -> GameState.GameState -> GameState.GameState
+      times k f = foldr (.) id (List.genericReplicate k f)
+      built = times n (place Zone.Hand spell) (times n (place Zone.Battlefield spell) (times 3 (place Zone.Battlefield anthem) (times 5 (place Zone.Battlefield land) (Setup.emptyGame players))))
+   in built {GameState.phase = Phase.PrecombatMain, GameState.priority = Just alice}
+
+-- How many casts the first player may propose on `anthemBoard`: through
+-- Cast.castableSpells when `shared`, and otherwise card by card through the
+-- plain Cast.castable, which builds its own board per question -- the paired
+-- control.
+castableCount :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural -> Int
+castableCount shared land anthem spell n =
+  let gs = anthemBoard land anthem spell n
+      pid = GameState.activePlayer gs
+   in if shared
+        then length (Cast.castableSpells pid gs)
+        else length (filter (\(oid, name, facing) -> Cast.castable pid oid name facing gs) (Cast.castProposals pid gs))
+{-# NOINLINE castableCount #-}
 
 -- The redDeck recipe (name -> count), loaded from the registry -- the proof
 -- that files -> parse -> a real game works end-to-end.
@@ -291,6 +325,9 @@ main = do
   noAuraDeck <- loadNoAuraDeck registry
   dependentDeck <- loadDependentDeck registry
   independentDeck <- loadIndependentDeck registry
+  mountain <- fetchOrThrow registry "Mountain"
+  anthem <- fetchOrThrow registry "Glorious Anthem"
+  piker <- fetchOrThrow registry "Goblin Piker"
   plural <- loadPluralBoard registry
   drum <- loadDrumBoard registry
   Bench.defaultMain
@@ -304,6 +341,10 @@ main = do
       -- The line above's paired control: same 13 cards, no movable layer
       -- (loadIndependentDeck).
       Bench.bench "casting 2p independent" $ Bench.whnf (casting independentDeck) 0,
+      -- #435: every cast of 40 cards in hand over 40 creatures and 3 anthems.
+      Bench.bench "castable 40" $ Bench.whnf (castableCount True mountain anthem piker) 40,
+      -- The line above's paired control: the same question card by card.
+      Bench.bench "castable 40 unshared" $ Bench.whnf (castableCount False mountain anthem piker) 40,
       Bench.bench "payable plural payable" $ Bench.whnf (payable plural (generic 4)) 0,
       Bench.bench "payable plural short" $ Bench.whnf (payable plural (generic 14)) 0,
       Bench.bench "payable plural far short" $ Bench.whnf (payable plural (generic 40)) 0,
