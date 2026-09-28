@@ -14,6 +14,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TheseDiscard as TheseDiscard
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -37,8 +38,8 @@ spec s = Spec.describe s "Pawl.Codec.Discard" $ do
     Common.assertCodec
       s
       Discard.codec
-      (Discard.These (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Just (Filter.Not (Filter.HasCardType CardType.Land))))))
-      " {\"type\":\"These\",\"value\":{\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"InSlot\",\"value\":\"target\"},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}}} "
+      (Discard.These (TheseDiscard.MkTheseDiscard (ObjectRef.EachCardInHand (EachCardInHand.MkEachCardInHand (ZoneScope.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Just (Filter.Not (Filter.HasCardType CardType.Land))))) Nothing))
+      " {\"type\":\"These\",\"value\":{\"cards\":{\"type\":\"EachCardInHand\",\"value\":{\"hands\":{\"type\":\"InSlot\",\"value\":\"target\"},\"filter\":{\"type\":\"Not\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Land\"}}}}}}} "
   -- CR 107.1c: the player the slot names discards any number of matching cards.
   Spec.it s "AnyNumber" $
     Common.assertCodec

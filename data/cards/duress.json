@@ -43,32 +43,34 @@
                     "value": {
                       "type": "These",
                       "value": {
-                        "type": "ChosenCardFromAmong",
-                        "value": {
-                          "filter": {
-                            "type": "And",
-                            "value": [
-                              {
-                                "type": "Not",
-                                "value": {
-                                  "type": "HasCardType",
+                        "cards": {
+                          "type": "ChosenCardFromAmong",
+                          "value": {
+                            "filter": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "Not",
                                   "value": {
-                                    "type": "Creature"
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Creature"
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Land"
+                                    }
                                   }
                                 }
-                              },
-                              {
-                                "type": "Not",
-                                "value": {
-                                  "type": "HasCardType",
-                                  "value": {
-                                    "type": "Land"
-                                  }
-                                }
-                              }
-                            ]
-                          },
-                          "slot": "revealed"
+                              ]
+                            },
+                            "slot": "revealed"
+                          }
                         }
                       }
                     }
