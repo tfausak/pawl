@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Projection.View as Projection.View
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -472,6 +473,38 @@ drawTriggerSpec s registry =
           Spec.assertEqWith s "alice drew none of them" (Map.lookup S.alice (GameState.drawsThisTurn after)) Nothing
           Spec.assertEqWith s "so her Wizard is printed-size" (S.powerToughnessOf wizardId after) (Just (2, 3))
         _ -> Spec.assertFailure s "fixture should put two Think Twice in bob's hand"
+    -- No ordinal: Teferi, Hero of Dominaria's emblem, "Whenever you draw a card,
+    -- exile target permanent an opponent controls" (Oracle text checked against
+    -- api.scryfall.com 2026-09-27), fires on EVERY draw -- the first one, which
+    -- leaves the Wizard above alone, and the second alike. bob holds three
+    -- Goblin Pikers, so each draw costs him one.
+    Spec.it s "CR 121.2 the Teferi emblem fires on the turn's first draw and on its second" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      wizard <- S.printingOf s registry "Erudite Wizard"
+      teferi <- S.printingOf s registry "Teferi, Hero of Dominaria"
+      let (_, base, thinks) = drawBoard island piker think wizard 2
+          (teferiId, withTeferi) = S.addPermanent teferi S.alice base
+          armed = S.addCounter CounterKind.Loyalty 8 teferiId withTeferi
+          gs = List.foldl' (\g _ -> snd (S.addPermanent piker S.bob g)) armed [1 .. (3 :: Int)]
+          -- The first offered recipient per slot, so the emblem's trigger is
+          -- not declined for want of a target.
+          aiming :: Prompt.Prompt r -> r
+          aiming p = case p of
+            Prompt.ChooseTargets _ _ _ offered -> fmap (\(n, set) -> Set.fromList (take (Natural.toIntSaturating n) (Set.toList set))) offered
+            _ -> S.identityAnswer p
+          castAiming g oid = S.runPure aiming (S.runPure aiming g (S.cast S.alice oid)) Engine.priorityLoop
+          bobsPermanents g = length (filter (\oid -> Projection.View.controllerOf oid g == Just S.bob) (Set.toList (GameState.battlefield g)))
+      case (drop 2 (Face.activatedAbilities (S.combinedFace teferi)), thinks) of
+        (ultimate : _, [a, b]) -> do
+          let emblemed = S.runPure S.identityAnswer gs (do Activate.activateAbility S.alice teferiId ultimate; Stack.resolveTop)
+              afterFirst = castAiming emblemed a
+              afterSecond = castAiming afterFirst b
+          Spec.assertEqWith s "the first draw exiled one of bob's three" (bobsPermanents afterFirst) 2
+          Spec.assertEqWith s "and the second another" (bobsPermanents afterSecond) 1
+          Spec.assertEqWith s "the emblem is in the command zone" (Set.size (GameState.command emblemed)) 1
+        _ -> Spec.assertFailure s "Teferi prints three loyalty abilities and the fixture two Think Twice"
 
 -- alice controls an Erudite Wizard and enough Islands to cast `copies` Think
 -- Twice, holds that many of them (none at all when `copies` is 0, which is the

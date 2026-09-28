@@ -25,6 +25,7 @@ import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachAll as AttachAll
@@ -110,6 +111,7 @@ import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -967,6 +969,8 @@ rewriteEffect pairs effect = case effect of
         }
   Effect.ForEach (ForEach.MkForEach ref membership slot body individually) ->
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually)
+  Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) ->
+    Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
 
 -- CR 612.2 over one word whose family a card's text names rather than a
@@ -1035,7 +1039,7 @@ rewriteObjectRef pairs ref = case ref of
   -- The arm above's regression fence, for its reason: the Gates' "nonland" is a
   -- card type and no printing changes their text.
   ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p f c) -> ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary p (Filter.rewrite pairs f) (rewriteQuantity pairs c))
-  ObjectRef.AnyNumberMatching f -> ObjectRef.AnyNumberMatching (Filter.rewrite pairs f)
+  ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching f n) -> ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n))
   ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent f w) -> ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent (Filter.rewrite pairs f) w)
   ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot f) -> ObjectRef.AttachedToBound (AttachedToBound.MkAttachedToBound slot (Filter.rewrite pairs f))
   ObjectRef.SourceAndChosenPermanent f -> ObjectRef.SourceAndChosenPermanent (Filter.rewrite pairs f)

@@ -45,6 +45,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Amass as Amass
+import qualified Pawl.Types.AnyNumberMatching as AnyNumberMatching
 import qualified Pawl.Types.AttachAll as AttachAll
 import qualified Pawl.Types.AttachBound as AttachBound
 import qualified Pawl.Types.AttachTarget as AttachTarget
@@ -99,6 +100,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -392,6 +394,7 @@ ownQuantities effect = case effect of
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile grant -> durationQuantities (GrantPlayFromExile.duration grant)
   Effect.ForEach {} -> []
+  Effect.ForEachNumber loop -> [ForEachNumber.upTo loop]
   Effect.Heal _ -> []
 
 -- The shapes CR 208.1 and CR 208.2 allow in a printed power or toughness box:
@@ -1142,7 +1145,7 @@ data Asks
     -- arm falls through to the pure sweep.
     AsksDiscardArm
   | -- | Pawl.Engine.Resolve's permanentsGathered, shared by Effect.Transform,
-    -- Effect.Convert and Effect.AttachAll. It asks the any-number arm and
+    -- Effect.Convert, Effect.AttachAll and Effect.Untap. It asks the any-number arm and
     -- nothing else: the four card-shaped chosen arms name cards in a graveyard,
     -- a hand or a group, and both instructions act on PERMANENTS.
     AsksTransformGather
@@ -1395,7 +1398,7 @@ effectObjectRefs effect =
         Effect.RemovePlayerCounters {} -> []
         Effect.PayAnyEnergy {} -> []
         Effect.Tap ref -> read_ [ref]
-        Effect.Untap ref -> read_ [ref]
+        Effect.Untap ref -> [(AsksTransformGather, ref)]
         Effect.Detain ref -> read_ [ref]
         Effect.Goad ref -> read_ [ref]
         Effect.Pair ref -> [(AsksPairPartner, ref)]
@@ -1464,6 +1467,7 @@ effectObjectRefs effect =
         Effect.OfferCast offer -> read_ [OfferCast.ref offer]
         Effect.GrantPlayFromExile grant -> read_ [GrantPlayFromExile.ref grant]
         Effect.ForEach (ForEach.MkForEach ref _ _ _ _) -> read_ [ref]
+        Effect.ForEachNumber {} -> []
         Effect.Heal ref -> read_ [ref]
 
 -- The chooser-shaped refs one effect writes where nothing can ask for them: the
@@ -2411,7 +2415,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
         atRandomInGraveyard = ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) anyCard (Quantity.Type.Literal 1))
         sought = ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
-        anyNumber = ObjectRef.AnyNumberMatching anyCard
+        anyNumber = ObjectRef.AnyNumberMatching (AnyNumberMatching.MkAnyNumberMatching anyCard Nothing)
         onePermanent = ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent anyCard (PlayerRef.Relative PlayerRelation.You))
         sourceAndOne = ObjectRef.SourceAndChosenPermanent anyCard
         moves ref = Effect.MoveToZone (MoveToZone.MkMoveToZone ref Zone.Battlefield EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue Nothing)
@@ -2444,16 +2448,17 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
       (inert (fmap Effect.Transform [inGraveyard, inHand, fromAmong, atRandom]))
       [True, True, True, True]
     -- The fourth degenerate classification, and the one widening the matrix for
-    -- #774 introduced: "the new arm asks everywhere". Accepted under the two
-    -- gathers that ask it -- Transform's and MoveToZone's -- and rejected under
-    -- Reveal's arm, which asks other arms but not this one, and under Tap, an
-    -- AsksNothing opcode. Without this leg an asksFor row answering True for the
-    -- new arm at every site would pass the three assertions above unchanged.
+    -- #774 introduced: "the new arm asks everywhere". Accepted under the
+    -- gathers that ask it -- Transform's, MoveToZone's and Untap's (Teferi, Hero
+    -- of Dominaria) -- and rejected under Reveal's arm, which asks other arms but
+    -- not this one, and under Tap, an AsksNothing opcode. Without this leg an
+    -- asksFor row answering True for the new arm at every site would pass the
+    -- three assertions above unchanged.
     Spec.assertEqWith
       s
-      "the battlefield subset is asked by the transform and move gathers and by neither other site"
-      (inert [Effect.Transform anyNumber, moves anyNumber, reveals anyNumber, Effect.Tap anyNumber])
-      [False, False, True, True]
+      "the battlefield subset is asked by the transform, move and untap gathers and by neither other site"
+      (inert [Effect.Transform anyNumber, moves anyNumber, Effect.Untap anyNumber, reveals anyNumber, Effect.Tap anyNumber])
+      [False, False, False, True, True]
     -- The singular of the arm above, asked by the MoveToZone gather alone --
     -- Hanweir Battlements' "exile them, then meld them", the printing that wanted
     -- it. Rejected under Transform and Reveal, the two other sites that ask any

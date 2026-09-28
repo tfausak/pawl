@@ -97,7 +97,8 @@ order oids = do
 -- Inside a CR 608.2f action (Event.together) the batch is only noted, and the
 -- action's whole batch is settled once as it ends: everything it put onto the
 -- battlefield entered at one moment, whichever instruction or iteration did it.
--- Proved by Pawl.RestampSpec's Mirror Match board.
+-- Proved by Pawl.RestampSpec's Mirror Match board, and on the conjure road by
+-- its Ornate Imitations board.
 settle :: Timestamp -> [ObjectId] -> Game ()
 settle start arrivals = do
   gs <- State.get

@@ -92,6 +92,7 @@ import qualified Pawl.Types.Fight as Fight
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.FlipCoin as FlipCoin
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ForEachNumber as ForEachNumber
 import qualified Pawl.Types.ForbidActivation as ForbidActivation
 import qualified Pawl.Types.ForbidAttack as ForbidAttack
 import qualified Pawl.Types.ForbidBlock as ForbidBlock
@@ -1008,6 +1009,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       " {\"type\":\"ForEach\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"victims\"},\"slot\":\"victim\",\"body\":[{\"type\":\"DealDamage\",\"value\":{\"parts\":[{\"ref\":{\"type\":\"InSlot\",\"value\":\"victim\"},\"quantity\":{\"type\":\"AgainstSlot\",\"value\":{\"slot\":\"exiled\",\"quantity\":{\"type\":\"ManaValue\"}}}}]}}],\"individually\":true}} "
+  -- The number loop, its body reading the number it binds.
+  Spec.it s "ForEachNumber" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.ForEachNumber
+          ForEachNumber.MkForEachNumber
+            { ForEachNumber.upTo = Quantity.InSlot (SlotName.MkSlotName (Text.pack "X")),
+              ForEachNumber.slot = SlotName.MkSlotName (Text.pack "number"),
+              ForEachNumber.body = Seq.singleton (Effect.Draw (Draw.MkDraw (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot (SlotName.MkSlotName (Text.pack "number"))) Nothing))
+            }
+      )
+      " {\"type\":\"ForEachNumber\",\"value\":{\"upTo\":{\"type\":\"InSlot\",\"value\":\"X\"},\"slot\":\"number\",\"body\":[{\"type\":\"Draw\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"quantity\":{\"type\":\"InSlot\",\"value\":\"number\"}}}]}} "
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
   Spec.it s "PreventAllDamage" $
     Common.assertJsonCodec

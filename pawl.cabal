@@ -142,6 +142,8 @@ library codec
     Pawl.Codec.AlternativeCost
     Pawl.Codec.AlternativeCostSpec
     Pawl.Codec.Amass
+    Pawl.Codec.AnyNumberMatching
+    Pawl.Codec.AnyNumberMatchingSpec
     Pawl.Codec.ArmDelayedTrigger
     Pawl.Codec.ArmDelayedTriggerSpec
     Pawl.Codec.AsCopy
@@ -574,6 +576,8 @@ library codec
     Pawl.Codec.ForbidBlock
     Pawl.Codec.ForbidBlockSpec
     Pawl.Codec.ForEach
+    Pawl.Codec.ForEachNumber
+    Pawl.Codec.ForEachNumberSpec
     Pawl.Codec.ForEachSpec
     Pawl.Codec.ForetellCost
     Pawl.Codec.ForetellCostSpec
@@ -1733,6 +1737,7 @@ library types
     Pawl.Types.AimedAt
     Pawl.Types.AlternativeCost
     Pawl.Types.Amass
+    Pawl.Types.AnyNumberMatching
     Pawl.Types.AppliedReduction
     Pawl.Types.ArmDelayedTrigger
     Pawl.Types.AsCopy
@@ -1974,6 +1979,7 @@ library types
     Pawl.Types.ForbidAttack
     Pawl.Types.ForbidBlock
     Pawl.Types.ForEach
+    Pawl.Types.ForEachNumber
     Pawl.Types.ForetellCost
     Pawl.Types.FromOutsideTheGame
     Pawl.Types.FromReference
