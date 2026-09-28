@@ -321,9 +321,10 @@ resolveSpellWith runSubgame oid = do
                         Nothing -> pure (answers, ran)
                         Just limb -> do
                           gateBindings <- State.gets (liveBindings obj oid)
-                          let instanceView = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode)
+                          let instanceView :: Map SlotName (Set Recipient) -> Map SlotName (Set Recipient)
+                              instanceView = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode)
                               legalHere = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                              boundHere = Map.keysSet (instanceView gateBindings)
+                              boundHere = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                           gated <- gateHolds effectController oid (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
                           taken <- if gated then exercises oid oid effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
                           (admitted, answers2) <-
@@ -354,7 +355,7 @@ resolveSpellWith runSubgame oid = do
                         -- SAME live bindings CR 608.2b's filter is applied to, so
                         -- a clause whose every read is dead is not asked about.
                         let legalNowForMay = Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                            boundNowForMay = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) gateBindings)
+                            boundNowForMay = Map.keysSet (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Monad.void gateBindings))
                         -- CR 608.2d's "or" next, and BEFORE the "may": Twiddle
                         -- prints one "may" over the pair, so a branch a player
                         -- did not announce has no "may" left to offer THEM.
@@ -698,7 +699,10 @@ resolveModesWith runSubgame stackId srcId modes = do
       -- bake never reads. Pawl.ModalSpec's "CR 700.2d a repeated mode on a trigger
       -- keeps reading the trigger's own bound player" is what proves the two paths
       -- agree.
-      let slots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (uncurry Modal.modeInstanceTargetSlots) modes))
+      let printedSlots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (uncurry Modal.modeInstanceTargetSlots) modes))
+          -- CR 608.2b judges a "for each opponent" slot per copy it bound;
+          -- instanceView folds the copies back under the printed name.
+          slots = Target.boundCopies (Map.keysSet (Object.bindings obj)) printedSlots
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipients = case Map.lookup slot slots of
             -- CR 608.2b is about TARGETS. A slot declaring none is a RESERVED
@@ -722,7 +726,8 @@ resolveModesWith runSubgame stackId srcId modes = do
               let idx = ModeInstance.index mi
                   -- CR 700.2d: this instance's slots under the names its mode
                   -- prints, applied to both maps so they cannot disagree.
-                  instanceView = Modal.instanceView slots mi (Mode.targetSlots mode)
+                  instanceView :: Map SlotName (Set Recipient) -> Map SlotName (Set Recipient)
+                  instanceView = Modal.instanceView printedSlots mi (Mode.targetSlots mode)
                   -- CR 608.2c's printed order, and the lookup CR 608.2d's
                   -- either-or reads its SIBLING back out of.
                   indexedClauses = zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))
@@ -744,7 +749,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                     Just limb -> do
                       gateBindings <- State.gets (liveBindings obj stackId)
                       let legalHere = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                          boundHere = Map.keysSet (instanceView gateBindings)
+                          boundHere = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                       gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) gateBindings limb
                       taken <- if gated then exercises stackId srcId effectController idx limbIdx boundHere legalHere (Just facing) limb else pure False
                       (admitted, answers2) <- if taken then payGateAdmits stackId srcId effectController idx limbIdx (instanceView legal) (Just facing) answers limb else pure (False, answers)
@@ -774,7 +779,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                         -- SAME live bindings CR 608.2b's filter is applied to, so a
                         -- clause whose every read is dead is not asked about.
                         let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
-                            boundNowForMay = Map.keysSet (instanceView gateBindings)
+                            boundNowForMay = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                         -- CR 608.2d's "or" next, and BEFORE the "may", off the same
                         -- helper the spell path uses. Proved on THIS loop and not
                         -- merely on the spell's twin: Teardrop Kami's "sacrifice
