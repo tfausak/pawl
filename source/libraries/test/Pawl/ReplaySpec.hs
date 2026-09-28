@@ -445,7 +445,7 @@ combatReplaySpec s =
         -- which is why one of the round-tripped names is empty and the others
         -- are not.
         Spec.it s "ChooseCardName records and replays a CardName" $ do
-          let p = Prompt.ChooseCardName decider S.alice oid (Filter.Type.And [])
+          let p = Prompt.ChooseCardName decider S.alice oid (Filter.Type.And []) Seq.empty
           Monad.forM_ [Text.empty, Text.pack "Goblin Piker", Text.pack "Ash Barrens"] $ \name ->
             Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p (CardName.MkCardName name))) (Just (CardName.MkCardName name))
         -- CR 201.2a: a transcript that runs short answers with the name no
@@ -454,7 +454,7 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "the empty name"
-            (Replay.defaultAnswer (Prompt.ChooseCardName decider S.alice oid (Filter.Type.And [])))
+            (Replay.defaultAnswer (Prompt.ChooseCardName decider S.alice oid (Filter.Type.And []) Seq.empty))
             (CardName.MkCardName Text.empty)
         -- CR 614.12a: which opponent an as-enters choice names. Its answer has
         -- the same shape as ChooseDefender's, so the transcript has to tell the
@@ -504,7 +504,7 @@ combatReplaySpec s =
         -- proved to distinguish them -- a codec that collapsed them would
         -- replay a declined Renewed Faith as a taken one.
         Spec.it s "ChooseOptional records and replays both answers" $ do
-          let p = Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0)
+          let p = Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0) Seq.empty
           Spec.assertEqWith s "exercised" (Replay.decode p (Replay.encode p OptionalDecision.Exercises)) (Just OptionalDecision.Exercises)
           Spec.assertEqWith s "declined" (Replay.decode p (Replay.encode p OptionalDecision.Declines)) (Just OptionalDecision.Declines)
         -- CR 603.5: a transcript that runs short must not silently take an
@@ -513,7 +513,7 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "declines"
-            (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0)))
+            (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0) Seq.empty))
             OptionalDecision.Declines
         -- CR 118.12a: both answers to a resolution-time cost, so the transcript
         -- is proved to distinguish them -- a codec that collapsed them would
@@ -534,7 +534,7 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "mismatch"
-            (Replay.decode (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0)) (Response.Conceded Concession.Continues))
+            (Replay.decode (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0) Seq.empty) (Response.Conceded Concession.Continues))
             Nothing
         Spec.it s "defaultAnswer attacks with nothing" $
           Spec.assertEqWith s "no attacks" (Replay.defaultAnswer attackPrompt) []
@@ -692,14 +692,14 @@ combatReplaySpec s =
             (Replay.defaultAnswer (Prompt.OrderManaActivations decider S.alice [oid, ObjectId.MkObjectId 8]))
             [0, 1 :: Natural.Natural]
         Spec.it s "ChooseSacrifices records and replays a Set ObjectId" $ do
-          let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
+          let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1 Seq.empty
               answer = Set.singleton (ObjectId.MkObjectId 8)
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         Spec.it s "defaultAnswer sacrifices the first `count` offered, in order" $
           Spec.assertEqWith
             s
             "the ascending prefix"
-            (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
+            (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1 Seq.empty))
             (Set.singleton oid)
         -- The payload is ChooseSacrifices' exactly, which is why the CROSS-decode
         -- is the assertion that matters: a shared Response constructor would let
@@ -712,7 +712,7 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "a ChooseSacrifices transcript entry does not answer it"
-            (Replay.decode p (Replay.encode (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
+            (Replay.decode p (Replay.encode (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1 Seq.empty) answer))
             Nothing
         -- ChooseTaps' payload exactly, so the CROSS-decode is again what
         -- matters: a shared Response constructor would let a transcript's tap
@@ -752,7 +752,7 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "a ChooseSacrifices transcript entry does not answer it"
-            (Replay.decode p (Replay.encode (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
+            (Replay.decode p (Replay.encode (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1 Seq.empty) answer))
             Nothing
         -- CR 701.59a: the WHOLE offer, not a prefix -- the arm above takes the
         -- first `count` because its Natural counts cards, and this one's is a
@@ -1784,7 +1784,7 @@ combatReplaySpec s =
         Spec.it s "ChooseCardInGraveyard round-trips through the transcript" $ do
           let a = ObjectId.MkObjectId 7
               b = ObjectId.MkObjectId 9
-              p = Prompt.ChooseCardInGraveyard decider S.alice oid (a NonEmpty.:| [b])
+              p = Prompt.ChooseCardInGraveyard decider S.alice oid (a NonEmpty.:| [b]) Seq.empty
           Spec.assertEqWith s "returning the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
           -- Discriminating: a decode that ignored the response and returned the
           -- head would pass one leg by accident.
@@ -1794,14 +1794,14 @@ combatReplaySpec s =
           -- rather than getting its own ObjectId-shaped constructor. The two are
           -- the same SHAPE, so nothing but a distinct constructor keeps a
           -- transcript of one from replaying as the other.
-          let p = Prompt.ChooseCardInGraveyard decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          let p = Prompt.ChooseCardInGraveyard decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]) Seq.empty
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseRingBearer (ObjectId.MkObjectId 7))) Nothing
         Spec.it s "a short transcript returns the first candidate offered" $
           -- CR 608.2d: every offered card is a legal choice, so the head is legal.
           Spec.assertEqWith
             s
             "the head"
-            (Replay.defaultAnswer (Prompt.ChooseCardInGraveyard decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
+            (Replay.defaultAnswer (Prompt.ChooseCardInGraveyard decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9]) Seq.empty))
             (ObjectId.MkObjectId 7)
         -- CR 608.2d again, out of a hidden zone: which card Karn's target took
         -- out of their own hand is a decision, and its transcript must not be

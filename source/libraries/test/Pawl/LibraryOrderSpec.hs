@@ -2020,7 +2020,7 @@ namesInstead wanted p = case p of
 -- is sacrificed, rather than the order the candidates are enumerated in.
 sacrifices :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 sacrifices wanted p = case p of
-  Prompt.ChooseSacrifices _ _ _ candidates _ ->
+  Prompt.ChooseSacrifices _ _ _ candidates _ _ ->
     if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
   Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
@@ -2482,7 +2482,7 @@ optionalEffectSpec s registry =
       -- is discriminating about the whole payload, not just about the answer.
       takeOptional :: Prompt.Prompt r -> r
       takeOptional p = case p of
-        Prompt.ChooseOptional (Decider.MkDecider d) player _ idx cIdx
+        Prompt.ChooseOptional (Decider.MkDecider d) player _ idx cIdx _
           | d == S.alice && player == S.alice && idx == ModeIndex.MkModeIndex 0 && cIdx == ClauseIndex.MkClauseIndex 0 ->
               OptionalDecision.Exercises
         Prompt.ChooseOptional {} -> OptionalDecision.Declines
@@ -2533,7 +2533,7 @@ optionalEffectSpec s registry =
       -- to S.identityAnswer.
       returnsChurn :: Prompt.Prompt r -> r
       returnsChurn p = case p of
-        Prompt.ChooseOptional _ _ _ _ cIdx
+        Prompt.ChooseOptional _ _ _ _ cIdx _
           | cIdx == ClauseIndex.MkClauseIndex 1 -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
       churnName = CardName.MkCardName (Text.pack "Corpse Churn")

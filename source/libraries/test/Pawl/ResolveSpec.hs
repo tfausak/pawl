@@ -11,6 +11,7 @@ module Pawl.ResolveSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Containers.ListUtils as ListUtils
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -1170,7 +1171,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let takes pid cIdx = pid == S.alice || (pid, cIdx) `elem` [(S.carol, ClauseIndex.MkClauseIndex 0), (S.bob, ClauseIndex.MkClauseIndex 2)]
         answer :: Prompt.Prompt r -> r
         answer p = case p of
-          Prompt.ChooseOptional _ pid _ _ cIdx -> if takes pid cIdx then OptionalDecision.Exercises else OptionalDecision.Declines
+          Prompt.ChooseOptional _ pid _ _ cIdx _ -> if takes pid cIdx then OptionalDecision.Exercises else OptionalDecision.Declines
           _ -> S.identityAnswer p
         after = S.runPure answer gs (Cast.castSpell S.manaPerformer S.alice spellId (CardName.MkCardName (Text.pack "Development")) Facing.FaceUp >> Stack.resolveTop)
         piker = Just (CardName.MkCardName (Text.pack "Goblin Piker"))
@@ -2103,6 +2104,23 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and every hand is empty" (fmap (\pid -> namesIn Zone.Hand pid after) [S.alice, S.bob, S.carol]) [[], [], []]
     Spec.assertEqWith s "three asks and no search" asked [(Text.pack "may", S.alice), (Text.pack "may", S.bob), (Text.pack "may", S.carol)]
     Spec.assertEqWith s "the Wayfinder itself still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jungle Wayfinder")) S.alice after) 1
+  -- CR 101.4b: a pair of boards differing only in alice's answer to the "may".
+  -- bob and carol each give the answer their prompt says the seat before them
+  -- gave, declining when told nothing, so what they do is what they were told.
+  Spec.it s "CR 101.4b Jungle Wayfinder's later seats know the earlier seats' answers" $ do
+    (gs, spellId) <- wayfinderBoard s registry
+    let cast = snd (Engine.runGamePure findFirstExercising gs (S.cast S.alice spellId))
+        onStack = snd (Engine.runGamePure findFirstExercising cast (Stack.resolveTop >> Engine.settleForPriority))
+        run hers = State.runState (Engine.runGame (copyingWayfinderAnswer hers) onStack Stack.resolveTop) []
+        ((_, took), toldTook) = run OptionalDecision.Exercises
+        ((_, declined), toldDeclined) = run OptionalDecision.Declines
+        nameOf = Just . CardName.MkCardName . Text.pack
+        exercises = OptionalDecision.Exercises
+        declines = OptionalDecision.Declines
+    Spec.assertEqWith s "CR 101.4b told alice took it, bob took it and found a Mountain" (namesIn Zone.Hand S.bob took) [nameOf "Mountain"]
+    Spec.assertEqWith s "CR 101.4b told alice declined, bob declined" (namesIn Zone.Hand S.bob declined) []
+    Spec.assertEqWith s "CR 101.4b each seat was told the answers before its own" toldTook [(S.alice, []), (S.bob, [(S.alice, exercises)]), (S.carol, [(S.alice, exercises), (S.bob, exercises)])]
+    Spec.assertEqWith s "CR 101.4b and so when alice declined" toldDeclined [(S.alice, []), (S.bob, [(S.alice, declines)]), (S.carol, [(S.alice, declines), (S.bob, declines)])]
   -- Synthetic Shared Excavation -- "{2}{U} Sorcery. Each player searches your
   -- library for a card and exiles it. Then shuffle." Synthetic because every
   -- printed several-player search has each player search their own library
@@ -3513,7 +3531,7 @@ browbeatBoard s registry = do
 browbeatAnswer :: [PlayerId.PlayerId] -> Prompt.Prompt r -> r
 browbeatAnswer takers p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.carol) sets
-  Prompt.ChooseOptional _ pid _ _ _ -> if pid `elem` takers then OptionalDecision.Exercises else OptionalDecision.Declines
+  Prompt.ChooseOptional _ pid _ _ _ _ -> if pid `elem` takers then OptionalDecision.Exercises else OptionalDecision.Declines
   _ -> S.identityAnswer p
 
 -- Three seats, three Mountains for Breaking Point's {1}{R}{R}, and a Goblin
@@ -3545,7 +3563,7 @@ distantMemoriesBoard s registry = do
 distantMemoriesAnswer :: ObjectId.ObjectId -> [PlayerId.PlayerId] -> Prompt.Prompt r -> r
 distantMemoriesAnswer wanted takers p = case p of
   Prompt.Search _ _ matches _ -> filter (== wanted) matches
-  Prompt.ChooseOptional _ pid _ _ _ -> if pid `elem` takers then OptionalDecision.Exercises else OptionalDecision.Declines
+  Prompt.ChooseOptional _ pid _ _ _ _ -> if pid `elem` takers then OptionalDecision.Exercises else OptionalDecision.Declines
   _ -> S.identityAnswer p
 
 -- Three seats; an Island and four Mountains pay Development's {3}{U}{R}. Four
@@ -3655,7 +3673,7 @@ planResolved branch (gs, planId) =
 planAnswer :: ClauseIndex.ClauseIndex -> Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ClauseIndex.ClauseIndex])] r
 planAnswer branch p = case p of
   Prompt.ChooseTargets _ _ _ sets -> pure (S.preferring (== Recipient.ToPlayer S.bob) sets)
-  Prompt.ChooseClause _ pid _ _ live -> do
+  Prompt.ChooseClause _ pid _ _ live _ -> do
     State.modify' ((pid, NonEmpty.toList live) :)
     pure (if elem branch live then branch else NonEmpty.head live)
   Prompt.ChooseDiscard _ _ ids n -> pure (List.genericTake n ids)
@@ -3709,11 +3727,11 @@ emperorCombat picks (gs, _) =
 -- repair a mutation that aimed the sacrifice at the wrong seat.
 emperorAnswer :: Map.Map PlayerId.PlayerId ClauseIndex.ClauseIndex -> Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [ClauseIndex.ClauseIndex])] r
 emperorAnswer picks p = case p of
-  Prompt.ChooseClause _ pid _ _ live -> do
+  Prompt.ChooseClause _ pid _ _ live _ -> do
     State.modify' ((pid, NonEmpty.toList live) :)
     let wanted = Map.findWithDefault (NonEmpty.head live) pid picks
     pure (if elem wanted live then wanted else NonEmpty.head live)
-  Prompt.ChooseSacrifices _ _ _ offered _ -> pure (Set.fromList (take 1 offered))
+  Prompt.ChooseSacrifices _ _ _ offered _ _ -> pure (Set.fromList (take 1 offered))
   _ -> pure (S.identityAnswer p)
 
 -- Which branches CR 608.2d actually asked about, in the order asked.
@@ -3758,7 +3776,7 @@ anuridBoard s registry withLands = do
 anuridAnswer :: Maybe ObjectId.ObjectId -> Prompt.Prompt r -> r
 anuridAnswer fodder p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-  Prompt.ChooseSacrifices _ _ _ offered _ -> Set.fromList (filter (\oid -> Just oid == fodder) offered)
+  Prompt.ChooseSacrifices _ _ _ offered _ _ -> Set.fromList (filter (\oid -> Just oid == fodder) offered)
   _ -> S.identityAnswer p
 
 -- The board the two Mineshaft Spider cases share, differing in exactly one
@@ -3819,8 +3837,8 @@ opportunityBoard s registry eggs = do
 -- pick is pinned by id.
 opportunityAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 opportunityAnswer pinned p = case p of
-  Prompt.ChooseClause _ _ _ _ live -> if elem (ClauseIndex.MkClauseIndex 0) live then ClauseIndex.MkClauseIndex 0 else NonEmpty.head live
-  Prompt.ChooseSacrifices _ _ _ offered n -> Set.fromList (List.genericTake n (filter (`elem` pinned) offered <> filter (`notElem` pinned) offered))
+  Prompt.ChooseClause _ _ _ _ live _ -> if elem (ClauseIndex.MkClauseIndex 0) live then ClauseIndex.MkClauseIndex 0 else NonEmpty.head live
+  Prompt.ChooseSacrifices _ _ _ offered n _ -> Set.fromList (List.genericTake n (filter (`elem` pinned) offered <> filter (`notElem` pinned) offered))
   _ -> S.identityAnswer p
 
 -- The CR 608.2d announcements a transcript holds.
@@ -3899,7 +3917,7 @@ wayfinderBoard s registry = do
 -- left to it.
 wayfinderAnswer :: Prompt.Prompt r -> State.State [(Text.Text, PlayerId.PlayerId)] r
 wayfinderAnswer p = case p of
-  Prompt.ChooseOptional _ pid _ _ _ -> do
+  Prompt.ChooseOptional _ pid _ _ _ _ -> do
     State.modify' (<> [(Text.pack "may", pid)])
     pure (if pid == S.bob then OptionalDecision.Declines else OptionalDecision.Exercises)
   -- CR 701.23b's fail-to-find for carol; the filter states a quality, so an
@@ -3914,10 +3932,26 @@ wayfinderAnswer p = case p of
 -- a board run through both differs in exactly the decisions.
 decliningWayfinderAnswer :: Prompt.Prompt r -> State.State [(Text.Text, PlayerId.PlayerId)] r
 decliningWayfinderAnswer p = case p of
-  Prompt.ChooseOptional _ pid _ _ _ -> do
+  Prompt.ChooseOptional _ pid _ _ _ _ -> do
     State.modify' (<> [(Text.pack "may", pid)])
     pure OptionalDecision.Declines
   _ -> wayfinderAnswer p
+
+-- CR 101.4b's answerer for Jungle Wayfinder: alice answers `hers`, and each
+-- later seat gives the answer its prompt says the seat before it gave, declining
+-- when told nothing. Each "may" prompt's earlier answers are recorded in order.
+copyingWayfinderAnswer :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> State.State [(PlayerId.PlayerId, [(PlayerId.PlayerId, OptionalDecision.OptionalDecision)])] r
+copyingWayfinderAnswer hers p = case p of
+  Prompt.ChooseOptional _ pid _ _ _ earlier -> do
+    State.modify' (<> [(pid, Foldable.toList earlier)])
+    pure $
+      if pid == S.alice
+        then hers
+        else case Seq.viewr earlier of
+          _ Seq.:> (_, previous) -> previous
+          Seq.EmptyR -> OptionalDecision.Declines
+  Prompt.Search _ _ matches cap -> pure (List.genericTake cap matches)
+  _ -> pure (S.identityAnswer p)
 
 -- Delivery Moogle's board. Four Plains pay the {3}{W}; the library holds a
 -- MATCHING artifact (Chromatic Star, mana value 1) and one the filter rejects
@@ -4147,7 +4181,7 @@ resolveBruvacPredict s registry top = do
 -- Prompt.ChooseCardName carries the chooser.
 sphinxAnswer :: Prompt.Prompt r -> r
 sphinxAnswer p = case p of
-  Prompt.ChooseCardName _ chooser _ _ ->
+  Prompt.ChooseCardName _ chooser _ _ _ ->
     CardName.MkCardName (Text.pack (if chooser == S.bob then "Chromatic Star" else "Crucible of Worlds"))
   _ -> atBobAnswer p
 
@@ -4650,12 +4684,29 @@ wormsSpec s registry =
       -- decline every printed reading allows.
       announcing :: Map.Map PlayerId.PlayerId ClauseIndex.ClauseIndex -> Prompt.Prompt r -> r
       announcing choices p = case p of
-        Prompt.ChooseClause (Decider.MkDecider d) player _ _ _
+        Prompt.ChooseClause (Decider.MkDecider d) player _ _ _ _
           | d == player -> Map.findWithDefault sacrificeBranch player choices
         Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
           | d == player -> if Map.member player choices then PaymentDecision.Pays else PaymentDecision.Declines
-        Prompt.ChooseOptional (Decider.MkDecider d) player _ _ _
+        Prompt.ChooseOptional (Decider.MkDecider d) player _ _ _ _
           | d == player -> if Map.member player choices then OptionalDecision.Exercises else OptionalDecision.Declines
+        _ -> S.identityAnswer p
+      -- CR 101.4b: alice announces `hers`, and each later seat announces what
+      -- its prompt says the seat before it announced -- the sacrifice when told
+      -- nothing. Only bob then goes through with his branch.
+      copying :: ClauseIndex.ClauseIndex -> Prompt.Prompt r -> r
+      copying hers p = case p of
+        Prompt.ChooseClause (Decider.MkDecider d) player _ _ _ earlier
+          | d == player ->
+              if player == S.alice
+                then hers
+                else case Seq.viewr earlier of
+                  _ Seq.:> (_, previous) -> previous
+                  Seq.EmptyR -> sacrificeBranch
+        Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+          | d == player -> if player == S.bob then PaymentDecision.Pays else PaymentDecision.Declines
+        Prompt.ChooseOptional (Decider.MkDecider d) player _ _ _ _
+          | d == player -> if player == S.bob then OptionalDecision.Exercises else OptionalDecision.Declines
         _ -> S.identityAnswer p
       -- A different basic per seat, so a land count reads one seat's payment and
       -- not the table's, and THREE of them where the cost takes two -- a seat
@@ -4692,6 +4743,13 @@ wormsSpec s registry =
           Spec.assertEqWith s "CR 701.21a bob paid with two Forests and carol paid nothing" (lands after) (3, 1, 3)
           Spec.assertEqWith s "CR 120.1 carol took the 5 damage and bob, who sacrificed instead, did not" (lives after) (Just 20, Just 20, Just 15)
           Spec.assertEqWith s "CR 608.2c the one destruction the sentence prints happened: alice's graveyard holds the enchantment alone" (wormsStands after, length (Game.zoneMembers Zone.Graveyard S.alice after)) (0, 1)
+        -- A pair differing only in what alice announces; bob copies it.
+        Spec.it s "CR 101.4b a later seat knows the branch the seat before it announced" $ do
+          (_, onStack) <- boardOf 3
+          let damaged = S.runPure (copying damageBranch) onStack Stack.resolveTop
+              sacrificed = S.runPure (copying sacrificeBranch) onStack Stack.resolveTop
+          Spec.assertEqWith s "CR 101.4b told alice announced the damage, bob took the 5 damage and kept his Forests" (lives damaged, lands damaged) ((Just 20, Just 15, Just 20), (3, 3, 3))
+          Spec.assertEqWith s "CR 101.4b told alice announced the sacrifice, bob sacrificed two Forests" (lives sacrificed, lands sacrificed) ((Just 20, Just 20, Just 20), (3, 1, 3))
         Spec.it s "CR 608.2c with every seat declining, the enchantment survives untouched" $ do
           (_, onStack) <- boardOf 3
           let after = S.runPure (announcing Map.empty) onStack Stack.resolveTop
