@@ -2417,7 +2417,12 @@ castsPerPlayer :: GameState -> Map.Map PlayerId Natural
 castsPerPlayer gs =
   Map.fromListWith
     (+)
-    (fmap (\cast -> (SpellWasCast.player cast, 1)) (Maybe.mapMaybe (castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs))))
+    (fmap (\cast -> (SpellWasCast.player cast, 1)) (Foldable.toList (castsInLog gs)))
+
+-- CR 601.2i: this turn's casts, in the order they became cast, off the log
+-- Engine.handoffTurn clears.
+castsInLog :: GameState -> Seq.Seq SpellWasCast.SpellWasCast
+castsInLog gs = Seq.fromList (Maybe.mapMaybe (castOf . LoggedEvent.event) (Foldable.toList (GameState.events gs)))
 
 -- CR 608.2n: the ABILITY an event describes RESOLVING, if it describes one, as
 -- the Source its object on the stack carried -- the source object and the

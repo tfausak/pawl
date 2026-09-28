@@ -42,4 +42,10 @@ spec s = Spec.describe s "Pawl.Codec.EventShape" $ do
       EventShape.codec
       EventShape.SpellCast
       " {\"type\":\"SpellCast\"} "
+  Spec.it s "SpellCastThisGame" $
+    Common.assertCodec
+      s
+      EventShape.codec
+      EventShape.SpellCastThisGame
+      " {\"type\":\"SpellCastThisGame\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s EventShape.codec
