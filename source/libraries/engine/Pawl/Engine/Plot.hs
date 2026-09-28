@@ -64,9 +64,9 @@ import qualified Pawl.Types.Zone as Zone
 -- equal costs are one: nothing tells the actions apart.
 --
 -- Read off the CARD (Card.combined) and never a projection, the reading
--- Pawl.Engine.Action.discardableCards gives for CR 116.2e one rule over: a hand
--- and a library are both zones pawl's projection does not reach (#1859). A
--- member with no card behind it has no plot cost.
+-- Pawl.Engine.Action.discardableCards gives for CR 116.2e one rule over: the
+-- ability functions in a hand or a library, where this reader takes the printed
+-- card (#1859). A member with no card behind it has no plot cost.
 plotCostsOf :: PlayerId -> ObjectId -> GameState -> [Cost Keyword]
 plotCostsOf pid oid gs = case Game.cardOfHandMember oid gs of
   Nothing -> []
@@ -137,9 +137,11 @@ plottable pid gs =
 -- reason -- a failed one has moved nothing to put back -- where rule 702.170a's
 -- own sentence names the exile first ("exile this card from your hand and pay
 -- [cost]"). Nothing observes the order: no player has priority inside a special
--- action (CR 116.1), and CR 605.1a keeps every mana ability the payment can
--- activate from moving a card to or from a library, so a card plotted from the
--- top of one is still there when it is exiled.
+-- action (CR 116.1), and the exile names the card by its id. A mana ability can
+-- still shuffle a library mid-payment through a replacement effect, which CR
+-- 605.1a's last sentence leaves out of the classification (Ashnod's Altar
+-- sacrificing Progenitus), but Event.shuffleLibrary reorders the ids it holds and
+-- mints none, so the card plotted from the top is exiled wherever it went.
 --
 -- CR 107.3d's X, which a mana cost granted as a plot cost can hold, is named
 -- "immediately before they pay that cost", Suspend.suspend's prompt and for its
