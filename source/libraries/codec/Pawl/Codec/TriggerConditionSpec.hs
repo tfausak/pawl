@@ -1172,6 +1172,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PlayerSurveils PlayerRelation.Opponent)
       " {\"type\":\"PlayerSurveils\",\"value\":{\"type\":\"Opponent\"}} "
+  Spec.it s "PlayerProliferates" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.PlayerProliferates PlayerRelation.You)
+      " {\"type\":\"PlayerProliferates\",\"value\":{\"type\":\"You\"}} "
   -- CR 706.1. Both relations, for the reason above: Feywild Trickster is the
   -- You form, and CR 109.5 is what an Opponent printing would be read against.
   Spec.it s "PlayerRollsDice round-trips both relations" $ do

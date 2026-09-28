@@ -119,6 +119,8 @@ import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.ProliferateR as ProliferateR
+import qualified Pawl.Types.ProliferateRewrite as ProliferateRewrite
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
@@ -173,6 +175,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 -- Every replacement effect instance in the game, in the engine's canonical
 -- order, which is what the ChooseReplacement prompt indexes into:
@@ -694,6 +697,7 @@ affected event = case event of
   ProposedEvent.WouldMillCards pid _ -> ([], [pid])
   ProposedEvent.WouldFlipCoin pid _ -> ([], [pid])
   ProposedEvent.WouldRollDice roll -> ([], [DiceRoll.roller roll])
+  ProposedEvent.WouldProliferate pid _ -> ([], [pid])
 
 -- CR 614.1: does this replacement's printed pattern match this event?
 matchesPrinted :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
@@ -924,6 +928,11 @@ matchesPrinted gs event candidate =
         -- projected now.
         (ReplacementEffect.DieRollR (DieRollR.MkDieRollR whose _), ProposedEvent.WouldRollDice roll) ->
           matchesPlayer gs src whose (DiceRoll.roller roll)
+        -- CR 701.34a / 614.1a: whose proliferates the row watches (CR 109.5's
+        -- "you"), the CoinFlipR arm's posture and for its reason. No `admits`:
+        -- ProliferateRewrite.Doubled always changes the count.
+        (ReplacementEffect.ProliferateR (ProliferateR.MkProliferateR whose _), ProposedEvent.WouldProliferate pid _) ->
+          matchesPlayer gs src whose pid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -943,6 +952,7 @@ matchesPrinted gs event candidate =
         (ReplacementEffect.MillCountR {}, _) -> False
         (ReplacementEffect.CoinFlipR {}, _) -> False
         (ReplacementEffect.DieRollR {}, _) -> False
+        (ReplacementEffect.ProliferateR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
 -- CR 614.1a: would this rewrite actually change the loss? `admits` and `unspent`
@@ -1836,6 +1846,9 @@ bucketOfEffect re = case re of
   -- CR 616.1a-d are all about entries and copies; rolling dice is none of them, so
   -- CR 616.1e. CoinFlipR's answer one rule over.
   ReplacementEffect.DieRollR {} -> ReplacementBucket.Other
+  -- CR 616.1a-d are all about entries and copies; proliferating is none of them,
+  -- so CR 616.1e.
+  ReplacementEffect.ProliferateR {} -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entries and copies; a skip is none of those, so it
   -- falls to CR 616.1e.
   ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
@@ -2106,6 +2119,9 @@ readsApplier re = case re of
   -- CoinFlipR's answer, and for its reason; the inner sum is cased so a rewrite
   -- that DOES read the applier has to be decided here.
   ReplacementEffect.DieRollR (DieRollR.MkDieRollR _ DieRollRewrite.ExtraIgnoringLowest) -> False
+  -- The proliferator is the seat the EVENT named and the doubling is the
+  -- effect's own field. CoinFlipR's answer, and for its reason.
+  ReplacementEffect.ProliferateR (ProliferateR.MkProliferateR _ ProliferateRewrite.Doubled) -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
@@ -2151,6 +2167,7 @@ readsSource effect = case effect of
   ReplacementEffect.MillCountR {} -> False
   ReplacementEffect.CoinFlipR {} -> False
   ReplacementEffect.DieRollR {} -> False
+  ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 616.1: the affected object's controller (or its owner if it has none), or
@@ -2331,6 +2348,9 @@ affectedChooserOf gs event = case event of
   -- CR 616.1 / 706.1: the instruction is addressed to the roller, and rule 706's
   -- roll involves no other seat -- WouldFlipCoin's answer one rule over.
   ProposedEvent.WouldRollDice roll -> Just (DiceRoll.roller roll)
+  -- CR 616.1 / 701.34a: the instruction is addressed to the proliferator, whose
+  -- choice rule 701.34a makes it -- WouldRollDice's answer.
+  ProposedEvent.WouldProliferate pid _ -> Just pid
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
@@ -3738,6 +3758,9 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   -- Adding a die to an instruction is arithmetic on whatever arrives, and
   -- `contested` above asks only about a damage batch. CoinFlipR's answer.
   ReplacementEffect.DieRollR {} -> Nothing
+  -- Doubling a count of proliferates is arithmetic on whatever arrives.
+  -- CoinFlipR's answer.
+  ReplacementEffect.ProliferateR {} -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
@@ -3759,6 +3782,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
@@ -3779,6 +3803,7 @@ asDestruction event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 -- asDestruction's twin one event class over: the permanent that actually becomes
 -- untapped, or Nothing when a replacement took the event.
@@ -3801,6 +3826,7 @@ asUntap event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 -- asUntap's twin one event class over: the player who actually draws a card, or
 -- Nothing when a replacement took the event (CR 614.6).
@@ -3811,6 +3837,7 @@ asDraw event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
@@ -3833,6 +3860,7 @@ asDrawCount event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
@@ -3859,6 +3887,7 @@ asMillCount event = case event of
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
@@ -3877,6 +3906,7 @@ asCoinFlip :: ProposedEvent -> Maybe (PlayerId, Natural)
 asCoinFlip event = case event of
   ProposedEvent.WouldFlipCoin pid n -> Just (pid, n)
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
@@ -3899,6 +3929,30 @@ asCoinFlip event = case event of
 asDiceRoll :: ProposedEvent -> Maybe DiceRoll.DiceRoll
 asDiceRoll event = case event of
   ProposedEvent.WouldRollDice roll -> Just roll
+  ProposedEvent.WouldFlipCoin {} -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
+  ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
+
+-- CR 701.34a: the proliferator and how many times it proliferates once CR
+-- 616.1's loop has settled the instruction. asCoinFlip's shape.
+asProliferate :: ProposedEvent -> Maybe (PlayerId, Natural)
+asProliferate event = case event of
+  ProposedEvent.WouldProliferate pid n -> Just (pid, n)
+  ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldMillCards {} -> Nothing
@@ -3935,6 +3989,7 @@ asCounters event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 -- asCounters' player half. The CAUSE is dropped by both, for the same reason: what
 -- the funnel needs back is the placement to carry out, and the provenance has
@@ -3958,6 +4013,7 @@ asPlayerCounters event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 -- asPlayerCounters' sibling one event class over: the player who would lose life
 -- and how much of the loss has survived, or Nothing when a replacement took the
@@ -3983,6 +4039,7 @@ asLifeLoss event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 -- asLifeLoss the other direction: the player who would gain life and how much of
 -- the gain has survived, or Nothing when a replacement took the event outright.
@@ -4005,6 +4062,7 @@ asLifeGain event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 asTokens :: ProposedEvent -> Maybe (PlayerId, Seq.Seq TokenLot.TokenLot)
 asTokens event = case event of
@@ -4025,6 +4083,7 @@ asTokens event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing
 
 -- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
 -- skips become floating replacement effects, one per selector. Called by
@@ -4222,3 +4281,4 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldProliferate {} -> Nothing

@@ -240,4 +240,8 @@ data ProposedEvent
     -- rule 706.1's "one or more" is not met, so there is no event for a row to
     -- replace.
     WouldRollDice DiceRoll.DiceRoll
+  | -- | CR 701.34a / 614.1a: this player would proliferate this many times, each
+    -- its own choice of permanents and players. Raised once per proliferate
+    -- instruction by Pawl.Engine.Resolve.Effect's Proliferate arm.
+    WouldProliferate PlayerId.PlayerId Natural.Natural
   deriving (Eq, Ord, Show)

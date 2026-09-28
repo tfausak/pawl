@@ -142,18 +142,20 @@
                     "value": {
                       "type": "These",
                       "value": {
-                        "type": "EachCardFromAmong",
-                        "value": {
-                          "filter": {
-                            "type": "Not",
-                            "value": {
-                              "type": "HasCardType",
+                        "cards": {
+                          "type": "EachCardFromAmong",
+                          "value": {
+                            "filter": {
+                              "type": "Not",
                               "value": {
-                                "type": "Land"
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
                               }
-                            }
-                          },
-                          "slot": "revealed"
+                            },
+                            "slot": "revealed"
+                          }
                         }
                       }
                     }
