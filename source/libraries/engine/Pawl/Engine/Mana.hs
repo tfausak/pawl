@@ -270,10 +270,12 @@ producedTypes oid gs production = case production of
 --
 -- The route asks for the LAND card type as well as the basic land type, rule
 -- 305.6 giving the ability to "an object with the land card type and a basic
--- land type". A REGRESSION FENCE rather than a proved behaviour: the pool's two
--- Modification.SetCardType writers are Song of the Dryads, which sets Land, and
+-- land type". A REGRESSION FENCE rather than a proved behaviour: the pool's
+-- Modification.SetCardType writers are Song of the Dryads, which sets Land,
 -- Gliding Licid, which sets Enchantment on a creature holding no basic land
--- type, so no board can tell the conjunct from its absence.
+-- type, and Kenrith's Transformation, which sets Creature and so strips any
+-- basic land type with the Land card type (CR 205.1a), so no board can tell the
+-- conjunct from its absence.
 --
 -- One route per SELECTION (Modal.selectionClauses), not per mode: CR 700.2's
 -- selection is what a player actually makes, so a choose-two ability's route is
