@@ -382,12 +382,16 @@ simultaneously body = do
 -- leaves the suite green.
 -- CR 614.12b / 608.2f: run a one-member-at-a-time move of `members` onto the
 -- battlefield with every member not yet moved visible to the entry choices of
--- the ones moved before it (GameState.enteringPending). Saved and restored, so a
--- move nested inside an entry leaves the outer one's members pending.
-amongPending :: [ObjectId] -> Game a -> Game a
-amongPending members body = do
+-- the ones moved before it (GameState.enteringPending). `under` is the player
+-- they enter under, Nothing for each member's owner -- changeZoneEnteringIn's
+-- reading of the same move. Saved and restored, so a move nested inside an
+-- entry leaves the outer one's members pending.
+amongPending :: Maybe PlayerId -> [ObjectId] -> Game a -> Game a
+amongPending under members body = do
   saved <- State.gets GameState.enteringPending
-  State.modify' (\g -> g {GameState.enteringPending = saved <> Set.fromList members})
+  gs <- State.get
+  let enteringUnder member = fmap (\obj -> (member, Maybe.fromMaybe (Object.owner obj) under)) (Game.lookupObject member gs)
+  State.modify' (\g -> g {GameState.enteringPending = saved <> Map.fromList (Maybe.mapMaybe enteringUnder members)})
   result <- body
   State.modify' (\g -> g {GameState.enteringPending = saved})
   pure result
@@ -2780,7 +2784,7 @@ apply batch candidate event =
           Just controller -> do
             let entering oid2 = oid2 == oid || Set.member oid2 batch || Set.member oid2 (GameState.enteringSubjects gs)
                 own = filter (not . entering) (Replacement.sacrificeCandidates Map.empty controller (Just oid) criterion gs)
-                owed = fmap (fmap (filter (not . entering))) (pendingSacrifices gs)
+                owed = fmap (fmap (filter (not . entering))) (pendingSacrifices controller gs)
                 sets = Replacement.subsetsOf n own
                 joint = filter (\chosen -> Replacement.jointlyPayable (Set.fromList chosen) owed) sets
                 allowed = if null joint then sets else joint
@@ -4357,18 +4361,20 @@ runEntry given oid = do
 
 -- CR 614.12b: what each member of the batch not yet moved will have to
 -- sacrifice as it enters, and out of which permanents -- read off its own rows
--- as it would exist on the battlefield (CR 614.12), under its owner, who is who
--- the one-at-a-time funnel puts it under for Splendid Reclamation's "your
--- graveyard".
-pendingSacrifices :: GameState -> [(Natural, [ObjectId])]
-pendingSacrifices gs =
-  [ (count, Replacement.sacrificeCandidates Map.empty owner (Just member) criterion gs)
-  | member <- Set.toAscList (GameState.enteringPending gs),
+-- as it would exist on the battlefield (CR 614.12), under the player it enters
+-- under. Only `chooser`'s: the rule constrains "that player"'s choices by the
+-- costs of that player's effects, so another player's unpayable member narrows
+-- nothing here. A regression fence, not a proof: no effect in data/cards/ moves
+-- two players' SacrificeToEnter cards in one batch (Second Sunrise would).
+pendingSacrifices :: PlayerId -> GameState -> [(Natural, [ObjectId])]
+pendingSacrifices chooser gs =
+  [ (count, Replacement.sacrificeCandidates Map.empty chooser (Just member) criterion gs)
+  | (member, controller) <- Map.toAscList (GameState.enteringPending gs),
+    controller == chooser,
     Just obj <- [Game.lookupObject member gs],
     Object.zone obj /= Zone.Battlefield,
-    let owner = Object.owner obj,
     (_, ReplacementEffect.EntryR (EntryR.MkEntryR pattern_ rewrite)) <- Projection.replacementsOf Zone.Battlefield member gs,
-    Filter.matches (Filter.contextFor (Game.teams gs) (Just owner) (Just member)) (Projection.viewOfObject member gs) pattern_,
+    Filter.matches (Filter.contextFor (Game.teams gs) (Just controller) (Just member)) (Projection.viewOfObject member gs) pattern_,
     (count, criterion) <- Maybe.maybeToList (Replacement.entryCostOf rewrite)
   ]
 
@@ -5219,7 +5225,7 @@ changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> L
 changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
   -- CR 614.12b: this member is moving now, so it no longer owes anything to an
   -- earlier member's choice (see amongPending).
-  State.modify' (\g -> g {GameState.enteringPending = Set.delete oid (GameState.enteringPending g)})
+  State.modify' (\g -> g {GameState.enteringPending = Map.delete oid (GameState.enteringPending g)})
   gs <- State.get
   let mCard = Game.cardOf oid gs
       onto = requestedDest == Zone.Battlefield
@@ -6383,6 +6389,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 -- below. A card that was already in the graveyard stays there.
                 Monad.unless entered $ do
                   State.put unentered
+                  State.modify' (\g -> g {GameState.refusedEntries = fmap (Set.insert oid) (GameState.refusedEntries g)})
                   Monad.unless (fromZone == Zone.Graveyard) (Monad.void (changeZoneReturning oid Zone.Graveyard))
               refused <- State.gets (Maybe.isNothing . Game.lookupObject newId)
               -- CR 712.13a: a resolving double-faced spell that entered

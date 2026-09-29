@@ -213,10 +213,15 @@ data GameState = MkGameState
     -- window.
     enteringSubjects :: Set.Set ObjectId.ObjectId,
     -- | CR 614.12b: the members of a CR 608.2f move onto the battlefield that
-    -- have not yet been moved, which CR 614.13a's one-at-a-time funnel would
-    -- otherwise hide from an earlier member's entry choice. Empty at every
-    -- priority window.
-    enteringPending :: Set.Set ObjectId.ObjectId,
+    -- have not yet been moved, each with the player it will enter under, which
+    -- the one-at-a-time funnel would otherwise hide from an earlier member's
+    -- entry choice. Empty at every priority window.
+    enteringPending :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
+    -- | CR 614.1a: while a land play is moving its card, the pre-move ids whose
+    -- entry an EntryRewrite.SacrificeToEnter turned into the graveyard -- the
+    -- land was still played (CR 305.1). Nothing when no play is listening,
+    -- which is at every priority window.
+    refusedEntries :: Maybe (Set.Set ObjectId.ObjectId),
     -- | CR 614.1c: the counters each entering permanent is so far going to
     -- enter with, pending until runEntry flushes them onto the object. Empty
     -- outside an entry.
