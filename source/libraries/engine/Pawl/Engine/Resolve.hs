@@ -28,7 +28,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.Rewrite as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replacement as Replacement
-import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffect, applyEffectWith, branchSelects, clauseIsImpossible, noSubgame, payGatePaid, targetSlotsOf)
+import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, noSubgame, payGatePaid, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
 import Pawl.Types.AbilityName (AbilityName)
@@ -67,7 +67,6 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.OrElse as OrElse
 import qualified Pawl.Types.PayGate as PayGate
-import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
@@ -1294,48 +1293,6 @@ crewersOf obj =
 -- The no-subgame activated-ability resolver.
 resolveAbility :: ObjectId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) -> Game ()
 resolveAbility = resolveAbilityWith noSubgame
-
--- CR 614.1c: run the effects of every as-enters rewrite that has applied and not
--- run yet. Drains GameState.pendingEntryEffects, which Pawl.Engine.Event filled
--- -- runPreventionRiders above in every structural respect and for the same
--- reason. Emptied before the effects run.
---
--- Its one caller is Pawl.Engine.Engine.performSettle, which runs it before the
--- SBA pass and before the trigger scan. What that ordering does NOT give is CR
--- 614.1c's own placement, inside the entry; see GameState.pendingEntryEffects.
-runEntryEffects :: Game ()
-runEntryEffects = do
-  queued <- State.gets GameState.pendingEntryEffects
-  State.modify' (\gs -> gs {GameState.pendingEntryEffects = Seq.empty})
-  Foldable.traverse_ runEntryEffect queued
-
--- One entered permanent's as-enters effects, in printed order.
---
--- `resolving` and `source` are both the permanent (CR 113.7), runPreventionRider's
--- posture. The slot maps are empty because a static ability targets nothing (CR
--- 115.10a).
---
--- CR 107.3m: an X these effects read is the one announced for the spell that
--- became the permanent (Neverwinter Hydra's "roll X d6"), bound on the permanent
--- only while they run, since that clause makes the permanent's own X 0.
-runEntryEffect :: PendingEntryEffect.PendingEntryEffect -> Game ()
-runEntryEffect pending = do
-  let oid = PendingEntryEffect.object pending
-      setX value gs = gs {GameState.objects = Map.adjust (\o -> o {Object.bindings = Map.alter (const value) Binding.variableX (Object.bindings o)}) oid (GameState.objects gs)}
-  entering <- State.gets (Game.lookupObject oid)
-  let announced = entering >>= Object.announcedX
-      before = entering >>= Map.lookup Binding.variableX . Object.bindings
-  Foldable.for_ announced $ \n -> State.modify' (setX (Just (Binding.toAmount n)))
-  Foldable.traverse_
-    ( applyEffect
-        oid
-        oid
-        (PendingEntryEffect.controller pending)
-        Map.empty
-        Map.empty
-    )
-    (PendingEntryEffect.effects pending)
-  Foldable.for_ announced $ \_ -> State.modify' (setX before)
 
 -- CR 608.2c: the bindings a resolution reads before each of its own effects --
 -- the LIVE ones off the stack object, so a slot an earlier effect DEFINED is

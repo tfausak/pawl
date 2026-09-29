@@ -45,6 +45,7 @@ import qualified Pawl.Engine.Dice as Dice
 import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Earthbend as Earthbend
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Event.Trigger as Trigger
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
@@ -280,6 +281,7 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingDamageEffect as PendingDamageEffect
+import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.Phase as Phase
@@ -364,6 +366,7 @@ import qualified Pawl.Types.VoteChoices as VoteChoices
 import qualified Pawl.Types.VoteObjects as VoteObjects
 import qualified Pawl.Types.WhichCounters as WhichCounters
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZonePair as ZonePair
 import qualified Pawl.Types.ZoneScope as ZoneScope
 
@@ -2349,6 +2352,10 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = do
   applyOneEffect runSubgame resolving source controller legal chosen effect
   State.modify' (recordExiledWith ExileLink.MkExileLink {ExileLink.source = source, ExileLink.ability = ability} before)
   State.modify' (recordExilePile before)
+  -- CR 614.1c: the as-enters effects of what this instruction put onto the
+  -- battlefield, before the next instruction reads the board. After the window
+  -- above, so what they exile is filed by their own windows, not this one's.
+  runEntryEffects
 
 -- CR 607.2a's name for the ability resolving as `resolving`: an activated
 -- ability's ActivatedAbility.name, which is how a linked reference names one of
@@ -9797,6 +9804,71 @@ runPreventionRider prevention = Foldable.for_ (Prevention.rider prevention) $ \r
     (applyEffect src src (PreventionRider.controller rider) targets targets)
     (PreventionRider.effects rider)
   State.modify' (\gs -> gs {GameState.ambientAmounts = was})
+
+-- CR 614.1c: run the effects of every as-enters rewrite that has applied and not
+-- run yet. Drains GameState.pendingEntryEffects, which Pawl.Engine.Event filled
+-- -- runPreventionRiders above in every structural respect and for the same
+-- reason. Emptied before the effects run.
+--
+-- Two callers. applyEffectWith runs it as each instruction finishes, so a later
+-- instruction of the same resolution reads the board the effects left (CR
+-- 608.2h) -- Pawl.FaceDownSpec's "CR 614.1c / 608.2h the reanimated Ixidron's
+-- power is read after its own sweep" proves it. Pawl.Engine.Engine.performSettle
+-- runs it for every other road onto the battlefield (a permanent spell, a land
+-- play), before the SBA pass and the trigger scan.
+--
+-- Not implemented: keeping what entered in the same batch out of the effects'
+-- reach, where CR 614.12 has it not yet on the battlefield (#4389).
+runEntryEffects :: Game ()
+runEntryEffects = do
+  queued <- State.gets GameState.pendingEntryEffects
+  State.modify' (\gs -> gs {GameState.pendingEntryEffects = Seq.empty})
+  Foldable.traverse_ runEntryEffect queued
+
+-- One entered permanent's as-enters effects, in printed order.
+--
+-- `resolving` and `source` are both the permanent (CR 113.7), runPreventionRider's
+-- posture. The slot maps are empty because a static ability targets nothing (CR
+-- 115.10a).
+--
+-- CR 107.3m: an X these effects read is the one announced for the spell that
+-- became the permanent (Neverwinter Hydra's "roll X d6"), bound on the permanent
+-- only while they run, since that clause makes the permanent's own X 0.
+runEntryEffect :: PendingEntryEffect.PendingEntryEffect -> Game ()
+runEntryEffect pending = do
+  let oid = PendingEntryEffect.object pending
+      setX value gs = gs {GameState.objects = Map.adjust (\o -> o {Object.bindings = Map.alter (const value) Binding.variableX (Object.bindings o)}) oid (GameState.objects gs)}
+  entering <- State.gets (Game.lookupObject oid)
+  let announced = entering >>= Object.announcedX
+      before = entering >>= Map.lookup Binding.variableX . Object.bindings
+  Foldable.for_ announced $ \n -> State.modify' (setX (Just (Binding.toAmount n)))
+  Foldable.traverse_
+    ( applyEffect
+        oid
+        oid
+        (PendingEntryEffect.controller pending)
+        Map.empty
+        Map.empty
+    )
+    (PendingEntryEffect.effects pending)
+  Foldable.for_ announced $ \_ -> State.modify' (setX before)
+  State.modify' (resampleEntry oid)
+
+-- CR 603.10: the board "immediately after" a permanent entered includes what its
+-- as-enters effects did, since they are part of the entry (CR 614.1c). So the
+-- CR 603.10 sample filed under the entry's event group is taken again now --
+-- a watcher Ixidron turned face down sees nothing enter. Pawl.FaceDownSpec's "CR
+-- 614.1c / 603.10 a watcher Ixidron turns face down does not see it enter" proves
+-- it. Only an existing sample is replaced; a group without one reads the live
+-- board anyway (Trigger.battlefieldAt).
+resampleEntry :: ObjectId -> GameState -> GameState
+resampleEntry oid gs =
+  let entered logged = maybe False (\zc -> ZoneChange.object zc == oid && ZoneChange.to zc == Zone.Battlefield) (Trigger.movedOf (LoggedEvent.event logged))
+   in case Seq.findIndexR entered (GameState.events gs) of
+        Nothing -> gs
+        Just i ->
+          let group = LoggedEvent.group (Seq.index (GameState.events gs) i)
+           in gs {GameState.battlefieldWhenTriggered = Map.adjust (const (Trigger.battlefieldCandidates gs)) group (GameState.battlefieldWhenTriggered gs)}
 
 -- CR 614.1a: run the effects a DamageRewrite.RunEffects rewrite put in a damage
 -- event's place -- Kill-Suit Cultist's destruction. Drains

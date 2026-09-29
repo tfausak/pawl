@@ -208,6 +208,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnUpAttachSpec s registry
   turnFaceDownSpec s registry
   restampSpec s registry
+  asEntersSpec s registry
   listedSpec s registry
   turnedFaceDownSpec s registry
   manifestSpec s registry
@@ -692,6 +693,63 @@ restampSpec s registry = Spec.describe s "Timestamps (CR 613.7f)" $ do
     Spec.assertEqWith s "CR 702.37e the morph cost was paid and the Tracker is face up" (fmap Object.facing (Game.lookupObject suspect after)) (Just Facing.FaceUp)
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) after) "while the unsuspected Piker beside it blocks"
 
+-- CR 614.1c / 608.2h: an as-enters effect is part of the entry, so a later
+-- instruction of the same resolution reads the board it left.
+--
+-- Too Greedily, Too Deep ({5}{B}{R} Sorcery, LTC; Oracle checked against
+-- api.scryfall.com 2026-09-29): "Put target creature card from a graveyard onto
+-- the battlefield under your control. That creature deals damage equal to its
+-- power to each other creature." Reanimating Ixidron with it is the pair: the
+-- second sentence reads Ixidron's power, which IS the count its own as-enters
+-- sweep changes.
+--
+-- bob controls Goblin Piker, Hill Giant and Russet Wolves, all nontoken, and a
+-- token copy of Jedit Ojanen (5/5) the sweep skips. So Ixidron arrives a 3/3 and
+-- deals 3 to each other creature: the three face-down 2/2s die and the token
+-- keeps 3 damage. Were the sweep run only after the resolution, nothing would be
+-- face down when the power is read, and Ixidron would deal 0.
+asEntersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+asEntersSpec s registry = Spec.describe s "As-enters inside a resolution (CR 614.1c)" $ do
+  Spec.it s "CR 614.1c / 608.2h the reanimated Ixidron's power is read after its own sweep" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    greedily <- S.printingOf s registry "Too Greedily, Too Deep"
+    ixidron <- S.printingOf s registry "Ixidron"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    let (held, spell) = S.handOne greedily (S.landsFor mountain S.alice 1 (S.landsInPlay swamp 6))
+        (buried, g1) = S.addGraveyardCard ixidron S.alice held {GameState.phase = Phase.PrecombatMain}
+        (pikerId, g2) = S.addPermanent piker S.bob g1
+        (giantId, g3) = S.addPermanent giant S.bob g2
+        (wolvesId, g4) = S.addPermanent wolves S.bob g3
+        (tokenId, gs) = S.addToken (Printing.card jedit) S.bob g4
+        after = S.runPure (aimAtByFiltering buried) gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)
+        creatures g = Set.filter (\oid -> Set.member CardType.Creature (Projection.cardTypesOf oid g)) (GameState.battlefield g)
+    -- THE assertion, gameplay level and first: the damage Ixidron dealt is the
+    -- number of creatures its sweep turned face down.
+    Spec.assertEqWith s "CR 608.2h the token took damage equal to Ixidron's power after the sweep" (fmap Object.damage (Game.lookupObject tokenId after)) (Just 3)
+    Spec.assertEqWith s "CR 704.5g the three face-down 2/2s died to it, and CR 704.5f then took Ixidron, and only the token is left" (creatures after) (Set.singleton tokenId)
+    Spec.assertBool s (all (`Set.member` GameState.battlefield gs) [pikerId, giantId, wolvesId]) "the three victims were on the battlefield before"
+    Spec.assertEqWith s "CR 601.2h all seven lands paid {5}{B}{R}" (S.tappedCount S.alice after) 7
+
+  -- CR 614.1c / 603.10: the sweep is part of Ixidron's entry, so the board
+  -- "immediately after" it has bob's Soul Warden face down, abilityless, and its
+  -- "whenever another creature enters" never triggers. A token Warden beside it,
+  -- which the sweep skips, is the control: it does trigger, so exactly one
+  -- ability waits on the stack.
+  Spec.it s "CR 614.1c / 603.10 a watcher Ixidron turns face down does not see it enter" $ do
+    warden <- S.printingOf s registry "Soul Warden"
+    ixidron <- S.printingOf s registry "Ixidron"
+    island <- S.printingOf s registry "Island"
+    let (wardenId, g1) = S.addPermanent warden S.bob (S.landsInPlay island 1)
+        (tokenId, board) = S.addToken (Printing.card warden) S.bob g1
+        (after, _) = entering ixidron board
+    Spec.assertEqWith s "CR 603.10 only the face-up token Warden saw Ixidron enter" (length (GameState.stack after)) 1
+    Spec.assertEqWith s "CR 708.2a the sweep turned the card Warden face down and not the token" (faceDownIds after) (Set.singleton wardenId)
+    Spec.assertBool s (tokenId `Set.member` GameState.battlefield after) "the token Warden is still on the battlefield"
+
 -- alice attacks with one Goblin Piker into bob's suspect, a second Piker beside it
 -- and `lands`. Returns the board with attackers declared, the suspect, the Piker
 -- beside it and alice's attacker.
@@ -733,9 +791,9 @@ frogging frog victim gs =
 
 -- Resolve a permanent spell of alice's off the stack, then settle. PUT rather than
 -- cast, because nothing here is about paying for Ixidron; the settle is what
--- matters, since CR 614.1c's effects are queued as the permanent enters and
--- Pawl.Engine.Resolve.runEntryEffects drains them at the start of the next one
--- (#1639).
+-- matters, since a permanent spell's CR 614.1c effects are queued as it enters
+-- and Pawl.Engine.Resolve.Effect.runEntryEffects drains them at the start of the
+-- next one.
 entering :: Printing.Printing -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
 entering printing gs =
   let (_, onStack) = S.spellOnStack printing S.alice gs
