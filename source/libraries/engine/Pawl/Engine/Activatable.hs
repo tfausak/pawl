@@ -425,10 +425,31 @@ activationSourcesGiven grants pcs pid gs =
 -- The once-per-turn clause is a fold over the CR 608.2i log rather than a stamp,
 -- and it is keyed on the PERMANENT and not on the player: an opponent who
 -- somehow activated it first has used the permanent's one activation.
+--
+-- An effect letting the player activate this permanent's loyalty abilities "any
+-- time you could cast an instant" (The Wandering Emperor) replaces the window
+-- alone with CR 117.1a's priority, on any player's turn; the once-per-turn
+-- clause stands, per her ruling. Pawl.PlaneswalkerSpec's WanderingEmperor
+-- group proves the window.
 loyaltyOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
 loyaltyOk pid srcId ability gs =
   not (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
-    || (Turn.sorcerySpeedWindow pid gs && not (loyaltyActivatedThisTurn srcId gs))
+    || ( (Turn.sorcerySpeedWindow pid gs || PlayerEffect.activatesLoyaltyAtInstantSpeed pid srcId gs)
+           && not (loyaltyActivatedThisTurn srcId gs)
+       )
+
+-- CR 602.5: the ability's printed rider holds, or holds once an effect letting
+-- the player activate it "any time you could cast an instant" (Leonin Shikari)
+-- reads its CR 602.5d clause as CR 602.5e's. The permission is asked only when
+-- the rider as printed refuses, so a board without one pays nothing for it.
+-- Pawl.ActivateSpec's InstantSpeedEquip group proves it.
+riderOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card) -> GameState -> Bool
+riderOk pid srcId ability gs =
+  let printed = Keyword.restrictionsOf ability
+   in ActivationRestriction.restrictionsOk pid srcId (Just ability) printed gs
+        || ( PlayerEffect.activatesKeywordAtInstantSpeed (ActivatedAbility.keyword ability) pid gs
+               && ActivationRestriction.restrictionsOk pid srcId (Just ability) (fmap ActivationRestriction.atInstantSpeed printed) gs
+           )
 
 loyaltyActivatedThisTurn :: ObjectId -> GameState -> Bool
 loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcId) (fmap LoggedEvent.event (GameState.events gs))
@@ -707,7 +728,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
         -- this function.
         && not (PlayerEffect.prohibitsActivating (ActivatedAbility.keyword ability) pid gs)
         && sicknessOkGiven pcs pid srcId ability gs
-        && ActivationRestriction.restrictionsOk pid srcId (Just ability) (Keyword.restrictionsOf ability) gs
+        && riderOk pid srcId ability gs
         && loyaltyOk pid srcId ability gs
         && Modal.selectionPossible fillable (Modal.Type.selection modal)
         && any (payableCostAtGiven aimable sources pcs (ActivatedAbility.minimumX ability) (ActivatedAbility.keyword ability) pid srcId gs) (costsFor pid ability gs)

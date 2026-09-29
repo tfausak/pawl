@@ -620,6 +620,8 @@ prohibitsCasting pid oid name variable gs =
         -- mayCastAsThoughItHadFlash below is where it is read.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         -- CR 701.6a is about a spell or ability ALREADY on the stack, and CR
         -- 601.3 is about beginning to cast one: an uncounterable spell is not a
         -- spell anyone is more or less allowed to cast.
@@ -803,6 +805,8 @@ prohibitsPlayingLand pid names oid gs =
         -- of a CAST has nothing to widen here either.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         -- CR 305.1 again: a land is never put on the stack, so nothing about
         -- countering reaches a land play.
         PlayerEffect.CantBeCountered _ -> False
@@ -885,6 +889,8 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -954,6 +960,8 @@ prohibitsCounters pid kind gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -1026,6 +1034,8 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -1080,6 +1090,8 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -1134,6 +1146,8 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -1418,6 +1432,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1469,6 +1485,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1523,6 +1541,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1727,6 +1747,8 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1791,6 +1813,8 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1854,6 +1878,8 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -1944,6 +1970,28 @@ mayCastAsThoughItHadFlash pid oid gs = any (grantReaches castFlashGrant oid gs) 
 mayPlayAsThoughItHadFlash :: PlayerId -> ObjectId -> GameState -> Bool
 mayPlayAsThoughItHadFlash pid oid gs = any (grantReaches landPlayFlashGrant oid gs) (applying pid gs)
 
+-- CR 602.5d / 602.5e: may `pid` activate an ability under this rule-702 keyword
+-- any time they could cast an instant (Leonin Shikari's "equip abilities")?
+-- Compared against Pawl.Types.ActivatedAbility.keyword, as prohibitsActivating
+-- above is, so reconfigure -- no equip ability, per Forge Anew's ruling -- is
+-- not reached. A disjunction, for mayCastAsThoughItHadFlash's reason.
+activatesKeywordAtInstantSpeed :: Maybe Keyword -> PlayerId -> GameState -> Bool
+activatesKeywordAtInstantSpeed stamp pid gs =
+  let grants effect = case effect of
+        PlayerEffect.ActivateKeywordAtInstantSpeed designator -> any (Keyword.designates designator) stamp
+        _ -> False
+   in any (grants . snd) (applying pid gs)
+
+-- CR 606.3: may `pid` activate the loyalty abilities of `srcId` any time they
+-- could cast an instant (The Wandering Emperor)? The criterion is asked of the
+-- permanent, from the effect's source, so `IsSource` is "her loyalty abilities".
+activatesLoyaltyAtInstantSpeed :: PlayerId -> ObjectId -> GameState -> Bool
+activatesLoyaltyAtInstantSpeed pid srcId gs =
+  let grants (source, effect) = case effect of
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed criterion -> matchesObjectFrom source criterion srcId gs
+        _ -> False
+   in any grants (applying pid gs)
+
 -- One row of `applying`, asked whether the grant `grantOf` reads off it reaches
 -- `oid`: CR 601.3b's first sentence through matchesObjectFrom, and its second --
 -- what a choice still to be made during the proposal could make of the card --
@@ -1960,6 +2008,8 @@ grantReaches grantOf oid gs (source, effect) =
 landPlayFlashGrant :: PlayerEffect -> Maybe (Filter Keyword)
 landPlayFlashGrant effect = case effect of
   PlayerEffect.MayPlayAsThoughItHadFlash criterion -> Just criterion
+  PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+  PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
   PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
   PlayerEffect.CantCastSpells -> Nothing
   PlayerEffect.CantActivateAbilities _ -> Nothing
@@ -2210,6 +2260,8 @@ castPermissionsFrom pid zone oid gs =
         -- question is about a ZONE.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantActivateAbilities _ -> False
@@ -2438,6 +2490,8 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.CastFrom _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.PlayLandsFrom _ -> False
         PlayerEffect.PlotFrom _ -> False
         PlayerEffect.PlayAdditionalLands _ -> False
@@ -2521,6 +2575,8 @@ playLandPiles pid gs =
         PlayerEffect.PlayAdditionalLands _ -> []
         PlayerEffect.CastAsThoughItHadFlash _ -> []
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> []
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> []
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> []
         PlayerEffect.CantCastSpells -> []
         PlayerEffect.CantActivateAbilities _ -> []
         PlayerEffect.CantCastMoreThan _ -> []
@@ -2632,6 +2688,8 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         -- CR 701.6a grants no targeting immunity: Pawl.Types.Counterability
         -- says the same about CR 113.6g, and a Cancel at a spell Spider-Punk
         -- protects still targets it legally and still resolves.
@@ -2731,6 +2789,8 @@ protectedFromGiven rows oid gs =
         PlayerEffect.SpendManaAsThough _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -2814,6 +2874,8 @@ protectionCarriers gs =
         PlayerEffect.SpendManaAsThough _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -2867,6 +2929,8 @@ landPlaysAllowed pid gs =
         PlayerEffect.PlayAdditionalLands extra -> Just extra
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantActivateAbilities _ -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
@@ -2958,6 +3022,8 @@ votesAllowed pid gs =
         PlayerEffect.HasProtectionFrom {} -> Nothing
         PlayerEffect.CastAsThoughItHadFlash {} -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash {} -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed {} -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed {} -> Nothing
         PlayerEffect.CantBeCountered {} -> Nothing
         PlayerEffect.DamageCantBePrevented {} -> Nothing
         PlayerEffect.DamageCantBeRedirected {} -> Nothing
@@ -3047,6 +3113,8 @@ maximumHandSize pid gs =
         PlayerEffect.CantBeTargetedBy _ -> current
         PlayerEffect.CastAsThoughItHadFlash _ -> current
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> current
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> current
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> current
         PlayerEffect.CantBeCountered _ -> current
         PlayerEffect.DamageCantBePrevented _ -> current
         PlayerEffect.DamageCantBeRedirected _ -> current
@@ -3123,6 +3191,8 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -3191,6 +3261,8 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -3260,6 +3332,8 @@ prohibitsGainingLife pid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -3324,6 +3398,8 @@ prohibitsLosingLife pid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.DamageCantBeRedirected _ -> False
@@ -3389,6 +3465,8 @@ spendManaAsThough pid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -3471,6 +3549,8 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> False
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> False
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> False
         -- Spider-Punk's OTHER sentence, and no part of this answer: CR 615.12
         -- and CR 614.9 are about a damage event and CR 701.6a about an object on
         -- the stack. The two travel together on one card and share nothing.
@@ -3587,6 +3667,8 @@ unpreventable gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
    in concatMap (\pid -> Maybe.mapMaybe says (applying pid gs)) (Game.stillPlaying gs)
 
 -- CR 614.9: the patterns of every "that damage can't be ... dealt instead to
@@ -3661,6 +3743,8 @@ unredirectable gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
    in concatMap (\pid -> Maybe.mapMaybe says (applying pid gs)) (Game.stillPlaying gs)
 
 -- CR 705.3: every statement in force right now about a coin flip `pid` would
@@ -3715,6 +3799,8 @@ statedFlips pid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -3785,6 +3871,8 @@ rollModifiers pid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.MayPlayAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed _ -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.DamageCantBeRedirected _ -> Nothing
@@ -3877,6 +3965,8 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.HasProtectionFrom _ -> pure effect
   PlayerEffect.CastAsThoughItHadFlash _ -> pure effect
   PlayerEffect.MayPlayAsThoughItHadFlash _ -> pure effect
+  PlayerEffect.ActivateKeywordAtInstantSpeed _ -> pure effect
+  PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> pure effect
   PlayerEffect.CantBeCountered _ -> pure effect
   PlayerEffect.DamageCantBePrevented _ -> pure effect
   PlayerEffect.DamageCantBeRedirected _ -> pure effect
@@ -3949,6 +4039,8 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.HasProtectionFrom _ -> pure effect
   PlayerEffect.CastAsThoughItHadFlash _ -> pure effect
   PlayerEffect.MayPlayAsThoughItHadFlash _ -> pure effect
+  PlayerEffect.ActivateKeywordAtInstantSpeed _ -> pure effect
+  PlayerEffect.ActivateLoyaltyAtInstantSpeed _ -> pure effect
   PlayerEffect.CantBeCountered _ -> pure effect
   PlayerEffect.DamageCantBePrevented pattern_ -> fmap PlayerEffect.DamageCantBePrevented (f pattern_)
   PlayerEffect.DamageCantBeRedirected pattern_ -> fmap PlayerEffect.DamageCantBeRedirected (f pattern_)

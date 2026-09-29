@@ -431,6 +431,10 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.MayPlayAsThoughItHadFlash f -> PlayerEffect.MayPlayAsThoughItHadFlash (Filter.rewrite pairs f)
+  -- A rule-702 designator is no word CR 612.1 swaps; the loyalty arm's Filter
+  -- names the permanent, so it descends as CastAsThoughItHadFlash's does.
+  PlayerEffect.ActivateKeywordAtInstantSpeed _ -> effect
+  PlayerEffect.ActivateLoyaltyAtInstantSpeed f -> PlayerEffect.ActivateLoyaltyAtInstantSpeed (Filter.rewrite pairs f)
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
   -- CR 305.1's play-side prohibition, narrowed by the same kind of Filter.

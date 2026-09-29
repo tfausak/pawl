@@ -48,6 +48,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Action as A
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
@@ -90,6 +91,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
@@ -305,7 +307,11 @@ data ActionChoices = MkActionChoices
     -- Nothingness's "{T}, Sacrifice this" is what needs it.
     choiceCostOrder :: Maybe [Natural],
     choiceManaSources :: Seq.Seq (Maybe ObjectRef),
-    choiceManaYields :: Seq.Seq Mana.Mana
+    choiceManaYields :: Seq.Seq Mana.Mana,
+    -- | Which of the source's activated abilities to activate, by its index in
+    -- Projection.abilitiesOf, for a source offering several (a planeswalker).
+    -- Nothing accepts any, and two offers are then ambiguous.
+    choiceAbility :: Maybe Natural
   }
   deriving (Eq, Ord, Show)
 
@@ -318,7 +324,8 @@ noChoices =
       choiceCost = Nothing,
       choiceCostOrder = Nothing,
       choiceManaSources = Seq.empty,
-      choiceManaYields = Seq.empty
+      choiceManaYields = Seq.empty,
+      choiceAbility = Nothing
     }
 
 -- The moment an entry is eligible: turn, phase or step, and WHO ANSWERS.
@@ -2089,7 +2096,8 @@ answerActionPrompt gs pid actions = do
             [action] -> pure action
             _ -> failHarness (MkAmbiguousAction key verb offered)
           popTimedAt key index
-          State.modify' (\state -> state {harnessAction = Just (key, verb, choicesOf verb)})
+          -- The ability selector is spent by the match above.
+          State.modify' (\state -> state {harnessAction = Just (key, verb, (choicesOf verb) {choiceAbility = Nothing})})
           pure chosen
   entries <- queueAt key
   -- The first ACTION entry at this key, not the head. An entry for a prompt the
@@ -2114,9 +2122,9 @@ actionsMatching gs verb actions = case verb of
   MkPlayLand ref face -> do
     oid <- resolveObject ref gs
     pure $ filter (matchesPlay oid face) actions
-  MkActivate ref _ -> do
+  MkActivate ref choices -> do
     oid <- resolveObject ref gs
-    pure $ filter (matchesActivation oid) actions
+    pure $ filter (matchesActivation oid (fmap (\i -> List.genericDrop i (Projection.abilitiesOf oid gs)) (choiceAbility choices))) actions
   _ -> pure []
 
 matchesCast :: ObjectId.ObjectId -> Maybe (CardName.CardName, Facing.Facing) -> A.Action -> Bool
@@ -2135,9 +2143,9 @@ matchesPlay oid face action = case action of
         Just wanted -> chosen == Just wanted
   _ -> False
 
-matchesActivation :: ObjectId.ObjectId -> A.Action -> Bool
-matchesActivation oid action = case action of
-  A.Activate candidate _ -> candidate == oid
+matchesActivation :: ObjectId.ObjectId -> Maybe [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> A.Action -> Bool
+matchesActivation oid selected action = case action of
+  A.Activate candidate ability -> candidate == oid && maybe True ((== Just ability) . Maybe.listToMaybe) selected
   _ -> False
 
 describeAction :: GameState.GameState -> A.Action -> State.StateT HarnessState (Either HarnessFailure) Text.Text
