@@ -1,9 +1,11 @@
 module Pawl.Types.CastFromZone where
 
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
+import qualified Pawl.Types.PermissionPool as PermissionPool
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 
 -- | The payload of Pawl.Types.PlayerEffect's CastFrom arm: whose copy of which
@@ -31,6 +33,11 @@ data CastFromZone = MkCastFromZone
   { from :: InZone.InZone,
     matching :: Filter.Filter Keyword.Keyword,
     limit :: PermissionLimit.PermissionLimit,
-    verb :: PermissionVerb.PermissionVerb
+    verb :: PermissionVerb.PermissionVerb,
+    -- | CR 607.2a: the whole zone, or only the cards exiled with the source.
+    pool :: PermissionPool.PermissionPool,
+    -- | CR 118.8 / 601.2f: what a cast made under this permission costs "in
+    -- addition to paying their other costs" (Dawnhand Dissident).
+    additionalCosts :: [CostComponent.CostComponent Keyword.Keyword]
   }
   deriving (Eq, Ord, Show)

@@ -44,10 +44,12 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.FaceDownReason as FaceDownReason
@@ -2663,3 +2665,100 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   jaredSpec s registry
   oppressiveRaysSpec s registry
   scoutsWarningSpec s registry
+  dawnhandSpec s registry
+
+-- Dawnhand Dissident {B} Creature -- Elf Warlock 1/2 (Oracle text checked against
+-- Scryfall 2026-09-29): "During your turn, you may cast creature spells from among
+-- cards you own exiled with this creature by removing three counters from among
+-- creatures you control in addition to paying their other costs."
+--
+-- The producer for PermissionPool.CardsExiledWithSource (CR 607.2a) and for a
+-- CastFromZone's additionalCosts (CR 118.8 / 601.2f); "during your turn" is the
+-- PlayerStaticAbility condition Paladin Class writes.
+--
+-- THE BOARD: alice controls the Dissident, three Forests, a Goblin Piker carrying
+-- a vigilance and a +1/+1 counter and a Hill Giant carrying the given count of
+-- +1/+1 counters. Exiled: her Pouncing Cheetah (flash) linked to the Dissident,
+-- her second Cheetah linked to nothing, and bob's Cheetah linked to the
+-- Dissident. Her hand holds a third Cheetah.
+dawnhandSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dawnhandSpec s registry =
+  Spec.describe s "DawnhandDissident" $ do
+    Spec.it s "CR 601.3 / 118.8 the linked creature is cast by removing three counters" $ do
+      (linked, _, _, _, pikerId, giantId, gs) <- dawnhandBoard s registry 2 S.alice
+      cheetah <- S.printingOf s registry "Pouncing Cheetah"
+      let answer = Map.fromList [(pikerId, Map.singleton dawnhandVigilance 1), (giantId, Map.singleton CounterKind.PlusOnePlusOne 2)]
+          resolved = S.runPure (castLinkedAnswering linked answer) gs Engine.priorityLoop
+      Spec.assertEqWith s "the linked Cheetah resolved onto alice's battlefield" (S.countOnBattlefieldByName (S.printingName cheetah) S.alice resolved) 1
+      Spec.assertEqWith s "CR 601.2h the Piker's vigilance counter came off" (S.counterOf dawnhandVigilance pikerId resolved) 0
+      Spec.assertEqWith s "and both of the Giant's" (S.counterOf CounterKind.PlusOnePlusOne giantId resolved) 0
+      Spec.assertEqWith s "and the Piker kept its +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne pikerId resolved) 1
+    Spec.it s "CR 607.2a only her own cards exiled with it are reached" $ do
+      (linked, unlinked, bobs, _, _, _, gs) <- dawnhandBoard s registry 2 S.alice
+      let offered oid = any (S.isCastOf oid) (Action.legalActions S.alice gs)
+      Spec.assertBool s (not (offered unlinked)) "her Cheetah exiled by nothing is not offered"
+      Spec.assertBool s (not (offered bobs)) "nor bob's Cheetah exiled with it"
+      Spec.assertBool s (offered linked) "while her Cheetah exiled with it is"
+    -- The pair: three counters among her creatures and two.
+    Spec.it s "CR 118.3 two counters among her creatures do not pay for three" $ do
+      (short, _, _, _, _, _, shortBoard) <- dawnhandBoard s registry 0 S.alice
+      Spec.assertBool s (not (any (S.isCastOf short) (Action.legalActions S.alice shortBoard))) "the linked Cheetah is not offered with two counters"
+      (enough, _, _, _, _, _, gs) <- dawnhandBoard s registry 1 S.alice
+      Spec.assertBool s (any (S.isCastOf enough) (Action.legalActions S.alice gs)) "and is with three"
+    -- The Cheetah's flash makes the turn observable: the same card in her hand is
+    -- offered on bob's turn.
+    Spec.it s "CR 611.3a on bob's turn the permission does not apply" $ do
+      (linked, _, _, inHand, _, _, gs) <- dawnhandBoard s registry 2 S.bob
+      Spec.assertBool s (not (any (S.isCastOf linked) (Action.legalActions S.alice gs))) "the linked Cheetah is not offered on bob's turn"
+      Spec.assertBool s (any (S.isCastOf inHand) (Action.legalActions S.alice gs)) "though the Cheetah in her hand is"
+
+-- CR 122.1b's vigilance counter.
+dawnhandVigilance :: CounterKind.CounterKind Keyword.Keyword
+dawnhandVigilance = CounterKind.Keyword Keyword.Vigilance
+
+-- The board dawnhandSpec's cases share, described above it, given the Giant's
+-- +1/+1 count and whose turn it is (alice holding priority on it with an empty
+-- stack). Answers the linked Cheetah, the unlinked one, bob's linked one, the
+-- one in her hand, the Piker and the Giant.
+dawnhandBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Natural -> PlayerId.PlayerId -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+dawnhandBoard s registry giantPlusOne active = do
+  dissident <- S.printingOf s registry "Dawnhand Dissident"
+  cheetah <- S.printingOf s registry "Pouncing Cheetah"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  forest <- S.printingOf s registry "Forest"
+  let lands = S.landsFor forest S.alice 3 (Setup.emptyGame S.bothPlayers)
+      (dissidentId, g1) = S.addPermanent dissident S.alice lands
+      (pikerId, g2) = S.addPermanent piker S.alice g1
+      (giantId, g3) = S.addPermanent giant S.alice g2
+      (linked, g4) = S.addExiledCard cheetah S.alice g3
+      (unlinked, g5) = S.addExiledCard cheetah S.alice g4
+      (bobs, g6) = S.addExiledCard cheetah S.bob g5
+      (inHand, g7) = S.addHandCard cheetah S.alice g6
+      link = ExileLink.MkExileLink {ExileLink.source = dissidentId, ExileLink.ability = Nothing}
+      counted =
+        S.addCounter CounterKind.PlusOnePlusOne giantPlusOne giantId
+          . S.addCounter CounterKind.PlusOnePlusOne 1 pikerId
+          . S.addCounter dawnhandVigilance 1 pikerId
+          $ g7
+  pure
+    ( linked,
+      unlinked,
+      bobs,
+      inHand,
+      pikerId,
+      giantId,
+      counted
+        { GameState.exiledWith = Map.fromList [(linked, link), (bobs, link)],
+          GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = active,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- castOnly, answering CR 601.2h's division of the counters with the one given.
+-- PINNED, so an answer the engine did not ask for cannot be repaired.
+castLinkedAnswering :: ObjectId.ObjectId -> Map.Map ObjectId.ObjectId (Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural) -> Prompt.Prompt r -> r
+castLinkedAnswering wanted answer p = case p of
+  Prompt.ChooseMixedCounterRemoval {} -> answer
+  _ -> castOnly wanted p

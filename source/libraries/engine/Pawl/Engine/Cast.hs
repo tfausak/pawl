@@ -50,6 +50,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Convoking as Convoking
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
@@ -1131,8 +1132,10 @@ castableZones pid oid face gs =
         _ -> False
    in filter permitted castZones
 
--- CR 601.3: may this player cast this half of this exiled card? FIVE INDEPENDENT
--- PERMISSIONS, any of which suffices, because the rules state five.
+-- CR 601.3: may this player cast this half of this exiled card? SIX INDEPENDENT
+-- PERMISSIONS, any of which suffices, because the rules state six: exileOpen's
+-- five below, and a player's CR 601.3 CastFrom grant naming exile (Dawnhand
+-- Dissident's).
 -- The first is Object.playableFromExile's, whose two conjuncts are below and
 -- whose second is why a card its own Adventure exiled offers only the creature
 -- half, while the same card in a hand -- or exiled by some other effect --
@@ -1156,6 +1159,14 @@ castableZones pid oid face gs =
 --     are the pair that proves both directions.
 permitsCastFromExile :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromExile pid oid face gs =
+  exileOpen pid oid face gs || PlayerEffect.mayCastFrom pid Zone.Exile oid gs
+
+-- permitsCastFromExile's five permissions an exiled card carries for itself,
+-- without a player's CR 601.3 CastFrom grant (Dawnhand Dissident's): a cast one
+-- of these admits need be made under no such grant, so it pays none of that
+-- grant's additional costs (castWays).
+exileOpen :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+exileOpen pid oid face gs =
   (permitsPlayFromExile pid oid gs && not (Card.isAdventure face && grantedByAdventureRule oid gs))
     || permitsCastPlotted pid oid gs
     || permitsCastForetold pid oid gs
@@ -1692,10 +1703,14 @@ castableGiven shared pid oid name facing gs =
       -- can be read: this gate runs before any move, so the permission is still
       -- on the object. Off `proposed` rather than the candidate's board, since
       -- nothing rule 702.103b writes is a thing rule 118.14's rider reads.
+      --
+      -- CR 118.8: payable together with the additional costs of SOME
+      -- permission the cast could be made under (Dawnhand Dissident's).
+      extras = maybe [[]] (\face -> permissionCostChoices pid oid face proposed) (proposedFace oid name proposed)
       candidateOk candidate =
         candidateAllowed pid oid proposedName proposed candidate
           && candidateFillable pid oid name proposed candidate
-          && payable (CandidateCost.reductions candidate) (spendingFor pid oid proposed) (proposedFor oid (CandidateCost.keyword candidate) proposed) (CandidateCost.cost candidate)
+          && any (\extra -> payable (CandidateCost.reductions candidate) (spendingFor pid oid proposed) (proposedFor oid (CandidateCost.keyword candidate) proposed) (withPermissionCosts extra (CandidateCost.cost candidate))) extras
    in cardGatesOk pid oid name proposed
         -- Gated HERE, upstream of Action.legalActions, because the engine never
         -- offers an illegal action and then rejects it.
@@ -2281,7 +2296,7 @@ castSpellWith perform timed offered applied widened pid oid name facing = do
           -- same PROPOSED state and for `spent`'s reason -- the ones the gate
           -- offered the cast under are the ones castProposed chooses among, and
           -- a rejected announcement spends none.
-          permissions = foldMap (\zone -> PlayerEffect.castPermissionOptions (\src -> not (null (Event.permissionRiders src proposed oid))) offered pid zone oid proposed) castFrom
+          permissions = foldMap (\zone -> castWays (\src -> not (null (Event.permissionRiders src proposed oid))) offered pid oid zone face proposed) castFrom
           -- CR 400.7h / 611.3d: what the permission a cast is made under gives
           -- the spell it becomes, asked of the same PROPOSED state -- the board
           -- that source was offering it on.
@@ -2419,6 +2434,24 @@ playLand offered pid oid mName = do
   -- flagging. CR 305.4: the only tally, an effect that PUTS a land onto the
   -- battlefield not being one.
   State.modify' (\g -> g {GameState.landsPlayed = Map.insertWith (+) pid 1 (GameState.landsPlayed g)})
+
+-- CR 601.3: PlayerEffect.castPermissionOptions for a cast of `oid` out of
+-- `zone`, open without a grant where the exiled card carries a permission of
+-- its own (exileOpen) as well as where `offered` says so.
+castWays :: (ObjectId -> Bool) -> Bool -> PlayerId -> ObjectId -> Zone.Zone -> Face.Face Card.Type.Card -> GameState -> [Maybe (ObjectId, CastFromZone.CastFromZone)]
+castWays rides offered pid oid zone face gs =
+  PlayerEffect.castPermissionOptions rides (offered || (zone == Zone.Exile && exileOpen pid oid face gs)) pid zone oid gs
+
+-- CR 118.8: the additional costs each way castWays offers would add, [[]] where
+-- there is no permission to choose among.
+permissionCostChoices :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> [[CostComponent.CostComponent Keyword]]
+permissionCostChoices pid oid face gs = case foldMap (\zone -> castWays (const False) False pid oid zone face gs) (Game.zoneOf oid gs) of
+  [] -> [[]]
+  ways -> fmap PlayerEffect.permissionCosts ways
+
+-- CR 601.2f: `cost` with a permission's additional costs added to it.
+withPermissionCosts :: [CostComponent.CostComponent Keyword] -> Cost Keyword -> Cost Keyword
+withPermissionCosts extra cost = cost {Cost.Type.components = Cost.Type.components cost <> extra}
 
 -- CR 601.3 / 305.1: which of `options` (PlayerEffect.castPermissionOptions,
 -- PlayerEffect.landPermissionOptions) the play of `oid` is made under. Asked
@@ -2986,6 +3019,9 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
               -- it is made under -- the budget it spends and the rider it gets.
               permissionUsed <- if ownPermission then pure Nothing else choosePlayPermission pid sid permissions
               let ridersUsed = riders permissionUsed
+                  -- CR 118.8 / 601.2f: the permission's additional costs join
+                  -- the chosen candidate's.
+                  chargedCost = withPermissionCosts (PlayerEffect.permissionCosts permissionUsed) chosenCost
               -- CR 702.103b: the announcement has settled on the bestow
               -- candidate, so the spell becomes an Aura enchantment with enchant
               -- creature -- BEFORE CR 601.2c's targets below, which that rule's
@@ -3065,8 +3101,8 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
               -- unaffordable announcement still reverses the whole cast (#417).
               -- Its least value is CR 101.1's printed floor, off the same face.
               mAmount <-
-                if Cost.hasVariable chosenCost
-                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (Face.minimumX face) (affordableX mCeiling chosenReductions spending pid sid bestowedGs chosenCost)))
+                if Cost.hasVariable chargedCost
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (Face.minimumX face) (affordableX mCeiling chosenReductions spending pid sid bestowedGs chargedCost)))
                   else pure Nothing
               -- CR 101.1, and CR 101.2 for its direction: the card's sentence
               -- overrides the rule that would otherwise leave X free, and a
@@ -3105,7 +3141,7 @@ castProposed perform spending pid oid sid face castFrom preparedFor keywordsBefo
               -- cost with none, `announcedAtX` IS the chosen candidate, which buys
               -- one predicate over one cost instead of two spellings of when the
               -- gate applies.
-              let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
+              let announcedAtX = maybe chargedCost (\x -> Cost.substituteX x chargedCost) mAmount
                   -- CR 601.2e / 202.3e: the spell's mana value with X announced,
                   -- read off the stack incarnation as CR 601.2i will stamp it.
                   -- PlayerEffect.choiceCouldEscape let the cast BEGIN; this is
