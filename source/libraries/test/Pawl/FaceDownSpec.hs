@@ -750,6 +750,31 @@ asEntersSpec s registry = Spec.describe s "As-enters inside a resolution (CR 614
     Spec.assertEqWith s "CR 708.2a the sweep turned the card Warden face down and not the token" (faceDownIds after) (Set.singleton wardenId)
     Spec.assertBool s (tokenId `Set.member` GameState.battlefield after) "the token Warden is still on the battlefield"
 
+  -- CR 614.12 and Ixidron's ruling ("If Ixidron and another creature are entering
+  -- at the same time, the other creature enters face up"), on one MoveToZone
+  -- batch. Exhume ({1}{B} Sorcery, "Each player puts a creature card from their
+  -- graveyard onto the battlefield") returns alice's Ixidron beside bob's Soul
+  -- Warden, while bob's Hill Giant stands on the battlefield as the control the
+  -- sweep does reach. CR 603.6a: the Warden, face up and entering with Ixidron,
+  -- sees it enter.
+  Spec.it s "CR 614.12 a creature entering beside Ixidron enters face up" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    exhume <- S.printingOf s registry "Exhume"
+    ixidron <- S.printingOf s registry "Ixidron"
+    warden <- S.printingOf s registry "Soul Warden"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (held, spell) = S.handOne exhume (S.landsInPlay swamp 2)
+        (_, g1) = S.addGraveyardCard ixidron S.alice held {GameState.phase = Phase.PrecombatMain}
+        (_, g2) = S.addGraveyardCard warden S.bob g1
+        (giantId, gs) = S.addPermanent giant S.bob g2
+        after = S.runPure S.identityAnswer gs (S.cast S.alice spell >> Stack.resolveTop >> Engine.settleForPriority)
+        named name = Set.filter (\oid -> fmap S.nameOf (Game.cardOf oid after) == Just (CardName.MkCardName (Text.pack name))) (GameState.battlefield after)
+    -- THE assertion, gameplay level and first: only the Giant was turned over.
+    Spec.assertEqWith s "CR 614.12 the sweep turned over the Giant and not the Warden entering beside Ixidron" (faceDownIds after) (Set.singleton giantId)
+    Spec.assertEqWith s "both creature cards entered" (Set.size (named "Ixidron") + Set.size (named "Soul Warden")) 2
+    Spec.assertEqWith s "Ixidron is a 1/1, counting the Giant alone" (fmap (`S.powerToughnessOf` after) (Set.toList (named "Ixidron"))) [Just (1, 1)]
+    Spec.assertEqWith s "CR 603.6a the face-up Warden saw Ixidron enter" (length (GameState.stack after)) 1
+
 -- alice attacks with one Goblin Piker into bob's suspect, a second Piker beside it
 -- and `lands`. Returns the board with attackers declared, the suspect, the Piker
 -- beside it and alice's attacker.
