@@ -830,10 +830,7 @@ data Keyword
     -- -- exhaust's "activate only once", plus a reduction by the permanent's mana
     -- cost if it entered this turn (Pawl.Engine.PlayerEffect's activation gather).
     PowerUp
-  | -- | 716.2: a class level bar, "[Cost]: Level N", written on the activated
-    -- ability it indicates; CR 716.2a's two riders are
-    -- Pawl.Engine.Keyword.printedRiders', and CR 716.2c's "to gain a Class
-    -- level" is Pawl.Types.KeywordDesignator.OfFamily naming it.
+  | -- | 716.2: a class level bar, written on the activated ability it indicates.
     ClassLevel ClassLevel.ClassLevel
   | -- | 702.57a: a forecast ability is the activated ability printed after it,
     -- activatable only from a hand, during its owner's upkeep, once each turn

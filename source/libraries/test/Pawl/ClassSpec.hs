@@ -909,8 +909,8 @@ gainClassLevelSpec s registry = Spec.describe s "Gaining a Class level" $ do
              in S.runPure S.identityAnswer activated Stack.resolveTop
     Spec.assertEqWith s "CR 716.2c the level-3 bar is paid with the creatures' mana" (levelOf classId after) (Just (ClassLevel.MkClassLevel 3))
     Spec.assertEqWith s "and every creature tapped for it" (S.tappedCount S.alice after) 5
-  -- The same mana refuses an ability no class level bar indicates, which a
-  -- restriction read off the SOURCE's keywords could not tell apart.
+  -- The same mana refuses an activation no class level bar indicates; the
+  -- Mountain board is the control.
   Spec.it s "CR 106.6 the same mana does not pay Shivan Dragon's firebreathing" $ do
     sorcererClass <- S.printingOf s registry "Sorcerer Class"
     shivan <- S.printingOf s registry "Shivan Dragon"
