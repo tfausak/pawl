@@ -166,6 +166,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -401,6 +402,7 @@ ownQuantities effect = case effect of
   Effect.ForEach {} -> []
   Effect.ForEachNumber loop -> [ForEachNumber.upTo loop]
   Effect.Repeat _ -> []
+  Effect.RepeatIf loop -> conditionQuantities (RepeatIf.condition loop)
   Effect.Heal _ -> []
 
 -- The shapes CR 208.1 and CR 208.2 allow in a printed power or toughness box:
@@ -1500,6 +1502,7 @@ effectObjectRefs effect =
         Effect.ForEach (ForEach.MkForEach ref _ _ _ _ _) -> read_ [ref]
         Effect.ForEachNumber {} -> []
         Effect.Repeat {} -> []
+        Effect.RepeatIf {} -> []
         Effect.Heal ref -> read_ [ref]
 
 -- The chooser-shaped refs one effect writes where nothing can ask for them: the

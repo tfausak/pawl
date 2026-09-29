@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cloak as Cloak
 import qualified Pawl.Engine.Coin as Coin
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.CounterRestriction as CounterRestriction
 import qualified Pawl.Engine.Damage as Damage
@@ -316,6 +317,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
@@ -3205,6 +3207,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.ForEach {} -> False
   Effect.ForEachNumber {} -> False
   Effect.Repeat {} -> False
+  Effect.RepeatIf {} -> False
   -- CR 701.69a removes marked damage, so permanents bearing none have nothing
   -- to lose. A regression fence: no printed "may" in data/cards reaches it.
   Effect.Heal ref ->
@@ -5483,25 +5486,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.ZoneChangeSpec's Kindle the Carnage group proves both the second run and
   -- the rescope.
   Effect.Repeat body -> do
-    gs0 <- State.get
-    let bodyDefined = foldMap boundSlots body
-        bindingsOf gs = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
-        beforeLoop = Map.restrictKeys (bindingsOf gs0) bodyDefined
-        rescope gs =
-          gs
-            { GameState.objects =
-                Map.adjust
-                  (\o -> o {Object.bindings = Map.union beforeLoop (Map.withoutKeys (Object.bindings o) bodyDefined)})
-                  resolving
-                  (GameState.objects gs)
-            }
-        run runs = do
+    rescope <- State.gets (rescopeRun resolving (foldMap boundSlots body))
+    let run runs = do
           State.modify' rescope
           applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
           gs <- State.get
           again <- Game.choose (Prompt.ChooseRepeat (Decide.deciderFor controller gs) controller resolving runs)
           Monad.when (again == OptionalDecision.Exercises) (run (runs + 1))
     run 1
+  -- CR 608.2c: the process in written order, then its printed "if" asked of the
+  -- state that run left -- live, so the tally the run's own mill just bound is
+  -- what it reads. While it holds, the "if"'s instructions and another run. No
+  -- prompt: no player chooses, which is Effect.Repeat's CR 608.2d difference.
+  -- Rescoped and unbracketed per run for Effect.Repeat's reasons.
+  --
+  -- Pawl.PlaneswalkerSpec's GristLoyalty group proves the run count.
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> do
+    rescope <- State.gets (rescopeRun resolving (foldMap boundSlots (process <> ifHolds)))
+    let apply effects = applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList effects)
+        run = do
+          State.modify' rescope
+          apply process
+          gs <- State.get
+          let context = effectContext gs controller source legal (slotBindings resolving gs)
+          Monad.when (Condition.holds (effectViewOf source legal gs) context gs source condition) $ do
+            apply ifHolds
+            run
+    run
   Effect.Draw (Draw.MkDraw ref quantity mSlot) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
@@ -10387,6 +10398,23 @@ carrying gs kind candidates = Map.filter (> 0) (Map.fromList [(candidate, Cost.c
 -- trigger on the stack -- the amount goes on `resolving`, the object
 -- Quantity.InSlot falls back to, since CR 113.7a resolves the ability anyway.
 -- Pawl.RemoveCounterSpec's bounced Spider-Man proves it.
+-- A loop's per-run scope (CR 608.2c): the slots its body defines put back to
+-- what the resolving object held before the first run, so a run that binds
+-- nothing does not read what the previous run bound. Takes the pre-loop state
+-- and answers the reset to apply before each run.
+rescopeRun :: ObjectId -> Set SlotName -> GameState -> GameState -> GameState
+rescopeRun resolving bodyDefined gs0 =
+  let bindingsOf gs = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+      beforeLoop = Map.restrictKeys (bindingsOf gs0) bodyDefined
+   in \gs ->
+        gs
+          { GameState.objects =
+              Map.adjust
+                (\o -> o {Object.bindings = Map.union beforeLoop (Map.withoutKeys (Object.bindings o) bodyDefined)})
+                resolving
+                (GameState.objects gs)
+          }
+
 bindAmountSlot :: ObjectId -> ObjectId -> SlotName -> Natural -> GameState -> GameState
 bindAmountSlot resolving source slot n gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}

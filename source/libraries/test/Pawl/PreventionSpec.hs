@@ -1391,9 +1391,10 @@ auriokReplicaSpec s registry = Spec.describe s "Auriok Replica (CR 609.7a)" $ do
         (fodder, g5) = S.addPermanent pikerPrinting S.alice g4
         (decoy, g6) = S.addPermanent pikerPrinting S.bob g5
         board = S.landsFor plains S.alice 1 g6
+        -- The card file's second ability, after the +1.
         minusTwo = case Face.activatedAbilities (S.combinedFace grist) of
-          ab : _ -> ab
-          [] -> theAbility grist
+          _ : ab : _ -> ab
+          _ -> theAbility grist
         -- Grist's -2 alone, paid, so the delayed trigger is armed and its
         -- captured environment holds the ability's own id. Its reflexive trigger
         -- is left unplaced, which is what keeps the entry WAITING.
