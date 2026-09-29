@@ -977,6 +977,52 @@ cadaverousBloomSpec s registry =
       Spec.assertEqWith s "nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice cast)) 0
       Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
       Spec.assertEqWith s "and both cards are still in hand" (S.handSize S.alice cast) 2
+    -- CR 602.2b / 605.3a: each activation is its own, so each picks its own yield
+    -- (Prompt.ChooseManaYield, answered by call index). Jarad's {B}{B}{G}{G}
+    -- needs one of each, which no single yield repeated can pay.
+    Spec.it s "CR 118.3 two activations take {B}{B} then {G}{G} and pay {B}{B}{G}{G}" $ do
+      (jarad, gs, resolved, asked) <- bloomPaysJarad [black, green]
+      Spec.assertEqWith s "CR 601.2g Jarad resolved off one activation of each yield" (S.countOnBattlefieldByName jaradName S.alice resolved) 1
+      Spec.assertBool s (S.castable S.alice jarad gs) "CR 118.3 the cast is offered"
+      Spec.assertEqWith s "CR 406.2 both fuel cards are in exile" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 2
+      Spec.assertEqWith s "and the yield was asked once per activation" asked 2
+    -- The same board and the same offer, the payer answering {B}{B} twice: the
+    -- engine does not repair the choice, so {B}{B}{B}{B} is short a {G}{G} and the
+    -- cast is refused (CR 601.2h).
+    Spec.it s "CR 601.2h answering {B}{B} twice does not pay {B}{B}{G}{G}" $ do
+      (jarad, gs, resolved, _) <- bloomPaysJarad [black, black]
+      Spec.assertBool s (S.castable S.alice jarad gs) "CR 118.3 the cast is offered, as above"
+      Spec.assertEqWith s "Jarad did not resolve" (S.countOnBattlefieldByName jaradName S.alice resolved) 0
+  where
+    jaradName = CardName.MkCardName (Text.pack "Jarad, Golgari Lich Lord")
+    twice manaType = Mana.Type.MkMana (replicate 2 (bloomUnit manaType))
+    black = twice (ManaType.Colored Color.Black)
+    green = twice (ManaType.Colored Color.Green)
+    bloomUnit manaType =
+      ManaUnit.MkManaUnit
+        { ManaUnit.manaType = manaType,
+          ManaUnit.tags = Set.empty,
+          ManaUnit.retention = ManaRetention.Ordinary,
+          ManaUnit.restriction = Nothing,
+          ManaUnit.rider = Nothing,
+          ManaUnit.sourceChosenSubtype = Nothing
+        }
+    -- Two fuel cards, Jarad cast with the yields answered in `yields`' order.
+    bloomPaysJarad yields = do
+      bloom <- S.printingOf s registry "Cadaverous Bloom"
+      piker <- S.printingOf s registry "Goblin Piker"
+      jaradPrinting <- S.printingOf s registry "Jarad, Golgari Lich Lord"
+      let (jarad, gs) = cadaverousBloomBoard bloom piker jaradPrinting 2
+          answer :: Prompt.Prompt r -> State.State Int r
+          answer p = case p of
+            Prompt.ChooseManaYield _ _ _ candidates -> do
+              n <- State.get
+              State.put (n + 1)
+              pure (S.optionYielding (Maybe.fromMaybe black (Maybe.listToMaybe (drop n yields))) candidates)
+            _ -> pure (S.identityAnswer p)
+          ((_, cast), asked) = State.runState (Engine.runGame answer gs (S.cast S.alice jarad)) 0
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      pure (jarad, gs, resolved, asked)
 
 -- The Bloom on the battlefield, `fuel` Goblin Pikers in hand and the spell on
 -- top of them. No lands: every mana here has to come through the Bloom.

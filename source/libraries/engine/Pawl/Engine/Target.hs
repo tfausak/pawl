@@ -1421,8 +1421,8 @@ zoneScopeSlot scope = case scope of
 -- change, even if the information used to determine the number of targets does".
 -- Nothing stores the determined number, and it holds anyway because no reader of
 -- a count stands after the announcement window: the gates run before it,
--- selectionLegal runs at CR 601.2e on the board the offer was built from, and CR
--- 707.10c's re-target counts the recipients the original already has
+-- selectionLegal runs at CR 601.2e on the board the offer was built from, and the
+-- CR 707.10c / 115.7d re-target counts the recipients the object already has
 -- (Resolve.Effect.chooseNewTargetsFor) rather than asking a count again.
 countingByGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> ObjectId -> GameState -> Quantity -> Natural
 countingByGiven pcs perspective source gs =
@@ -1711,7 +1711,7 @@ piledOffer perspective gs =
 -- Narrowing here instead would make the draw incapable of failing, and would
 -- weight it towards the cards the chooser wanted. What comes back is judged by
 -- selectionLegal at CR 601.2c (a cast, an activation) and by
--- Pawl.Engine.Resolve's own gate at CR 707.10c's re-target.
+-- Pawl.Engine.Resolve's own gate at the CR 707.10c / 115.7d re-target.
 --
 -- A TRIGGER's placement (Pawl.Engine.Engine.placeBorne) judges it by
 -- selectionLegal too, so a card the draw named that the slot's own filter
@@ -1846,13 +1846,13 @@ selectionLegal perspective seed source x slots sets chosen gs =
 -- between them the moments an announcement over declared slots is accepted --
 -- selectionLegal above -- CR 601.2e's cast, CR 602.2's activation and CR
 -- 603.3d's trigger placement alike -- and
--- Pawl.Engine.Resolve.Effect.chooseNewTargetsFor (CR 707.10c's re-target). The
+-- Pawl.Engine.Resolve.Effect.chooseNewTargetsFor (the CR 707.10c / 115.7d re-target). The
 -- re-derivation is exactly the one CR 608.2b will make at resolution, so a
 -- selection this admits cannot be one resolution then drops.
 --
 -- Only the WHICH question, never the how many: a count is measured against
--- slotCapacities by selectionLegal, and CR 707.10c's caller has no count to
--- judge at all, its re-target taking the recipients the original already has.
+-- slotCapacities by selectionLegal, and the CR 707.10c / 115.7d caller has no
+-- count to judge at all, its re-target taking the recipients the object has.
 jointlyCoherent :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
 jointlyCoherent perspective seed source slots chosen gs =
   let pcs = Projection.projectAll gs

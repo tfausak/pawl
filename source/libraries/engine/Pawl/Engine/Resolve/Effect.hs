@@ -2711,7 +2711,14 @@ copyForEachTargets controller resolving source legal original candidateRef = do
 
 -- CR 707.10c: "the player may leave any number of the targets unchanged, even if
 -- those targets would be illegal. If the player chooses to change some or all of
--- the targets, the new targets must be legal."
+-- the targets, the new targets must be legal." CR 115.7d says the same of an
+-- original spell or ability, which Effect.ChooseNewTargets re-aims.
+--
+-- TWO SEATS: `chooser` is asked and draws any CR 406.4 pile, and `controller`
+-- -- the object's own -- is CR 109.5's "you" that legality is judged from, since
+-- the targets stay the object's. They differ only under Effect.ChooseNewTargets,
+-- whose resolving controller chooses for an object someone else may control.
+-- Pawl.TargetSpec's Redirect group proves both seats.
 --
 -- ONE prompt, not a "may" followed by a choice: leaving every target where it is
 -- is an answer to the same question, so a second prompt would ask nothing the
@@ -2750,8 +2757,8 @@ copyForEachTargets controller resolving source legal original candidateRef = do
 -- particular choice restores exactly that state. CR 733.2's redo has no analogue
 -- inside a resolution: nobody holds priority, and a pure prompt-to-answer
 -- decider re-asked would loop on a stubborn answer.
-chooseNewTargetsFor :: Bool -> PlayerId -> ObjectId -> Game ()
-chooseNewTargetsFor unannounced controller copyId = do
+chooseNewTargetsFor :: Bool -> PlayerId -> PlayerId -> ObjectId -> Game ()
+chooseNewTargetsFor unannounced chooser controller copyId = do
   gs <- State.get
   Monad.forM_ (Game.lookupObject copyId gs) $ \copy -> do
     let slots = stackTargetSlots copy copyId gs
@@ -2795,14 +2802,14 @@ chooseNewTargetsFor unannounced controller copyId = do
         -- the pile it sits in, exactly as at CR 601.2c. The targets already
         -- CHOSEN are offered unchanged whatever they are, rule 707.10c letting
         -- one stand even when it is now illegal.
-        offer slot (n, recipients) = (n, Set.union recipients (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh)))
+        offer slot (n, recipients) = (n, Set.union recipients (Target.piledOffer (Just chooser) gs (Map.findWithDefault Set.empty slot fresh)))
         asked = Map.mapWithKey offer (Map.union (fmap (\recipients -> (Natural.length recipients, recipients)) current) (fmap (\n -> (n, Set.empty)) blank))
         held = Map.union current (Set.empty <$ blank)
         -- Every slot answerable only one way means the options are
         -- indistinguishable, and CR 707.10c's offer is elided.
-        settled slot = Set.isSubsetOf (Target.piledOffer (Just controller) gs (Map.findWithDefault Set.empty slot fresh))
+        settled slot = Set.isSubsetOf (Target.piledOffer (Just chooser) gs (Map.findWithDefault Set.empty slot fresh))
     Monad.unless (and (Map.elems (Map.mapWithKey settled held))) $ do
-      answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor controller gs) controller copyId asked)
+      answer <- Game.choose (Prompt.ChooseTargets (Decide.deciderFor chooser gs) chooser copyId asked)
       let admits slot (n, offered) picked = picked == Map.findWithDefault Set.empty slot current || (Natural.length picked == n && Set.isSubsetOf picked offered)
           wellFormed =
             Map.keysSet answer == Map.keysSet asked
@@ -2810,7 +2817,7 @@ chooseNewTargetsFor unannounced controller copyId = do
       Monad.when wellFormed $ do
         -- CR 406.4's draw, run on the ANSWER: a pile the player named becomes
         -- the card randomness picked out of it before any target is recorded.
-        drawn <- traverse (Target.drawFromPiles (Just controller)) answer
+        drawn <- traverse (Target.drawFromPiles (Just chooser)) answer
         -- CR 707.10c: "if the player chooses to change some or all of the
         -- targets, the new targets must be legal". Asked of the DRAWN answer
         -- and not of the raw one, because rule 406.4 draws from the whole pile
@@ -3032,6 +3039,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.CreateCopy {} -> False
   Effect.BecomeCopy {} -> False
   Effect.CopyStackObject {} -> False
+  Effect.ChooseNewTargets {} -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   Effect.PreventNextDamage {} -> False
@@ -6863,7 +6871,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Monad.forM_ (filter (Maybe.isJust . onStackIn before) (objectRefObjects legal resolving controller source before subjectRef)) $ \spell -> do
         g <- State.get
         Monad.forM_ (Game.lookupObject spell g) $ \obj ->
-          chooseNewTargetsFor (Maybe.isNothing mOriginalOf) (Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf spell g)) spell
+          let spellController = Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf spell g)
+           in chooseNewTargetsFor (Maybe.isNothing mOriginalOf) spellController spellController spell
   Effect.CopyStackObject (CopyStackObject.MkCopyStackObject ref targets quantity copierRef exceptions) -> do
     gs <- State.get
     -- CR 707.10: `quantity` copies of each named object, each put onto the stack.
@@ -7068,7 +7077,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- CR 707.10c's chooser is the COPY's controller and not the copying
             -- effect's: Meletis Charlatan's "that player may choose new targets
             -- for the copy". Proved by Pawl.CopySpec's Charlatan group.
-            Monad.when (targets == CopyTargets.ChosenByController) (chooseNewTargetsFor False copier copyId)
+            Monad.when (targets == CopyTargets.ChosenByController) (chooseNewTargetsFor False copier copier copyId)
             -- CR 115.1: "these targets are declared as part of the process of
             -- putting the spell or ability on the stack", and CR 707.10c puts the
             -- copy on the stack once its controller has decided what its targets
@@ -7086,6 +7095,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- ability is itself an ability".
             gsCopied <- State.get
             Event.becameTarget gsCopied copyId kind copier (targetsOnStack copyId gsCopied)
+  Effect.ChooseNewTargets ref -> do
+    gs <- State.get
+    -- CR 115.7d over each named spell or ability still on the stack, asked of
+    -- the resolving controller (Redirect's "you") and judged from the object's
+    -- own controller.
+    Monad.forM_ (objectRefObjects legal resolving controller source gs ref) $ \oid -> do
+      g <- State.get
+      Monad.forM_ (List.find ((== Zone.Stack) . Object.zone) (Game.lookupObject oid g)) $ \obj ->
+        Monad.forM_ (copyOnStackOf (Object.source obj)) $ \(_, kind) -> do
+          let aimer = Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf oid g)
+              before = targetsOnStack oid g
+          chooseNewTargetsFor False controller aimer oid
+          -- A recipient CR 115.7d newly chose becomes a target of the object
+          -- (CR 601.2c's event), so CR 702.21a's ward fires on it. Only what
+          -- CHANGED, per slot: unlike the copy arm above, the object already
+          -- held the targets it kept. Pawl.TargetSpec's Redirect group proves it.
+          after <- State.get
+          let changed = Map.differenceWith (\new old -> let fresh = Set.difference new old in if Set.null fresh then Nothing else Just fresh) (targetsOnStack oid after) before
+          Monad.unless (Map.null changed) (Event.becameTarget after oid kind aimer changed)
   Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and not belt and braces: the source can

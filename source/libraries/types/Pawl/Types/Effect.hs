@@ -845,4 +845,7 @@ data Effect card ability
   | -- | CR 701.69a: remove all marked damage from the permanents the ObjectRef
     -- names.
     Heal ObjectRef.ObjectRef
+  | -- | CR 115.7d: the resolving controller may choose new targets for each
+    -- spell or ability on the stack the ObjectRef names (Redirect).
+    ChooseNewTargets ObjectRef.ObjectRef
   deriving (Eq, Ord, Show)

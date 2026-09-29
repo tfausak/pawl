@@ -468,6 +468,7 @@ manaProduced effect = case effect of
   Effect.Repeat body -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Nothing
+  Effect.ChooseNewTargets _ -> Nothing
 
 -- CR 605.1a's fourth clause, asked of one effect: does it move a card to or from
 -- a library? The 2026-08-07 update added the clause, and `isManaAbility` folds
@@ -733,6 +734,7 @@ movesLibraryCard effect = case effect of
   Effect.Repeat body -> any movesLibraryCard body
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> any movesLibraryCard (process <> ifHolds)
   Effect.Heal _ -> False
+  Effect.ChooseNewTargets _ -> False
 
 -- Which zone an ObjectRef reaches, asked of libraries alone: does the ref name
 -- cards that may be IN one? movesLibraryCard's shared half, since CR 605.1a's
