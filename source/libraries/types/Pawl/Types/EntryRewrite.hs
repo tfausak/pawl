@@ -29,12 +29,12 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- SacrificeAnyNumber, ExileFromGraveyard, PayLifeOrTapped and SacrificeToEnter
 -- are the constructors whose choice SPENDS something. Each is paid inside the
 -- entry loop that made it, so the next member of a batch cannot choose what an
--- earlier one already spent (CR 614.13b), and for the first three that is the
--- whole of CR 614.12b: none can leave a later member owing what it cannot pay.
--- SacrificeToEnter can, and carries CR 614.12b's forward check --
--- Pawl.Engine.Event's arm states it. CR 614.13a is a separate exclusion and does
--- NOT fall out with it -- see Pawl.Engine.Replacement.graveyardCandidates for the
--- half that is unimplemented.
+-- earlier one already spent (CR 614.13b). The first three cannot be left owing
+-- what they cannot pay; SacrificeToEnter's fixed count can, so its arm carries
+-- CR 614.12b's forward check -- Pawl.Engine.Event states it. CR 614.13a is a
+-- separate exclusion and does NOT fall out with it -- see
+-- Pawl.Engine.Replacement.graveyardCandidates for the half that is
+-- unimplemented.
 data EntryRewrite ability effect
   = -- | CR 707.5 / 614.1c / Clone, Vesuva: "you may have this permanent enter as a
     -- copy of ...", the payload carrying which permanents the printed noun phrase

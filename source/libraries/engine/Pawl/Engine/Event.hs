@@ -2756,17 +2756,20 @@ apply batch candidate event =
       -- the rule allows (the SacrificeAnyNumber arm's argument); this one can be
       -- starved by an earlier member's choice. So the offer is narrowed to the
       -- sets that leave every member still to come able to pay its own
-      -- (Replacement.jointlyPayable) -- the members already materialized beside
-      -- this one are paid, and the ones not yet moved are read off
-      -- GameState.enteringPending. Where no set does, the rule forbids every
-      -- answer; it says nothing more, and the whole offer stands.
+      -- (Replacement.jointlyPayable) -- the members already moved have paid, and
+      -- the ones not yet moved are read off GameState.enteringPending. Where no
+      -- set does, the rule forbids every answer; it says nothing more, and the
+      -- whole offer stands. A token batch's siblings are materialized together
+      -- and not read: no token-making card in data/cards/ copies a card carrying
+      -- this row (see `unmake`).
       --
       -- CR 118.3: too few candidates is no payment at all, not a partial one.
       -- CR 614.13a: the object entering and its siblings are not candidates, the
       -- SacrificeAnyNumber arm's exclusion.
       --
-      -- Pawl.ReplacementSpec's "CR 614.12b" Heart of Yavimaya and Lake of the
-      -- Dead boards prove the narrowing.
+      -- Pawl.ReplacementSpec's "Fixed entry costs across a batch (CR 614.12b)"
+      -- proves the narrowing, over Heart of Yavimaya with Lake of the Dead and
+      -- with Lotus Vale.
       EntryRewrite.SacrificeToEnter (SacrificeToEnter.MkSacrificeToEnter n criterion) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -6396,171 +6399,171 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- proves. Pawl.DaytimeSpec's Dusklit Conjurer cases prove the rest,
               -- Double Major for the rule's copy clause and Exhume for CR 304.4.
               instantFace <- State.gets (showsInstantBackFace newId)
-              if refused
-                then pure Seq.empty
-                else
-                  if dest == Zone.Battlefield && instantFace
-                    then do
+              if refused || (dest == Zone.Battlefield && instantFace)
+                then
+                  if refused
+                    then pure Seq.empty
+                    else do
                       State.put unentered
                       if fromZone == Zone.Stack then changeZoneReturning oid Zone.Graveyard else pure Seq.empty
-                    else do
-                      -- CR 709.5h: an ability that triggers on a door opening fires "regardless
-                      -- of whether it was given that designation while entering the
-                      -- battlefield or after entering the battlefield", so the entry
-                      -- designation `unlocking` wrote into mkObj above needs its event too.
-                      -- Recorded rather than routed through unlockHalves, which would find the
-                      -- door already open and record nothing: writing the designation inside
-                      -- the move is what CR 709.5d's "as it enters" asks for, and the event is
-                      -- what CR 709.5h asks for -- two rules, and the entry is the one place
-                      -- they are not the same write.
-                      --
-                      -- BEFORE the Moved event, so a Room's own "when you unlock this door"
-                      -- and its "when this enters" are gathered in one scan with the door's
-                      -- event first. The two are simultaneous and CR 603.3b lets their
-                      -- controller order them on the stack, so nothing observable rides on
-                      -- which is logged first.
-                      --
-                      -- CR 709.5i's flag is computed here too, through the same
-                      -- `fullyUnlockedAfter` unlockHalves uses, and against the designations
-                      -- `mkObj` actually wrote. Reading `shown` back rather than the stored
-                      -- object, so the two writers answer the question the same way from the
-                      -- same input. Always False on THIS route, and that is CR 709.5d rather
-                      -- than a shortcut: an entry gives at most ONE designation, so a
-                      -- two-door Room can never arrive fully unlocked. CR 709.5i's second
-                      -- branch is reached from unlockHalves instead, which can give both at
-                      -- once.
-                      --
-                      -- The ACTOR is CR 110.2a's entry controller, the `chooser` above:
-                      -- rule 709.5d gives the designation with no player taking an action,
-                      -- and the permanent's own controller is the only player the rule
-                      -- connects to it -- which is also the player a Room's own "when you
-                      -- unlock this door" reads as "you" (CR 109.5).
-                      Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
-                        State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
-                      -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
-                      -- what an enters trigger scans -- alongside the id it had in `fromZone`,
-                      -- which is the key `lastKnown` is filed under and so the only route back
-                      -- once CR 400.7 has minted a new incarnation (CR 603.10a's look-back
-                      -- reads it). Recorded LAST, so the entry loop's choices are locked in
-                      -- before any trigger or SBA can observe the object.
-                      -- CR 608.3c and CR 303.4f: a permanent that ARRIVES attached became
-                      -- attached, which is the half Event.attach cannot record -- there is
-                      -- no CR 701.3 move here, the seed goes on the incarnation `mkObj`
-                      -- mints and the id it names did not exist a moment ago. Bramble
-                      -- Elemental's "whenever an Aura becomes attached to this creature"
-                      -- fires for a cast Pacifism through this line and for Crown of the
-                      -- Ages through the other one.
-                      --
-                      -- Gated on the SETTLED destination, `unlocking`'s reading: a seed
-                      -- rides along on every move (mkObj writes the field whatever the
-                      -- zone), and only the battlefield has attachments. CR 614.6's
-                      -- redirect elsewhere leaves it unread and unrecorded.
-                      --
-                      -- Carries `newId`, the CR 400.7 incarnation, rather than the id the
-                      -- Aura spell had on the stack: that is the object a trigger scan
-                      -- will find attached.
-                      --
-                      -- Read back off the ENTERED object rather than off `entrySeed`,
-                      -- which is what widened this line: the seed decides how the
-                      -- incarnation is minted, and the EntryRewrite.EntersAttachedTo arm
-                      -- writes Object.attachedTo during the CR 616.1 loop afterwards, so
-                      -- the seed alone would miss a permanent that arrived attached by
-                      -- its own static ability. Every seeded road still reaches it --
-                      -- `mkObj` writes the seed into this same field.
-                      settledHost <- State.gets (Game.lookupObject newId Monad.>=> Object.attachedTo)
-                      Monad.forM_ (if dest == Zone.Battlefield then settledHost else Nothing) $ \host ->
-                        State.modify'
-                          . recordEvent
-                          $ GameEvent.BecameAttached
-                            BecameAttached.MkBecameAttached
-                              { BecameAttached.attachment = newId,
-                                BecameAttached.host = host
-                              }
-                      -- CR 607.2b: this move ended in exile because somebody's replacement
-                      -- effect sent it there, so the arriving card is linked to THAT
-                      -- object. Filed here, at the one place the CR 400.7 incarnation
-                      -- first has an id, and before the Moved event so nothing can read
-                      -- the arrival with the link missing.
-                      --
-                      -- Resolve.recordExiledWith's diff runs afterwards and would
-                      -- otherwise file this same card against whatever effect was
-                      -- running; its insertWith keeps the entry already present, which is
-                      -- what makes this write the one that stands.
-                      --
-                      -- Every arrival is linked, not just the first: CR 712.21c gives an
-                      -- effect that finds what a melded permanent becomes both cards, and
-                      -- CR 607.2b's link is exactly such a finding.
-                      Monad.forM_ (if dest == Zone.Exile then exiledBy else Nothing) $ \linked ->
-                        Monad.forM_ arrivals $ \arrival ->
-                          State.modify' (\g -> g {GameState.exiledWith = Map.insert arrival ExileLink.MkExileLink {ExileLink.source = linked, ExileLink.ability = Nothing} (GameState.exiledWith g)})
-                      -- ONE Moved event for the whole move, which is CR 712.21's first
-                      -- clause: one permanent leaves the battlefield. `newId` is the
-                      -- first arrival, so a trigger reading the destination end of this
-                      -- event finds one of the two cards, and the rest are announced by
-                      -- the CardArrived events below.
-                      --
-                      -- CR 712.21e's two halves come out of that split: an effect that
-                      -- needs the number of OBJECTS that changed zones folds the Moved
-                      -- events one at a time and sees one, and one that needs the number
-                      -- of CARDS folds this event and every CardArrived below and sees
-                      -- two (Pawl.Engine.Count.snapshotView, Pawl.MeldSpec).
-                      --
-                      -- The OTHER arrivals ride along in Moved.otherArrivals as well as in the
-                      -- CardArrived events below, which is CR 712.21c: "if an effect can
-                      -- find the new object that a melded permanent becomes as it leaves
-                      -- the battlefield, it finds both cards." eventBindings reads them
-                      -- through Moved.arrivals and binds CR 400.7e's `became` slot as a
-                      -- group, so a trigger's payload acts on each card. Empty for every
-                      -- move but this one.
-                      --
-                      -- CR 701.3d's "this includes if that Aura, Equipment, or
-                      -- Fortification leaves the battlefield": an attached permanent that
-                      -- is leaving becomes unattached from whatever it was on. Read off
-                      -- `obj`, the PRE-MOVE object, since CR 400.7 has already taken the
-                      -- live one away. Ahead of the Moved event, which is the order the
-                      -- rule's own sentence takes -- the unattachment is part of the
-                      -- leaving rather than a consequence of it.
-                      --
-                      -- The BATTLEFIELD conjunct is the rule's own scope; an object in any
-                      -- other zone carries no attachment for CR 701.3a to have made.
-                      Monad.when (fromZone == Zone.Battlefield) $
-                        Monad.forM_ (Object.attachedTo obj) (unattach oid)
-                      State.modify'
-                        . recordEvent
-                        . GameEvent.Moved
-                        $ Moved.MkMoved
-                          { Moved.change = ZoneChange.MkZoneChange oid newId fromZone dest,
-                            Moved.characteristics = snapshot,
-                            Moved.otherArrivals = trailingIds,
-                            -- One object left, `oid`: only a meld's entry departs more.
-                            Moved.otherDepartures = Seq.empty,
-                            -- CR 608.2n's own move and no other: `resolving` is True only
-                            -- at changeZoneResolvingReturning's door.
-                            Moved.duringResolution = resolving
+                else do
+                  -- CR 709.5h: an ability that triggers on a door opening fires "regardless
+                  -- of whether it was given that designation while entering the
+                  -- battlefield or after entering the battlefield", so the entry
+                  -- designation `unlocking` wrote into mkObj above needs its event too.
+                  -- Recorded rather than routed through unlockHalves, which would find the
+                  -- door already open and record nothing: writing the designation inside
+                  -- the move is what CR 709.5d's "as it enters" asks for, and the event is
+                  -- what CR 709.5h asks for -- two rules, and the entry is the one place
+                  -- they are not the same write.
+                  --
+                  -- BEFORE the Moved event, so a Room's own "when you unlock this door"
+                  -- and its "when this enters" are gathered in one scan with the door's
+                  -- event first. The two are simultaneous and CR 603.3b lets their
+                  -- controller order them on the stack, so nothing observable rides on
+                  -- which is logged first.
+                  --
+                  -- CR 709.5i's flag is computed here too, through the same
+                  -- `fullyUnlockedAfter` unlockHalves uses, and against the designations
+                  -- `mkObj` actually wrote. Reading `shown` back rather than the stored
+                  -- object, so the two writers answer the question the same way from the
+                  -- same input. Always False on THIS route, and that is CR 709.5d rather
+                  -- than a shortcut: an entry gives at most ONE designation, so a
+                  -- two-door Room can never arrive fully unlocked. CR 709.5i's second
+                  -- branch is reached from unlockHalves instead, which can give both at
+                  -- once.
+                  --
+                  -- The ACTOR is CR 110.2a's entry controller, the `chooser` above:
+                  -- rule 709.5d gives the designation with no player taking an action,
+                  -- and the permanent's own controller is the only player the rule
+                  -- connects to it -- which is also the player a Room's own "when you
+                  -- unlock this door" reads as "you" (CR 109.5).
+                  Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
+                    State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId (Maybe.fromMaybe pid under) half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
+                  -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
+                  -- what an enters trigger scans -- alongside the id it had in `fromZone`,
+                  -- which is the key `lastKnown` is filed under and so the only route back
+                  -- once CR 400.7 has minted a new incarnation (CR 603.10a's look-back
+                  -- reads it). Recorded LAST, so the entry loop's choices are locked in
+                  -- before any trigger or SBA can observe the object.
+                  -- CR 608.3c and CR 303.4f: a permanent that ARRIVES attached became
+                  -- attached, which is the half Event.attach cannot record -- there is
+                  -- no CR 701.3 move here, the seed goes on the incarnation `mkObj`
+                  -- mints and the id it names did not exist a moment ago. Bramble
+                  -- Elemental's "whenever an Aura becomes attached to this creature"
+                  -- fires for a cast Pacifism through this line and for Crown of the
+                  -- Ages through the other one.
+                  --
+                  -- Gated on the SETTLED destination, `unlocking`'s reading: a seed
+                  -- rides along on every move (mkObj writes the field whatever the
+                  -- zone), and only the battlefield has attachments. CR 614.6's
+                  -- redirect elsewhere leaves it unread and unrecorded.
+                  --
+                  -- Carries `newId`, the CR 400.7 incarnation, rather than the id the
+                  -- Aura spell had on the stack: that is the object a trigger scan
+                  -- will find attached.
+                  --
+                  -- Read back off the ENTERED object rather than off `entrySeed`,
+                  -- which is what widened this line: the seed decides how the
+                  -- incarnation is minted, and the EntryRewrite.EntersAttachedTo arm
+                  -- writes Object.attachedTo during the CR 616.1 loop afterwards, so
+                  -- the seed alone would miss a permanent that arrived attached by
+                  -- its own static ability. Every seeded road still reaches it --
+                  -- `mkObj` writes the seed into this same field.
+                  settledHost <- State.gets (Game.lookupObject newId Monad.>=> Object.attachedTo)
+                  Monad.forM_ (if dest == Zone.Battlefield then settledHost else Nothing) $ \host ->
+                    State.modify'
+                      . recordEvent
+                      $ GameEvent.BecameAttached
+                        BecameAttached.MkBecameAttached
+                          { BecameAttached.attachment = newId,
+                            BecameAttached.host = host
                           }
-                      -- CR 712.21's second clause: "two cards are put into the
-                      -- appropriate zone". One event per card AFTER the leading one,
-                      -- which the Moved event above already announces -- so CR 712.21's
-                      -- Example comes out as written, a "whenever a creature dies"
-                      -- ability seeing one event and a "whenever a card is put into a
-                      -- graveyard from anywhere" ability seeing two.
-                      --
-                      -- The departing id is the melded permanent's, as the Moved event's
-                      -- is: one permanent left, and CR 608.2h's record is filed under
-                      -- that id for both.
-                      --
-                      -- Each card's OWN destination rather than the move's, CR 903.9c
-                      -- splitting a melded commander's two cards across two zones.
-                      --
-                      -- No characteristics snapshot: the departing permanent's is on the
-                      -- Moved event beside this, and the arriving CARD is a live object
-                      -- in a public zone for a trigger to read.
-                      Monad.forM_ (fmap ((,) dest) trailingIds0 <> fmap ((,) Zone.Command) commandIds) $ \(zone, arrival) ->
-                        State.modify'
-                          . recordEvent
-                          . GameEvent.CardArrived
-                          $ ZoneChange.MkZoneChange oid arrival fromZone zone
-                      pure arrivals
+                  -- CR 607.2b: this move ended in exile because somebody's replacement
+                  -- effect sent it there, so the arriving card is linked to THAT
+                  -- object. Filed here, at the one place the CR 400.7 incarnation
+                  -- first has an id, and before the Moved event so nothing can read
+                  -- the arrival with the link missing.
+                  --
+                  -- Resolve.recordExiledWith's diff runs afterwards and would
+                  -- otherwise file this same card against whatever effect was
+                  -- running; its insertWith keeps the entry already present, which is
+                  -- what makes this write the one that stands.
+                  --
+                  -- Every arrival is linked, not just the first: CR 712.21c gives an
+                  -- effect that finds what a melded permanent becomes both cards, and
+                  -- CR 607.2b's link is exactly such a finding.
+                  Monad.forM_ (if dest == Zone.Exile then exiledBy else Nothing) $ \linked ->
+                    Monad.forM_ arrivals $ \arrival ->
+                      State.modify' (\g -> g {GameState.exiledWith = Map.insert arrival ExileLink.MkExileLink {ExileLink.source = linked, ExileLink.ability = Nothing} (GameState.exiledWith g)})
+                  -- ONE Moved event for the whole move, which is CR 712.21's first
+                  -- clause: one permanent leaves the battlefield. `newId` is the
+                  -- first arrival, so a trigger reading the destination end of this
+                  -- event finds one of the two cards, and the rest are announced by
+                  -- the CardArrived events below.
+                  --
+                  -- CR 712.21e's two halves come out of that split: an effect that
+                  -- needs the number of OBJECTS that changed zones folds the Moved
+                  -- events one at a time and sees one, and one that needs the number
+                  -- of CARDS folds this event and every CardArrived below and sees
+                  -- two (Pawl.Engine.Count.snapshotView, Pawl.MeldSpec).
+                  --
+                  -- The OTHER arrivals ride along in Moved.otherArrivals as well as in the
+                  -- CardArrived events below, which is CR 712.21c: "if an effect can
+                  -- find the new object that a melded permanent becomes as it leaves
+                  -- the battlefield, it finds both cards." eventBindings reads them
+                  -- through Moved.arrivals and binds CR 400.7e's `became` slot as a
+                  -- group, so a trigger's payload acts on each card. Empty for every
+                  -- move but this one.
+                  --
+                  -- CR 701.3d's "this includes if that Aura, Equipment, or
+                  -- Fortification leaves the battlefield": an attached permanent that
+                  -- is leaving becomes unattached from whatever it was on. Read off
+                  -- `obj`, the PRE-MOVE object, since CR 400.7 has already taken the
+                  -- live one away. Ahead of the Moved event, which is the order the
+                  -- rule's own sentence takes -- the unattachment is part of the
+                  -- leaving rather than a consequence of it.
+                  --
+                  -- The BATTLEFIELD conjunct is the rule's own scope; an object in any
+                  -- other zone carries no attachment for CR 701.3a to have made.
+                  Monad.when (fromZone == Zone.Battlefield) $
+                    Monad.forM_ (Object.attachedTo obj) (unattach oid)
+                  State.modify'
+                    . recordEvent
+                    . GameEvent.Moved
+                    $ Moved.MkMoved
+                      { Moved.change = ZoneChange.MkZoneChange oid newId fromZone dest,
+                        Moved.characteristics = snapshot,
+                        Moved.otherArrivals = trailingIds,
+                        -- One object left, `oid`: only a meld's entry departs more.
+                        Moved.otherDepartures = Seq.empty,
+                        -- CR 608.2n's own move and no other: `resolving` is True only
+                        -- at changeZoneResolvingReturning's door.
+                        Moved.duringResolution = resolving
+                      }
+                  -- CR 712.21's second clause: "two cards are put into the
+                  -- appropriate zone". One event per card AFTER the leading one,
+                  -- which the Moved event above already announces -- so CR 712.21's
+                  -- Example comes out as written, a "whenever a creature dies"
+                  -- ability seeing one event and a "whenever a card is put into a
+                  -- graveyard from anywhere" ability seeing two.
+                  --
+                  -- The departing id is the melded permanent's, as the Moved event's
+                  -- is: one permanent left, and CR 608.2h's record is filed under
+                  -- that id for both.
+                  --
+                  -- Each card's OWN destination rather than the move's, CR 903.9c
+                  -- splitting a melded commander's two cards across two zones.
+                  --
+                  -- No characteristics snapshot: the departing permanent's is on the
+                  -- Moved event beside this, and the arriving CARD is a live object
+                  -- in a public zone for a trigger to read.
+                  Monad.forM_ (fmap ((,) dest) trailingIds0 <> fmap ((,) Zone.Command) commandIds) $ \(zone, arrival) ->
+                    State.modify'
+                      . recordEvent
+                      . GameEvent.CardArrived
+                      $ ZoneChange.MkZoneChange oid arrival fromZone zone
+                  pure arrivals
 
 -- CR 712.21a: "if a melded permanent is put into its owner's graveyard or
 -- library, that player may arrange the two cards in any order." Answers the
