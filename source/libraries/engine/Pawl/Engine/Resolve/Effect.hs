@@ -5521,25 +5521,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- rescoped per run, ForEach's reason: a run whose discard found an empty hand
   -- must not read the card the previous run discarded.
   --
-  -- The chooser is whoever the payload names, which is Trade Secrets' target
-  -- opponent rather than the resolving controller. A reference naming several
-  -- players asks them in APNAP order until one repeats, and one naming nobody
-  -- ends the loop.
+  -- The chooser is the ONE player the payload names, which is Trade Secrets'
+  -- target opponent rather than the resolving controller, read through
+  -- askedChooser so CR 800.4g hands a departed chooser's ask to another player.
+  -- A reference naming anything but one player asks nobody and ends the loop.
   --
   -- Pawl.ZoneChangeSpec's Kindle the Carnage group proves both the second run and
-  -- the rescope, and its Trade Secrets group the chooser.
+  -- the rescope, and its Trade Secrets group the chooser. The CR 800.4g
+  -- reassignment is a fence here: no board lets a player leave the game partway
+  -- through a resolution.
   Effect.Repeat (Repeat.MkRepeat chooser body) -> do
     rescope <- State.gets (rescopeRun resolving (foldMap boundSlots body))
     let run runs = do
           State.modify' rescope
           applyLoopBody runSubgame resolving source controller legal chosen (foldMap boundSlots body) body
-          gs <- State.get
-          let ask done pid =
-                if done
-                  then pure True
-                  else fmap (== OptionalDecision.Exercises) (Game.choose (Prompt.ChooseRepeat (Decide.deciderFor pid gs) pid resolving runs))
-          again <- Monad.foldM ask False (apnapPlayersOf chooser legal controller gs)
-          Monad.when again (run (runs + 1))
+          asked <- askedChooser source controller legal chooser
+          Monad.forM_ asked $ \who -> do
+            gs <- State.get
+            again <- Game.choose (Prompt.ChooseRepeat (Decide.deciderFor who gs) who resolving runs)
+            Monad.when (again == OptionalDecision.Exercises) (run (runs + 1))
     run 1
   -- CR 608.2c: the process in written order, then its printed "if" asked of the
   -- state that run left -- live, so the tally the run's own mill just bound is
