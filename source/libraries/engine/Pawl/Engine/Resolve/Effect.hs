@@ -195,6 +195,7 @@ import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventGroup as EventGroup
+import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
@@ -3126,6 +3127,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.RemoveFromCombat {} -> False
   Effect.BecomesBlocked {} -> False
   Effect.SwitchBlockers {} -> False
+  Effect.ExchangeBlocks {} -> False
   Effect.AddPhases {} -> False
   Effect.EndTurn {} -> False
   Effect.EndCombatPhase {} -> False
@@ -4643,6 +4645,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       case Maybe.mapMaybe Recipient.objectOf (legalMany slot legal) of
         [firstAttacker, secondAttacker] -> Combat.switchBlockers firstAttacker secondAttacker gs
         _ -> gs
+  -- CR 509.3a's effect road, through Combat.exchangeBlocks, which owns the gate
+  -- and the events (Sorrow's Path). Both targets or nothing: CR 608.2b having
+  -- taken one away leaves no exchange to make.
+  Effect.ExchangeBlocks (ExchangeBlocks.MkExchangeBlocks firstSlot secondSlot) ->
+    State.modify' $ \gs ->
+      case (legalOne firstSlot legal >>= Recipient.objectOf, legalOne secondSlot legal >>= Recipient.objectOf) of
+        (Just firstBlocker, Just secondBlocker) -> Combat.exchangeBlocks firstBlocker secondBlocker gs
+        _ -> gs
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone entry mSlot _ placement duration) ->
     -- ONE object through CR 400.7's funnel, shared by the two arms below.
     let -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative
@@ -5124,7 +5134,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
                   fmap (reverse . snd) (Event.simultaneously (moveOne mAttack mBlocked riders now (Set.empty, []) arrival))
                 else do
-                  batch <- fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
+                  batch <- fmap (reverse . snd) (Event.simultaneously (Event.amongPending (if EntryRiders.underOwner frozen then Nothing else Just controller) (fmap fst arrivals) (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals)))
                   -- CR 613.7m: the members that entered the battlefield together
                   -- take their stamps in APNAP order, each seat choosing its own.
                   -- Not on the one-at-a-time road above, whose cards enter at

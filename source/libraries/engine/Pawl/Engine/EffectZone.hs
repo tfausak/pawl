@@ -172,6 +172,7 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.RemoveFromCombat _ -> Nothing
   Effect.BecomesBlocked _ -> Nothing
   Effect.SwitchBlockers _ -> Nothing
+  Effect.ExchangeBlocks _ -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
   Effect.Reveal {} -> Nothing

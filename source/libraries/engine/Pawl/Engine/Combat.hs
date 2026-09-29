@@ -1525,6 +1525,75 @@ switchBlockers first second gs =
                 Just defending -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked oid defending (Natural.length (Map.findWithDefault Set.empty oid moved)))) h
            in List.foldl' blocked (List.foldl' record switched arrivals) becameBlocked
 
+-- CR 509.3a's effect road, the one that makes a creature block ANEW: two
+-- blocking creatures are removed from combat, and then each blocks all the
+-- creatures the other was blocking (Sorrow's Path). Having left combat first,
+-- neither is a blocking creature when it blocks again, so rule 509.3a's "only
+-- if it wasn't a blocking creature at that time" is met and both of CR 509.1i's
+-- grouped events are recorded -- which is how rule 509.3e's blocker-side forms
+-- see a creature that now blocks a different number, or a different quality,
+-- of attackers. Pawl.CombatCostSpec's ExchangeBlocks group is the proof.
+--
+-- The GATE is the printed "if each of those creatures could block all creatures
+-- that the other is blocking", all or nothing: CR 509.1b's pairwise
+-- restrictions (pairAllowed), the creature's CR 509.1a arity, and canBlock's
+-- per-creature questions: CR 509.1a's "must be untapped" and CR 509.1b's
+-- restrictions on the creature itself (Blind-Spot Giant), which CR 506.4a
+-- leaves standing in combat once they bite. Only attackers
+-- still attacking count, so one whose attackers have all left combat hands the
+-- other nothing and it is removed from combat to block nothing.
+--
+-- The attackers keep their keys throughout, which is CR 509.1h: they never
+-- stopped being blocked, so no GameEvent.AttackerBlocked is recorded.
+exchangeBlocks :: ObjectId -> ObjectId -> GameState -> GameState
+exchangeBlocks first second gs =
+  let c = GameState.combat gs
+      attacking = Map.keys (Combat.attackers c)
+      blocking blocker = Set.fromList (filter (\attacker -> Set.member blocker (blockersOf attacker gs)) attacking)
+      onFirst = blocking first
+      onSecond = blocking second
+      arity = blockArityGiven [first, second] gs
+      couldBlock blocker attackers =
+        Set.null attackers
+          || ( maybe False (\pid -> canBlock pid blocker gs) (Projection.controllerOf blocker gs)
+                 && withinLimit (arity blocker) (Set.size attackers)
+                 && all (\attacker -> pairAllowed [first, second] attacking blocker attacker gs) (Set.toList attackers)
+             )
+      isBlocker oid = any (Set.member oid) (Map.elems (Combat.blockers c))
+      removed = Game.removeFromCombat second (Game.removeFromCombat first gs)
+      pairs = fmap (\attacker -> (first, attacker)) (Set.toList onSecond) <> fmap (\attacker -> (second, attacker)) (Set.toList onFirst)
+      add m (blocker, attacker) = Map.insertWith Set.union attacker (Set.singleton blocker) m
+      rc = GameState.combat removed
+      moved = List.foldl' add (Combat.blockers rc) pairs
+      controllerOf oid = Projection.controllerOf oid gs
+      joined = Map.union (Map.fromList (Maybe.mapMaybe (\(b, _) -> fmap (\p -> (b, p)) (controllerOf b)) pairs)) (Combat.joinedUnder rc)
+      exchanged = removed {GameState.combat = rc {Combat.blockers = moved, Combat.joinedUnder = joined}}
+      -- CR 608.2f: one action, so every pair reads the board as it stood
+      -- BEFORE the exchange, for switchBlockers' reason.
+      record h (blocker, attacker) =
+        Event.recordEvent
+          ( GameEvent.BecameBlocking
+              ( BecameBlocking.MkBecameBlocking
+                  { BecameBlocking.blocker = blocker,
+                    BecameBlocking.attacker = attacker,
+                    BecameBlocking.producer = BlockProducer.ByEffect (Map.findWithDefault Set.empty attacker moved),
+                    BecameBlocking.attackerWasBlocked = isBlocked attacker gs,
+                    BecameBlocking.blockersBefore = blockersOf attacker gs
+                  }
+              )
+          )
+          h
+      blocks h (blocker, attackers) =
+        if Set.null attackers
+          then h
+          else Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h
+   in if first == second
+        || not (isBlocker first)
+        || not (isBlocker second)
+        || not (couldBlock first onSecond && couldBlock second onFirst)
+        then gs
+        else List.foldl' blocks (List.foldl' record exchanged pairs) [(first, onSecond), (second, onFirst)]
+
 -- Every creature currently IN combat: the attackers, plus everything still
 -- blocking one of them. Not the keys of Combat.joinedUnder, which can outlive the
 -- record it was taken for.

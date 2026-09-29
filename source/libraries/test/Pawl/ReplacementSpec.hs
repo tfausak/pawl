@@ -22,6 +22,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Pawl.DamageReplacementSpec (graveyardNames)
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
@@ -1263,6 +1264,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   thromokSpec s registry
   undergrowthScavengerSpec s registry
   entryBudgetSpec s registry
+  fixedEntryCostSpec s registry
   warLeechSpec s registry
   faerieSquadronSpec s registry
   grifterBladeSpec s registry
@@ -2739,6 +2741,111 @@ entryBudgetSpec s registry =
       Spec.assertEqWith s "three tokens survived, each a 1/1 off one Forest" (fmap (\oid -> S.powerToughnessOf oid after) (tokensOnBattlefield after)) [Just (1, 1), Just (1, 1), Just (1, 1)]
       Spec.assertEqWith s "three of the five entry costs found something to spend" asks 3
       Spec.assertEqWith s "all three lands went, one apiece" (filter (\oid -> Set.member oid (GameState.battlefield after)) sacrificeable) []
+
+-- CR 614.12b's fixed-cost board: alice controls three untapped Mountains and a
+-- Llanowar Elves to pay for Splendid Reclamation ({3}{G}) with nothing that is
+-- a Forest, a Swamp or an untapped land once it is paid, then one permanent per
+-- printing in `lands`, in order, with the `tapped` ones tapped. Her graveyard
+-- holds one card per printing in `buried`, in order -- the order the
+-- Reclamation's one-at-a-time funnel moves them in. Returns the state, the
+-- Reclamation's hand id and the land ids in the order given.
+reclamationBoard :: (Printing.Printing, Printing.Printing, Printing.Printing) -> [(Printing.Printing, Bool)] -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId])
+reclamationBoard (mountain, elves, reclamation) lands buried =
+  let base = S.landsInPlay mountain 3
+      (_, board1) = S.addPermanent elves S.alice base
+      addLand (ids, g) (p, tapped) =
+        let (oid, g1) = S.addPermanent p S.alice g
+         in (ids <> [oid], if tapped then S.tapObject oid g1 else g1)
+      (landIds, board2) = List.foldl' addLand ([], board1) lands
+      board3 = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) board2 buried
+      (held, board4) = S.addHandCard reclamation S.alice board3
+   in ( board4
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held,
+        landIds
+      )
+
+-- Sacrifice the `preferred` permanents whenever they are offered, filling the
+-- rest of the count from the head of the offer. Pinned by id, so an engine that
+-- offered a preferred permanent cannot be rescued by an answerer searching for a
+-- legal set.
+sacrificesPreferring :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+sacrificesPreferring preferred p = case p of
+  Prompt.ChooseSacrifices _ _ _ candidates n _ -> Set.fromList (List.genericTake n (List.sortOn (`List.notElem` preferred) candidates))
+  _ -> S.identityAnswer p
+
+-- How many of alice's permanents carry this name.
+onBattlefieldNamed :: String -> GameState.GameState -> Int
+onBattlefieldNamed name = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack name)) S.alice
+
+fixedEntryCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fixedEntryCostSpec s registry =
+  Spec.describe s "Fixed entry costs across a batch (CR 614.12b)" $ do
+    -- THE PROVING BOARD. Heart of Yavimaya ("sacrifice a Forest instead") moves
+    -- first and Lake of the Dead ("sacrifice a Swamp instead") second, over a
+    -- Bayou (Swamp Forest) and a Forest. Heart's greedy answer is the Bayou,
+    -- which would leave the Lake no Swamp and send it back to the graveyard; CR
+    -- 614.12b forbids that choice, so Heart is offered the Forest alone and asked
+    -- nothing.
+    Spec.it s "an earlier choice may not starve a later fixed cost (CR 614.12b)" $ do
+      prints <- (,,) <$> S.printingOf s registry "Mountain" <*> S.printingOf s registry "Llanowar Elves" <*> S.printingOf s registry "Splendid Reclamation"
+      bayou <- S.printingOf s registry "Bayou"
+      forest <- S.printingOf s registry "Forest"
+      heart <- S.printingOf s registry "Heart of Yavimaya"
+      lake <- S.printingOf s registry "Lake of the Dead"
+      let (gs, held, landIds) = reclamationBoard prints [(bayou, False), (forest, False)] [heart, lake]
+          bayouId = take 1 landIds
+          play = S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority
+          after = S.runPure (sacrificesPreferring bayouId) gs play
+      Spec.assertEqWith s "Lake of the Dead entered" (onBattlefieldNamed "Lake of the Dead" after) 1
+      Spec.assertEqWith s "and Heart of Yavimaya beside it" (onBattlefieldNamed "Heart of Yavimaya" after) 1
+      Spec.assertEqWith s "the Forest and the Bayou paid for them" (List.sort (graveyardNames S.alice after)) (fmap (CardName.MkCardName . Text.pack) ["Bayou", "Forest", "Splendid Reclamation"])
+      Spec.assertEqWith s "Heart was offered one Forest, so nobody was asked" (sacrificeAsks (answersFor (sacrificesPreferring bayouId) gs play)) 0
+    -- The control, differing in one thing: no Lake behind the Heart. Now nothing
+    -- is owed later, so Heart is offered both and the greedy answer takes the
+    -- Bayou -- the narrowing above is the Lake's, not the arm's.
+    Spec.it s "with nothing owed later, the whole offer stands" $ do
+      prints <- (,,) <$> S.printingOf s registry "Mountain" <*> S.printingOf s registry "Llanowar Elves" <*> S.printingOf s registry "Splendid Reclamation"
+      bayou <- S.printingOf s registry "Bayou"
+      forest <- S.printingOf s registry "Forest"
+      heart <- S.printingOf s registry "Heart of Yavimaya"
+      let (gs, held, landIds) = reclamationBoard prints [(bayou, False), (forest, False)] [heart]
+          bayouId = take 1 landIds
+          play = S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority
+          after = S.runPure (sacrificesPreferring bayouId) gs play
+      Spec.assertEqWith s "Heart of Yavimaya entered" (onBattlefieldNamed "Heart of Yavimaya" after) 1
+      Spec.assertEqWith s "paid for with the Bayou it was asked about" (List.sort (graveyardNames S.alice after)) (fmap (CardName.MkCardName . Text.pack) ["Bayou", "Splendid Reclamation"])
+      Spec.assertEqWith s "one prompt, over both" (sacrificeAsks (answersFor (sacrificesPreferring bayouId) gs play)) 1
+    -- A demand of TWO: Lotus Vale's "sacrifice two untapped lands" behind the
+    -- Heart, over an untapped Forest, a tapped Forest and an untapped Island.
+    -- Taking the untapped Forest would leave the Vale one untapped land, so the
+    -- Heart gets the tapped one.
+    Spec.it s "a later demand of two is counted whole (CR 614.12b, CR 118.3)" $ do
+      prints <- (,,) <$> S.printingOf s registry "Mountain" <*> S.printingOf s registry "Llanowar Elves" <*> S.printingOf s registry "Splendid Reclamation"
+      forest <- S.printingOf s registry "Forest"
+      island <- S.printingOf s registry "Island"
+      heart <- S.printingOf s registry "Heart of Yavimaya"
+      vale <- S.printingOf s registry "Lotus Vale"
+      let (gs, held, landIds) = reclamationBoard prints [(forest, False), (forest, True), (island, False)] [heart, vale]
+          untappedForest = take 1 landIds
+          play = S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority
+          after = S.runPure (sacrificesPreferring untappedForest) gs play
+      Spec.assertEqWith s "Lotus Vale entered" (onBattlefieldNamed "Lotus Vale" after) 1
+      Spec.assertEqWith s "and Heart of Yavimaya beside it" (onBattlefieldNamed "Heart of Yavimaya" after) 1
+      Spec.assertEqWith s "both Forests and the Island paid for them" (List.sort (graveyardNames S.alice after)) (fmap (CardName.MkCardName . Text.pack) ["Forest", "Forest", "Island", "Splendid Reclamation"])
+    -- CR 614.1a's other branch: played from hand with no Swamp to sacrifice, the
+    -- Lake is put into its owner's graveyard instead of entering.
+    Spec.it s "with nothing to sacrifice, the land goes to the graveyard instead (CR 614.1a)" $ do
+      forest <- S.printingOf s registry "Forest"
+      lake <- S.printingOf s registry "Lake of the Dead"
+      let (lakeId, gs) = S.addHandCard lake S.alice (S.landsInPlay forest 1)
+          after = S.runPure S.identityAnswer gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice} (Cast.playLand False S.alice lakeId Nothing)
+      Spec.assertEqWith s "no Lake of the Dead entered" (onBattlefieldNamed "Lake of the Dead" after) 0
+      Spec.assertEqWith s "it is in alice's graveyard" (graveyardNames S.alice after) [CardName.MkCardName (Text.pack "Lake of the Dead")]
+      Spec.assertEqWith s "and the Forest is untouched" (onBattlefieldNamed "Forest" after) 1
 
 -- alice controls `mountains` untapped Mountains and `forests` untapped Forests
 -- in a precombat main phase with priority, holding one card per printing in
