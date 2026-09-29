@@ -3105,7 +3105,7 @@ hyenaUmbraSpec s registry = Spec.describe s "Hyena Umbra (CR 702.89a)" $ do
 -- against api.scryfall.com 2026-09-18).
 --
 -- The pool's dredge producer and the only row rule 702 mints into a GRAVEYARD:
--- Pawl.Engine.Keyword.graveyardReplacementsOf builds it off the printed face and
+-- Pawl.Engine.Keyword.graveyardReplacementsOf builds it off the card's keywords and
 -- Pawl.Engine.Projection.replacementsAffecting's graveyard walk gathers it, so
 -- nothing has to be cast for the row to stand.
 --
