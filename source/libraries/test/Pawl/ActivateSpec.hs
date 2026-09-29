@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
@@ -45,9 +46,11 @@ import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
@@ -64,6 +67,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -73,6 +77,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
+import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -91,8 +96,10 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
+import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -402,10 +409,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
             S.bob
             S.beginningOfCombat
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget piker],
-              S.choiceManaSources = Seq.singleton (Just forest),
-              S.choiceCostOrder = Just [0, 1]
+          Choices.none
+            { Choices.targets = Just [piker],
+              Choices.manaSources = Seq.singleton (Just forest),
+              Choices.costOrder = Just [0, 1]
             }
         script =
           S.turn
@@ -421,7 +428,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
            in go 8
     built <- S.buildBoardOrFail s registry setup
     (_, after) <- S.runScriptOrFail s script built toEndOfCombat
-    let alias name = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
+    let alias name = Map.lookup (Label.MkLabel (Text.pack name)) (Staged.objects built)
         onField oid = Set.member oid (GameState.battlefield after)
     Spec.assertEqWith s "CR 701.19a the Piker survives, and the Lifebreather that shielded it does not" (fmap onField (alias "piker"), fmap onField (alias "breather")) (Just True, Just False)
     Spec.assertEqWith
@@ -2137,7 +2144,7 @@ desertBoard piker desert =
 
 -- The board the two whole-card tests share: alice's Piker, already able to
 -- attack, against bob's Desert, at the beginning of combat.
-desertDuel :: S.Board
+desertDuel :: Board.Board
 desertDuel =
   S.duel
     S.beginningOfCombat
@@ -2223,9 +2230,9 @@ printedActivationRestrictionSpec s registry = Spec.describe s "PrintedActivation
     let attacker = S.aliasRef "attacker"
         desert = S.aliasRef "desert"
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget attacker],
-              S.choiceManaSources = Seq.singleton Nothing
+          Choices.none
+            { Choices.targets = Just [attacker],
+              Choices.manaSources = Seq.singleton Nothing
             }
         script =
           S.turn
@@ -6133,18 +6140,18 @@ instantSpeedEquipSpec s registry = Spec.describe s "InstantSpeedEquip" $ do
           )
           active
           step
-      onPiker = S.noChoices {S.choiceTargets = Just [S.MkObjectTarget piker]}
-      paying = onPiker {S.choiceManaSources = Seq.singleton (Just (S.aliasRef "mana"))}
+      onPiker = Choices.none {Choices.targets = Just [piker]}
+      paying = onPiker {Choices.manaSources = Seq.singleton (Just (S.aliasRef "mana"))}
       equipAt step choices = S.turn 1 [S.on step S.alice (S.activateAction splitter choices)]
       attachedTo built after =
         ( do
-            splitterId <- Map.lookup (S.MkObjectAlias (Text.pack "splitter")) (S.builtAliases built)
-            pikerId <- Map.lookup (S.MkObjectAlias (Text.pack "piker")) (S.builtAliases built)
+            splitterId <- Map.lookup (Label.MkLabel (Text.pack "splitter")) (Staged.objects built)
+            pikerId <- Map.lookup (Label.MkLabel (Text.pack "piker")) (Staged.objects built)
             object <- Game.lookupObject splitterId after
             pure (Object.attachedTo object == Just (Recipient.ToCreature pikerId))
         )
-      refused script board = case S.runScript script board S.priorityGame of
-        Left (S.MkActionNotOffered _ (S.MkActivate {}) _) -> pure ()
+      refused script board = case Scenario.rehearse script board S.priorityGame of
+        Left (ScenarioFailure.MkActionNotOffered _ (Move.Activate {}) _) -> pure ()
         Left failure -> Spec.assertFailure s (S.renderFailure failure)
         Right _ -> Spec.assertFailure s "the equip was offered anyway"
   Spec.it s "CR 602.5e with Leonin Shikari alice equips during bob's turn" $ do
@@ -6160,7 +6167,7 @@ instantSpeedEquipSpec s registry = Spec.describe s "InstantSpeedEquip" $ do
   -- line makes the turn's first equip cost {0}, which the script chooses.
   Spec.it s "CR 602.5e with Forge Anew alice equips in her own beginning of combat" $ do
     built <- S.buildBoardOrFail s registry (setup S.alice S.beginningOfCombat ["Forge Anew"])
-    (_, after) <- S.runScriptOrFail s (equipAt S.beginningOfCombat onPiker {S.choiceCost = Just (ManaCost.MkManaCost []), S.choiceManaSources = Seq.singleton Nothing}) built S.priorityGame
+    (_, after) <- S.runScriptOrFail s (equipAt S.beginningOfCombat onPiker {Choices.cost = Just (ManaCost.MkManaCost []), Choices.manaSources = Seq.singleton Nothing}) built S.priorityGame
     Spec.assertEqWith s "the Bonesplitter is on the Piker" (attachedTo built after) (Just True)
     Spec.assertEqWith s "CR 118.9 the {0} was paid: nothing tapped" (S.tappedCount S.alice after) 0
   Spec.it s "CR 602.5d without Forge Anew it is not offered there" $ do

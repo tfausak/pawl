@@ -125,7 +125,8 @@ data GameState = MkGameState
     lastKnown :: Map.Map ObjectId.ObjectId LastKnown.LastKnown,
     -- | CR 608.2h for a STACK object, keyed by the id it had before it left the
     -- stack (CR 400.7): the whole object, so an effect armed while it was still
-    -- there can put a copy of it onto the stack afterwards (CR 707.10).
+    -- there can put a copy of it onto the stack afterwards (CR 707.10), or cast
+    -- one from exile (rule 702.192a's paradigm).
     --
     -- The whole object and not a LastKnown record, because CR 707.10 copies the
     -- DECISIONS -- the modes, the targets, the value of X, the announced costs --
@@ -412,6 +413,10 @@ data GameState = MkGameState
     -- clears. Pawl.Engine.Count's EventShape.SpellCastThisGame fold joins it
     -- to the live log.
     castsBeforeThisTurn :: Seq.Seq SpellWasCast.SpellWasCast,
+    -- | CR 702.192a: the names of the spells each player controlled that have
+    -- resolved this game, as they resolved, written by
+    -- Pawl.Engine.Resolve.noteResolved.
+    resolvedNames :: Map.Map PlayerId.PlayerId (Set.Set CardName.CardName),
     -- | CR 725: objects exiled "until an opponent becomes the monarch", keyed
     -- by the exiled incarnation, swept by
     -- Pawl.Engine.Monarch.returnExiledForMonarch. Not an Expiry, which cannot

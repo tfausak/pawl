@@ -18,16 +18,20 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -391,8 +395,8 @@ doubleEachKindSpec s registry = Spec.describe s "CR 701.10e doubling each kind o
           ( [ S.settled "vorel" "Vorel of the Hull Clade",
               S.settled "forest" "Forest",
               S.settled "island" "Island",
-              (S.settled "taker" "Goblin Piker") {S.objectCounters = Map.fromList [(CounterKind.PlusOnePlusOne, 3), (CounterKind.Keyword Keyword.Flying, 2)]},
-              (S.settled "decoy" "Goblin Piker") {S.objectCounters = Map.singleton CounterKind.PlusOnePlusOne 1}
+              (S.settled "taker" "Goblin Piker") {Placement.counters = Map.fromList [(CounterKind.PlusOnePlusOne, 3), (CounterKind.Keyword Keyword.Flying, 2)]},
+              (S.settled "decoy" "Goblin Piker") {Placement.counters = Map.singleton CounterKind.PlusOnePlusOne 1}
             ]
               <> extra
           )
@@ -401,12 +405,12 @@ doubleEachKindSpec s registry = Spec.describe s "CR 701.10e doubling each kind o
         S.turn
           1
           [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "vorel") $
-              S.noChoices
-                { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "taker")],
-                  S.choiceManaSources = Seq.fromList [Just (S.aliasRef "forest"), Just (S.aliasRef "island")]
+              Choices.none
+                { Choices.targets = Just [S.aliasRef "taker"],
+                  Choices.manaSources = Seq.fromList [Just (S.aliasRef "forest"), Just (S.aliasRef "island")]
                 }
           ]
-      aliasIn name built = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
+      aliasIn name built = Map.lookup (Label.MkLabel (Text.pack name)) (Staged.objects built)
   -- THE CASE THIS GROUP EXISTS FOR. 3 -> 6 and 2 -> 4, so doubling is not adding
   -- one, and each kind doubles by its OWN count rather than by the sum (5).
   Spec.it s "CR 701.10e whole card: every kind on Vorel's target doubles by its own count" $ do
@@ -438,21 +442,21 @@ doubleEachKindSpec s registry = Spec.describe s "CR 701.10e doubling each kind o
     let bairnBoard =
           S.duel
             S.precombatMain
-            [ (S.settled "bairn" "Gilder Bairn") {S.objectTapState = TapState.Tapped},
+            [ (S.settled "bairn" "Gilder Bairn") {Placement.tapped = TapState.Tapped},
               S.settled "forest1" "Forest",
               S.settled "forest2" "Forest",
               S.settled "forest3" "Forest",
-              (S.settled "jace" "Jace Beleren") {S.objectCounters = Map.singleton CounterKind.Loyalty 3},
-              (S.settled "decoy" "Goblin Piker") {S.objectCounters = Map.singleton CounterKind.PlusOnePlusOne 1}
+              (S.settled "jace" "Jace Beleren") {Placement.counters = Map.singleton CounterKind.Loyalty 3},
+              (S.settled "decoy" "Goblin Piker") {Placement.counters = Map.singleton CounterKind.PlusOnePlusOne 1}
             ]
             []
         bairnScript =
           S.turn
             1
             [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "bairn") $
-                S.noChoices
-                  { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "jace")],
-                    S.choiceManaSources = Seq.fromList [Just (S.aliasRef "forest1"), Just (S.aliasRef "forest2"), Just (S.aliasRef "forest3")]
+                Choices.none
+                  { Choices.targets = Just [S.aliasRef "jace"],
+                    Choices.manaSources = Seq.fromList [Just (S.aliasRef "forest1"), Just (S.aliasRef "forest2"), Just (S.aliasRef "forest3")]
                   }
             ]
     built <- S.buildBoardOrFail s registry bairnBoard
@@ -522,22 +526,22 @@ doubleEachTargetSpec s registry = Spec.describe s "CR 701.10e doubling each kind
           S.turn
             1
             [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "amplifier") $
-                S.noChoices
-                  { S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
+                Choices.none
+                  { Choices.modes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
                     -- CR 605.3a: the untapped Amplifier is itself a mana source, so
                     -- the payment asks for an extra one; Nothing declines it.
-                    S.choiceManaSources = Seq.fromList (fmap (Just . S.aliasRef) ["f1", "f2", "f3", "f4"]) Seq.|> Nothing
+                    Choices.manaSources = Seq.fromList (fmap (Just . S.aliasRef) ["f1", "f2", "f3", "f4"]) Seq.|> Nothing
                   }
             ]
         playerCounters pid gs = maybe Map.empty Player.counters (Map.lookup pid (GameState.players gs))
     built <- S.buildBoardOrFail s registry amplifierBoard
     let stocked =
           built
-            { S.builtState =
+            { Staged.state =
                 S.addPlayerCounter PlayerCounterKind.Poison 1 S.bob
                   . S.addPlayerCounter PlayerCounterKind.Poison 2 S.alice
                   . S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice
-                  $ S.builtState built
+                  $ Staged.state built
             }
     (_, after) <- S.runScriptOrFail s script stocked S.priorityGame
     Spec.assertEqWith s "alice has six energy and four poison, and still no other kind" (playerCounters S.alice after) (Map.fromList [(PlayerCounterKind.Energy, 6), (PlayerCounterKind.Poison, 4)])

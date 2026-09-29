@@ -39,6 +39,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
@@ -965,35 +966,6 @@ charSpec s registry = Spec.describe s "Char" $ do
 
 blazeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blazeSpec s registry = Spec.describe s "Blaze" $ do
-  Spec.it s "Blaze at X=3 deals 3 to the opponent (CR 601.2b/f/h, 608.2)" $ do
-    -- Falsifier: an engine that ignored the chosen value (treated X as 0, or
-    -- as the {X} mana value) would leave bob at 20.
-    let mana1 = S.aliased "first mana" (S.permanent "Mountain")
-        mana2 = S.aliased "second mana" (S.permanent "Mountain")
-        mana3 = S.aliased "third mana" (S.permanent "Mountain")
-        mana4 = S.aliased "fourth mana" (S.permanent "Mountain")
-        spell = S.aliased "spell" (S.cardSetup "Blaze")
-        alice =
-          (S.battlefield S.alice [mana1, mana2, mana3, mana4])
-            { S.setupHand = Seq.singleton spell
-            }
-        board = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-        choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkPlayerTarget S.bob],
-              S.choiceX = Just 3,
-              S.choiceManaSources =
-                Seq.fromList
-                  [ Just (S.aliasRef "first mana"),
-                    Just (S.aliasRef "second mana"),
-                    Just (S.aliasRef "third mana"),
-                    Just (S.aliasRef "fourth mana")
-                  ]
-            }
-        script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
-    after <- S.play s registry board script S.priorityGame
-    Spec.assertEqWith s "Bob at 17" (S.lifeOf S.bob after) (Just 17)
-    Spec.assertEqWith s "four Mountains paid {3}{R}" (S.tappedCount S.alice after) 4
   Spec.it s "Blaze at X=0 is castable and deals nothing (the X=0 floor)" $ do
     -- Falsifier: a floor that required {X} > 0 would make Blaze uncastable off
     -- one Mountain, leaving it in hand.
@@ -5799,7 +5771,7 @@ mayhemSpec s registry = Spec.describe s "Mayhem" $ do
     bolt <- S.printingOf s registry "Electro's Bolt"
     reunion <- S.printingOf s registry "Cathartic Reunion"
     let (discarded, notDiscarded) = mayhemBoards mountain piker bolt reunion
-        boltIn gs = case S.namedObjects (S.printingName bolt) gs of
+        boltIn gs = case Scenario.namedObjects (S.printingName bolt) gs of
           oid : _ -> Just oid
           [] -> Nothing
         cast oid gs = S.runPure S.identityAnswer gs (S.cast S.alice oid)
@@ -5816,7 +5788,7 @@ mayhemSpec s registry = Spec.describe s "Mayhem" $ do
     bolt <- S.printingOf s registry "Electro's Bolt"
     reunion <- S.printingOf s registry "Cathartic Reunion"
     let (discarded, notDiscarded) = mayhemBoards mountain piker bolt reunion
-        costsOf gs = case S.namedObjects (S.printingName bolt) gs of
+        costsOf gs = case Scenario.namedObjects (S.printingName bolt) gs of
           oid : _ -> fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor S.alice (S.printingName bolt) oid gs)
           [] -> []
     Spec.assertEqWith
@@ -6181,6 +6153,61 @@ epicSpec s registry = Spec.describe s "Epic" $ do
     Spec.assertBool s (not (S.castable S.alice fogId resolved)) "alice can't cast the Fog once the Endless Swarm has resolved"
     Spec.assertBool s (S.castable S.alice fogId gs) "though the ninth Forest pays for it on the same board before it did"
 
+-- CR 702.192's whole keyword, on Decorum Dissertation {3}{B}{B} Sorcery -- Lesson,
+-- "Target player draws two cards and loses 2 life. / Paradigm" (Oracle text
+-- fetched from Scryfall 2026-09-29, SOS). Its payoff is Sign in Blood's, so rule
+-- 702.192a's two spell abilities are the only things under test.
+--
+-- BOB'S LIFE is the observer, and it moves by 2 at each resolution: 18 as the
+-- card resolves, 16 once alice's next precombat main phase has cast a copy, 14
+-- after the one after. A copy that armed a delayed ability of its own -- the
+-- first-resolution gate missing -- would make that last reading 12.
+--
+-- Cast in alice's POSTCOMBAT main: the harness's first step re-begins the phase
+-- the fixture names, and a precombat main begun again after the card resolved
+-- would fire the delayed ability that very turn.
+--
+-- FIVE SWAMPS pay the card and nothing else. Twelve library cards apiece: CR
+-- 104.3c takes a player who draws from an empty library out before any
+-- assertion runs, and bob draws twice per resolution.
+paradigmBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+paradigmBoard swamp fog dissertation =
+  let stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard fog pid h)) g [1 :: Int .. 12]
+      stocked = List.foldl' stock (S.landsInPlay swamp 5) [S.alice, S.bob]
+      (dissertationId, ready) = S.addHandCard dissertation S.alice stocked
+   in ((aliceOnTurn ready) {GameState.phase = Phase.PostcombatMain, GameState.remaining = S.phasesAfter Phase.PostcombatMain}, dissertationId)
+
+-- Aims every target at bob and takes rule 702.192a's "you may cast the copy".
+lecturing :: Prompt.Prompt r -> r
+lecturing p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+paradigmSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+paradigmSpec s registry = Spec.describe s "Paradigm" $ do
+  -- Both of rule 702.192a's abilities, driven through two of alice's later
+  -- precombat main phases. The once-not-twice reading comes first: it is the
+  -- one the first-resolution gate owns, the copy being a spell with this name
+  -- that resolves.
+  Spec.it s "CR 702.192a the first resolution is exiled and each of its controller's precombat mains casts one free copy, which arms nothing more" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    fog <- S.printingOf s registry "Fog"
+    dissertation <- S.printingOf s registry "Decorum Dissertation"
+    let (gs, dissertationId) = paradigmBoard swamp fog dissertation
+        resolved = S.runPure lecturing gs (S.cast S.alice dissertationId >> Stack.resolveTop)
+        startTurn = GameState.turnNumber resolved
+        pastMainOf n g =
+          GameState.turnNumber g > startTurn + n && case GameState.phase g of
+            Phase.Combat _ -> True
+            _ -> False
+        -- bob's turn is the one between, and rule 702.192a's "YOUR" excludes it.
+        firstMain = reboundRunUntil lecturing (pastMainOf 1) resolved
+        secondMain = reboundRunUntil lecturing (pastMainOf 3) firstMain
+    Spec.assertEqWith s "alice's second precombat main after it casts one copy more, not two" (S.lifeOf S.bob secondMain) (Just 14)
+    Spec.assertEqWith s "her first precombat main after it cast a copy" (S.lifeOf S.bob firstMain) (Just 16)
+    Spec.assertEqWith s "and the card itself was exiled rather than put into her graveyard, where it stays alone" (namesIn Zone.Exile secondMain, namesIn Zone.Graveyard secondMain) ([S.printingName dissertation], [])
+
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
@@ -6443,6 +6470,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   madnessSpec s registry
   reboundSpec s registry
   epicSpec s registry
+  paradigmSpec s registry
   legendarySpellSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).

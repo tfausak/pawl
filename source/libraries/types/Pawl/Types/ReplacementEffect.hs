@@ -17,6 +17,7 @@ import qualified Pawl.Types.ScryR as ScryR
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.UntapR as UntapR
+import qualified Pawl.Types.VillainousChoiceR as VillainousChoiceR
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- | CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
@@ -202,5 +203,8 @@ data ReplacementEffect card ability effect
   | -- | CR 701.22a / 614.1a: "if you would scry a number of cards, [...]
     -- instead" (Kenessos, Priest of Thassa; Eligeth, Crossroads Augur).
     ScryR ScryR.ScryR
+  | -- | CR 701.55c / 614.1a: "if an opponent would face a villainous choice, they
+    -- face that choice an additional time" (The Valeyard).
+    VillainousChoiceR VillainousChoiceR.VillainousChoiceR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

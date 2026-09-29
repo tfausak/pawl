@@ -25,3 +25,6 @@ spec s = Spec.describe s "Pawl.Codec.TapState" $ do
   Spec.it s "round trips every constructor" $ Common.assertEnumCodec s TapState.codec
   Spec.it s "has a schema" $
     Common.assertHasSchema s TapState.codec
+  Spec.it s "flag writes tapped as true and untapped as false" $ do
+    Common.assertCodec s TapState.flag TapState.Tapped " true "
+    Common.assertCodec s TapState.flag TapState.Untapped " false "

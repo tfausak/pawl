@@ -1,0 +1,35 @@
+module Pawl.Types.Move where
+
+import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
+import Numeric.Natural (Natural)
+import qualified Pawl.Types.Activation as Activation
+import qualified Pawl.Types.Casting as Casting
+import qualified Pawl.Types.Label as Label
+import qualified Pawl.Types.Reference as Reference
+
+-- | One decision a scenario makes for a player.
+data Move
+  = -- | CR 601.2.
+    Cast Casting.Casting
+  | -- | CR 305.1.
+    PlayLand Reference.Reference
+  | -- | CR 602.2.
+    Activate Activation.Activation
+  | -- | CR 508.1a.
+    Attack (Seq.Seq Reference.Reference)
+  | -- | CR 509.1a, each blocker to the attackers it blocks.
+    Block (Map.Map Reference.Reference (Set.Set Reference.Reference))
+  | -- | CR 510.1c-d, passed to the engine unvalidated so CR 510.1's checks stay
+    -- the engine's.
+    AssignDamage (Map.Map Reference.Reference Natural)
+  | -- | CR 506.2.
+    ChooseDefender Label.Label
+  | -- | CR 508.1b.
+    ChooseAttackTarget Reference.Reference
+  | -- | CR 104.3a.
+    Concede
+  | -- | CR 117.3d.
+    Pass
+  deriving (Eq, Ord, Show)

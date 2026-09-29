@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Replacement as Replacement
 import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, noSubgame, payGatePaid, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
@@ -73,6 +74,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
@@ -407,8 +409,10 @@ resolveSpellWith runSubgame oid = do
                     )
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
+                firstOfName <- noteResolved oid effectController
                 applyEpic oid effectController
-                encoded <- applyCipher oid effectController
+                exiled <- applyParadigm oid effectController firstOfName
+                encoded <- if exiled then pure True else applyCipher oid effectController
                 Monad.unless encoded (finishSpell oid face effectController)
 
 -- CR 702.174b's instant-and-sorcery half: "If this spell's gift cost was paid,
@@ -524,6 +528,54 @@ applyEpic oid controller = do
               Onset.Immediately
               (Just Expiry.Type.Never)
               g {GameState.stackArchive = Map.insert oid archived (GameState.stackArchive g)}
+
+-- CR 702.192a's "the first time a spell you control with this spell's name has
+-- resolved this game": file the resolving spell's names under its controller in
+-- GameState.resolvedNames, answering whether none of them was there already.
+--
+-- Called from both of CR 608.2's resolving roads -- here for an instant or
+-- sorcery, and from Pawl.Engine.Stack for a permanent spell -- and from neither
+-- fizzle, since a spell CR 608.2b removes did not resolve. The names come off
+-- the PROJECTION, so a spell that is a copy of another (CR 707.2) files the
+-- copied name. The permanent road is a REGRESSION FENCE: no permanent card in
+-- data/cards/ shares a paradigm card's name.
+noteResolved :: ObjectId -> PlayerId -> Game Bool
+noteResolved oid controller = do
+  gs <- State.get
+  let names = Projection.namesOf oid gs
+      earlier = Map.findWithDefault Set.empty controller (GameState.resolvedNames gs)
+  State.put gs {GameState.resolvedNames = Map.insertWith Set.union controller names (GameState.resolvedNames gs)}
+  pure (Set.disjoint names earlier)
+
+-- CR 702.192a's two SPELL abilities, performed as the last part of the spell's
+-- resolution in applyEpic's place and for its reason: the delayed ability, armed
+-- only where noteResolved answered that this is the first resolution of the name
+-- (`firstOfName`), and "exile this spell".
+--
+-- Answers whether the spell left the stack, applyCipher's answer, so
+-- finishSpell's move is skipped: the exile IS where the spell goes. A copy (CR
+-- 707.12's, the delayed ability's own) is exiled too and CR 704.5e then ends it.
+--
+-- The keyword is read off the PROJECTION, applyEpic's reading. The ability is
+-- armed with Expiry.Never for "for the rest of the game", epic's reason, and
+-- binds this id for Keyword.paradigmCopy to find in GameState.stackArchive.
+-- Pawl.CastSpec's "Paradigm" group proves both abilities.
+applyParadigm :: ObjectId -> PlayerId -> Bool -> Game Bool
+applyParadigm oid controller firstOfName = do
+  gs <- State.get
+  if not (Keyword.Engine.hasParadigm (Map.keysSet (Projection.keywordsOf oid gs)))
+    then pure False
+    else do
+      Monad.when firstOfName . State.modify' $
+        Event.armDelayed
+          Keyword.Engine.paradigmCopy
+          oid
+          controller
+          (Map.singleton Keyword.Engine.paradigmSlot (Binding.toObject oid))
+          Onset.Immediately
+          (Just Expiry.Type.Never)
+      Event.changeZone oid Zone.Exile
+      pure True
 
 -- CR 702.99a's spell ability, "if this spell is represented by a card, you may
 -- exile this card encoded on a creature you control", performed as the last
@@ -1034,8 +1086,11 @@ facedVillainously picked cIdx clause = case Clause.orElse clause of
 -- readable: the limb's reads are re-taken after the bind, where chosenBranch's
 -- callers had captured theirs before the question was put.
 --
--- Not implemented: rule 701.55c's replacement of one facing by several, which
--- would run this body's inner step more than once for the same seat (#3898).
+-- CR 701.55c: each seat's facing is first proposed as WouldFaceVillainousChoice,
+-- so a row like The Valeyard's can make it several -- the whole of rule 701.55a
+-- performed that many times for that seat, one at a time, each its own choice
+-- read off the board the previous one left. Pawl.ResolveSpec's "CR 701.55c The
+-- Valeyard: an opponent faces the choice twice" proves it.
 villainousPass :: ObjectId -> PlayerId -> ModeIndex -> Map.Map SlotName (Set Recipient) -> OrElse.OrElse -> NonEmpty.NonEmpty ClauseIndex -> (ClauseIndex -> Set PlayerId -> acc -> Game acc) -> acc -> Game acc
 villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
   gs <- State.get
@@ -1043,16 +1098,21 @@ villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
   -- drives two seats through this pass, so the payload is unproven here.
   fmap fst $
     Monad.foldM
-      ( \(acc, made) chooser -> do
-          gs1 <- State.get
-          answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs made)
-          let chosen = if elem answered limbs then answered else NonEmpty.head limbs
-          State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
-          performed <- performLimb chosen (Set.singleton chooser) acc
-          pure (performed, made Seq.|> (chooser, chosen))
+      ( \seat chooser -> do
+          outcome <- Event.applyReplacements (ProposedEvent.WouldFaceVillainousChoice chooser 1)
+          let times = maybe 0 (Natural.toIntSaturating . snd) (outcome >>= Replacement.asVillainousChoice)
+          Monad.foldM (\faced _ -> face chooser faced) seat (List.replicate times ())
       )
       (acc0, Seq.empty)
       (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+  where
+    face chooser (acc, made) = do
+      gs1 <- State.get
+      answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs made)
+      let chosen = if elem answered limbs then answered else NonEmpty.head limbs
+      State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
+      performed <- performLimb chosen (Set.singleton chooser) acc
+      pure (performed, made Seq.|> (chooser, chosen))
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made

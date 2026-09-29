@@ -256,4 +256,7 @@ data ProposedEvent
     -- Pawl.Engine.Resolve.Effect's Scry arm for a positive count only, CR
     -- 701.22b's scry 0 being no scry event.
     WouldScry PlayerId.PlayerId Natural.Natural
+  | -- | CR 701.55a / 701.55c: this player would face a villainous choice this many
+    -- times. Raised once per facing seat by Pawl.Engine.Resolve.villainousPass.
+    WouldFaceVillainousChoice PlayerId.PlayerId Natural.Natural
   deriving (Eq, Ord, Show)

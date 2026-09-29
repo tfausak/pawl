@@ -233,6 +233,8 @@ import qualified Pawl.Types.TurnWindow as TurnWindow
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
+import qualified Pawl.Types.VillainousChoiceR as VillainousChoiceR
+import qualified Pawl.Types.VillainousChoiceRewrite as VillainousChoiceRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
@@ -2026,6 +2028,7 @@ shufflesAfter candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.ScryR {} -> False
+  ReplacementEffect.VillainousChoiceR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 615.12: apply one chosen PREVENTION effect to damage that can't be
@@ -4074,6 +4077,16 @@ apply batch candidate event =
         pure Nothing
     -- Unreachable: `applies` admits ScryR only against WouldScry.
     (ReplacementEffect.ScryR {}, _) -> pure (Just event)
+    -- CR 701.55c / 614.1a: The Valeyard's "they face that choice an additional
+    -- time" leaves the event STANDING one facing larger, the ProliferateR arm
+    -- above for its reason.
+    (ReplacementEffect.VillainousChoiceR (VillainousChoiceR.MkVillainousChoiceR _ rewrite), ProposedEvent.WouldFaceVillainousChoice pid n) -> case rewrite of
+      VillainousChoiceRewrite.AdditionalTime -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        pure (Just (ProposedEvent.WouldFaceVillainousChoice pid (n + 1)))
+    -- Unreachable: `applies` admits VillainousChoiceR only against
+    -- WouldFaceVillainousChoice.
+    (ReplacementEffect.VillainousChoiceR {}, _) -> pure (Just event)
     -- CR 122.6/614.1: Hardened Scales/Doubling Season scale a counter placement.
     (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)

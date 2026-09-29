@@ -1,5 +1,6 @@
 module Pawl.Executable where
 
+import qualified Control.Monad as Monad
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.Text as Text
@@ -7,11 +8,14 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Data.Text.IO as TextIO
 import qualified Pawl.Benchmark
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.Scenario as Codec.Scenario
 import qualified Pawl.DeckList as DeckList
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
+import qualified Pawl.Scenario.Load as Load
 import qualified Pawl.Test
 import qualified System.Environment as Environment
 import qualified System.Exit as Exit
@@ -30,12 +34,14 @@ main = do
   arguments <- Environment.getArgs
   case arguments of
     ["schema"] -> schema
+    ["schema", "scenario"] -> scenarioSchema
     ["deck", path] -> deck path
+    "scenario" : paths@(_ : _) -> scenario paths
     "bench" : rest -> Environment.withArgs rest Pawl.Benchmark.main
     "test" : rest -> Environment.withArgs rest Pawl.Test.main
     _ -> do
       name <- Environment.getProgName
-      IO.hPutStrLn IO.stderr $ "usage: " <> name <> " (schema | deck FILE | bench | test)"
+      IO.hPutStrLn IO.stderr $ "usage: " <> name <> " (schema [scenario] | deck FILE | scenario FILE... | bench | test)"
       Exit.exitFailure
 
 -- | Reads a deck list and writes back the deck it means, which is what makes a
@@ -75,3 +81,34 @@ schema :: IO ()
 schema =
   Builder.hPutBuilder IO.stdout $
     Value.encode (Define.run (Codec.schema Card.codec)) <> Builder.charUtf8 '\n'
+
+-- | The scenario format's JSON Schema, for an editor or a contributor writing
+-- one by hand. Emitted on demand for 'schema''s reason.
+scenarioSchema :: IO ()
+scenarioSchema =
+  Builder.hPutBuilder IO.stdout $
+    Value.encode (Define.run (Codec.schema Codec.Scenario.codec)) <> Builder.charUtf8 '\n'
+
+-- | Runs each scenario file against the bundled cards and says how it went,
+-- one line each: the first way to drive the engine that is not the test suite.
+-- Exits 1 if any did not decode or did not run clean.
+scenario :: [FilePath] -> IO ()
+scenario paths = do
+  root <- Registry.defaultRoot
+  registry <- Registry.fileRegistry root
+  outcomes <- mapM (runOne registry) paths
+  Monad.unless (and outcomes) Exit.exitFailure
+
+runOne :: Registry.Registry IO -> FilePath -> IO Bool
+runOne registry path = do
+  let report message ok = do
+        TextIO.hPutStrLn (if ok then IO.stdout else IO.stderr) (Text.pack (path <> ": ") <> message)
+        pure ok
+  (_, decoded) <- Load.loadFile path
+  case decoded of
+    Left problem -> report (Text.pack "does not decode: " <> problem) False
+    Right parsed -> do
+      result <- Scenario.run registry parsed
+      case result of
+        Left failure -> report (Scenario.render failure) False
+        Right _ -> report (Text.pack "ok") True

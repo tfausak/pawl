@@ -434,6 +434,7 @@ resolveCardBacked runSubgame oid rest printingId = do
           -- restating it. `seed` is CR 303.4's host and `facing` CR 708.4's
           -- status, the two things those branches differ in.
           entersAs seed facing = do
+            Monad.void (Resolve.noteResolved oid (Resolve.spellController obj oid gs1))
             arrivals <- Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue seed (maybe TapState.Untapped EntryRiders.tapped sneak) Map.empty (Just controller) entering facing False CarryOver.Carried False
             -- AFTER the move, ninjutsu's ordering one opcode over
             -- (Pawl.Engine.Resolve.Effect's MoveToZone arm): the permanent has
@@ -471,6 +472,7 @@ resolveCardBacked runSubgame oid rest printingId = do
                   case mutatingTarget oid gs1 of
                     Just victim | Event.mergeable oid victim gs1 -> do
                       side <- Game.choose (Prompt.ChooseMutateSide (Decide.deciderFor controller gs1) controller oid victim)
+                      Monad.void (Resolve.noteResolved oid (Resolve.spellController obj oid gs1))
                       merged <- Event.merge oid victim side
                       -- A FENCE, said plainly: `mergeable` above asked the same
                       -- two reads off the same board, and nothing between them

@@ -1,0 +1,33 @@
+{
+  "description": "CR 614.1a Kill-Suit Cultist destroys the blocking Wall instead of it being dealt 2",
+  "board": {
+    "active": "bob",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Kill-Suit Cultist", "label": "cultist", "ready": true },
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Wall of Stone", "label": "wall", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Child of Night", "label": "attacker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "BeginningOfCombat",
+      "player": "alice",
+      "do": { "Activate": { "object": "@cultist", "targets": ["@wall"], "mana": ["@swamp"] } }
+    },
+    { "turn": 1, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "do": { "Block": { "@wall": ["@attacker"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "bob", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Wall of Stone", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}
