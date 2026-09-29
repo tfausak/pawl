@@ -572,7 +572,7 @@ data Response
   | -- | CR 608.2d: the members of a per-member loop a resolving spell's
     -- controller chose for its body to run for.
     ChoseLoopMembers (Set.Set Recipient.Recipient)
-  | -- | CR 608.2d: whether an Effect.Repeat's controller ran its body again. Its
+  | -- | CR 608.2d: whether an Effect.Repeat's chooser ran its body again. Its
     -- own constructor for ChoseRiot's reason: no other OptionalDecision answer
     -- may replay as this one.
     ChoseRepeat OptionalDecision.OptionalDecision

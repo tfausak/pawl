@@ -117,6 +117,7 @@ import qualified Pawl.Codec.CharacteristicPTSpec
 import qualified Pawl.Codec.CheckSpec
 import qualified Pawl.Codec.ChoicesSpec
 import qualified Pawl.Codec.ChooseBetweenSpec
+import qualified Pawl.Codec.ChooseNumberSpec
 import qualified Pawl.Codec.ChoosePlayerAtRandomSpec
 import qualified Pawl.Codec.ChoosePlayerSpec
 import qualified Pawl.Codec.ChooserSpec
@@ -467,6 +468,7 @@ import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReinforceSpec
 import qualified Pawl.Codec.RemoveCountersSpec
 import qualified Pawl.Codec.RepeatIfSpec
+import qualified Pawl.Codec.RepeatSpec
 import qualified Pawl.Codec.ReplaceSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
@@ -898,6 +900,7 @@ spec s registry = do
   Pawl.Codec.ChangeTextSpec.spec s
   Pawl.Codec.CharacteristicPTSpec.spec s
   Pawl.Codec.ChooseBetweenSpec.spec s
+  Pawl.Codec.ChooseNumberSpec.spec s
   Pawl.Codec.ChoosePlayerAtRandomSpec.spec s
   Pawl.Codec.ChoosePlayerSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
@@ -1063,6 +1066,7 @@ spec s registry = do
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.ForEachNumberSpec.spec s
+  Pawl.Codec.RepeatSpec.spec s
   Pawl.Codec.RepeatIfSpec.spec s
   Pawl.Codec.ForetellCostSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s

@@ -3491,12 +3491,79 @@ randomDiscardProcessSpec s registry = Spec.describe s "CR 701.9b random discards
     Spec.assertEqWith s "alice's hand is empty" handLeft 0
     Spec.assertEqWith s "alice was asked after each of three runs" asked 3
 
+-- Ad Nauseam {3}{B}{B} Instant -- "Reveal the top card of your library and put
+-- that card into your hand. You lose life equal to its mana value. You may
+-- repeat this process any number of times."
+--
+-- Trade Secrets {1}{U}{U} Sorcery -- "Target opponent draws two cards, then you
+-- draw up to four cards. That opponent may repeat this process as many times as
+-- they choose."
+repeatProcessSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+repeatProcessSpec s registry = Spec.describe s "CR 608.2d processes a player may repeat" $ do
+  -- Ad Nauseam off five Swamps. alice's library, top down: Hill Giant (mana
+  -- value 4), Lightning Bolt (1), Goblin Piker (2). `runs` is how many times she
+  -- runs the process before declining.
+  let named = Just . CardName.MkCardName . Text.pack
+      nauseam runs = do
+        swamp <- S.printingOf s registry "Swamp"
+        spell <- S.printingOf s registry "Ad Nauseam"
+        library <- traverse (S.printingOf s registry) ["Goblin Piker", "Lightning Bolt", "Hill Giant"]
+        let lands = S.landsFor swamp S.alice 5 S.threePlayerGame
+            (withSpell, spellId) = S.handOne spell lands
+            stocked = List.foldl' (\gs p -> snd (S.addLibraryCard p S.alice gs)) withSpell library
+            limit :: Natural
+            limit = runs
+            answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              Prompt.ChooseRepeat _ _ _ done -> if done < limit then OptionalDecision.Exercises else OptionalDecision.Declines
+              _ -> S.identityAnswer p
+            cast = S.runPure answer stocked (S.cast S.alice spellId)
+            after = S.runPure answer cast Stack.resolveTop
+        pure (S.lifeOf S.alice after, namesIn Zone.Hand S.alice after)
+  -- CR 701.20a: the card stays revealed for the part of the effect it is
+  -- relevant to, so the loss reads its mana value in the hand.
+  Spec.it s "CR 701.20a Ad Nauseam loses life equal to the mana value of the card it put into hand" $ do
+    (life, hand) <- nauseam 1
+    Spec.assertEqWith s "alice lost the Hill Giant's 4" life (Just 16)
+    Spec.assertEqWith s "the Hill Giant is in alice's hand" hand [named "Hill Giant"]
+  Spec.it s "CR 608.2d Ad Nauseam repeated loses each card's mana value" $ do
+    (life, hand) <- nauseam 2
+    Spec.assertEqWith s "alice lost 4 then 1" life (Just 15)
+    Spec.assertEqWith s "both cards are in alice's hand" (List.sort hand) (List.sort [named "Hill Giant", named "Lightning Bolt"])
+  -- Trade Secrets off three Islands, aimed at carol rather than bob, so "that
+  -- opponent" is not the one APNAP order reaches first. Whoever is asked to
+  -- repeat answers by seat: carol takes a second run and declines a third, and
+  -- anyone else declines outright. alice names six each time, past the four the
+  -- card allows.
+  Spec.it s "CR 608.2d Trade Secrets' target opponent chooses to repeat, and alice draws at most four" $ do
+    island <- S.printingOf s registry "Island"
+    spell <- S.printingOf s registry "Trade Secrets"
+    filler <- S.printingOf s registry "Mountain"
+    let lands = S.landsFor island S.alice 3 S.threePlayerGame
+        (withSpell, spellId) = S.handOne spell lands
+        stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard filler pid g)) gs [1 :: Int .. 12]
+        stocked = stock S.carol (stock S.alice withSpell)
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.carol) . snd) sets
+          Prompt.ChooseRepeat _ pid _ done -> if pid == S.carol && done < 2 then OptionalDecision.Exercises else OptionalDecision.Declines
+          Prompt.ChooseNumber {} -> 6
+          _ -> S.identityAnswer p
+        cast = S.runPure answer stocked (S.cast S.alice spellId)
+        ((_, after), transcript) = Replay.record answer cast Stack.resolveTop
+        numbers = filter (\r -> case r of Response.ChoseNumber _ -> True; _ -> False) transcript
+    Spec.assertEqWith s "carol drew two cards in each of two runs" (S.handSize S.carol after) 4
+    Spec.assertEqWith s "alice drew four, not six, in each of two runs" (S.handSize S.alice after) 8
+    Spec.assertEqWith s "bob drew nothing" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "CR 608.2d alice named each run's number" numbers [Response.ChoseNumber 6, Response.ChoseNumber 6]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
   discardExceptionsSpec s registry
   discardedThisWaySpec s registry
   randomDiscardProcessSpec s registry
+  repeatProcessSpec s registry
   anyNumberDiscardSpec s registry
   elkinLairSpec s registry
   castTheCardSpec s registry

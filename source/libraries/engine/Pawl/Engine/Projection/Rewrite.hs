@@ -179,6 +179,7 @@ import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
@@ -991,7 +992,7 @@ rewriteEffect pairs effect = case effect of
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually (fmap (rewritePayGate pairs) gate))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) ->
     Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
-  Effect.Repeat body -> Effect.Repeat (fmap (rewriteEffect pairs) body)
+  Effect.Repeat (Repeat.MkRepeat chooser body) -> Effect.Repeat (Repeat.MkRepeat chooser (fmap (rewriteEffect pairs) body))
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) ->
     Effect.RepeatIf (RepeatIf.MkRepeatIf (fmap (rewriteEffect pairs) process) (rewriteCondition pairs condition) (fmap (rewriteEffect pairs) ifHolds))
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)

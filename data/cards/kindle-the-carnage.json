@@ -34,65 +34,73 @@
                 "effects": [
                   {
                     "type": "Repeat",
-                    "value": [
-                      {
-                        "type": "Discard",
-                        "value": {
-                          "type": "These",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "Discard",
                           "value": {
-                            "cards": {
-                              "type": "RandomCardInHand",
-                              "value": {
-                                "player": {
-                                  "type": "Relative",
-                                  "value": {
-                                    "type": "You"
-                                  }
-                                }
-                              }
-                            },
-                            "discarded": "discarded"
-                          }
-                        }
-                      },
-                      {
-                        "type": "DealDamage",
-                        "value": {
-                          "parts": [
-                            {
-                              "quantity": {
-                                "type": "Count",
+                            "type": "These",
+                            "value": {
+                              "cards": {
+                                "type": "RandomCardInHand",
                                 "value": {
-                                  "aggregation": {
-                                    "type": "Total",
+                                  "player": {
+                                    "type": "Relative",
                                     "value": {
-                                      "type": "ManaValue"
+                                      "type": "You"
                                     }
-                                  },
-                                  "filter": {
-                                    "type": "IsBound",
-                                    "value": "discarded"
-                                  },
-                                  "scope": {
-                                    "type": "OverBound",
-                                    "value": "discarded"
                                   }
                                 }
                               },
-                              "ref": {
-                                "type": "EachMatching",
-                                "value": {
-                                  "type": "HasCardType",
+                              "discarded": "discarded"
+                            }
+                          }
+                        },
+                        {
+                          "type": "DealDamage",
+                          "value": {
+                            "parts": [
+                              {
+                                "quantity": {
+                                  "type": "Count",
                                   "value": {
-                                    "type": "Creature"
+                                    "aggregation": {
+                                      "type": "Total",
+                                      "value": {
+                                        "type": "ManaValue"
+                                      }
+                                    },
+                                    "filter": {
+                                      "type": "IsBound",
+                                      "value": "discarded"
+                                    },
+                                    "scope": {
+                                      "type": "OverBound",
+                                      "value": "discarded"
+                                    }
+                                  }
+                                },
+                                "ref": {
+                                  "type": "EachMatching",
+                                  "value": {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Creature"
+                                    }
                                   }
                                 }
                               }
-                            }
-                          ]
+                            ]
+                          }
+                        }
+                      ],
+                      "chooser": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
                         }
                       }
-                    ]
+                    }
                   }
                 ]
               }

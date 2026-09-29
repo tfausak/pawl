@@ -27,6 +27,7 @@ import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.ChooseCardName as ChooseCardName
+import qualified Pawl.Codec.ChooseNumber as ChooseNumber
 import qualified Pawl.Codec.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Codec.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Codec.Conjure as Conjure
@@ -90,6 +91,7 @@ import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.RedirectDamage as RedirectDamage
 import qualified Pawl.Codec.RemoveCounters as RemoveCounters
 import qualified Pawl.Codec.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Codec.Repeat as Repeat
 import qualified Pawl.Codec.RepeatIf as RepeatIf
 import qualified Pawl.Codec.Replace as Replace
 import qualified Pawl.Codec.RequireAttack as RequireAttack
@@ -123,6 +125,7 @@ codec cardCodec abilityCodec =
       preventAllCodec = PreventAllDamage.codec (codec cardCodec abilityCodec)
       forEachCodec = ForEach.codec (codec cardCodec abilityCodec)
       forEachNumberCodec = ForEachNumber.codec (codec cardCodec abilityCodec)
+      repeatCodec = Repeat.codec (codec cardCodec abilityCodec)
       repeatIfCodec = RepeatIf.codec (codec cardCodec abilityCodec)
    in Arm.tagged
         tagOf
@@ -214,7 +217,7 @@ codec cardCodec abilityCodec =
           Arm.payload "GainPlayerCounters" PlayerCounters.codec Effect.GainPlayerCounters (\x -> case x of Effect.GainPlayerCounters y -> Just y; _ -> Nothing),
           Arm.payload "RemovePlayerCounters" PlayerCounters.codec Effect.RemovePlayerCounters (\x -> case x of Effect.RemovePlayerCounters y -> Just y; _ -> Nothing),
           Arm.payload "PayAnyEnergy" SlotName.codec Effect.PayAnyEnergy (\x -> case x of Effect.PayAnyEnergy y -> Just y; _ -> Nothing),
-          Arm.payload "ChooseNumber" SlotName.codec Effect.ChooseNumber (\x -> case x of Effect.ChooseNumber y -> Just y; _ -> Nothing),
+          Arm.payload "ChooseNumber" ChooseNumber.codec Effect.ChooseNumber (\x -> case x of Effect.ChooseNumber y -> Just y; _ -> Nothing),
           Arm.payload "Tap" ObjectRef.codec Effect.Tap (\x -> case x of Effect.Tap y -> Just y; _ -> Nothing),
           Arm.payload "Untap" ObjectRef.codec Effect.Untap (\x -> case x of Effect.Untap y -> Just y; _ -> Nothing),
           Arm.payload "Detain" ObjectRef.codec Effect.Detain (\x -> case x of Effect.Detain y -> Just y; _ -> Nothing),
@@ -282,7 +285,7 @@ codec cardCodec abilityCodec =
           Arm.payload "MakeWarped" ObjectRef.codec Effect.MakeWarped (\x -> case x of Effect.MakeWarped y -> Just y; _ -> Nothing),
           Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing),
           Arm.payload "ForEachNumber" forEachNumberCodec Effect.ForEachNumber (\x -> case x of Effect.ForEachNumber y -> Just y; _ -> Nothing),
-          Arm.payload "Repeat" (Common.seq (codec cardCodec abilityCodec)) Effect.Repeat (\x -> case x of Effect.Repeat y -> Just y; _ -> Nothing),
+          Arm.payload "Repeat" repeatCodec Effect.Repeat (\x -> case x of Effect.Repeat y -> Just y; _ -> Nothing),
           Arm.payload "RepeatIf" repeatIfCodec Effect.RepeatIf (\x -> case x of Effect.RepeatIf y -> Just y; _ -> Nothing),
           Arm.payload "Heal" ObjectRef.codec Effect.Heal (\x -> case x of Effect.Heal y -> Just y; _ -> Nothing),
           Arm.payload "ChooseNewTargets" ObjectRef.codec Effect.ChooseNewTargets (\x -> case x of Effect.ChooseNewTargets y -> Just y; _ -> Nothing)
