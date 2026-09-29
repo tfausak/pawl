@@ -412,6 +412,10 @@ data GameState = MkGameState
     -- clears. Pawl.Engine.Count's EventShape.SpellCastThisGame fold joins it
     -- to the live log.
     castsBeforeThisTurn :: Seq.Seq SpellWasCast.SpellWasCast,
+    -- | CR 702.192a: the names of the spells each player controlled that have
+    -- resolved this game, as they resolved, written by
+    -- Pawl.Engine.Resolve.noteResolved.
+    resolvedNames :: Map.Map PlayerId.PlayerId (Set.Set CardName.CardName),
     -- | CR 725: objects exiled "until an opponent becomes the monarch", keyed
     -- by the exiled incarnation, swept by
     -- Pawl.Engine.Monarch.returnExiledForMonarch. Not an Expiry, which cannot

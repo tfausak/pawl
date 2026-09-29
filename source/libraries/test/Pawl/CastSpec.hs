@@ -6181,6 +6181,57 @@ epicSpec s registry = Spec.describe s "Epic" $ do
     Spec.assertBool s (not (S.castable S.alice fogId resolved)) "alice can't cast the Fog once the Endless Swarm has resolved"
     Spec.assertBool s (S.castable S.alice fogId gs) "though the ninth Forest pays for it on the same board before it did"
 
+-- CR 702.192's whole keyword, on Decorum Dissertation {3}{B}{B} Sorcery -- Lesson,
+-- "Target player draws two cards and loses 2 life. / Paradigm" (Oracle text
+-- fetched from Scryfall 2026-09-29, SOS). Its payoff is Sign in Blood's, so rule
+-- 702.192a's two spell abilities are the only things under test.
+--
+-- BOB'S LIFE is the observer, and it moves by 2 at each resolution: 18 as the
+-- card resolves, 16 once alice's next precombat main phase has cast a copy, 14
+-- after the one after. A copy that armed a delayed ability of its own -- the
+-- first-resolution gate missing -- would make that last reading 12.
+--
+-- FIVE SWAMPS pay the card and nothing else. Twelve library cards apiece: CR
+-- 104.3c takes a player who draws from an empty library out before any
+-- assertion runs, and bob draws twice per resolution.
+paradigmBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+paradigmBoard swamp fog dissertation =
+  let stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard fog pid h)) g [1 :: Int .. 12]
+      stocked = List.foldl' stock (S.landsInPlay swamp 5) [S.alice, S.bob]
+      (dissertationId, ready) = S.addHandCard dissertation S.alice stocked
+   in ((aliceOnTurn ready) {GameState.remaining = S.phasesAfter Phase.PrecombatMain}, dissertationId)
+
+-- Aims every target at bob and takes rule 702.192a's "you may cast the copy".
+lecturing :: Prompt.Prompt r -> r
+lecturing p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+paradigmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+paradigmSpec s registry = Spec.describe s "Paradigm" $ do
+  -- Both of rule 702.192a's abilities, driven through two of alice's later
+  -- precombat main phases. The once-not-twice reading comes first: it is the
+  -- one the first-resolution gate owns, the copy being a spell with this name
+  -- that resolves.
+  Spec.it s "CR 702.192a the first resolution is exiled and each of its controller's precombat mains casts one free copy, which arms nothing more" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    fog <- S.printingOf s registry "Fog"
+    dissertation <- S.printingOf s registry "Decorum Dissertation"
+    let (gs, dissertationId) = paradigmBoard swamp fog dissertation
+        resolved = S.runPure lecturing gs (S.cast S.alice dissertationId >> Stack.resolveTop)
+        startTurn = GameState.turnNumber resolved
+        pastMainOf n g =
+          GameState.turnNumber g > startTurn + n && case GameState.phase g of
+            Phase.Combat _ -> True
+            _ -> False
+        -- bob's turn is the one between, and rule 702.192a's "YOUR" excludes it.
+        firstMain = reboundRunUntil lecturing (pastMainOf 1) resolved
+        secondMain = reboundRunUntil lecturing (pastMainOf 3) firstMain
+    Spec.assertEqWith s "alice's second precombat main after it casts one copy more, not two" (S.lifeOf S.bob secondMain) (Just 14)
+    Spec.assertEqWith s "her first precombat main after it cast a copy" (S.lifeOf S.bob firstMain) (Just 16)
+    Spec.assertEqWith s "and the card itself was exiled rather than put into her graveyard, where it stays alone" (namesIn Zone.Exile secondMain, namesIn Zone.Graveyard secondMain) ([S.printingName dissertation], [])
+
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
@@ -6443,6 +6494,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   madnessSpec s registry
   reboundSpec s registry
   epicSpec s registry
+  paradigmSpec s registry
   legendarySpellSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).

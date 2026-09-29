@@ -565,6 +565,7 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.89a states a REPLACEMENT and nothing else; see mintedReplacementsFor.
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
@@ -811,6 +812,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
@@ -1385,6 +1387,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
@@ -2047,6 +2050,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Station -> List.genericReplicate count station
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
@@ -2825,6 +2829,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- which is CR 601.2h and not CR 601.3. Pawl.Engine.Cost.manaSubstitutions is
   -- where the offer lives, Bestow's arm above and for its reason.
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
@@ -4619,6 +4624,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- Replacement.collect assigns.
   Keyword.UmbraArmor -> List.genericReplicate count (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.UmbraArmor))
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
@@ -4907,6 +4913,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
@@ -5211,6 +5218,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   -- states its own "enchant creature".
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Improvise -> []
@@ -5539,6 +5547,7 @@ familyOf keyword = case keyword of
   -- CR 702.89a carries no parameter, so there is no family to name it by.
   Keyword.UmbraArmor -> Nothing
   Keyword.Epic -> Nothing
+  Keyword.Paradigm -> Nothing
   Keyword.Cipher -> Nothing
   Keyword.Convoke -> Nothing
   Keyword.Improvise -> Nothing
@@ -6746,7 +6755,7 @@ decayed =
 -- is forgotten -- a dangling name is a silent no-op. Pawl.CardSpec closes the
 -- other direction, so no card's declaration can shadow a row here.
 mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card (GrantedAbility.GrantedAbility Card))
-mintedDelayedAbilities = Map.fromList [(epicCopyName, epicCopy), (decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice), (mobilizeSacrificeName, mobilizeSacrifice), (warpExileName, warpExile)]
+mintedDelayedAbilities = Map.fromList [(epicCopyName, epicCopy), (paradigmCopyName, paradigmCopy), (decayedSacrificeName, decayedSacrifice), (unearthExileName, unearthExile), (Earthbend.returnName, Earthbend.returnAbility), (dashReturnName, dashReturn), (blitzSacrificeName, blitzSacrifice), (myriadExileName, myriadExile), (encoreSacrificeName, encoreSacrifice), (mobilizeSacrificeName, mobilizeSacrifice), (warpExileName, warpExile)]
 
 -- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
 -- an ability under this name and never which keyword did.
@@ -9034,6 +9043,58 @@ epicCopy =
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
+          TriggeredAbility.modal =
+            Modal.MkModal
+              (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+              (ModeSelection.ChooseExactly 1),
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
+        }
+
+-- CR 702.192a: does this object have paradigm? hasEpic's membership, read off
+-- Projection.keywordsOf by Pawl.Engine.Resolve.applyParadigm for the same reason.
+hasParadigm :: Set Keyword -> Bool
+hasParadigm = Set.member Keyword.Paradigm
+
+-- The slot rule 702.192a's "this object" is bound into as the spell resolves,
+-- epicSlot's reading: the id has ceased before the ability first triggers (CR
+-- 400.7), and Pawl.Engine.Resolve.Effect's castableCopy finds it in
+-- GameState.stackArchive, where the zone-change funnel filed it as it left the
+-- stack. So the copy is still made once the card has left exile (rulings,
+-- 2026-03-20).
+paradigmSlot :: SlotName.SlotName
+paradigmSlot = SlotName.MkSlotName (Text.pack "paradigm spell")
+
+-- The name rule 702.192a's delayed ability is filed under. A card may not declare
+-- one under it (Pawl.AbilitySlotLintSpec).
+paradigmCopyName :: AbilityName
+paradigmCopyName = AbilityName.MkAbilityName (Text.pack "paradigm")
+
+-- CR 702.192a's delayed triggered ability: "at the beginning of each of your
+-- precombat main phases for the rest of the game, create a copy of this object in
+-- exile. You may cast the copy without paying its mana cost."
+--
+-- Pawl.Engine.Rad's condition for CR 505.1a's precombat main phase, and epicCopy's
+-- Expiry.Never at the arming for "for the rest of the game". The copy is CR
+-- 707.12's (OfferCast.copied), and ONE optional offer covers the creation and
+-- the "may", cipherTrigger's reading: a copy nobody casts ceases to exist (CR
+-- 704.5e) with nothing having seen it.
+paradigmCopy :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
+paradigmCopy =
+  let effect =
+        Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.ref = ObjectRef.InSlot paradigmSlot,
+              OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+              OfferCast.optionality = CastObligation.Optional,
+              OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing, CastOffer.spending = ManaSpending.AsProduced, CastOffer.restriction = Nothing, CastOffer.offeredBy = Nothing},
+              OfferCast.repetition = CastRepetition.Once,
+              OfferCast.copied = True,
+              OfferCast.verb = PermissionVerb.Cast,
+              OfferCast.controlWhileResolving = False
+            }
+   in TriggeredAbility.MkTriggeredAbility
+        { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =
             Modal.MkModal
               (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))

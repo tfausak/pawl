@@ -199,6 +199,7 @@ codec resolve = Fields.object $ do
   spellsCastLastTurn <- Fields.defaulted "spellsCastLastTurn" 0 Common.natural GameState.spellsCastLastTurn
   castsLastTurn <- Fields.defaulted "castsLastTurn" Map.empty (Common.naturalMap PlayerId.codec Common.natural) GameState.castsLastTurn
   castsBeforeThisTurn <- Fields.defaulted "castsBeforeThisTurn" Seq.empty (Common.seq SpellWasCast.codec) GameState.castsBeforeThisTurn
+  resolvedNames <- Fields.defaulted "resolvedNames" Map.empty (Common.naturalMap PlayerId.codec (Common.set CardName.codec)) GameState.resolvedNames
   exiledUntilMonarch <- Fields.defaulted "exiledUntilMonarch" Map.empty (Common.naturalMap ObjectId.codec MonarchWatch.codec) GameState.exiledUntilMonarch
   movedUntilSourceLeaves <- Fields.defaulted "movedUntilSourceLeaves" Map.empty (Common.naturalMap ObjectId.codec ReturnWatch.codec) GameState.movedUntilSourceLeaves
   haunting <- Fields.defaulted "haunting" Map.empty (Common.naturalMap ObjectId.codec ObjectId.codec) GameState.haunting
@@ -303,6 +304,7 @@ codec resolve = Fields.object $ do
         GameState.spellsCastLastTurn = spellsCastLastTurn,
         GameState.castsLastTurn = castsLastTurn,
         GameState.castsBeforeThisTurn = castsBeforeThisTurn,
+        GameState.resolvedNames = resolvedNames,
         GameState.exiledUntilMonarch = exiledUntilMonarch,
         GameState.movedUntilSourceLeaves = movedUntilSourceLeaves,
         GameState.haunting = haunting,

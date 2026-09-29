@@ -1314,15 +1314,24 @@ offerCast context named caster optionality verb retake repetition copied offer =
 -- in that zone rather than moved there, so nothing was exiled or discarded and
 -- no zone-change trigger has an event to watch.
 --
--- Nothing for an object that has left (CR 400.7) and for one with no card behind
--- it (Game.printingIdOfSource): an offer over a copy that cannot be made is not
--- made, which is offerCastOnce's own posture for a reference that named nothing.
+-- A SPELL that has left the stack is copied from GameState.stackArchive (CR
+-- 608.2h), and its copy is created in exile: an object in no zone has no "same
+-- zone", and rule 702.192a's "create a copy of this object in exile" is the one
+-- producer whose reference outlives its spell (Keyword.paradigmCopy).
+--
+-- Nothing for any other object that has left (CR 400.7) and for one with no card
+-- behind it (Game.printingIdOfSource): an offer over a copy that cannot be made is
+-- not made, which is offerCastOnce's own posture for a reference that named
+-- nothing.
 castableCopy :: PlayerId -> ObjectId -> Game (Maybe ObjectId)
 castableCopy caster original = do
   gs <- State.get
-  case Game.lookupObject original gs of
+  let found = case Game.lookupObject original gs of
+        Just obj -> Just (obj, Object.zone obj)
+        Nothing -> fmap (\obj -> (obj, Zone.Exile)) (Map.lookup original (GameState.stackArchive gs))
+  case found of
     Nothing -> pure Nothing
-    Just obj -> case Game.printingIdOfSource (Object.source obj) of
+    Just (obj, zone) -> case Game.printingIdOfSource (Object.source obj) of
       Nothing -> pure Nothing
       Just printingId -> do
         let (copyId, gs1) = Game.freshObjectId gs
@@ -1331,11 +1340,11 @@ castableCopy caster original = do
               (Object.newIncarnation obj)
                 { Object.source = Source.OfCardCopy printingId,
                   Object.owner = caster,
-                  Object.zone = Object.zone obj,
+                  Object.zone = zone,
                   Object.timestamp = ts,
                   Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (Game.copyStampOf obj)
                 }
-        State.put (Game.insertIntoZone (Object.zone obj) LibraryPosition.Top caster copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
+        State.put (Game.insertIntoZone zone LibraryPosition.Top caster copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
         pure (Just copyId)
 
 -- CR 707.13 / 707.14: offer the cast of a copy of this printing created outside
