@@ -26,6 +26,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -331,3 +332,24 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
           [copy] -> Spec.assertEqWith s "CR 707.2 a Clone of the returned Elves copies no grant, so it dies into the graveyard" (named "Clone" Zone.Exile (destroyed copy copied), named "Clone" Zone.Graveyard (destroyed copy copied)) (0, 1)
           _ -> Spec.assertFailure s ("expected one Clone to arrive, got " <> show copies)
       _ -> Spec.assertFailure s ("expected one returned creature, got " <> show arrived)
+  -- CR 613.1f in a GRAVEYARD: Yixlid Jailer ({1}{B} Creature -- Zombie Wizard
+  -- 2/1, "Cards in graveyards lose all abilities." -- checked against
+  -- api.scryfall.com 2026-09-29) takes Darkblast's dredge 3 away, so CR 702.52a
+  -- mints no row for the draw to be replaced by. A pair of boards differing only
+  -- in whether bob's Jailer is in play: alice's graveyard holds Darkblast, her
+  -- library four basics, and she takes every dredge she is offered. Library
+  -- sizes differ (three after a draw, one after a dredge of three).
+  Spec.it s "CR 613.1f Yixlid Jailer leaves Darkblast no dredge" $ do
+    darkblast <- S.printingOf s registry "Darkblast"
+    jailer <- S.printingOf s registry "Yixlid Jailer"
+    basics <- mapM (S.printingOf s registry) ["Island", "Mountain", "Forest", "Plains"]
+    let (_, g1) = S.addGraveyardCard darkblast S.alice (Setup.emptyGame S.bothPlayers)
+        without = List.foldl' (\g b -> snd (S.addLibraryCard b S.alice g)) g1 basics
+        withJailer = snd (S.addPermanent jailer S.bob without)
+        dredging :: Prompt.Prompt r -> r
+        dredging p = case p of
+          Prompt.ChooseDredge {} -> OptionalDecision.Exercises
+          _ -> S.identityAnswer p
+        librarySize gs = length (Game.zoneMembers Zone.Library S.alice (S.runPure dredging gs (Event.drawCard S.alice)))
+    Spec.assertEqWith s "CR 613.1f under the Jailer alice draws one card rather than dredging" (librarySize withJailer) 3
+    Spec.assertEqWith s "CR 702.52a without it she dredges, milling three" (librarySize without) 1
