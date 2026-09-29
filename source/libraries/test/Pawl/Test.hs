@@ -541,6 +541,7 @@ import qualified Pawl.Codec.TurnUpRSpec
 import qualified Pawl.Codec.TurnUpRewriteSpec
 import qualified Pawl.Codec.TurnWindowSpec
 import qualified Pawl.Codec.TypeLineSpec
+import qualified Pawl.Codec.UntapRSpec
 import qualified Pawl.Codec.UntapRestrictionSpec
 import qualified Pawl.Codec.UntapRewriteSpec
 import qualified Pawl.Codec.UsesSpec
@@ -1285,6 +1286,7 @@ spec s registry = do
   Pawl.Codec.TurnUpRSpec.spec s
   Pawl.Codec.TurnUpRewriteSpec.spec s
   Pawl.Codec.UntapRewriteSpec.spec s
+  Pawl.Codec.UntapRSpec.spec s
   Pawl.Codec.TurnWindowSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
   Pawl.Codec.UntapRestrictionSpec.spec s

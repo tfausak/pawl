@@ -197,6 +197,7 @@ import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
@@ -625,11 +626,11 @@ engineOnlyOffends replacement = case replacement of
   -- half is, so the sweep reaches it through this arm rather than through a lint
   -- of its own.
   ReplacementEffect.DestructionR (DestructionR.MkDestructionR _ rewrite) -> engineMintedDestruction rewrite
-  -- CR 122.1d's row is engine-minted for CR 122.1c's reason, and the WHOLE arm
-  -- rather than one rewrite of it: printed regeneration shares DestructionR, so
-  -- that arm needs a per-rewrite test, where nothing a card may print replaces an
-  -- untap at all.
-  ReplacementEffect.UntapR _ -> True
+  -- CR 122.1d's row is engine-minted for CR 122.1c's reason; Bewitching
+  -- Leechcraft's printed rewrite shares the arm, so the test is per rewrite.
+  ReplacementEffect.UntapR (UntapR.MkUntapR _ rewrite) -> case rewrite of
+    UntapRewrite.RemoveStunCounter -> True
+    UntapRewrite.RemoveCounterToUntap _ -> False
   ReplacementEffect.PhaseR _ -> False
   ReplacementEffect.CounterR {} -> False
   ReplacementEffect.ZoneChangeR {} -> False
@@ -2865,9 +2866,9 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (any (engineOnlyOffends . printRedirect) printed)) "while one describing that destination is accepted"
     Spec.assertBool s (engineOnlyOffends (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.RemoveShieldCounter))) "and so is CR 122.1c's destruction half"
     Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate)))) "while CR 701.19a's printed regeneration is accepted"
-    -- CR 122.1d's row, which only Projection.stunOf may mint -- the whole arm,
-    -- with no printed rewrite beside it to accept.
-    Spec.assertBool s (engineOnlyOffends (ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter)) "and so is CR 122.1d's untap replacement"
+    -- CR 122.1d's row, which only Projection.stunOf may mint.
+    Spec.assertBool s (engineOnlyOffends (ReplacementEffect.UntapR (UntapR.MkUntapR Nothing UntapRewrite.RemoveStunCounter))) "and so is CR 122.1d's untap replacement"
+    Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.UntapR (UntapR.MkUntapR Nothing (UntapRewrite.RemoveCounterToUntap CounterKind.PlusOnePlusOne))))) "while Bewitching Leechcraft's printed one is accepted"
   -- CR 615.5's rider is a PREVENTION effect's, which the type cannot say. See
   -- riderWithoutPreventionOffends.
   Spec.it s "no card hangs CR 615.5's additional effect off a rewrite that prevents nothing" $ do
