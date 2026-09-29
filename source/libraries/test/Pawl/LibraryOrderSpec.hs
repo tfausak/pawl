@@ -2786,9 +2786,28 @@ optionalEffectSpec s registry =
             (_, g3) = S.addLibraryCard forest S.alice g2
             (g4, spellId) = S.handOne churn g3
         pure (g4 {GameState.priority = Just S.alice}, spellId)
-      -- Takes Corpse Churn's SECOND clause, pinned by clause index: the group's
-      -- takeOptional above pins clause 0, which on this card is the mandatory
-      -- mill, so the taking half needs its own answerer. Everything else,
+      -- Eccentric Farmer {2}{G} Creature -- Human Peasant 2/3, "When this
+      -- creature enters, mill three cards, then you may return a land card from
+      -- your graveyard to your hand." (checked against Scryfall.) Corpse Churn's
+      -- clause pair on a TRIGGERED ability, so it resolves through
+      -- Resolve.resolveModesWith rather than the spell loop.
+      --
+      -- The Farmer has just entered with its trigger pending, over a three-card
+      -- library of a Forest, a Swamp and a Goblin Piker: two lands, so the
+      -- return's choice is a real one, and a non-land for the filter to exclude.
+      farmerBoard = do
+        farmer <- S.printingOf s registry "Eccentric Farmer"
+        piker <- S.printingOf s registry "Goblin Piker"
+        forest <- S.printingOf s registry "Forest"
+        swamp <- S.printingOf s registry "Swamp"
+        let (_, g1) = S.addLibraryCard piker S.alice (Setup.emptyGame S.bothPlayers)
+            (_, g2) = S.addLibraryCard swamp S.alice g1
+            (_, g3) = S.addLibraryCard forest S.alice g2
+        pure (snd (S.entersWithTrigger farmer S.alice g3))
+      -- Takes the SECOND clause of Corpse Churn or Eccentric Farmer, pinned by
+      -- clause index: the group's takeOptional above pins clause 0, which on
+      -- these cards is the mandatory mill, so the taking half needs its own
+      -- answerer. Everything else,
       -- including the choice of which graveyard card comes back, falls through
       -- to S.identityAnswer.
       returnsChurn :: Prompt.Prompt r -> r
@@ -2800,6 +2819,7 @@ optionalEffectSpec s registry =
       complicationName = CardName.MkCardName (Text.pack "Deadly Complication")
       forestName = CardName.MkCardName (Text.pack "Forest")
       pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      swampName = CardName.MkCardName (Text.pack "Swamp")
       aliceNamesIn zone gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs))
       -- The graveyard as a sorted LIST rather than a set -- two Goblin Pikers
       -- are two cards and a set would collapse them -- with Corpse Churn itself
@@ -2932,18 +2952,10 @@ optionalEffectSpec s registry =
         --
         -- resolveModes is the ABILITY clause loop; a spell's clauses run through
         -- Resolve.resolveSpellWith's own fold, which the Corpse Churn cases below
-        -- reach through a real cast. The pair is printed on four cards --
-        -- Corpse Churn and Shed Weakness as spells, Into the Wilds and Nissa,
-        -- Steward of Elements as abilities -- but both abilities open with an
-        -- Effect.LookAt, which changes nothing a board can see, so neither can
-        -- tell this rule's reading from a mode-wide one. Not implemented: a
-        -- gameplay-level twin for the ability loop, which wants a card whose
-        -- mandatory clause is observable (#1887). Until one lands, this is a
-        -- unit-level pin for THAT shape, and it is also the only case for the
+        -- reach through a real cast. Eccentric Farmer's cases below are this
+        -- loop's gameplay-level proof; this one is the only case for the
         -- two-DRAW shape, where the library count alone separates "declined"
-        -- from "drew". Aetherplasm reaches the loop from a real trigger with two
-        -- OPTIONAL clauses, the second hanging on the first, which
-        -- Pawl.CombatEffectSpec proves at gameplay level.
+        -- from "drew".
         Spec.it s "CR 608.2d a declined clause skips only its own effects" $ do
           forest <- S.printingOf s registry "Forest"
           piker <- S.printingOf s registry "Goblin Piker"
@@ -2995,6 +3007,21 @@ optionalEffectSpec s registry =
               after = S.runPure returnsChurn cast Stack.resolveTop
           Spec.assertEqWith s "taking the return leaves the other two milled cards in the graveyard" (milledNames after) [forestName, pikerName]
           Spec.assertEqWith s "and exactly the creature card is in the hand" (aliceNamesIn Zone.Hand after) [pikerName]
+        -- The same pair on the ABILITY clause loop, from a real trigger: the
+        -- mandatory mill is observable, so declining the "may" is told apart
+        -- from skipping the whole mode. Paired with the taking half below.
+        Spec.it s "CR 608.2d whole card: Eccentric Farmer's declined return leaves the mill done" $ do
+          gs <- farmerBoard
+          let ((_, after), transcript) = Replay.record S.identityAnswer gs (Engine.settleForPriority >> Stack.resolveTop)
+          Spec.assertEqWith s "declining the return leaves all three milled cards in the graveyard" (aliceNamesIn Zone.Graveyard after) [forestName, pikerName, swampName]
+          Spec.assertEqWith s "and nothing came back to the hand" (aliceNamesIn Zone.Hand after) []
+          Spec.assertEqWith s "the may was asked once, and declined" (filter isOptionalResponse transcript) [Response.ChoseOptional OptionalDecision.Declines]
+        Spec.it s "CR 608.2d whole card: taking Eccentric Farmer's return moves one land and leaves the rest milled" $ do
+          gs <- farmerBoard
+          let ((_, after), transcript) = Replay.record returnsChurn gs (Engine.settleForPriority >> Stack.resolveTop)
+          Spec.assertEqWith s "taking the return leaves the other two milled cards in the graveyard" (aliceNamesIn Zone.Graveyard after) [pikerName, swampName]
+          Spec.assertEqWith s "and exactly one land card is in the hand" (aliceNamesIn Zone.Hand after) [forestName]
+          Spec.assertEqWith s "the may was asked once, and taken" (filter isOptionalResponse transcript) [Response.ChoseOptional OptionalDecision.Exercises]
         -- The live half of the pair below, and the control that says the guard is
         -- not simply refusing to ask: the same board, the same answer, the same
         -- two modes, differing only in whether mode 1's target is still there.

@@ -764,9 +764,7 @@ resolveModesWith runSubgame stackId srcId modes = do
                         -- fenced: Aetherplasm's second clause hangs on its first,
                         -- and Pawl.CombatEffectSpec's "declining to return
                         -- Aetherplasm skips the clause its 'If you do' hangs on"
-                        -- reddens when this conjunct is defeated. What #1887 still
-                        -- covers on this loop is the OTHER gate -- an observable
-                        -- MANDATORY clause standing before a printed "may".
+                        -- reddens when this conjunct is defeated.
                         let hangs = ifTakenHolds ran clause
                         -- CR 701.46a's printed "if" next, read against `srcId` --
                         -- the rule says "this permanent", which is also why
@@ -778,6 +776,10 @@ resolveModesWith runSubgame stackId srcId modes = do
                         -- CR 603.5 / 608.2d: then the printed "may", against the
                         -- SAME live bindings CR 608.2b's filter is applied to, so a
                         -- clause whose every read is dead is not asked about.
+                        -- Scoped to its own clause on this loop: Eccentric Farmer's
+                        -- declined return still mills, Pawl.LibraryOrderSpec's "CR
+                        -- 608.2d whole card: Eccentric Farmer's declined return
+                        -- leaves the mill done".
                         let legalNowForMay = instanceView (Map.mapWithKey legalSlot (Binding.targetsOf gateBindings))
                             boundNowForMay = Map.keysSet (instanceView (Set.empty <$ gateBindings))
                         -- CR 608.2d's "or" next, and BEFORE the "may", off the same
