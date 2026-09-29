@@ -18,6 +18,7 @@ import qualified Pawl.Codec.ScryR as ScryR
 import qualified Pawl.Codec.TokenR as TokenR
 import qualified Pawl.Codec.TurnUpR as TurnUpR
 import qualified Pawl.Codec.UntapR as UntapR
+import qualified Pawl.Codec.VillainousChoiceR as VillainousChoiceR
 import qualified Pawl.Codec.ZoneChangeR as ZoneChangeR
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -56,6 +57,7 @@ codec cardCodec abilityCodec effectCodec =
       Arm.payload "DieRollR" DieRollR.codec ReplacementEffect.DieRollR (\x -> case x of ReplacementEffect.DieRollR y -> Just y; _ -> Nothing),
       Arm.payload "ProliferateR" ProliferateR.codec ReplacementEffect.ProliferateR (\x -> case x of ReplacementEffect.ProliferateR y -> Just y; _ -> Nothing),
       Arm.payload "ScryR" ScryR.codec ReplacementEffect.ScryR (\x -> case x of ReplacementEffect.ScryR y -> Just y; _ -> Nothing),
+      Arm.payload "VillainousChoiceR" VillainousChoiceR.codec ReplacementEffect.VillainousChoiceR (\x -> case x of ReplacementEffect.VillainousChoiceR y -> Just y; _ -> Nothing),
       Arm.payload "PhaseR" PhasePattern.codec ReplacementEffect.PhaseR (\x -> case x of ReplacementEffect.PhaseR y -> Just y; _ -> Nothing)
     ]
 
@@ -78,4 +80,5 @@ tagOf x = case x of
   ReplacementEffect.DieRollR {} -> "DieRollR"
   ReplacementEffect.ProliferateR {} -> "ProliferateR"
   ReplacementEffect.ScryR {} -> "ScryR"
+  ReplacementEffect.VillainousChoiceR {} -> "VillainousChoiceR"
   ReplacementEffect.PhaseR {} -> "PhaseR"

@@ -1,0 +1,83 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "The Valeyard",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "replacementEffects": [
+        {
+          "effect": {
+            "type": "VillainousChoiceR",
+            "value": {
+              "rewrite": {
+                "type": "AdditionalTime"
+              },
+              "whose": {
+                "type": "Opponents"
+              }
+            }
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 5
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Noble"
+          },
+          {
+            "type": "TimeLord"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
