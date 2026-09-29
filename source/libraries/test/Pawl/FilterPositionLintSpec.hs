@@ -1714,11 +1714,18 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Animate Dead's return is framed too"
       (hostOfSourceCounts (S.combinedFace animate))
       (1, 0)
+    -- And Bewitching Leechcraft's CR 603.4 tap of the creature it enchants.
+    leechcraft <- S.printingOf s registry "Bewitching Leechcraft"
+    Spec.assertEqWith
+      s
+      "Bewitching Leechcraft's tap is framed too"
+      (hostOfSourceCounts (S.combinedFace leechcraft))
+      (1, 0)
     Spec.assertEqWith
       s
       "and they are the pool's only ones"
       (sum (fmap (uncurry (+) . hostOfSourceCounts . S.combinedFace) ps))
-      6
+      7
     -- The rejected side, which the sweep above cannot show while the pool has no
     -- offender: the same atom planted in a target slot -- the position a card
     -- author would most plausibly reach for -- IS counted as elsewhere.

@@ -60,6 +60,7 @@ import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
@@ -168,14 +169,15 @@ spec s =
             codec
             (ReplacementEffect.DestructionR (DestructionR.MkDestructionR Nothing DestructionRewrite.Regenerate))
             " {\"type\":\"DestructionR\",\"value\":{\"rewrite\":{\"type\":\"Regenerate\"}}} "
-        -- CR 122.1d, UntapR's sole producer -- engine-minted, so this is the only
-        -- place its wire form is pinned.
+        -- CR 122.1d -- engine-minted, so this is the only place its wire form is
+        -- pinned whole. Bewitching Leechcraft's printed row is in
+        -- Pawl.Codec.UntapRSpec.
         Spec.it s "UntapR (a stun counter's replacement)" $
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter)
-            " {\"type\":\"UntapR\",\"value\":{\"type\":\"RemoveStunCounter\"}} "
+            (ReplacementEffect.UntapR (UntapR.MkUntapR Nothing UntapRewrite.RemoveStunCounter))
+            " {\"type\":\"UntapR\",\"value\":{\"rewrite\":{\"type\":\"RemoveStunCounter\"}}} "
         -- CR 614.1a / 120.4c: Worship, the damage-scoped LifeLossR producer. The other
         -- shape -- an open cause and a scaled rewrite -- is Bloodletter of Aclazotz,
         -- whose halves round-trip in Pawl.Codec.LifeLossPatternSpec and

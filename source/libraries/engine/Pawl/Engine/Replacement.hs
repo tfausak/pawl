@@ -151,6 +151,7 @@ import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
@@ -843,10 +844,13 @@ matchesPrinted viewOf gs event candidate =
         -- CR 122.1d's "a permanent with a stun counter on it" is the self-scope
         -- DestructionR's arm reads one event class over: the row is minted onto
         -- the permanent holding the counters, so `src` IS the rule's subject and
-        -- UntapR needs no pattern. Rule 122.1d states no further restriction on
-        -- WHICH untaps it reaches -- unlike CR 122.1c's "as the result of an
-        -- effect" -- so there is no `admits` beside this.
-        (ReplacementEffect.UntapR _, ProposedEvent.WouldUntap oid) -> src == oid
+        -- UntapR needs no subject. Bewitching Leechcraft's granted "this
+        -- creature" is the same self-scope.
+        --
+        -- `during` is the one restriction on WHICH untaps a row reaches, read
+        -- off the board as the step the game is in. Nothing is rule 122.1d's
+        -- every untap.
+        (ReplacementEffect.UntapR untapR, ProposedEvent.WouldUntap oid) -> src == oid && maybe True (== GameState.phase gs) (UntapR.during untapR)
         -- CR 614.1a / 120.4c: whose life total the row watches (CR 109.5's
         -- "your"), what caused the loss, and whether the loss would actually
         -- carry the player past the total the rewrite leaves them at.

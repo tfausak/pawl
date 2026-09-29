@@ -16,7 +16,7 @@ import qualified Pawl.Types.ProliferateR as ProliferateR
 import qualified Pawl.Types.ScryR as ScryR
 import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
-import qualified Pawl.Types.UntapRewrite as UntapRewrite
+import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- | CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
@@ -30,7 +30,7 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- An (effect, event) pair whose arms disagree simply does not apply, so the type
 -- rules out "redirect a damage event" without a validity pass.
 --
--- UntapR carries NO pattern, and DestructionR's is optional: absent, each
+-- UntapR carries NO subject, and DestructionR's is optional: absent, each
 -- rewrite names its subject in its own rule's words, which
 -- Pawl.Engine.Replacement.scopes reads off the board. CR 201.5 makes a card's
 -- reference to itself by name mean just that object, so "regenerate this
@@ -118,11 +118,12 @@ data ReplacementEffect card ability effect
     -- 701.26b's action, which CR 502.3's turn-based action, an Effect.Untap and
     -- CR 107.6's untap symbol in a cost all perform.
     --
-    -- Carries NO pattern, for an unpatterned DestructionR's reason: rule 122.1d's
-    -- effect is minted onto the permanent whose counters create it, so "a
-    -- permanent with a stun counter on it" is the object it was minted for. The
-    -- field appears when a card needs it.
-    UntapR UntapRewrite.UntapRewrite
+    -- Carries NO subject, for an unpatterned DestructionR's reason: rule
+    -- 122.1d's effect is minted onto the permanent whose counters create it, and
+    -- Bewitching Leechcraft's "this creature" is the permanent granted the
+    -- ability, so each is its own row's source. The field appears when a card
+    -- needs it.
+    UntapR UntapR.UntapR
   | -- | CR 614.1a / 120.4c: "damage that would reduce your life total to less
     -- than 1 reduces it to 1 instead" (Worship). A separate arm from DamageR
     -- because the two intercept different event classes: CR 120.4b's damage is
