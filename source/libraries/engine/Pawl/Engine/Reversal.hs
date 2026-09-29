@@ -369,7 +369,7 @@ objectWith before entry closed = do
   castGrant <- field Object.castGrant
   detainedUntil <- field Object.detainedUntil
   goadedBy <- field Object.goadedBy
-  doesNotUntapNext <- field Object.doesNotUntapNext
+  doesNotUntapFor <- field Object.doesNotUntapFor
   exertedBy <- field Object.exertedBy
   activatedOnce <- field Object.activatedOnce
   paired <- field Object.paired
@@ -428,7 +428,7 @@ objectWith before entry closed = do
         Object.castGrant = castGrant,
         Object.detainedUntil = detainedUntil,
         Object.goadedBy = goadedBy,
-        Object.doesNotUntapNext = doesNotUntapNext,
+        Object.doesNotUntapFor = doesNotUntapFor,
         Object.exertedBy = exertedBy,
         Object.activatedOnce = activatedOnce,
         Object.paired = paired,

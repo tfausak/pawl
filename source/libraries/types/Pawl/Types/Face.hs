@@ -489,7 +489,7 @@ data Face card = MkFace
     --
     -- The STATIC prohibition only. The one-shots -- "doesn't untap during its
     -- controller's NEXT untap step" and CR 701.43a's exert -- ride the victim, as
-    -- Object.doesNotUntapNext and Object.exertedBy, and neither reaches this
+    -- Object.doesNotUntapFor and Object.exertedBy, and neither reaches this
     -- field.
     untapRestrictions :: [UntapRestriction.UntapRestriction],
     -- | CR 604.1/604.2 / 702.122d / 101.2: this face's printed CREW PROHIBITIONS

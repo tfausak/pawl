@@ -984,7 +984,7 @@ cardObject pid under printingId dest tapped ts =
       Object.castGrant = Nothing,
       Object.detainedUntil = Set.empty,
       Object.goadedBy = Set.empty,
-      Object.doesNotUntapNext = False,
+      Object.doesNotUntapFor = 0,
       Object.exertedBy = Set.empty,
       Object.activatedOnce = Set.empty
     }
@@ -1213,7 +1213,7 @@ createEmblem pid card = do
                 Object.castGrant = Nothing,
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
-                Object.doesNotUntapNext = False,
+                Object.doesNotUntapFor = 0,
                 Object.exertedBy = Set.empty,
                 Object.activatedOnce = Set.empty
               }
@@ -7460,7 +7460,7 @@ createTokens controller card copy n tapped entering attached = do
                       Object.castGrant = Nothing,
                       Object.detainedUntil = Set.empty,
                       Object.goadedBy = Set.empty,
-                      Object.doesNotUntapNext = False,
+                      Object.doesNotUntapFor = 0,
                       Object.exertedBy = Set.empty,
                       Object.activatedOnce = Set.empty
                     }
@@ -7706,7 +7706,7 @@ meld controller victims resultCard = do
                 Object.castGrant = Nothing,
                 Object.detainedUntil = Set.empty,
                 Object.goadedBy = Set.empty,
-                Object.doesNotUntapNext = False,
+                Object.doesNotUntapFor = 0,
                 Object.exertedBy = Set.empty,
                 Object.activatedOnce = Set.empty
               }

@@ -114,7 +114,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.castGrant = Nothing,
           Object.detainedUntil = Set.empty,
           Object.goadedBy = Set.empty,
-          Object.doesNotUntapNext = False,
+          Object.doesNotUntapFor = 0,
           Object.exertedBy = Set.empty,
           Object.activatedOnce = Set.empty
         }
@@ -233,7 +233,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           Object.exileLookers = Set.singleton (ExileLooker.ThePlayer (PlayerId.MkPlayerId 27)),
           Object.detainedUntil = Set.singleton (PlayerId.MkPlayerId 21),
           Object.goadedBy = Set.singleton (PlayerId.MkPlayerId 22),
-          Object.doesNotUntapNext = True,
+          Object.doesNotUntapFor = 2,
           Object.exertedBy = Set.singleton (PlayerId.MkPlayerId 23),
           Object.activatedOnce = Set.singleton ActivatedAbilitySourceSpec.ability
         }
@@ -277,7 +277,7 @@ spec s = Spec.describe s "Pawl.Codec.Object" $ do
           <> ",\"castUsing\":{\"type\":\"JumpStart\"}"
           <> ",\"castGrant\":{\"type\":\"Retrace\"}"
           <> ",\"exileLookers\":[{\"type\":\"ThePlayer\",\"value\":27}],\"detainedUntil\":[21],\"goadedBy\":[22]"
-          <> ",\"doesNotUntapNext\":true,\"exertedBy\":[23]"
+          <> ",\"doesNotUntapFor\":2,\"exertedBy\":[23]"
           <> ",\"activatedOnce\":[{\"cost\":{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}"
           <> ",\"modal\":{\"modes\":[{}]}}]} "
       )
