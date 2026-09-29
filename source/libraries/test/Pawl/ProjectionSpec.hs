@@ -43,6 +43,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -4543,7 +4544,7 @@ clonedAkiriExchangeBoard akiri sentry ring clone exchange =
       (_, b3) = S.addPermanent ring S.alice b2
       (_, staged) = S.spellOnStack clone S.alice b3
       before = S.runPure (copyNamed akiriId) staged (Stack.resolveTop Monad.>> Engine.settleForPriority)
-   in case S.namedObjects (CardName.MkCardName (Text.pack "Clone")) before of
+   in case Scenario.namedObjects (CardName.MkCardName (Text.pack "Clone")) before of
         [cloneId] ->
           let (_, entered) = S.entersWithTrigger exchange S.alice before
               -- Inlined rather than bound, for exchangeOfWordsBoard's reason.
@@ -4637,7 +4638,7 @@ fullTextSpec s registry = Spec.describe s "HasFullText" $ do
     let (shifterId, board) = shapeshifterBoard shapeshifter sorcerer sentry
         (_, staged) = S.spellOnStack clone S.bob board
         copied = S.runPure (copyNamed shifterId) staged (Stack.resolveTop Monad.>> Engine.settleForPriority)
-    case S.namedObjects (CardName.MkCardName (Text.pack "Clone")) copied of
+    case Scenario.namedObjects (CardName.MkCardName (Text.pack "Clone")) copied of
       [cloneId] -> do
         Spec.assertEqWith s "bob's Clone is a 0/1 Volrath's Shapeshifter" (Projection.namesOf cloneId copied, S.powerToughnessOf cloneId copied) (Set.singleton (CardName.MkCardName (Text.pack "Volrath's Shapeshifter")), Just (0, 1))
         let (_, stocked) = S.addGraveyardCard sentry S.bob copied
@@ -5034,7 +5035,7 @@ exchangeTextBoxSpec s registry = Spec.describe s "ExchangeTextBoxes" $ do
     let (sentryId, _, _, _, after) = exchangeOfWordsBoard sentry sorcerer piker exchange
         (_, staged) = S.spellOnStack clone S.alice after
         copied = S.runPure (copyNamed sentryId) staged (Stack.resolveTop Monad.>> Engine.settleForPriority)
-    case Maybe.listToMaybe (S.namedObjects (CardName.MkCardName (Text.pack "Clone")) copied) of
+    case Maybe.listToMaybe (Scenario.namedObjects (CardName.MkCardName (Text.pack "Clone")) copied) of
       Nothing -> Spec.assertFailure s "the Clone should be on the battlefield"
       Just cloneId -> do
         Spec.assertBool s (null (Projection.abilitiesOf cloneId copied)) "CR 707.2 the copy has no activated ability, the printed Ogre Sentry having none"

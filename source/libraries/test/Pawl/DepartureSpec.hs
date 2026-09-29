@@ -33,7 +33,9 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -61,9 +63,11 @@ import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
+import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import Pawl.ZoneTriggerSpec (paysFor)
@@ -1219,7 +1223,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
 
 -- alice with Door to Nothingness and one land per colored symbol of its
 -- activation cost, plus whatever other seats the case wants.
-doorBoard :: [S.PlayerSetup] -> S.Board
+doorBoard :: [Seat.Seat] -> Board.Board
 doorBoard others =
   S.board
     (S.battlefield S.alice (S.settled "door" "Door to Nothingness" : fmap (uncurry S.settled) doorLands) NonEmpty.:| others)
@@ -1245,18 +1249,18 @@ doorLands =
 -- alice activates the Door targeting bob. Every board it runs on offers at least
 -- two players in the target pool, so the target is a real choice rather than the
 -- one option a prompt would short-circuit.
-doorScript :: Seq.Seq S.Timed
+doorScript :: Seq.Seq Timed.Timed
 doorScript =
   S.turn
     1
     [ S.on S.precombatMain S.alice . S.activateAction (S.aliasRef "door") $
-        S.noChoices
-          { S.choiceTargets = Just [S.MkPlayerTarget S.bob],
+        Choices.none
+          { Choices.targets = Just [S.seatRef S.bob],
             -- CR 601.2h: tap first, then sacrifice. The other order is a real
             -- choice -- a sacrificed artifact is no longer there to tap -- which
             -- is why Pawl.Engine.Cost asks.
-            S.choiceCostOrder = Just [0, 1],
-            S.choiceManaSources = Seq.fromList (fmap (Just . S.aliasRef . fst) doorLands)
+            Choices.costOrder = Just [0, 1],
+            Choices.manaSources = Seq.fromList (fmap (Just . S.aliasRef . fst) doorLands)
           }
     ]
 

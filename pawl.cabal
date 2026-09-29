@@ -12,7 +12,10 @@ license: 0BSD
 maintainer: Taylor Fausak
 license-file: LICENSE.txt
 data-dir: data
-data-files: cards/*.json
+data-files:
+  cards/*.json
+  scenarios/*.json
+
 extra-doc-files:
   CHANGELOG.md
   README.md
@@ -74,6 +77,7 @@ library codec
     containers ^>=0.7,
     pawl:json,
     pawl:json-codec,
+    pawl:json-schema,
     pawl:spec,
     pawl:types,
     text ^>=2.1.3,
@@ -95,10 +99,12 @@ library codec
     Pawl.Codec.ActivatedAbilitySpec
     Pawl.Codec.ActivateManaAbilities
     Pawl.Codec.ActivateManaAbilitiesSpec
+    Pawl.Codec.Activation
     Pawl.Codec.ActivationProhibition
     Pawl.Codec.ActivationProhibitionSpec
     Pawl.Codec.ActivationRestriction
     Pawl.Codec.ActivationRestrictionSpec
+    Pawl.Codec.ActivationSpec
     Pawl.Codec.Activator
     Pawl.Codec.ActivatorSpec
     Pawl.Codec.ActiveActivationProhibition
@@ -211,6 +217,8 @@ library codec
     Pawl.Codec.BlockRequirementSpec
     Pawl.Codec.BlocksDeclared
     Pawl.Codec.BlocksDeclaredSpec
+    Pawl.Codec.Board
+    Pawl.Codec.BoardSpec
     Pawl.Codec.CandidateId
     Pawl.Codec.CandidateIdSpec
     Pawl.Codec.CantAttackPlayer
@@ -241,10 +249,12 @@ library codec
     Pawl.Codec.CastFromSpec
     Pawl.Codec.CastFromZone
     Pawl.Codec.CastFromZoneSpec
+    Pawl.Codec.Casting
     Pawl.Codec.CastingPermission
     Pawl.Codec.CastingPermissionSpec
     Pawl.Codec.CastingRestriction
     Pawl.Codec.CastingRestrictionSpec
+    Pawl.Codec.CastingSpec
     Pawl.Codec.CastObligation
     Pawl.Codec.CastObligationSpec
     Pawl.Codec.CastOffer
@@ -257,6 +267,10 @@ library codec
     Pawl.Codec.ChangeTextSpec
     Pawl.Codec.CharacteristicPT
     Pawl.Codec.CharacteristicPTSpec
+    Pawl.Codec.Check
+    Pawl.Codec.CheckSpec
+    Pawl.Codec.Choices
+    Pawl.Codec.ChoicesSpec
     Pawl.Codec.ChooseBetween
     Pawl.Codec.ChooseBetweenSpec
     Pawl.Codec.ChooseCardName
@@ -388,6 +402,8 @@ library codec
     Pawl.Codec.CounterSpreadSpec
     Pawl.Codec.CounterSubject
     Pawl.Codec.CounterSubjectSpec
+    Pawl.Codec.CountIs
+    Pawl.Codec.CountIsSpec
     Pawl.Codec.CountSpec
     Pawl.Codec.Craft
     Pawl.Codec.CraftSpec
@@ -409,6 +425,8 @@ library codec
     Pawl.Codec.DamageDirectionSpec
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageEventSpec
+    Pawl.Codec.DamageIs
+    Pawl.Codec.DamageIsSpec
     Pawl.Codec.DamageKind
     Pawl.Codec.DamageKindSpec
     Pawl.Codec.DamagePart
@@ -509,6 +527,7 @@ library codec
     Pawl.Codec.EnteringTogetherSpec
     Pawl.Codec.EntersWith
     Pawl.Codec.EntersWithSpec
+    Pawl.Codec.Entry
     Pawl.Codec.EntryAttack
     Pawl.Codec.EntryAttackSpec
     Pawl.Codec.EntryBlock
@@ -525,6 +544,7 @@ library codec
     Pawl.Codec.EntryRiders
     Pawl.Codec.EntryRidersSpec
     Pawl.Codec.EntryRSpec
+    Pawl.Codec.EntrySpec
     Pawl.Codec.Equip
     Pawl.Codec.EquipSpec
     Pawl.Codec.EventGroup
@@ -651,6 +671,8 @@ library codec
     Pawl.Codec.KeywordFamilySpec
     Pawl.Codec.KeywordSpec
     Pawl.Codec.KeywordTally
+    Pawl.Codec.Label
+    Pawl.Codec.LabelSpec
     Pawl.Codec.LastKnown
     Pawl.Codec.LastKnownSpec
     Pawl.Codec.Layout
@@ -667,6 +689,8 @@ library codec
     Pawl.Codec.LifeGainRewrite
     Pawl.Codec.LifeGainRewriteSpec
     Pawl.Codec.LifeGainRSpec
+    Pawl.Codec.LifeIs
+    Pawl.Codec.LifeIsSpec
     Pawl.Codec.LifeLoss
     Pawl.Codec.LifeLossCause
     Pawl.Codec.LifeLossCauseSpec
@@ -769,6 +793,7 @@ library codec
     Pawl.Codec.MorphSpec
     Pawl.Codec.MorphVariant
     Pawl.Codec.MorphVariantSpec
+    Pawl.Codec.Move
     Pawl.Codec.MoveCounters
     Pawl.Codec.MoveCountersSpec
     Pawl.Codec.Moved
@@ -781,6 +806,7 @@ library codec
     Pawl.Codec.MoveDurationSpec
     Pawl.Codec.MoveMana
     Pawl.Codec.MoveManaSpec
+    Pawl.Codec.MoveSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
     Pawl.Codec.Object
@@ -852,6 +878,8 @@ library codec
     Pawl.Codec.PhaseSpec
     Pawl.Codec.Pile
     Pawl.Codec.PileSpec
+    Pawl.Codec.Placement
+    Pawl.Codec.PlacementSpec
     Pawl.Codec.PlanarDieFace
     Pawl.Codec.PlanarDieFaceSpec
     Pawl.Codec.PlanarDieRolled
@@ -940,6 +968,8 @@ library codec
     Pawl.Codec.RandomCardInLibrary
     Pawl.Codec.RangeOfInfluence
     Pawl.Codec.RangeOfInfluenceSpec
+    Pawl.Codec.Readiness
+    Pawl.Codec.ReadinessSpec
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientSpec
     Pawl.Codec.RedirectDamage
@@ -948,6 +978,8 @@ library codec
     Pawl.Codec.ReduceActivationCostSpec
     Pawl.Codec.ReduceSpellCost
     Pawl.Codec.ReduceSpellCostSpec
+    Pawl.Codec.Reference
+    Pawl.Codec.ReferenceSpec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.Reinforce
@@ -1016,6 +1048,8 @@ library codec
     Pawl.Codec.SaddlingSpec
     Pawl.Codec.Scaling
     Pawl.Codec.ScalingSpec
+    Pawl.Codec.Scenario
+    Pawl.Codec.ScenarioSpec
     Pawl.Codec.SchemeSetInMotion
     Pawl.Codec.SchemeSetInMotionSpec
     Pawl.Codec.Scope
@@ -1028,6 +1062,8 @@ library codec
     Pawl.Codec.SearchDestination
     Pawl.Codec.SearchDestinationSpec
     Pawl.Codec.SearchSpec
+    Pawl.Codec.Seat
+    Pawl.Codec.SeatSpec
     Pawl.Codec.SelfCountersReached
     Pawl.Codec.SelfCountersReachedSpec
     Pawl.Codec.SetBasePowerToughness
@@ -1092,6 +1128,8 @@ library codec
     Pawl.Codec.TapForTotalPowerSpec
     Pawl.Codec.TappedForMana
     Pawl.Codec.TappedForManaSpec
+    Pawl.Codec.TappedIs
+    Pawl.Codec.TappedIsSpec
     Pawl.Codec.TapPermanents
     Pawl.Codec.TapPermanentsSpec
     Pawl.Codec.TapState
@@ -1106,6 +1144,8 @@ library codec
     Pawl.Codec.TeamsSpec
     Pawl.Codec.TheseDiscard
     Pawl.Codec.TheseDiscardSpec
+    Pawl.Codec.Timed
+    Pawl.Codec.TimedSpec
     Pawl.Codec.Times
     Pawl.Codec.TimesSpec
     Pawl.Codec.Timestamp
@@ -1160,12 +1200,18 @@ library codec
     Pawl.Codec.VanguardSpec
     Pawl.Codec.VentureMarkerEntered
     Pawl.Codec.VentureMarkerEnteredSpec
+    Pawl.Codec.VillainousChoiceR
+    Pawl.Codec.VillainousChoiceRewrite
+    Pawl.Codec.VillainousChoiceRewriteSpec
+    Pawl.Codec.VillainousChoiceRSpec
     Pawl.Codec.Vote
     Pawl.Codec.VoteChoices
     Pawl.Codec.VoteObjects
     Pawl.Codec.VoteSpec
     Pawl.Codec.Ward
     Pawl.Codec.WardSpec
+    Pawl.Codec.When
+    Pawl.Codec.WhenSpec
     Pawl.Codec.WhichCounters
     Pawl.Codec.WhichCountersSpec
     Pawl.Codec.While
@@ -1354,6 +1400,7 @@ library executable
     pawl:json-codec,
     pawl:json-schema,
     pawl:registry,
+    pawl:scenario,
     pawl:test,
     text ^>=2.1.3,
 
@@ -1537,6 +1584,33 @@ library registry
     Pawl.DeckList
     Pawl.Registry
 
+-- Scenarios: a board, a timeline of decisions and checks, and the runner that
+-- plays one against the engine. The boundary through which anything other than
+-- the rules core drives a game.
+library scenario
+  import: library
+  build-depends:
+    bytestring ^>=0.12.2,
+    containers ^>=0.7,
+    directory ^>=1.3.8,
+    pawl:codec,
+    pawl:engine,
+    pawl:extra,
+    pawl:json-codec,
+    pawl:registry,
+    pawl:types,
+    text ^>=2.1.3,
+    transformers ^>=0.6.1,
+
+  hs-source-dirs: source/libraries/scenario
+  autogen-modules: Paths_pawl
+  other-modules: Paths_pawl
+  -- cabal-gild: discover source/libraries/scenario
+  exposed-modules:
+    Pawl.Scenario
+    Pawl.Scenario.Load
+    Pawl.Scenario.Prompt
+
 -- Converts text (card names) into slugs, which can be used for convenient file
 -- names.
 library slug
@@ -1578,6 +1652,7 @@ library test
     pawl:json-pointer,
     pawl:json-schema,
     pawl:registry,
+    pawl:scenario,
     pawl:slug,
     pawl:spec,
     pawl:types,
@@ -1710,6 +1785,7 @@ library test
     Pawl.SacrificeRestrictionSpec
     Pawl.SaddleSpec
     Pawl.SagaSpec
+    Pawl.ScenarioSpec
     Pawl.SetupSpec
     Pawl.ShieldCounterSpec
     Pawl.SpecialActionSpec
@@ -1717,7 +1793,6 @@ library test
     Pawl.SplitSecondSpec
     Pawl.StationSpec
     Pawl.Support
-    Pawl.SupportSpec
     Pawl.TargetPerPlayerSpec
     Pawl.TargetSpec
     Pawl.TeamSpec
@@ -1753,6 +1828,7 @@ library types
     Pawl.Types.ActivatedAbility
     Pawl.Types.ActivatedAbilitySource
     Pawl.Types.ActivateManaAbilities
+    Pawl.Types.Activation
     Pawl.Types.ActivationProhibition
     Pawl.Types.ActivationRestriction
     Pawl.Types.Activations
@@ -1817,6 +1893,7 @@ library types
     Pawl.Types.BlockProducer
     Pawl.Types.BlockRequirement
     Pawl.Types.BlocksDeclared
+    Pawl.Types.Board
     Pawl.Types.BuybackDecision
     Pawl.Types.CandidateCost
     Pawl.Types.CandidateId
@@ -1835,6 +1912,7 @@ library types
     Pawl.Types.CarryOver
     Pawl.Types.CastFrom
     Pawl.Types.CastFromZone
+    Pawl.Types.Casting
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
     Pawl.Types.CastObligation
@@ -1843,6 +1921,8 @@ library types
     Pawl.Types.ChangeSubtypeWord
     Pawl.Types.ChangeText
     Pawl.Types.CharacteristicPT
+    Pawl.Types.Check
+    Pawl.Types.Choices
     Pawl.Types.ChooseBetween
     Pawl.Types.ChooseCardName
     Pawl.Types.ChoosePlayer
@@ -1918,6 +1998,7 @@ library types
     Pawl.Types.CountersFromThis
     Pawl.Types.CounterSpread
     Pawl.Types.CounterSubject
+    Pawl.Types.CountIs
     Pawl.Types.Craft
     Pawl.Types.Create
     Pawl.Types.CreateCopy
@@ -1928,6 +2009,7 @@ library types
     Pawl.Types.Cycling
     Pawl.Types.DamageDirection
     Pawl.Types.DamageEvent
+    Pawl.Types.DamageIs
     Pawl.Types.DamageKind
     Pawl.Types.DamagePart
     Pawl.Types.DamagePattern
@@ -1984,6 +2066,7 @@ library types
     Pawl.Types.EndTurnSignal
     Pawl.Types.EnteringTogether
     Pawl.Types.EntersWith
+    Pawl.Types.Entry
     Pawl.Types.EntryAttack
     Pawl.Types.EntryBlock
     Pawl.Types.EntryFlip
@@ -2065,6 +2148,7 @@ library types
     Pawl.Types.KeywordFamily
     Pawl.Types.KeywordTally
     Pawl.Types.KickerDecision
+    Pawl.Types.Label
     Pawl.Types.LastKnown
     Pawl.Types.Layer
     Pawl.Types.Layout
@@ -2075,6 +2159,7 @@ library types
     Pawl.Types.LifeChange
     Pawl.Types.LifeGainR
     Pawl.Types.LifeGainRewrite
+    Pawl.Types.LifeIs
     Pawl.Types.LifeLoss
     Pawl.Types.LifeLossCause
     Pawl.Types.LifeLossPattern
@@ -2130,6 +2215,7 @@ library types
     Pawl.Types.MonarchWatch
     Pawl.Types.Morph
     Pawl.Types.MorphVariant
+    Pawl.Types.Move
     Pawl.Types.MoveCounters
     Pawl.Types.Moved
     Pawl.Types.MovedBetween
@@ -2184,6 +2270,7 @@ library types
     Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
     Pawl.Types.Pile
+    Pawl.Types.Placement
     Pawl.Types.PlanarDieFace
     Pawl.Types.PlanarDieRolled
     Pawl.Types.Player
@@ -2233,10 +2320,12 @@ library types
     Pawl.Types.RandomCardInHand
     Pawl.Types.RandomCardInLibrary
     Pawl.Types.RangeOfInfluence
+    Pawl.Types.Readiness
     Pawl.Types.Recipient
     Pawl.Types.RedirectDamage
     Pawl.Types.ReduceActivationCost
     Pawl.Types.ReduceSpellCost
+    Pawl.Types.Reference
     Pawl.Types.Regenerability
     Pawl.Types.Reinforce
     Pawl.Types.RemovalCount
@@ -2277,6 +2366,8 @@ library types
     Pawl.Types.SacrificeToEnter
     Pawl.Types.Saddling
     Pawl.Types.Scaling
+    Pawl.Types.Scenario
+    Pawl.Types.ScenarioFailure
     Pawl.Types.SchemeSetInMotion
     Pawl.Types.Scope
     Pawl.Types.ScryR
@@ -2284,6 +2375,7 @@ library types
     Pawl.Types.Search
     Pawl.Types.SearchDestination
     Pawl.Types.SearchPlace
+    Pawl.Types.Seat
     Pawl.Types.SelfCountersReached
     Pawl.Types.SetBasePowerToughness
     Pawl.Types.SetClassLevel
@@ -2304,6 +2396,7 @@ library types
     Pawl.Types.SpendManaAsThough
     Pawl.Types.Splice
     Pawl.Types.StackObjectKind
+    Pawl.Types.Staged
     Pawl.Types.StatedFlip
     Pawl.Types.StaticAbility
     Pawl.Types.Status
@@ -2317,6 +2410,7 @@ library types
     Pawl.Types.TakeExtraTurn
     Pawl.Types.TapForTotalPower
     Pawl.Types.TappedForMana
+    Pawl.Types.TappedIs
     Pawl.Types.TapPermanents
     Pawl.Types.TapState
     Pawl.Types.TargetCount
@@ -2324,6 +2418,7 @@ library types
     Pawl.Types.TeamId
     Pawl.Types.Teams
     Pawl.Types.TheseDiscard
+    Pawl.Types.Timed
     Pawl.Types.Times
     Pawl.Types.Timestamp
     Pawl.Types.TimeTravelChoice
@@ -2355,10 +2450,13 @@ library types
     Pawl.Types.Vanguard
     Pawl.Types.VariableChoice
     Pawl.Types.VentureMarkerEntered
+    Pawl.Types.VillainousChoiceR
+    Pawl.Types.VillainousChoiceRewrite
     Pawl.Types.Vote
     Pawl.Types.VoteChoices
     Pawl.Types.VoteObjects
     Pawl.Types.Ward
+    Pawl.Types.When
     Pawl.Types.WhichCounters
     Pawl.Types.While
     Pawl.Types.WithCounters

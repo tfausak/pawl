@@ -1,0 +1,43 @@
+{
+  "description": "CR 601.2b Blaze at X=3 deals 3 to the opponent",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "first mana" },
+          { "card": "Mountain", "label": "second mana" },
+          { "card": "Mountain", "label": "third mana" },
+          { "card": "Mountain", "label": "fourth mana" }
+        ],
+        "hand": [{ "card": "Blaze", "label": "spell" }]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": {
+        "Cast": {
+          "object": "@spell",
+          "targets": ["@bob"],
+          "x": 3,
+          "mana": ["@first mana", "@second mana", "@third mana", "@fourth mana"]
+        }
+      }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } }
+  ],
+  "final": [
+    { "Tapped": { "object": "@first mana", "tapped": true } },
+    { "Tapped": { "object": "@second mana", "tapped": true } },
+    { "Tapped": { "object": "@third mana", "tapped": true } },
+    { "Tapped": { "object": "@fourth mana", "tapped": true } }
+  ]
+}

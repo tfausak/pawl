@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Replacement as Replacement
 import Pawl.Engine.Resolve.Effect (announcedOnly, apnapPlayersOf, applyClauseEffects, applyEffectWith, branchSelects, clauseIsImpossible, noSubgame, payGatePaid, targetSlotsOf)
 import Pawl.Engine.Resolve.Slots (boundSlots, effectContext, slotsAreExhaustive, slotsOf)
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
@@ -73,6 +74,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
@@ -1084,8 +1086,11 @@ facedVillainously picked cIdx clause = case Clause.orElse clause of
 -- readable: the limb's reads are re-taken after the bind, where chosenBranch's
 -- callers had captured theirs before the question was put.
 --
--- Not implemented: rule 701.55c's replacement of one facing by several, which
--- would run this body's inner step more than once for the same seat (#3898).
+-- CR 701.55c: each seat's facing is first proposed as WouldFaceVillainousChoice,
+-- so a row like The Valeyard's can make it several -- the whole of rule 701.55a
+-- performed that many times for that seat, one at a time, each its own choice
+-- read off the board the previous one left. Pawl.ResolveSpec's "CR 701.55c The
+-- Valeyard: an opponent faces the choice twice" proves it.
 villainousPass :: ObjectId -> PlayerId -> ModeIndex -> Map.Map SlotName (Set Recipient) -> OrElse.OrElse -> NonEmpty.NonEmpty ClauseIndex -> (ClauseIndex -> Set PlayerId -> acc -> Game acc) -> acc -> Game acc
 villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
   gs <- State.get
@@ -1093,16 +1098,21 @@ villainousPass resolving controller idx legal orElse limbs performLimb acc0 = do
   -- drives two seats through this pass, so the payload is unproven here.
   fmap fst $
     Monad.foldM
-      ( \(acc, made) chooser -> do
-          gs1 <- State.get
-          answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs made)
-          let chosen = if elem answered limbs then answered else NonEmpty.head limbs
-          State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
-          performed <- performLimb chosen (Set.singleton chooser) acc
-          pure (performed, made Seq.|> (chooser, chosen))
+      ( \seat chooser -> do
+          outcome <- Event.applyReplacements (ProposedEvent.WouldFaceVillainousChoice chooser 1)
+          let times = maybe 0 (Natural.toIntSaturating . snd) (outcome >>= Replacement.asVillainousChoice)
+          Monad.foldM (\faced _ -> face chooser faced) seat (List.replicate times ())
       )
       (acc0, Seq.empty)
       (apnapPlayersOf (OrElse.chooser orElse) legal controller gs)
+  where
+    face chooser (acc, made) = do
+      gs1 <- State.get
+      answered <- Game.choose (Prompt.ChooseClause (Decide.deciderFor chooser gs1) chooser resolving idx limbs made)
+      let chosen = if elem answered limbs then answered else NonEmpty.head limbs
+      State.modify' (bindPlayersSlot resolving Binding.facingPlayers (Set.singleton chooser))
+      performed <- performLimb chosen (Set.singleton chooser) acc
+      pure (performed, made Seq.|> (chooser, chosen))
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made

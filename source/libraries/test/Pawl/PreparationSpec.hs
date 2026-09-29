@@ -64,12 +64,14 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -78,6 +80,9 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Seat as Seat
+import qualified Pawl.Types.Staged as Staged
+import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.Zone as Zone
 
 aviatorName, jumpName, cloneName :: CardName.CardName
@@ -148,7 +153,7 @@ rippleAt victim p = case p of
 -- copy's {U} and combat about to start. The Piker is Jump's target and is
 -- otherwise inert: it never attacks, and nothing else on the board grants
 -- anything.
-aviatorDuel :: S.Board
+aviatorDuel :: Board.Board
 aviatorDuel =
   S.duel
     S.beginningOfCombat
@@ -166,7 +171,7 @@ aviatorDuel =
 -- bob starts at 60 so that two combats do not kill him: the three attackers deal
 -- 7 a combat, and a dead defending player would end the game (CR 104.3b) before
 -- the second declaration this case is about.
-aureliaDuel :: S.Board
+aureliaDuel :: Board.Board
 aureliaDuel =
   S.board
     ( S.battlefield
@@ -176,7 +181,7 @@ aureliaDuel =
           S.settled "piker" "Goblin Piker",
           S.aliased "island" (S.permanent "Island")
         ]
-        NonEmpty.:| [(S.battlefield S.bob []) {S.setupLife = 60}]
+        NonEmpty.:| [(S.battlefield S.bob []) {Seat.life = 60}]
     )
     S.alice
     S.beginningOfCombat
@@ -184,7 +189,7 @@ aureliaDuel =
 -- The Aviator attacks bob unblocked, and the whole combat phase runs -- so CR
 -- 508.1's declaration, CR 603.3's trigger placement and CR 608's resolution all
 -- happen inside the engine rather than being poked in.
-attackScript :: Seq.Seq S.Timed
+attackScript :: Seq.Seq Timed.Timed
 attackScript = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "aviator"])]
 
 -- CR 722.2b's board. The printed Aviator is here only to be COPIED: Concordant
@@ -196,7 +201,7 @@ attackScript = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "
 -- The printed Aviator attacks too -- `attackTo` declares every creature -- and
 -- mints a copy of its own, which is why every assertion below is keyed to the
 -- permanent a copy NAMES rather than to a count of exile.
-cloneDuel :: S.Board
+cloneDuel :: Board.Board
 cloneDuel =
   S.duel
     S.precombatMain
@@ -215,7 +220,7 @@ cloneDuel =
 -- CR 702.26b's board: the proving board plus three Islands and Reality Ripple in
 -- alice's own hand, so the phase-out happens after the mint with nothing else
 -- changed.
-rippleDuel :: S.Board
+rippleDuel :: Board.Board
 rippleDuel =
   S.board
     ( ( S.battlefield
@@ -227,7 +232,7 @@ rippleDuel =
             S.permanent "Island"
           ]
       )
-        { S.setupHand = Seq.fromList [S.aliased "ripple" (S.cardSetup "Reality Ripple")]
+        { Seat.hand = Seq.fromList [S.aliased "ripple" (S.cardSetup "Reality Ripple")]
         }
         NonEmpty.:| [S.battlefield S.bob []]
     )
@@ -241,7 +246,7 @@ rippleDuel =
 --
 -- The Wolves is vanilla and never attacks, so "the Wolves is flying" means the
 -- copy of the prepare spell resolved and nothing else.
-twincastDuel :: S.Board
+twincastDuel :: Board.Board
 twincastDuel =
   S.board
     ( ( S.battlefield
@@ -256,7 +261,7 @@ twincastDuel =
             S.permanent "Island"
           ]
       )
-        { S.setupHand = Seq.fromList [S.aliased "twincast" (S.cardSetup "Twincast")]
+        { Seat.hand = Seq.fromList [S.aliased "twincast" (S.cardSetup "Twincast")]
         }
         NonEmpty.:| [S.battlefield S.bob []]
     )
@@ -294,8 +299,8 @@ untapStep pid gs =
     gs {GameState.activePlayer = pid}
     (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
 
-aliasOrFail :: (Monad m) => Spec.Spec m n -> S.BuiltBoard -> String -> m ObjectId.ObjectId
-aliasOrFail s built name = case Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built) of
+aliasOrFail :: (Monad m) => Spec.Spec m n -> Staged.Staged -> String -> m ObjectId.ObjectId
+aliasOrFail s built name = case Map.lookup (Label.MkLabel (Text.pack name)) (Staged.objects built) of
   Nothing -> Spec.assertFailure s ("the board omitted the " <> name <> " alias")
   Just oid -> pure oid
 
@@ -351,7 +356,7 @@ spec s registry = Spec.describe s "Preparation" $ do
     built <- S.buildBoardOrFail s registry aviatorDuel
     aviatorId <- aliasOrFail s built "aviator"
     pikerId <- aliasOrFail s built "piker"
-    let start = S.builtState built
+    let start = Staged.state built
     Spec.assertBool s (not (isPrepared aviatorId start)) "before: the Aviator is not prepared"
     Spec.assertEqWith s "before: nothing in exile" (prepareCopies start) []
     Spec.assertBool s (notElem jumpName (namesOffered start)) "before: no Jump is offered"
@@ -403,7 +408,7 @@ spec s registry = Spec.describe s "Preparation" $ do
   Spec.it s "CR 722.3a a second attack while already prepared mints no second copy" $ do
     built <- S.buildBoardOrFail s registry aureliaDuel
     aviatorId <- aliasOrFail s built "aviator"
-    let twice = S.runCombat (S.attackTo S.bob) (S.builtState built)
+    let twice = S.runCombat (S.attackTo S.bob) (Staged.state built)
     -- The CONTROL, and what keeps the count below from passing vacuously: two
     -- combats of 7 took bob from 60 to 46, where one would have left him at 53.
     -- So the Aviator really did attack a second time while prepared.
@@ -428,7 +433,7 @@ spec s registry = Spec.describe s "Preparation" $ do
     aviatorId <- aliasOrFail s built "aviator"
     pikerId <- aliasOrFail s built "piker"
     clone <- S.printingOf s registry "Clone"
-    let (cloneHandId, ready) = S.addHandCard clone S.alice (S.builtState built)
+    let (cloneHandId, ready) = S.addHandCard clone S.alice (Staged.state built)
         entered = S.runPure (copyNamed aviatorId) ready (S.cast S.alice cloneHandId *> Stack.resolveTop *> Engine.settleForPriority)
     case newestClone entered of
       Nothing -> Spec.assertFailure s "the Clone did not reach the battlefield"

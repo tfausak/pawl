@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Soulbond as Soulbond
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural.Extra
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -2234,7 +2235,7 @@ stormSpec s registry = Spec.describe s "Storm" $ do
         -- Grapeshot at bob, with its storm trigger settled onto the stack above it.
         cast_ = atBob opened {GameState.priority = Just S.alice} (S.cast S.alice grapeshotId)
         -- CR 400.7's incarnation: the spell carries an id the hand card did not.
-        onStack = Maybe.listToMaybe (S.namedObjects (S.printingName grapeshot) cast_)
+        onStack = Maybe.listToMaybe (Scenario.namedObjects (S.printingName grapeshot) cast_)
         -- bob's Cancel, aimed at that id by FILTERING the offered set, so a pool
         -- that stopped offering the spell counters nothing rather than quietly
         -- finding something else.
@@ -2445,7 +2446,7 @@ demonstrateSpec s registry = Spec.describe s "Demonstrate" $ do
         copied = after OptionalDecision.Exercises
         declined = after OptionalDecision.Declines
         controllersOf printing gs =
-          List.sort (Maybe.mapMaybe (`Projection.View.controllerOf` gs) (filter (`Set.member` GameState.battlefield gs) (S.namedObjects (S.printingName printing) gs)))
+          List.sort (Maybe.mapMaybe (`Projection.View.controllerOf` gs) (filter (`Set.member` GameState.battlefield gs) (Scenario.namedObjects (S.printingName printing) gs)))
     Spec.assertEqWith
       s
       "CR 707.10 the copy alice demonstrated is bob's: it resolved out of BOB's graveyard, under bob's control"

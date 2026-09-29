@@ -74,6 +74,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Suspend as Suspend
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -1055,7 +1056,7 @@ valkyrieAnswers loreId prompt = case prompt of
 tapOneNamed :: Printing.Printing -> GameState.GameState -> GameState.GameState
 tapOneNamed island gs =
   let untapped oid = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
-   in case filter untapped (S.namedObjects (S.printingName island) gs) of
+   in case filter untapped (Scenario.namedObjects (S.printingName island) gs) of
         oid : _ -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
         [] -> gs
 

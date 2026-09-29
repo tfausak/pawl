@@ -38,6 +38,22 @@ codecWith = Fields.objectWith nonZeroSize $ do
   l <- Fields.defaulted "label" Nothing (Common.maybe size2) label
   pure MkExample {size = s, label = l}
 
+-- | 'Example' inside a record of its own, its keys written beside @name@.
+data Wrapped = MkWrapped
+  { name :: Text.Text,
+    inner :: Example
+  }
+  deriving (Eq, Ord, Show)
+
+wrappedCodec :: Codec.Codec Wrapped
+wrappedCodec = Fields.object $ do
+  n <- Fields.required "name" Common.text name
+  i <- Fields.contramap inner $ do
+    s <- Fields.required "size" size2 size
+    l <- Fields.defaulted "label" Nothing (Common.maybe size2) label
+    pure MkExample {size = s, label = l}
+  pure MkWrapped {name = n, inner = i}
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.JsonCodec.Fields" $ do
   Spec.it s "writes a required field" $
@@ -51,6 +67,9 @@ spec s = Spec.describe s "Pawl.JsonCodec.Fields" $ do
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec
+
+  Spec.it s "contramap writes a nested record's fields into its parent's object" $
+    Common.assertCodec s wrappedCodec MkWrapped {name = Text.pack "x", inner = MkExample {size = 1, label = Just 2}} " {\"name\":\"x\",\"size\":1,\"label\":2} "
 
   Spec.describe s "objectWith" $ do
     Spec.it s "round trips a value the check accepts" $
