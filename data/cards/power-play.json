@@ -1,0 +1,15 @@
+{
+  "faces": [
+    {
+      "claimsStartingPlayer": true,
+      "name": "Power Play",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Conspiracy"
+          }
+        ]
+      }
+    }
+  ]
+}

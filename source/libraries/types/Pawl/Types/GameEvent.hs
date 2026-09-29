@@ -358,11 +358,8 @@ data GameEvent
     -- ability's controller as it triggered (CR 603.3a), and the ability itself.
     -- Appended by Pawl.Engine.Engine.placePendingTriggers before the batch is put
     -- onto the stack, which is what lets the abilities reacting to it join the
-    -- SAME batch in rule 603.3b's second pass.
-    --
-    -- Not implemented: a CR 603.7 DELAYED ability never triggers off one of
-    -- these entries, Engine.reactions re-scanning only the event triggers
-    -- (#1026).
+    -- SAME batch in rule 603.3b's second pass, a CR 603.7 delayed ability's
+    -- included.
     AbilityTriggered AbilityTriggered.AbilityTriggered
   | -- | A permanent's CONTROLLER CHANGED: the permanent, the player who
     -- controlled it when the game last looked, and the player who controls it

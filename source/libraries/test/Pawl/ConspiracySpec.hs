@@ -14,9 +14,18 @@
 -- as an each-upkeep trigger that triggers only once: CR 315.3 keeps the card in
 -- the command zone from before the first upkeep to the end of the game, so its
 -- first triggering is at the game's first upkeep.
+--
+-- Power Play (Conspiracy, no mana cost; "(Start the game with this conspiracy
+-- face up in the command zone.) You are the starting player. If multiple players
+-- would be the starting player, one of those players is chosen at random." --
+-- checked against api.scryfall.com 2026-09-29, paper printing `cns`) is CR
+-- 103.1c's card, and Pawl.Engine.Setup.claimStartingPlayer its reader.
 module Pawl.ConspiracySpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -67,6 +76,40 @@ keepAnswer p = case p of
 
 commandNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
 commandNames pid gs = fmap (\oid -> maybe (CardName.MkCardName (Text.pack "?")) S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Command pid gs)
+
+-- What a whole-setup run asked: who declared a mulligan, in order, and the
+-- candidates of each CR 103.1c random draw.
+data Asked
+  = DeclaredBy PlayerId.PlayerId
+  | DrewFrom [PlayerId.PlayerId]
+  deriving (Eq, Show)
+
+-- Keeps every hand and takes every offered CR 103.6 action, recording each ask.
+-- A CR 103.1c draw is answered with the candidate at index `pick`, pinned by
+-- position so the answer cannot go looking for the right player.
+recording :: Int -> Prompt.Prompt r -> State.State [Asked] r
+recording pick p = case p of
+  Prompt.DeclareMulligan _ pid _ -> do
+    State.modify' (DeclaredBy pid :)
+    pure MulliganDecision.Keep
+  Prompt.OpeningHandAction _ _ candidates -> pure (Maybe.listToMaybe candidates)
+  Prompt.RandomFirstPlayer candidates -> do
+    State.modify' (DrewFrom (NonEmpty.toList candidates) :)
+    pure (Maybe.fromMaybe (NonEmpty.head candidates) (Maybe.listToMaybe (drop pick (NonEmpty.toList candidates))))
+  _ -> pure (S.identityAnswer p)
+
+-- The whole of Setup.newGame over this matchup, seated in its order -- so its
+-- head is CR 103.1's determination -- with what `recording pick` was asked.
+started :: Int -> NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck) -> (GameState.GameState, [Asked])
+started pick matchup =
+  let ((_, gs), asked) = State.runState (Engine.runGame (recording pick) (Setup.emptyGame (fmap fst matchup)) (Setup.newGame S.performer matchup)) []
+   in (gs, reverse asked)
+
+declarers :: [Asked] -> [PlayerId.PlayerId]
+declarers asked = [pid | DeclaredBy pid <- asked]
+
+draws :: [Asked] -> [[PlayerId.PlayerId]]
+draws asked = [pids | DrewFrom pids <- asked]
 
 -- Run the upkeep of the given turn, with the given player active.
 upkeep :: PlayerId.PlayerId -> Natural -> GameState.GameState -> GameState.GameState
@@ -130,3 +173,53 @@ spec s registry = Spec.describe s "Conspiracy" $ do
     Spec.assertEqWith s "still in bob's command zone" (commandNames S.bob restarted) [CardName.MkCardName (Text.pack "Sentinel Dispatch")]
     Spec.assertEqWith s "not shuffled into his thirty-card library" (length (Game.zoneMembers Zone.Library S.bob restarted) + length (Game.zoneMembers Zone.Hand S.bob restarted)) 30
     Spec.assertEqWith s "and the new game's first upkeep makes a Construct again" (constructsControlledBy S.bob (upkeep S.alice 1 restarted)) 1
+
+  -- CR 103.1c: alice is seated first, so CR 103.1 makes her the starting player
+  -- -- until bob's Power Play supersedes it. Gemstone Caverns is the observer:
+  -- "if ... you're not the starting player" reads Quantity.IsStartingPlayer. Both
+  -- decks are all Caverns, so the two seats differ only in the conspiracy, and
+  -- the control leg differs from this one only in that.
+  Spec.describe s "Power Play" $ do
+    Spec.it s "CR 103.1c Power Play makes its controller the starting player" $ do
+      caverns <- S.printingOf s registry "Gemstone Caverns"
+      powerPlay <- S.printingOf s registry "Power Play"
+      let leg conspiracies = started 0 ((S.alice, deckOf caverns []) NonEmpty.:| [(S.bob, deckOf caverns conspiracies)])
+          (with, asked) = leg [powerPlay]
+          (control, controlAsked) = leg []
+          begunWith pid gs = not (null (Game.zoneMembers Zone.Battlefield pid gs))
+      Spec.assertEqWith s "alice, no longer the starting player, begins with her Caverns" (begunWith S.alice with) True
+      Spec.assertEqWith s "bob, now the starting player, does not" (begunWith S.bob with) False
+      Spec.assertEqWith s "without Power Play, alice starts and has none" (begunWith S.alice control) False
+      Spec.assertEqWith s "and bob has his" (begunWith S.bob control) True
+      Spec.assertEqWith s "bob takes the first turn" (GameState.activePlayer with) S.bob
+      Spec.assertEqWith s "the turn order begins with him" (GameState.turnOrder with) [S.bob, S.alice]
+      -- CR 103.5: the starting player declares first.
+      Spec.assertEqWith s "bob declares his mulligan first" (declarers asked) [S.bob, S.alice]
+      Spec.assertEqWith s "the control leg is untouched" (declarers controlAsked) [S.alice, S.bob]
+      -- One claimant is no draw.
+      Spec.assertEqWith s "nothing is drawn at random" (draws asked) []
+
+    -- Power Play's second sentence, and its 2014-05-29 ruling: the draw is over
+    -- exactly the two claimants, and the order is rotated, not reseated, so the
+    -- loser keeps their place. Two logs, one landing on each claimant; three
+    -- seats so the non-claimant is a third player the draw must leave out.
+    Spec.it s "CR 103.1c two Power Plays: one claimant is drawn at random" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      powerPlay <- S.printingOf s registry "Power Play"
+      let matchup = (S.alice, deckOf mountain []) NonEmpty.:| [(S.bob, deckOf mountain [powerPlay]), (S.carol, deckOf mountain [powerPlay])]
+          (toCarol, carolAsked) = started 1 matchup
+          (toBob, bobAsked) = started 0 matchup
+      Spec.assertEqWith s "landing on carol, she starts and bob goes last" (GameState.turnOrder toCarol) [S.carol, S.alice, S.bob]
+      Spec.assertEqWith s "landing on bob, he starts and alice goes last" (GameState.turnOrder toBob) [S.bob, S.carol, S.alice]
+      Spec.assertEqWith s "carol takes the first turn" (GameState.activePlayer toCarol) S.carol
+      Spec.assertEqWith s "one draw, over bob and carol alone" (draws carolAsked) [[S.bob, S.carol]]
+      Spec.assertEqWith s "the same draw in the other log" (draws bobAsked) [[S.bob, S.carol]]
+
+    -- CR 727.1a then CR 103.1c: alice restarts the game, and bob's Power Play,
+    -- still in his command zone (CR 315.3), supersedes her claim.
+    Spec.it s "CR 103.1c / 727.1a Power Play supersedes a restart's starting player" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      powerPlay <- S.printingOf s registry "Power Play"
+      let restart conspiracies = S.runPure keepAnswer (built mountain conspiracies) (Setup.restartGame S.performer Set.empty S.alice)
+      Spec.assertEqWith s "with Power Play, bob starts the new game" (GameState.turnOrder (restart [powerPlay])) [S.bob, S.alice]
+      Spec.assertEqWith s "without it, alice does" (GameState.turnOrder (restart [])) [S.alice, S.bob]
