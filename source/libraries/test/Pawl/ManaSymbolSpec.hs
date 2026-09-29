@@ -188,6 +188,45 @@ celestialDawnSpec s registry = Spec.describe s "Celestial Dawn" $ do
     Spec.assertBool s paid "and the payment really taps it"
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice after) 0
 
+-- CR 609.4b's non-"only" clause ADDS a way to spend the mana rather than
+-- replacing what it is. Sunglasses of Urza ({3} Artifact, "You may spend white
+-- mana as though it were red mana.") names red and not white, so the two readings
+-- diverge: a replace reading would stop white mana paying {W}.
+--
+-- Celestial Dawn's permission cannot tell them apart, since "any color" contains
+-- white; these cases are what prove Pawl.Engine.Mana.spendableAs keeps the
+-- mana's own type.
+sunglassesOfUrzaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sunglassesOfUrzaSpec s registry = Spec.describe s "Sunglasses of Urza" $ do
+  -- Two Plains and Deflecting Palm's {R}{W}: one white mana is spent as red and
+  -- the other as itself. The board side, through the untapped lands' supply. An
+  -- instant, so the cast is not gated on the empty game's step.
+  Spec.it s "CR 609.4b two Plains cast a {R}{W} spell, white paying both {R} and {W}" $ do
+    sunglasses <- S.printingOf s registry "Sunglasses of Urza"
+    plains <- S.printingOf s registry "Plains"
+    palm <- S.printingOf s registry "Deflecting Palm"
+    let (spell, without) = S.addHandCard palm S.alice (S.landsInPlay plains 2)
+        with = snd (S.addPermanent sunglasses S.alice without)
+        after = S.runPure S.identityAnswer with (S.cast S.alice spell)
+    Spec.assertEqWith s "under Sunglasses of Urza the two Plains cast Deflecting Palm" (length (GameState.stack after), Game.zoneMembers Zone.Hand S.alice after) (1, [])
+    Spec.assertEqWith s "and both Plains tapped for it" (S.tappedCount S.alice after) 2
+    Spec.assertBool s (not (S.castable S.alice spell without)) "and without it the same Plains cannot pay {R}"
+
+  -- The pool side, one symbol at a time. {U} is the control: the clause names red
+  -- only, so white mana is not spendable as any other colour.
+  Spec.it s "CR 609.4b a white mana still pays {W}, and also {R} but not {U}" $ do
+    sunglasses <- S.printingOf s registry "Sunglasses of Urza"
+    let (with, without) = dawnBoards sunglasses [plainOf (ManaType.Colored Color.White)]
+        white = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.White))
+        red = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Red))
+        blue = oneSymbol (ManaSymbol.OfType (ManaType.Colored Color.Blue))
+        (paid, after) = S.runPureWith S.identityAnswer with (Cost.payMana S.manaPerformer PaymentSubject.ForNeither ManaSpending.AsProduced S.alice white)
+    Spec.assertBool s paid "under Sunglasses of Urza the white mana pays {W}"
+    Spec.assertEqWith s "and it spent the white unit" (poolUnits after) []
+    Spec.assertBool s (payable S.alice red with) "the same white mana pays {R}"
+    Spec.assertBool s (not (payable S.alice red without)) "which it cannot without the artifact"
+    Spec.assertBool s (not (payable S.alice blue with)) "and it still cannot pay {U}"
+
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against
 -- data/cards/icehide-golem.json.
@@ -2311,6 +2350,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   snowSpec s registry
   snowSymbolSpec s registry
   celestialDawnSpec s registry
+  sunglassesOfUrzaSpec s registry
   spendChoiceSpec s registry
   bergStriderSpec s registry
   rimewoodHeraldSpec s registry

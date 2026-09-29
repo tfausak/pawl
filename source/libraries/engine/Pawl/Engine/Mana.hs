@@ -1132,7 +1132,9 @@ supplyOf admitting unit =
 -- is added to it otherwise (Pawl.Types.SpendManaAsThough.only). Celestial Dawn's
 -- restriction is the first case -- a red mana under it can pay {1} and {C} and no
 -- longer {R} -- and its permission is the second, though nothing observes the
--- difference there, since "mana of any color" already contains white.
+-- difference there, since "mana of any color" already contains white. Sunglasses
+-- of Urza's "white mana as though it were red" does: its white mana still pays
+-- {W}.
 --
 -- A UNION over the applicable clauses, with no CR 613.11 timestamp ordering,
 -- because a union has nothing to order: two clauses that permit different types

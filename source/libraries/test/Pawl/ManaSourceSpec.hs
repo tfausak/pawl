@@ -2283,9 +2283,10 @@ plainOf manaType = ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.t
 oneSymbol :: ManaSymbol.ManaSymbol -> ManaCost.ManaCost
 oneSymbol symbol = ManaCost.MkManaCost [symbol]
 
--- Alice's board with Celestial Dawn out and `units` seated in her pool, paired
--- with the same board WITHOUT the enchantment. Every case below reads both, so
--- each answer is a pair of boards differing in exactly one permanent.
+-- Alice's board with Celestial Dawn (or Pawl.ManaSymbolSpec's Sunglasses of
+-- Urza) out and `units` seated in her pool, paired with the same board WITHOUT
+-- it. Every case reads both, so each answer is a pair of boards differing in
+-- exactly one permanent.
 dawnBoards :: Printing.Printing -> [ManaUnit.ManaUnit] -> (GameState.GameState, GameState.GameState)
 dawnBoards dawn units =
   let seated = Mana.setPool S.alice (Mana.Type.MkMana units) (Setup.emptyGame S.bothPlayers)
