@@ -205,7 +205,7 @@ data TriggerCondition
     -- on a quality instead.
     --
     -- Not implemented: rule 509.3e's "effects that add or remove blockers" reach
-    -- neither this nor SelfBlocksAtLeast (#1146). The pool's one effect that
+    -- neither this nor SelfBlocksAtLeast (#4384). The pool's one effect that
     -- makes an already-blocking creature block (General Jarkeld) is not that
     -- producer either: it moves a blocker between two attackers, leaving the
     -- number of creatures each blocker blocks exactly where it was.
@@ -239,12 +239,9 @@ data TriggerCondition
     -- Rule 509.3e's "effects that add or remove blockers" reaches it where the
     -- arrival is the first admitted blocker: Aetherplasm swapping itself out for
     -- a black creature card is the pooled pair, and Pawl.KeywordTriggerSpec's
-    -- SelfBlocksOneOrMore group is the proof.
-    --
-    -- Not implemented: an effect that causes a creature already on the
-    -- battlefield to block (General Jarkeld) records GameEvent.BecameBlocking
-    -- with putOntoBattlefield CLEAR, and this arm guards on that flag being set,
-    -- so it misses that road (#1146).
+    -- SelfBlocksOneOrMore group is the proof. General Jarkeld moving black
+    -- blockers onto it is the effect road, and Pawl.CombatCostSpec's
+    -- SwitchBlockers group is that proof.
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3e read by a bystander on the attacking side: "whenever a
     -- creature attacking one of your opponents becomes blocked by two or more
@@ -257,12 +254,9 @@ data TriggerCondition
     -- onto the battlefield blocking an already-blocked attacker: Flash Foliage's
     -- Saproling joining a declared Hill Giant is the pooled pair, and
     -- Pawl.KeywordTriggerSpec's CreatureBecomesBlockedByAtLeast group is the
-    -- proof.
-    --
-    -- Not implemented: an effect that causes a creature already on the
-    -- battlefield to block (General Jarkeld) records GameEvent.BecameBlocking
-    -- with putOntoBattlefield CLEAR, and this arm guards on that flag being set,
-    -- so it misses that road (#1146).
+    -- proof. General Jarkeld moving two blockers onto a singly-blocked
+    -- attacker is the effect road, and Pawl.CombatCostSpec's SwitchBlockers
+    -- group is that proof.
     CreatureBecomesBlockedByAtLeast CreatureBecomesBlockedByAtLeast.CreatureBecomesBlockedByAtLeast
   | -- | CR 509.1h: "whenever this creature attacks and isn't blocked" -- CR
     -- 702.68a's frenzy, with the status fixed at the declaration.

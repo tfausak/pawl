@@ -5,6 +5,7 @@ import qualified Pawl.Codec.BecameBlocking as BecameBlocking
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BlockProducer as BlockProducer
 import qualified Pawl.Types.ObjectId as ObjectId
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -19,7 +20,7 @@ spec s = Spec.describe s "Pawl.Codec.BecameBlocking" $ do
       ( BecameBlocking.MkBecameBlocking
           { BecameBlocking.blocker = ObjectId.MkObjectId 1,
             BecameBlocking.attacker = ObjectId.MkObjectId 2,
-            BecameBlocking.putOntoBattlefield = False,
+            BecameBlocking.producer = BlockProducer.Declared,
             BecameBlocking.attackerWasBlocked = False,
             BecameBlocking.blockersBefore = Set.empty
           }
@@ -33,12 +34,12 @@ spec s = Spec.describe s "Pawl.Codec.BecameBlocking" $ do
       ( BecameBlocking.MkBecameBlocking
           { BecameBlocking.blocker = ObjectId.MkObjectId 1,
             BecameBlocking.attacker = ObjectId.MkObjectId 2,
-            BecameBlocking.putOntoBattlefield = True,
+            BecameBlocking.producer = BlockProducer.PutOntoBattlefield,
             BecameBlocking.attackerWasBlocked = False,
             BecameBlocking.blockersBefore = Set.empty
           }
       )
-      " {\"blocker\":1,\"attacker\":2,\"putOntoBattlefield\":true} "
+      " {\"blocker\":1,\"attacker\":2,\"producer\":{\"type\":\"PutOntoBattlefield\"}} "
   -- CR 509.1h's flag and CR 509.3e's set, and the one producer that can carry
   -- either: an arrival at an attacker that was ALREADY blocked. The case above
   -- holds both clear while the other flag is set, which is what tells the three
@@ -52,10 +53,25 @@ spec s = Spec.describe s "Pawl.Codec.BecameBlocking" $ do
       ( BecameBlocking.MkBecameBlocking
           { BecameBlocking.blocker = ObjectId.MkObjectId 1,
             BecameBlocking.attacker = ObjectId.MkObjectId 2,
-            BecameBlocking.putOntoBattlefield = True,
+            BecameBlocking.producer = BlockProducer.PutOntoBattlefield,
             BecameBlocking.attackerWasBlocked = True,
             BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 3)
           }
       )
-      " {\"blocker\":1,\"attacker\":2,\"putOntoBattlefield\":true,\"attackerWasBlocked\":true,\"blockersBefore\":[3]} "
+      " {\"blocker\":1,\"attacker\":2,\"producer\":{\"type\":\"PutOntoBattlefield\"},\"attackerWasBlocked\":true,\"blockersBefore\":[3]} "
+  -- The effect road, whose producer carries the attacker's blockers after the
+  -- effect: a fourth id, so a codec reading it into blockersBefore disagrees.
+  Spec.it s "MkBecameBlocking, made to block by an effect" $
+    Common.assertCodec
+      s
+      BecameBlocking.codec
+      ( BecameBlocking.MkBecameBlocking
+          { BecameBlocking.blocker = ObjectId.MkObjectId 1,
+            BecameBlocking.attacker = ObjectId.MkObjectId 2,
+            BecameBlocking.producer = BlockProducer.ByEffect (Set.singleton (ObjectId.MkObjectId 4)),
+            BecameBlocking.attackerWasBlocked = True,
+            BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 3)
+          }
+      )
+      " {\"blocker\":1,\"attacker\":2,\"producer\":{\"type\":\"ByEffect\",\"value\":[4]},\"attackerWasBlocked\":true,\"blockersBefore\":[3]} "
   Spec.it s "has a schema" $ Common.assertHasSchema s BecameBlocking.codec

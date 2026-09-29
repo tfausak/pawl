@@ -44,6 +44,7 @@ import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.BlockProducer as BlockProducer
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.Card as Card
@@ -2478,15 +2479,15 @@ representativeEvents cond =
         TriggerCondition.SelfBlocksOneOrMore _ -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
         -- The PAIRWISE event instead: CR 509.3b's bearer is the BLOCKER too, and
         -- the attacker beside it is what this one binds.
-        TriggerCondition.SelfBlocksCreature _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = departed, BecameBlocking.attacker = ObjectId.MkObjectId 41, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
+        TriggerCondition.SelfBlocksCreature _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = departed, BecameBlocking.attacker = ObjectId.MkObjectId 41, BecameBlocking.producer = BlockProducer.Declared, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
         -- CR 508.5's defending player again, and carol for SelfAttacks' reason
         -- above: eventBindings binds this field under `thatPlayer`.
         TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol 1))
         -- The same declaration event SelfBlocks names, with the ids the other way
         -- round: this condition's bearer is the ATTACKER, and the blocker is what
         -- it binds.
-        TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 41, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
-        TriggerCondition.PermanentBecomesBlockedBy _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 41, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
+        TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 41, BecameBlocking.attacker = departed, BecameBlocking.producer = BlockProducer.Declared, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
+        TriggerCondition.PermanentBecomesBlockedBy _ -> one (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 41, BecameBlocking.attacker = departed, BecameBlocking.producer = BlockProducer.Declared, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
         -- The GROUPED attacking-side event, which is what makes this one fire
         -- once where the arm above fires per blocker. carol on SelfBecomesBlocked's
         -- reasoning -- and this one binds that player nothing, which is the
@@ -2502,7 +2503,7 @@ representativeEvents cond =
         -- would break.
         TriggerCondition.SelfBecomesBlockedByOneOrMore _ ->
           noTable (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol 1))
-            NonEmpty.:| [noTable (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 43)}))]
+            NonEmpty.:| [noTable (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.producer = BlockProducer.PutOntoBattlefield, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 43)}))]
         -- The same grouped event once more, with the ids read the other way from
         -- every arm above it: the bearer is a BYSTANDER, so `departed` sits in
         -- the attacker position and is what this one binds -- an arm that bound
@@ -2518,7 +2519,7 @@ representativeEvents cond =
         -- intersection is the fence for exactly that.
         TriggerCondition.CreatureBecomesBlockedByAtLeast {} ->
           noTable (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol 1))
-            NonEmpty.:| [noTable (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 43)}))]
+            NonEmpty.:| [noTable (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 42, BecameBlocking.attacker = departed, BecameBlocking.producer = BlockProducer.PutOntoBattlefield, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = Set.singleton (ObjectId.MkObjectId 43)}))]
         -- The same declaration's unblocked branch, which carries the attacker
         -- and nothing else -- so the floor it pins is the empty set.
         TriggerCondition.SelfAttacksUnblocked -> one (GameEvent.AttackerUnblocked departed)

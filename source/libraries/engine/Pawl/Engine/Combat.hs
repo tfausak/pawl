@@ -41,6 +41,7 @@ import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameAttacked as BecameAttacked
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BlockProducer as BlockProducer
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -1455,7 +1456,9 @@ becomeBlocked oid gs =
 -- leaves it nothing to assign. Deleting the key would make it unblocked and
 -- send its damage at the player.
 --
--- BecameBlocking with the flag CLEAR is the whole record on the blocking side.
+-- BecameBlocking under BlockProducer.ByEffect is the whole record on the
+-- blocking side, carrying the attacker's blockers after the switch beside the
+-- ones before it: CR 509.3e's forms read the crossing off that pair.
 -- No GameEvent.BlocksDeclared beside it, and that is CR 509.3a's own guard
 -- rather than a shortfall: "only if it wasn't a blocking creature at that time",
 -- and every creature this moves was blocking one of the pair.
@@ -1504,7 +1507,7 @@ switchBlockers first second gs =
                       ( BecameBlocking.MkBecameBlocking
                           { BecameBlocking.blocker = blocker,
                             BecameBlocking.attacker = attacker,
-                            BecameBlocking.putOntoBattlefield = False,
+                            BecameBlocking.producer = BlockProducer.ByEffect (Map.findWithDefault Set.empty attacker moved),
                             BecameBlocking.attackerWasBlocked = isBlocked attacker gs,
                             BecameBlocking.blockersBefore = blockersOf attacker gs
                           }
@@ -2292,10 +2295,10 @@ data BlockChoice
 --   * no GameEvent.BlocksDeclared is recorded, which is CR 509.3a's last
 --     sentence ("It won't trigger if the creature is put onto the battlefield
 --     blocking"), and the GameEvent.BecameBlocking that IS recorded carries
---     BecameBlocking.putOntoBattlefield, which is CR 509.3b's identical last
+--     BlockProducer.PutOntoBattlefield, which is CR 509.3b's identical last
 --     sentence: rule 509.3d's "In addition, it will trigger if a creature is put
 --     onto the battlefield blocking that creature" is why the event is recorded
---     at all, and that flag is what keeps rule 509.3b off it;
+--     at all, and that producer is what keeps rule 509.3b off it;
 --   * no CR 509.1b restriction and no CR 509.1c requirement is checked, and
 --     canBlock is never asked, per CR 509.4b in as many words -- so a Saproling
 --     put onto the battlefield blocking a flier really does block it (CR
@@ -2401,8 +2404,8 @@ enterBlocking controller oid attacker = do
   -- blocking this attacker does not make this creature's arrival any
   -- less a blocker for it.
   --
-  -- The flag is CR 509.4's exclusion: rule 509.3b reads the same event
-  -- and must NOT fire off this one.
+  -- The producer is CR 509.4's exclusion: rule 509.3b reads the same
+  -- event and must NOT fire off this one.
   --
   -- `wasBlocked` rides the event because no reader can re-derive it
   -- afterwards: the write above has already put this creature into the
@@ -2415,7 +2418,7 @@ enterBlocking controller oid attacker = do
   -- before any trigger is scanned, so the entry read at the scan holds
   -- the arrivals that came AFTER this one too. Both of rule 509.3e's
   -- forms read it.
-  State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = wasBlocked, BecameBlocking.blockersBefore = before})))
+  State.modify' (Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = oid, BecameBlocking.attacker = attacker, BecameBlocking.producer = BlockProducer.PutOntoBattlefield, BecameBlocking.attackerWasBlocked = wasBlocked, BecameBlocking.blockersBefore = before})))
   -- CR 509.3c: the attacker became a blocked creature. The defending
   -- player rides the event as it does off the declaration; the guard
   -- above has already settled that it is this creature's controller.
@@ -2626,7 +2629,7 @@ attemptBlockDeclaration perform pid attacking rejected = do
               -- Recorded AFTER the state is written, and over `declaration` rather
               -- than `merged`, since CR 509.4 makes a creature put onto the
               -- battlefield blocking never "blocked" -- which is what the
-              -- putOntoBattlefield flag below says of the other producer.
+              -- producer below tells apart from the other two roads.
               --
               -- TWO events per declaration, split by CR 509.3a against CR 509.3b: one
               -- BecameBlocking per PAIR, and one BlocksDeclared per BLOCKING CREATURE.
@@ -2651,8 +2654,8 @@ attemptBlockDeclaration perform pid attacking rejected = do
               -- after this declaration -- Flash Foliage prints the restriction
               -- and Aetherplasm has to be blocking already -- and read rather
               -- than written as Set.empty because the event is the record. No
-              -- reader looks: both guard on putOntoBattlefield.
-              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = Set.member attacker wasBlocked, BecameBlocking.blockersBefore = Map.findWithDefault Set.empty attacker (Combat.blockers (GameState.combat gs2))})) h) g pairs
+              -- reader looks: both refuse BlockProducer.Declared.
+              State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.producer = BlockProducer.Declared, BecameBlocking.attackerWasBlocked = Set.member attacker wasBlocked, BecameBlocking.blockersBefore = Map.findWithDefault Set.empty attacker (Combat.blockers (GameState.combat gs2))})) h) g pairs
               State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
               -- CR 509.1h: the same declaration makes each attacker it named a BLOCKED
               -- creature. One event per attacker rather than per pair, which is CR
