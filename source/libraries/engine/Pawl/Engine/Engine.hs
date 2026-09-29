@@ -704,7 +704,8 @@ reacts = Maybe.isJust . (Event.abilityTriggeredOf Monad.<=< PendingTrigger.fired
 -- fire, and repeat until a round finds nothing. MINTING AN EVENT rather than
 -- inspecting the pending set directly, because an ability triggering IS a game
 -- event -- rule 603.3b says so by making it a trigger condition -- so the
--- existing machinery applies unchanged. Only EVENT triggers are scanned. No
+-- existing machinery applies unchanged. EVENT triggers and the CR 603.7 delayed
+-- store are scanned; state triggers are not, matching no event. No
 -- bound on the rounds, and none needed: the one condition of this class
 -- (TriggerCondition.SagaFinalChapterTriggers) watches a Saga's final chapter ability,
 -- which triggers off lore counters (CR 714.2b), never off an ability
@@ -712,8 +713,11 @@ reacts = Maybe.isJust . (Event.abilityTriggeredOf Monad.<=< PendingTrigger.fired
 -- filtered by `Event.withinTriggerLimit` first, the ONE place a "triggers only once"
 -- rider is spent.
 --
--- Not implemented: a CR 603.7 DELAYED ability whose trigger event is another
--- ability triggering (#1026).
+-- The delayed store is re-run over the round's records ALONE, so an entry is
+-- spent (CR 603.7b) only by a record it matched, and one that matched none
+-- survives for a later round -- proved by Pawl.TriggerSpec's "CR 603.7b a
+-- non-final chapter triggering leaves the one-shot entry armed". Its CR 603.12
+-- reflexive entries fired at the batch's first gather, which spent them.
 reactions :: [PendingTrigger.PendingTrigger] -> Game [PendingTrigger.PendingTrigger]
 reactions incoming = do
   before <- State.get
@@ -730,16 +734,21 @@ reactions incoming = do
       -- the set stays the size of the rider's use rather than the game's.
       State.modify' (\g -> g {GameState.triggeredThisGame = List.foldl' (flip Set.insert) (GameState.triggeredThisGame g) (Maybe.mapMaybe perGameRecord batch)})
       gs <- State.get
-      let fresh = Event.reactionTriggers (Event.unscannedGrouped gs) gs
+      let recorded = Event.unscannedGrouped gs
+          fresh = Event.reactionTriggers recorded gs
+      -- A CR 603.7 entry watching an ability trigger. Can ASK (CR 603.7b), so
+      -- the store is written back by modify below rather than by putting `gs`.
+      (fromDelayed, surviving) <- Trigger.delayedPending recorded gs
       -- The round's own events are consumed here, CR 603.10's samples with them.
       State.modify'
         ( \g ->
             g
               { GameState.scannedThrough = Natural.length (GameState.events g),
-                GameState.battlefieldWhenTriggered = Map.empty
+                GameState.battlefieldWhenTriggered = Map.empty,
+                GameState.delayedTriggers = surviving
               }
         )
-      rest <- reactions fresh
+      rest <- reactions (fresh <> fromDelayed)
       pure (batch <> rest)
 
 -- CR 603.3b's record of one ability triggering: what it hangs on (CR 113.7), its

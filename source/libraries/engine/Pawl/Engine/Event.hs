@@ -8899,11 +8899,10 @@ gatherTriggers grouped gs = do
 -- | CR 603.3b: the abilities a round of GameEvent.AbilityTriggered records fires,
 -- for Pawl.Engine.Engine.reactions to fold into the same batch.
 --
--- `gatherTriggers`' event half alone. The other two sources are deliberately not
--- re-run: CR 603.8's state triggers were gathered once for this batch already and
--- match no event at all, so a second call would duplicate every one of them; and
--- the CR 603.7 delayed store's watermark is spent by the same one call, so
--- re-running it would consume entries against events they never matched.
+-- `gatherTriggers`' event half alone. CR 603.8's state triggers are deliberately
+-- not re-run: they were gathered once for this batch already and match no event
+-- at all, so a second call would duplicate every one of them. The CR 603.7
+-- delayed store is re-run by Engine.reactions itself, which writes it back.
 reactionTriggers :: [LoggedEvent.LoggedEvent] -> GameState -> [PendingTrigger]
 reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events gs)
 
