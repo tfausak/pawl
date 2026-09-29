@@ -2919,15 +2919,10 @@ manaActivationsGiven effects measure pcs pid oid printedCost restrictions abilit
         -- Pawl.Engine.Activate refuses a mana ability one conjunct before it reads
         -- the rider, so a rider read only there is a rider nothing reads.
         --
-        -- CR 109.4a makes `pid` the rider's "you": a mana ability's controller is
-        -- the permanent's controller (CR 110.2), which is who Mana.manaSourcesGiven
-        -- and Cost.tapForMana each ask about.
-        --
-        -- Not implemented: CR 602.1b's other activation instruction, the one
-        -- Pawl.Types.Activator carries. Mana.manaSourcesGiven offers a
-        -- permanent's routes to its controller alone, so a mana ability printing
-        -- "any player may activate this ability" would run stricter than printed
-        -- (#3087).
+        -- CR 109.4a and CR 113.8 make `pid` the rider's "you": a mana ability's
+        -- controller is the player activating it, which Mana Cache's "during
+        -- their turn" reads (Pawl.ManaSpec's Mana Cache group). CR 602.1b's
+        -- other instruction, who may activate at all, is Mana.permitsRoute.
         && ActivationRestriction.restrictionsOk pid oid ability restrictions gs
         then
           Activations.MkActivations
@@ -3671,10 +3666,9 @@ canPayComponent slots pid oid component gs = case component of
   -- Deliberately NOT gated on control, unlike the loyalty arms above and like
   -- PutPlusOneCountersOnThis below: CR 122 qualifies a counter by the object it
   -- sits on and by nothing else, and CR 602.1a already fixes the payer as the
-  -- player activating the ability. Unobservable either way on this pool: no
-  -- ability in `data/cards/` pairs this component with an Activator.AnyPlayer
-  -- clause, and without one CR 602.2's default makes the payer the controller --
-  -- a declared reading rather than a tested one.
+  -- player activating the ability. Mana Cache pairs this component with an
+  -- Activator.AnyPlayer clause, and Pawl.ManaSpec's Mana Cache group is what
+  -- proves an opponent's activation spends its counter.
   CostComponent.RemoveCountersFromThis removal ->
     Set.member oid (GameState.battlefield gs)
       && countersOn (CountersFromThis.kind removal) oid gs >= CountersFromThis.count removal
@@ -4797,8 +4791,8 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
             -- The capacity is taken on the board of the PASS rather than once for
             -- the payment: a tap changes the board, and
             -- Pawl.Engine.PlayerEffect.applying is a function of it. `pid` is the
-            -- payer, and manaSourcesGiven offers only what that player controls, so
-            -- the capacity's own `pid` is this one.
+            -- payer, and CR 113.8 makes the payer the controller of every mana
+            -- ability activated here, so the capacity's own `pid` is this one.
             windowCapacity = midPayment (manaActivationsGiven (PlayerEffect.applying pid gs))
             offered = Mana.manaSourcesGiven inFlight windowCapacity (Projection.controlGrants gs) pcs pid gs
         case filter (`Set.notMember` refused) offered of
@@ -4808,7 +4802,7 @@ payManaWindow perform inFlight record subject spending pid substituting cost = d
             case answer of
               Nothing -> settle activated
               Just oid -> do
-                (produced, kept) <- tapForManaWith perform midPayment inFlight oid
+                (produced, kept) <- tapForManaWith perform midPayment inFlight pid oid
                 -- An activation that FAILED reversed itself already (payActivation
                 -- below), so it is not one of rule 733.1's to offer back -- but
                 -- the sources its own nested window activated and the payer KEPT
@@ -5075,8 +5069,11 @@ payAssist helper subject sid cost = case Cost.mana cost of
 -- The ability's NON-MANA clauses run too (CR 405.6c), through the injected
 -- Pawl.Types.ManaAbilityPerformer rather than a call into Pawl.Engine.Resolve,
 -- which sits above this module.
-tapForMana :: ManaAbilityPerformer.ManaAbilityPerformer -> ObjectId -> Game Bool
-tapForMana perform oid = fmap fst (tapForManaWith perform id Set.empty oid)
+--
+-- `pid` is the player activating it (CR 602.1a), who need not control the
+-- permanent where the route says any player may (CR 602.1b).
+tapForMana :: ManaAbilityPerformer.ManaAbilityPerformer -> PlayerId -> ObjectId -> Game Bool
+tapForMana perform pid oid = fmap fst (tapForManaWith perform id Set.empty pid oid)
 
 -- The same activation carrying the abilities already mid-activation (CR
 -- 605.3c), which is payManaExcept's one narrowing: the route CHOSEN here joins
@@ -5089,27 +5086,29 @@ tapForMana perform oid = fmap fst (tapForManaWith perform id Set.empty oid)
 --
 -- `window` narrows the capacity to the window the activation is made in:
 -- `midPayment` inside a payment, the identity at priority (`tapForMana`).
-tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> (Mana.Capacity -> Mana.Capacity) -> Mana.InFlight -> ObjectId -> Game (Bool, [ObjectId])
-tapForManaWith perform window inFlight oid = do
+tapForManaWith :: ManaAbilityPerformer.ManaAbilityPerformer -> (Mana.Capacity -> Mana.Capacity) -> Mana.InFlight -> PlayerId -> ObjectId -> Game (Bool, [ObjectId])
+tapForManaWith perform window inFlight activator oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure (False, [])
-    Just obj -> do
-      -- CR 109.4a/110.2: the mana ability's controller is the permanent's
-      -- controller, and that player makes the colour choice and pays the cost.
-      -- Falls back to owner in the impossible case where lookupObject found the
-      -- object but controllerOf answers Nothing.
+    Just _ -> do
+      -- CR 109.4a/113.8: the mana ability's controller is the player
+      -- activating it -- the permanent's controller, or anyone at all for a
+      -- route printing "any player may activate this ability" (CR 602.1b,
+      -- Mana.permitsRoute). That player makes the colour choice and pays the
+      -- cost (CR 602.1a).
       --
       -- Not whose POOL the mana lands in, which each AddMana's own reference
       -- names (CR 106.4) and CR 109.5 makes this player only by default:
       -- Yurlok of Scorch Thrash's "Each player adds {B}{R}{G}" fills the whole
       -- table's. See the Payment.Paid branch below.
-      let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+      let controller = activator
+          permitted = Mana.permitsRoute (Projection.controllerOf oid gs == Just activator) . ManaOption.ability
           -- ONE gather of the player's effects for every option this permanent
           -- offers, rather than one per option: `manaActivations` would take its
           -- own, and that walk is the shape #1073 was about.
           capacity = window (manaActivationsGiven (PlayerEffect.applying controller gs))
-      case filter (\option -> not (Mana.inFlightRoute inFlight oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> permitted option && not (Mana.inFlightRoute inFlight oid (ManaOption.ability option)) && Activations.times (capacity Mana.ForOffer Map.empty controller oid (ManaOption.cost option) (ManaOption.restrictions option) (ManaOption.ability option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure (False, [])
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs

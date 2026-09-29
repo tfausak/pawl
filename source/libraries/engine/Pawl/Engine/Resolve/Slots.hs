@@ -2632,8 +2632,8 @@ battlefieldMatching legal resolving controller source gs filter_ =
       viewOf = Projection.viewsOf gs
       -- CR 603.2's player slots baked in, exactly as Pawl.Engine.Target.bakeSlots
       -- does it for a MODE's target filter and off the same map: Filter.matches
-      -- answers Filter.ControlledByBound False wherever it reaches one, so an
-      -- unbaked "that player controls" sweeps nobody rather than sweeping wrong.
+      -- answers Filter.ControlledByBound False wherever the Context binds its
+      -- slot to no one player, so an unbaked "that player controls" sweeps nobody rather than sweeping wrong.
       -- Total War's "destroy all untapped non-Wall creatures that player
       -- controls" is the phrase, and Pawl.CardTriggerSpec's Total War group is
       -- what proves it.

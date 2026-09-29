@@ -15,12 +15,13 @@ module Pawl.Types.Activator where
 -- as a sorcery" -- and they compose rather than merge: the rider narrows WHEN,
 -- this widens WHO, and every clause of both must hold.
 --
--- The reader is Pawl.Engine.Activatable.mayActivateGiven, which is CR 602.2's whole
--- permission conjunct. Nothing here says who PAYS: CR 602.1a gives the cost to
+-- The readers are Pawl.Engine.Activatable.mayActivateGiven, which is CR 602.2's
+-- whole permission conjunct, and Pawl.Engine.Mana.permitsRoute, the same
+-- conjunct for a mana ability CR 605.3b keeps off the stack. Nothing here says who PAYS: CR 602.1a gives the cost to
 -- the player activating the ability whichever arm this is.
 data Activator
   = -- | CR 602.2's default: the object's controller, or its owner if it has none.
     Controller
-  | -- | "Any player may activate this ability" (Glittering Lion, Aether Storm).
+  | -- | "Any player may activate this ability" (Glittering Lion, Aether Storm, Mana Cache).
     AnyPlayer
   deriving (Bounded, Enum, Eq, Ord, Show)

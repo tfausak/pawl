@@ -1113,8 +1113,7 @@ data Context = MkContext
     -- CR 601.2c chooses the targets before CR 601.2h pays.
     --
     -- Outside those, contextFor leaves it empty, and every atom that reads it
-    -- (IsBound, SameNameAsBound, IsControllerOfBound, ControlledByBound,
-    -- Quantity.AgainstSlot) is then vacuously False or Nothing rather than
+    -- (IsBound, SameNameAsBound, IsControllerOfBound, Quantity.AgainstSlot) is then vacuously False or Nothing rather than
     -- raising. That is honest wherever no announcement is in flight -- the layer
     -- fold, trigger matching, a cost paid with nothing announced, combat
     -- declarations, duration expiry -- and it was not honest of every
@@ -1136,8 +1135,9 @@ data Context = MkContext
     -- rather than this map and carries its own lint, SameControllerAsBound reads
     -- slotControllers and carries one that matters MORE, its vacuous direction
     -- being True, SameControllerAsHostOfBound reads slotHostControllers and
-    -- refuses on an absent key, IsControllerOfBound and ControlledByBound are False wherever
-    -- `matches` reaches them, and no Filter atom carries a Quantity.
+    -- refuses on an absent key, IsControllerOfBound is False wherever `matches`
+    -- reaches it, ControlledByBound is False for a card with no controller (CR
+    -- 108.4), and no Filter atom carries a Quantity.
     -- Pawl.CardSpec's "CR 400.11c no card asks IsBound
     -- in a wish's filter" is what keeps a card out of that position, and
     -- Pawl.OutsideTheGameSpec proves the atom answers nothing there.
@@ -1780,13 +1780,15 @@ matches context view predicate = case predicate of
   Filter.ControlledByDefendingPlayer -> case (controller view, defendingPlayer context) of
     (Just c, Just d) -> c == d
     _ -> False
-  -- CR 603.2's "that player controls", and False WHEREVER IT IS REACHED: `bakeBound`
-  -- below replaces the atom with the arm under it before either of CR 115's moments
-  -- judges the slot, so an atom that survives to here is one whose slot named no one
-  -- player. That is the vacuous posture every player-referencing atom takes, and it
-  -- is why this reads no Context field -- the substitution happens where the bindings
-  -- are, which is not here.
-  Filter.ControlledByBound _ -> False
+  -- CR 603.2's "that player controls". `bakeBound` below replaces the atom before
+  -- either of CR 115's moments judges the slot; a COUNT is matched unbaked, so the
+  -- atom reads the Context's slotPlayers there -- Mana Cache's "for each untapped
+  -- land that player controls" (Pawl.ManaSpec's Mana Cache group). False unless the
+  -- slot names exactly one player, bakeBound's own posture and the vacuous one
+  -- every player-referencing atom takes.
+  Filter.ControlledByBound slot -> case fmap Set.toList (Map.lookup slot (slotPlayers context)) of
+    Just [pid] -> controller view == Just pid
+    _ -> False
   -- The baked half: the candidate's controller IS this player, with no perspective
   -- to relate it to. Vacuously False off an object, `controller` being Nothing for a
   -- player view and for a card in a hidden zone (CR 108.4).
@@ -1973,8 +1975,8 @@ matches context view predicate = case predicate of
   -- survives to here is one in a position nothing bakes -- any filter but a
   -- Scope.OverPlayers count's.
   Filter.IsControllerOfBound _ -> False
-  -- CR 110.2's board comparison, and False WHEREVER IT IS REACHED, exactly as
-  -- ControlledByBound above is: Pawl.Engine.Count.bakePerspective replaces the
+  -- CR 110.2's board comparison, and False WHEREVER IT IS REACHED:
+  -- Pawl.Engine.Count.bakePerspective replaces the
   -- atom with a trivially true or trivially false predicate before the candidate
   -- is matched, because answering it means counting permanents and this module
   -- holds no game state. An atom that survives to here is one in a position
