@@ -194,14 +194,11 @@ data GameState = MkGameState
     -- exist, keyed by that object's id; the fallback Pawl.Engine.Resolve reads
     -- for an object it can no longer find. Never pruned.
     detachedBindings :: Map.Map ObjectId.ObjectId (Map.Map SlotName.SlotName Binding.Binding),
-    -- | CR 614.1c: as-enters rewrites whose effects have not run yet, drained
-    -- first thing in Pawl.Engine.Engine.performSettle, before the SBA pass and
-    -- the trigger scan. Empty at every priority window.
-    --
-    -- Not implemented: the effects running inside the entry, where CR 614.1c puts
-    -- them. A resolution that puts a permanent onto the battlefield and then reads
-    -- the board itself would see the pre-effect one (#1639); no card in the pool
-    -- does that.
+    -- | CR 614.1c: as-enters rewrites whose effects have not run yet. Drained as
+    -- the instruction that entered the permanent finishes
+    -- (Pawl.Engine.Resolve.Effect.applyEffectWith), and first thing in
+    -- Pawl.Engine.Engine.performSettle for every other road; either way the entry's
+    -- CR 603.10 sample is retaken after them. Empty at every priority window.
     pendingEntryEffects :: Seq.Seq PendingEntryEffect.PendingEntryEffect,
     -- | CR 113.6 / 614.12: the permanents entering beside the one whose entry
     -- loop is running -- materialized but not yet entered, so their static

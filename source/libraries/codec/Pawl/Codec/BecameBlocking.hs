@@ -3,11 +3,13 @@
 module Pawl.Codec.BecameBlocking where
 
 import qualified Data.Set as Set
+import qualified Pawl.Codec.BlockProducer as BlockProducer
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BlockProducer as BlockProducer
 
 -- | A bare object keyed by the record's field names, replacing the two-element
 -- array this payload used to be. Runtime-only: GameEvent serialises transcripts,
@@ -18,8 +20,8 @@ codec = Fields.object $ do
   attacker <- Fields.required "attacker" ObjectId.codec BecameBlocking.attacker
   -- Defaulted rather than required, as DamageEvent's flags are: CR 509.1's
   -- declaration is the producer of all but a handful of these events, so the key
-  -- rides only on CR 509.4's entry.
-  putOntoBattlefield <- Fields.defaulted "putOntoBattlefield" False Common.boolean BecameBlocking.putOntoBattlefield
+  -- rides only on CR 509.4's entry and on an effect's.
+  producer <- Fields.defaulted "producer" BlockProducer.Declared BlockProducer.codec BecameBlocking.producer
   -- Defaulted for the same reason, and to the same value: CR 509.1's declaration
   -- is the first thing that blocks any attacker, so every event it records
   -- carries this clear too.
@@ -32,7 +34,7 @@ codec = Fields.object $ do
     BecameBlocking.MkBecameBlocking
       { BecameBlocking.blocker = blocker,
         BecameBlocking.attacker = attacker,
-        BecameBlocking.putOntoBattlefield = putOntoBattlefield,
+        BecameBlocking.producer = producer,
         BecameBlocking.attackerWasBlocked = attackerWasBlocked,
         BecameBlocking.blockersBefore = blockersBefore
       }

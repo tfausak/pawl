@@ -512,9 +512,9 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- rather than an object, and eventBindingSlots promises
   -- Binding.attackingCreature alone.
   --
-  -- Unguarded on putOntoBattlefield where matchesTrigger is not, for the
+  -- Unguarded on the producer where matchesTrigger is not, for the
   -- PlayerAttacksPlayer arm's converse reason: an event this condition
-  -- rejected reaches no binding at all, so a declaration's clear flag has
+  -- rejected reaches no binding at all, so a declaration's producer has
   -- already been answered by the time anything asks here.
   (TriggerCondition.CreatureBecomesBlockedByAtLeast {}, GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker})) ->
     Binding.setAttackingCreature attacker Map.empty

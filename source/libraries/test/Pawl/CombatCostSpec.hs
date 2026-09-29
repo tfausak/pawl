@@ -30,10 +30,12 @@ import Pawl.PlaneswalkerCombatSpec (allTapped, allUntapped, announcesWay, atLife
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveAttackRequirement as ActiveAttackRequirement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BecameBlocking as BecameBlocking
+import qualified Pawl.Types.BlockProducer as BlockProducer
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Combat as Combat.Type
@@ -43,6 +45,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.Object as Object
@@ -59,6 +62,9 @@ import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 508.1d's cost clause and CR 508.1h-508.1j, proved by Ghostly Prison
@@ -1103,18 +1109,18 @@ declineBlocks p = case p of
   _ -> S.aggressiveAnswer p
 
 -- CR 509.1g's blocker-side event as a DECLARATION recorded it. CR 509.4's entry
--- records the same event with the flag set, and the flag is exactly what keeps
--- CR 509.3b off it, so a test asking "was anything declared" has to read the
--- flag rather than the constructor.
+-- records the same event under another producer, and the producer is exactly
+-- what keeps CR 509.3b off it, so a test asking "was anything declared" has to
+-- read the producer rather than the constructor.
 blockerWasDeclared :: GameEvent.GameEvent -> Bool
 blockerWasDeclared e = case e of
-  GameEvent.BecameBlocking b -> not (BecameBlocking.putOntoBattlefield b)
+  GameEvent.BecameBlocking b -> BecameBlocking.producer b == BlockProducer.Declared
   _ -> False
 
 -- Its complement: CR 509.4's own producer, which CR 509.3d fires off.
 blockerEnteredBlocking :: GameEvent.GameEvent -> Bool
 blockerEnteredBlocking e = case e of
-  GameEvent.BecameBlocking b -> BecameBlocking.putOntoBattlefield b
+  GameEvent.BecameBlocking b -> BecameBlocking.producer b == BlockProducer.PutOntoBattlefield
   _ -> False
 
 -- CR 509.1h's escape clause: "an effect says that it becomes blocked". Curtain
@@ -1778,8 +1784,8 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
   --
   -- Until Aetherplasm this was a REGRESSION FENCE. The only card that could put
   -- a creature onto the battlefield blocking minted a vanilla token, which can
-  -- bear no trigger, so deleting matchesTrigger's read of
-  -- BecameBlocking.putOntoBattlefield left the whole suite green. A creature
+  -- bear no trigger, so deleting matchesTrigger's read of the entry's
+  -- BecameBlocking.producer left the whole suite green. A creature
   -- CARD arrives with its own text.
   --
   -- Loyal Sentry {W} 1/1 -- "Whenever this creature blocks a creature, destroy
@@ -2829,7 +2835,7 @@ declarationRetrySpec s registry = Spec.describe s "DeclarationRetry" $ do
 -- is blocking the other attacking creature. Activate only during the declare
 -- blockers step."
 --
--- All three cases run the priority loop through the declare blockers step, so the
+-- Every case runs the priority loop through the declare blockers step, so the
 -- ability is activated the way a player would and its trigger goes onto the
 -- stack under CR 509.2a. They stop BEFORE the combat damage step, which is where
 -- Combat.blockers and the moved creature's power are still readable.
@@ -2919,6 +2925,89 @@ switchBlockersSpec s registry = Spec.describe s "SwitchBlockers" $ do
         Spec.assertEqWith s "control: leaving it where it was declared" (Combat.blockersOf plain idle) (Set.singleton guardianId)
       _ -> Spec.assertFailure s "fixture should have two attackers and three of bob's creatures"
 
+  -- CR 509.3e's quality form on the effect road: "effects that add or remove
+  -- blockers can also cause such abilities to trigger". Serra Inquisitors
+  -- ("Whenever this creature blocks or becomes blocked by one or more black
+  -- creatures, this creature gets +2/+0 until end of turn") is declared blocked
+  -- by a red Hill Giant, which fires nothing, and the switch brings it BOTH Bog
+  -- Wraiths. Two black arrivals from one effect are one crossing, so it gets
+  -- +2/+0 once: 5/3, where a trigger per arrival would make it 7/3.
+  Spec.it s "CR 509.3e whole card: General Jarkeld moves two black blockers onto Serra Inquisitors and it triggers once" $ do
+    inquisitors <- S.printingOf s registry "Serra Inquisitors"
+    giant <- S.printingOf s registry "Hill Giant"
+    wraith <- S.printingOf s registry "Bog Wraith"
+    jarkeld <- S.printingOf s registry "General Jarkeld"
+    case S.combatBoardOf [inquisitors, giant] [giant, wraith, wraith, jarkeld] of
+      (gs0, [inq, other], [red, first, second, _]) -> do
+        let blocks = Map.fromList [(red, Set.singleton inq), (first, Set.singleton other), (second, Set.singleton other)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (switching blocks [inq, other]) gs0
+            idle = S.runToStep (Phase.Combat CombatStep.CombatDamage) (declaring blocks) gs0
+        Spec.assertEqWith s "CR 509.3e: the effect-made block fired the Inquisitors' trigger, once" (S.powerToughnessOf inq used) (Just (5, 3))
+        Spec.assertEqWith s "and the Inquisitors is blocked by both Wraiths now" (Combat.blockersOf inq used) (Set.fromList [first, second])
+        Spec.assertEqWith s "control: without the switch the Inquisitors' trigger never fired" (S.powerToughnessOf inq idle) (Just (3, 3))
+      _ -> Spec.assertFailure s "fixture should have two attackers and four of bob's creatures"
+
+  -- The same form's CROSSING: an Inquisitors already blocked by a black creature
+  -- does not become blocked by one or more black creatures again when the
+  -- switch trades that Wraith for another. The declaration fires it once, 5/3,
+  -- and the switch adds nothing.
+  Spec.it s "CR 509.3e an Inquisitors already blocked by a black creature does not trigger again on the switch" $ do
+    inquisitors <- S.printingOf s registry "Serra Inquisitors"
+    giant <- S.printingOf s registry "Hill Giant"
+    wraith <- S.printingOf s registry "Bog Wraith"
+    jarkeld <- S.printingOf s registry "General Jarkeld"
+    case S.combatBoardOf [inquisitors, giant] [wraith, wraith, jarkeld] of
+      (gs0, [inq, other], [first, second, _]) -> do
+        let blocks = Map.fromList [(first, Set.singleton inq), (second, Set.singleton other)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (switching blocks [inq, other]) gs0
+        Spec.assertEqWith s "CR 509.3e: only the declaration fired the Inquisitors' trigger" (S.powerToughnessOf inq used) (Just (5, 3))
+        Spec.assertEqWith s "though the switch really happened" (Combat.blockersOf inq used) (Set.singleton second)
+      _ -> Spec.assertFailure s "fixture should have two attackers and three of bob's creatures"
+
+  -- CR 509.3e's count form on the effect road, read by a bystander: Seifer,
+  -- Balamb Rival ("Whenever a creature attacking one of your opponents becomes
+  -- blocked by two or more creatures, that attacking creature gains deathtouch
+  -- until end of turn"). The Elves is declared blocked by one Giant and the
+  -- Piker by two, which fires Seifer for the Piker; the switch then takes the
+  -- Elves from one to two, crossing the floor, and the Piker from two to one,
+  -- crossing nothing. Seifer stays home.
+  Spec.it s "CR 509.3e whole card: General Jarkeld moves two blockers onto the Elves and Seifer grants it deathtouch" $ do
+    elves <- S.printingOf s registry "Llanowar Elves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    seifer <- S.printingOf s registry "Seifer, Balamb Rival"
+    giant <- S.printingOf s registry "Hill Giant"
+    jarkeld <- S.printingOf s registry "General Jarkeld"
+    case S.combatBoardOf [elves, piker, seifer] [giant, giant, giant, jarkeld] of
+      (gs0, [elf, pik, seiferId], [lone, first, second, _]) -> do
+        let blocks = Map.fromList [(lone, Set.singleton elf), (first, Set.singleton pik), (second, Set.singleton pik)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (seiferSwitching True [elf, pik] blocks) gs0
+            idle = S.runToStep (Phase.Combat CombatStep.CombatDamage) (seiferSwitching False [elf, pik] blocks) gs0
+        Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch elf used) "CR 509.3e: the switch took the Elves to two blockers, and Seifer granted it deathtouch"
+        -- One firing for the Piker's declaration and one for the Elves' switch.
+        -- Three would be the switch answered once per arrival.
+        Spec.assertEqWith s "and Seifer fired once for each crossing" (countFiredBy seiferId used) 2
+        Spec.assertEqWith s "with both Giants on the Elves now" (Combat.blockersOf elf used) (Set.fromList [first, second])
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch elf idle)) "control: without the switch the Elves never gains deathtouch"
+        Spec.assertEqWith s "control: Seifer fired for the Piker's declaration alone" (countFiredBy seiferId idle) 1
+      _ -> Spec.assertFailure s "fixture should have three of alice's creatures and four of bob's"
+
+  -- The same form's floor, which a switch must CROSS: two Giants on each
+  -- attacker fire Seifer twice at the declaration, and the switch trading them
+  -- leaves both at two, which crosses nothing.
+  Spec.it s "CR 509.3e a switch that leaves both attackers at two blockers does not fire Seifer again" $ do
+    elves <- S.printingOf s registry "Llanowar Elves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    seifer <- S.printingOf s registry "Seifer, Balamb Rival"
+    giant <- S.printingOf s registry "Hill Giant"
+    jarkeld <- S.printingOf s registry "General Jarkeld"
+    case S.combatBoardOf [elves, piker, seifer] [giant, giant, giant, giant, jarkeld] of
+      (gs0, [elf, pik, seiferId], [a, b, c, d, _]) -> do
+        let blocks = Map.fromList [(a, Set.singleton elf), (b, Set.singleton elf), (c, Set.singleton pik), (d, Set.singleton pik)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (seiferSwitching True [elf, pik] blocks) gs0
+        Spec.assertEqWith s "CR 509.3e: Seifer fired for the two declarations and not for the switch" (countFiredBy seiferId used) 2
+        Spec.assertEqWith s "though the switch really happened" (Combat.blockersOf elf used) (Set.fromList [c, d])
+      _ -> Spec.assertFailure s "fixture should have three of alice's creatures and five of bob's"
+
 -- Declare exactly `blocks` and otherwise answer as the aggressive interpreter
 -- does. Pinned rather than searched for: the two boards above both turn on WHICH
 -- attacker each blocker was declared against.
@@ -2939,6 +3028,33 @@ switching blocks victims p = case p of
     a : _ -> a
     [] -> A.Pass
   _ -> S.aggressiveAnswer p
+
+-- `switching` for the board with Seifer on it: the attack pinned to
+-- `attackers`, so Seifer stays home, and alice's own target prompt (Seifer's
+-- goad) left to the aggressive answer, since `switching` would offer it no
+-- victim. With `activate` off it is the control, declaring the same blocks and
+-- never activating Jarkeld.
+seiferSwitching :: Bool -> [ObjectId.ObjectId] -> Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId) -> Prompt.Prompt r -> r
+seiferSwitching activate attackers blocks p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+  Prompt.ChooseTargets _ pid _ _
+    | pid == S.alice -> S.aggressiveAnswer p
+  _
+    | activate -> switching blocks attackers p
+    | otherwise -> declaring blocks p
+
+-- How many times `oid` triggered on CR 509.3e's count form. Scoped to the
+-- CONDITION, since Seifer's goad fires off the same attack.
+countFiredBy :: ObjectId.ObjectId -> GameState.GameState -> Int
+countFiredBy oid gs = length (filter fired (S.eventsOf gs))
+  where
+    fired event = case event of
+      GameEvent.AbilityTriggered record ->
+        AbilityTriggered.source record == TriggerSource.OfObject oid
+          && case TriggeredAbility.condition (AbilityTriggered.ability record) of
+            TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> True
+            _ -> False
+      _ -> False
 
 isActivation :: A.Action -> Bool
 isActivation a = case a of

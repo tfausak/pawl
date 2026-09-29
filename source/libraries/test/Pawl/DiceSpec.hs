@@ -582,8 +582,8 @@ severalDiceSpec s registry = Spec.describe s "RollSeveralDice" $ do
 -- took the first (2), the largest (5), the last (4) or the number of dice (3)
 -- is a different number from their total (11).
 --
--- Not implemented: the counters are PUT on the Hydra just after it enters rather
--- than entering with it, since an as-enters effect runs after the entry (#1639).
+-- The counters are PUT by the as-enters effect as the settle drains it, before CR
+-- 704.5f reads the 0/0 and with the entry's CR 603.10 sample retaken after them.
 hydraBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
 hydraBoard s registry = do
   hydra <- S.printingOf s registry "Neverwinter Hydra"

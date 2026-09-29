@@ -205,6 +205,8 @@ library codec
     Pawl.Codec.BlockCostSpec
     Pawl.Codec.BlockPermission
     Pawl.Codec.BlockPermissionSpec
+    Pawl.Codec.BlockProducer
+    Pawl.Codec.BlockProducerSpec
     Pawl.Codec.BlockRequirement
     Pawl.Codec.BlockRequirementSpec
     Pawl.Codec.BlocksDeclared
@@ -1806,6 +1808,7 @@ library types
     Pawl.Types.Blight
     Pawl.Types.BlockCost
     Pawl.Types.BlockPermission
+    Pawl.Types.BlockProducer
     Pawl.Types.BlockRequirement
     Pawl.Types.BlocksDeclared
     Pawl.Types.BuybackDecision
