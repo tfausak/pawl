@@ -1724,11 +1724,12 @@ isWaneCast a = case a of
 -- into a leaves-the-battlefield test. Llanowar Elves' mana ability is never
 -- activated -- both answerers pass, and an attacking Elf is tapped anyway.
 --
--- FIVE loyalty counters, where jaceBoard places three: the three legs then read 4,
--- 3 and 5, each distinct from the others, and none reaches CR 704.5i's zero. The
--- both-at-once leg's reading is the starting value itself, since nothing is ever
--- assigned to him there -- which is what the untouched 5 has to be distinguishable
--- from, and it is: 4 and 3 are the only other readings the fixture admits.
+-- FIVE loyalty counters, where jaceBoard places three: the legs then read 4, 3
+-- and 5, and none reaches CR 704.5i's zero. The two legs that end his
+-- planeswalker-ness both read the untouched 5, since the attacker aimed at him
+-- assigns nothing there; the marked damage separates them -- 0 where both types
+-- go, 1 where only the planeswalker type does and his block survives -- and 2 on
+-- the control leg. Each leg's (loyalty, damage) pair is distinct from the others.
 creaturePlaneswalkerBoard ::
   Printing.Printing ->
   Printing.Printing ->
@@ -1793,32 +1794,32 @@ blockAndWane jaceId atBob marchId p = case p of
     [] -> A.Pass
   _ -> blockWithJace jaceId atBob p
 
--- The other half of the pair blockAndWane makes: the cast that strips BOTH card
--- types at once rather than one of them.
-songName :: CardName.CardName
-songName = CardName.MkCardName (Text.pack "Song of the Dryads")
-
-isSongCast :: A.Action -> Bool
-isSongCast a = case a of
-  A.Cast _ name _ -> name == songName
-  _ -> False
-
--- blockWithJace, plus: whoever is offered the cast takes Song of the Dryads and
--- enchants Jace with it. The recipient is FILTERED out of what the prompt offers
--- rather than built: "enchant permanent" is a Pool.Permanents slot, so a
--- hand-built Recipient.ToCreature of the same object would be a different
--- recipient and CR 608.2b's re-read at resolution would drop it with no error --
--- where a filter that matches nothing leaves the slot empty and reddens loudly.
+-- blockWithJace, plus: whoever is offered the cast of the Aura named `aura`
+-- takes it and enchants Jace with it -- the other half of the pair blockAndWane
+-- makes, stripping card types by CR 205.1a's set rather than by ending an
+-- animation. Song of the Dryads strips both at once; Kenrith's Transformation
+-- only the planeswalker type.
+--
+-- The recipient is FILTERED out of what the prompt offers rather than built, and
+-- the caller names its tag: Song's "enchant permanent" is a Pool.Permanents slot
+-- offering Recipient.ToObject, Kenrith's "enchant creature" a Pool.Creatures one
+-- offering Recipient.ToCreature. A hand-built recipient of the wrong tag would be
+-- dropped with no error by CR 608.2b's re-read at resolution, where a filter that
+-- matches nothing leaves the slot empty and reddens loudly.
 --
 -- Wax // Wane is in the same hand and both its halves are affordable once the
 -- Forests are seated, so unlike blockAndWane the name filter is load-bearing here.
-blockAndSong :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-blockAndSong jaceId atBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (Recipient.ToObject jaceId ==) . snd) sets
-  Prompt.ChooseAction _ _ actions -> case filter isSongCast actions of
+blockAndEnchant :: Text.Text -> Recipient.Recipient -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+blockAndEnchant aura onJace jaceId atBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (onJace ==) . snd) sets
+  Prompt.ChooseAction _ _ actions -> case filter isAuraCast actions of
     a : _ -> a
     [] -> A.Pass
   _ -> blockWithJace jaceId atBob p
+  where
+    isAuraCast a = case a of
+      A.Cast _ name _ -> name == CardName.MkCardName aura
+      _ -> False
 
 isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
