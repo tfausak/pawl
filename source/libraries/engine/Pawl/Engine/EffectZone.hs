@@ -324,3 +324,4 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.Repeat body -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Nothing
+  Effect.ChooseNewTargets _ -> Nothing

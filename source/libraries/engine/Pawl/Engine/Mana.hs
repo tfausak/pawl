@@ -1900,13 +1900,20 @@ canPayCommittingGiven subject capacity spending sources pcs pid committed claime
 -- activations spending the same objects and the same life, so k of them are k
 -- supplies of the union, claim Claim.scale k, and pay k times the life.
 --
--- Two GROUPS are still never mixed, since a source offers one option: a
--- multi-mana yield cannot be taken on one activation and a one-mana yield on the
--- next, nor can two groups that differ in what an activation costs. Not
--- implemented; Cadaverous Bloom ("Exile a card from your hand: Add {B}{B} or
--- {G}{G}") is the card in the pool that has the first shape, so two activations
--- buy {B}{B}{B}{B} or {G}{G}{G}{G} and never {B}{B}{G}{G}. Understating supply
--- only ever refuses a cast that was payable (#1137).
+-- A multi-mana yield mixes the same way, one activation at a time: a GROUP's
+-- alternatives are its one-mana union (per CR 106.6 key, below) and each
+-- multi-mana yield on its own, and k activations take a MULTISET of k of them.
+-- Cadaverous Bloom's two activations buy {B}{B}{G}{G} as well as four of one
+-- colour (Pawl.CostSpec's Cadaverous Bloom group). A group activated at most
+-- once (every {T} ability) or with one alternative (every group of one-mana
+-- yields) makes the options it always did; only a repeatable group of m >= 2
+-- alternatives grows, from m options for k activations to C(k + m - 1, m - 1).
+--
+-- Two GROUPS are still never mixed, since a source offers one option: two
+-- abilities of one source that differ in what an activation costs are never both
+-- taken on one board. Not implemented; Skyshroud Elf's "{T}: Add {G}" paying its
+-- own "{1}: Add {R} or {W}" is the card that needs it. Understating supply only
+-- ever refuses a cast that was payable (#4385).
 --
 -- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
@@ -1927,25 +1934,35 @@ data SourceOption = MkSourceOption
 
 sourceOptions :: [SpendManaAsThough.SpendManaAsThough] -> (ManaUnit -> Set.Set PaymentSubject.PaymentSubject) -> Bool -> [(Activations.Activations, Mana, ManaCost)] -> [SourceOption]
 sourceOptions clauses admitting contended supplies =
-  let -- CR 106.6 joins the key the narrow yields are grouped by, so the collapse
-      -- below never unions a mana one payment admits with one it does not into a
-      -- supply that is neither. Such a source offers the two as separate
-      -- OPTIONS, which is what they are: one activation makes one or the other.
-      -- A narrow yield holds at most one unit, so the fold is that unit's own
-      -- answer and the key is exact.
-      unitLists =
-        fmap
-          (\(activations, yield, manaCost) -> ((activations, manaCost, foldMap admitting (unitsOf yield)), unitsOf yield))
-          supplies
-      (narrow, wide) = List.partition (\(_, units) -> length units <= 1) unitLists
-      grouped =
-        fmap
-          (\(key@(_, _, admits), units) -> (key, collapsed admits units))
-          (Map.toList (Map.fromListWith (<>) narrow))
-      apart = fmap (Bifunctor.second (fmap (rewriteSupply clauses . supplyOf admitting))) wide
-      optionsFor ((activations, manaCost, _), offered) =
+  let -- Grouped by what ONE activation costs, which is what lets k activations of
+      -- the group take k alternatives independently.
+      groups =
+        Map.toList
+          ( Map.fromListWith
+              (flip (<>))
+              (fmap (\(activations, yield, manaCost) -> ((activations, manaCost), [unitsOf yield])) supplies)
+          )
+      -- CR 106.6 joins the key the narrow yields are unioned by, so the collapse
+      -- never unions a mana one payment admits with one it does not into a supply
+      -- that is neither. Such a group offers the two as separate ALTERNATIVES,
+      -- which is what they are: one activation makes one or the other. A narrow
+      -- yield holds at most one unit, so the fold is that unit's own answer and
+      -- the key is exact. A yield adding no mana is no alternative: an activation
+      -- taking it is dominated by one taking any other, or by one fewer.
+      alternativesOf yields =
+        let (narrow, wide) = List.partition (\units -> length units <= 1) yields
+            unions =
+              fmap
+                (uncurry collapsed)
+                (Map.toList (Map.fromListWith (<>) (fmap (\units -> (foldMap admitting units, units)) narrow)))
+            apart = fmap (fmap (rewriteSupply clauses . supplyOf admitting)) wide
+         in case ListUtils.nubOrd (filter (not . null) (unions <> apart)) of
+              [] -> [[]]
+              some -> some
+      optionsFor ((activations, manaCost), yields) =
         let claims = Activations.claims activations
             life = Activations.life activations
+            alternatives = alternativesOf yields
             eats = not (null (ManaCost.unwrap manaCost))
             -- A mana-EATING option is always worth taking fewer times, for the same
             -- reason a claiming or a life-paying one is: what it does not activate
@@ -1964,10 +1981,11 @@ sourceOptions clauses admitting contended supplies =
             resolved = if eats then resolutions ManaSpending.AsProduced manaCost else [([], 0, 0)]
          in do
               k <- counts
+              taken <- multisets k alternatives
               (demands, generic, owed) <- resolved
               pure
                 MkSourceOption
-                  { optionSupplies = concat (List.genericReplicate k offered),
+                  { optionSupplies = concat taken,
                     optionDemands = concat (List.genericReplicate k (demands <> List.genericReplicate generic anyTypeDemand)),
                     optionClaims = Claim.scale k claims,
                     optionLife = k * (life + owed)
@@ -1984,7 +2002,15 @@ sourceOptions clauses admitting contended supplies =
                     supplyAdmits = admits
                   }
             ]
-   in ListUtils.nubOrd (concatMap optionsFor (grouped <> apart))
+   in ListUtils.nubOrd (concatMap optionsFor groups)
+
+-- Every multiset of `k` elements drawn from `xs`, each once, as a list in `xs`'
+-- order: C(k + m - 1, m - 1) of them for m elements.
+multisets :: Natural -> [a] -> [[a]]
+multisets k xs = case (k, xs) of
+  (0, _) -> [[]]
+  (_, []) -> []
+  (_, x : rest) -> fmap (x :) (multisets (k - 1) xs) <> multisets k rest
 
 -- The resolutions of `cost` this player could actually pay right now, in
 -- `resolutions`' order -- so the head costs the least life of any of them, which
@@ -2000,10 +2026,10 @@ sourceOptions clauses admitting contended supplies =
 -- So it is an assignment question, and it is answered exactly. Model each
 -- available mana as a SUPPLY carrying the set of types it could be and the
 -- production-time tags it would carry (CR 106.3). A source is a CHOICE among such
--- supplies, one option per yield it could add and each option as wide as the
--- number of activations that yield admits (sourceOptions above). Each typed
--- symbol of the cost is a DEMAND, which `serves` matches against a supply;
--- generic symbols demand a count and nothing more.
+-- supplies, one option per way its activations could fill a pool: k activations
+-- at one cost taking k of the yields it buys, each on its own (sourceOptions).
+-- Each typed symbol of the cost is a DEMAND, which `serves` matches against a
+-- supply; generic symbols demand a count and nothing more.
 --
 -- A BOARD is the pool plus one option taken from every source -- the mana the
 -- player would actually have in front of them after tapping everything -- and it
@@ -2039,9 +2065,10 @@ sourceOptions clauses admitting contended supplies =
 -- The SEARCH over boards is the product of the sources' options, exponential in
 -- the number of sources offering more than one -- the reason sourceOptions'
 -- collapse matters. After it, a source offers more than one option only if it has
--- yields the collapse keeps apart -- one adding more than one mana, which in this
--- pool takes a multi-mana ability on a permanent some effect has ALSO given a
--- basic land type (Palladium Myr under Ashaya) -- or if its activation claims
+-- yields the collapse keeps apart -- one adding more than one mana: a multi-mana
+-- ability on a permanent some effect has ALSO given a basic land type (Palladium
+-- Myr under Ashaya), or Cadaverous Bloom's {B}{B} and {G}{G}, whose repeats take
+-- a multiset of the two (sourceOptions above) -- or if its activation claims
 -- something ANOTHER group also wants, or pays life, either of which costs one
 -- option per number of times it could be taken. So the ordinary board -- lands,
 -- and a mana creature, each claiming only itself -- is still one board, and a
