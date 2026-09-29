@@ -202,8 +202,10 @@ data GameState = MkGameState
     pendingEntryEffects :: Seq.Seq PendingEntryEffect.PendingEntryEffect,
     -- | CR 113.6 / 614.12: the permanents entering beside the one whose entry
     -- loop is running -- materialized but not yet entered, so their static
-    -- abilities do not function. Never holds the loop's own subject. Empty at
-    -- every priority window.
+    -- abilities do not function. Never holds the loop's own subject. Also held
+    -- while the subject's as-enters effects run
+    -- (Pawl.Engine.Resolve.Effect.runEntryEffect), and a resolution's
+    -- battlefield sweep skips it. Empty at every priority window.
     enteringBeside :: Set.Set ObjectId.ObjectId,
     -- | CR 614.12: the subject of every entry loop currently running,
     -- materialized but not entered; with `enteringBeside`, what
