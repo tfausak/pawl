@@ -3327,6 +3327,7 @@ filterReads f = case f of
   -- reason too: no Modification writes Object.attachedTo.
   Filter.Type.HasAttached g -> filterReads g
   Filter.Type.IsAttachedToSource -> Set.empty
+  Filter.Type.IsAttachedToEvaluated -> Set.empty
   Filter.Type.IsHostOfSource -> Set.empty
   Filter.Type.EnteredWithSource -> Set.empty
   -- Over-declared deliberately, per the note on Aspect above: the characteristics
@@ -3592,6 +3593,7 @@ filterReadsPeers f = case f of
   Filter.Type.SaddledSourceThisTurn -> False
   Filter.Type.ControlledSinceTurnBegan -> False
   Filter.Type.IsAttachedToSource -> False
+  Filter.Type.IsAttachedToEvaluated -> False
   Filter.Type.IsHostOfSource -> False
   Filter.Type.EnteredWithSource -> False
   Filter.Type.IsToken -> False

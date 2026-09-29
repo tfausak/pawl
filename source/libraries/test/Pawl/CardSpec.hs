@@ -4652,6 +4652,7 @@ filterSlotsReadSingly predicate = case predicate of
   -- DESCENT, for the atom above's reason.
   Filter.Type.HasAttached f -> filterSlotsReadSingly f
   Filter.Type.IsAttachedToSource -> []
+  Filter.Type.IsAttachedToEvaluated -> []
   Filter.Type.IsHostOfSource -> []
   Filter.Type.EnteredWithSource -> []
   Filter.Type.CanHostSubject -> []

@@ -11,7 +11,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (Framing (AttachDestination, ClauseGateFramed, EntryAttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
+import Pawl.CardSpec (Framing (AttachDestination, ClauseGateFramed, EntryAttachDestination, HandSweepFramed, InTargetSlot, KeywordFramed, LifeLossAmountFramed, MillTallyFramed, MintedTargetSlot, OutsideTheGameFramed, ReplacementRowFramed, SearchFramed, SlotlessCostFramed, SourceHostFramed, StandingHostFramed, Unframed), anyFace, cardCounts, cardFilters, cardResolutionEffects, conditionFilters, counterKindFilters, durationFilters, effectFilters, entryRewriteFilters, filterSlotsReadSingly, framedSlotsReadSingly, keywordFilters, objectRefFilters, oneEffectTrigger, oneFaced, payGateFilters, quantityFilters, replacementEffectFilters, riderFilters, triggerConditionFilters, turnUpRewriteFilters)
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
@@ -303,6 +303,7 @@ canHostSubjects predicate = case predicate of
   -- 303.4b's atom is a Filter position a card author writes into like any other.
   Filter.Type.HasAttached f -> canHostSubjects f
   Filter.Type.IsAttachedToSource -> 0
+  Filter.Type.IsAttachedToEvaluated -> 0
   Filter.Type.IsHostOfSource -> 0
   Filter.Type.EnteredWithSource -> 0
   -- Zero: the MIRROR atom is not this one, and its own lint counts it through the
@@ -901,6 +902,28 @@ hostOfSourceOffends :: Face.Face Card.Type.Card -> Bool
 hostOfSourceOffends card =
   let (framed, elsewhere) = hostOfSourceCounts card
    in elsewhere /= 0 || framed + elsewhere /= jsonAtoms hostOfSourceTag (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- The tag of the atom aimed at a quantity's object, spelled once.
+evaluatedTag :: Text.Text
+evaluatedTag = Text.pack "IsAttachedToEvaluated"
+
+-- How many Filter.IsAttachedToEvaluated atoms this card carries in a Count's
+-- filter, and how many its encoding carries in all.
+evaluatedCounts :: Face.Face Card.Type.Card -> (Int, Int)
+evaluatedCounts card =
+  ( sum (fmap (filterAtoms evaluatedTag . Count.Type.filter) (cardCounts card)),
+    jsonAtoms evaluatedTag (Codec.encode (Face.Codec.codec Card.codec) card)
+  )
+
+-- Filter.Context.evaluated is filled by Pawl.Engine.Quantity's Count arm, the
+-- only caller of Pawl.Engine.Count.evaluate, and by nothing else, so the atom
+-- anywhere but a Count's filter is a silent False. An atom the codec finds and
+-- cardCounts does not is the offence -- misplaced, or in a blind spot of that
+-- traversal.
+evaluatedOffends :: Face.Face Card.Type.Card -> Bool
+evaluatedOffends card =
+  let (inCounts, total) = evaluatedCounts card
+   in inCounts /= total
 
 -- The CR 115.10a bound-object tag, spelled once.
 isBoundTag :: Text.Text
@@ -1709,6 +1732,27 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
             }
     Spec.assertEqWith s "a planted atom is an offence" (hostOfSourceCounts planted) (0, 1)
     Spec.assertBool s (hostOfSourceOffends planted) "and the lint says so"
+  -- CR 613.4c's "attached to it": Filter.IsAttachedToEvaluated is answerable only
+  -- in a Count's filter. See evaluatedOffends.
+  Spec.it s "CR 613.4c no card asks IsAttachedToEvaluated outside a Count" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace evaluatedOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only in a Count's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous: Thran Power Suit writes it twice, once per half of its pump.
+    suit <- S.printingOf s registry "Thran Power Suit"
+    Spec.assertEqWith s "Thran Power Suit's two atoms are both in Counts" (evaluatedCounts (S.combinedFace suit)) (2, 2)
+    -- The rejected side: the same atom planted in a target slot.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.IsAttachedToEvaluated]]
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buried)))))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is outside every Count" (evaluatedCounts planted) (0, 1)
+    Spec.assertBool s (evaluatedOffends planted) "and the lint says so"
   -- CR 702.33d: a kicker tally names one of the face's OWN kicker keywords,
   -- joined to Pawl.Engine.Cast's per-keyword map by structural equality. See
   -- timesPaidOffends for why this is read off the encoding.

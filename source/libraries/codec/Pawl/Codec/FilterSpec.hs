@@ -501,6 +501,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsAttachedToSource
       " {\"type\":\"IsAttachedToSource\"} "
+  Spec.it s "IsAttachedToEvaluated" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsAttachedToEvaluated
+      " {\"type\":\"IsAttachedToEvaluated\"} "
   Spec.it s "EnteredWithSource" $
     Common.assertCodec
       s

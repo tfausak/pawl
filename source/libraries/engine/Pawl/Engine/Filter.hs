@@ -1366,6 +1366,12 @@ data Context = MkContext
     -- IsHostOfSource where the source's host is unknown", the sweep sourcePower's
     -- and slotNames' siblings each have.
     sourceAttachedTo :: Maybe ObjectId.ObjectId,
+    -- The object the surrounding Quantity is evaluated against, which
+    -- IsAttachedToEvaluated compares a candidate's host with. Filled by
+    -- Pawl.Engine.Quantity's Count arm alone; Nothing everywhere else, where the
+    -- atom answers False. Pawl.FilterPositionLintSpec's "CR 613.4c no card asks
+    -- IsAttachedToEvaluated outside a Count" keeps a card to the filled position.
+    evaluated :: Maybe ObjectId.ObjectId,
     -- CR 400.7: the objects an effect of the SOURCE put onto the battlefield, as
     -- those objects, for EnteredWithSource. Filled from GameState.enteredWith by
     -- Pawl.Engine.Target.slotContext, where an enchant ability is matched; empty
@@ -1582,7 +1588,7 @@ data Context = MkContext
 -- here owes both halves of the same pair: which way its unfilled read answers,
 -- and what holds a card to the positions that fill it.
 contextFor :: Teams.Teams -> Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextFor t p s = MkContext {teams = t, perspective = p, source = s, sourcePower = Nothing, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- contextFor with a resolution's -- or a trigger's -- slot objects supplied; see
 -- slotObjects above for who supplies them.
@@ -1620,7 +1626,7 @@ slotOneObject slot context = case Set.toList (Map.findWithDefault Set.empty slot
 -- position is one CR 303.4b's atom may be written into, which is what
 -- Pawl.CardSpec's position lint enforces.
 contextComparingPower :: Teams.Teams -> Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
+contextComparingPower t p s n = MkContext {teams = t, perspective = p, source = Just s, sourcePower = n, sourceManaValue = Nothing, sourceColors = Set.empty, sourceNames = Set.empty, slotAmount = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, cantCrewVehicles = Set.empty, slotNames = Map.empty, slotControllers = Map.empty, slotHostControllers = Map.empty, subjectHostCardTypes = Set.empty, slotCreatureTypes = Map.empty, slotToughnesses = Map.empty, slotPlayers = Map.empty, boundAmounts = Map.empty, boundUnannounced = False, sourceAttachedTo = Nothing, evaluated = Nothing, sourceEntrants = Set.empty, sourceOwner = Nothing, sourceChosenNames = Set.empty, carrierChosenPlayer = Nothing, aimingController = Nothing, sourceChosenColor = Nothing, sourceChosenSubtype = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -2115,6 +2121,14 @@ matches context view predicate = case predicate of
   Filter.IsAttachedToSource -> case (attachedTo view, source context) of
     (Just host, Just src) -> host == src
     _ -> False
+  -- CR 701.3a / 301.5a: the same live comparison against the object the
+  -- surrounding quantity is aimed at rather than the match's source -- under CR
+  -- 613.4c the affected object, which need not be the source. Vacuously False
+  -- where the candidate is attached to nothing or to a player, and where no
+  -- quantity aims the match.
+  Filter.IsAttachedToEvaluated -> case (attachedTo view, evaluated context) of
+    (Just host, Just aimed) -> host == aimed
+    _ -> False
   -- CR 303.4b: the same comparison a THIRD way -- the source's host against the
   -- candidate, rather than the candidate's host against the source. A live read
   -- too, one record over: the caller re-reads Object.attachedTo on every match, so
@@ -2395,6 +2409,7 @@ rewrite pairs predicate = case predicate of
   -- it reaches the same description written at the top level.
   Filter.HasAttached f -> Filter.HasAttached (rewrite pairs f)
   Filter.IsAttachedToSource -> predicate
+  Filter.IsAttachedToEvaluated -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.EnteredWithSource -> predicate
   Filter.CanHostSubject -> predicate
@@ -3141,6 +3156,7 @@ bakeBound players predicate = case predicate of
   -- would be, and Pawl.Engine.Filter.boundSlots descends to match.
   Filter.HasAttached f -> Filter.HasAttached (bakeBound players f)
   Filter.IsAttachedToSource -> predicate
+  Filter.IsAttachedToEvaluated -> predicate
   Filter.IsHostOfSource -> predicate
   Filter.EnteredWithSource -> predicate
   Filter.CanHostSubject -> predicate
@@ -3310,6 +3326,7 @@ manaValueThresholds predicate = case predicate of
   -- widening CR 601.3a's sample is the safe direction.
   Filter.HasAttached f -> manaValueThresholds f
   Filter.IsAttachedToSource -> []
+  Filter.IsAttachedToEvaluated -> []
   Filter.IsHostOfSource -> []
   Filter.EnteredWithSource -> []
   Filter.CanHostSubject -> []
@@ -3481,6 +3498,7 @@ statesAQuality predicate = case predicate of
   -- one too ("has something attached to it").
   Filter.HasAttached _ -> True
   Filter.IsAttachedToSource -> True
+  Filter.IsAttachedToEvaluated -> True
   Filter.IsHostOfSource -> True
   Filter.EnteredWithSource -> True
   Filter.CanHostSubject -> True
