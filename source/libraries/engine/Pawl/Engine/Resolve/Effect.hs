@@ -5134,7 +5134,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   let riders = freezeRiders (effectViewOf source legal now) (chooseContext now) now resolving source entry
                   fmap (reverse . snd) (Event.simultaneously (moveOne mAttack mBlocked riders now (Set.empty, []) arrival))
                 else do
-                  batch <- fmap (reverse . snd) (Event.simultaneously (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals))
+                  batch <- fmap (reverse . snd) (Event.simultaneously (Event.amongPending (if EntryRiders.underOwner frozen then Nothing else Just controller) (fmap fst arrivals) (Monad.foldM (moveOne mAttack mBlocked frozen before) (Set.empty, []) arrivals)))
                   -- CR 613.7m: the members that entered the battlefield together
                   -- take their stamps in APNAP order, each seat choosing its own.
                   -- Not on the one-at-a-time road above, whose cards enter at

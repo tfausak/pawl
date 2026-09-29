@@ -304,6 +304,7 @@ import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -4970,6 +4971,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- Keyword carrying a Filter (see #2728), and the multiplier beside them, which
   -- is a Quantity and so reaches Filters the way withCountersFilters' do.
   EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f kind each) -> unframed [f] <> concatMap counterKindFilters (Maybe.maybeToList kind) <> quantityFilters each
+  EntryRewrite.SacrificeToEnter (SacrificeToEnter.MkSacrificeToEnter _ f) -> unframed [f]
   EntryRewrite.Amplify _ -> []
   -- CR 614.1c's as-enters effects hold no Filter of their own; the ones inside
   -- them are reached as ordinary effect filters, through cardResolutionEffects.

@@ -192,6 +192,7 @@ import qualified Pawl.Types.RuleAbilities as RuleAbilities
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
@@ -1605,6 +1606,9 @@ rewriteEntryRewrite pairs rewrite = case rewrite of
   -- reason -- that EntryR matches Filter.IsSource, and CR 400.7 forbids carrying a
   -- text change onto the permanent before it entered.
   EntryRewrite.ExileFromGraveyard f -> EntryRewrite.ExileFromGraveyard (Filter.rewrite pairs f)
+  -- CR 614.1a's "sacrifice a Forest instead": Heart of Yavimaya's names a land
+  -- type CR 612.1 reaches. Latent for the arm above's reason.
+  EntryRewrite.SacrificeToEnter s -> EntryRewrite.SacrificeToEnter s {SacrificeToEnter.filter = Filter.rewrite pairs (SacrificeToEnter.filter s)}
   -- CR 614.1c's "a creature you control it could be attached to": Grifter's
   -- Blade's names a card type CR 612.1 reaches. Latent for the arm above's
   -- reason -- that EntryR matches Filter.IsSource, and CR 400.7 forbids carrying

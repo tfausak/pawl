@@ -203,6 +203,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.ScryR as ScryR
 import qualified Pawl.Types.ScryRewrite as ScryRewrite
 import qualified Pawl.Types.Sickness as Sickness
@@ -379,6 +380,22 @@ simultaneously body = do
 -- Holding back the entry events is a regression fence: a CR 603.6a match reads
 -- the entrant live (Pawl.Engine.Event.Match), so recording them before the order
 -- leaves the suite green.
+-- CR 614.12b / 608.2f: run a one-member-at-a-time move of `members` onto the
+-- battlefield with every member not yet moved visible to the entry choices of
+-- the ones moved before it (GameState.enteringPending). `under` is the player
+-- they enter under, Nothing for each member's owner -- changeZoneEnteringIn's
+-- reading of the same move. Saved and restored, so a move nested inside an
+-- entry leaves the outer one's members pending.
+amongPending :: Maybe PlayerId -> [ObjectId] -> Game a -> Game a
+amongPending under members body = do
+  saved <- State.gets GameState.enteringPending
+  gs <- State.get
+  let enteringUnder member = fmap (\obj -> (member, Maybe.fromMaybe (Object.owner obj) under)) (Game.lookupObject member gs)
+  State.modify' (\g -> g {GameState.enteringPending = saved <> Map.fromList (Maybe.mapMaybe enteringUnder members)})
+  result <- body
+  State.modify' (\g -> g {GameState.enteringPending = saved})
+  pure result
+
 together :: Game a -> Game a
 together body = do
   before <- State.get
@@ -1107,9 +1124,10 @@ conjureOntoBattlefield controller card copied count tapped = do
       ids <- Monad.replicateM (Natural.toIntSaturating count) (State.state (mintCard controller (Just controller) printingId Zone.Battlefield LibraryPosition.defaultValue tapped))
       Monad.forM_ copied (\snapshot -> Monad.mapM_ (`markDuplicate` snapshot) ids)
       let siblingsOf oid = Set.delete oid (Set.fromList ids)
-      Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
-      settleMinted (GameState.nextTimestamp gs) ids
-      pure (Seq.fromList ids)
+      entered <- Monad.filterM (\oid -> runEntry (siblingsOf oid) oid) ids
+      Monad.mapM_ unmake (filter (`List.notElem` entered) ids)
+      settleMinted (GameState.nextTimestamp gs) entered
+      pure (Seq.fromList entered)
 
 -- CR 114.2: a player gets an emblem with the given abilities, put into the
 -- command zone and both owned and controlled by them. CR 613.7a: its entry
@@ -2655,14 +2673,15 @@ apply batch candidate event =
       -- token copies, one supply of three Forests. `many` counts what was
       -- CHOSEN, so paying any later than this leaves five 3/3s instead of one.
       --
-      -- The argument rests on no entry cost in the pool being able to come up
-      -- short. This one is "any number", which is never unpayable; the exile
-      -- beside it (EntryRewrite.ExileFromGraveyard) names one card and does as
-      -- much as it can where the graveyard holds none (CR 101.3), which is not a
-      -- payment that failed. An entry cost whose amount is fixed by the choice
-      -- and CAN be unpayable (Frankenstein's Monster's X) would need the forward
-      -- check the rule literally describes; no EntryRewrite arm carries one
-      -- (#1395).
+      -- That argument covers the costs no earlier choice can leave unpayable:
+      -- this one is "any number", PayLifeOrTapped may be declined, and the exile
+      -- (EntryRewrite.ExileFromGraveyard) does as much as it can (CR 101.3).
+      -- EntryRewrite.SacrificeToEnter's fixed count can be starved, and its own
+      -- arm carries the forward check the rule describes.
+      --
+      -- Not implemented: narrowing THIS choice for a SacrificeToEnter member
+      -- still to come -- Wood Elemental's untapped Forests taken ahead of Heart
+      -- of Yavimaya's Forest (#4394).
       EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber criterion kind each) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -2730,6 +2749,61 @@ apply batch candidate event =
                 scale = maybe 0 Integer.toNaturalSaturating (Quantity.evaluate viewOf context (Projection.boardAsEntering gs3) oid each)
             Monad.mapM_ (\k -> addEnteringCounters oid k (scale * many)) kind
             pure (Just event)
+      -- CR 614.1a / 614.12: "if this land would enter, sacrifice a Forest
+      -- instead. If you do, put this land onto the battlefield. If you don't, put
+      -- it into its owner's graveyard" (Heart of Yavimaya). Answering Nothing is
+      -- the "if you don't": runEntry's callers unmake the entry.
+      --
+      -- MANDATORY and FIXED, which is what makes it the one entry cost CR
+      -- 614.12b's check has work to do for. Every other spending arm is optional
+      -- or "any number", so paying each inside the loop in turn loses no answer
+      -- the rule allows (the SacrificeAnyNumber arm's argument); this one can be
+      -- starved by an earlier member's choice. So the offer is narrowed to the
+      -- sets that leave every member still to come able to pay its own
+      -- (Replacement.jointlyPayable) -- the members already moved have paid, and
+      -- the ones not yet moved are read off GameState.enteringPending. Where no
+      -- set does, the rule forbids every answer; it says nothing more, and the
+      -- whole offer stands. A token batch's siblings are materialized together
+      -- and not read: no token-making card in data/cards/ copies a card carrying
+      -- this row (see `unmake`).
+      --
+      -- CR 118.3: too few candidates is no payment at all, not a partial one.
+      -- CR 614.13a: the object entering and its siblings are not candidates, the
+      -- SacrificeAnyNumber arm's exclusion.
+      --
+      -- Pawl.ReplacementSpec's "Fixed entry costs across a batch (CR 614.12b)"
+      -- proves the narrowing, over Heart of Yavimaya with Lake of the Dead and
+      -- with Lotus Vale.
+      EntryRewrite.SacrificeToEnter (SacrificeToEnter.MkSacrificeToEnter n criterion) -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arms above's reason. Enters rather
+          -- than guessing whose permanents "a Forest" means.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            let entering oid2 = oid2 == oid || Set.member oid2 batch || Set.member oid2 (GameState.enteringSubjects gs)
+                own = filter (not . entering) (Replacement.sacrificeCandidates Map.empty controller (Just oid) criterion gs)
+                owed = fmap (fmap (filter (not . entering))) (pendingSacrifices controller gs)
+                sets = Replacement.subsetsOf n own
+                joint = filter (\chosen -> Replacement.jointlyPayable (Set.fromList chosen) owed) sets
+                allowed = if null joint then sets else joint
+            case allowed of
+              [] -> pure Nothing
+              forced : _ -> do
+                let offered = Set.toAscList (Set.fromList (concat allowed))
+                chosen <-
+                  -- Where the rules leave nothing to ask, don't prompt: one
+                  -- allowed set is the whole offer.
+                  if length allowed == 1
+                    then pure forced
+                    else do
+                      answer <- Game.choose (Prompt.ChooseSacrifices (Decide.deciderFor controller gs) controller oid offered n Seq.empty)
+                      -- FILTERED, NOT TRUSTED (#222): an answer outside the
+                      -- allowed sets would starve a later member or overpay.
+                      pure (Maybe.fromMaybe forced (List.find (\set -> Set.fromList set == answer) allowed))
+                sacrificeAll (fmap ((,) controller) chosen)
+                pure (Just event)
       -- CR 702.38a: amplify N (Feral Throwback). "As this object enters, reveal
       -- any number of cards from your hand that share a creature type with it.
       -- This permanent enters with N +1/+1 counters on it for each card revealed
@@ -4244,10 +4318,9 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- Moved event is recorded, so no trigger scan and no state-based action can see
 -- it.
 --
--- `Monad.void` discards the `Nothing` that means the event does not happen. Safe
--- here: every EntryR arm always returns `Just`, and only DamageR/DestructionR
--- ever return `Nothing`, neither of which pairs with WouldEnter -- the only
--- event this loop proposes.
+-- Answers whether the object entered: False is CR 614.1a's "instead" from an
+-- EntryRewrite.SacrificeToEnter arm that could not be paid, the one EntryR arm
+-- that answers `Nothing`. Each caller unmakes the entry.
 --
 -- Always the LIVE board (`Nothing`), even when the zone change containing this
 -- entry belongs to a CR 608.2f batch: the entering object is not on the
@@ -4257,7 +4330,7 @@ copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
 -- speaks only to the ORDER the two events' effects are chosen in, not to which
 -- board each collects from. That a contained event keeps its own footing is this
 -- engine's reading, resting on CR 614.12; no rule states it outright.
-runEntry :: Set ObjectId -> ObjectId -> Game ()
+runEntry :: Set ObjectId -> ObjectId -> Game Bool
 runEntry given oid = do
   -- CR 608.2f / 614.12: inside one action (`together`), what an EARLIER call
   -- put onto the battlefield entered at the same moment as this object, so it
@@ -4280,10 +4353,30 @@ runEntry given oid = do
   -- restored wholesale below for the reason `before` is.
   beforeSubjects <- State.gets GameState.enteringSubjects
   State.modify' (\gs -> gs {GameState.enteringBeside = batch, GameState.enteringSubjects = Set.insert oid beforeSubjects})
-  Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
+  outcome <- applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid)
   flushEnteringCounters oid
   designateProtector oid
   State.modify' (\gs -> gs {GameState.enteringBeside = before, GameState.enteringSubjects = beforeSubjects})
+  pure (Maybe.isJust outcome)
+
+-- CR 614.12b: what each member of the batch not yet moved will have to
+-- sacrifice as it enters, and out of which permanents -- read off its own rows
+-- as it would exist on the battlefield (CR 614.12), under the player it enters
+-- under. Only `chooser`'s: the rule constrains "that player"'s choices by the
+-- costs of that player's effects, so another player's unpayable member narrows
+-- nothing here. A regression fence, not a proof: no effect in data/cards/ moves
+-- two players' SacrificeToEnter cards in one batch (Second Sunrise would).
+pendingSacrifices :: PlayerId -> GameState -> [(Natural, [ObjectId])]
+pendingSacrifices chooser gs =
+  [ (count, Replacement.sacrificeCandidates Map.empty chooser (Just member) criterion gs)
+  | (member, controller) <- Map.toAscList (GameState.enteringPending gs),
+    controller == chooser,
+    Just obj <- [Game.lookupObject member gs],
+    Object.zone obj /= Zone.Battlefield,
+    (_, ReplacementEffect.EntryR (EntryR.MkEntryR pattern_ rewrite)) <- Projection.replacementsOf Zone.Battlefield member gs,
+    Filter.matches (Filter.contextFor (Game.teams gs) (Just controller) (Just member)) (Projection.viewOfObject member gs) pattern_,
+    (count, criterion) <- Maybe.maybeToList (Replacement.entryCostOf rewrite)
+  ]
 
 -- CR 712.13a / 304.4 / 307.4: is this entered object showing its back face, and is that
 -- face an instant or sorcery? Reads Game.cardOf, the card the EntersTransformed
@@ -5130,6 +5223,9 @@ changeZoneEntering = changeZoneEnteringIn Nothing Set.empty
 -- lone moves have no batch to name.
 changeZoneEnteringIn :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> EntryRiders.EntryRiders Natural (GrantedAbility.Type.GrantedAbility Card.Type.Card) -> Maybe PlayerId -> Game (Seq.Seq ObjectId)
 changeZoneEnteringIn asOf batch oid requestedDest position riders under = do
+  -- CR 614.12b: this member is moving now, so it no longer owes anything to an
+  -- earlier member's choice (see amongPending).
+  State.modify' (\g -> g {GameState.enteringPending = Map.delete oid (GameState.enteringPending g)})
   gs <- State.get
   let mCard = Game.cardOf oid gs
       onto = requestedDest == Zone.Battlefield
@@ -6287,7 +6383,15 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
                 -- three is fed by an entering permanent's own pending counters
                 -- today.
                 Monad.mapM_ (uncurry (addEnteringCounters newId)) (Map.toAscList entering)
-                runEntry batch newId
+                entered <- runEntry batch newId
+                -- CR 614.1a: EntryRewrite.SacrificeToEnter's "if you don't, put it
+                -- into its owner's graveyard", the entry unmade as CR 712.13a's is
+                -- below. A card that was already in the graveyard stays there.
+                Monad.unless entered $ do
+                  State.put unentered
+                  State.modify' (\g -> g {GameState.refusedEntries = fmap (Set.insert oid) (GameState.refusedEntries g)})
+                  Monad.unless (fromZone == Zone.Graveyard) (Monad.void (changeZoneReturning oid Zone.Graveyard))
+              refused <- State.gets (Maybe.isNothing . Game.lookupObject newId)
               -- CR 712.13a: a resolving double-faced spell that entered
               -- transformed onto an instant or sorcery back face "doesn't enter
               -- the battlefield, and is instead put into its owner's graveyard";
@@ -6302,10 +6406,13 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
               -- proves. Pawl.DaytimeSpec's Dusklit Conjurer cases prove the rest,
               -- Double Major for the rule's copy clause and Exhume for CR 304.4.
               instantFace <- State.gets (showsInstantBackFace newId)
-              if dest == Zone.Battlefield && instantFace
-                then do
-                  State.put unentered
-                  if fromZone == Zone.Stack then changeZoneReturning oid Zone.Graveyard else pure Seq.empty
+              if refused || (dest == Zone.Battlefield && instantFace)
+                then
+                  if refused
+                    then pure Seq.empty
+                    else do
+                      State.put unentered
+                      if fromZone == Zone.Stack then changeZoneReturning oid Zone.Graveyard else pure Seq.empty
                 else do
                   -- CR 709.5h: an ability that triggers on a door opening fires "regardless
                   -- of whether it was given that designation while entering the
@@ -7545,9 +7652,24 @@ createTokens controller card copy n tapped entering attached = do
               -- `siblingsOf` then hands each entry loop.
               let siblingsOf oid = Set.delete oid (Set.fromList ids)
               Monad.mapM_ (\oid -> Monad.mapM_ (uncurry (addEnteringCounters oid)) (Map.toAscList entering)) ids
-              Monad.mapM_ (\oid -> runEntry (siblingsOf oid) oid) ids
-              settleMinted (GameState.nextTimestamp unminted) ids
-              pure ids
+              entered <- Monad.filterM (\oid -> runEntry (siblingsOf oid) oid) ids
+              Monad.mapM_ unmake (filter (`List.notElem` entered) ids)
+              settleMinted (GameState.nextTimestamp unminted) entered
+              pure entered
+
+-- CR 614.1a on the two roads that MINT onto the battlefield: an object whose
+-- EntryRewrite.SacrificeToEnter went unpaid never entered, so it is removed.
+-- Not implemented: putting a refused token or conjured card into its owner's
+-- graveyard, which only a "put into a graveyard from anywhere" trigger could
+-- tell apart -- no card in data/cards/ creates or conjures a card carrying the
+-- row (grep "SacrificeToEnter", 2026-09-29), and Heart of Yavimaya copied by a
+-- token-copy effect would refute that.
+unmake :: ObjectId -> Game ()
+unmake oid = State.modify' $ \gs -> case Game.lookupObject oid gs of
+  Nothing -> gs
+  Just obj ->
+    let gs1 = Game.removeFromZones (Object.owner obj) oid gs
+     in gs1 {GameState.objects = Map.delete oid (GameState.objects gs1)}
 
 -- The tail createTokens and conjureOntoBattlefield share, run after every entry
 -- loop of a batch minted onto the battlefield. CR 613.7m: the batch entered
@@ -7736,8 +7858,10 @@ meld controller victims resultCard = do
       -- CR 712.14c / CR 616.1: ONE permanent enters, so ONE entry loop, with no
       -- simultaneously-entering sibling to exclude. createTokens' order exactly:
       -- the object is materialized first, because CR 614.12 asks for the
-      -- characteristics it would have on the battlefield.
-      runEntry Set.empty newId
+      -- characteristics it would have on the battlefield. The answer is dropped:
+      -- only EntryRewrite.SacrificeToEnter refuses an entry, and a melded
+      -- permanent's rows are its meld result's, none of which prints one.
+      Monad.void (runEntry Set.empty newId)
       -- CR 603.6a's enters-the-battlefield triggers scan this, and it is recorded
       -- after the entry loop so the snapshot describes a settled permanent --
       -- recordMintedEntry's reasons, one zone over. `from` is where the cards were,

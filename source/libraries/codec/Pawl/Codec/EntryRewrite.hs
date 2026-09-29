@@ -8,6 +8,7 @@ import qualified Pawl.Codec.EntryOption as EntryOption
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Codec.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Codec.WithCounters as WithCounters
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -56,6 +57,7 @@ codec abilityCodec effectCodec =
       Arm.payload "PayLifeOrTapped" Common.natural EntryRewrite.PayLifeOrTapped (\x -> case x of EntryRewrite.PayLifeOrTapped y -> Just y; _ -> Nothing),
       Arm.payload "RevealOrTapped" (Filter.codec Keyword.codec) EntryRewrite.RevealOrTapped (\x -> case x of EntryRewrite.RevealOrTapped y -> Just y; _ -> Nothing),
       Arm.payload "SacrificeAnyNumber" SacrificeAnyNumber.codec EntryRewrite.SacrificeAnyNumber (\x -> case x of EntryRewrite.SacrificeAnyNumber y -> Just y; _ -> Nothing),
+      Arm.payload "SacrificeToEnter" SacrificeToEnter.codec EntryRewrite.SacrificeToEnter (\x -> case x of EntryRewrite.SacrificeToEnter y -> Just y; _ -> Nothing),
       Arm.payload "ExileFromGraveyard" (Filter.codec Keyword.codec) EntryRewrite.ExileFromGraveyard (\x -> case x of EntryRewrite.ExileFromGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "EntersAttachedTo" (Filter.codec Keyword.codec) EntryRewrite.EntersAttachedTo (\x -> case x of EntryRewrite.EntersAttachedTo y -> Just y; _ -> Nothing),
       Arm.payload "RunEffects" (Common.seq effectCodec) EntryRewrite.RunEffects (\x -> case x of EntryRewrite.RunEffects y -> Just y; _ -> Nothing)
@@ -88,6 +90,7 @@ tagOf x = case x of
   EntryRewrite.PayLifeOrTapped {} -> "PayLifeOrTapped"
   EntryRewrite.RevealOrTapped {} -> "RevealOrTapped"
   EntryRewrite.SacrificeAnyNumber {} -> "SacrificeAnyNumber"
+  EntryRewrite.SacrificeToEnter {} -> "SacrificeToEnter"
   EntryRewrite.ExileFromGraveyard {} -> "ExileFromGraveyard"
   EntryRewrite.EntersAttachedTo {} -> "EntersAttachedTo"
   EntryRewrite.RunEffects {} -> "RunEffects"

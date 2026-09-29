@@ -476,6 +476,7 @@ import qualified Pawl.Codec.SacrificeAnyNumberSpec
 import qualified Pawl.Codec.SacrificeEffectSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.SacrificeSpec
+import qualified Pawl.Codec.SacrificeToEnterSpec
 import qualified Pawl.Codec.SacrificerSpec
 import qualified Pawl.Codec.SaddlingSpec
 import qualified Pawl.Codec.ScalingSpec
@@ -1227,6 +1228,7 @@ spec s registry = do
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.RuleAbilitiesSpec.spec s
   Pawl.Codec.SacrificeAnyNumberSpec.spec s
+  Pawl.Codec.SacrificeToEnterSpec.spec s
   Pawl.Codec.SacrificeEffectSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ReturnPermanentsSpec.spec s
