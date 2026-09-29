@@ -1391,6 +1391,86 @@ surveilPromptSpec s registry = Spec.describe s "SurveilPrompt" $ do
     Spec.assertEqWith s "and the library is what it was" (Game.zoneMembers Zone.Library S.alice after) ids
     Spec.assertEqWith s "with an empty graveyard" (surveilGraveyard after) []
 
+-- CR 701.25b: Curate's surveil 2 cast over seven DIFFERENT printings, top-first
+-- [piker, maiden, mountain, forest, plains, swamp, giant], with one Enhanced
+-- Surveillance ("You may look at an additional two cards each time you
+-- surveil.") on the battlefield for each seat `owners` names.
+widenedSurveilBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [PlayerId.PlayerId] ->
+  m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+widenedSurveilBoard s registry owners = do
+  island <- S.printingOf s registry "Island"
+  stock <- traverse (S.printingOf s registry) ["Goblin Piker", "Bird Maiden", "Mountain", "Forest", "Plains", "Swamp", "Hill Giant"]
+  curate <- S.printingOf s registry "Curate"
+  enhanced <- S.printingOf s registry "Enhanced Surveillance"
+  let deal (acc, g) printing = let (oid, g2) = S.addLibraryCard printing S.alice g in (oid : acc, g2)
+      (ids, stocked) = List.foldl' deal ([], S.landsInPlay island 2) (reverse stock)
+      watched = List.foldl' (\g owner -> snd (S.addPermanent enhanced owner g)) stocked owners
+      (board, spellId) = S.handOne curate watched
+  pure (ids, spellId, board)
+
+-- The card names in alice's hand after Curate's draw.
+surveilHand :: GameState.GameState -> [Maybe CardName.CardName]
+surveilHand gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Hand S.alice gs)
+
+enhancedSurveillanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enhancedSurveillanceSpec s registry = Spec.describe s "EnhancedSurveillance" $ do
+  -- The positive: the answer bins forest and tops mountain, the third and fourth
+  -- cards, which only the two extra looks reach. Curate's draw then takes
+  -- mountain.
+  Spec.it s "CR 701.25b alice's Enhanced Surveillance makes the extra two cards hers to bin or top" $ do
+    (ids, spellId, board) <- widenedSurveilBoard s registry [S.alice]
+    case ids of
+      [piker, maiden, mountain, forest, plains, swamp, giant] -> do
+        let after = S.runPure (surveilAnswer ([forest], [mountain])) board $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+        Spec.assertEqWith s "the draw took mountain, the third card" (surveilHand after) [cardNamed "Mountain"]
+        Spec.assertEqWith s "forest, the fourth, was binned under Curate" (surveilGraveyard after) [cardNamed "Forest", cardNamed "Curate"]
+        Spec.assertEqWith s "and the unnamed two kept their places" (Game.zoneMembers Zone.Library S.alice after) [piker, maiden, plains, swamp, giant]
+      _ -> Spec.assertFailure s "expected seven library cards"
+  -- The negative half of the pair, differing only in who controls the
+  -- enchantment: bob's widens bob's surveils, not alice's, so the same answer
+  -- names two cards she never looked at and both are ignored.
+  Spec.it s "CR 701.25b bob's Enhanced Surveillance does not widen alice's surveil" $ do
+    (ids, spellId, board) <- widenedSurveilBoard s registry [S.bob]
+    case ids of
+      [_, maiden, mountain, forest, plains, swamp, giant] -> do
+        let after = S.runPure (surveilAnswer ([forest], [mountain])) board $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+        Spec.assertEqWith s "the draw took piker, still on top" (surveilHand after) [cardNamed "Goblin Piker"]
+        Spec.assertEqWith s "nothing but Curate reached the graveyard" (surveilGraveyard after) [cardNamed "Curate"]
+        Spec.assertEqWith s "and the library is untouched below it" (Game.zoneMembers Zone.Library S.alice after) [maiden, mountain, forest, plains, swamp, giant]
+      _ -> Spec.assertFailure s "expected seven library cards"
+  -- The card's ruling (2018-10-05): two of them look at an additional four. The
+  -- answer reaches the fifth and sixth cards, which one alone would not.
+  Spec.it s "CR 701.25b two Enhanced Surveillances add up to four extra cards" $ do
+    (ids, spellId, board) <- widenedSurveilBoard s registry [S.alice, S.alice]
+    case ids of
+      [piker, maiden, mountain, forest, plains, swamp, giant] -> do
+        let after = S.runPure (surveilAnswer ([swamp], [plains])) board $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+        Spec.assertEqWith s "the draw took plains, the fifth card" (surveilHand after) [cardNamed "Plains"]
+        Spec.assertEqWith s "swamp, the sixth, was binned under Curate" (surveilGraveyard after) [cardNamed "Swamp", cardNamed "Curate"]
+        Spec.assertEqWith s "and the unnamed four kept their places" (Game.zoneMembers Zone.Library S.alice after) [piker, maiden, mountain, forest, giant]
+      _ -> Spec.assertFailure s "expected seven library cards"
+  -- CR 701.25c: surveil 0 is no surveil, so there is nothing for the
+  -- enchantment to widen. Driven through the opcode, no printing surveilling
+  -- zero.
+  Spec.it s "CR 701.25c Enhanced Surveillance does not turn surveil 0 into a surveil" $ do
+    (ids, sourceId, base) <- surveilOpcodeBoard s registry 2
+    enhanced <- S.printingOf s registry "Enhanced Surveillance"
+    let board = snd (S.addPermanent enhanced S.alice base)
+        surveilZero = Effect.Surveil (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 0))
+        after = S.runPure (surveilAnswer (ids, [])) board (Resolve.applyEffect sourceId sourceId S.alice Map.empty Map.empty surveilZero)
+    Spec.assertEqWith s "the library is what it was" (Game.zoneMembers Zone.Library S.alice after) ids
+    Spec.assertEqWith s "with an empty graveyard" (surveilGraveyard after) []
+
 -- CR 701.29a: "to 'fateseal N' means to look at the top N cards of an opponent's
 -- library, then put any number of them on the bottom of that library in any
 -- order and the rest on top of that library in any order."
@@ -3120,6 +3200,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   scryPromptSpec s registry
   surveilSpec s registry
   surveilPromptSpec s registry
+  enhancedSurveillanceSpec s registry
   fatesealSpec s registry
   exploreSpec s registry
   explorePromptSpec s registry

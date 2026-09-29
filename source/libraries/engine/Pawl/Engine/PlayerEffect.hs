@@ -691,6 +691,7 @@ prohibitsCasting pid oid name variable gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any prohibits (applying pid gs)
@@ -830,6 +831,7 @@ prohibitsPlayingLand pid names oid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any prohibits (applying pid gs)
@@ -908,6 +910,7 @@ prohibitsSearching pid owner causeController gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any (prohibits . snd) (applying pid gs)
@@ -978,6 +981,7 @@ prohibitsCounters pid kind gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any (prohibits . snd) (applying pid gs)
@@ -1053,6 +1057,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any (prohibits . snd) (applying pid gs)
@@ -1109,6 +1114,7 @@ schemesCantBeSetInMotion gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any (\pid -> any (prohibits . snd) (applying pid gs)) (Game.stillPlaying gs)
@@ -1165,6 +1171,7 @@ prohibitsAttackingWithCreatures pid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any (prohibits . snd) (applying pid gs)
@@ -1454,6 +1461,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       reductionOf (source, effect) = case effect of
@@ -1507,6 +1515,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       -- CR 601.2f's "plus all additional costs", the non-mana half, reaching a
@@ -1563,6 +1572,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       effects = applying pid gs
@@ -1769,6 +1779,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       reductionOf (source, effect) = case effect of
@@ -1835,6 +1846,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       -- CR 601.2f's "plus all additional costs", the non-mana half: Brutal
@@ -1900,6 +1912,7 @@ activationCostAdjustmentsGiven effects pid targets stamp kind loyalty srcId gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       -- CR 702.193a/b: power-up's own reduction by "this permanent's mana cost",
@@ -2052,6 +2065,7 @@ landPlayFlashGrant effect = case effect of
   PlayerEffect.StateCoinFlip _ -> Nothing
   PlayerEffect.ModifyDieRoll _ -> Nothing
   PlayerEffect.AdditionalVotes _ -> Nothing
+  PlayerEffect.AdditionalSurveilCards _ -> Nothing
   PlayerEffect.CantGainLife -> Nothing
   PlayerEffect.CantLoseLife -> Nothing
 
@@ -2312,6 +2326,7 @@ castPermissionsFrom pid zone oid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
       grantOf (source, effect) = case effect of
@@ -2482,6 +2497,7 @@ mayCastFromHandWithoutPayingManaCost pid oid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
         -- The CR 601.3 permissions, which say WHERE a spell may be cast from and
@@ -2619,6 +2635,7 @@ playLandPiles pid gs =
         PlayerEffect.StateCoinFlip _ -> []
         PlayerEffect.ModifyDieRoll _ -> []
         PlayerEffect.AdditionalVotes _ -> []
+        PlayerEffect.AdditionalSurveilCards _ -> []
         PlayerEffect.CantGainLife -> []
         PlayerEffect.CantLoseLife -> []
    in concatMap (piles . snd) (applying pid gs)
@@ -2713,6 +2730,7 @@ protectedFromTargeting rows caster pid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any (stops . snd) rows
@@ -2808,6 +2826,7 @@ protectedFromGiven rows oid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any stops rows
@@ -2893,6 +2912,7 @@ protectionCarriers gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
    in concatMap (\pid -> Maybe.mapMaybe (carrier pid) (applying pid gs)) (Game.stillPlaying gs)
@@ -2974,6 +2994,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
@@ -3042,9 +3063,70 @@ votesAllowed pid gs =
         PlayerEffect.StateCoinFlip {} -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes extra -> Just extra
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
    in defaultVotes + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
+
+-- CR 701.25b: how many cards beyond the instruction's own N `pid` looks at
+-- when they surveil (Enhanced Surveillance). A SUM over every applicable
+-- grant, votesAllowed's posture: rule 701.25b makes no two such effects
+-- redundant, and the card's own ruling (2018-10-05) makes two of them four.
+--
+-- Not implemented: the card's "may" is not asked; the extra cards are always
+-- looked at (#4391).
+surveilExtra :: PlayerId -> GameState -> Natural
+surveilExtra pid gs =
+  let grantOf effect = case effect of
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantActivateAbilities _ -> Nothing
+        PlayerEffect.CantCastMoreThan {} -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost {} -> Nothing
+        PlayerEffect.IncreaseActivationCost {} -> Nothing
+        PlayerEffect.ReduceSpellCost {} -> Nothing
+        PlayerEffect.ReduceActivationCost {} -> Nothing
+        PlayerEffect.AddActivationCost {} -> Nothing
+        PlayerEffect.AlternativeActivationCost {} -> Nothing
+        PlayerEffect.AddSpellCost {} -> Nothing
+        PlayerEffect.PlayAdditionalLands {} -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize {} -> Nothing
+        PlayerEffect.IncreaseMaximumHandSize {} -> Nothing
+        PlayerEffect.ReduceMaximumHandSize {} -> Nothing
+        PlayerEffect.DontLoseUnspentMana {} -> Nothing
+        PlayerEffect.LoseLifeForUnspentMana -> Nothing
+        PlayerEffect.SpendManaAsThough {} -> Nothing
+        PlayerEffect.CantBeTargetedBy {} -> Nothing
+        PlayerEffect.HasProtectionFromChosenName -> Nothing
+        PlayerEffect.HasProtectionFrom {} -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash {} -> Nothing
+        PlayerEffect.MayPlayAsThoughItHadFlash {} -> Nothing
+        PlayerEffect.ActivateKeywordAtInstantSpeed {} -> Nothing
+        PlayerEffect.ActivateLoyaltyAtInstantSpeed {} -> Nothing
+        PlayerEffect.CantBeCountered {} -> Nothing
+        PlayerEffect.DamageCantBePrevented {} -> Nothing
+        PlayerEffect.DamageCantBeRedirected {} -> Nothing
+        PlayerEffect.CantSearchLibraries {} -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantSetSchemesInMotion -> Nothing
+        PlayerEffect.CantAttackWithCreatures -> Nothing
+        PlayerEffect.CantCastMatching {} -> Nothing
+        PlayerEffect.CastOnlyAtSorcerySpeed -> Nothing
+        PlayerEffect.CantPlayLands {} -> Nothing
+        PlayerEffect.CastFrom {} -> Nothing
+        PlayerEffect.PlayLandsFrom {} -> Nothing
+        PlayerEffect.PlotFrom {} -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost {} -> Nothing
+        PlayerEffect.CantGetCounters {} -> Nothing
+        PlayerEffect.StateCoinFlip {} -> Nothing
+        PlayerEffect.ModifyDieRoll _ -> Nothing
+        PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards extra -> Just extra
+        PlayerEffect.CantGainLife -> Nothing
+        PlayerEffect.CantLoseLife -> Nothing
+   in sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
 -- starting hand size, which is a different seven (Mulligan.openingHand) that
@@ -3135,6 +3217,7 @@ maximumHandSize pid gs =
         PlayerEffect.StateCoinFlip _ -> current
         PlayerEffect.ModifyDieRoll _ -> current
         PlayerEffect.AdditionalVotes _ -> current
+        PlayerEffect.AdditionalSurveilCards _ -> current
         PlayerEffect.CantGainLife -> current
         PlayerEffect.CantLoseLife -> current
    in List.foldl' (\current row -> apply current (snd row)) (Just (Vanguard.handSize defaultMaximumHandSize pid gs)) (applying pid gs)
@@ -3213,6 +3296,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
@@ -3283,6 +3367,7 @@ losesLifeForUnspentMana pid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any (charges . snd) (applying pid gs)
@@ -3354,6 +3439,7 @@ prohibitsGainingLife pid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantLoseLife -> False
    in any (prohibits . snd) (applying pid gs)
 
@@ -3420,6 +3506,7 @@ prohibitsLosingLife pid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
    in any (prohibits . snd) (applying pid gs)
 
@@ -3487,6 +3574,7 @@ spendManaAsThough pid gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
    in Maybe.mapMaybe (spends . snd) (applying pid gs)
@@ -3573,6 +3661,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.StateCoinFlip _ -> False
         PlayerEffect.ModifyDieRoll _ -> False
         PlayerEffect.AdditionalVotes _ -> False
+        PlayerEffect.AdditionalSurveilCards _ -> False
         PlayerEffect.CantGainLife -> False
         PlayerEffect.CantLoseLife -> False
    in any stops (applying pid gs)
@@ -3641,6 +3730,7 @@ unpreventable gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -3717,6 +3807,7 @@ unredirectable gs =
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -3768,6 +3859,7 @@ statedFlips pid gs =
         PlayerEffect.StateCoinFlip statement -> Just statement
         PlayerEffect.ModifyDieRoll _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
         -- Every other arm is about casting, playing, targeting, countering,
@@ -3846,6 +3938,7 @@ rollModifiers pid gs =
         PlayerEffect.ModifyDieRoll modifier -> Just modifier
         PlayerEffect.StateCoinFlip _ -> Nothing
         PlayerEffect.AdditionalVotes _ -> Nothing
+        PlayerEffect.AdditionalSurveilCards _ -> Nothing
         PlayerEffect.CantGainLife -> Nothing
         PlayerEffect.CantLoseLife -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
@@ -3988,6 +4081,7 @@ overPlayerRefs f effect = case effect of
   PlayerEffect.StateCoinFlip _ -> pure effect
   PlayerEffect.ModifyDieRoll _ -> pure effect
   PlayerEffect.AdditionalVotes _ -> pure effect
+  PlayerEffect.AdditionalSurveilCards _ -> pure effect
   PlayerEffect.CantGainLife -> pure effect
   PlayerEffect.CantLoseLife -> pure effect
 
@@ -4059,6 +4153,7 @@ overDamagePatterns f effect = case effect of
   PlayerEffect.StateCoinFlip _ -> pure effect
   PlayerEffect.ModifyDieRoll _ -> pure effect
   PlayerEffect.AdditionalVotes _ -> pure effect
+  PlayerEffect.AdditionalSurveilCards _ -> pure effect
   PlayerEffect.CantGainLife -> pure effect
   PlayerEffect.CantLoseLife -> pure effect
 

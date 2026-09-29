@@ -260,9 +260,8 @@ data Effect card ability
     Scry PlayerQuantity.PlayerQuantity
   | -- | CR 701.25a: the players the PlayerRef names each surveil this many, the
     -- unwanted cards crossing into their graveyard where Scry's go to the bottom
-    -- of the library.
-    --
-    -- Not implemented: CR 701.25b's "additional cards" rider (#1343).
+    -- of the library. CR 701.25b's extra cards come from
+    -- Pawl.Types.PlayerEffect's AdditionalSurveilCards.
     Surveil PlayerQuantity.PlayerQuantity
   | -- | CR 701.29a: the players the PlayerRef names each fateseal this many --
     -- Scry's library rewrite over an opponent's library, that opponent chosen as
@@ -491,9 +490,8 @@ data Effect card ability
     -- Pawl.Types.ExchangeSides.BetweenTargets does.
     --
     -- Neither a declaration (CR 509.1a) nor an entry (CR 509.4), which is the
-    -- distinction Pawl.Types.BecameBlocking's putOntoBattlefield draws: this road
-    -- records that event with the flag CLEAR, so CR 509.3b and CR 509.3d both
-    -- fire off it.
+    -- distinction Pawl.Types.BlockProducer draws: this road records that event
+    -- under BlockProducer.ByEffect, so CR 509.3b and CR 509.3d both fire off it.
     --
     -- CR 509.1b's hypothetical legality test rides inside
     -- Pawl.Engine.Combat.switchBlockers rather than being a Condition here: the

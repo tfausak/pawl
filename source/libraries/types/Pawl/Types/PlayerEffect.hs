@@ -224,6 +224,9 @@ data PlayerEffect
     -- beyond the one CR 701.38a gives every seat, cast at the same time they
     -- would otherwise have voted.
     AdditionalVotes Natural.Natural
+  | -- | CR 701.25b / Enhanced Surveillance: this player may look at this many
+    -- more cards each time they surveil.
+    AdditionalSurveilCards Natural.Natural
   | -- | CR 119.7 / Giant Cindermaw, Platinum Emperion: this player can't gain
     -- life.
     --

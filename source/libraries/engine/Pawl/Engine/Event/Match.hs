@@ -38,6 +38,7 @@ import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
 import Pawl.Types.Binding (Binding)
+import qualified Pawl.Types.BlockProducer as BlockProducer
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardLeavesZone as CardLeavesZone
 import qualified Pawl.Types.CardPutIntoGraveyard as CardPutIntoGraveyard
@@ -133,6 +134,14 @@ declarationsOf bearer gs =
         GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _ _ _) -> oid == bearer
         _ -> False
    in length (Seq.filter (declaredIt . LoggedEvent.event) (GameState.events gs))
+
+-- CR 509.3e on the effect road (BlockProducer.ByEffect): whether this arrival
+-- is the one that answers the attacker's crossing. One effect records a
+-- GameEvent.BecameBlocking per arrival, each carrying the same sets before and
+-- after, so the crossing is answered on the least arrival and refused on the
+-- rest. Pawl.CombatCostSpec's SwitchBlockers group proves it for both forms.
+answersEffectCrossing :: ObjectId -> Set.Set ObjectId -> Set.Set ObjectId -> Bool
+answersEffectCrossing blocker before after = Set.lookupMin (Set.difference after before) == Just blocker
 
 -- CR 702.122e: how many times the bearer has become crewed this turn --
 -- declarationsOf above one rule over, over GameEvent.BecameCrewed rather than
@@ -3589,7 +3598,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
         -- text. Pawl.CombatEffectSpec puts Loyal Sentry out that way against a
         -- 2/2 and reddens here when this guard is dropped, with the same Sentry
         -- DECLARED as the control leg where it does fire.
-        not (BecameBlocking.putOntoBattlefield b) ->
+        BecameBlocking.producer b /= BlockProducer.PutOntoBattlefield ->
           let attacker = BecameBlocking.attacker b
            in case Projection.viewWithLastKnown attacker gs attacker of
                 Nothing -> False
@@ -3685,7 +3694,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- 509.3e's "when blockers are declared" the moment this fires.
   --
   -- Not implemented: rule 509.3e's "effects that add or remove blockers" also
-  -- cause it to trigger, and the count here is the declaration's (#1146). The
+  -- cause it to trigger, and the count here is the declaration's (#4384). The
   -- pool's one effect that makes an already-blocking creature block (General
   -- Jarkeld) is not that producer: it moves a blocker between two attackers, so
   -- the number of creatures each blocker blocks is unchanged.
@@ -3980,11 +3989,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- side, which is what makes this fire once per blocker where
   -- SelfBecomesBlocked's arm above fires once per attacker.
   --
-  -- BecameBlocking.putOntoBattlefield is deliberately not read: rule 509.3d's
+  -- BecameBlocking.producer is deliberately not read: rule 509.3d's
   -- third sentence is "In addition, it will trigger if a creature is put onto
   -- the battlefield blocking that creature", the one form of CR 509.3 that CR
   -- 509.4's "never blocked" does not silence. CR 509.3b's arm above reads the
-  -- flag, and that difference is the rule.
+  -- producer, and that difference is the rule.
   --
   -- The blocker's characteristics come from the game as it stands, which is rule
   -- 509.3f's "at the point it becomes a blocking creature": CR 509.2a puts these
@@ -4087,7 +4096,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- Pawl.Engine.Ring.yourRingBearer -- the emblem is not in the event at all, so
   -- nothing here compares an id to the bearer.
   --
-  -- BecameBlocking.putOntoBattlefield is not read, for the arm above's reason:
+  -- BecameBlocking.producer is not read, for the arm above's reason:
   -- rule 509.3d's third sentence admits a creature put onto the battlefield
   -- blocking.
   --
@@ -4251,19 +4260,19 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           -- black. Relaxing the conjunct to a wildcard leaves the whole suite
           -- green.
           --
-          -- BecameBlocking.putOntoBattlefield is load-bearing beside it:
+          -- BecameBlocking.producer is load-bearing beside it:
           -- Combat.declareBlockers records this same constructor once per
-          -- declared PAIR with that flag clear, so an arm without it would
-          -- answer an ordinary declaration the arm above has already answered,
-          -- once more per blocker.
-          --
-          -- Not implemented: an effect that causes a creature already on the
-          -- battlefield to block (Combat.switchBlockers, General Jarkeld) records
-          -- this constructor with the flag CLEAR, which this conjunct refuses, so
-          -- rule 509.3e's added blocker does not reach this arm by that road
-          -- (#1146).
-          GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = prior})
+          -- declared PAIR under BlockProducer.Declared, so an arm admitting that
+          -- would answer an ordinary declaration the arm above has already
+          -- answered, once more per blocker.
+          GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.producer = BlockProducer.PutOntoBattlefield, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = prior})
             | attacker == bearer -> admits blocker && not (any admits (Set.toList prior))
+          -- The same crossing on the effect road (Combat.switchBlockers,
+          -- General Jarkeld): one simultaneous change, so it reads the sets
+          -- before and after it and answers once, on answersEffectCrossing's
+          -- arrival. Pawl.CombatCostSpec's SwitchBlockers group is the proof.
+          GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.producer = BlockProducer.ByEffect after, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = prior})
+            | attacker == bearer -> answersEffectCrossing blocker prior after && any admits (Set.toList after) && not (any admits (Set.toList prior))
           GameEvent.BecameBlocking {} -> False
           GameEvent.BlocksDeclared {} -> False
           GameEvent.AttackerDeclared {} -> False
@@ -4391,10 +4400,11 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           -- Removing blockers cannot reach THIS form of the rule: the count
           -- only falls, and a floor is never crossed upwards by a departure.
           --
-          -- The flag is load-bearing. Combat.declareBlockers records this same
-          -- constructor once per declared PAIR with it clear, so an unguarded
-          -- arm would answer an ordinary declaration the arm above has already
-          -- answered, once more per blocker.
+          -- The producer is load-bearing. Combat.declareBlockers records this
+          -- same constructor once per declared PAIR under
+          -- BlockProducer.Declared, so an unguarded arm would answer an
+          -- ordinary declaration the arm above has already answered, once more
+          -- per blocker.
           --
           -- `+ 1 == n` here where the arm above reads `>= n`, and the two are
           -- not in disagreement. The rule's "at least" is about how many
@@ -4418,8 +4428,15 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
           -- all -- which is what stops a doubled pair landing on an unblocked
           -- attacker from firing once for the becoming and once for its second
           -- token.
-          GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker, BecameBlocking.putOntoBattlefield = True, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = before}) ->
+          GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.attacker = attacker, BecameBlocking.producer = BlockProducer.PutOntoBattlefield, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = before}) ->
             attacksAdmittedPlayer attacker && Natural.length before + 1 == n
+          -- The effect road (Combat.switchBlockers, General Jarkeld) adds and
+          -- removes blockers in one change, so the floor is crossed when the
+          -- tally before it is under `n` and the tally after it is not, and
+          -- answered once, on answersEffectCrossing's arrival.
+          -- Pawl.CombatCostSpec's SwitchBlockers group is the proof.
+          GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = blocker, BecameBlocking.attacker = attacker, BecameBlocking.producer = BlockProducer.ByEffect after, BecameBlocking.attackerWasBlocked = True, BecameBlocking.blockersBefore = before}) ->
+            attacksAdmittedPlayer attacker && answersEffectCrossing blocker before after && Natural.length before < n && Natural.length after >= n
           GameEvent.BecameBlocking {} -> False
           GameEvent.AttackerUnblocked _ -> False
           GameEvent.BlocksDeclared {} -> False

@@ -4846,6 +4846,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- Wall you control" being one.
   PlayerEffect.ModifyDieRoll modified -> foldMap costFilters (ModifiedRoll.cost modified)
   PlayerEffect.AdditionalVotes _ -> []
+  PlayerEffect.AdditionalSurveilCards _ -> []
   PlayerEffect.CantGainLife -> []
   PlayerEffect.CantLoseLife -> []
 

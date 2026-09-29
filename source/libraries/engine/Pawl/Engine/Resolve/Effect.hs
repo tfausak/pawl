@@ -2836,8 +2836,17 @@ chooseNewTargetsFor unannounced chooser controller copyId = do
         -- when the draw names a card the slot refuses" is what proves this
         -- line: without it the copy records the illegal card and CR 608.2b
         -- counters it, where the rule leaves it resolving on its old target.
+        --
+        -- CR 115.7d's joint half: the new targets "must not cause any unchanged
+        -- targets to become illegal". So the joint check refuses only what was
+        -- NOT already refused under the object's current targets -- an unchanged
+        -- target already illegal stands, one legal before must stay legal.
+        -- Pawl.TargetSpec's Bioshift cases prove both halves.
         let stands slot picked = Set.isSubsetOf picked (Set.union (Map.findWithDefault Set.empty slot current) (Map.findWithDefault Set.empty slot fresh))
-        Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && Target.jointlyCoherent (Just controller) seed copyId slots drawn gs) $ do
+            already = Target.jointlyIllegal (Just controller) seed copyId slots current gs
+            caused slot refused = not (Set.isSubsetOf refused (Map.findWithDefault Set.empty slot already))
+            coherent = not (or (Map.mapWithKey caused (Target.jointlyIllegal (Just controller) seed copyId slots drawn gs)))
+        Monad.when (and (Map.elems (Map.mapWithKey stands drawn)) && coherent) $ do
           let write o = o {Object.bindings = Map.union (fmap Binding.toRecipients (Map.filter (not . Set.null) drawn)) (Object.bindings o)}
           State.modify' (\g -> g {GameState.objects = Map.adjust write copyId (GameState.objects g)})
 
@@ -5814,8 +5823,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     decided <-
       fmap Maybe.catMaybes . Monad.forM surveillers $ \pid ->
         case evaluateForRecipient viewOf context gs resolving source pid quantity of
-          -- CR 701.25c: surveil 0 is not a surveil at all.
-          Just n | n > 0 -> fmap Just (decideSurveil n pid)
+          -- CR 701.25c: surveil 0 is not a surveil at all, so nothing widens
+          -- it. CR 701.25b's extra cards join the ones looked at, read off the
+          -- board the surveil begins on.
+          Just n | n > 0 -> fmap Just (decideSurveil (n + toInteger (PlayerEffect.surveilExtra pid gs)) pid)
           _ -> pure Nothing
     Monad.mapM_ applySurveil decided
     -- CR 701.25d, scry's placement and for its rule.
