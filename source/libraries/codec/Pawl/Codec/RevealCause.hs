@@ -11,10 +11,12 @@ codec =
   Arm.tagged
     tagOf
     [ Arm.nullary "Ordinary" RevealCause.Ordinary,
-      Arm.payload "ForMiracle" (Cost.codec Keyword.codec) RevealCause.ForMiracle (\x -> case x of RevealCause.ForMiracle y -> Just y; _ -> Nothing)
+      Arm.payload "ForMiracle" (Cost.codec Keyword.codec) RevealCause.ForMiracle (\x -> case x of RevealCause.ForMiracle y -> Just y; _ -> Nothing),
+      Arm.nullary "LeavingFaceDown" RevealCause.LeavingFaceDown
     ]
 
 tagOf :: RevealCause.RevealCause -> String
 tagOf x = case x of
   RevealCause.Ordinary {} -> "Ordinary"
   RevealCause.ForMiracle {} -> "ForMiracle"
+  RevealCause.LeavingFaceDown {} -> "LeavingFaceDown"
