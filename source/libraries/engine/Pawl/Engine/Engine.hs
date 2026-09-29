@@ -51,7 +51,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Rad as Rad
 import qualified Pawl.Engine.Replacement as Replacement
-import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Resolve.Slots as Resolve
 import qualified Pawl.Engine.Ring as Ring
