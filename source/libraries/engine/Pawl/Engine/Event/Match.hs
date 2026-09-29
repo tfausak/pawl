@@ -3693,11 +3693,10 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- count read, on the very same grouped event -- which is what makes rule
   -- 509.3e's "when blockers are declared" the moment this fires.
   --
-  -- Not implemented: rule 509.3e's "effects that add or remove blockers" also
-  -- cause it to trigger, and the count here is the declaration's (#4384). The
-  -- pool's one effect that makes an already-blocking creature block (General
-  -- Jarkeld) is not that producer: it moves a blocker between two attackers, so
-  -- the number of creatures each blocker blocks is unchanged.
+  -- Rule 509.3e's "effects that add or remove blockers" reach it through the
+  -- same event: Combat.exchangeBlocks (Sorrow's Path) records it for a creature
+  -- made to block anew, and Pawl.CombatCostSpec's ExchangeBlocks group is the
+  -- proof.
   TriggerCondition.SelfBlocksAtLeast n -> case event of
     GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker count) -> blocker == bearer && count >= n
     GameEvent.BecameBlocking {} -> False
@@ -3792,7 +3791,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- entries are the ones whose blocker set holds it. Exact at this moment for
   -- SelfAttacksWithAnother's reason: CR 509.2a puts these triggers on the stack
   -- before any player gets priority, so the record still holds the declaration
-  -- that made the event.
+  -- or the effect (Combat.exchangeBlocks) that made the event.
   --
   -- viewWithLastKnown, and the Filter context framed by the bearer, exactly as
   -- SelfBecomesBlockedBy's arm below does it.

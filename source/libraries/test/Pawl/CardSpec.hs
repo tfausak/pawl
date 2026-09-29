@@ -304,6 +304,7 @@ import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -1311,6 +1312,7 @@ ownCounts effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
   Effect.PutCountersFrom {} -> []
@@ -1755,6 +1757,7 @@ effectNestedEffects effect = case effect of
   Effect.RemoveFromCombat {} -> []
   Effect.BecomesBlocked {} -> []
   Effect.SwitchBlockers {} -> []
+  Effect.ExchangeBlocks {} -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.PutCountersFrom {} -> []
@@ -2271,6 +2274,7 @@ effectReplacements effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.PutCountersFrom {} -> []
@@ -2754,6 +2758,7 @@ effectMintedFaces effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.PutCountersFrom {} -> []
@@ -4966,6 +4971,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   -- Keyword carrying a Filter (see #2728), and the multiplier beside them, which
   -- is a Quantity and so reaches Filters the way withCountersFilters' do.
   EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f kind each) -> unframed [f] <> concatMap counterKindFilters (Maybe.maybeToList kind) <> quantityFilters each
+  EntryRewrite.SacrificeToEnter (SacrificeToEnter.MkSacrificeToEnter _ f) -> unframed [f]
   EntryRewrite.Amplify _ -> []
   -- CR 614.1c's as-enters effects hold no Filter of their own; the ones inside
   -- them are reached as ordinary effect filters, through cardResolutionEffects.
@@ -5783,6 +5789,7 @@ effectFilters effect = case effect of
   Effect.RemoveFromCombat ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
   Effect.Counter (Counter.MkCounter ref _ _) -> frame SourceHostFramed (objectRefFilters ref)
