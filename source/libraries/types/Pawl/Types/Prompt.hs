@@ -76,9 +76,10 @@ data Prompt r where
   -- | CR 104.3a. No Decider: CR 723.6 needs the ask to reach the true player.
   Concede :: PlayerId.PlayerId -> Prompt Concession.Concession
   Shuffle :: [ObjectId.ObjectId] -> Prompt [ObjectId.ObjectId]
-  -- | CR 729.2: a subgame's starting player, drawn from its turn order, which
-  -- is then rotated to begin with them (CR 103.1). No Decider: randomness is
-  -- not a choice.
+  -- | CR 729.2 \/ 103.1c: a starting player drawn at random from these
+  -- players -- a subgame's seats, or the players claiming to be the starting
+  -- player -- and the turn order is then rotated to begin with them. No
+  -- Decider: randomness is not a choice.
   RandomFirstPlayer :: NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | Which object randomness named (Pawl.Types.ObjectRef.RandomCardInHand,
   -- Pawl.Types.ObjectRef.RandomCardInGraveyard,
