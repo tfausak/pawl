@@ -77,6 +77,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.RequireAttack as RequireAttack
 import qualified Pawl.Types.RequireBlock as RequireBlock
@@ -100,9 +101,11 @@ import qualified Pawl.Types.Vote as Vote
 -- The ONLY module that may case on a constructor is Pawl.Engine.Resolve; the
 -- rules core asks classifications, never identities.
 --
--- The one iteration in it is ForEach's, and it is not a loop in that sense: CR
--- 608.2f's per-object processing runs a body over a set SWEPT ONCE before the
--- first pass, so the count is data an analysis can read off the instruction.
+-- ForEach and ForEachNumber iterate over a set or a number fixed before the
+-- first pass (CR 608.2f), so their count is data an analysis can read off the
+-- instruction. Repeat and RepeatIf are the loops whose count is not: each run
+-- ends in a question -- a player's choice (CR 608.2d) or a printed condition (CR
+-- 608.2c) -- and the body stays first-order either way.
 --
 -- The `card` parameter lets an opcode embed a card's characteristics WITHOUT a
 -- module cycle: Card embeds [Effect Card], and ties the knot by instantiating
@@ -835,6 +838,11 @@ data Effect card ability
     -- run it again, until they decline -- Kindle the Carnage's "you may repeat
     -- this process any number of times".
     Repeat (Seq.Seq (Effect card ability))
+  | -- | CR 608.2c: run the process, then run it again for as long as the
+    -- payload's condition holds after a run -- Grist, the Hunger Tide's "if an
+    -- Insect card was milled this way, put a loyalty counter on Grist and repeat
+    -- this process".
+    RepeatIf (RepeatIf.RepeatIf (Effect card ability))
   | -- | CR 701.69a: remove all marked damage from the permanents the ObjectRef
     -- names.
     Heal ObjectRef.ObjectRef

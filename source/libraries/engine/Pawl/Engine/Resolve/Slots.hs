@@ -172,6 +172,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -838,6 +839,7 @@ effectObjectRefs effect = case effect of
   Effect.ForEach (ForEach.MkForEach ref _ _ _ _ _) -> [ref]
   Effect.ForEachNumber {} -> []
   Effect.Repeat {} -> []
+  Effect.RepeatIf {} -> []
   Effect.Heal ref -> [ref]
   Effect.ChooseNewTargets ref -> [ref]
 
@@ -1035,6 +1037,7 @@ effectPlayerRefs effect = case effect of
   Effect.ForEach {} -> []
   Effect.ForEachNumber {} -> []
   Effect.Repeat {} -> []
+  Effect.RepeatIf {} -> []
   Effect.Heal {} -> []
   Effect.ChooseNewTargets {} -> []
 
@@ -1424,6 +1427,9 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ gate) -> joinSlots (maybe Map.empty payGateSlots gate : fmap slotsOf (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> joinTwo (quantitySlots upTo) (joinSlots (fmap slotsOf (Foldable.toList body)))
   Effect.Repeat body -> joinSlots (fmap slotsOf (Foldable.toList body))
+  -- What the process and the "if" read, and the condition itself: a read of
+  -- what the process bound, which boundSlots below defines.
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> joinSlots (conditionSlots condition : fmap slotsOf (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Map.empty
   Effect.ChooseNewTargets _ -> Map.empty
 
@@ -2031,6 +2037,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ gate) -> all slotsAreExhaustive body && all (all Quantity.slotsAreExhaustive . PayGate.perEach) gate
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.slotsAreExhaustive upTo && all slotsAreExhaustive body
   Effect.Repeat body -> all slotsAreExhaustive body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> conditionSlotsAreExhaustive condition && all slotsAreExhaustive (process <> ifHolds)
   Effect.Heal _ -> True
   Effect.ChooseNewTargets _ -> True
 
@@ -2063,6 +2070,13 @@ conditionSlotsAreExhaustive condition = case condition of
     Quantity.slotsAreExhaustive (Compares.measured c) && Quantity.slotsAreExhaustive (Compares.threshold c)
   Condition.Type.Any conditions -> all conditionSlotsAreExhaustive conditions
   Condition.Type.All conditions -> all conditionSlotsAreExhaustive conditions
+
+-- conditionSlots' mirror for X: does either side of any comparison read it?
+conditionReadsX :: Condition.Type.Condition -> Bool
+conditionReadsX condition = case condition of
+  Condition.Type.Compares c -> Quantity.readsX (Compares.measured c) || Quantity.readsX (Compares.threshold c)
+  Condition.Type.Any conditions -> any conditionReadsX conditions
+  Condition.Type.All conditions -> any conditionReadsX conditions
 
 -- Does any of these effects read X? A card that reads X must declare it in its
 -- cost (CR 107.3, CR 107.3a, CR 118.4), the same reads-equal-declares contract
@@ -2257,6 +2271,7 @@ readsX =
         Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> readsX (Foldable.toList body)
         Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.readsX upTo || readsX (Foldable.toList body)
         Effect.Repeat body -> readsX (Foldable.toList body)
+        Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> conditionReadsX condition || readsX (Foldable.toList (process <> ifHolds))
         Effect.Heal _ -> False
         Effect.ChooseNewTargets _ -> False
    in any effectReadsX
@@ -2495,6 +2510,7 @@ boundSlots effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ slot body _ _) -> Set.insert slot (foldMap boundSlots body)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ slot body) -> Set.insert slot (foldMap boundSlots body)
   Effect.Repeat body -> foldMap boundSlots body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> foldMap boundSlots (process <> ifHolds)
   Effect.Heal _ -> Set.empty
   Effect.ChooseNewTargets _ -> Set.empty
 
@@ -2639,8 +2655,8 @@ battlefieldMatching legal resolving controller source gs filter_ =
       viewOf = Projection.viewsOf gs
       -- CR 603.2's player slots baked in, exactly as Pawl.Engine.Target.bakeSlots
       -- does it for a MODE's target filter and off the same map: Filter.matches
-      -- answers Filter.ControlledByBound False wherever it reaches one, so an
-      -- unbaked "that player controls" sweeps nobody rather than sweeping wrong.
+      -- answers Filter.ControlledByBound False wherever the Context binds its
+      -- slot to no one player, so an unbaked "that player controls" sweeps nobody rather than sweeping wrong.
       -- Total War's "destroy all untapped non-Wall creatures that player
       -- controls" is the phrase, and Pawl.CardTriggerSpec's Total War group is
       -- what proves it.

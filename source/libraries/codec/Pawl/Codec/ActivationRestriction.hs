@@ -23,6 +23,7 @@ codec =
       Arm.nullary "AttackedThisStep" ActivationRestriction.AttackedThisStep,
       Arm.nullary "AfterBlockersDeclared" ActivationRestriction.AfterBlockersDeclared,
       Arm.nullary "BeforeCombatDamage" ActivationRestriction.BeforeCombatDamage,
+      Arm.nullary "BeforeEndStep" ActivationRestriction.BeforeEndStep,
       Arm.payload "OnlyIf" Condition.codec ActivationRestriction.OnlyIf (\x -> case x of ActivationRestriction.OnlyIf y -> Just y; _ -> Nothing),
       Arm.nullary "OnlyOnce" ActivationRestriction.OnlyOnce,
       Arm.nullary "OnlyOnceEachTurn" ActivationRestriction.OnlyOnceEachTurn,
@@ -38,6 +39,7 @@ tagOf x = case x of
   ActivationRestriction.AttackedThisStep {} -> "AttackedThisStep"
   ActivationRestriction.AfterBlockersDeclared {} -> "AfterBlockersDeclared"
   ActivationRestriction.BeforeCombatDamage {} -> "BeforeCombatDamage"
+  ActivationRestriction.BeforeEndStep {} -> "BeforeEndStep"
   ActivationRestriction.OnlyIf {} -> "OnlyIf"
   ActivationRestriction.OnlyOnce {} -> "OnlyOnce"
   ActivationRestriction.OnlyOnceEachTurn {} -> "OnlyOnceEachTurn"

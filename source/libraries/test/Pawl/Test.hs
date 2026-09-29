@@ -447,6 +447,7 @@ import qualified Pawl.Codec.ReduceSpellCostSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReinforceSpec
 import qualified Pawl.Codec.RemoveCountersSpec
+import qualified Pawl.Codec.RepeatIfSpec
 import qualified Pawl.Codec.ReplaceSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
@@ -1025,6 +1026,7 @@ spec s registry = do
   Pawl.Codec.FloatingCandidateSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.ForEachNumberSpec.spec s
+  Pawl.Codec.RepeatIfSpec.spec s
   Pawl.Codec.ForetellCostSpec.spec s
   Pawl.Codec.ForbidAttackSpec.spec s
   Pawl.Codec.ForbidActivationSpec.spec s

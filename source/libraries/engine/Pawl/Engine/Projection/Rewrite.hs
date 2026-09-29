@@ -178,6 +178,7 @@ import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -987,6 +988,8 @@ rewriteEffect pairs effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot body) ->
     Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
   Effect.Repeat body -> Effect.Repeat (fmap (rewriteEffect pairs) body)
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) ->
+    Effect.RepeatIf (RepeatIf.MkRepeatIf (fmap (rewriteEffect pairs) process) (rewriteCondition pairs condition) (fmap (rewriteEffect pairs) ifHolds))
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
   Effect.ChooseNewTargets ref -> Effect.ChooseNewTargets (rewriteObjectRef pairs ref)
 
@@ -1945,6 +1948,7 @@ rewriteRestriction pairs restriction = case restriction of
   ActivationRestriction.AttackedThisStep -> restriction
   ActivationRestriction.AfterBlockersDeclared -> restriction
   ActivationRestriction.BeforeCombatDamage -> restriction
+  ActivationRestriction.BeforeEndStep -> restriction
   ActivationRestriction.OnlyOnce -> restriction
   ActivationRestriction.OnlyOnceEachTurn -> restriction
   ActivationRestriction.DuringDieRoll -> restriction

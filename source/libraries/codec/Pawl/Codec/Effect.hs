@@ -88,6 +88,7 @@ import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.RedirectDamage as RedirectDamage
 import qualified Pawl.Codec.RemoveCounters as RemoveCounters
 import qualified Pawl.Codec.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Codec.RepeatIf as RepeatIf
 import qualified Pawl.Codec.Replace as Replace
 import qualified Pawl.Codec.RequireAttack as RequireAttack
 import qualified Pawl.Codec.RequireBlock as RequireBlock
@@ -120,6 +121,7 @@ codec cardCodec abilityCodec =
       preventAllCodec = PreventAllDamage.codec (codec cardCodec abilityCodec)
       forEachCodec = ForEach.codec (codec cardCodec abilityCodec)
       forEachNumberCodec = ForEachNumber.codec (codec cardCodec abilityCodec)
+      repeatIfCodec = RepeatIf.codec (codec cardCodec abilityCodec)
    in Arm.tagged
         tagOf
         [ Arm.payload "DealDamage" DealDamage.codec Effect.DealDamage (\x -> case x of Effect.DealDamage y -> Just y; _ -> Nothing),
@@ -278,6 +280,7 @@ codec cardCodec abilityCodec =
           Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing),
           Arm.payload "ForEachNumber" forEachNumberCodec Effect.ForEachNumber (\x -> case x of Effect.ForEachNumber y -> Just y; _ -> Nothing),
           Arm.payload "Repeat" (Common.seq (codec cardCodec abilityCodec)) Effect.Repeat (\x -> case x of Effect.Repeat y -> Just y; _ -> Nothing),
+          Arm.payload "RepeatIf" repeatIfCodec Effect.RepeatIf (\x -> case x of Effect.RepeatIf y -> Just y; _ -> Nothing),
           Arm.payload "Heal" ObjectRef.codec Effect.Heal (\x -> case x of Effect.Heal y -> Just y; _ -> Nothing),
           Arm.payload "ChooseNewTargets" ObjectRef.codec Effect.ChooseNewTargets (\x -> case x of Effect.ChooseNewTargets y -> Just y; _ -> Nothing)
         ]
@@ -440,5 +443,6 @@ tagOf x = case x of
   Effect.ForEach {} -> "ForEach"
   Effect.ForEachNumber {} -> "ForEachNumber"
   Effect.Repeat {} -> "Repeat"
+  Effect.RepeatIf {} -> "RepeatIf"
   Effect.Heal {} -> "Heal"
   Effect.ChooseNewTargets {} -> "ChooseNewTargets"

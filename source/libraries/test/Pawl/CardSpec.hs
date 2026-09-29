@@ -289,6 +289,7 @@ import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -800,6 +801,7 @@ restrictionConditions restriction = case restriction of
   ActivationRestriction.AttackedThisStep -> []
   ActivationRestriction.AfterBlockersDeclared -> []
   ActivationRestriction.BeforeCombatDamage -> []
+  ActivationRestriction.BeforeEndStep -> []
   ActivationRestriction.OnlyIf condition -> [condition]
   ActivationRestriction.OnlyOnce -> []
   ActivationRestriction.OnlyOnceEachTurn -> []
@@ -1400,6 +1402,7 @@ ownCounts effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectCounts body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> quantityCounts upTo <> concatMap effectCounts body
   Effect.Repeat body -> concatMap effectCounts body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> conditionCounts condition <> concatMap effectCounts (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
 
@@ -1667,6 +1670,7 @@ effectNestedEffects effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Foldable.toList body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Foldable.toList body
   Effect.Repeat body -> Foldable.toList body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Foldable.toList (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
   Effect.Create {} -> []
@@ -2255,6 +2259,7 @@ effectReplacements effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectReplacements body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectReplacements body
   Effect.Repeat body -> concatMap effectReplacements body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> concatMap effectReplacements (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
   Effect.RedirectDamage {} -> []
@@ -2735,6 +2740,7 @@ effectMintedFaces effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectMintedFaces body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectMintedFaces body
   Effect.Repeat body -> concatMap effectMintedFaces body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> concatMap effectMintedFaces (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
   Effect.RedirectDamage {} -> []
@@ -5924,6 +5930,7 @@ effectFilters effect = case effect of
   Effect.ForEach (ForEach.MkForEach ref _ _ body _ gate) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body <> concatMap payGateFilters (Maybe.maybeToList gate)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectFilters body
   Effect.Repeat body -> concatMap effectFilters body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> frame Unframed (conditionFilters condition) <> concatMap effectFilters (process <> ifHolds)
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ChooseNewTargets ref -> frame SourceHostFramed (objectRefFilters ref)
 

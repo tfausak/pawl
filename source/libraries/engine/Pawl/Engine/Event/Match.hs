@@ -5863,11 +5863,12 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- narrows none of them spells itself out as AnyPlayer over the trivial Filter
   -- with ManaSpecification.AnyMana.
   --
-  -- The TAPPING player is the tapped permanent's controller: CR 602.2's default
-  -- gives an activated ability to its object's controller, and
-  -- Pawl.Engine.Cost.tapForManaWith has no other activator to offer, reading
-  -- Projection.controllerOf and never CR 602.1b's Activator (#3087). A printing
-  -- that let anyone tap it for mana would make the two come apart.
+  -- The TAPPING player is read as the tapped permanent's controller, CR 602.2's
+  -- default activator. CR 602.1b lets another player activate a route printing
+  -- "any player may activate this ability", but the one such mana ability
+  -- (Mana Cache; MTGJSON AllPrintings, 2026-09-29, "Add ... Any player may
+  -- activate this ability") has no {T} in its cost, so it records no
+  -- TappedForMana. A land anyone could tap for mana would refute this.
   --
   -- LIVE, the arm above's reason and not the PermanentSacrificed arm's: nothing
   -- has moved, and Pawl.Engine.Cost.applyManaTriggers records this event with
