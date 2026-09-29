@@ -19,14 +19,14 @@ spec s = Spec.describe s "Pawl.Codec.SacrificeEffect" $ do
     Common.assertCodec
       s
       SacrificeEffect.codec
-      SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")), SacrificeEffect.sacrificer = Sacrificer.EffectController}
+      SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")), SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
   -- CR 701.54c's form, which is what makes the field more than a constant.
   Spec.it s "the permanent's controller is written" $
     Common.assertCodec
       s
       SacrificeEffect.codec
-      SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "thatBlocker")), SacrificeEffect.sacrificer = Sacrificer.PermanentController}
+      SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "thatBlocker")), SacrificeEffect.sacrificer = Sacrificer.PermanentController, SacrificeEffect.sacrificed = Nothing}
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"thatBlocker\"},\"sacrificer\":{\"type\":\"PermanentController\"}} "
   -- Golgothian Sylex's form: the sweep a bare SlotName could not express, with
   -- the other sacrificer beside it.
@@ -34,6 +34,13 @@ spec s = Spec.describe s "Pawl.Codec.SacrificeEffect" $ do
     Common.assertCodec
       s
       SacrificeEffect.codec
-      SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.EachMatching (Filter.Not Filter.IsToken), SacrificeEffect.sacrificer = Sacrificer.PermanentController}
+      SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.EachMatching (Filter.Not Filter.IsToken), SacrificeEffect.sacrificer = Sacrificer.PermanentController, SacrificeEffect.sacrificed = Nothing}
       " {\"ref\":{\"type\":\"EachMatching\",\"value\":{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}},\"sacrificer\":{\"type\":\"PermanentController\"}} "
+  -- God-Eternal Bontu's form: a chosen set, and the count of what went.
+  Spec.it s "the sacrificed count's slot is written" $
+    Common.assertCodec
+      s
+      SacrificeEffect.codec
+      SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")), SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Just (SlotName.MkSlotName (Text.pack "sacrificed"))}
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"},\"sacrificed\":\"sacrificed\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s SacrificeEffect.codec
