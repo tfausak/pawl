@@ -17,7 +17,7 @@ import qualified Pawl.Codec.ProliferateR as ProliferateR
 import qualified Pawl.Codec.ScryR as ScryR
 import qualified Pawl.Codec.TokenR as TokenR
 import qualified Pawl.Codec.TurnUpR as TurnUpR
-import qualified Pawl.Codec.UntapRewrite as UntapRewrite
+import qualified Pawl.Codec.UntapR as UntapR
 import qualified Pawl.Codec.ZoneChangeR as ZoneChangeR
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -46,7 +46,7 @@ codec cardCodec abilityCodec effectCodec =
       Arm.payload "CounterR" CounterR.codec ReplacementEffect.CounterR (\x -> case x of ReplacementEffect.CounterR y -> Just y; _ -> Nothing),
       Arm.payload "TokenR" (TokenR.codec cardCodec) ReplacementEffect.TokenR (\x -> case x of ReplacementEffect.TokenR y -> Just y; _ -> Nothing),
       Arm.payload "TurnUpR" TurnUpR.codec ReplacementEffect.TurnUpR (\x -> case x of ReplacementEffect.TurnUpR y -> Just y; _ -> Nothing),
-      Arm.payload "UntapR" UntapRewrite.codec ReplacementEffect.UntapR (\x -> case x of ReplacementEffect.UntapR y -> Just y; _ -> Nothing),
+      Arm.payload "UntapR" UntapR.codec ReplacementEffect.UntapR (\x -> case x of ReplacementEffect.UntapR y -> Just y; _ -> Nothing),
       Arm.payload "LifeLossR" LifeLossR.codec ReplacementEffect.LifeLossR (\x -> case x of ReplacementEffect.LifeLossR y -> Just y; _ -> Nothing),
       Arm.payload "LifeGainR" LifeGainR.codec ReplacementEffect.LifeGainR (\x -> case x of ReplacementEffect.LifeGainR y -> Just y; _ -> Nothing),
       Arm.payload "DrawR" DrawR.codec ReplacementEffect.DrawR (\x -> case x of ReplacementEffect.DrawR y -> Just y; _ -> Nothing),
