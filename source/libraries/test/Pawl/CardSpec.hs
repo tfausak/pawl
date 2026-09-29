@@ -3493,6 +3493,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Delve -> []

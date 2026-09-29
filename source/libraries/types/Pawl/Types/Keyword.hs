@@ -262,6 +262,10 @@ data Keyword
     -- the value of X -- which the archived spell carries none of, so an epic card
     -- that announces one cannot be transcribed (Eternal Dominion, #3708).
     Epic
+  | -- | 702.192a: a free cast of a copy each precombat main phase after the
+    -- first resolution of this name, and "exile this spell"
+    -- (Pawl.Engine.Resolve.applyParadigm).
+    Paradigm
   | -- | 702.51a: for each colored mana in this spell's total cost you may tap an
     -- untapped creature of that color you control rather than pay that mana, and
     -- for each generic mana an untapped creature you control. CR 702.51b puts it

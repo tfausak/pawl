@@ -1571,6 +1571,12 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Epic
       " {\"type\":\"Epic\"} "
+  Spec.it s "Paradigm" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Paradigm
+      " {\"type\":\"Paradigm\"} "
   Spec.it s "Cipher" $
     Common.assertCodec
       s
