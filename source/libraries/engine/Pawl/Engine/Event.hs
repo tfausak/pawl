@@ -6131,6 +6131,12 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
           case settledSeed of
             Nothing -> pure Seq.empty
             Just entrySeed -> do
+              -- CR 708.9: the owner reveals a face-down permanent "as they move
+              -- it", so here -- after CR 616.1 has settled a move that will
+              -- happen, and before CR 400.7 retires the id `reveal` needs.
+              -- Pawl.FaceDownSpec's Synthetic Unmasking Witness group proves it.
+              Monad.when (fromZone == Zone.Battlefield && dest /= Zone.Battlefield && Facing.isFaceDown (Object.facing obj)) $
+                reveal RevealCause.LeavingFaceDown pid oid
               -- CR 712.13a's rollback point; see the branch after the entry loop.
               unentered <- State.get
               State.modify' $ \g ->
@@ -8414,20 +8420,19 @@ shuffleAttractionDeck pid = do
 -- tally (see #1911) -- so what is shown and what is judged cannot part
 -- company.
 --
--- The `cause` is CR 702.94a's "this way" (see RevealCause): every caller but the
--- draw funnel's miracle window shows a card for a reason no rule asks about
--- again, and passes Ordinary.
+-- The `cause` is what a later rule asks about the reveal (see RevealCause): CR
+-- 702.94a's "this way" from the draw funnel's miracle window, CR 708.9's
+-- departure from changeZoneAttaching, and Ordinary from every other caller.
 --
 -- CR 708.12 does NOT move this read, and that is the rule rather than an
 -- oversight: it governs what a revealing ability READS, not what the log records,
 -- and the read is Pawl.Types.Filter's RepresentedByCard -- Hauntwoods Shrieker's
 -- "if it's a creature card", proved at Pawl.FaceDownSpec's CR 708.12 group.
 --
--- Not implemented: CR 708.9's reveal, which a face-down permanent's owner makes
--- as it leaves the battlefield. Pawl.Types.Object's newIncarnation gets the
--- OUTCOME right -- the status is back to FaceUp -- but no caller reaches this
--- funnel, so nothing can trigger on it, and the snapshot such a reveal would
--- record is unsettled for the same reason nothing reads it (#921).
+-- CR 708.9's departure reveal records the same projection, which is CR 708.2's
+-- face-down one while the permanent is still on the battlefield. Its only
+-- reader, FaceDownPermanentLeavesRevealed, reads the cause and never the
+-- snapshot.
 reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
 reveal cause pid oid = do
   gs <- State.get
@@ -8556,6 +8561,7 @@ controllerTurnScoped cond = case cond of
   -- taking it.
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   TriggerCondition.PermanentTurnedFaceDown _ -> False
+  TriggerCondition.FaceDownPermanentLeavesRevealed -> False
   -- CR 702.112a's ability fires on combat damage to a player, which any player's
   -- turn can carry, and the watcher's turn is not asked about at all.
   TriggerCondition.PermanentBecomesDesignated {} -> False
