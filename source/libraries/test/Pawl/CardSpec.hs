@@ -6921,7 +6921,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             pure (Set.member Binding.variableX (QuantitySlot.slots q))
         -- The same rule's reader in a CR 614.1c row that RUNS effects rather than
         -- placing counters: Neverwinter Hydra's "roll X d6", which
-        -- Pawl.Engine.Resolve.runEntryEffect answers with the announcement.
+        -- Pawl.Engine.Resolve.Effect.runEntryEffect answers with the announcement.
         entryEffectsReadX rows =
           or $ do
             ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects effects)) <- rows
