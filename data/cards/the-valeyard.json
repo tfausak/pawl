@@ -61,10 +61,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "TimeLord"
+            "type": "Noble"
           },
           {
-            "type": "Noble"
+            "type": "TimeLord"
           }
         ],
         "supertypes": [
