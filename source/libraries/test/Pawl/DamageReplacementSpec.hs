@@ -33,6 +33,7 @@ import qualified Pawl.Extra.Int as Int
 import Pawl.LifeReplacementSpec (aimCreatureAndOrder, castDeflection, castDisaster, deflectionCombat, winTheFlipAndOrder)
 import Pawl.PreventionSpec (aimAndChoose, aimCreature, aimPlayer, answersFor, atLife, attackNoBlock, bobAttacks, castAndResolve, chosenSourcesIn, countersOn, onlyCreature, preventAllRows, preventionsRecorded, riderHits, settleDamage, shieldsLeft, theAbility, wasAskedToAllocateDamage, wasAskedToOrderDamage)
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action
@@ -42,6 +43,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -62,6 +64,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -70,6 +73,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -3506,51 +3510,6 @@ blockAllAndOrder wanted p = case p of
 -- nested effect names the slot its own ability targeted.
 killSuitCultistSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 killSuitCultistSpec s registry = Spec.describe s "Kill-Suit Cultist (CR 614.1a)" $ do
-  -- A gameplay-level board (design.md section 4) driven through the priority
-  -- loop: bob's Child of Night attacks, alice's Wall of Stone blocks, and the
-  -- shield alice installed on the Wall meets that combat damage.
-  --
-  -- The Wall is 0/8, so 2 damage would leave it standing -- which is what makes
-  -- the destruction attributable to this rewrite rather than to CR 704.5g. The
-  -- lifelink is the other half of the same board: CR 120.3f gains life for
-  -- damage DEALT, so an implementation that destroyed the Wall and dealt the
-  -- damage too would show bob at 22.
-  --
-  -- Three creatures are in the target pool when the ability is announced, so the
-  -- Cultist's target is a real choice rather than the one option a prompt would
-  -- short-circuit.
-  let cultist = S.aliasRef "cultist"
-      swamp = S.aliasRef "swamp"
-      wall = S.aliasRef "wall"
-      attacker = S.aliasRef "attacker"
-      -- bob is the active player, so the Cultist's CR 508.1d requirement
-      -- ("attacks each combat if able") never comes up and the sacrifice is the
-      -- only thing that removes it.
-      cultistBoard =
-        S.board
-          ( S.battlefield S.alice [S.settled "cultist" "Kill-Suit Cultist", S.settled "swamp" "Swamp", S.settled "wall" "Wall of Stone"]
-              NonEmpty.:| [S.battlefield S.bob [S.settled "attacker" "Child of Night"]]
-          )
-          S.bob
-          S.beginningOfCombat
-      choices =
-        S.noChoices
-          { S.choiceTargets = Just [S.MkObjectTarget wall],
-            S.choiceManaSources = Seq.singleton (Just swamp)
-          }
-      script =
-        S.turn
-          1
-          [ S.on S.beginningOfCombat S.alice (S.activateAction cultist choices),
-            S.on S.declareAttackers S.bob (S.attack [attacker]),
-            S.on S.declareBlockers S.alice (S.block [(wall, attacker)])
-          ]
-  Spec.it s "CR 614.1a whole card: the blocking Wall is destroyed instead of being dealt 2" $ do
-    after <- S.play s registry cultistBoard script S.combatGame
-    Spec.assertEqWith s "the 0/8 Wall is gone, which 2 combat damage could never have done" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Wall of Stone")) S.alice after) 0
-    -- CR 120.3f: lifelink gains life for damage DEALT. The replacement means
-    -- none was, so a destroy-AND-deal implementation shows 22 here.
-    Spec.assertEqWith s "and no damage was dealt: the lifelinker's controller gained nothing" (S.lifeOf S.bob after) (Just 20)
   -- CR 614.3's "used up", at gameplay level rather than as a count of rows: the
   -- shield covers the FIRST event and the second lands whole.
   --
@@ -3697,8 +3656,8 @@ bewitchingLeechcraftSpec s registry = Spec.describe s "Bewitching Leechcraft (CR
       pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
       leechBoard counters =
         S.board
-          ( (S.battlefield S.alice [S.permanent "Island", S.permanent "Island", S.permanent "Island"]) {S.setupHand = Seq.fromList [S.permanent "Bewitching Leechcraft", S.permanent "Dream's Grip"]}
-              NonEmpty.:| [S.battlefield S.bob [(S.settled "piker" "Goblin Piker") {S.objectCounters = counters}]]
+          ( (S.battlefield S.alice [S.permanent "Island", S.permanent "Island", S.permanent "Island"]) {Seat.hand = Seq.fromList [S.permanent "Bewitching Leechcraft", S.permanent "Dream's Grip"]}
+              NonEmpty.:| [S.battlefield S.bob [(S.settled "piker" "Goblin Piker") {Placement.counters = counters}]]
           )
           S.alice
           S.precombatMain
@@ -3708,14 +3667,14 @@ bewitchingLeechcraftSpec s registry = Spec.describe s "Bewitching Leechcraft (CR
           S.alice
           ( S.castAction
               leechcraft
-              S.noChoices
-                { S.choiceTargets = Just [S.MkObjectTarget piker],
-                  S.choiceManaSources = Seq.fromList [Just (island 1), Just (island 2), Nothing]
+              Choices.none
+                { Choices.targets = Just [piker],
+                  Choices.manaSources = Seq.fromList [Just (island 1), Just (island 2), Nothing]
                 }
           )
       -- CR 502.3, bob's: the step Engine.runStep runs for the phase it is in.
       bobsUntapStep gs = S.runPure S.identityAnswer gs {GameState.activePlayer = S.bob, GameState.phase = Phase.Beginning BeginningStep.Untap} Engine.runStep
-      pikerIn gs = case S.namedObjects pikerName gs of
+      pikerIn gs = case Scenario.namedObjects pikerName gs of
         [oid] -> Just oid
         _ -> Nothing
       pikerState gs = case pikerIn gs of
@@ -3742,10 +3701,10 @@ bewitchingLeechcraftSpec s registry = Spec.describe s "Bewitching Leechcraft (CR
             S.alice
             ( S.castAction
                 grip
-                S.noChoices
-                  { S.choiceTargets = Just [S.MkObjectTarget piker],
-                    S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
-                    S.choiceManaSources = Seq.fromList [Just (island 3)]
+                Choices.none
+                  { Choices.targets = Just [piker],
+                    Choices.modes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
+                    Choices.manaSources = Seq.fromList [Just (island 3)]
                   }
             )
     gripped <- S.play s registry (leechBoard (Map.singleton CounterKind.PlusOnePlusOne 2)) (S.turn 1 [enchant, untap]) (Engine.runStep Monad.>> Engine.runStep)

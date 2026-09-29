@@ -43,6 +43,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural.Extra
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
@@ -54,6 +55,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -80,6 +82,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
@@ -109,7 +112,9 @@ import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
@@ -2018,14 +2023,14 @@ halfLifeSpec s registry =
     Spec.it s "CR 601.2f Murderous Betrayal's half is fixed before Mana Confluence's life is paid" $ do
       let mine =
             (S.battlefield S.alice [S.aliased "betrayal" (S.permanent "Murderous Betrayal"), S.settled "swamp" "Swamp", S.settled "confluence" "Mana Confluence"])
-              { S.setupLife = 11
+              { Seat.life = 11
               }
           setup = S.board (mine NonEmpty.:| [S.battlefield S.bob [S.aliased "piker" (S.permanent "Goblin Piker")]]) S.alice S.precombatMain
           choices =
-            S.noChoices
-              { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "piker")],
-                S.choiceManaSources = Seq.fromList [Just (S.aliasRef "swamp"), Just (S.aliasRef "confluence")],
-                S.choiceManaYields = Seq.singleton (Mana.Type.MkMana [plainUnit (ManaType.Colored Color.Black)])
+            Choices.none
+              { Choices.targets = Just [S.aliasRef "piker"],
+                Choices.manaSources = Seq.fromList [Just (S.aliasRef "swamp"), Just (S.aliasRef "confluence")],
+                Choices.manaYields = Seq.singleton (Mana.Type.MkMana [plainUnit (ManaType.Colored Color.Black)])
               }
           script = S.turn 1 [S.on S.precombatMain S.alice (S.activateAction (S.aliasRef "betrayal") choices)]
       after <- S.play s registry setup script S.priorityGame
@@ -2038,11 +2043,11 @@ halfLifeSpec s registry =
       let boardAt life = do
             let mine =
                   (S.battlefield S.alice [S.aliased "betrayal" (S.permanent "Murderous Betrayal"), S.settled "swamp" "Swamp", S.settled "confluence" "Mana Confluence"])
-                    { S.setupLife = life
+                    { Seat.life = life
                     }
             built <- S.buildBoardOrFail s registry (S.board (mine NonEmpty.:| [S.battlefield S.bob [S.permanent "Goblin Piker"]]) S.alice S.precombatMain)
-            betrayal <- maybe (Spec.assertFailure s "no Murderous Betrayal") pure (Map.lookup (S.MkObjectAlias (Text.pack "betrayal")) (S.builtAliases built))
-            pure (betrayal, (S.builtState built) {GameState.priority = Just S.alice})
+            betrayal <- maybe (Spec.assertFailure s "no Murderous Betrayal") pure (Map.lookup (Label.MkLabel (Text.pack "betrayal")) (Staged.objects built))
+            pure (betrayal, (Staged.state built) {GameState.priority = Just S.alice})
       (atOne, one) <- boardAt 1
       (atThree, three) <- boardAt 3
       Spec.assertBool s (not (any (isActivateOf atOne) (Action.legalActions S.alice one))) "CR 118.3: at 1 life, half (1) plus the Confluence's 1 is unpayable, so the activation is not offered"
@@ -2050,12 +2055,12 @@ halfLifeSpec s registry =
     -- Lurking Evil at 7 pays 4 and becomes the 4/4 flier, no longer an
     -- enchantment (CR 205.1a).
     Spec.it s "CR 119.4 Lurking Evil pays half of 7, rounded up, and becomes a 4/4 Phyrexian Horror with flying" $ do
-      let mine = (S.battlefield S.alice [S.aliased "evil" (S.permanent "Lurking Evil")]) {S.setupLife = 7}
+      let mine = (S.battlefield S.alice [S.aliased "evil" (S.permanent "Lurking Evil")]) {Seat.life = 7}
           setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-          script = S.turn 1 [S.on S.precombatMain S.alice (S.activateAction (S.aliasRef "evil") S.noChoices)]
+          script = S.turn 1 [S.on S.precombatMain S.alice (S.activateAction (S.aliasRef "evil") Choices.none)]
       built <- S.buildBoardOrFail s registry setup
       (_, after) <- S.runScriptOrFail s script built S.priorityGame
-      evil <- maybe (Spec.assertFailure s "no Lurking Evil") pure (Map.lookup (S.MkObjectAlias (Text.pack "evil")) (S.builtAliases built))
+      evil <- maybe (Spec.assertFailure s "no Lurking Evil") pure (Map.lookup (Label.MkLabel (Text.pack "evil")) (Staged.objects built))
       Spec.assertEqWith s "CR 107.1a: 7 - 4" (S.lifeOf S.alice after) (Just 3)
       Spec.assertEqWith s "a 4/4" (S.powerToughnessOf evil after) (Just (4, 4))
       Spec.assertEqWith s "CR 205.1a: a creature and not an enchantment" (Projection.cardTypesOf evil after) (Set.singleton CardType.Creature)
@@ -7061,7 +7066,7 @@ benevolentRiverSpiritSpec s registry = Spec.describe s "Benevolent River Spirit"
         answer :: Prompt.Prompt r -> r
         answer = waterbending (ManaCost.MkManaCost [blue, blue]) (take 5 tappable)
         resolved = S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop
-        entered = filter (\oid -> Game.zoneOf oid resolved == Just Zone.Battlefield) (S.namedObjects (CardName.MkCardName (Text.pack "Benevolent River Spirit")) resolved)
+        entered = filter (\oid -> Game.zoneOf oid resolved == Just Zone.Battlefield) (Scenario.namedObjects (CardName.MkCardName (Text.pack "Benevolent River Spirit")) resolved)
     Spec.assertEqWith s "CR 118.8d the Spirit on the battlefield has its printed mana value 2, not the 7 alice paid" (fmap (\oid -> Filter.manaValue (Projection.viewOfObject oid resolved)) entered) [Just 2]
     -- The taps, which the assertion above does not see: a Spirit whose {5} went
     -- unpaid would also have entered with mana value 2.

@@ -46,6 +46,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario.Prompt as Scenario.Prompt
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
@@ -86,7 +87,7 @@ foraged :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ([Text.Tex
 foraged answer gs =
   let recording :: Prompt.Prompt r -> State.State [Text.Text] r
       recording p = do
-        State.modify (<> [S.promptKind p])
+        State.modify (<> [Scenario.Prompt.kindOf p])
         pure (answer p)
       (after, asked) = State.runState (Engine.runGame recording gs (Engine.placePendingTriggers *> Stack.resolveTop)) []
    in (asked, snd after)

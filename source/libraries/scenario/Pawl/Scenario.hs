@@ -1,0 +1,820 @@
+{-# LANGUAGE GADTs #-}
+
+-- Runs a scenario: places its board, answers the engine's prompts from its
+-- timeline, and evaluates its checks. The one boundary through which something
+-- other than the rules core says what happens in a game (#146), and the test
+-- suite's gameplay harness.
+module Pawl.Scenario where
+
+import Control.Applicative ((<|>))
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Bifunctor as Bifunctor
+import qualified Data.Foldable as Foldable
+import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+import Numeric.Natural (Natural)
+import qualified Pawl.Codec.Check as Codec.Check
+import qualified Pawl.Codec.Choices as Codec.Choices
+import qualified Pawl.Codec.Move as Codec.Move
+import qualified Pawl.Codec.Phase as Codec.Phase
+import qualified Pawl.Codec.Reference as Codec.Reference
+import qualified Pawl.Codec.Timed as Codec.Timed
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Projection.View as Projection
+import qualified Pawl.Engine.Script as Script
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario.Prompt as Prompt
+import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Activation as Activation
+import qualified Pawl.Types.Asked as Asked
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Board as Board
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Casting as Casting
+import qualified Pawl.Types.Check as Check
+import qualified Pawl.Types.Choices as Choices
+import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CountIs as CountIs
+import qualified Pawl.Types.DamageIs as DamageIs
+import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.Entry as Entry
+import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Game as Game.Type
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantedAbility as GrantedAbility
+import qualified Pawl.Types.Label as Label
+import qualified Pawl.Types.LifeIs as LifeIs
+import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.Move as Move
+import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Placement as Placement
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt.Type
+import qualified Pawl.Types.Readiness as Readiness
+import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Reference as Reference
+import qualified Pawl.Types.Scenario as Scenario
+import qualified Pawl.Types.ScenarioFailure as Failure
+import qualified Pawl.Types.Seat as Seat
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Staged as Staged
+import qualified Pawl.Types.TappedIs as TappedIs
+import qualified Pawl.Types.Timed as Timed
+import qualified Pawl.Types.When as When
+import qualified Pawl.Types.Zone as Zone
+
+-- | What a run carries between prompts: the entries not yet taken, keyed by
+-- their moment, the board's labels, and the cast or activation whose own
+-- prompts are still being answered.
+data Rehearsal = MkRehearsal
+  { queues :: Map.Map When.When (Seq.Seq Timed.Timed),
+    staged :: Staged.Staged,
+    pending :: Maybe (When.When, Move.Move, Choices.Choices)
+  }
+
+type Run = State.StateT Rehearsal (Either Failure.ScenarioFailure)
+
+-- | Build, run from the board's step, check. The entry point for a scenario
+-- written as data: whole steps (CR 500.1) until the timeline is spent, the game
+-- is over, or the turn passes the last one the timeline names. Its final checks
+-- then run on that state.
+run :: (Monad m) => Registry.Registry m -> Scenario.Scenario -> m (Either Failure.ScenarioFailure GameState.GameState)
+run registry scenario = do
+  staging <- stage registry (Scenario.board scenario)
+  pure $ do
+    board <- staging
+    (final, rehearsal) <- State.runStateT (playOut stepBudget (Staged.state board)) (rehearsalOf (Scenario.timeline scenario) board)
+    settle rehearsal final
+    State.evalStateT (mapM_ (expect Nothing final) (Scenario.final scenario)) rehearsal
+    pure final
+
+-- | How many steps a data scenario may run: a bound, so a scenario whose moment
+-- never comes fails rather than hangs.
+stepBudget :: Natural
+stepBudget = 1000
+
+playOut :: Natural -> GameState.GameState -> Run GameState.GameState
+playOut budget gs = do
+  remaining <- State.gets queues
+  let lastTurn = maybe 0 (When.turn . fst) (Map.lookupMax remaining)
+  if Map.null remaining || Maybe.isJust (GameState.result gs) || budget == 0 || GameState.turnNumber gs > lastTurn
+    then pure gs
+    else do
+      (_, next) <- Engine.runGameAsked answerPrompt gs Engine.runStep
+      playOut (budget - 1) next
+
+-- | Run one explicit engine entry point under a timeline, for a Haskell caller
+-- whose subject is a subsystem rather than a whole game. An entry whose moment
+-- never arrives is a failure, not a silently skipped claim.
+rehearse :: Seq.Seq Timed.Timed -> Staged.Staged -> Game.Type.Game a -> Either Failure.ScenarioFailure (a, GameState.GameState)
+rehearse timeline board game = do
+  ((value, final), rehearsal) <- State.runStateT (Engine.runGameAsked answerPrompt (Staged.state board) game) (rehearsalOf timeline board)
+  settle rehearsal final
+  pure (value, final)
+
+rehearsalOf :: Seq.Seq Timed.Timed -> Staged.Staged -> Rehearsal
+rehearsalOf timeline board =
+  let add queue timed = Map.insertWith (flip (Seq.><)) (Timed.when timed) (Seq.singleton timed) queue
+   in MkRehearsal
+        { queues = Foldable.foldl' add Map.empty timeline,
+          staged = board,
+          pending = Nothing
+        }
+
+-- | What a finished run still owes: choices its last action never used, and
+-- entries whose moment never came, told apart by whether any is a move.
+settle :: Rehearsal -> GameState.GameState -> Either Failure.ScenarioFailure ()
+settle rehearsal final = case pending rehearsal of
+  Just (key, verb, choices)
+    | choices /= Choices.none -> Left (Failure.MkUnusedActionChoices key verb choices)
+  _ ->
+    let remaining = foldMap snd (Map.toAscList (queues rehearsal))
+        turn = GameState.turnNumber final
+        step = GameState.phase final
+     in if Seq.null remaining
+          then Right ()
+          else
+            if any isMove remaining
+              then Left (Failure.MkUnreachedEntries turn step remaining)
+              else Left (Failure.MkUnrunChecks turn step remaining)
+
+-- Board ----------------------------------------------------------------------
+
+-- | Place a board directly, without zone-change events or settlement, so
+-- nothing it places fires anything. The validity it guarantees is
+-- REPRESENTATIONAL only: labels are unique, seats and controllers exist, and
+-- every object sits in exactly the zone its Object records.
+stage :: (Monad m) => Registry.Registry m -> Board.Board -> m (Either Failure.ScenarioFailure Staged.Staged)
+stage registry board =
+  let seated = NonEmpty.zip (Board.seats board) (fmap PlayerId.MkPlayerId (0 NonEmpty.:| [1 ..]))
+      ids = Map.fromList (fmap (Bifunctor.first Seat.name) (NonEmpty.toList seated))
+   in case boardFailure ids board of
+        Just failure -> pure (Left failure)
+        Nothing -> case Map.lookup (Board.active board) ids of
+          Nothing -> pure (Left (Failure.MkUnknownActivePlayer (Board.active board)))
+          Just active -> do
+            let base = Setup.emptyGame (fmap snd seated)
+                lives = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.life seat)) (NonEmpty.toList seated))
+                positioned =
+                  base
+                    { GameState.activePlayer = active,
+                      GameState.phase = Board.phase board,
+                      GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Board.phase board) (Seq.fromList Turn.allPhases)),
+                      GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives}) (GameState.players base)
+                    }
+            placed <- placeSeats registry (NonEmpty.toList seated) (Staged.MkStaged positioned ids Map.empty)
+            pure (fmap designateDefenders placed)
+
+-- | CR 506.2 / CR 507.1: a board past the beginning of combat has its defending
+-- players settled already, so the turn-based action that step would have taken
+-- is taken here. The engine's own answer picks among defenders.
+designateDefenders :: Staged.Staged -> Staged.Staged
+designateDefenders board = case GameState.phase (Staged.state board) of
+  Phase.Combat step
+    | step > CombatStep.BeginningOfCombat ->
+        board {Staged.state = snd (Engine.runGamePure quietAnswer (Staged.state board) Combat.designateDefenders)}
+  _ -> board
+
+quietAnswer :: Prompt.Type.Prompt r -> r
+quietAnswer p = case p of
+  Prompt.Type.ChooseAction {} -> Action.Pass
+  _ -> Script.declining p
+
+boardFailure :: Map.Map Label.Label PlayerId.PlayerId -> Board.Board -> Maybe Failure.ScenarioFailure
+boardFailure ids board =
+  let seats = NonEmpty.toList (Board.seats board)
+      placements = concatMap (\seat -> Foldable.toList (Seat.battlefield seat) <> Foldable.toList (Seat.hand seat)) seats
+      labels = fmap Seat.name seats <> Maybe.mapMaybe Placement.label placements
+      counts = Map.fromListWith (+) (fmap (\label -> (label, 1 :: Natural)) labels)
+      duplicate = fmap fst (List.find ((> 1) . snd) (Map.toAscList counts))
+      unknownController = List.find (\label -> not (Map.member label ids)) (Maybe.mapMaybe Placement.controller placements)
+   in case duplicate of
+        Just label -> Just (Failure.MkDuplicateLabel label)
+        Nothing -> fmap Failure.MkUnknownController unknownController
+
+placeSeats :: (Monad m) => Registry.Registry m -> [(Seat.Seat, PlayerId.PlayerId)] -> Staged.Staged -> m (Either Failure.ScenarioFailure Staged.Staged)
+placeSeats registry seated board = case seated of
+  [] -> pure (Right board)
+  (seat, pid) : rest -> do
+    onBattlefield <- placeAll registry Zone.Battlefield pid (Foldable.toList (Seat.battlefield seat)) board
+    inHand <- case onBattlefield of
+      Left failure -> pure (Left failure)
+      Right next -> placeAll registry Zone.Hand pid (Foldable.toList (Seat.hand seat)) next
+    case inHand of
+      Left failure -> pure (Left failure)
+      Right next -> placeSeats registry rest next
+
+placeAll :: (Monad m) => Registry.Registry m -> Zone.Zone -> PlayerId.PlayerId -> [Placement.Placement] -> Staged.Staged -> m (Either Failure.ScenarioFailure Staged.Staged)
+placeAll registry zone owner placements board = case placements of
+  [] -> pure (Right board)
+  placement : rest -> do
+    found <- Registry.fetchCard registry (Placement.card placement)
+    case found of
+      Nothing -> pure (Left (Failure.MkUnknownCard (Placement.card placement)))
+      Just card -> do
+        let (printingId, interned) = Game.intern (Printing.ofCard card) (Staged.state board)
+            (oid, placed) = Setup.placeCard zone owner printingId interned
+            controller = Maybe.fromMaybe owner (Placement.controller placement >>= \label -> Map.lookup label (Staged.seats board))
+            adjust obj =
+              obj
+                { Object.enteredUnder = if controller == owner then Nothing else Just controller,
+                  Object.tapped = Placement.tapped placement,
+                  Object.damage = Placement.damage placement,
+                  Object.sickness = case Placement.readiness placement of
+                    Readiness.Sick -> Sickness.Sick
+                    Readiness.Ready -> Sickness.Settled controller,
+                  -- Object.counterTimestamps stays empty: CR 613.7c then reads
+                  -- every placed counter as old as its permanent.
+                  Object.counters = Placement.counters placement
+                }
+            next =
+              board
+                { Staged.state = placed {GameState.objects = Map.adjust adjust oid (GameState.objects placed)},
+                  Staged.objects = foldr (\label -> Map.insert label oid) (Staged.objects board) (Placement.label placement)
+                }
+        placeAll registry zone owner rest next
+
+-- Answering -------------------------------------------------------------------
+
+answerPrompt :: Asked.Asked r -> Run r
+answerPrompt asked = do
+  let prompt = Asked.prompt asked
+      gs = Asked.game asked
+      kind = Prompt.kindOf prompt
+  decider <- traverse labelOf (Prompt.deciderOf prompt)
+  -- Hoisted above every arm: a nested game (CR 729.1) is out of scope for every
+  -- prompt alike, a pending action's sub-choices included.
+  if not (null (Asked.enclosing asked))
+    then failWith (Failure.MkNestedGamePrompt (GameState.turnNumber gs) (GameState.phase gs) decider kind)
+    else do
+      waiting <- State.gets pending
+      case waiting of
+        Just (key, verb, choices)
+          | subChoiceFor key prompt decider -> answerActionChoice key verb choices asked
+          -- Any other prompt means the action has finished. A choice it never
+          -- asked for is a scenario error, reported here rather than at the
+          -- next prompt that happens to want an answer.
+          | choices /= Choices.none -> failWith (Failure.MkUnusedActionChoices key verb choices)
+        Just {} -> do
+          State.modify' (\rehearsal -> rehearsal {pending = Nothing})
+          answerTopPrompt decider asked
+        Nothing -> answerTopPrompt decider asked
+
+-- | Whether a prompt is one a cast or activation asks its own decider between
+-- the ChooseAction that began it and its completion (CR 601.2b-h, CR 602.2b).
+subChoiceFor :: When.When -> Prompt.Type.Prompt r -> Maybe Label.Label -> Bool
+subChoiceFor key prompt decider =
+  decider == Just (When.player key) && case prompt of
+    Prompt.Type.ChooseTargets {} -> True
+    Prompt.Type.ChooseModes {} -> True
+    Prompt.Type.ChooseX {} -> True
+    Prompt.Type.ChooseCost {} -> True
+    Prompt.Type.OrderCostComponents {} -> True
+    Prompt.Type.ChooseManaSource {} -> True
+    Prompt.Type.ChooseExtraManaSource {} -> True
+    Prompt.Type.ChooseManaYield {} -> True
+    _ -> False
+
+answerTopPrompt :: Maybe Label.Label -> Asked.Asked r -> Run r
+answerTopPrompt decider asked =
+  let prompt = Asked.prompt asked
+      gs = Asked.game asked
+      kind = Prompt.kindOf prompt
+      unscheduled offers = failWith (Failure.MkUnscheduledPrompt (GameState.turnNumber gs) (GameState.phase gs) decider kind offers)
+   in case prompt of
+        Prompt.Type.ChooseAction who _ actions -> answerActionPrompt gs (Decider.unwrap who) actions
+        -- CR 723.6: keyed on the conceding player, whom no one decides for.
+        Prompt.Type.Concede pid -> do
+          key <- whenOf gs pid
+          found <- takeMove key
+          case found of
+            Just (index, timed)
+              | Timed.entry timed == Entry.Do Move.Concede -> case Timed.source timed of
+                  Just ref -> failWith (Failure.MkUnexpectedQualifier key kind ref)
+                  Nothing -> do
+                    popAt key index
+                    pure Concession.Concedes
+            _ -> pure Concession.Continues
+        Prompt.Type.ChooseDefender who _ candidates -> do
+          key <- whenOf gs (Decider.unwrap who)
+          offers <- fmap (fmap Label.unwrap) (mapM labelOf (NonEmpty.toList candidates))
+          onEntry unscheduled key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            Move.ChooseDefender label -> Just $ do
+              pid <- resolvePlayer label
+              if List.elem pid candidates
+                then pure pid
+                else failWith (Failure.MkActionNotOffered key verb offers)
+            _ -> Nothing
+        Prompt.Type.DeclareAttackers who _ candidates -> do
+          key <- whenOf gs (Decider.unwrap who)
+          offers <- describeAll gs candidates
+          onEntry unscheduled key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            Move.Attack refs -> Just (fmap Foldable.toList (mapM (resolveOffered gs key kind candidates) refs))
+            _ -> Nothing
+        Prompt.Type.ChooseAttackTarget who _ source candidates -> do
+          key <- whenOf gs (Decider.unwrap who)
+          offers <- mapM (describeTarget gs) (NonEmpty.toList candidates)
+          onEntry unscheduled key kind offers (takeForSource gs key source) $ \verb -> case verb of
+            Move.ChooseAttackTarget ref -> Just $ do
+              target <- resolveEither ref gs
+              let matches candidate = case (target, candidate) of
+                    (Left pid, AttackTarget.OfPlayer other) -> pid == other
+                    (Right oid, AttackTarget.OfPlaneswalker other) -> oid == other
+                    (Right oid, AttackTarget.OfBattle other) -> oid == other
+                    _ -> False
+              case List.find matches candidates of
+                Just chosen -> pure chosen
+                Nothing -> failWith (Failure.MkActionNotOffered key verb offers)
+            _ -> Nothing
+        Prompt.Type.DeclareBlockers who _ blockers attackers -> do
+          let candidates = blockers <> attackers
+          key <- whenOf gs (Decider.unwrap who)
+          offers <- describeAll gs candidates
+          onEntry unscheduled key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            Move.Block blocks -> Just (fmap Map.fromList (mapM (resolveBlock gs key kind candidates) (Map.toAscList blocks)))
+            _ -> Nothing
+        -- Passed through unvalidated: CR 510.1c-d's legality is the engine's
+        -- to enforce, and a runner that checked it first would hide that.
+        Prompt.Type.AssignCombatDamage who _ source thresholds _ -> do
+          key <- whenOf gs (Decider.unwrap who)
+          let offered = Map.keysSet thresholds
+          offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
+          onEntry unscheduled key kind offers (takeForSource gs key source) $ \verb -> case verb of
+            Move.AssignDamage assignment -> Just (fmap Map.fromList (mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)))
+            _ -> Nothing
+        _ -> unscheduled []
+
+-- | A priority prompt: first the checks at the head of this moment, in timeline
+-- order, then the first move that takes priority, and a pass when there is
+-- none. An entry for a prompt the engine elided stays queued rather than
+-- blocking the move behind it, and is reported as unreached.
+answerActionPrompt :: GameState.GameState -> PlayerId.PlayerId -> [Action.Action] -> Run Action.Action
+answerActionPrompt gs pid actions = do
+  key <- whenOf gs pid
+  runLeadingChecks key gs
+  entries <- queueAt key
+  let takesPriority timed = case Timed.entry timed of
+        Entry.Do Move.Cast {} -> True
+        Entry.Do Move.PlayLand {} -> True
+        Entry.Do Move.Activate {} -> True
+        Entry.Do Move.Pass -> True
+        _ -> False
+  case List.find (takesPriority . snd) (zip [0 ..] (Foldable.toList entries)) of
+    Nothing -> pure Action.Pass
+    Just (index, timed) -> case (Timed.source timed, Timed.entry timed) of
+      (Just ref, _) -> failWith (Failure.MkUnexpectedQualifier key (Text.pack "ChooseAction") ref)
+      (Nothing, Entry.Do Move.Pass) -> do
+        popAt key index
+        pure Action.Pass
+      (Nothing, Entry.Do verb) -> do
+        offered <- mapM (describeAction gs) actions
+        matching <- actionsMatching gs verb actions
+        chosen <- case matching of
+          [] -> failWith (Failure.MkActionNotOffered key verb offered)
+          [action] -> pure action
+          _ -> failWith (Failure.MkAmbiguousAction key verb offered)
+        popAt key index
+        State.modify' (\rehearsal -> rehearsal {pending = Just (key, verb, choicesOf verb)})
+        pure chosen
+      (Nothing, Entry.Expect _) -> pure Action.Pass
+
+-- | The checks at the head of a moment's queue, evaluated and taken in order,
+-- stopping at the first move.
+runLeadingChecks :: When.When -> GameState.GameState -> Run ()
+runLeadingChecks key gs = do
+  entries <- queueAt key
+  case Seq.lookup 0 entries of
+    Just timed
+      | Entry.Expect check <- Timed.entry timed -> case Timed.source timed of
+          Just ref -> failWith (Failure.MkUnexpectedQualifier key (Text.pack "check") ref)
+          Nothing -> do
+            expect (Just key) gs check
+            popAt key 0
+            runLeadingChecks key gs
+    _ -> pure ()
+
+choicesOf :: Move.Move -> Choices.Choices
+choicesOf verb = case verb of
+  Move.Cast casting -> Casting.choices casting
+  Move.Activate activation -> Activation.choices activation
+  _ -> Choices.none
+
+actionsMatching :: GameState.GameState -> Move.Move -> [Action.Action] -> Run [Action.Action]
+actionsMatching gs verb actions = case verb of
+  Move.Cast casting -> do
+    oid <- resolveObject (Casting.object casting) gs
+    pure (filter (\action -> case action of Action.Cast candidate _ _ -> candidate == oid; _ -> False) actions)
+  Move.PlayLand ref -> do
+    oid <- resolveObject ref gs
+    pure (filter (\action -> case action of Action.Play candidate _ -> candidate == oid; _ -> False) actions)
+  Move.Activate activation -> do
+    oid <- resolveObject (Activation.object activation) gs
+    let selected = fmap (\index -> List.genericDrop index (Projection.abilitiesOf oid gs)) (Activation.ability activation)
+    pure (filter (matchesActivation oid selected) actions)
+  _ -> pure []
+
+matchesActivation :: ObjectId.ObjectId -> Maybe [ActivatedAbility.ActivatedAbility Card.Card (GrantedAbility.GrantedAbility Card.Card)] -> Action.Action -> Bool
+matchesActivation oid selected action = case action of
+  Action.Activate candidate ability -> candidate == oid && maybe True ((== Just ability) . Maybe.listToMaybe) selected
+  _ -> False
+
+answerActionChoice :: When.When -> Move.Move -> Choices.Choices -> Asked.Asked r -> Run r
+answerActionChoice key verb choices asked =
+  let prompt = Asked.prompt asked
+      gs = Asked.game asked
+      kind = Prompt.kindOf prompt
+      unexpected :: Run b
+      unexpected = failWith (Failure.MkUnexpectedActionChoice key verb kind)
+   in case prompt of
+        Prompt.Type.ChooseTargets _ _ _ offered -> case (Choices.targets choices, Map.toList offered) of
+          (Just targets, [(slot, (count, candidates))])
+            | Natural.length targets == count -> do
+                resolved <- mapM (\ref -> resolveRecipient gs ref candidates unexpected) targets
+                let selected = Set.fromList resolved
+                if Natural.length selected == count
+                  then do
+                    updateChoices (\current -> current {Choices.targets = Nothing})
+                    pure (Map.singleton slot selected)
+                  else unexpected
+          _ -> unexpected
+        Prompt.Type.ChooseModes _ _ _ legal selection -> case Choices.modes choices of
+          Just modes
+            | Modal.selectionSatisfiedBy legal selection modes -> do
+                updateChoices (\current -> current {Choices.modes = Nothing})
+                pure modes
+          _ -> unexpected
+        Prompt.Type.ChooseX _ _ _ minimumX maximumX -> case Choices.x choices of
+          Just x
+            | minimumX <= x && x <= maximumX -> do
+                updateChoices (\current -> current {Choices.x = Nothing})
+                pure x
+          _ -> unexpected
+        Prompt.Type.ChooseCost _ _ _ candidates -> case Choices.cost choices of
+          Just wanted -> case filter ((== Just wanted) . Cost.mana) candidates of
+            [cost] -> do
+              updateChoices (\current -> current {Choices.cost = Nothing})
+              pure cost
+            _ -> unexpected
+          Nothing -> unexpected
+        -- A PERMUTATION is the only legal answer, so the order is checked
+        -- against the printed indices rather than trusted: one naming an index
+        -- twice would pay one component twice and skip another.
+        Prompt.Type.OrderCostComponents _ _ _ components -> case Choices.costOrder choices of
+          Just order
+            | List.sort order == fmap fst (zip [0 ..] components) -> do
+                updateChoices (\current -> current {Choices.costOrder = Nothing})
+                pure order
+          _ -> unexpected
+        Prompt.Type.ChooseManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
+        Prompt.Type.ChooseExtraManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
+        Prompt.Type.ChooseManaYield _ _ _ candidates -> case Seq.viewl (Choices.manaYields choices) of
+          Seq.EmptyL -> unexpected
+          -- Recipient-blind: the yield is matched on its units alone.
+          wanted Seq.:< rest -> case filter ((== Mana.Type.unwrap wanted) . Mana.yieldUnits) (NonEmpty.toList candidates) of
+            [option] -> do
+              updateChoices (\current -> current {Choices.manaYields = rest})
+              pure option
+            _ -> unexpected
+        _ -> unexpected
+
+answerManaSource :: GameState.GameState -> When.When -> Move.Move -> Choices.Choices -> Text.Text -> NonEmpty.NonEmpty ObjectId.ObjectId -> Run (Maybe ObjectId.ObjectId)
+answerManaSource gs key verb choices kind candidates = case Seq.viewl (Choices.manaSources choices) of
+  Seq.EmptyL -> failWith (Failure.MkUnexpectedActionChoice key verb kind)
+  wanted Seq.:< rest -> do
+    resolved <- traverse (resolveOffered gs key kind (NonEmpty.toList candidates)) wanted
+    updateChoices (\current -> current {Choices.manaSources = rest})
+    pure resolved
+
+updateChoices :: (Choices.Choices -> Choices.Choices) -> Run ()
+updateChoices f =
+  State.modify' $ \rehearsal ->
+    rehearsal {pending = fmap (\(key, verb, choices) -> (key, verb, f choices)) (pending rehearsal)}
+
+-- | The require-match-pop sequence every non-priority prompt shares: nothing at
+-- this moment is an unscheduled prompt, an entry with another verb an
+-- unexpected one, and the pop happens once, before the arm resolves anything.
+onEntry ::
+  ([Text.Text] -> Run a) ->
+  When.When ->
+  Text.Text ->
+  [Text.Text] ->
+  Run (Maybe (Int, Timed.Timed)) ->
+  (Move.Move -> Maybe (Run a)) ->
+  Run a
+onEntry unscheduled key kind offers select match = do
+  found <- select
+  case found of
+    Nothing -> unscheduled offers
+    Just (index, timed) -> case Timed.entry timed of
+      Entry.Do verb
+        | Just action <- match verb -> do
+            popAt key index
+            action
+      entry -> failWith (Failure.MkUnexpectedPrompt key entry kind offers)
+
+-- Checks -----------------------------------------------------------------------
+
+-- | Fails the run unless the check holds on this state.
+expect :: Maybe When.When -> GameState.GameState -> Check.Check -> Run ()
+expect key gs check = do
+  observed <- observe gs check
+  case observed of
+    Nothing -> pure ()
+    Just actual -> failWith (Failure.MkCheckFailed key check actual)
+
+-- | Nothing when the check holds, else what was there instead.
+observe :: GameState.GameState -> Check.Check -> Run (Maybe Text.Text)
+observe gs check = case check of
+  Check.Life (LifeIs.MkLifeIs label life) -> do
+    pid <- resolvePlayer label
+    let actual = fmap Player.life (Map.lookup pid (GameState.players gs))
+    pure (if actual == Just life then Nothing else Just (Text.pack (maybe "no such player" show actual)))
+  Check.Count (CountIs.MkCountIs label zone card count) -> do
+    pid <- resolvePlayer label
+    let members = case zone of
+          -- CR 110.2: on the battlefield, what a player has is what they
+          -- control, and a permanent's name is its projected one.
+          Zone.Battlefield -> filter (\oid -> Projection.controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs))
+          _ -> Game.zoneMembers zone pid gs
+        namesOf oid = case zone of
+          Zone.Battlefield -> Projection.namesOf oid gs
+          _ -> Game.namesOf oid gs
+        actual = Natural.length (filter (Set.member card . namesOf) members)
+    pure (if actual == count then Nothing else Just (Text.pack (show actual)))
+  Check.Damage (DamageIs.MkDamageIs ref damage) -> do
+    oid <- resolveObject ref gs
+    let actual = fmap Object.damage (Game.lookupObject oid gs)
+    pure (if actual == Just damage then Nothing else Just (Text.pack (maybe "no such object" show actual)))
+  Check.Tapped (TappedIs.MkTappedIs ref tapped) -> do
+    oid <- resolveObject ref gs
+    let actual = fmap Object.tapped (Game.lookupObject oid gs)
+    pure (if actual == Just tapped then Nothing else Just (Text.pack (maybe "no such object" show actual)))
+
+-- Queues -----------------------------------------------------------------------
+
+-- | The key an entry answered by `pid` would carry now. `pid` is the DECIDER.
+whenOf :: GameState.GameState -> PlayerId.PlayerId -> Run When.When
+whenOf gs pid = fmap (When.MkWhen (GameState.turnNumber gs) (GameState.phase gs)) (labelOf pid)
+
+queueAt :: When.When -> Run (Seq.Seq Timed.Timed)
+queueAt key = State.gets (Map.findWithDefault Seq.empty key . queues)
+
+-- | The first move at `key`, skipping checks, which wait for priority.
+takeMove :: When.When -> Run (Maybe (Int, Timed.Timed))
+takeMove key = do
+  entries <- queueAt key
+  pure (List.find (isMove . snd) (zip [0 ..] (Foldable.toList entries)))
+
+isMove :: Timed.Timed -> Bool
+isMove timed = case Timed.entry timed of
+  Entry.Do _ -> True
+  Entry.Expect _ -> False
+
+-- | The first move at `key`, for a prompt with no source of its own, which a
+-- source qualifier could never match.
+takeUnqualified :: When.When -> Text.Text -> Run (Maybe (Int, Timed.Timed))
+takeUnqualified key kind = do
+  found <- takeMove key
+  case found of
+    Just (_, timed)
+      | Just ref <- Timed.source timed -> failWith (Failure.MkUnexpectedQualifier key kind ref)
+    _ -> pure found
+
+-- | The first move at `key` whose source is `source`, else the first with none:
+-- several prompts at one moment arrive in the engine's order, which a scenario
+-- cannot predict, so a qualified entry is found by its source. Every qualifier
+-- at the moment is resolved, so a dangling one fails here rather than sitting
+-- in the queue until the end.
+takeForSource :: GameState.GameState -> When.When -> ObjectId.ObjectId -> Run (Maybe (Int, Timed.Timed))
+takeForSource gs key source = do
+  entries <- queueAt key
+  let moves = filter (isMove . snd) (zip [0 ..] (Foldable.toList entries))
+  qualifiers <- mapM (\(index, timed) -> fmap (\oid -> (index, timed, oid)) (traverse (\ref -> resolveObject ref gs) (Timed.source timed))) moves
+  let qualified = List.find (\(_, _, oid) -> oid == Just source) qualifiers
+      unqualified = List.find (\(_, _, oid) -> Maybe.isNothing oid) qualifiers
+  pure (fmap (\(index, timed, _) -> (index, timed)) (qualified <|> unqualified))
+
+popAt :: When.When -> Int -> Run ()
+popAt key index =
+  State.modify' $ \rehearsal ->
+    let remaining = case Map.lookup key (queues rehearsal) of
+          Nothing -> queues rehearsal
+          Just entries ->
+            let rest = Seq.deleteAt index entries
+             in if Seq.null rest then Map.delete key (queues rehearsal) else Map.insert key rest (queues rehearsal)
+     in rehearsal {queues = remaining}
+
+failWith :: Failure.ScenarioFailure -> Run a
+failWith failure = State.StateT (const (Left failure))
+
+-- References -------------------------------------------------------------------
+
+-- | Every live object whose card answers to `name`, in creation order and in
+-- every zone -- the numbering Reference.Printed counts in. The printed card,
+-- since a reference names a card rather than asking a rules question about it.
+namedObjects :: CardName.CardName -> GameState.GameState -> [ObjectId.ObjectId]
+namedObjects name gs =
+  let wanted = Registry.slugFor name
+      matches oid = case Game.cardOf oid gs of
+        Nothing -> False
+        Just card -> any ((== wanted) . Registry.slugFor . Face.name) (NonEmpty.toList (Card.faces card))
+   in filter matches (Map.keys (GameState.objects gs))
+
+labelOf :: PlayerId.PlayerId -> Run Label.Label
+labelOf pid = do
+  seats <- State.gets (Staged.seats . staged)
+  pure $ case List.find ((== pid) . snd) (Map.toList seats) of
+    Just (label, _) -> label
+    Nothing -> Label.MkLabel (Text.pack ("player " <> show (PlayerId.unwrap pid)))
+
+resolvePlayer :: Label.Label -> Run PlayerId.PlayerId
+resolvePlayer label = do
+  seats <- State.gets (Staged.seats . staged)
+  case Map.lookup label seats of
+    Just pid -> pure pid
+    Nothing -> failWith (Failure.MkNotAPlayer label)
+
+resolveObject :: Reference.Reference -> GameState.GameState -> Run ObjectId.ObjectId
+resolveObject ref gs = case ref of
+  Reference.Labelled label -> do
+    board <- State.gets staged
+    case Map.lookup label (Staged.objects board) of
+      Just oid
+        | Map.member oid (GameState.objects gs) -> pure oid
+        | otherwise -> failWith (Failure.MkUnknownObject ref True)
+      Nothing
+        | Map.member label (Staged.seats board) -> failWith (Failure.MkNotAnObject ref)
+        | otherwise -> failWith (Failure.MkUnknownObject ref False)
+  Reference.Printed name occurrence -> case occurrence of
+    0 -> failWith (Failure.MkUnknownObject ref False)
+    _ -> case List.genericDrop (occurrence - 1) (namedObjects name gs) of
+      oid : _ -> pure oid
+      [] -> failWith (Failure.MkUnknownObject ref False)
+
+-- | A seat (Left) or an object (Right), for a reference that may name either.
+resolveEither :: Reference.Reference -> GameState.GameState -> Run (Either PlayerId.PlayerId ObjectId.ObjectId)
+resolveEither ref gs = do
+  seats <- State.gets (Staged.seats . staged)
+  case ref of
+    Reference.Labelled label
+      | Just pid <- Map.lookup label seats -> pure (Left pid)
+    _ -> fmap Right (resolveObject ref gs)
+
+-- | The one offered recipient a reference names, whatever kind the offer
+-- calls it: a planeswalker is offered as one, a creature as another.
+resolveRecipient :: GameState.GameState -> Reference.Reference -> Set.Set Recipient.Recipient -> Run Recipient.Recipient -> Run Recipient.Recipient
+resolveRecipient gs ref offered unmatched = do
+  target <- resolveEither ref gs
+  let matches recipient = case target of
+        Left pid -> recipient == Recipient.ToPlayer pid
+        Right oid -> Recipient.objectOf recipient == Just oid
+  case filter matches (Set.toList offered) of
+    [recipient] -> pure recipient
+    _ -> unmatched
+
+-- | resolveObject, plus the check that the prompt offered what it found:
+-- otherwise the engine drops the non-candidate after the entry was taken, and
+-- the scenario passes proving nothing.
+resolveOffered :: GameState.GameState -> When.When -> Text.Text -> [ObjectId.ObjectId] -> Reference.Reference -> Run ObjectId.ObjectId
+resolveOffered gs key kind offered ref = do
+  oid <- resolveObject ref gs
+  if List.elem oid offered
+    then pure oid
+    else do
+      offers <- describeAll gs offered
+      failWith (Failure.MkUnofferedObject key kind (Codec.Reference.toText ref) offers)
+
+resolveBlock :: GameState.GameState -> When.When -> Text.Text -> [ObjectId.ObjectId] -> (Reference.Reference, Set.Set Reference.Reference) -> Run (ObjectId.ObjectId, Set.Set ObjectId.ObjectId)
+resolveBlock gs key kind offered (blocker, attackers) = do
+  blockerId <- resolveOffered gs key kind offered blocker
+  attackerIds <- mapM (resolveOffered gs key kind offered) (Set.toAscList attackers)
+  pure (blockerId, Set.fromList attackerIds)
+
+-- | CR 510.1a: a recipient must be one the prompt offered a threshold for.
+resolveDamage :: GameState.GameState -> When.When -> Text.Text -> Set.Set Recipient.Recipient -> (Reference.Reference, Natural) -> Run (Recipient.Recipient, Natural)
+resolveDamage gs key kind offered (ref, amount) = do
+  offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
+  recipient <- resolveRecipient gs ref offered (failWith (Failure.MkUnofferedObject key kind (Codec.Reference.toText ref) offers))
+  pure (recipient, amount)
+
+-- Rendering --------------------------------------------------------------------
+
+-- | How a failure names an object: its label, or its card name and occurrence,
+-- the two ways a scenario could have written it.
+describeObject :: GameState.GameState -> ObjectId.ObjectId -> Run Text.Text
+describeObject gs oid = do
+  labels <- State.gets (Staged.objects . staged)
+  pure $ case List.find ((== oid) . snd) (Map.toAscList labels) of
+    Just (label, _) -> Codec.Reference.toText (Reference.Labelled label)
+    Nothing -> case Game.cardOf oid gs of
+      Nothing -> Text.pack ("object " <> show (ObjectId.unwrap oid))
+      Just card ->
+        let name = Face.name (NonEmpty.head (Card.faces card))
+            occurrence = Natural.length (takeWhile (/= oid) (namedObjects name gs)) + 1
+         in Codec.Reference.toText (Reference.Printed name occurrence)
+
+describeAll :: GameState.GameState -> [ObjectId.ObjectId] -> Run [Text.Text]
+describeAll gs = mapM (describeObject gs)
+
+describeTarget :: GameState.GameState -> AttackTarget.AttackTarget -> Run Text.Text
+describeTarget gs target = case target of
+  AttackTarget.OfPlayer pid -> fmap (Codec.Reference.toText . Reference.Labelled) (labelOf pid)
+  AttackTarget.OfPlaneswalker oid -> describeObject gs oid
+  AttackTarget.OfBattle oid -> describeObject gs oid
+
+describeAction :: GameState.GameState -> Action.Action -> Run Text.Text
+describeAction gs action = case action of
+  Action.Pass -> pure (Text.pack "Pass")
+  Action.Cast oid _ _ -> fmap (Text.pack "Cast " <>) (describeObject gs oid)
+  Action.Play oid _ -> fmap (Text.pack "PlayLand " <>) (describeObject gs oid)
+  Action.Activate oid _ -> fmap (Text.pack "Activate " <>) (describeObject gs oid)
+  _ -> pure (Text.pack (show action))
+
+-- | One line per failure, naming entries in the JSON a scenario writes them in.
+render :: Failure.ScenarioFailure -> Text.Text
+render failure = case failure of
+  Failure.MkDuplicateLabel label -> Label.unwrap label <> Text.pack " labels two things on the board"
+  Failure.MkUnknownActivePlayer label -> Label.unwrap label <> Text.pack " is active but has no seat"
+  Failure.MkUnknownController label -> Label.unwrap label <> Text.pack " controls a placed card but has no seat"
+  Failure.MkUnknownCard name -> Text.pack "no card named " <> CardName.unwrap name
+  Failure.MkUnknownObject ref known ->
+    Codec.Reference.toText ref
+      <> Text.pack " names nothing in the game"
+      <> (if known then Text.pack " (the board did label it, so it has since left)" else Text.empty)
+  Failure.MkNotAnObject ref -> Codec.Reference.toText ref <> Text.pack " names a seat, not an object"
+  Failure.MkNotAPlayer label -> Label.unwrap label <> Text.pack " names no seat"
+  Failure.MkUnofferedObject key kind named offers ->
+    renderWhen key <> Text.pack ": the " <> kind <> Text.pack " prompt did not offer " <> named <> renderOffers offers
+  Failure.MkUnexpectedQualifier key kind ref ->
+    renderWhen key <> Text.pack ": " <> kind <> Text.pack " has no source, so the source " <> Codec.Reference.toText ref <> Text.pack " matches nothing"
+  Failure.MkNestedGamePrompt turn step decider kind ->
+    renderLocation turn step decider <> Text.pack ": " <> kind <> Text.pack " was asked inside a nested game"
+  Failure.MkUnscheduledPrompt turn step decider kind offers ->
+    renderLocation turn step decider <> Text.pack ": nothing is scheduled for the " <> kind <> Text.pack " prompt" <> renderOffers offers
+  Failure.MkUnexpectedPrompt key entry kind offers ->
+    renderWhen key <> Text.pack ": " <> renderEntry entry <> Text.pack " does not answer the " <> kind <> Text.pack " prompt" <> renderOffers offers
+  Failure.MkActionNotOffered key verb offers ->
+    renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " was not offered" <> renderOffers offers
+  Failure.MkAmbiguousAction key verb offers ->
+    renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " matched more than one offer" <> renderOffers offers
+  Failure.MkUnexpectedActionChoice key verb kind ->
+    renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " has no answer for the " <> kind <> Text.pack " prompt"
+  Failure.MkUnusedActionChoices key verb choices ->
+    renderWhen key <> Text.pack ": " <> renderMove verb <> Text.pack " finished without using " <> Common.render (Codec.encode Codec.Choices.codec choices)
+  Failure.MkUnreachedEntries turn step timed ->
+    renderTimeds timed <> Text.pack " never came; the game stopped at " <> renderLocation turn step Nothing
+  Failure.MkUnrunChecks turn step timed ->
+    renderTimeds timed <> Text.pack " never ran; the game stopped at " <> renderLocation turn step Nothing
+  Failure.MkCheckFailed key check observed ->
+    maybe (Text.pack "at the end") renderWhen key
+      <> Text.pack ": "
+      <> Common.render (Codec.encode Codec.Check.codec check)
+      <> Text.pack " failed; it was "
+      <> observed
+
+renderWhen :: When.When -> Text.Text
+renderWhen key = renderLocation (When.turn key) (When.phase key) (Just (When.player key))
+
+renderLocation :: Natural -> Phase.Phase -> Maybe Label.Label -> Text.Text
+renderLocation turn step decider =
+  Text.intercalate (Text.pack ", ") ([Text.pack ("turn " <> show turn), Text.pack (Codec.Phase.flatName step)] <> foldMap (pure . Label.unwrap) decider)
+
+renderMove :: Move.Move -> Text.Text
+renderMove = Common.render . Codec.encode Codec.Move.codec
+
+renderEntry :: Entry.Entry -> Text.Text
+renderEntry entry = case entry of
+  Entry.Do verb -> renderMove verb
+  Entry.Expect check -> Common.render (Codec.encode Codec.Check.codec check)
+
+renderTimeds :: Seq.Seq Timed.Timed -> Text.Text
+renderTimeds = Text.intercalate (Text.pack "; ") . fmap (Common.render . Codec.encode Codec.Timed.codec) . Foldable.toList
+
+renderOffers :: [Text.Text] -> Text.Text
+renderOffers offers =
+  if null offers
+    then Text.empty
+    else Text.pack "; it offered " <> Text.intercalate (Text.pack ", ") offers

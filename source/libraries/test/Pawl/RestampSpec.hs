@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Interpreter as Interpreter
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Asked as Asked
@@ -447,7 +448,7 @@ conjuredOrderSpec s registry =
     Spec.it s "CR 614.12 / 608.2f a card one conjure loop made later enters beside the earlier ones, not after them" $ do
       (together, _, fixture) <- ornateBoard s registry ["Tayam, Luminous Enigma", "Godhead of Awe"] False
       (before, _, _) <- ornateBoard s registry ["Tayam, Luminous Enigma", "Godhead of Awe"] True
-      let vigilanceOnGodhead g = fmap (\oid -> S.counterOf (CounterKind.Keyword Keyword.Vigilance) oid g) (S.namedObjects (CardName.MkCardName (Text.pack "Godhead of Awe")) g)
+      let vigilanceOnGodhead g = fmap (\oid -> S.counterOf (CounterKind.Keyword Keyword.Vigilance) oid g) (Scenario.namedObjects (CardName.MkCardName (Text.pack "Godhead of Awe")) g)
       Spec.assertEqWith s "CR 614.12 the conjured Tayam entered with the Godhead, so the Godhead has no vigilance counter" (vigilanceOnGodhead (fst (ornateImitations fixture Nothing together))) [0]
       Spec.assertEqWith s "while a Tayam already on the battlefield gives it one" (vigilanceOnGodhead (fst (ornateImitations fixture Nothing before))) [1]
 
@@ -534,6 +535,6 @@ mirrorMatchSiblingSpec s registry =
                   oid : _ -> oid
                   [] -> ObjectId.MkObjectId 0
              in snd (fst (State.runState (Engine.runGame answer board (S.cast S.bob spell >> Stack.resolveTop >> Engine.settleForPriority)) ()))
-          pikerTokens g = filter (\oid -> Projection.controllerOf oid g == Just S.bob) (S.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) g)
+          pikerTokens g = filter (\oid -> Projection.controllerOf oid g == Just S.bob) (Scenario.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) g)
           vigilance g = fmap (\oid -> S.counterOf (CounterKind.Keyword Keyword.Vigilance) oid g) (pikerTokens g)
       Spec.assertEqWith s "CR 614.12 in either order, bob's Piker token entered beside his Tayam token and has no vigilance counter" (vigilance (run False), vigilance (run True)) ([0], [0])
