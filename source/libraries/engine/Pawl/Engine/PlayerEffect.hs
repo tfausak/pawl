@@ -3036,6 +3036,9 @@ defaultVotes = 1
 -- Read LIVE through `applying`, like every other question in this module. The
 -- vote itself reads it ONCE, off the board the vote begins on, since nothing
 -- happens between two seats' ballots that could change it.
+--
+-- Not implemented: an OPTIONAL additional vote, Ballot Broker's and The
+-- Valeyard's "you may vote an additional time" (#4409).
 votesAllowed :: PlayerId -> GameState -> Natural
 votesAllowed pid gs =
   let grantOf effect = case effect of
