@@ -81,6 +81,7 @@ import qualified Pawl.Types.Earthbend as Earthbend
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
@@ -1662,6 +1663,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.SwitchBlockers (SlotName.MkSlotName (Text.pack "attackers")))
       " {\"type\":\"SwitchBlockers\",\"value\":\"attackers\"} "
+  Spec.it s "ExchangeBlocks" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeBlocks (ExchangeBlocks.MkExchangeBlocks (SlotName.MkSlotName (Text.pack "first")) (SlotName.MkSlotName (Text.pack "second"))))
+      " {\"type\":\"ExchangeBlocks\",\"value\":{\"first\":\"first\",\"second\":\"second\"}} "
   -- Both shapes in the pool: a pair, and a repeated phase.
   Spec.it s "AddPhases round-trips the pair and a repeated phase" $ do
     Common.assertJsonCodec

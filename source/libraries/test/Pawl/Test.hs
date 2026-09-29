@@ -244,6 +244,7 @@ import qualified Pawl.Codec.EquipSpec
 import qualified Pawl.Codec.EventGroupSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExcessDestinationSpec
+import qualified Pawl.Codec.ExchangeBlocksSpec
 import qualified Pawl.Codec.ExchangeSidesSpec
 import qualified Pawl.Codec.ExchangeValuesSpec
 import qualified Pawl.Codec.ExchangeZonesSpec
@@ -1000,6 +1001,7 @@ spec s registry = do
   Pawl.Codec.EventGroupSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExcessDestinationSpec.spec s
+  Pawl.Codec.ExchangeBlocksSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
   Pawl.Codec.ExchangeValuesSpec.spec s
   Pawl.Codec.ExchangeZonesSpec.spec s

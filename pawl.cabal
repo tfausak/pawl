@@ -531,6 +531,8 @@ library codec
     Pawl.Codec.EventShapeSpec
     Pawl.Codec.ExcessDestination
     Pawl.Codec.ExcessDestinationSpec
+    Pawl.Codec.ExchangeBlocks
+    Pawl.Codec.ExchangeBlocksSpec
     Pawl.Codec.ExchangedValue
     Pawl.Codec.ExchangedValueSpec
     Pawl.Codec.ExchangeSides
@@ -1988,6 +1990,7 @@ library types
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
     Pawl.Types.ExcessDestination
+    Pawl.Types.ExchangeBlocks
     Pawl.Types.ExchangedValue
     Pawl.Types.ExchangeSides
     Pawl.Types.ExchangeValues

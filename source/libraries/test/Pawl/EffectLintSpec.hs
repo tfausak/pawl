@@ -326,6 +326,7 @@ ownQuantities effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> [quantity]
   Effect.PutCountersFrom {} -> []
@@ -1418,6 +1419,7 @@ effectObjectRefs effect =
         Effect.BecomesBlocked {} -> []
         -- The pair comes out of a target slot, not an ObjectRef.
         Effect.SwitchBlockers {} -> []
+        Effect.ExchangeBlocks {} -> []
         Effect.Counter (Counter.MkCounter ref _ _) -> read_ [ref]
         Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
         Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> read_ [ref]
