@@ -2668,7 +2668,10 @@ battlefieldMatching legal resolving controller source gs filter_ =
       matching =
         filter
           (\oid -> Filter.matches context (viewOf oid) baked && Projection.objectInRangeGiven grants controller oid gs)
-          (Set.toList (GameState.battlefield gs))
+          -- CR 614.12: less a batch an entry loop or its as-enters effects hold
+          -- off the battlefield (GameState.enteringBeside) -- Ixidron's sweep
+          -- misses a creature entering beside it.
+          (Set.toList (Set.difference (GameState.battlefield gs) (GameState.enteringBeside gs)))
       order = Game.apnapOrder gs
       last_ = length order
       seat oid = case Projection.controllerOf oid gs of
