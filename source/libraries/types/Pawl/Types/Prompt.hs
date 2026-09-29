@@ -734,14 +734,16 @@ data Prompt r where
   -- printed "you may attach it"; never elided, declining leaving it to CR
   -- 704.5m.
   ChooseTurnUpAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
-  -- | Which of several costs this object\'s controller pays. Asked at two
-  -- moments, both of them "which cost", which is why one constructor serves
-  -- both: CR 601.2b\'s payable alternative and additional costs, after modes and
-  -- before X and targets (CR 118.9b makes an alternative cost optional), and CR
+  -- | Which of several costs this object\'s controller pays. Asked at three
+  -- moments, all of them "which cost", which is why one constructor serves
+  -- all: CR 601.2b\'s payable alternative and additional costs, after modes and
+  -- before X and targets (CR 118.9b makes an alternative cost optional); CR
   -- 702.51b\'s, CR 702.66b\'s, CR 702.126b\'s and CR 701.67a\'s substitutes once the
   -- total cost is locked in and CR 601.2g\'s mana window has closed
-  -- (Pawl.Engine.Cost.announceSubstitutions). The candidates are filtered
-  -- by payability at both, and an answer outside them is rejected.
+  -- (Pawl.Engine.Cost.announceSubstitutions); and CR 702.37e\'s morph cost, for a
+  -- card printing more than one (Pawl.Engine.FaceDown.turnFaceUp). The
+  -- candidates are filtered by payability at each, and an answer outside them
+  -- is rejected.
   ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost Keyword.Keyword] -> Prompt (Cost.Cost Keyword.Keyword)
   -- | CR 601.3 / 305.1: which of the permissions admitting a play of the
   -- ObjectId it is made under (Nothing = none of them); asked only where two

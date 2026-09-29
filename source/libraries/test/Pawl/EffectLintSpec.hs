@@ -720,9 +720,9 @@ isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
   _ -> False
 
--- phasePatternOffends one replacement class over, for the other field the codec
--- accepts and only the engine writes: TurnUpR.requiring, CR 702.37b's "if its
--- megamorph cost was paid to turn it face up". That is a RULE's condition, minted
+-- phasePatternOffends one replacement class over, for the other fields the codec
+-- accepts and only the engine writes: TurnUpR.requiring and TurnUpR.paying, CR
+-- 702.37b's "if its megamorph cost was paid to turn it face up". That is a RULE's condition, minted
 -- by Pawl.Engine.Keyword.mintedReplacementsFor; a card's own CR 614.1e clause
 -- states no procedure and applies down every road (Bubble Smuggler); see #987.
 --
@@ -730,7 +730,7 @@ isPhaseR replacement = case replacement of
 -- engine-baked field on this class must break this build rather than pass.
 turnUpRequiringOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 turnUpRequiringOffends replacement = case replacement of
-  ReplacementEffect.TurnUpR turnUpR -> Maybe.isJust (TurnUpR.requiring turnUpR)
+  ReplacementEffect.TurnUpR turnUpR -> Maybe.isJust (TurnUpR.requiring turnUpR) || Maybe.isJust (TurnUpR.paying turnUpR)
   ReplacementEffect.CounterR {} -> False
   ReplacementEffect.ZoneChangeR {} -> False
   ReplacementEffect.EntryR {} -> False
