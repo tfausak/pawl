@@ -1010,6 +1010,8 @@ library codec
     Pawl.Codec.SacrificeRestrictionSpec
     Pawl.Codec.SacrificerSpec
     Pawl.Codec.SacrificeSpec
+    Pawl.Codec.SacrificeToEnter
+    Pawl.Codec.SacrificeToEnterSpec
     Pawl.Codec.Saddling
     Pawl.Codec.SaddlingSpec
     Pawl.Codec.Scaling
@@ -2272,6 +2274,7 @@ library types
     Pawl.Types.SacrificeEffect
     Pawl.Types.Sacrificer
     Pawl.Types.SacrificeRestriction
+    Pawl.Types.SacrificeToEnter
     Pawl.Types.Saddling
     Pawl.Types.Scaling
     Pawl.Types.SchemeSetInMotion

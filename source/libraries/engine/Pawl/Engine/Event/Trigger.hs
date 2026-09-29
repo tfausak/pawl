@@ -1548,10 +1548,11 @@ eventTriggers events gs =
       -- "these abilities trigger from whatever zone the card winds up in after
       -- it's cycled", the graveyard for every printing today.
       --
-      -- Abilities come from the PRINTED card rather than a projection, no pool
-      -- effect changing the TRIGGERED abilities of a card in a graveyard (#1859) --
-      -- Teferi, Mage of Zhalfir's grant off the battlefield mints none. Rule 702's
-      -- minted abilities are not consulted either: rule 702.29c scopes this source
+      -- Abilities come from the PROJECTION (CR 613.1 names no zone), so Yixlid
+      -- Jailer's "cards in graveyards lose all abilities" strips the trigger
+      -- before it can fire -- Pawl.ZoneTriggerSpec's "CR 702.29c Yixlid Jailer
+      -- leaves a cycled Windcaller Aven nothing to trigger" proves it. Rule 702's
+      -- minted abilities are not consulted: rule 702.29c scopes this source
       -- to the cycled card's own abilities, and the one rule 702 keyword that
       -- functions from a graveyard -- CR 702.59a's recover -- watches a creature
       -- dying rather than a cycling, so `inGraveyards` is where it is offered.
@@ -1567,7 +1568,7 @@ eventTriggers events gs =
           Nothing -> Map.empty
           Just obj -> case Game.faceOf oid gs of
             Nothing -> Map.empty
-            Just face -> Map.singleton oid (Object.owner obj, fmap whole (Face.triggeredAbilities face))
+            Just _ -> Map.singleton oid (Object.owner obj, fmap whole (Projection.triggeredAbilitiesOf oid gs))
         GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary _) -> Map.empty
         -- A draw names no object either. The card it puts in a hand may well bear
         -- an ability that triggers from there -- CR 702.94a's miracle -- but that
@@ -1663,12 +1664,19 @@ eventTriggers events gs =
       -- may see of the answer is `arrivedLater`'s subtraction below.
       --
       -- Narrow by construction, which keeps a large graveyard cheap: membership is
-      -- decided by `functionsIn` -- a total case over a closed condition type and a
-      -- walk of the ability's own effects, no projection and no board walk. Cards
-      -- contributing nothing are dropped rather than carried as empty entries.
+      -- decided by `functionsIn` over the PRINTED card first -- a total case over
+      -- a closed condition type and a walk of the ability's own effects, no
+      -- projection and no board walk -- and only a card passing it is projected.
+      -- Cards contributing nothing are dropped rather than carried as empty
+      -- entries.
       --
-      -- Abilities come from the PRINTED card and the controller is the OWNER, for
-      -- `cycledCard`'s reasons.
+      -- The abilities offered are the PROJECTION's (CR 613.1 names no zone), so
+      -- Yixlid Jailer's "cards in graveyards lose all abilities" silences them --
+      -- Pawl.ZoneTriggerSpec's "CR 613.1f Yixlid Jailer keeps a milled Narcomoeba
+      -- from triggering" proves it. A card printing no such ability is never
+      -- projected, so one an effect GRANTS in a graveyard is not seen (gap #1859).
+      -- The controller is the OWNER, CR 113.8's second clause: a card in a
+      -- graveyard has no controller (CR 108.4).
       --
       -- CR 603.10a does not apply to what this serves -- a card ENTERING a
       -- graveyard is on none of its look-back list -- so CR 603.10's normal first
@@ -1692,9 +1700,14 @@ eventTriggers events gs =
       -- sorcery -- which is why it is handed the face's card TYPES as well.
       graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case Maybe.mapMaybe (functionsIn (TypeLine.subtypes (Face.typeLine face)) (Face.delayedAbilities face) Zone.Graveyard) (Face.triggeredAbilities face) <> fmap whole (Keyword.graveyardTriggeredAbilitiesOf (TypeLine.types (Face.typeLine face)) (Face.keywordSet face)) of
-            [] -> Nothing
-            abilities -> Just (oid, (Object.owner obj, abilities))
+          let inGraveyard subtypes cardTypes triggered keywords = Maybe.mapMaybe (functionsIn subtypes (Face.delayedAbilities face) Zone.Graveyard) triggered <> fmap whole (Keyword.graveyardTriggeredAbilitiesOf cardTypes keywords)
+           in case inGraveyard (TypeLine.subtypes (Face.typeLine face)) (TypeLine.types (Face.typeLine face)) (Face.triggeredAbilities face) (Face.keywordSet face) of
+                [] -> Nothing
+                _ ->
+                  let pc = Projection.project oid gs
+                   in case inGraveyard (PC.subtypes pc) (PC.cardTypes pc) (PC.triggeredAbilities pc) (Map.keysSet (PC.keywords pc)) of
+                        [] -> Nothing
+                        abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
       inGraveyards =
         Map.fromList
@@ -1718,7 +1731,7 @@ eventTriggers events gs =
       -- leaves-your-graveyard trigger, which only this source serves, and
       -- Pawl.ZoneTriggerSpec's "CR 603.10a Oglor's perpetual grant fires as the
       -- milled card leaves the graveyard" proves it -- where `inGraveyards`'
-      -- printed read would miss one (gap #1859). Not `abilitiesOf` either,
+      -- printed gate would miss one (gap #1859). Not `abilitiesOf` either,
       -- and not `graveyardTriggeredAbilitiesOf`, which `inGraveyards` does consult:
       -- both abilities on that roster -- CR 702.59a's recover and CR 702.55a's
       -- haunt on an instant or sorcery -- move the card they are on, and an id
@@ -1776,9 +1789,10 @@ eventTriggers events gs =
       -- `inGraveyards`' reason: a haunting card sits in exile indefinitely and no
       -- event names it, so nothing narrower could find it.
       --
-      -- Abilities come from the PRINTED card and the controller is the OWNER (CR
-      -- 108.4a), also for `inGraveyards`' reasons: CR 108.4 gives a card in exile
-      -- no controller at all, so Blind Hunter's "you gain 2 life" pays the player
+      -- Abilities come from the PRINTED card, so an effect changing the abilities
+      -- of a card in exile is not seen (#1859). The controller is the OWNER (CR
+      -- 108.4a), for `inGraveyards`' reason: CR 108.4 gives a card in exile no
+      -- controller at all, so Blind Hunter's "you gain 2 life" pays the player
       -- who owns the haunting card.
       -- A card exiled FACE DOWN is skipped: CR 406.3a leaves it no
       -- characteristics, so it bears no ability to function from anywhere. The
@@ -1829,7 +1843,8 @@ eventTriggers events gs =
       -- Pawl.Engine.Keyword.stackTriggeredAbilitiesOf is what decides which
       -- keywords reach this: cascade and storm.
       --
-      -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#1859).
+      -- Abilities come from the PRINTED card, so an effect changing the
+      -- triggered abilities of a spell on the stack is not seen (#1859).
       spellCast event = case event of
         GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
@@ -2135,7 +2150,8 @@ eventTriggers events gs =
       -- was taken -- nor with each other, an id departing at exactly one group.
       -- `graveyard` genuinely overlaps `cycledCard` on purpose -- a card
       -- cycled into a graveyard is honestly a member of both -- and the winner
-      -- offers that card's printed abilities unfiltered, a superset either way.
+      -- offers that card's projected abilities unfiltered, a superset of the
+      -- other's projected, `functionsIn`-filtered read.
       -- `spellCast` overlaps nothing: CR 601.2a keeps its object on the stack,
       -- which no other source reads. Neither does `inCommand`: CR 114.1 puts an
       -- emblem into the command zone, and no rule or effect in pawl moves one

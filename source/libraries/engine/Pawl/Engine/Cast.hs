@@ -2417,8 +2417,13 @@ playLand offered pid oid mName = do
   -- CR 110.2 / 305.1: the permanent enters under the player who PLAYED it, which
   -- is not the card's owner once a permission opens somebody else's hand (Sen
   -- Triplets); see #2169.
+  -- CR 614.1a: a land an EntryRewrite.SacrificeToEnter turns into the graveyard
+  -- was still played, so it spends the permission as a land that arrived does.
+  State.modify' (\g -> g {GameState.refusedEntries = Just Set.empty})
   moved <- Event.changeZoneShowing (Just pid) oid Zone.Battlefield mName
-  Monad.unless (Seq.null moved) $ do
+  refused <- State.gets (maybe False (Set.member oid) . GameState.refusedEntries)
+  State.modify' (\g -> g {GameState.refusedEntries = Nothing})
+  Monad.unless (Seq.null moved && not refused) $ do
     State.modify' (PlayerEffect.consume spent)
     State.modify' (PlayerEffect.spendCastPermission (PlayerEffect.permissionSpent permission))
     State.modify' (\g -> g {GameState.continuousEffects = concatMap riders (filter (`Set.member` GameState.battlefield g) (Foldable.toList moved)) <> GameState.continuousEffects g})

@@ -25,6 +25,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -299,6 +300,13 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
       (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.And [Filter.HasSubtype Subtype.Forest, Filter.Not Filter.IsTapped]) Nothing (Quantity.Literal 1)))
       " {\"type\":\"SacrificeAnyNumber\",\"value\":{\"each\":{\"type\":\"Literal\",\"value\":1},\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Forest\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsTapped\"}}]},\"kind\":null}} "
+  -- CR 614.1a / 614.12: Heart of Yavimaya's "sacrifice a Forest instead".
+  Spec.it s "SacrificeToEnter (Heart of Yavimaya)" $
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      (EntryRewrite.SacrificeToEnter (SacrificeToEnter.MkSacrificeToEnter 1 (Filter.HasSubtype Subtype.Forest)))
+      " {\"type\":\"SacrificeToEnter\",\"value\":{\"count\":1,\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Forest\"}}}} "
   -- CR 614.1c / 614.14: an as-enters exile out of the controller's own graveyard,
   -- carrying the criterion the exiled card must match -- Living Lore's "an
   -- instant or sorcery card".

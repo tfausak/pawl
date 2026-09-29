@@ -2357,6 +2357,33 @@ serraParagonSpec s registry =
               next = nextTurnOfAliceAfter after
           Spec.assertBool s (elem (pbGraveForest b, Nothing) (Action.playableLands S.alice next)) "the graveyard Forest is playable again"
 
+        -- CR 614.1a: Heart of Yavimaya played from the graveyard with no Forest
+        -- to sacrifice goes back to the graveyard instead of entering -- but it
+        -- WAS played (CR 305.1), so the one use is spent and the buried
+        -- Ornithopter is not cast. Swamps, so nothing can pay the Heart; the
+        -- case below is the pair.
+        Spec.it s "CR 305.1 / 614.1a a graveyard land turned away by its own sacrifice still spends the use" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          ornithopter <- S.printingOf s registry "Ornithopter"
+          paragon <- S.printingOf s registry "Serra Paragon"
+          heart <- S.printingOf s registry "Heart of Yavimaya"
+          let b = paragonBoard swamp ornithopter swamp (Just paragon)
+              (heartId, gs) = S.addGraveyardCard heart S.alice (pbState b)
+              after = S.runPure (takeFirst [playOf heartId, S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
+          Spec.assertBool s (elem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice after)) "the Ornithopter is still in alice's graveyard"
+          Spec.assertEqWith s "and Heart of Yavimaya went back there rather than entering" (namesIn Zone.Graveyard S.alice after List.\\ namesIn Zone.Graveyard S.alice gs) []
+          Spec.assertEqWith s "and nothing arrived" (arrivedBetween gs after) []
+
+        -- The pair: with no Heart played, the same Ornithopter is cast.
+        Spec.it s "CR 601.3 the same Ornithopter is cast when no land play spent the use" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          ornithopter <- S.printingOf s registry "Ornithopter"
+          paragon <- S.printingOf s registry "Serra Paragon"
+          let b = paragonBoard swamp ornithopter swamp (Just paragon)
+              gs = pbState b
+              after = S.runPure (takeFirst [S.isCastOf (pbBuried b)]) gs Engine.priorityLoop
+          Spec.assertBool s (notElem (pbBuried b) (Game.zoneMembers Zone.Graveyard S.alice after)) "the Ornithopter left alice's graveyard"
+
         -- Without the Paragon nothing in the graveyard is playable.
         Spec.it s "CR 305.1 without Serra Paragon the graveyard Forest is not playable" $ do
           b <- board "Llanowar Elves" "Forest" False
