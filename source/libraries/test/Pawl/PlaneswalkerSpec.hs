@@ -60,10 +60,12 @@
 module Pawl.PlaneswalkerSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -377,6 +379,7 @@ attackingChandra p = case p of
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
+  wanderingEmperorSpec s registry
   Spec.it s "CR 306.5b Jace Beleren enters with three loyalty counters" $ do
     island <- S.printingOf s registry "Island"
     jace <- S.printingOf s registry "Jace Beleren"
@@ -1503,3 +1506,58 @@ tamiyoNotebookSpec s registry = Spec.describe s "TamiyoNotebook" $ do
       [(True, Set.singleton Supertype.Legendary, Set.singleton CardType.Artifact, Set.singleton Subtype.Book, Set.empty)]
     Spec.assertBool s (S.castable S.alice divinationId created) "CR 601.2f: {2}{U} Divination costs {U}, so the one Island casts it"
     Spec.assertEqWith s "{T}: Draw a card -- Divination plus the drawn card" (S.handSize S.alice drawn) 2
+
+-- The Wandering Emperor {2}{W}{W}, loyalty 3: "Flash. As long as The Wandering
+-- Emperor entered this turn, you may activate her loyalty abilities any time
+-- you could cast an instant. ... -2: Exile target tapped creature. You gain 2
+-- life." Her play: flashed in after bob declares an attacker, then the -2 on it
+-- in the same step -- bob's turn, a combat step and a stack that just held her,
+-- each outside CR 606.3's window.
+--
+-- The pair differs in whether she entered this turn: the refusal's board has her
+-- on the battlefield already, with her loyalty and the same four Plains.
+wanderingEmperorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
+  let giant = S.aliasRef "giant"
+      plains = fmap (\i -> S.settled ("plains" <> show i) "Plains") [1 .. 4 :: Int]
+      setup battlefield hand =
+        S.board
+          ( (S.battlefield S.alice (plains <> battlefield)) {S.setupHand = Seq.fromList hand}
+              NonEmpty.:| [S.battlefield S.bob [S.settled "giant" "Hill Giant"]]
+          )
+          S.bob
+          S.beginningOfCombat
+      casting = S.noChoices {S.choiceManaSources = Seq.fromList (fmap (\i -> Just (S.aliasRef ("plains" <> show i))) [1 .. 4 :: Int])}
+      -- The -2, her third printed ability.
+      exiling = S.noChoices {S.choiceAbility = Just 2, S.choiceTargets = Just [S.MkObjectTarget giant]}
+      attacking = S.on S.declareAttackers S.bob (S.attack [giant])
+      toEndOfCombat =
+        let go n = do
+              gs <- State.get
+              Monad.unless (n <= (0 :: Int) || GameState.phase gs == S.endOfCombat || Maybe.isJust (GameState.result gs)) (Engine.runStep >> go (n - 1))
+         in go 8
+  Spec.it s "CR 606.3 flashed in on bob's turn, her -2 exiles his attacker" $ do
+    let script =
+          S.turn
+            1
+            [ attacking,
+              S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "emperor") casting),
+              S.on S.declareBlockers S.alice (S.activateAction (S.namedRef "The Wandering Emperor" 1) exiling)
+            ]
+    built <- S.buildBoardOrFail s registry (setup [] [S.aliased "emperor" (S.cardSetup "The Wandering Emperor")])
+    (_, after) <- S.runScriptOrFail s script built toEndOfCombat
+    -- CR 400.7: the exiled card is a new object, so it is counted by name.
+    Spec.assertEqWith s "the Hill Giant is in exile" (length (Game.zoneMembers Zone.Exile S.bob after), S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Hill Giant")) S.bob after) (1, 0)
+    Spec.assertEqWith s "alice gained 2 life" (S.lifeOf S.alice after) (Just 22)
+    Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
+  Spec.it s "CR 606.3 already on the battlefield, she is not offered on bob's turn" $ do
+    let resident = (S.aliased "emperor" (S.permanent "The Wandering Emperor")) {S.objectCounters = Map.singleton CounterKind.Loyalty 3}
+        -- She is attackable now, so bob also names where the Giant attacks.
+        script = S.turn 1 [attacking, S.on S.declareAttackers S.bob (S.attackPlayer S.alice), S.on S.declareAttackers S.alice (S.activateAction (S.aliasRef "emperor") exiling)]
+    built <- S.buildBoardOrFail s registry (setup [resident] [])
+    let emperorId = Map.lookup (S.MkObjectAlias (Text.pack "emperor")) (S.builtAliases built)
+    Spec.assertEqWith s "setup: she stands with three loyalty" (fmap (\oid -> S.counterOf CounterKind.Loyalty oid (S.builtState built)) emperorId) (Just 3)
+    case S.runScript script built toEndOfCombat of
+      Left (S.MkActionNotOffered _ (S.MkActivate {}) _) -> pure ()
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "the -2 was offered anyway"

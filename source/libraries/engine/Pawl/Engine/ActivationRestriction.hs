@@ -212,6 +212,25 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- payment in progress apart.
   ActivationRestriction.InstantSpeed -> True
 
+-- CR 602.5d under a permission to activate "any time you could cast an instant"
+-- (Leonin Shikari): the sorcery-speed rider reads as CR 602.5e's instant-speed
+-- one, and every other clause stands -- "You're still subject to any other
+-- restrictions", per the Shikari's ruling. Exhaustive, so a new timing clause
+-- is named here by -Werror.
+atInstantSpeed :: ActivationRestriction.ActivationRestriction -> ActivationRestriction.ActivationRestriction
+atInstantSpeed restriction = case restriction of
+  ActivationRestriction.SorcerySpeed -> ActivationRestriction.InstantSpeed
+  ActivationRestriction.DuringPhase _ -> restriction
+  ActivationRestriction.DuringTurn _ -> restriction
+  ActivationRestriction.AttackedThisStep -> restriction
+  ActivationRestriction.AfterBlockersDeclared -> restriction
+  ActivationRestriction.BeforeCombatDamage -> restriction
+  ActivationRestriction.OnlyIf _ -> restriction
+  ActivationRestriction.OnlyOnce -> restriction
+  ActivationRestriction.OnlyOnceEachTurn -> restriction
+  ActivationRestriction.DuringDieRoll -> restriction
+  ActivationRestriction.InstantSpeed -> restriction
+
 -- CR 602.5b: record that THIS ability of this source has now been activated,
 -- for whichever counted rider it prints. The writer both readers above are
 -- served from, so the two roads to an activation cannot disagree:

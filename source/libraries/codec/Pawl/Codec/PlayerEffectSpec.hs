@@ -23,6 +23,7 @@ import qualified Pawl.Types.IncreaseActivationCost as IncreaseActivationCost
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -299,6 +300,20 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.MayPlayAsThoughItHadFlash (Filter.HasCardType CardType.Creature))
       " {\"type\":\"MayPlayAsThoughItHadFlash\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}} "
+  -- CR 602.5d / Leonin Shikari: "equip abilities", the family with its cost dropped.
+  Spec.it s "ActivateKeywordAtInstantSpeed, Leonin Shikari's equip abilities" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.ActivateKeywordAtInstantSpeed (KeywordDesignator.OfFamily KeywordFamily.Equip))
+      " {\"type\":\"ActivateKeywordAtInstantSpeed\",\"value\":{\"type\":\"OfFamily\",\"value\":{\"type\":\"Equip\"}}} "
+  -- CR 606.3 / The Wandering Emperor: "her loyalty abilities", the source itself.
+  Spec.it s "ActivateLoyaltyAtInstantSpeed, The Wandering Emperor's own" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.ActivateLoyaltyAtInstantSpeed Filter.IsSource)
+      " {\"type\":\"ActivateLoyaltyAtInstantSpeed\",\"value\":{\"type\":\"IsSource\"}} "
   -- CR 601.3b's "certain qualities" (Yeva, Nature's Herald), so a codec that
   -- dropped the payload would round-trip one of these and not both.
   Spec.it s "CastAsThoughItHadFlash, a filter that names qualities" $
