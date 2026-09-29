@@ -23,7 +23,6 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
-import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -2969,7 +2968,7 @@ kadenaBoard island kadena recall sorcerer = case soleActivatedAbility sorcerer o
         -- the pair of stack sizes is what says the ability never joined it.
         tapped = case aliceIsland activated of
           Nothing -> activated
-          Just oid -> S.runPure S.identityAnswer activated (Cost.tapForMana S.manaPerformer oid)
+          Just oid -> S.runPure S.identityAnswer activated (S.tapForMana oid)
         sizes = (length (GameState.stack activated), length (GameState.stack tapped))
         theirs = fmap snd (filter ((/= S.bob) . fst) abilityIds)
         mine = fmap snd (filter ((== S.bob) . fst) abilityIds)

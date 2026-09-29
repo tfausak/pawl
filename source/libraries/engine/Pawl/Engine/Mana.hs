@@ -34,6 +34,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Activations as Activations
+import qualified Pawl.Types.Activator as Activator
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Claim (Claim)
@@ -450,8 +451,8 @@ manaSuppliesGiven capacity pcs pid oid gs =
           -- naming an opponent alone supplies nothing.
           --
           -- `pid` stands in for the CONTROLLER recipientsOf resolves against,
-          -- and is one: manaSourcesGiven offers only what the asking player
-          -- controls, so every oid that reaches here is theirs (CR 110.2).
+          -- and is one: CR 109.4a and CR 113.8 make the player activating a
+          -- mana ability its controller, whoever controls the permanent.
           --
           -- Still a supply of NO units rather than no supply at all: dropping
           -- the triple would take the source off payableResolutionsGiven's
@@ -463,7 +464,11 @@ manaSuppliesGiven capacity pcs pid oid gs =
           -- a claim that such a route costs nothing.
           Maybe.fromMaybe (ManaCost.MkManaCost []) (Cost.mana (ManaOption.cost option))
         )
-      counted = fmap measured (manaOptionsOfGiven pcs oid gs)
+      options = manaOptionsOfGiven pcs oid gs
+      -- Lazy, and forced only for a permanent mixing open and closed routes:
+      -- manaSourcesGiven hands this nothing else pid does not control.
+      controls = not (any (openToAnyone . ManaOption.ability) options) || Projection.controllerOf oid gs == Just pid
+      counted = fmap measured (filter (permitsRoute controls . ManaOption.ability) options)
       available = filter (\(activations, _, _) -> Activations.times activations > 0) counted
       yieldOf (_, yield, _) = yield
       -- Ordered so `maximumBy` prefers the larger count, and a mana-free route
@@ -889,10 +894,10 @@ endRetentionAtEndOf ending gs =
       ended pool = Mana.MkMana (fmap ordinary (Mana.unwrap pool))
    in gs {GameState.manaPool = fmap ended (GameState.manaPool gs)}
 
--- Permanents this player controls with a mana ability they could activate right
--- now (CR 109.4a: a mana ability's controller is determined as though it were on
--- the stack -- i.e. the permanent's controller, CR 110.2 -- not the object's
--- owner).
+-- Permanents with a mana ability this player could activate right now: their
+-- own (CR 602.2), and another player's whose ability says any player may
+-- activate it (CR 602.1b). CR 109.4a and CR 113.8 make the player activating
+-- it the ability's controller either way.
 --
 -- ONE control-grant walk and ONE whole-board projection for the whole sweep,
 -- threaded into every question asked of every permanent -- the hoist
@@ -930,7 +935,14 @@ manaSourcesGiven inFlight capacity grants pcs pid gs =
       -- the tap and sickness rules reach only such a cost. A Blood Pet is a
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
-      isSource oid = any (\(cost, restrictions, ability, _) -> not (inFlightRoute inFlight oid ability) && Activations.times (capacity ForOffer pcs pid oid cost restrictions ability gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      isSource oid = any (\(cost, restrictions, ability, _) -> permitsRoute (Set.member oid mine) ability && not (inFlightRoute inFlight oid ability) && Activations.times (capacity ForOffer pcs pid oid cost restrictions ability gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      -- CR 602.2's candidates: what this player controls, then CR 602.1b's
+      -- exception -- a permanent someone else controls, which isSource then
+      -- asks of its "any player may activate" routes alone.
+      -- Activatable.activationSourcesGiven is the same list for the stack.
+      own = Projection.controlsGiven grants pid gs
+      mine = Set.fromList own
+      others = filter (`Set.notMember` mine) (Set.toList (GameState.battlefield gs))
       -- CR 723.7, in the one form a card prints it: Word of Command's "the
       -- player can activate mana abilities only if they're from lands that
       -- player controls". Read off the control row rather than from the
@@ -947,7 +959,19 @@ manaSourcesGiven inFlight capacity grants pcs pid gs =
       -- Sol Ring is a land here and a Dryad Arbor is one too.
       landsOnly = maybe False PlayerControl.manaFromLandsOnly (Map.lookup pid (GameState.control gs) >>= Decide.effective)
       isLand oid = maybe False (Set.member CardType.Land . PC.cardTypes) (Map.lookup oid pcs)
-   in filter (\oid -> isSource oid && (not landsOnly || isLand oid)) (Projection.controlsGiven grants pid gs)
+   in filter (\oid -> isSource oid && (not landsOnly || (isLand oid && Set.member oid mine))) (own <> others)
+
+-- CR 602.2's permission over one mana route: the permanent's controller may
+-- take any, and anyone else only one whose ability says any player may
+-- activate it (CR 602.1b, Mana Cache). CR 305.6's intrinsic route prints no
+-- such clause. Whoever takes it controls it (CR 109.4a, CR 113.8), so the
+-- mana is theirs. `controls` is asked second, so a caller may pass it lazily.
+permitsRoute :: Bool -> Maybe (ActivatedAbility.ActivatedAbility c g) -> Bool
+permitsRoute controls ability = openToAnyone ability || controls
+
+-- Does this route's ability say any player may activate it (CR 602.1b)?
+openToAnyone :: Maybe (ActivatedAbility.ActivatedAbility c g) -> Bool
+openToAnyone = maybe False ((== Activator.AnyPlayer) . ActivatedAbility.activator)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
 -- types, carrying at least these production-time tags.

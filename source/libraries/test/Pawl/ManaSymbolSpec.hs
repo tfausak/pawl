@@ -272,7 +272,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
           let board = S.landsInPlay land 1
            in case Game.zoneMembers Zone.Battlefield S.alice board of
                 [] -> []
-                oid : _ -> poolUnits (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer oid))
+                oid : _ -> poolUnits (S.runPure S.identityAnswer board (S.tapForMana oid))
     Spec.assertEqWith s "the snow one" (tapFirst snowMountain) [snowRed]
     Spec.assertEqWith s "the plain one" (tapFirst mountain) [plainRed]
 
@@ -334,7 +334,7 @@ snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
     let board = S.landsInPlay snowSymbol 1
         tapped = case Game.zoneMembers Zone.Battlefield S.alice board of
           [] -> []
-          oid : _ -> poolUnits (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer oid))
+          oid : _ -> poolUnits (S.runPure S.identityAnswer board (S.tapForMana oid))
     Spec.assertEqWith s "two untagged colorless mana" tapped [plainColorless, plainColorless]
 
   -- CR 107.4h from the other side, and THE case this card exists for: the symbol
@@ -1971,7 +1971,7 @@ twoRedFloated snowMountain mountain =
   let base = Setup.emptyGame S.bothPlayers
       (snowId, withSnow) = S.addPermanent snowMountain S.alice base
       (plainId, withBoth) = S.addPermanent mountain S.alice withSnow
-   in S.runPure S.identityAnswer withBoth (Cost.tapForMana S.manaPerformer snowId *> Cost.tapForMana S.manaPerformer plainId)
+   in S.runPure S.identityAnswer withBoth (S.tapForMana snowId *> S.tapForMana plainId)
 
 -- Pay `cost` out of `units`, counting the questions asked about which mana goes.
 payCounting :: [ManaUnit.ManaUnit] -> ManaCost.ManaCost -> (Bool, Int)

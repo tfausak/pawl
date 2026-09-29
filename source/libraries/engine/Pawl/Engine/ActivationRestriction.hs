@@ -115,8 +115,9 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- Augur's "only during your upkeep" names alice's upkeep and not bob's. CR
   -- 109.5 is why `pid` answers "your" -- for an activated ability that is the
   -- player who activated it, which Activatable.activatable has already pinned to
-  -- activatorOf and which CR 109.4a pins to the permanent's controller for a
-  -- mana ability -- so a stolen permanent's rider follows the thief.
+  -- activatorOf and which CR 109.4a and CR 113.8 make the activating player for
+  -- a mana ability too -- so a stolen permanent's rider follows the thief, and
+  -- Mana Cache's "their turn" follows whoever activates it.
   ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
       && Turn.turnScopeAdmits gs scope (GameState.activePlayer gs) pid
@@ -140,6 +141,8 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- than the combat record, since CR 510.2's damage is a turn-based action of one
   -- step and CR 506.7c admits every combat phase of the turn. Save Point.
   ActivationRestriction.BeforeCombatDamage -> Turn.beforeCombatDamage (GameState.phase gs)
+  -- CR 500.1's order, asked of the phase alone for BeforeCombatDamage's reason.
+  ActivationRestriction.BeforeEndStep -> Turn.beforeEndStep (GameState.phase gs)
   -- CR 602.5's prohibition over a fact about the board rather than a window:
   -- Barbarian Ring's "Activate only if there are seven or more cards in your
   -- graveyard". Projection.fullView because nothing here is inside a layer fold
@@ -147,7 +150,7 @@ restrictionMet pid srcId ability gs restriction = case restriction of
   -- same view for ActivatedAbility.condition, for the same reason.
   --
   -- CR 109.5's "your" is `pid`, the same player every arm above answers "your"
-  -- with, and CR 109.4a pins it to the permanent's controller on the mana path.
+  -- with, and CR 109.4a makes it the activating player on the mana path.
   --
   -- Nimbus Maze is the producer on that path -- "{T}: Add {W}. Activate only if
   -- you control an Island" -- and Pawl.ManaSpec's Nimbus Maze group is what proves
@@ -225,6 +228,7 @@ atInstantSpeed restriction = case restriction of
   ActivationRestriction.AttackedThisStep -> restriction
   ActivationRestriction.AfterBlockersDeclared -> restriction
   ActivationRestriction.BeforeCombatDamage -> restriction
+  ActivationRestriction.BeforeEndStep -> restriction
   ActivationRestriction.OnlyIf _ -> restriction
   ActivationRestriction.OnlyOnce -> restriction
   ActivationRestriction.OnlyOnceEachTurn -> restriction
@@ -318,6 +322,7 @@ needsEmptyStack restriction = case restriction of
   ActivationRestriction.AttackedThisStep -> False
   ActivationRestriction.AfterBlockersDeclared -> False
   ActivationRestriction.BeforeCombatDamage -> False
+  ActivationRestriction.BeforeEndStep -> False
   -- A board condition reads no stack, so the empty-stack question is not its
   -- question. What CR 601.2a's move does to the zone the card leaves,
   -- `restrictionMet` reads for itself (Game.withoutBeingCast).
@@ -353,6 +358,7 @@ refusedMidPayment restriction = case restriction of
   ActivationRestriction.AttackedThisStep -> False
   ActivationRestriction.AfterBlockersDeclared -> False
   ActivationRestriction.BeforeCombatDamage -> False
+  ActivationRestriction.BeforeEndStep -> False
   ActivationRestriction.OnlyIf _ -> False
   ActivationRestriction.OnlyOnce -> False
   ActivationRestriction.OnlyOnceEachTurn -> False

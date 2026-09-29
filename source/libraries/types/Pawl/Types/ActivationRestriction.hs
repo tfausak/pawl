@@ -124,6 +124,9 @@ data ActivationRestriction
     -- end of combat step. Nor the negation of AfterBlockersDeclared above, which
     -- would exclude the declare blockers step the card admits.
     BeforeCombatDamage
+  | -- | CR 500.1: "before the end step" (Mana Cache) -- any phase of the turn
+    -- ahead of CR 513's end step. Pawl.Engine.Turn.beforeEndStep is the reader.
+    BeforeEndStep
   | -- | CR 602.5: "Activate only if [a fact about the board]" -- Barbarian
     -- Ring's "Activate only if there are seven or more cards in your
     -- graveyard". The first arm here that reads no window at all.

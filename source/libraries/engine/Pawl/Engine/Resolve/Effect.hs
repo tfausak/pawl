@@ -2579,8 +2579,8 @@ stackTargetSlots obj oid gs =
       -- CR 603.2's player slots baked in, off the object's OWN bindings -- the
       -- map Pawl.Engine.Engine.placeBorne baked with as the ability went on the
       -- stack, and which CR 707.10 copied onto a copy verbatim. Not optional:
-      -- Filter.ControlledByBound answers False wherever `matches` reaches it, so
-      -- an unbaked slot admits nobody, and CR 707.10c's prompt would then be
+      -- Filter.ControlledByBound answers False wherever `matches` reaches it
+      -- with no slotPlayers entry, so an unbaked slot admits nobody, and CR 707.10c's prompt would then be
       -- elided as "settled" while the copy silently kept the original's target
       -- (Questing Beast's "that player" under Lithoform Engine).
       baked = Target.bakeModal (Binding.playerSlots (Object.bindings obj))
@@ -3671,7 +3671,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- answer that is not a permutation of the offered indices.
           pure (Game.permute batch answer)
         _ -> pure batch
-      Monad.mapM_ (Cost.tapForMana performManaAbility) ordered
+      Monad.mapM_ (Cost.tapForMana performManaAbility pid) ordered
   -- CR 106.13: one player loses all their unspent mana and another adds "the mana
   -- lost this way". WHOLE UNITS cross (Mana.moveMana), which is the rule's second
   -- sentence -- what produced the mana, its CR 106.4 retention and both of CR

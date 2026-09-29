@@ -38,7 +38,6 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Replay as Replay
-import qualified Pawl.Engine.Resolve.Effect as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Subtype as SubtypeEngine
@@ -54,6 +53,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterName as CounterName
@@ -62,8 +62,10 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -103,6 +105,7 @@ import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -256,7 +259,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     case Game.zoneMembers Zone.Battlefield S.alice gs of
       [] -> Spec.assertFailure s "fixture should have one Mountain"
       oid : _ -> do
-        let after = S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer oid)
+        let after = S.runPure S.identityAnswer gs (S.tapForMana oid)
         Spec.assertEqWith s "tapped" (S.tappedCount S.alice after) 1
         Spec.assertEqWith
           s
@@ -293,7 +296,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     case Game.zoneMembers Zone.Battlefield S.alice gs of
       [] -> Spec.assertFailure s "fixture should have one Mountain"
       oid : _ ->
-        Spec.assertEqWith s "emptied" (poolSize S.alice (Mana.emptiedManaPools (S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer oid)))) 0
+        Spec.assertEqWith s "emptied" (poolSize S.alice (Mana.emptiedManaPools (S.runPure S.identityAnswer gs (S.tapForMana oid)))) 0
 
   -- CR 122.1 / CR 105.4: "{T}: Add {C}. If Gemstone Caverns has a luck counter on
   -- it, instead add one mana of any color." pawl carries the sentence as two
@@ -364,7 +367,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
     let (towerId, gs) = zhaoBoard zhao reliquaryTower []
-    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer towerId))) (oneUnit ManaType.Colorless)
+    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (S.tapForMana towerId))) (oneUnit ManaType.Colorless)
     Spec.assertBool s (Subtype.Mountain `notElem` Set.toList (Projection.subtypesOf towerId gs)) "and the layer-4 set did not happen either"
 
   -- The discriminating case: Zhao carries a counter, but of the WRONG KIND. An
@@ -377,7 +380,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
     let (towerId, gs) = zhaoBoard zhao reliquaryTower [CounterKind.PlusOnePlusOne]
-    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer towerId))) (oneUnit ManaType.Colorless)
+    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (S.tapForMana towerId))) (oneUnit ManaType.Colorless)
     Spec.assertBool s (Subtype.Mountain `notElem` Set.toList (Projection.subtypesOf towerId gs)) "and the layer-4 set did not happen either"
 
   -- The same board with the clause satisfied, which is what keeps the two cases
@@ -388,7 +391,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     zhao <- S.printingOf s registry "Zhao, the Moon Slayer"
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
     let (towerId, gs) = zhaoBoard zhao reliquaryTower [conquerorCounter]
-    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (Cost.tapForMana S.manaPerformer towerId))) (oneUnit (ManaType.Colored Color.Red))
+    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (S.tapForMana towerId))) (oneUnit (ManaType.Colored Color.Red))
     Spec.assertBool s (Subtype.Mountain `elem` Set.toList (Projection.subtypesOf towerId gs)) "the Tower is a Mountain (CR 305.7's set)"
     Spec.assertEqWith s "and its printed ability is gone" (Projection.abilitiesOf towerId gs) []
 
@@ -731,7 +734,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let (oid, base) = S.addPermanent llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
         gs0 = S.giveControl oid S.alice base
-        after = S.runPure S.identityAnswer gs0 (Cost.tapForMana S.manaPerformer oid)
+        after = S.runPure S.identityAnswer gs0 (S.tapForMana oid)
         manaUnitsOf pool = case pool of
           Mana.Type.MkMana units -> units
     Spec.assertBool s (not (null (manaUnitsOf (Game.poolOf S.alice after)))) "alice received a mana unit"
@@ -782,7 +785,7 @@ castFrom answer board spell =
 -- `answer` -- the observable that says WHAT a source produced: which type, where
 -- it offers several, and how much, where one activation adds more than one.
 tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> [ManaType.ManaType]
-tappedFor answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana S.manaPerformer oid)) of
+tappedFor answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (S.tapForMana oid)) of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units
 
 -- A fixture write that untaps one permanent, so a card that entered tapped can
@@ -892,7 +895,7 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
           _ -> pure (S.identityAnswer p)
         asks printing =
           let (oid, gs) = S.addPermanent printing S.alice (Setup.emptyGame S.bothPlayers)
-           in State.execState (Engine.runGame countingAnswer gs (Cost.tapForMana S.manaPerformer oid)) 0
+           in State.execState (Engine.runGame countingAnswer gs (S.tapForMana oid)) 0
     Spec.assertEqWith s "a Forest: nothing to ask" (asks forest) 0
     Spec.assertEqWith s "a Birds of Paradise: one real decision" (asks birds) 1
 
@@ -914,8 +917,8 @@ floatedPools alices forest =
       (extras, withAlices) = List.foldl' addOne ([], Setup.emptyGame S.bothPlayers) alices
       (aliceForest, g1) = S.addPermanent forest S.alice withAlices
       (bobForest, g2) = S.addPermanent forest S.bob g1
-      g3 = S.runPure S.identityAnswer g2 (Cost.tapForMana S.manaPerformer aliceForest)
-   in (extras, S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer bobForest))
+      g3 = S.runPure S.identityAnswer g2 (S.tapForMana aliceForest)
+   in (extras, S.runPure S.identityAnswer g3 (S.tapForMana bobForest))
 
 -- CR 500.5: "As a step or phase ends ... any unspent mana left in a player's
 -- mana pool empties. This is a turn-based action that doesn't use the stack (see
@@ -1026,7 +1029,7 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
     let (_, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
         (forestId, g2) = S.addPermanent forest S.alice g1
         (islandId, g3) = S.addPermanent island S.alice g2
-        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer forestId)) (Cost.tapForMana S.manaPerformer islandId)
+        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (S.tapForMana forestId)) (S.tapForMana islandId)
         ended = Mana.emptiedManaPools floated
     Spec.assertEqWith s "two floated" (poolSize S.alice floated) 2
     Spec.assertEqWith s "one survives the step's end" (poolSize S.alice ended) 1
@@ -1046,7 +1049,7 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
     let (_, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
         (alicesForest, g2) = S.addPermanent forest S.alice g1
         (bobsForest, g3) = S.addPermanent forest S.bob g2
-        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer alicesForest)) (Cost.tapForMana S.manaPerformer bobsForest)
+        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (S.tapForMana alicesForest)) (S.tapForMana bobsForest)
         ended = Mana.emptiedManaPools floated
     Spec.assertEqWith s "alice keeps hers" (poolSize S.alice ended) 1
     Spec.assertEqWith s "bob loses his" (poolSize S.bob ended) 0
@@ -1063,7 +1066,7 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
     let (omnathId, g1) = S.addPermanent omnath S.alice (Setup.emptyGame S.bothPlayers)
         (forestId, g2) = S.addPermanent forest S.alice g1
         (islandId, g3) = S.addPermanent island S.alice g2
-        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (Cost.tapForMana S.manaPerformer forestId)) (Cost.tapForMana S.manaPerformer islandId)
+        floated = S.runPure S.identityAnswer (S.runPure S.identityAnswer g3 (S.tapForMana forestId)) (S.tapForMana islandId)
         afterStep = S.runPure S.identityAnswer floated Engine.runStep
     Spec.assertEqWith s "before: two floating, and only the green pumps" (Projection.powerOf omnathId floated) (Just 2)
     Spec.assertEqWith s "the blue is gone" (poolSize S.alice afterStep) 1
@@ -1644,7 +1647,7 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
         (solRingId, gs) = S.addPermanent solRing S.alice (Setup.emptyGame S.bothPlayers)
-    Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (Cost.tapForMana S.manaPerformer solRingId)) 0) 0
+    Spec.assertEqWith s "nothing to ask" (State.execState (Engine.runGame countingAnswer gs (S.tapForMana solRingId)) 0) 0
 
 -- Answers Prompt.ChooseManaYield with `wanted`'s LONGEST yield, and defers every
 -- other source's prompt to S.identityAnswer, which takes the head. A payment off
@@ -1699,7 +1702,7 @@ ancientTombSpec s registry = Spec.describe s "Ancient Tomb" $ do
   Spec.it s "CR 605.1a Ancient Tomb's damage leaves it a mana ability" $ do
     ancientTomb <- S.printingOf s registry "Ancient Tomb"
     let (tombId, board) = S.addPermanent ancientTomb S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer tombId)
+        after = S.runPure S.identityAnswer board (S.tapForMana tombId)
     Spec.assertEqWith s "the yield is two colorless and nothing else" (tappedFor S.identityAnswer tombId board) [ManaType.Colorless, ManaType.Colorless]
     Spec.assertBool s (elem tombId (Mana.manaSources Cost.manaActivations S.alice board)) "and it is a mana source"
     Spec.assertEqWith s "the activation used no stack (CR 605.3b)" (length (GameState.stack after)) 0
@@ -1980,7 +1983,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
   Spec.it s "CR 602.2b tapping it adds a mana and pays the 1 life" $ do
     manaConfluence <- S.printingOf s registry "Mana Confluence"
     let (oid, gs) = S.addPermanent manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure (prefersColor Color.Black) gs (Cost.tapForMana S.manaPerformer oid)
+        after = S.runPure (prefersColor Color.Black) gs (S.tapForMana oid)
     Spec.assertEqWith s "the colour asked for" (tappedFor (prefersColor Color.Black) oid gs) [ManaType.Colored Color.Black]
     Spec.assertEqWith s "exactly 1 life" (S.lifeOf S.alice after) (Just 19)
     Spec.assertEqWith s "and the land is tapped, by the {T} of that same cost" (S.tappedCount S.alice after) 1
@@ -1995,7 +1998,7 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
     let (firstId, g1) = S.addPermanent manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
         (secondId, g2) = S.addPermanent manaConfluence S.alice g1
         (forestId, g3) = S.addPermanent forest S.alice g2
-        tapEach = List.foldl' (\g oid -> S.runPure (prefersColor Color.Black) g (Cost.tapForMana S.manaPerformer oid)) g3
+        tapEach = List.foldl' (\g oid -> S.runPure (prefersColor Color.Black) g (S.tapForMana oid)) g3
     Spec.assertEqWith s "one Confluence, 1 life" (S.lifeOf S.alice (tapEach [firstId])) (Just 19)
     Spec.assertEqWith s "both of them, 2 life" (S.lifeOf S.alice (tapEach [firstId, secondId])) (Just 18)
     Spec.assertEqWith s "and the Forest adds a third mana for nothing" (S.lifeOf S.alice (tapEach [firstId, secondId, forestId])) (Just 18)
@@ -2069,8 +2072,8 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
              in Maybe.fromMaybe (NonEmpty.head candidates) (List.find wanted (NonEmpty.toList candidates))
           _ -> S.identityAnswer p
         blacks = filter ((==) (Mana.unitsOf black) . Mana.yieldUnits) (optionsOffered confluenceId gs)
-        free = S.runPure (buysBlack False) gs (Cost.tapForMana S.manaPerformer confluenceId)
-        bought = S.runPure (buysBlack True) gs (Cost.tapForMana S.manaPerformer confluenceId)
+        free = S.runPure (buysBlack False) gs (S.tapForMana confluenceId)
+        bought = S.runPure (buysBlack True) gs (S.tapForMana confluenceId)
     Spec.assertEqWith s "both ways of adding black are offered" (length blacks) 2
     Spec.assertEqWith s "charging two different costs" (Set.size (Set.fromList (fmap ManaOption.cost blacks))) 2
     Spec.assertEqWith s "the free one: black in the pool" (poolTypes S.alice free) [ManaType.Colored Color.Black]
@@ -2101,7 +2104,7 @@ optionsOffered oid gs =
           State.modify' (<> NonEmpty.toList candidates)
           pure (NonEmpty.head candidates)
         _ -> pure (S.identityAnswer p)
-   in State.execState (Engine.runGame step gs (Cost.tapForMana S.manaPerformer oid)) []
+   in State.execState (Engine.runGame step gs (S.tapForMana oid)) []
 
 -- The colours of those candidates alone, for a caller that is asking what the
 -- source could produce rather than what it charges.
@@ -2149,7 +2152,7 @@ phyrexianTowerSpec s registry = Spec.describe s "Phyrexian Tower" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (towerId, board) = S.addPermanent tower S.alice (snd (S.addPermanent piker S.alice (Setup.emptyGame S.bothPlayers)))
         tapWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
-        tapWith answer = S.runPure answer board (Cost.tapForMana S.manaPerformer towerId)
+        tapWith answer = S.runPure answer board (S.tapForMana towerId)
     Spec.assertEqWith s "the Piker is gone" (S.creaturesInPlay S.alice (tapWith prefersDoubleBlack)) 0
     Spec.assertEqWith s "choosing {C} instead leaves it alive" (S.creaturesInPlay S.alice (tapWith S.identityAnswer)) 1
 
@@ -2928,7 +2931,7 @@ mysticGateSpec s registry = Spec.describe s "Mystic Gate" $ do
   Spec.it s "CR 118.13a the player announces the {W/U} in a mana ability's own activation cost" $ do
     gate <- S.printingOf s registry "Mystic Gate"
     let board = gateBoard gate
-        run half = S.runPureWith (takesGate [whiteType, blueType] (Just half)) (snd board) (Cost.tapForMana S.manaPerformer (fst board))
+        run half = S.runPureWith (takesGate [whiteType, blueType] (Just half)) (snd board) (S.tapForMana (fst board))
         (paidWhite, afterWhite) = run whiteType
         (paidBlue, afterBlue) = run blueType
     Spec.assertEqWith s "the white half announced, so the blue unit is what is still floating beside the {W}{U}" (poolTypes S.alice afterWhite) [blueType, whiteType, blueType]
@@ -2948,7 +2951,7 @@ mysticGateSpec s registry = Spec.describe s "Mystic Gate" $ do
             State.modify' (+ 1)
             pure (takesGate wanted (Just whiteType) p)
           _ -> pure (takesGate wanted (Just whiteType) p)
-        asked wanted = State.execState (Engine.runGame (counting wanted) (snd board) (Cost.tapForMana S.manaPerformer (fst board))) (0 :: Int)
+        asked wanted = State.execState (Engine.runGame (counting wanted) (snd board) (S.tapForMana (fst board))) (0 :: Int)
     Spec.assertEqWith s "CR 118.13a the {C} route's cost prints no symbol payable two ways, so nothing is announced" (asked [ManaType.Colorless]) 0
     Spec.assertEqWith s "and the {W/U} route on the same board is asked once" (asked [whiteType, blueType]) 1
 
@@ -2966,7 +2969,7 @@ skyshroudElfSpec s registry = Spec.describe s "Skyshroud Elf" $ do
   Spec.it s "CR 605.3c the Elf's other mana ability pays for this one, the rule excluding the ability and not the permanent" $ do
     elf <- S.printingOf s registry "Skyshroud Elf"
     let (elfId, board) = S.addPermanent elf S.alice (Setup.emptyGame S.bothPlayers)
-        ((paid, after), offers) = State.runState (Engine.runGame (takesElfRoute elfId) board (Cost.tapForMana S.manaPerformer elfId)) []
+        ((paid, after), offers) = State.runState (Engine.runGame (takesElfRoute elfId) board (S.tapForMana elfId)) []
     -- The gameplay assertion: the {1} was paid by the Elf's OWN {T}, so the {G}
     -- is gone and the {R} is what is floating. An exclusion keyed to the
     -- permanent leaves the window nothing to offer and the pool empty.
@@ -3354,10 +3357,10 @@ wildGrowthSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> 
 wildGrowthSpec s registry = Spec.describe s "Wild Growth" $ do
   Spec.it s "CR 106.12a tapping the enchanted land adds the Aura's mana to the LAND's controller" $ do
     (aliceForest, bobForest, _, board) <- wildGrowthBoard s registry
-    let after = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer bobForest)
+    let after = S.runPure S.identityAnswer board (S.tapForMana bobForest)
         -- The same board differing in exactly one thing: which Forest was
         -- tapped. Alice's carries no Aura, so it must add one and only one.
-        unenchanted = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceForest)
+        unenchanted = S.runPure S.identityAnswer board (S.tapForMana aliceForest)
         -- CR 605.4a from the other side: the next time the game settles for
         -- priority it scans the very event this tap recorded, and the ability
         -- must NOT be gathered onto the stack there -- it has already resolved.
@@ -3389,12 +3392,12 @@ autumnWillowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 autumnWillowSpec s registry = Spec.describe s "Autumn Willow, Harmony" $ do
   Spec.it s "CR 106.12a tapping alice's own land creature for mana adds the Willow's additional {G}" $ do
     (aliceArbor, aliceForest, bobArbor, board) <- autumnWillowBoard s registry
-    let arbor = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceArbor)
+    let arbor = S.runPure S.identityAnswer board (S.tapForMana aliceArbor)
         -- The same board differing in exactly one thing: which of alice's
         -- permanents was tapped. Her Forest is a land and no creature.
-        forest = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceForest)
+        forest = S.runPure S.identityAnswer board (S.tapForMana aliceForest)
         -- And differing in exactly one other thing: whose land creature it was.
-        theirs = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer bobArbor)
+        theirs = S.runPure S.identityAnswer board (S.tapForMana bobArbor)
         -- CR 605.4a from the other side, the Wild Growth group's reason.
         settled = resolveDown (S.runPure S.identityAnswer arbor Engine.settleForPriority)
     Spec.assertEqWith s "CR 106.12a alice's pool holds the Arbor's {G} and the Willow's additional one" (poolTypes S.alice arbor) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
@@ -3447,15 +3450,15 @@ gauntletOfPowerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 gauntletOfPowerSpec s registry = Spec.describe s "Gauntlet of Power" $ do
   Spec.it s "CR 106.12a a basic land tapped for the CHOSEN colour adds the Gauntlet's additional mana" $ do
     (aliceForest, aliceMountain, aliceArbor, bobForest, board) <- gauntletBoard s registry
-    let forest = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceForest)
+    let forest = S.runPure S.identityAnswer board (S.tapForMana aliceForest)
         -- The same board differing in exactly one thing: the mana the tap
         -- produced. A Mountain is as basic a land as the Forest.
-        mountain = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceMountain)
+        mountain = S.runPure S.identityAnswer board (S.tapForMana aliceMountain)
         -- And in exactly one other: the Basic supertype. A Dryad Arbor is a land
         -- producing the same {G} (CR 305.6) with no supertype at all.
-        arbor = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer aliceArbor)
+        arbor = S.runPure S.identityAnswer board (S.tapForMana aliceArbor)
         -- And in exactly one other again: whose land it was.
-        theirs = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer bobForest)
+        theirs = S.runPure S.identityAnswer board (S.tapForMana bobForest)
         -- CR 605.4a from the other side, the Wild Growth group's reason.
         settled = resolveDown (S.runPure S.identityAnswer forest Engine.settleForPriority)
     Spec.assertEqWith s "CR 106.12a alice's pool holds the Forest's {G} and the Gauntlet's additional one" (poolTypes S.alice forest) [ManaType.Colored Color.Green, ManaType.Colored Color.Green]
@@ -3516,12 +3519,12 @@ cagedSunSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n 
 cagedSunSpec s registry = Spec.describe s "Caged Sun" $ do
   Spec.it s "CR 605.1b a land's ability adding the chosen colour with no tap adds Caged Sun's additional mana" $ do
     (pet, bobSwamp, board, withAshaya) <- cagedSunBoard s registry
-    let sacrificed = S.runPure S.identityAnswer withAshaya (Cost.tapForMana S.manaPerformer pet)
+    let sacrificed = S.runPure S.identityAnswer withAshaya (S.tapForMana pet)
         -- The same board differing in exactly one thing: no Ashaya, so the Pet
         -- is no land.
-        creature = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer pet)
+        creature = S.runPure S.identityAnswer board (S.tapForMana pet)
         -- And in exactly one other: whose pool the mana went to.
-        theirs = S.runPure S.identityAnswer withAshaya (Cost.tapForMana S.manaPerformer bobSwamp)
+        theirs = S.runPure S.identityAnswer withAshaya (S.tapForMana bobSwamp)
     Spec.assertEqWith s "CR 605.1b the Ashaya'd Pet is a land, so alice's pool holds its {B} and Caged Sun's additional one" (poolTypes S.alice sacrificed) [ManaType.Colored Color.Black, ManaType.Colored Color.Black]
     Spec.assertEqWith s "the Filter: without Ashaya the Pet is no land, so its {B} stands alone" (poolTypes S.alice creature) [ManaType.Colored Color.Black]
     Spec.assertEqWith s "the PlayerRelation: bob's Swamp added the {B} to HIS pool, so Caged Sun gives alice nothing" (poolTypes S.alice theirs) []
@@ -3856,19 +3859,19 @@ tyvarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tyvarSpec s registry = Spec.describe s "Tyvar the Bellicose" $ do
   Spec.it s "CR 605.1b a creature's mana ability resolving puts a counter on it per mana it produced" $ do
     (myr, elves, forest, theirElves, board) <- tyvarBoard s registry
-    let tapped = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer myr)
+    let tapped = S.runPure S.identityAnswer board (S.tapForMana myr)
         -- CR 605.5a: the granted trigger could add no mana, so it waits on the
         -- stack rather than applying inline the way CR 605.4a's would.
         waiting = S.runPure S.identityAnswer tapped Engine.settleForPriority
         settled = resolveDown waiting
         -- The same board differing in exactly one thing: how much mana the
         -- activation produced. One Llanowar Elf's {G} against the Myr's {C}{C}.
-        one = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer elves)) Engine.settleForPriority)
+        one = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.tapForMana elves)) Engine.settleForPriority)
         -- And in exactly one other: a Forest is a mana source that is no
         -- creature, so Tyvar granted it nothing.
-        land = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer forest)) Engine.settleForPriority)
+        land = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.tapForMana forest)) Engine.settleForPriority)
         -- And in exactly one other again: whose creature it was.
-        theirs = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer theirElves)) Engine.settleForPriority)
+        theirs = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.tapForMana theirElves)) Engine.settleForPriority)
     Spec.assertEqWith s "CR 605.1b the Myr made two mana, so two +1/+1 counters went on it" (S.counterOf CounterKind.PlusOnePlusOne myr settled) 2
     Spec.assertEqWith s "the amount: one Llanowar Elf made one mana, so one counter" (S.counterOf CounterKind.PlusOnePlusOne elves one) 1
     Spec.assertEqWith s "the Filter: alice's Forest is no creature, so Tyvar granted it nothing" (S.counterOf CounterKind.PlusOnePlusOne forest land) 0
@@ -3880,13 +3883,13 @@ tyvarSpec s registry = Spec.describe s "Tyvar the Bellicose" $ do
   -- road CR 502.3 takes, so the second one pays the same {T} the first did.
   Spec.it s "the rider: a second resolution the same turn triggers nothing more" $ do
     (myr, elves, _, _, board) <- tyvarBoard s registry
-    let once = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer myr)) Engine.settleForPriority)
+    let once = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.tapForMana myr)) Engine.settleForPriority)
         untapped = S.runPure S.identityAnswer once (Event.untap myr)
-        twice = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer untapped (Cost.tapForMana S.manaPerformer myr)) Engine.settleForPriority)
+        twice = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer untapped (S.tapForMana myr)) Engine.settleForPriority)
         -- The same board differing in exactly one thing: which creature's mana
         -- ability resolved the second time. CR 113.7 gives each its own
         -- instance of the granted ability, so the Elf's limit is unspent.
-        another = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer once (Cost.tapForMana S.manaPerformer elves)) Engine.settleForPriority)
+        another = resolveDown (S.runPure S.identityAnswer (S.runPure S.identityAnswer once (S.tapForMana elves)) Engine.settleForPriority)
     Spec.assertEqWith s "the rider: the Myr's second resolution added no third counter" (S.counterOf CounterKind.PlusOnePlusOne myr twice) 2
     Spec.assertEqWith s "the fixture: the second activation really did make its mana" (poolTypes S.alice twice) [ManaType.Colorless, ManaType.Colorless, ManaType.Colorless, ManaType.Colorless]
     Spec.assertEqWith s "and the limit is per source: the Elf's own instance is unspent" (S.counterOf CounterKind.PlusOnePlusOne elves another) 1
@@ -3942,7 +3945,7 @@ rhysticCaveSpec s registry =
       -- for Action.ActivateManaAbility.
       tapCave who = do
         (caveId, gs) <- caveBoard 1
-        pure (caveId, gs, Replay.record (paysFor who) gs (Cost.tapForMana Resolve.performManaAbility caveId))
+        pure (caveId, gs, Replay.record (paysFor who) gs (S.tapForMana caveId))
    in Spec.describe s "CR 118.12a Rhystic Cave's unless any player pays" $ do
         Spec.it s "CR 118.12a bob pays {1}, so no mana is added" $ do
           (caveId, gs, ((_, after), transcript)) <- tapCave (Just S.bob)
@@ -4015,6 +4018,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   almsEngineSpec s registry
   confluenceObeliskSpec s registry
   hickoryWoodlotSpec s registry
+  manaCacheSpec s registry
   recipientsSpec s registry
 
 -- CR 605.3b's road has no ability object, so a mana addition naming a BINDING
@@ -4071,7 +4075,7 @@ almsEngineSpec s registry = Spec.describe s "Synthetic Alms Engine" $ do
         board = g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
         withOwn = Mana.addMana S.alice [unitOf ManaType.Colorless] board
         offers g = length (filter (S.isCastOf stoneId) (Action.legalActions S.alice g))
-        tapped = S.runPure S.identityAnswer board (Cost.tapForMana S.manaPerformer engineId)
+        tapped = S.runPure S.identityAnswer board (S.tapForMana engineId)
     Spec.assertEqWith s "CR 118.3 the Meekstone is castable only off a {C} of her own, the Engine's being no supply of hers" (fmap offers [board, withOwn]) [0, 1]
     Spec.assertEqWith s "CR 106.4 and the {C} the Engine does make reaches each opponent instead" (fmap (\pid -> poolTypes pid tapped) [S.alice, S.bob, S.carol]) [[], [ManaType.Colorless], [ManaType.Colorless]]
 
@@ -4094,7 +4098,7 @@ confluenceObeliskSpec s registry = Spec.describe s "Synthetic Confluence Obelisk
         (_, bare) = S.addPermanent island S.bob g1
         (_, withForest) = S.addPermanent forest S.alice bare
         (_, withBoth) = S.addPermanent island S.alice withForest
-        tapped g = List.sort (poolTypes S.alice (S.runPure S.identityAnswer g (Cost.tapForMana S.manaPerformer obeliskId)))
+        tapped g = List.sort (poolTypes S.alice (S.runPure S.identityAnswer g (S.tapForMana obeliskId)))
     Spec.assertEqWith
       s
       "CR 608.2c tapping the Obelisk adds {C}, then {G} with a Forest, then {U} too with an Island of alice's own"
@@ -4127,7 +4131,7 @@ hickoryWoodlotSpec s registry = Spec.describe s "Hickory Woodlot" $ do
     let (woodlotId, base) = S.addPermanent woodlot S.alice (Setup.emptyGame S.bothPlayers)
         depletion = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "depletion"))
         tapWith n =
-          let after = S.runPure S.identityAnswer (S.addCounter depletion n woodlotId base) (Cost.tapForMana S.manaPerformer woodlotId)
+          let after = S.runPure S.identityAnswer (S.addCounter depletion n woodlotId base) (S.tapForMana woodlotId)
            in (poolTypes S.alice after, Set.member woodlotId (GameState.battlefield after))
     Spec.assertEqWith
       s
@@ -4539,3 +4543,99 @@ translatorSpec s registry = Spec.describe s "Kozilek's Translator" $ do
     -- Mana.manaSourcesGiven rather than through a payment: the Translator is a
     -- source again on the later turn and is none once its route is spent.
     Spec.assertEqWith s "CR 605.3a the priority window drops the source whose only route is spent, and offers it again next turn" (fmap (length . filter isManaActivation . Action.legalActions S.alice) [spent, next]) [0, 1]
+
+-- CR 602.1b on a MANA ability: Mana Cache ({1}{R}{R} Enchantment, Oracle text
+-- checked against Scryfall 2026-09-29): "At the beginning of each player's end
+-- step, put a charge counter on this enchantment for each untapped land that
+-- player controls. Remove a charge counter from this enchantment: Add {C}. Any
+-- player may activate this ability but only during their turn before the end
+-- step."
+--
+-- THREE SEATS, alice controlling the Cache on every board, so "their turn" can
+-- be told apart from its controller's turn and from any one opponent's. The
+-- Workhorse board is the control: alice's again, the same "Remove a counter:
+-- Add {C}" shape, and no "any player" clause -- so what bob cannot do there is
+-- CR 602.2's default rather than a want of mana.
+manaCacheSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+manaCacheSpec s registry = Spec.describe s "Mana Cache" $ do
+  let charge = CounterKind.Named (CounterName.UnsafeMkCounterName (Text.pack "charge"))
+      colorless n = replicate n ManaType.Colorless
+      pools gs = fmap (`poolTypes` gs) [S.alice, S.bob, S.carol]
+      floated active phase = do
+        cache <- S.printingOf s registry "Mana Cache"
+        let (cacheId, gs) = cacheBoard cache charge active phase
+        pure (cacheId, S.runPure tapEverything gs Engine.priorityLoop)
+
+  -- CR 605.3a's priority window. The gameplay-level assertion is whose POOL
+  -- the {C} lands in (CR 109.4a, CR 113.8: the activator controls the
+  -- ability), and whose counters paid for it (CR 602.1a).
+  Spec.it s "CR 602.1b the player whose turn it is activates alice's Cache and the mana is theirs" $ do
+    (cacheId, onBob) <- floated S.bob Phase.PrecombatMain
+    (_, onCarol) <- floated S.carol Phase.PrecombatMain
+    (_, onAlice) <- floated S.alice Phase.PrecombatMain
+    Spec.assertEqWith s "CR 113.8 on bob's turn all three {C} are bob's" (pools onBob) [[], colorless 3, []]
+    Spec.assertEqWith s "CR 102.1 on carol's turn they are carol's, so this is not one opponent" (pools onCarol) [[], [], colorless 3]
+    Spec.assertEqWith s "CR 602.2 and on alice's own turn hers" (pools onAlice) [colorless 3, [], []]
+    Spec.assertEqWith s "CR 602.1a bob's activations spent the counters on alice's permanent" (S.counterOf charge cacheId onBob) 0
+
+  -- The rider's two halves. "Their turn" is the ACTIVATOR's, so alice -- who
+  -- controls the Cache -- is refused on bob's turn; "before the end step"
+  -- refuses everyone once it begins.
+  Spec.it s "CR 500.1 the rider is read against the activator, and closes at the end step" $ do
+    cache <- S.printingOf s registry "Mana Cache"
+    let offered pid gs = length (filter isManaActivation (Action.legalActions pid gs {GameState.priority = Just pid}))
+        (_, bobMain) = cacheBoard cache charge S.bob Phase.PrecombatMain
+        (_, bobCombat) = cacheBoard cache charge S.bob (Phase.Combat CombatStep.DeclareAttackers)
+    (cacheId, atEnd) <- floated S.bob (Phase.Ending EndingStep.EndStep)
+    Spec.assertEqWith s "CR 513.1 in bob's end step nobody floats anything" (pools atEnd) [[], [], []]
+    Spec.assertEqWith s "and the counters are all still there" (S.counterOf charge cacheId atEnd) 3
+    Spec.assertEqWith s "CR 109.4a on bob's turn the offer is bob's and not its controller's" (fmap (`offered` bobMain) [S.alice, S.bob, S.carol]) [0, 1, 0]
+    Spec.assertEqWith s "CR 506.1 combat is before the end step too" (offered S.bob bobCombat) 1
+
+  -- CR 605.3a's payment window, through Cast.castSpell rather than the menu.
+  -- Crucible of Worlds is {3}, all generic, and bob controls nothing, so the
+  -- Cache's three counters are the only way to pay it.
+  Spec.it s "CR 605.3a bob pays for his spell from alice's Cache, and not from her Workhorse" $ do
+    cache <- S.printingOf s registry "Mana Cache"
+    horse <- S.printingOf s registry "Workhorse"
+    crucible <- S.printingOf s registry "Crucible of Worlds"
+    let (cacheId, cacheBoard_) = cacheBoard cache charge S.bob Phase.PrecombatMain
+        (horseId, horseBoard_) = cacheBoard horse CounterKind.PlusOnePlusOne S.bob Phase.PrecombatMain
+        castBy gs =
+          let (spellId, withSpell) = S.addHandCard crucible S.bob gs
+              afterCast = S.runPure S.identityAnswer withSpell (S.cast S.bob spellId)
+           in (S.castable S.bob spellId withSpell, S.runPure S.identityAnswer afterCast Stack.resolveTop)
+        crucibles = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Crucible of Worlds")) S.bob
+        (cacheCastable, viaCache) = castBy cacheBoard_
+        (horseCastable, viaHorse) = castBy horseBoard_
+    Spec.assertEqWith s "CR 602.1b the Crucible resolved under bob" (crucibles viaCache) 1
+    Spec.assertEqWith s "CR 602.2 alice's Workhorse, printing no such clause, pays bob nothing" (crucibles viaHorse) 0
+    Spec.assertEqWith s "CR 602.1a the Cache's three counters paid for it" (S.counterOf charge cacheId viaCache) 0
+    Spec.assertEqWith s "and the Workhorse kept its counters" (S.counterOf CounterKind.PlusOnePlusOne horseId viaHorse) 3
+    Spec.assertEqWith s "CR 118.3 the cast gate agrees on both boards" [cacheCastable, horseCastable] [True, False]
+
+  -- The printed trigger: "each player's end step" and "that player controls"
+  -- both name the ACTIVE player (CR 603.2), not the Cache's controller. Every
+  -- seat's untapped-land count differs, and bob's tapped Forest is the one land
+  -- the "untapped" word excludes.
+  Spec.it s "CR 122.1 at bob's end step the Cache gets a counter per untapped land bob controls" $ do
+    cache <- S.printingOf s registry "Mana Cache"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (cacheId, base) = S.addPermanent cache S.alice S.threePlayerGame
+        lands = S.landsFor forest S.carol 1 (S.landsFor forest S.alice 4 (S.landsFor forest S.bob 2 base))
+        (tappedForest, withTapped) = S.addPermanent forest S.bob lands
+        stocked = List.foldl' (\g pid -> List.foldl' (\g2 _ -> snd (S.addLibraryCard piker pid g2)) g [1 .. (5 :: Int)]) (S.tapObject tappedForest withTapped) [S.alice, S.bob, S.carol]
+        endStep = Phase.Ending EndingStep.EndStep
+        began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.bob)) (stocked {GameState.phase = endStep, GameState.activePlayer = S.bob, GameState.remaining = Seq.empty})
+        settled = S.runPure S.identityAnswer began Engine.settleForPriority
+        after = S.runPure S.identityAnswer settled Engine.priorityLoop
+    Spec.assertEqWith s "two: bob's untapped Forests, not alice's four or carol's one" (S.counterOf charge cacheId after) 2
+
+-- One `printing` under alice's control carrying three `kind` counters, at three
+-- seats, on `active`'s turn in `phase`; an empty `remaining` pins the phase.
+-- Nothing else is on the board, so every mana comes through this permanent.
+cacheBoard :: Printing.Printing -> CounterKind.CounterKind Keyword.Keyword -> PlayerId.PlayerId -> Phase.Phase -> (ObjectId.ObjectId, GameState.GameState)
+cacheBoard printing kind active phase =
+  let (oid, gs) = S.addPermanent printing S.alice S.threePlayerGame
+   in (oid, (S.addCounter kind 3 oid gs) {GameState.activePlayer = active, GameState.phase = phase, GameState.remaining = Seq.empty})

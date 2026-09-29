@@ -419,3 +419,14 @@ beforeCombatDamage phase = case phase of
   Phase.PrecombatMain -> False
   Phase.PostcombatMain -> False
   Phase.Ending _ -> False
+
+-- CR 500.1: is the game in a phase or step of the turn ahead of the end step?
+-- Mana Cache's "before the end step". The phase alone answers, CR 500.1 fixing
+-- the order; CR 514's cleanup step comes after the end step, so it is not before.
+beforeEndStep :: Phase -> Bool
+beforeEndStep phase = case phase of
+  Phase.Beginning _ -> True
+  Phase.PrecombatMain -> True
+  Phase.Combat _ -> True
+  Phase.PostcombatMain -> True
+  Phase.Ending _ -> False

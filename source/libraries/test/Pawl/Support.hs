@@ -25,6 +25,7 @@ import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
@@ -1146,6 +1147,15 @@ performer = Resolve.performHandAction
 -- have to reach into Pawl.Engine.Resolve for it.
 manaPerformer :: ManaAbilityPerformer.ManaAbilityPerformer
 manaPerformer = Resolve.performManaAbility
+
+-- Cost.tapForMana by the permanent's controller, CR 602.2's default activator.
+-- A mana ability another player activates (CR 602.1b) goes to Cost.tapForMana.
+tapForMana :: ObjectId.ObjectId -> Game.Type.Game Bool
+tapForMana oid = do
+  gs <- State.get
+  case Projection.controllerOf oid gs of
+    Nothing -> pure False
+    Just pid -> Cost.tapForMana manaPerformer pid oid
 
 -- The source stand-in for a targeting call whose target slot is source-blind
 -- (every slot but the opponent's-creatures one, Pawl.ResolveSpec's CR 115.1a
