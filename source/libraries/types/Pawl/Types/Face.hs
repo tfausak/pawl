@@ -118,6 +118,15 @@ data Face card = MkFace
     -- Pawl.Engine.Commander.designations reads it off the front face for the
     -- reason that function gives.
     canBeYourCommander :: Bool,
+    -- | CR 103.1c: whether this card prints "you are the starting player".
+    -- False for every card that does not print it.
+    --
+    -- A printed flag rather than a static ability for canBeYourCommander's
+    -- reason: its one reader, Pawl.Engine.Setup.claimStartingPlayer, runs once
+    -- as the game begins, before there is a turn for a continuous effect to
+    -- apply in. Read off the face of a card in its owner's command zone, where
+    -- CR 315.3 keeps a conspiracy.
+    claimsStartingPlayer :: Bool,
     -- | CR 702, counted. A card can print the same keyword twice -- Apex
     -- Devastator's "Cascade, cascade, cascade, cascade" -- and CR 702.85c makes
     -- each instance trigger separately, so the count is printed text rather than

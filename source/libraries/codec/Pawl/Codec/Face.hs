@@ -175,6 +175,9 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
   -- CR 903.3a: False is the absence of a card stating it can be your
   -- commander.
   canBeYourCommander <- Fields.defaulted "canBeYourCommander" False Common.boolean Face.canBeYourCommander
+  -- CR 103.1c: False is the absence of a card stating its controller is the
+  -- starting player.
+  claimsStartingPlayer <- Fields.defaulted "claimsStartingPlayer" False Common.boolean Face.claimsStartingPlayer
   pure
     Face.MkFace
       { Face.name = name,
@@ -224,5 +227,6 @@ codec cardCodec = Fields.objectWith modeCostsInRange $ do
         Face.openingHandActions = openingHandActions,
         Face.specialActions = specialActions,
         Face.counterability = counterability,
-        Face.canBeYourCommander = canBeYourCommander
+        Face.canBeYourCommander = canBeYourCommander,
+        Face.claimsStartingPlayer = claimsStartingPlayer
       }
