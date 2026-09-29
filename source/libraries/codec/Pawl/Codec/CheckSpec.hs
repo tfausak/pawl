@@ -1,18 +1,28 @@
 module Pawl.Codec.CheckSpec where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Check as Check
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AttackersAre as AttackersAre.Type
+import qualified Pawl.Types.BlockersAre as BlockersAre.Type
 import qualified Pawl.Types.CardName as CardName.Type
+import qualified Pawl.Types.CardType as CardType.Type
 import qualified Pawl.Types.Check as Check.Type
 import qualified Pawl.Types.CountIs as CountIs.Type
+import qualified Pawl.Types.CounterKind as CounterKind.Type
+import qualified Pawl.Types.CountersAre as CountersAre.Type
 import qualified Pawl.Types.DamageIs as DamageIs.Type
+import qualified Pawl.Types.DefendersAre as DefendersAre.Type
 import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.LifeIs as LifeIs.Type
+import qualified Pawl.Types.MonarchIs as MonarchIs.Type
 import qualified Pawl.Types.Reference as Reference.Type
 import qualified Pawl.Types.TapState as TapState.Type
 import qualified Pawl.Types.TappedIs as TappedIs.Type
+import qualified Pawl.Types.TypesAre as TypesAre.Type
 import qualified Pawl.Types.Zone as Zone.Type
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -25,5 +35,20 @@ spec s = Spec.describe s "Pawl.Codec.Check" $ do
     Common.assertCodec s Check.codec (Check.Type.Damage (DamageIs.Type.MkDamageIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "wall"))) 2)) " {\"Damage\":{\"object\":\"@wall\",\"damage\":2}} "
   Spec.it s "Tapped" $
     Common.assertCodec s Check.codec (Check.Type.Tapped (TappedIs.Type.MkTappedIs (Reference.Type.Labelled (Label.Type.MkLabel (Text.pack "bear"))) TapState.Type.Untapped)) " {\"Tapped\":{\"object\":\"@bear\",\"tapped\":false}} "
+  Spec.it s "Counters" $
+    Common.assertCodec s Check.codec (Check.Type.Counters (CountersAre.Type.MkCountersAre (labelled "jace") CounterKind.Type.Loyalty 3)) " {\"Counters\":{\"object\":\"@jace\",\"kind\":{\"type\":\"Loyalty\"},\"count\":3}} "
+  Spec.it s "Types" $
+    Common.assertCodec s Check.codec (Check.Type.Types (TypesAre.Type.MkTypesAre (labelled "soldier") (Set.singleton CardType.Type.Creature))) " {\"Types\":{\"object\":\"@soldier\",\"types\":[\"Creature\"]}} "
+  Spec.it s "Attackers" $
+    Common.assertCodec s Check.codec (Check.Type.Attackers (AttackersAre.Type.MkAttackersAre (Map.singleton (labelled "bear") (labelled "bob")))) " {\"Attackers\":{\"attackers\":{\"@bear\":\"@bob\"}}} "
+  Spec.it s "Blockers" $
+    Common.assertCodec s Check.codec (Check.Type.Blockers (BlockersAre.Type.MkBlockersAre (labelled "bear") (Just (Set.singleton (labelled "wall"))))) " {\"Blockers\":{\"attacker\":\"@bear\",\"blockers\":[\"@wall\"]}} "
+  Spec.it s "Defenders" $
+    Common.assertCodec s Check.codec (Check.Type.Defenders (DefendersAre.Type.MkDefendersAre [Label.Type.MkLabel (Text.pack "bob")])) " {\"Defenders\":{\"players\":[\"bob\"]}} "
+  Spec.it s "Monarch" $
+    Common.assertCodec s Check.codec (Check.Type.Monarch (MonarchIs.Type.MkMonarchIs (Just (Label.Type.MkLabel (Text.pack "alice"))))) " {\"Monarch\":{\"player\":\"alice\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Check.codec
+
+labelled :: String -> Reference.Type.Reference
+labelled = Reference.Type.Labelled . Label.Type.MkLabel . Text.pack

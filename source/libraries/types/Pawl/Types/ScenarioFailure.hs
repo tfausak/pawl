@@ -22,6 +22,11 @@ data ScenarioFailure
   | MkUnknownActivePlayer Label.Label
   | MkUnknownController Label.Label
   | MkUnknownCard CardName.CardName
+  | -- | A placement attached to a label that names nothing on the board, or to
+    -- something CR 301.5 / 303.4 forbid it from being attached to.
+    MkIllegalAttachment Label.Label
+  | -- | The monarch names no seat.
+    MkUnknownMonarch Label.Label
   | -- | The reference named no live object, with whether the board did label
     -- one so -- a stale label and a typo read alike otherwise.
     MkUnknownObject Reference.Reference Bool

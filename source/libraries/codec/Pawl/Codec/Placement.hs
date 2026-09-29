@@ -25,6 +25,7 @@ codec = Fields.object $ do
   damage <- Fields.defaulted "damage" 0 Common.natural Placement.damage
   counters <- Fields.defaulted "counters" Map.empty (Common.multiset (CounterKind.codec Keyword.codec)) Placement.counters
   controller <- Fields.defaulted "controller" Nothing (Common.maybe Label.codec) Placement.controller
+  attached <- Fields.defaulted "attached" Nothing (Common.maybe Label.codec) Placement.attached
   pure
     Placement.MkPlacement
       { Placement.card = card,
@@ -33,5 +34,6 @@ codec = Fields.object $ do
         Placement.readiness = readiness,
         Placement.damage = damage,
         Placement.counters = counters,
-        Placement.controller = controller
+        Placement.controller = controller,
+        Placement.attached = attached
       }

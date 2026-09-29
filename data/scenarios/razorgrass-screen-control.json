@@ -1,0 +1,23 @@
+{
+  "description": "CR 509.1c whole cards: the Screen blocks a real declare blockers step (the Ogre Sentry control)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Ogre Sentry", "label": "wall", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Ogre Sentry", "count": 1 } } }
+  ]
+}

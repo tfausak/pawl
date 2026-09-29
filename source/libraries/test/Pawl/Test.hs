@@ -75,6 +75,7 @@ import qualified Pawl.Codec.AttackTargetKindSpec
 import qualified Pawl.Codec.AttackTargetSpec
 import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
+import qualified Pawl.Codec.AttackersAreSpec
 import qualified Pawl.Codec.AttackingPlayersSpec
 import qualified Pawl.Codec.BackupSpec
 import qualified Pawl.Codec.BattlefieldCandidateSpec
@@ -88,6 +89,7 @@ import qualified Pawl.Codec.BlockCostSpec
 import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockProducerSpec
 import qualified Pawl.Codec.BlockRequirementSpec
+import qualified Pawl.Codec.BlockersAreSpec
 import qualified Pawl.Codec.BlocksDeclaredSpec
 import qualified Pawl.Codec.BoardSpec
 import qualified Pawl.Codec.CandidateIdSpec
@@ -180,6 +182,7 @@ import qualified Pawl.Codec.CounterSpreadSpec
 import qualified Pawl.Codec.CounterSubjectSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
+import qualified Pawl.Codec.CountersAreSpec
 import qualified Pawl.Codec.CountersFromPermanentsSpec
 import qualified Pawl.Codec.CountersFromThisSpec
 import qualified Pawl.Codec.CraftSpec
@@ -202,6 +205,7 @@ import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DaytimeSpec
 import qualified Pawl.Codec.DealDamageSpec
 import qualified Pawl.Codec.DeciderSpec
+import qualified Pawl.Codec.DefendersAreSpec
 import qualified Pawl.Codec.DefenseSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
 import qualified Pawl.Codec.DepartureSpec
@@ -369,6 +373,7 @@ import qualified Pawl.Codec.ModificationSpec
 import qualified Pawl.Codec.ModifiedRollSpec
 import qualified Pawl.Codec.ModifyPowerToughnessSpec
 import qualified Pawl.Codec.ModifyTargetSpec
+import qualified Pawl.Codec.MonarchIsSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.MonarchWatchSpec
 import qualified Pawl.Codec.MorphSpec
@@ -568,6 +573,7 @@ import qualified Pawl.Codec.TurnUpRSpec
 import qualified Pawl.Codec.TurnUpRewriteSpec
 import qualified Pawl.Codec.TurnWindowSpec
 import qualified Pawl.Codec.TypeLineSpec
+import qualified Pawl.Codec.TypesAreSpec
 import qualified Pawl.Codec.UntapRSpec
 import qualified Pawl.Codec.UntapRestrictionSpec
 import qualified Pawl.Codec.UntapRewriteSpec
@@ -1206,6 +1212,12 @@ spec s registry = do
   Pawl.Codec.EntrySpec.spec s
   Pawl.Codec.DamageIsSpec.spec s
   Pawl.Codec.CountIsSpec.spec s
+  Pawl.Codec.TypesAreSpec.spec s
+  Pawl.Codec.MonarchIsSpec.spec s
+  Pawl.Codec.DefendersAreSpec.spec s
+  Pawl.Codec.CountersAreSpec.spec s
+  Pawl.Codec.BlockersAreSpec.spec s
+  Pawl.Codec.AttackersAreSpec.spec s
   Pawl.Codec.ChoicesSpec.spec s
   Pawl.Codec.CheckSpec.spec s
   Pawl.Codec.CastingSpec.spec s

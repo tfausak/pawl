@@ -1,0 +1,15 @@
+{
+  "description": "CR 703.4h no defending player has been chosen before the beginning of combat step",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      { "name": "alice" },
+      { "name": "bob" },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Defenders": { "players": [] } } }
+  ]
+}

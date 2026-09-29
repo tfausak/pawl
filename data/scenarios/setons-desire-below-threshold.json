@@ -1,0 +1,34 @@
+{
+  "description": "CR 509.1c whole cards: the threshold forces a block through a real declare blockers step (six cards)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker", "ready": true },
+          { "card": "Seton's Desire", "attached": "attacker" }
+        ],
+        "graveyard": [
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" },
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "blocker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 16 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

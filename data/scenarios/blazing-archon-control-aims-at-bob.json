@@ -1,0 +1,24 @@
+{
+  "description": "CR 508.1c whole cards: the declare attackers step aims the Piker at Jace instead (without the Archon)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "piker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Jace Beleren", "label": "jace", "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }] }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@piker", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@piker": "@bob" } } } }
+  ]
+}

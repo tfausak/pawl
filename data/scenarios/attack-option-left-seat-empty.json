@@ -1,0 +1,22 @@
+{
+  "description": "CR 803.1a a player whose nearest opponent to the left is more than one seat away can't attack (Leftward, bob gone)",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "attackOption": "Leftward",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      },
+      { "name": "bob" },
+      { "name": "carol" },
+      { "name": "dave" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "bob", "do": "Concede" },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Defenders": { "players": [] } } }
+  ]
+}

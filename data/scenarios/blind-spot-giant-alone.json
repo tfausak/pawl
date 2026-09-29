@@ -1,0 +1,19 @@
+{
+  "description": "CR 508.1c whole cards: the condition decides a real declare attackers step (the Hill Giant in the graveyard)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Blind-Spot Giant", "label": "giant", "ready": true }],
+        "graveyard": [{ "card": "Hill Giant" }]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

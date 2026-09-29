@@ -1,0 +1,24 @@
+{
+  "description": "CR 113.6b the same ability on the battlefield grants nothing",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "attacker" },
+          { "card": "Mountain" },
+          { "card": "Anger", "tapped": true, "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } }
+  ]
+}

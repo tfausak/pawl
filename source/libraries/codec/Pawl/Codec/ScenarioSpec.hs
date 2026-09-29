@@ -6,6 +6,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Scenario as Scenario
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AttackOption as AttackOption.Type
 import qualified Pawl.Types.Board as Board.Type
 import qualified Pawl.Types.Label as Label.Type
 import qualified Pawl.Types.Phase as Phase.Type
@@ -22,9 +23,11 @@ spec s = Spec.describe s "Pawl.Codec.Scenario" $ do
         { Scenario.Type.description = Text.pack "nothing happens",
           Scenario.Type.board =
             Board.Type.MkBoard
-              { Board.Type.seats = Seat.Type.MkSeat (Label.Type.MkLabel (Text.pack "alice")) 20 Seq.empty Seq.empty NonEmpty.:| [],
+              { Board.Type.seats = Seat.Type.MkSeat (Label.Type.MkLabel (Text.pack "alice")) 20 Seq.empty Seq.empty Seq.empty Seq.empty NonEmpty.:| [],
                 Board.Type.active = Label.Type.MkLabel (Text.pack "alice"),
-                Board.Type.phase = Phase.Type.PrecombatMain
+                Board.Type.phase = Phase.Type.PrecombatMain,
+                Board.Type.monarch = Nothing,
+                Board.Type.attackOption = Just AttackOption.Type.MultiplePlayers
               },
           Scenario.Type.timeline = Seq.empty,
           Scenario.Type.final = Seq.empty

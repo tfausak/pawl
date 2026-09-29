@@ -1,0 +1,18 @@
+{
+  "description": "CR 800.4h a turn whose active player has left puts the choice to the next player in turn order",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "attackOption": null,
+    "seats": [
+      { "name": "alice" },
+      { "name": "bob" },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Concede" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "do": { "ChooseDefender": "carol" } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Defenders": { "players": ["carol"] } } }
+  ]
+}

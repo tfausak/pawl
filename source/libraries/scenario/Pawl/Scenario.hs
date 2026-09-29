@@ -7,6 +7,7 @@
 module Pawl.Scenario where
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Foldable as Foldable
@@ -24,6 +25,7 @@ import qualified Pawl.Codec.Move as Codec.Move
 import qualified Pawl.Codec.Phase as Codec.Phase
 import qualified Pawl.Codec.Reference as Codec.Reference
 import qualified Pawl.Codec.Timed as Codec.Timed
+import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -44,26 +46,33 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activation as Activation
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackersAre as AttackersAre
+import qualified Pawl.Types.BlockersAre as BlockersAre
 import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Casting as Casting
 import qualified Pawl.Types.Check as Check
 import qualified Pawl.Types.Choices as Choices
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CountIs as CountIs
+import qualified Pawl.Types.CountersAre as CountersAre
 import qualified Pawl.Types.DamageIs as DamageIs
 import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.DefendersAre as DefendersAre
 import qualified Pawl.Types.Entry as Entry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Game as Game.Type
+import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.LifeIs as LifeIs
 import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.MonarchIs as MonarchIs
 import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -83,6 +92,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.Timed as Timed
+import qualified Pawl.Types.TypesAre as TypesAre
 import qualified Pawl.Types.When as When
 import qualified Pawl.Types.Zone as Zone
 
@@ -171,22 +181,25 @@ stage :: (Monad m) => Registry.Registry m -> Board.Board -> m (Either Failure.Sc
 stage registry board =
   let seated = NonEmpty.zip (Board.seats board) (fmap PlayerId.MkPlayerId (0 NonEmpty.:| [1 ..]))
       ids = Map.fromList (fmap (Bifunctor.first Seat.name) (NonEmpty.toList seated))
-   in case boardFailure ids board of
-        Just failure -> pure (Left failure)
-        Nothing -> case Map.lookup (Board.active board) ids of
-          Nothing -> pure (Left (Failure.MkUnknownActivePlayer (Board.active board)))
-          Just active -> do
-            let base = Setup.emptyGame (fmap snd seated)
-                lives = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.life seat)) (NonEmpty.toList seated))
-                positioned =
-                  base
-                    { GameState.activePlayer = active,
-                      GameState.phase = Board.phase board,
-                      GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Board.phase board) (Seq.fromList Turn.allPhases)),
-                      GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives}) (GameState.players base)
-                    }
-            placed <- placeSeats registry (NonEmpty.toList seated) (Staged.MkStaged positioned ids Map.empty)
-            pure (fmap designateDefenders placed)
+      seatOf label = maybe (Left (Failure.MkUnknownMonarch label)) Right (Map.lookup label ids)
+   in case (boardFailure ids board, Map.lookup (Board.active board) ids, traverse seatOf (Board.monarch board)) of
+        (Just failure, _, _) -> pure (Left failure)
+        (_, Nothing, _) -> pure (Left (Failure.MkUnknownActivePlayer (Board.active board)))
+        (_, _, Left failure) -> pure (Left failure)
+        (Nothing, Just active, Right monarch) -> do
+          let base = Setup.emptyGame (fmap snd seated)
+              lives = Map.fromList (fmap (\(seat, pid) -> (pid, Seat.life seat)) (NonEmpty.toList seated))
+              positioned =
+                base
+                  { GameState.activePlayer = active,
+                    GameState.phase = Board.phase board,
+                    GameState.remaining = Seq.drop 1 (Seq.dropWhileL (/= Board.phase board) (Seq.fromList Turn.allPhases)),
+                    GameState.players = Map.mapWithKey (\pid p -> p {Player.life = Map.findWithDefault (Player.life p) pid lives}) (GameState.players base),
+                    GameState.monarch = monarch,
+                    GameState.settings = (GameState.settings base) {GameSettings.attackOption = Board.attackOption board}
+                  }
+          placed <- placeSeats registry (NonEmpty.toList seated) (Staged.MkStaged positioned ids Map.empty)
+          pure (fmap designateDefenders (placed >>= attachAll (placementsOf board)))
 
 -- | CR 506.2 / CR 507.1: a board past the beginning of combat has its defending
 -- players settled already, so the turn-based action that step would have taken
@@ -203,10 +216,23 @@ quietAnswer p = case p of
   Prompt.Type.ChooseAction {} -> Action.Pass
   _ -> Script.declining p
 
+-- | Every placement on the board, in placement order.
+placementsOf :: Board.Board -> [Placement.Placement]
+placementsOf board = concatMap (concatMap (Foldable.toList . snd) . zonesOf) (NonEmpty.toList (Board.seats board))
+
+-- | A seat's zones in the order they are placed, which is creation order.
+zonesOf :: Seat.Seat -> [(Zone.Zone, Seq.Seq Placement.Placement)]
+zonesOf seat =
+  [ (Zone.Battlefield, Seat.battlefield seat),
+    (Zone.Hand, Seat.hand seat),
+    (Zone.Graveyard, Seat.graveyard seat),
+    (Zone.Library, Seat.library seat)
+  ]
+
 boardFailure :: Map.Map Label.Label PlayerId.PlayerId -> Board.Board -> Maybe Failure.ScenarioFailure
 boardFailure ids board =
   let seats = NonEmpty.toList (Board.seats board)
-      placements = concatMap (\seat -> Foldable.toList (Seat.battlefield seat) <> Foldable.toList (Seat.hand seat)) seats
+      placements = placementsOf board
       labels = fmap Seat.name seats <> Maybe.mapMaybe Placement.label placements
       counts = Map.fromListWith (+) (fmap (\label -> (label, 1 :: Natural)) labels)
       duplicate = fmap fst (List.find ((> 1) . snd) (Map.toAscList counts))
@@ -219,13 +245,32 @@ placeSeats :: (Monad m) => Registry.Registry m -> [(Seat.Seat, PlayerId.PlayerId
 placeSeats registry seated board = case seated of
   [] -> pure (Right board)
   (seat, pid) : rest -> do
-    onBattlefield <- placeAll registry Zone.Battlefield pid (Foldable.toList (Seat.battlefield seat)) board
-    inHand <- case onBattlefield of
-      Left failure -> pure (Left failure)
-      Right next -> placeAll registry Zone.Hand pid (Foldable.toList (Seat.hand seat)) next
-    case inHand of
+    let placeZone next (zone, placements) = case next of
+          Left failure -> pure (Left failure)
+          Right sofar -> placeAll registry zone pid (Foldable.toList placements) sofar
+    placed <- Monad.foldM placeZone (Right board) (zonesOf seat)
+    case placed of
       Left failure -> pure (Left failure)
       Right next -> placeSeats registry rest next
+
+-- | CR 301.5 / 303.4: each placement naming a host is attached to it, once
+-- every object exists, and only where Pawl.Engine.Attach would allow it. Staging
+-- creates one object per placement, in placementsOf's order, so the two zip.
+attachAll :: [Placement.Placement] -> Staged.Staged -> Either Failure.ScenarioFailure Staged.Staged
+attachAll placements board = Monad.foldM attachOne board (zip (Map.keys (GameState.objects (Staged.state board))) placements)
+  where
+    attachOne sofar (oid, placement) = case Placement.attached placement of
+      Nothing -> Right sofar
+      Just host ->
+        let gs = Staged.state sofar
+            destination = case (Map.lookup host (Staged.objects sofar), Map.lookup host (Staged.seats sofar)) of
+              (Just hostId, _) -> Just (Recipient.ToObject hostId)
+              (_, Just pid) -> Just (Recipient.ToPlayer pid)
+              _ -> Nothing
+         in case destination >>= \recipient -> Attach.attachmentFor oid recipient gs of
+              Nothing -> Left (Failure.MkIllegalAttachment host)
+              Just recipient ->
+                Right sofar {Staged.state = gs {GameState.objects = Map.adjust (\obj -> obj {Object.attachedTo = Just recipient}) oid (GameState.objects gs)}}
 
 placeAll :: (Monad m) => Registry.Registry m -> Zone.Zone -> PlayerId.PlayerId -> [Placement.Placement] -> Staged.Staged -> m (Either Failure.ScenarioFailure Staged.Staged)
 placeAll registry zone owner placements board = case placements of
@@ -572,6 +617,42 @@ observe gs check = case check of
     oid <- resolveObject ref gs
     let actual = fmap Object.tapped (Game.lookupObject oid gs)
     pure (if actual == Just tapped then Nothing else Just (Text.pack (maybe "no such object" show actual)))
+  Check.Counters (CountersAre.MkCountersAre ref kind count) -> do
+    oid <- resolveObject ref gs
+    let actual = fmap (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
+    pure (if actual == Just count then Nothing else Just (Text.pack (maybe "no such object" show actual)))
+  -- The projected types (CR 613.1d), never the printed card's.
+  Check.Types (TypesAre.MkTypesAre ref types) -> do
+    oid <- resolveObject ref gs
+    let actual = Projection.cardTypesOf oid gs
+    pure (if actual == types then Nothing else Just (Text.pack (show (Set.toList actual))))
+  Check.Attackers (AttackersAre.MkAttackersAre expected) -> do
+    wanted <- fmap Map.fromList (mapM (\(attacker, target) -> (,) <$> resolveObject attacker gs <*> resolveEither target gs) (Map.toList expected))
+    let actual = Combat.Type.attackers (GameState.combat gs)
+        targetOf target = case target of
+          AttackTarget.OfPlayer pid -> Left pid
+          AttackTarget.OfPlaneswalker oid -> Right oid
+          AttackTarget.OfBattle oid -> Right oid
+    if fmap targetOf actual == wanted
+      then pure Nothing
+      else do
+        described <- mapM (\(attacker, target) -> (\a t -> a <> Text.pack " attacking " <> t) <$> describeObject gs attacker <*> describeTarget gs target) (Map.toList actual)
+        pure (Just (if null described then Text.pack "nothing attacking" else Text.intercalate (Text.pack ", ") described))
+  Check.Blockers (BlockersAre.MkBlockersAre ref expected) -> do
+    oid <- resolveObject ref gs
+    wanted <- traverse (fmap Set.fromList . mapM (`resolveObject` gs) . Set.toList) expected
+    let actual = Map.lookup oid (Combat.Type.blockers (GameState.combat gs))
+    if actual == wanted
+      then pure Nothing
+      else case actual of
+        Nothing -> pure (Just (Text.pack "unblocked"))
+        Just blockers -> fmap (\named -> Just (Text.pack "blocked by [" <> Text.intercalate (Text.pack ", ") named <> Text.pack "]")) (describeAll gs (Set.toList blockers))
+  Check.Defenders (DefendersAre.MkDefendersAre expected) -> do
+    actual <- mapM labelOf (Combat.Type.defenders (GameState.combat gs))
+    pure (if actual == expected then Nothing else Just (Text.pack (show (fmap Label.unwrap actual))))
+  Check.Monarch (MonarchIs.MkMonarchIs expected) -> do
+    actual <- traverse labelOf (GameState.monarch gs)
+    pure (if actual == expected then Nothing else Just (maybe (Text.pack "nobody") Label.unwrap actual))
 
 -- Queues -----------------------------------------------------------------------
 
@@ -760,6 +841,8 @@ render failure = case failure of
   Failure.MkUnknownActivePlayer label -> Label.unwrap label <> Text.pack " is active but has no seat"
   Failure.MkUnknownController label -> Label.unwrap label <> Text.pack " controls a placed card but has no seat"
   Failure.MkUnknownCard name -> Text.pack "no card named " <> CardName.unwrap name
+  Failure.MkIllegalAttachment label -> Text.pack "a placement cannot be attached to " <> Label.unwrap label
+  Failure.MkUnknownMonarch label -> Label.unwrap label <> Text.pack " is the monarch but has no seat"
   Failure.MkUnknownObject ref known ->
     Codec.Reference.toText ref
       <> Text.pack " names nothing in the game"

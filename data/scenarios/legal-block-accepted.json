@@ -1,0 +1,22 @@
+{
+  "description": "CR 509.1b a wholly legal declaration is accepted",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Bird Maiden", "label": "flier", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Nimble Birdsticker", "label": "reacher", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@flier"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@reacher": ["@flier"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@flier", "blockers": ["@reacher"] } } }
+  ]
+}
