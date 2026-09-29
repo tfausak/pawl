@@ -593,6 +593,19 @@ viewOfCharacteristics peers oid pc controller counters gs =
               (Map.lookup oid (Combat.attackedUnder (GameState.combat gs))),
             any (Set.member CardType.Planeswalker . Filter.cardTypes) (peers pw) ->
               controllerOf pw gs
+        -- CR 506.4e: a battle announcement whose permanent stopped being a
+        -- battle but is still a planeswalker its protector controls, the second
+        -- disjunct of Pawl.Engine.Combat.targetStillAttacked's battle arm. A
+        -- regression fence: mutating it away leaves the suite green, as no test
+        -- puts Soul Snare on that board.
+        Just (AttackTarget.OfBattle pw)
+          | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
+            Set.member pw (GameState.battlefield gs),
+            Maybe.isJust (Battle.protectorOf pw gs),
+            controllerOf pw gs == Battle.protectorOf pw gs,
+            List.any (\defending -> controllerOf pw gs == Just defending) (Defender.defendingPlayers gs),
+            any (Set.member CardType.Planeswalker . Filter.cardTypes) (peers pw) ->
+              controllerOf pw gs
         _ -> Nothing,
       -- CR 310.9d: the SAME map's last arm, followed to the attacked battle's
       -- PROTECTOR -- the seat that rule substitutes for the defending player while
@@ -631,6 +644,16 @@ viewOfCharacteristics peers oid pc controller counters gs =
       -- than re-deriving it.
       Filter.attackingBattleProtector = case Map.lookup oid (Combat.attackers (GameState.combat gs)) of
         Just (AttackTarget.OfBattle battle)
+          | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
+            Set.member battle (GameState.battlefield gs),
+            List.any (\defending -> Battle.protectorOf battle gs == Just defending) (Defender.defendingPlayers gs),
+            any (Set.member CardType.Battle . Filter.cardTypes) (peers battle) ->
+              Battle.protectorOf battle gs
+        -- CR 506.4e: a planeswalker announcement whose permanent is a battle
+        -- too, or stopped being a planeswalker but is still a battle, is a battle
+        -- being attacked. Pawl.PlaneswalkerCombatSpec's PlaneswalkerBattleInCombat
+        -- is the board.
+        Just (AttackTarget.OfPlaneswalker battle)
           | Set.notMember oid (Combat.attackingNothing (GameState.combat gs)),
             Set.member battle (GameState.battlefield gs),
             List.any (\defending -> Battle.protectorOf battle gs == Just defending) (Defender.defendingPlayers gs),
