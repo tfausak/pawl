@@ -5262,9 +5262,17 @@ replacementsAffecting gs =
         Nothing -> []
         Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (Face.keywordSet face))
       -- CR 702.52a's replacement, minted for a card in a GRAVEYARD --
-      -- `mintedInHand`'s sibling one zone over, and read the same way, off the
-      -- PRINTED face (gap #1859). Pawl.Engine.Keyword.graveyardReplacementsOf is
-      -- what decides which keywords reach it, and dredge is the only one.
+      -- `mintedInHand`'s sibling one zone over.
+      -- Pawl.Engine.Keyword.graveyardReplacementsOf is what decides which
+      -- keywords reach it, and dredge is the only one.
+      --
+      -- Gated on the PRINTED face, which keeps the walk from projecting every
+      -- card in every graveyard, and minted off the PROJECTION's keywords (CR
+      -- 613.1 names no zone) once it passes: Yixlid Jailer's "cards in graveyards
+      -- lose all abilities" takes the dredge away, and Pawl.ZoneReplacementSpec's
+      -- "CR 613.1f Yixlid Jailer leaves Darkblast no dredge" proves it. A card
+      -- printing no dredge fails the gate, so a dredge an effect GRANTS in a
+      -- graveyard mints nothing (gap #1859).
       --
       -- No mayStateZoneOfRow prefilter beside it, `mintedInHand`'s posture: a
       -- MINTED row is not printed in a face's list, so there is no
@@ -5272,7 +5280,9 @@ replacementsAffecting gs =
       -- itself, and this walk is the zone.
       mintedInGraveyard oid = case Game.faceOf oid gs of
         Nothing -> []
-        Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.graveyardReplacementsOf (Face.keywordSet face))
+        Just face
+          | null (Keyword.graveyardReplacementsOf (Face.keywordSet face)) -> []
+          | otherwise -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.graveyardReplacementsOf (Map.keysSet (keywordsOf oid gs)))
       stated =
         concatMap fromSpellRow (GameState.stack gs)
           <> concatMap (statedFrom Zone.Graveyard) (graveyardCards gs)

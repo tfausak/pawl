@@ -251,6 +251,29 @@ cyclingTriggerSpec s registry =
               placed = S.runPure S.identityAnswer cycled Engine.placePendingTriggers
           Spec.assertEqWith s "only the draw is on the stack" (length (GameState.stack placed)) 1
         abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
+    -- CR 613.1f in a graveyard: Yixlid Jailer ({1}{B} Creature -- Zombie Wizard
+    -- 2/1, "Cards in graveyards lose all abilities." -- checked against
+    -- api.scryfall.com 2026-09-29) strips the Aven's trigger in the zone it
+    -- winds up in, so the cycling fires nothing. A pair of boards differing only
+    -- in whether bob's Jailer is in play, added after the Piker so the Piker
+    -- stays the least-id target either way.
+    Spec.it s "CR 702.29c Yixlid Jailer leaves a cycled Windcaller Aven nothing to trigger" $ do
+      aven <- S.printingOf s registry "Windcaller Aven"
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      jailer <- S.printingOf s registry "Yixlid Jailer"
+      let (creature, g0) = S.addPermanent piker S.alice (S.landsInPlay island 1)
+          (g1, avenId) = S.handOne aven g0
+          without = g1 {GameState.priority = Just S.alice}
+          withJailer = snd (S.addPermanent jailer S.bob without)
+          flies gs = case Activatable.abilitiesFor avenId gs of
+            [ability] ->
+              let cycled = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice avenId ability)
+                  after = S.runPure S.identityAnswer cycled (Engine.settleForPriority >> Stack.resolveTop)
+               in Just (Projection.hasKeyword Keyword.Type.Flying creature after)
+            _ -> Nothing
+      Spec.assertEqWith s "CR 613.1f under the Jailer the Piker never gains flying" (flies withJailer) (Just False)
+      Spec.assertEqWith s "CR 702.29c without it the trigger resolves and the Piker flies" (flies without) (Just True)
 
 -- CR 113.6k: "A trigger condition that can't trigger from the battlefield
 -- functions in all zones it can trigger from." Narcomoeba's "When this card is
@@ -389,6 +412,17 @@ graveyardTriggerSpec s registry =
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice after)) "Narcomoeba is still in the graveyard"
           Spec.assertBool s (not (Set.member narcomoebaName (namesIn Zone.Battlefield S.alice after))) "and not on the battlefield"
           Spec.assertEqWith s "and the ability left the stack -- a declined may is not a fizzle" (length (GameState.stack after)) 0
+        -- CR 613.1f in a graveyard: Yixlid Jailer (see the cycling group) strips
+        -- Narcomoeba's ability the moment it lands, so the milled card has
+        -- nothing to trigger. A pair of boards differing only in whether bob's
+        -- Jailer is in play, the may taken on both.
+        Spec.it s "CR 613.1f Yixlid Jailer keeps a milled Narcomoeba from triggering" $ do
+          jailer <- S.printingOf s registry "Yixlid Jailer"
+          (gs, spellId) <- milledBoard
+          let underJailer = snd (millSelf takeOptional (snd (S.addPermanent jailer S.bob gs), spellId))
+              without = snd (millSelf takeOptional (gs, spellId))
+          Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice underJailer)) "CR 613.1f under the Jailer Narcomoeba stays in the graveyard"
+          Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Battlefield S.alice without)) "CR 113.6k without it Narcomoeba returns"
         -- "from your library" doing real work, half one: the same card moved
         -- out of a HAND reaches the same graveyard and must not trigger.
         Spec.it s "CR 113.6k Narcomoeba put into the graveyard from the HAND does not trigger" $ do

@@ -107,6 +107,98 @@
         }
       ],
       "name": "Dawnhand Dissident",
+      "playerAbilities": [
+        {
+          "condition": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "Exactly"
+              },
+              "measured": {
+                "type": "IsActivePlayer",
+                "value": {
+                  "type": "Relative",
+                  "value": {
+                    "type": "You"
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
+            }
+          },
+          "effect": {
+            "type": "CastFrom",
+            "value": {
+              "additionalCosts": [
+                {
+                  "type": "RemoveCounters",
+                  "value": {
+                    "count": 3,
+                    "kind": {
+                      "type": "OfAnyKind"
+                    },
+                    "spread": {
+                      "type": "FromAmong"
+                    },
+                    "whichPermanent": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ],
+              "from": {
+                "player": {
+                  "type": "EachPlayer"
+                },
+                "zone": {
+                  "type": "Exile"
+                }
+              },
+              "matching": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  {
+                    "type": "OwnedBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                ]
+              },
+              "pool": {
+                "type": "CardsExiledWithSource"
+              }
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
       "power": {
         "type": "Literal",
         "value": 1

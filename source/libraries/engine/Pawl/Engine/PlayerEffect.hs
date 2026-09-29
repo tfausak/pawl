@@ -62,7 +62,9 @@ import Pawl.Types.CardName (CardName)
 import qualified Pawl.Types.CastFromZone as CastFromZone
 import Pawl.Types.CostAdjustments (CostAdjustments)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.ExileLink as ExileLink
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter.Type
@@ -84,6 +86,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectSnapshot as ObjectSnapshot
 import qualified Pawl.Types.PastActivation as PastActivation
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
+import qualified Pawl.Types.PermissionPool as PermissionPool
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerEffect (PlayerEffect)
@@ -1260,7 +1263,8 @@ matchesObjectFrom src filter_ oid gs =
 
 -- matchesObjectFrom with CR 109.5's "you" NAMED rather than read off the object.
 --
--- One caller, prohibitsCasting's CR 601.3a arm, and one rule: a card being cast
+-- Two callers: castPermissionsFrom, whose "you" is the grant's controller, and
+-- prohibitsCasting's CR 601.3a arm, under one rule: a card being cast
 -- has no controller yet (CR 108.4 gives a card in a hand none), so rule 109.5's
 -- "you" for it is the player who would control the spell -- the caster. The two
 -- coincide wherever the caster owns the card, which is why nothing observed the
@@ -2268,7 +2272,8 @@ castPermissionsFrom pid zone oid gs =
   let allows (source, effect) = case effect of
         PlayerEffect.CastFrom grant ->
           opensZoneOf pid zone oid (CastFromZone.from grant) gs
-            && matchesObjectFrom source (CastFromZone.matching grant) oid gs
+            && inPool source (CastFromZone.pool grant)
+            && matchesObjectFor (holder source) source (CastFromZone.matching grant) oid gs
             && unspentPermission pid source grant gs
         -- The other CR 601.3 permission on this axis names a TIME, and this
         -- question is about a ZONE.
@@ -2332,6 +2337,15 @@ castPermissionsFrom pid zone oid gs =
       grantOf (source, effect) = case effect of
         PlayerEffect.CastFrom grant -> Just (source, grant)
         _ -> Nothing
+      -- CR 109.5: the Filter's "you" is the granting ability's controller, not
+      -- the card's -- an exiled card's is its owner (CR 108.4a), which would
+      -- make Dawnhand Dissident's "cards you own" true of every card.
+      holder source = Maybe.fromMaybe pid (source >>= \sid -> Projection.controllerOf sid gs)
+      -- CR 607.2a: the linked set is the cards GameState.exiledWith files
+      -- against this very source object.
+      inPool source pool = case pool of
+        PermissionPool.EveryCard -> True
+        PermissionPool.CardsExiledWithSource -> Maybe.isJust source && fmap ExileLink.source (Map.lookup oid (GameState.exiledWith gs)) == source
    in Maybe.mapMaybe grantOf (filter allows (applying pid gs))
 
 -- CR 601.3: has this permission a use left this turn? Unlimited always; a
@@ -2361,7 +2375,8 @@ unspentPermission pid source grant gs =
 --
 -- Open without any of them where something else is CR 601.3's "rule or effect"
 -- allowing the cast: the rules for a card in its owner's hand, and an effect
--- offering the cast during resolution (`offered`, CR 608.2g). A permission the
+-- offering the cast during resolution or a permission an exiled card carries for
+-- itself (`offered`, CR 608.2g; Pawl.Engine.Cast.castWays). A permission the
 -- OBJECT carries is not weighed here: every one pawl
 -- has is a keyword's, offering its own CR 601.2b candidate (escape, flashback),
 -- so the candidate the cast chose says whether it was made under it --
@@ -2377,9 +2392,10 @@ castPermissionOptions rides offered pid zone oid gs =
 -- distinguishable outcome -- Nothing, where `open` says the play needs none of
 -- them, then each permission, the unlimited ones before the budgeted ones and
 -- each group in timestamp order. Two ways are ONE where they spend the same
--- budget and give the same rider (`rides` answers whether a source's
--- permission gives one, Pawl.Engine.Event.permissionRiders), and the first is
--- kept: a riderless unlimited permission beside an open zone changes nothing.
+-- budget, give the same rider (`rides` answers whether a source's permission
+-- gives one, Pawl.Engine.Event.permissionRiders) and add the same costs (CR
+-- 118.8), and the first is kept: a riderless, costless unlimited permission
+-- beside an open zone changes nothing.
 -- So the head spends nothing wherever something admits the play for free.
 --
 -- Every budgeted permission is a way of its own, two copies of one card
@@ -2388,8 +2404,13 @@ permissionOptions :: (ObjectId -> Bool) -> Bool -> [(Maybe ObjectId, CastFromZon
 permissionOptions rides open usable =
   let rows = [(sid, grant) | (Just sid, grant) <- usable]
       (unlimited, limited) = List.partition ((== PermissionLimit.Unlimited) . CastFromZone.limit . snd) rows
-      key option = (permissionSpent option, option >>= \(sid, _) -> if rides sid then Just sid else Nothing)
+      key option = (permissionSpent option, option >>= \(sid, _) -> if rides sid then Just sid else Nothing, permissionCosts option)
    in ListUtils.nubOrdOn key ([Nothing | open] <> fmap Just (unlimited <> limited))
+
+-- CR 118.8: the additional costs a cast made under `option` pays on top of its
+-- other costs -- none for a cast made under no permission.
+permissionCosts :: Maybe (ObjectId, CastFromZone.CastFromZone) -> [CostComponent.CostComponent Keyword]
+permissionCosts = foldMap (CastFromZone.additionalCosts . snd)
 
 -- The budget a play made under `option` spends: a once-each-turn permission's,
 -- and nothing for an unlimited one or for none.

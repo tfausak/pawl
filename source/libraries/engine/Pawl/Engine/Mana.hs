@@ -1573,8 +1573,9 @@ monocoloredHybridGeneric = 2
 -- 601.2f, one step after this, so withholding the resolution that pays would
 -- hide a route here for a choice the player has not made yet. That keeps this
 -- offer exactly as permissive as Pawl.Engine.Cost.canPaySomeCompletion, which
--- quantifies over the same two enumerations. What no test observes is the
--- difference, since it is only whether this function ASKS (#1076).
+-- quantifies over the same two enumerations. PROVEN by Pawl.PlayerEffectSpec's
+-- "CR 601.2b a hybrid reduction's {2} half keeps a {2/X}'s generic route on
+-- offer", which reddens when only the first total is asked.
 --
 -- Measured against the BOARD and not the pool: canPayCommitting counts an
 -- untapped source as the mana it could make (payableResolutions), so a Forest
