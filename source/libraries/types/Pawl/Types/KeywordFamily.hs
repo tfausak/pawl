@@ -349,4 +349,7 @@ data KeywordFamily
   | -- | CR 702.167a: craft with [materials] [cost]. No card in the pool asks yet,
     -- and it is owed at the keyword rather than at the first asker.
     Craft
+  | -- | CR 716.2: a class level bar, whatever its level; CR 716.2c's "to gain a
+    -- Class level".
+    ClassLevel
   deriving (Bounded, Enum, Eq, Ord, Show)
