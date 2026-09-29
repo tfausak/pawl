@@ -1,0 +1,25 @@
+{
+  "description": "CR 702.22k a banding attacker moves the blocker's division to the ACTIVE player (without banding)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "first", "ready": true },
+          { "card": "Goblin Piker", "label": "second", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Foriysian Brigade", "label": "brigade", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@first", "@second"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@brigade": ["@first", "@second"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "bob", "source": "@brigade", "do": { "AssignDamage": { "@first": 2 } } }
+  ]
+}

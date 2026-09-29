@@ -17,10 +17,14 @@ codec = Fields.object $ do
   life <- Fields.defaulted "life" 20 Common.integer Seat.life
   battlefield <- Fields.defaulted "battlefield" Seq.empty (Common.seq Placement.codec) Seat.battlefield
   hand <- Fields.defaulted "hand" Seq.empty (Common.seq Placement.codec) Seat.hand
+  graveyard <- Fields.defaulted "graveyard" Seq.empty (Common.seq Placement.codec) Seat.graveyard
+  library <- Fields.defaulted "library" Seq.empty (Common.seq Placement.codec) Seat.library
   pure
     Seat.MkSeat
       { Seat.name = name,
         Seat.life = life,
         Seat.battlefield = battlefield,
-        Seat.hand = hand
+        Seat.hand = hand,
+        Seat.graveyard = graveyard,
+        Seat.library = library
       }

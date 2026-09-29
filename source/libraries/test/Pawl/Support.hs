@@ -178,7 +178,8 @@ objectSetup name =
       Placement.readiness = Readiness.Sick,
       Placement.damage = 0,
       Placement.counters = Map.empty,
-      Placement.controller = Nothing
+      Placement.controller = Nothing,
+      Placement.attached = Nothing
     }
 
 -- Test-source spelling of objectSetup: a Magic card name, never a corpus slug.
@@ -206,7 +207,9 @@ playerSetup pid =
     { Seat.name = seatLabel pid,
       Seat.life = 20,
       Seat.battlefield = Seq.empty,
-      Seat.hand = Seq.empty
+      Seat.hand = Seq.empty,
+      Seat.graveyard = Seq.empty,
+      Seat.library = Seq.empty
     }
 
 battlefield :: PlayerId.PlayerId -> [Placement.Placement] -> Seat.Seat
@@ -228,7 +231,9 @@ board seats active step =
           Board.MkBoard
             { Board.seats = seats,
               Board.active = seatLabel active,
-              Board.phase = step
+              Board.phase = step,
+              Board.monarch = Nothing,
+              Board.attackOption = Just AttackOption.MultiplePlayers
             }
         else error "S.board: seats must be listed alice, bob, carol, dave"
 

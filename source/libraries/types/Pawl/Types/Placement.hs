@@ -19,6 +19,8 @@ data Placement = MkPlacement
     damage :: Natural,
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural,
     -- | The seat controlling it, when not its owner.
-    controller :: Maybe Label.Label
+    controller :: Maybe Label.Label,
+    -- | CR 301.5 / 303.4: the labelled object or seat it is attached to.
+    attached :: Maybe Label.Label
   }
   deriving (Eq, Ord, Show)

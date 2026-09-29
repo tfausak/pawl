@@ -1,0 +1,25 @@
+{
+  "description": "CR 302.6 a creature cannot attack the turn it arrives, and can after untapping",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker" }],
+        "library": [{ "card": "Mountain" }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "blocker", "ready": true }],
+        "library": [{ "card": "Mountain" }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": {} } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": [] } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@attacker": "@bob" } } } }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "description": "CR 703.4h/507.1 the active player chooses which opponent is the defending player",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "attackOption": null,
+    "seats": [
+      { "name": "alice" },
+      { "name": "bob" },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "do": { "ChooseDefender": "carol" } },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Defenders": { "players": ["carol"] } } }
+  ]
+}

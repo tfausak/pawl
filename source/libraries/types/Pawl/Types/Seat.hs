@@ -10,6 +10,9 @@ data Seat = MkSeat
   { name :: Label.Label,
     life :: Integer,
     battlefield :: Seq.Seq Placement.Placement,
-    hand :: Seq.Seq Placement.Placement
+    hand :: Seq.Seq Placement.Placement,
+    graveyard :: Seq.Seq Placement.Placement,
+    -- | Top card first (CR 401.1).
+    library :: Seq.Seq Placement.Placement
   }
   deriving (Eq, Ord, Show)

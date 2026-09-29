@@ -1,0 +1,21 @@
+{
+  "description": "CR 803.1a/803.1b alice attacks the neighbouring seat, and the option says which one (Rightward)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "attackOption": "Rightward",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      },
+      { "name": "bob" },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@attacker": "@carol" } } } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Defenders": { "players": ["carol"] } } }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "description": "CR 802.3a whole cards: the declare attackers step sends the Galleon at the Island's controller (bob's Island)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Armored Galleon", "label": "ship", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Island" }]
+      },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@ship"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 15 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } }
+  ]
+}
