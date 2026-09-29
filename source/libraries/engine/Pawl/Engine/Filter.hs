@@ -2882,6 +2882,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- vocabulary, and the criteria they produce are written in Pawl.Engine.Keyword
   -- rather than on the card, so CR 612.2 has no printed word here to swap.
   Keyword.Type.Epic -> keyword
+  Keyword.Type.Paradigm -> keyword
   Keyword.Type.Cipher -> keyword
   Keyword.Type.Convoke -> keyword
   Keyword.Type.Delve -> keyword

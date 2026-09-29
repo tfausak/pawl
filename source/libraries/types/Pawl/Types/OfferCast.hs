@@ -52,7 +52,8 @@ data OfferCast = MkOfferCast
     repetition :: CastRepetition.CastRepetition,
     -- | CR 707.12: whether what is offered is a COPY of each object `ref` names,
     -- created in the zone that object is in, rather than the object itself.
-    -- Mizzix's Mastery's "copy it, and you may cast the copy" sets it; every
+    -- Mizzix's Mastery's "copy it, and you may cast the copy" sets it, as do
+    -- the triggers Pawl.Engine.Keyword mints for cipher and paradigm; every
     -- other producer offers the card where it lies.
     --
     -- A field of THIS type and not of CastOffer, whose riders all describe the

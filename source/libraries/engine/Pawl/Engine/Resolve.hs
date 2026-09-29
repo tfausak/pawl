@@ -409,8 +409,10 @@ resolveSpellWith runSubgame oid = do
                     )
                     (Map.empty, Map.empty, Set.empty)
                     indexedClauses
+                firstOfName <- noteResolved oid effectController
                 applyEpic oid effectController
-                encoded <- applyCipher oid effectController
+                exiled <- applyParadigm oid effectController firstOfName
+                encoded <- if exiled then pure True else applyCipher oid effectController
                 Monad.unless encoded (finishSpell oid face effectController)
 
 -- CR 702.174b's instant-and-sorcery half: "If this spell's gift cost was paid,
@@ -526,6 +528,54 @@ applyEpic oid controller = do
               Onset.Immediately
               (Just Expiry.Type.Never)
               g {GameState.stackArchive = Map.insert oid archived (GameState.stackArchive g)}
+
+-- CR 702.192a's "the first time a spell you control with this spell's name has
+-- resolved this game": file the resolving spell's names under its controller in
+-- GameState.resolvedNames, answering whether none of them was there already.
+--
+-- Called from both of CR 608.2's resolving roads -- here for an instant or
+-- sorcery, and from Pawl.Engine.Stack for a permanent spell -- and from neither
+-- fizzle, since a spell CR 608.2b removes did not resolve. The names come off
+-- the PROJECTION, so a spell that is a copy of another (CR 707.2) files the
+-- copied name. The permanent road is a REGRESSION FENCE: no permanent card in
+-- data/cards/ shares a paradigm card's name.
+noteResolved :: ObjectId -> PlayerId -> Game Bool
+noteResolved oid controller = do
+  gs <- State.get
+  let names = Projection.namesOf oid gs
+      earlier = Map.findWithDefault Set.empty controller (GameState.resolvedNames gs)
+  State.put gs {GameState.resolvedNames = Map.insertWith Set.union controller names (GameState.resolvedNames gs)}
+  pure (Set.disjoint names earlier)
+
+-- CR 702.192a's two SPELL abilities, performed as the last part of the spell's
+-- resolution in applyEpic's place and for its reason: the delayed ability, armed
+-- only where noteResolved answered that this is the first resolution of the name
+-- (`firstOfName`), and "exile this spell".
+--
+-- Answers whether the spell left the stack, applyCipher's answer, so
+-- finishSpell's move is skipped: the exile IS where the spell goes. A copy (CR
+-- 707.12's, the delayed ability's own) is exiled too and CR 704.5e then ends it.
+--
+-- The keyword is read off the PROJECTION, applyEpic's reading. The ability is
+-- armed with Expiry.Never for "for the rest of the game", epic's reason, and
+-- binds this id for Keyword.paradigmCopy to find in GameState.stackArchive.
+-- Pawl.CastSpec's "Paradigm" group proves both abilities.
+applyParadigm :: ObjectId -> PlayerId -> Bool -> Game Bool
+applyParadigm oid controller firstOfName = do
+  gs <- State.get
+  if not (Keyword.Engine.hasParadigm (Map.keysSet (Projection.keywordsOf oid gs)))
+    then pure False
+    else do
+      Monad.when firstOfName . State.modify' $
+        Event.armDelayed
+          Keyword.Engine.paradigmCopy
+          oid
+          controller
+          (Map.singleton Keyword.Engine.paradigmSlot (Binding.toObject oid))
+          Onset.Immediately
+          (Just Expiry.Type.Never)
+      Event.changeZone oid Zone.Exile
+      pure True
 
 -- CR 702.99a's spell ability, "if this spell is represented by a card, you may
 -- exile this card encoded on a creature you control", performed as the last
