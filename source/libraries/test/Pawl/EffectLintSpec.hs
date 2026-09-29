@@ -1024,6 +1024,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.StateCoinFlip _ -> False
   PlayerEffect.ModifyDieRoll _ -> False
   PlayerEffect.AdditionalVotes _ -> False
+  PlayerEffect.AdditionalSurveilCards _ -> False
   PlayerEffect.CantGainLife -> False
   PlayerEffect.CantLoseLife -> False
 
@@ -1097,6 +1098,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.StateCoinFlip _ -> False
   PlayerEffect.ModifyDieRoll _ -> False
   PlayerEffect.AdditionalVotes _ -> False
+  PlayerEffect.AdditionalSurveilCards _ -> False
   PlayerEffect.CantGainLife -> False
   PlayerEffect.CantLoseLife -> False
 

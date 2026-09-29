@@ -488,6 +488,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.ModifyDieRoll modified ->
     PlayerEffect.ModifyDieRoll modified {ModifiedRoll.cost = fmap (Filter.rewriteCost pairs) (ModifiedRoll.cost modified)}
   PlayerEffect.AdditionalVotes _ -> effect
+  PlayerEffect.AdditionalSurveilCards _ -> effect
   PlayerEffect.CantGainLife -> effect
   PlayerEffect.CantLoseLife -> effect
 
