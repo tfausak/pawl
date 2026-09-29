@@ -1184,10 +1184,8 @@ sweptCountersSpec s registry =
 --   * Dawnhand Dissident {B} 1/2 Creature -- Elf Warlock
 --     (data/cards/dawnhand-dissident.json): "{T}, Blight 1: Surveil 1." CR 602.1b
 --     and CR 601.2h -- paid as the ability is ACTIVATED, which is what the first
---     case reads off a board whose stack has not resolved yet. (A third printed
---     ability, casting creature spells exiled with it by removing counters, is not
---     transcribed -- gap #1648. Omitting a permission leaves pawl's card STRICTER
---     than printed.)
+--     case reads off a board whose stack has not resolved yet. Its third
+--     ability is Pawl.CastPermissionSpec's DawnhandDissident group.
 --
 --   * Boggart Mischief {2}{B} Kindred Enchantment -- Goblin
 --     (data/cards/boggart-mischief.json): "When this enchantment enters, you may

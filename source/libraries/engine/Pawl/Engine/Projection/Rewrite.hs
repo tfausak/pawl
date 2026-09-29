@@ -440,7 +440,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
   -- CR 305.1's play-side prohibition, narrowed by the same kind of Filter.
   PlayerEffect.CantPlayLands f -> PlayerEffect.CantPlayLands (Filter.rewrite pairs f)
-  PlayerEffect.CastFrom grant -> PlayerEffect.CastFrom grant {CastFromZone.matching = Filter.rewrite pairs (CastFromZone.matching grant)}
+  PlayerEffect.CastFrom grant -> PlayerEffect.CastFrom grant {CastFromZone.matching = Filter.rewrite pairs (CastFromZone.matching grant), CastFromZone.additionalCosts = fmap (Filter.rewriteComponent pairs) (CastFromZone.additionalCosts grant)}
   PlayerEffect.PlotFrom grant -> PlayerEffect.PlotFrom grant {PlotFromZone.matching = Filter.rewrite pairs (PlotFromZone.matching grant)}
   PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
   -- CR 702.16a's quality where the CARD states it, so a subtype word in it is a

@@ -252,6 +252,7 @@ import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
+import qualified Pawl.Types.PermissionPool as PermissionPool
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerAttacksWith as PlayerAttacksWith
@@ -726,7 +727,7 @@ playerRefPositions =
         -- zone (Sen Triplets). All three are planted, since Pawl.Engine.PlayerEffect's
         -- traversal is what the AffectPlayers arm delegates to and a missing arm
         -- there answers [] rather than failing to compile.
-        ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []) PermissionLimit.Unlimited PermissionVerb.Cast)), [plantedPlayer "ap-cast"]),
+        ("affect-players-cast-from", affecting (PlayerEffect.CastFrom (CastFromZone.MkCastFromZone (InZone.MkInZone Zone.Hand (plantedPlayer "ap-cast")) (Filter.Type.And []) PermissionLimit.Unlimited PermissionVerb.Cast PermissionPool.EveryCard [])), [plantedPlayer "ap-cast"]),
         ("affect-players-play-lands-from", affecting (PlayerEffect.PlayLandsFrom (InZone.MkInZone Zone.Graveyard (plantedPlayer "ap-land"))), [plantedPlayer "ap-land"]),
         ("affect-players-plot-from", affecting (PlayerEffect.PlotFrom (PlotFromZone.MkPlotFromZone (InZone.MkInZone Zone.Library (plantedPlayer "ap-plot")) (Filter.Type.And []))), [plantedPlayer "ap-plot"]),
         -- And an arm carrying none, so the traversal is shown answering nothing where
@@ -4823,7 +4824,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- the timing permission beside it is (Yawgmoth's Will's is `And []`, Garruk's
   -- Horde's "creature spells"). WHOSE zone rides beside the Filter and is no
   -- quality of the card, so it is not a position this lint sweeps.
-  PlayerEffect.CastFrom grant -> [CastFromZone.matching grant]
+  PlayerEffect.CastFrom grant -> CastFromZone.matching grant : concatMap costComponentFilters (CastFromZone.additionalCosts grant)
   -- CR 305.1's play-side permission narrows nothing: a land play has already
   -- fixed the card type, and Crucible of Worlds' sentence says no more.
   PlayerEffect.PlayLandsFrom _ -> []
