@@ -1245,7 +1245,8 @@ replaceWholeWord from to =
                       else go (done <> Text.take 1 match) (Text.drop 1 match)
    in go Text.empty
 
--- CR 612.1 through CR 106.6a's spending restriction: every half is a filter of
+-- CR 612.1 through CR 106.6a's spending restriction: every half but
+-- keywordActivations, a designator naming no quality, is a filter of
 -- printed text. See the AddMana arm above for why this is a fence rather than a
 -- proof.
 rewriteManaRestriction :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ManaRestriction.ManaRestriction -> ManaRestriction.ManaRestriction

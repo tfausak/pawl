@@ -119,6 +119,7 @@ import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.Modal as Modal
@@ -1726,7 +1727,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
           Effect.AddMana addition -> case ManaAddition.restriction addition of
-            Just restriction -> null (restrictionFilters restriction)
+            Just restriction -> null (restrictionFilters restriction) && Maybe.isNothing (ManaRestriction.keywordActivations restriction)
             Nothing -> False
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
