@@ -5807,8 +5807,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     decided <-
       fmap Maybe.catMaybes . Monad.forM surveillers $ \pid ->
         case evaluateForRecipient viewOf context gs resolving source pid quantity of
-          -- CR 701.25c: surveil 0 is not a surveil at all.
-          Just n | n > 0 -> fmap Just (decideSurveil n pid)
+          -- CR 701.25c: surveil 0 is not a surveil at all, so nothing widens
+          -- it. CR 701.25b's extra cards join the ones looked at, read off the
+          -- board the surveil begins on.
+          Just n | n > 0 -> fmap Just (decideSurveil (n + toInteger (PlayerEffect.surveilExtra pid gs)) pid)
           _ -> pure Nothing
     Monad.mapM_ applySurveil decided
     -- CR 701.25d, scry's placement and for its rule.

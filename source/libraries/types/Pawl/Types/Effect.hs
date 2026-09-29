@@ -260,9 +260,8 @@ data Effect card ability
     Scry PlayerQuantity.PlayerQuantity
   | -- | CR 701.25a: the players the PlayerRef names each surveil this many, the
     -- unwanted cards crossing into their graveyard where Scry's go to the bottom
-    -- of the library.
-    --
-    -- Not implemented: CR 701.25b's "additional cards" rider (#1343).
+    -- of the library. CR 701.25b's extra cards come from
+    -- Pawl.Types.PlayerEffect's AdditionalSurveilCards.
     Surveil PlayerQuantity.PlayerQuantity
   | -- | CR 701.29a: the players the PlayerRef names each fateseal this many --
     -- Scry's library rewrite over an opponent's library, that opponent chosen as
