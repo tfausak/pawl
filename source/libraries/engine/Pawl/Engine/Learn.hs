@@ -106,7 +106,7 @@ learn pid resolving source = do
             pure (if List.elem answer (NonEmpty.toList cards) then answer else first)
         -- CR 701.9a, through the one funnel a discard goes through, so anything
         -- watching for a discard sees it.
-        Event.discard DiscardCause.Ordinary pid discarded
+        Event.discard DiscardCause.ByEffect pid discarded
         -- CR 121.1, through the draw funnel, so CR 121.3's empty library and CR
         -- 614's draw replacements both get their opportunity.
         Event.drawCard pid

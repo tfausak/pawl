@@ -35,6 +35,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeGainR as LifeGainR
 import qualified Pawl.Types.LifeGainRewrite as LifeGainRewrite
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
@@ -82,10 +83,13 @@ spec s =
                     ZoneChangePattern.MkZoneChangePattern
                       { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                         ZoneChangePattern.whatObject = Filter.And [],
-                        ZoneChangePattern.whoseObject = ControllerRelation.Anyones
+                        ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+                        ZoneChangePattern.whenDiscarded = Nothing
                       }
                     Zone.Exile
                     False
+                    False
+                    LibraryPosition.defaultValue
                     False
                 )
             )
@@ -101,10 +105,13 @@ spec s =
                     ZoneChangePattern.MkZoneChangePattern
                       { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
                         ZoneChangePattern.whatObject = Filter.And [],
-                        ZoneChangePattern.whoseObject = ControllerRelation.Opponents
+                        ZoneChangePattern.whoseObject = ControllerRelation.Opponents,
+                        ZoneChangePattern.whenDiscarded = Nothing
                       }
                     Zone.Exile
                     False
+                    False
+                    LibraryPosition.defaultValue
                     False
                 )
             )

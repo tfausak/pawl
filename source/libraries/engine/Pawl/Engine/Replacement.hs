@@ -98,6 +98,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.InstanceOrdinal as InstanceOrdinal
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeGainR as LifeGainR
 import qualified Pawl.Types.LifeGainRewrite as LifeGainRewrite
 import qualified Pawl.Types.LifeLossPattern as LifeLossPattern
@@ -162,7 +163,7 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 asZoneChange :: ProposedEvent -> Maybe ZoneChange
 asZoneChange event = case event of
-  ProposedEvent.WouldChangeZone zc -> Just zc
+  ProposedEvent.WouldChangeZone zc _ _ -> Just zc
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -688,7 +689,7 @@ reaches grants gs event candidate = case (ReplacementCandidate.controller candid
 -- class must be read against the rule rather than silently counted in range.
 affected :: ProposedEvent -> ([ObjectId], [PlayerId])
 affected event = case event of
-  ProposedEvent.WouldChangeZone zc -> ([ZoneChange.object zc], [])
+  ProposedEvent.WouldChangeZone zc _ _ -> ([ZoneChange.object zc], [])
   ProposedEvent.WouldEnter oid -> ([oid], [])
   ProposedEvent.WouldDealDamage de -> (Maybe.maybeToList (Recipient.objectOf (DamageEvent.target de)), Maybe.maybeToList (Recipient.playerOf (DamageEvent.target de)))
   ProposedEvent.WouldBeDestroyed oid _ _ -> ([oid], [])
@@ -719,9 +720,12 @@ matchesPrinted viewOf gs event candidate =
         --
         -- A pattern naming NO destination admits every one, which is CR 702.34a's
         -- "instead of putting it anywhere else"; the destinations are not
-        -- enumerated, so this is a Maybe rather than a set of zones.
-        (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _), ProposedEvent.WouldChangeZone zc) ->
+        -- enumerated, so this is a Maybe rather than a set of zones. A pattern
+        -- naming a DISCARD cause admits only a CR 701.9a discard of that cause
+        -- (Library of Leng's "if an effect causes you to discard").
+        (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _ _ _), ProposedEvent.WouldChangeZone zc discarded _) ->
           maybe True (== ZoneChange.to zc) (ZoneChangePattern.whenDestination pat)
+            && maybe True ((== discarded) . Just) (ZoneChangePattern.whenDiscarded pat)
             && matchesZoneOwner gs src (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered viewOf gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
@@ -2367,7 +2371,7 @@ chooserOf gs event = affectedChooserOf gs event >>= Game.ruleChooser gs
 -- CR 616.1's own question, before rule 800.4h is applied to the answer.
 affectedChooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
 affectedChooserOf gs event = case event of
-  ProposedEvent.WouldChangeZone zc -> Projection.controllerOf (ZoneChange.object zc) gs
+  ProposedEvent.WouldChangeZone zc _ _ -> Projection.controllerOf (ZoneChange.object zc) gs
   -- CR 616.1's affected object's controller, read LIVE off the materialized
   -- permanent -- which for an entry is the player it WOULD enter under, and
   -- which a CR 616.1b rewrite may already have changed on an earlier iteration.
@@ -3859,7 +3863,7 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
 asDamageEvent event = case event of
   ProposedEvent.WouldDealDamage de -> Just de
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
@@ -3881,7 +3885,7 @@ asDamageEvent event = case event of
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
   ProposedEvent.WouldBeDestroyed target _ _ -> Just target
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
@@ -3905,7 +3909,7 @@ asDestruction event = case event of
 asUntap :: ProposedEvent -> Maybe ObjectId
 asUntap event = case event of
   ProposedEvent.WouldUntap oid -> Just oid
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -3935,7 +3939,7 @@ asDraw event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -3960,7 +3964,7 @@ asDrawCount event = case event of
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -3988,7 +3992,7 @@ asMillCount event = case event of
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4010,7 +4014,7 @@ asCoinFlip event = case event of
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4035,7 +4039,7 @@ asDiceRoll event = case event of
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4059,7 +4063,7 @@ asScry event = case event of
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4083,7 +4087,7 @@ asProliferate event = case event of
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4099,7 +4103,7 @@ asProliferate event = case event of
 asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural)
 asCounters event = case event of
   ProposedEvent.WouldPutCounters _ oid kind n -> Just (oid, kind, n)
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4124,7 +4128,7 @@ asCounters event = case event of
 asPlayerCounters :: ProposedEvent -> Maybe (PlayerId, PlayerCounterKind.PlayerCounterKind, Natural)
 asPlayerCounters event = case event of
   ProposedEvent.WouldPutPlayerCounters _ pid kind n -> Just (pid, kind, n)
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4152,7 +4156,7 @@ asLifeLoss :: ProposedEvent -> Maybe (PlayerId, Natural)
 asLifeLoss event = case event of
   ProposedEvent.WouldLoseLife _ pid n -> Just (pid, n)
   ProposedEvent.WouldGainLife {} -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4176,7 +4180,7 @@ asLifeGain :: ProposedEvent -> Maybe (PlayerId, Natural)
 asLifeGain event = case event of
   ProposedEvent.WouldGainLife pid n -> Just (pid, n)
   ProposedEvent.WouldLoseLife {} -> Nothing
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4197,7 +4201,7 @@ asLifeGain event = case event of
 asTokens :: ProposedEvent -> Maybe (PlayerId, Seq.Seq TokenLot.TokenLot)
 asTokens event = case event of
   ProposedEvent.WouldCreateTokens pid lots -> Just (pid, lots)
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
@@ -4324,11 +4328,14 @@ installSpellMoveRow destination shuffling spellId caster gs =
                         -- Each says "this spell", so the row is scoped to the
                         -- object it was minted for -- castFromGraveyardExile's
                         -- Filter.IsSource, and for its reason.
-                        ZoneChangePattern.whatObject = Filter.Type.IsSource
+                        ZoneChangePattern.whatObject = Filter.Type.IsSource,
+                        ZoneChangePattern.whenDiscarded = Nothing
                       }
                     destination
                     False
                     shuffling
+                    LibraryPosition.defaultValue
+                    False
                 ),
             -- CR 113.7: the spell itself, which the pattern's IsSource is
             -- compared against.
@@ -4396,7 +4403,7 @@ rowApplied spellId ts gs =
 asPhaseBegin :: ProposedEvent -> Maybe (PhaseSelector, PlayerId)
 asPhaseBegin event = case event of
   ProposedEvent.WouldBeginPhase selector pid -> Just (selector, pid)
-  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldChangeZone {} -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing

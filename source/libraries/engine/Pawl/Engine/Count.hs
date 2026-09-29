@@ -175,15 +175,11 @@ evaluate viewOf quantityOf context gs count =
 -- Moved entry the same change records pairs that id with the incarnation the
 -- binding holds, so the two are joined through Moved rather than by id.
 --
--- Both public-zone legs and the revealed leg are proven in Pawl.ZoneChangeSpec's
--- Psychic Miasma cases: under Rest in Peace the discarded land is read out of
--- exile, and under Wheel of Sun and Moon it is revealed on its way to the bottom
--- of the discarding player's library; the spell returns in both.
---
--- Not implemented: a card that reaches a hidden zone unrevealed. No card in the
--- pool redirects a discard there without revealing it (Nexus of Fate, Progenitus
--- and the Wheel all reveal), so the False below is a fence rather than a proof;
--- Library of Leng is the producer (#2230).
+-- All three legs are proven in Pawl.ZoneChangeSpec's Psychic Miasma cases:
+-- under Rest in Peace the discarded land is read out of exile, and under Wheel
+-- of Sun and Moon it is revealed on its way to the bottom of the discarding
+-- player's library, so the spell returns in both; under Library of Leng it goes
+-- to the top of that library unrevealed, and the spell does not.
 --
 -- False for an id with no object, which is one that has ceased to exist since
 -- the binding was written -- CR 111.7's token, whose exile leaves nothing.

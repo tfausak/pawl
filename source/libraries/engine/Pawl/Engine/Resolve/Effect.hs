@@ -803,7 +803,7 @@ buryDiscards :: ObjectId -> Maybe SlotName -> [(PlayerId, [ObjectId])] -> Game (
 buryDiscards resolving mDiscarded doomed = do
   moved <-
     Event.simultaneously . fmap concat . Monad.forM doomed $ \(victim, oids) ->
-      fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
+      fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.ByEffect victim) oids)
   -- The cards "discarded this way", for a later effect of the same resolution
   -- to look back at -- Psychic Miasma's "if a land card is discarded this way".
   -- The CR 400.7 incarnations the funnel MINTED, never the hand ids it was
@@ -11082,7 +11082,7 @@ conniveOne n oid = Monad.when (n > 0) $ do
               filler = filter (\c -> List.notElem c valid) held
           pure (List.genericTake n (valid <> filler))
     -- One event group: CR 701.50d discards the N cards as one action.
-    moved <- Event.simultaneously (fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary pid) chosen))
+    moved <- Event.simultaneously (fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.ByEffect pid) chosen))
     after <- State.get
     let nonland c = not (Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject c after)))
         grown = Natural.length (filter nonland moved)

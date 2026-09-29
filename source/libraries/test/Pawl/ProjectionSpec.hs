@@ -76,6 +76,7 @@ import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaRetention as ManaRetention
@@ -3658,7 +3659,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       s
       "one redirect replacement"
       (fmap snd (Projection.replacementsOf Zone.Battlefield rip gs))
-      [ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Graveyard) ControllerRelation.Anyones (Filter.Type.And [])) Zone.Exile False False)]
+      [ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Graveyard) ControllerRelation.Anyones (Filter.Type.And []) Nothing) Zone.Exile False False LibraryPosition.defaultValue False)]
 
   Spec.it s "a vanilla creature projects no replacements" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"

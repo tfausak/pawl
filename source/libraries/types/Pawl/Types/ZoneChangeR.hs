@@ -1,5 +1,6 @@
 module Pawl.Types.ZoneChangeR where
 
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -9,7 +10,8 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 --
 -- Both riders default to False and are elided rather than written, DamageR's
 -- `riders` posture: a redirect that only names a destination is the common
--- shape.
+-- shape. `position` defaults to LibraryPosition.defaultValue and `optional` to
+-- False the same way.
 data ZoneChangeR = MkZoneChangeR
   { matching :: ZoneChangePattern.ZoneChangePattern,
     destination :: Zone.Zone,
@@ -20,6 +22,13 @@ data ZoneChangeR = MkZoneChangeR
     -- | CR 701.24a: randomize the moving card's owner's library, which is what
     -- separates "shuffle it into its owner's library" from putting it on the
     -- bottom.
-    shuffling :: Bool
+    shuffling :: Bool,
+    -- | CR 401.2: the end of the library a redirect into one puts the card on --
+    -- Library of Leng's "on top of your library". Ignored for any other
+    -- destination.
+    position :: LibraryPosition.LibraryPosition,
+    -- | CR 614.1a's "you MAY ... instead": the row's controller is asked as it
+    -- applies, and declining leaves the event standing.
+    optional :: Bool
   }
   deriving (Eq, Ord, Show)
