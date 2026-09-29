@@ -147,6 +147,7 @@ theRingEmblem temptations =
               Face.defense = Nothing,
               Face.vanguard = Nothing,
               Face.canBeYourCommander = False,
+              Face.claimsStartingPlayer = False,
               Face.keywords = Map.empty,
               Face.colorIndicator = Set.empty,
               Face.characteristicPT = Nothing,

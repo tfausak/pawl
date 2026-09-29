@@ -137,6 +137,7 @@ baseFace =
       Face.defense = Nothing,
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
+      Face.claimsStartingPlayer = False,
       Face.keywords = Map.empty,
       Face.staticAbilities = [],
       Face.spell = minimalModal,
@@ -192,6 +193,7 @@ minimalFace =
       Face.defense = Nothing,
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
+      Face.claimsStartingPlayer = False,
       Face.keywords = Map.empty,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
@@ -705,6 +707,10 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
   Spec.it s "MkFace, CR 903.3a's can-be-your-commander ability" $ do
     v <- Common.assertJson s " {\"name\":\"Freyalise\",\"typeLine\":{\"types\":[{\"type\":\"Planeswalker\"}]},\"canBeYourCommander\":true} "
     Spec.assertEq s (Face.canBeYourCommander <$> decodeFace v) (Right True)
+  -- CR 103.1c, for the same reason: the True half needs its own case.
+  Spec.it s "MkFace, CR 103.1c's starting-player claim" $ do
+    v <- Common.assertJson s " {\"name\":\"Power Play\",\"typeLine\":{\"types\":[{\"type\":\"Conspiracy\"}]},\"claimsStartingPlayer\":true} "
+    Spec.assertEq s (Face.claimsStartingPlayer <$> decodeFace v) (Right True)
   -- Every field at once, including the recursive card-in-card ones that only
   -- Card itself ties the knot on.
   Spec.it s "MkFace, every field populated at once" $

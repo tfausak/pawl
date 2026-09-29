@@ -32,6 +32,7 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
 import qualified Pawl.Types.EventGroup as EventGroup
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -49,6 +50,7 @@ import qualified Pawl.Types.OutsideObject as OutsideObject
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PrintingId as PrintingId
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Sickness as Sickness
@@ -540,6 +542,9 @@ newGame perform matchup = do
     Planechase.shufflePlanarDeck pid
     -- CR 904.3 / 103.3a.
     Archenemy.shuffleSchemeDeck pid
+  -- CR 103.1c, once every conspiracy is in its command zone (CR 315.2).
+  claimStartingPlayer
+  seated <- State.gets GameState.turnOrder
   -- CR 103.2b: the companion reveal round, after every starting deck is recorded
   -- (CR 103.2a, createDeck above) and before CR 103.5's opening hands -- rule
   -- 103.2's steps come first, and rule 702.139b's condition reads the deck rather
@@ -548,8 +553,8 @@ newGame perform matchup = do
   -- In TURN ORDER, which is the order rule 103.2's steps are taken in; nothing in
   -- rule 103.2b makes one player's reveal depend on another's, so the order is not
   -- observable today.
-  Monad.forM_ (NonEmpty.toList matchup) (Companion.reveal . fst)
-  Mulligan.openingHands perform (fmap fst (NonEmpty.toList matchup))
+  Monad.forM_ seated Companion.reveal
+  Mulligan.openingHands perform seated
   -- CR 103.7: in a Planechase game the starting player sets the starting plane,
   -- after every opening hand is kept (CR 901.5).
   starting <- State.gets GameState.activePlayer
@@ -728,12 +733,40 @@ startGameFromCards perform exemptions = do
   -- CR 103.3a / 729.2a.
   Monad.forM_ owners Planechase.shufflePlanarDeck
   Monad.forM_ owners Archenemy.shuffleSchemeDeck
-  Mulligan.openingHands perform owners
+  -- CR 103.1c after CR 727.1a's determination: a conspiracy stays in the
+  -- command zone through a restart (CR 315.3), so it claims again.
+  claimStartingPlayer
+  Mulligan.openingHands perform =<< State.gets Game.stillPlayingInOrder
   -- CR 103.7, newGame's step: the new game's starting player sets a starting
   -- plane after the opening hands.
   starting <- State.gets GameState.activePlayer
   planechase <- State.gets Planechase.isPlanechase
   Monad.when planechase (Planechase.setStartingPlane starting)
+
+-- CR 103.1c: rotate the turn order to begin with the player a card functioning
+-- from their command zone names as the starting player, superseding CR 103.1's
+-- (or CR 727.1a's) determination. Several such players are narrowed to one at
+-- random -- the card's own text, so randomness and not a choice -- drawn from
+-- exactly those players, in turn order. A rotation, not a reseat: the cyclic
+-- order is unchanged (Power Play's 2014-05-29 ruling).
+-- Pawl.ConspiracySpec's Power Play group proves it.
+claimStartingPlayer :: Game ()
+claimStartingPlayer = do
+  gs <- State.get
+  -- CR 315.6: a conspiracy's controller is its owner, so the owner-indexed
+  -- command zone is the controller's. The printed face, for
+  -- Pawl.Engine.Conspiracy.isConspiracy's reason (CR 315.3).
+  let claims pid = any (maybe False Face.claimsStartingPlayer . (`Game.faceOf` gs)) (Game.zoneMembers Zone.Command pid gs)
+  starter <- case filter claims (Game.stillPlayingInOrder gs) of
+    [] -> pure Nothing
+    [only] -> pure (Just only)
+    first : rest -> do
+      let claimants = first NonEmpty.:| rest
+      answer <- Game.ask (Prompt.RandomFirstPlayer claimants)
+      -- Filtered, not trusted: only a claimant can be chosen.
+      pure (Just (if List.elem answer claimants then answer else first))
+  Monad.forM_ starter $ \pid ->
+    State.modify' (\g -> g {GameState.turnOrder = rotateTo pid (GameState.turnOrder g), GameState.activePlayer = pid})
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
 -- cyclic order. Total: a `starter` not in the order leaves it as-is.
