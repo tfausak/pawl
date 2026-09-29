@@ -2117,6 +2117,7 @@ replacementRewriteEffects replacement = case replacement of
   ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.ScryR {} -> []
+  ReplacementEffect.VillainousChoiceR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -2146,6 +2147,7 @@ replacementEffectRiders replacement = case replacement of
   ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.ScryR {} -> []
+  ReplacementEffect.VillainousChoiceR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 111.1's token a replacement MINTS: TokenR's appended token (Queen Allenal
@@ -2173,6 +2175,7 @@ replacementMintedCards replacement = case replacement of
   ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.ScryR {} -> []
+  ReplacementEffect.VillainousChoiceR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
@@ -3444,6 +3447,8 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Forecast -> []
   -- CR 702.193a is payload-free for exhaust's reason: the ability is the CARD's.
   Keyword.PowerUp -> []
+  -- CR 716.2's payload is a level; the ability it indicates is the CARD's.
+  Keyword.ClassLevel _ -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
   -- TriggeredAbility, so any Filter in it is swept there rather than here.
@@ -5040,7 +5045,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   -- "creature tokens"). The appended token's own Filters are the MINTED
   -- object's, and reach the sweep through replacementMintedCards instead.
   ReplacementEffect.TokenR (TokenR.MkTokenR tokenPattern _ _) -> unframed [TokenPattern.whatToken tokenPattern]
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> unframed [turnUpPattern] <> turnUpRewriteFilters turnUpRewrite
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ _ turnUpRewrite) -> unframed [turnUpPattern] <> turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
   ReplacementEffect.LifeGainR {} -> []
@@ -5057,6 +5062,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DieRollR {} -> []
   ReplacementEffect.ProliferateR {} -> []
   ReplacementEffect.ScryR {} -> []
+  ReplacementEffect.VillainousChoiceR {} -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- CR 614.9's printed destination, the one Filter a damage REWRITE carries.

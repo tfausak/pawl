@@ -62,6 +62,8 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
+import qualified Pawl.Types.VillainousChoiceR as VillainousChoiceR
+import qualified Pawl.Types.VillainousChoiceRewrite as VillainousChoiceRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -257,6 +259,13 @@ spec s =
             codec
             (ReplacementEffect.ScryR (ScryR.MkScryR ControllerRelation.Yours ScryRewrite.DrawInstead))
             " {\"type\":\"ScryR\",\"value\":{\"whose\":{\"type\":\"Yours\"},\"rewrite\":{\"type\":\"DrawInstead\"}}} "
+        -- CR 701.55c: The Valeyard.
+        Spec.it s "VillainousChoiceR (The Valeyard)" $
+          Common.assertCodec
+            s
+            codec
+            (ReplacementEffect.VillainousChoiceR (VillainousChoiceR.MkVillainousChoiceR ControllerRelation.Opponents VillainousChoiceRewrite.AdditionalTime))
+            " {\"type\":\"VillainousChoiceR\",\"value\":{\"whose\":{\"type\":\"Opponents\"},\"rewrite\":{\"type\":\"AdditionalTime\"}}} "
         -- A fixed kind, a real filter, and CR 614.16's AddMore.
         Spec.it s "CounterR (Hardened Scales)" $
           Common.assertCodec
@@ -335,6 +344,6 @@ spec s =
           Common.assertCodec
             s
             codec
-            (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (Just TurnUpProcedure.Morph) (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
+            (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (Just TurnUpProcedure.Morph) Nothing (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
             " {\"type\":\"TurnUpR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"requiring\":{\"type\":\"Morph\"},\"rewrite\":{\"type\":\"WithCounters\",\"value\":[{\"kind\":{\"type\":\"PlusOnePlusOne\"},\"count\":{\"type\":\"Literal\",\"value\":1}}]}}} "
         Spec.it s "has a schema" $ Common.assertHasSchema s codec

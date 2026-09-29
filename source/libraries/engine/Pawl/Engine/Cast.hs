@@ -1775,7 +1775,7 @@ castFacings face =
     -- down and ANNOUNCE THAT YOU'RE USING A MORPH ABILITY" -- so the
     -- facing this proposes carries FaceDownReason.Morphed, and CR 701.40b's
     -- procedure is closed to the permanent it becomes.
-    : (if Maybe.isJust (Keyword.morphCost (Face.keywordSet face)) then [Facing.faceDown FaceDownReason.Morphed] else [])
+    : (if not (null (Keyword.morphCosts (Face.keywordSet face))) then [Facing.faceDown FaceDownReason.Morphed] else [])
       -- CR 702.168b names its own allower the same way -- "turn the card face
       -- down and ANNOUNCE THAT YOU ARE USING A DISGUISE ABILITY" -- and lists
       -- ward {2} where rule 702.37c lists nothing, so this facing carries both

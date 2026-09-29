@@ -154,6 +154,8 @@ import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.VillainousChoiceR as VillainousChoiceR
+import qualified Pawl.Types.VillainousChoiceRewrite as VillainousChoiceRewrite
 import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -181,6 +183,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 -- Every replacement effect instance in the game, in the engine's canonical
 -- order, which is what the ChooseReplacement prompt indexes into:
@@ -707,6 +710,7 @@ affected event = case event of
   ProposedEvent.WouldRollDice roll -> ([], [DiceRoll.roller roll])
   ProposedEvent.WouldProliferate pid _ -> ([], [pid])
   ProposedEvent.WouldScry pid _ -> ([], [pid])
+  ProposedEvent.WouldFaceVillainousChoice pid _ -> ([], [pid])
 
 -- CR 614.1: does this replacement's printed pattern match this event?
 matchesPrinted :: (ObjectId -> Filter.View) -> GameState -> ProposedEvent -> ReplacementCandidate -> Bool
@@ -823,12 +827,14 @@ matchesPrinted viewOf gs event candidate =
         -- have ... after it's turned face up" is answered by asking about the
         -- board rather than by a counterfactual.
         --
-        -- TurnUpR.requiring is the second conjunct, and it is the ROW's own
-        -- condition rather than the rewrite class's. CR 702.37b's megamorph
-        -- counter is the one row that carries it -- "put a +1/+1 counter on it IF
-        -- ITS MEGAMORPH COST WAS PAID to turn it face up" -- so the row is
-        -- refused down CR 701.40c's manifest road and off an Effect.TurnFaceUp
-        -- that names no procedure at all, neither having paid that cost. Refused
+        -- TurnUpR.requiring and TurnUpR.paying are the second and third
+        -- conjuncts, and they are the ROW's own condition rather than the
+        -- rewrite class's. CR 702.37b's megamorph counter is the one row that
+        -- carries them -- "put a +1/+1 counter on it IF ITS MEGAMORPH COST WAS
+        -- PAID to turn it face up" -- so the row is refused down CR 701.40c's
+        -- manifest road, off an Effect.TurnFaceUp that names no procedure at
+        -- all, and down CR 702.37e's own procedure when it paid a plain morph
+        -- cost, none having paid that megamorph cost. Refused
         -- rather than consumed and skipped, which is CR 614.1's own shape for an
         -- ability whose condition is not met.
         --
@@ -837,11 +843,12 @@ matchesPrinted viewOf gs event candidate =
         -- it" clause of its own -- Bubble Smuggler, whose road up is CR 702.168d's
         -- disguise procedure -- states no such condition; see #987. CR 303.4k's
         -- MayAttachTo has none either. Pawl.CardSpec holds that no printing
-        -- authors a `requiring` at all, which is what keeps a card's row
-        -- unconditional here.
-        (ReplacementEffect.TurnUpR turnUpR, ProposedEvent.WouldTurnFaceUp oid procedure) ->
+        -- authors a `requiring` or a `paying` at all, which is what keeps a
+        -- card's row unconditional here.
+        (ReplacementEffect.TurnUpR turnUpR, ProposedEvent.WouldTurnFaceUp oid road) ->
           matchesFiltered viewOf gs candidate (TurnUpR.matching turnUpR) oid
-            && maybe True (\required -> procedure == Just required) (TurnUpR.requiring turnUpR)
+            && maybe True (\required -> fmap fst road == Just required) (TurnUpR.requiring turnUpR)
+            && maybe True (\required -> fmap snd road == Just required) (TurnUpR.paying turnUpR)
         -- CR 122.1d's "a permanent with a stun counter on it" is the self-scope
         -- DestructionR's arm reads one event class over: the row is minted onto
         -- the permanent holding the counters, so `src` IS the rule's subject and
@@ -950,6 +957,11 @@ matchesPrinted viewOf gs event candidate =
         -- event, and CR 701.22b's scry 0 is never proposed.
         (ReplacementEffect.ScryR (ScryR.MkScryR whose _), ProposedEvent.WouldScry pid _) ->
           matchesPlayer gs src whose pid
+        -- CR 701.55c / 614.1a: whose villainous choices the row watches -- The
+        -- Valeyard's "an opponent" -- the ProliferateR arm's posture. No `admits`:
+        -- VillainousChoiceRewrite.AdditionalTime always changes the count.
+        (ReplacementEffect.VillainousChoiceR (VillainousChoiceR.MkVillainousChoiceR whose _), ProposedEvent.WouldFaceVillainousChoice pid _) ->
+          matchesPlayer gs src whose pid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -971,6 +983,7 @@ matchesPrinted viewOf gs event candidate =
         (ReplacementEffect.DieRollR {}, _) -> False
         (ReplacementEffect.ProliferateR {}, _) -> False
         (ReplacementEffect.ScryR {}, _) -> False
+        (ReplacementEffect.VillainousChoiceR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
 -- CR 614.1a: would this rewrite actually change the loss? `admits` and `unspent`
@@ -1925,6 +1938,7 @@ bucketOfEffect re = case re of
   -- so CR 616.1e.
   ReplacementEffect.ProliferateR {} -> ReplacementBucket.Other
   ReplacementEffect.ScryR {} -> ReplacementBucket.Other
+  ReplacementEffect.VillainousChoiceR {} -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entries and copies; a skip is none of those, so it
   -- falls to CR 616.1e.
   ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
@@ -2106,13 +2120,13 @@ readsApplier re = case re of
   -- WithCounters' answer one event class over. The inner sum is cased so a
   -- second TurnUpRewrite -- CR 208.2b's power-and-toughness setter -- has to be
   -- decided here rather than inheriting this answer.
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.WithCounters {})) -> False
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ _ (TurnUpRewrite.WithCounters {})) -> False
   -- CR 303.4k: "the AURA's controller" makes the choice, and the Aura is the
   -- object the event already named -- so the player asked is read off the event
   -- rather than off whose row is applying, and two identical rows would put the
   -- same question to the same player. The destination Filter is the effect's own
   -- field, inside `choose`'s comparison already.
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.MayAttachTo _)) -> False
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ _ (TurnUpRewrite.MayAttachTo _)) -> False
   -- CR 122.1d acts on the permanent becoming untapped and names no player -- CR
   -- 701.19a's answer one event class over, and for its reason.
   ReplacementEffect.UntapR _ -> False
@@ -2205,6 +2219,9 @@ readsApplier re = case re of
   -- is the event's own. ProliferateR's answer, and for its reason.
   ReplacementEffect.ScryR (ScryR.MkScryR _ ScryRewrite.PlusOne) -> False
   ReplacementEffect.ScryR (ScryR.MkScryR _ ScryRewrite.DrawInstead) -> False
+  -- The facing seat is the one the EVENT named and the extra facing is the
+  -- effect's own field. ProliferateR's answer, and for its reason.
+  ReplacementEffect.VillainousChoiceR (VillainousChoiceR.MkVillainousChoiceR _ VillainousChoiceRewrite.AdditionalTime) -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
@@ -2252,6 +2269,7 @@ readsSource effect = case effect of
   ReplacementEffect.DieRollR {} -> False
   ReplacementEffect.ProliferateR {} -> False
   ReplacementEffect.ScryR {} -> False
+  ReplacementEffect.VillainousChoiceR {} -> False
   ReplacementEffect.PhaseR _ -> False
 
 -- CR 616.1: the affected object's controller (or its owner if it has none), or
@@ -2439,6 +2457,8 @@ affectedChooserOf gs event = case event of
   -- Pawl.LibraryOrderSpec's "CR 616.1 Eligeth and Kenessos: the scryer orders
   -- them".
   ProposedEvent.WouldScry pid _ -> Just pid
+  -- CR 616.1 / 701.55a: the player facing the choice, WouldScry's answer.
+  ProposedEvent.WouldFaceVillainousChoice pid _ -> Just pid
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
@@ -3854,6 +3874,7 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   -- CoinFlipR's answer.
   ReplacementEffect.ProliferateR {} -> Nothing
   ReplacementEffect.ScryR {} -> Nothing
+  ReplacementEffect.VillainousChoiceR {} -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
@@ -3877,6 +3898,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
@@ -3899,6 +3921,7 @@ asDestruction event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 -- asDestruction's twin one event class over: the permanent that actually becomes
 -- untapped, or Nothing when a replacement took the event.
@@ -3923,6 +3946,7 @@ asUntap event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 -- asUntap's twin one event class over: the player who actually draws a card, or
 -- Nothing when a replacement took the event (CR 614.6).
@@ -3935,6 +3959,7 @@ asDraw event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
@@ -3959,6 +3984,7 @@ asDrawCount event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
@@ -3987,6 +4013,7 @@ asMillCount event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
@@ -4007,6 +4034,7 @@ asCoinFlip event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
@@ -4032,6 +4060,7 @@ asDiceRoll event = case event of
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
   ProposedEvent.WouldMillCards {} -> Nothing
   ProposedEvent.WouldDraw _ -> Nothing
@@ -4054,6 +4083,7 @@ asScry :: ProposedEvent -> Maybe (PlayerId, Natural)
 asScry event = case event of
   ProposedEvent.WouldScry pid n -> Just (pid, n)
   ProposedEvent.WouldProliferate {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
   ProposedEvent.WouldDrawCards {} -> Nothing
@@ -4077,6 +4107,32 @@ asScry event = case event of
 asProliferate :: ProposedEvent -> Maybe (PlayerId, Natural)
 asProliferate event = case event of
   ProposedEvent.WouldProliferate pid n -> Just (pid, n)
+  ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
+  ProposedEvent.WouldRollDice _ -> Nothing
+  ProposedEvent.WouldFlipCoin {} -> Nothing
+  ProposedEvent.WouldDrawCards {} -> Nothing
+  ProposedEvent.WouldMillCards {} -> Nothing
+  ProposedEvent.WouldDraw _ -> Nothing
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
+  ProposedEvent.WouldUntap _ -> Nothing
+  ProposedEvent.WouldLoseLife {} -> Nothing
+  ProposedEvent.WouldGainLife {} -> Nothing
+
+-- CR 701.55c: the facing player and how many times they face the choice once
+-- CR 616.1's loop has settled the instruction. asProliferate's shape.
+asVillainousChoice :: ProposedEvent -> Maybe (PlayerId, Natural)
+asVillainousChoice event = case event of
+  ProposedEvent.WouldFaceVillainousChoice pid n -> Just (pid, n)
+  ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldFlipCoin {} -> Nothing
@@ -4117,6 +4173,7 @@ asCounters event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 -- asCounters' player half. The CAUSE is dropped by both, for the same reason: what
 -- the funnel needs back is the placement to carry out, and the provenance has
@@ -4142,6 +4199,7 @@ asPlayerCounters event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 -- asPlayerCounters' sibling one event class over: the player who would lose life
 -- and how much of the loss has survived, or Nothing when a replacement took the
@@ -4169,6 +4227,7 @@ asLifeLoss event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 -- asLifeLoss the other direction: the player who would gain life and how much of
 -- the gain has survived, or Nothing when a replacement took the event outright.
@@ -4193,6 +4252,7 @@ asLifeGain event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 asTokens :: ProposedEvent -> Maybe (PlayerId, Seq.Seq TokenLot.TokenLot)
 asTokens event = case event of
@@ -4215,6 +4275,7 @@ asTokens event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing
 
 -- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
 -- skips become floating replacement effects, one per selector. Called by
@@ -4414,3 +4475,4 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldRollDice _ -> Nothing
   ProposedEvent.WouldProliferate {} -> Nothing
   ProposedEvent.WouldScry {} -> Nothing
+  ProposedEvent.WouldFaceVillainousChoice {} -> Nothing

@@ -1554,7 +1554,7 @@ replacementRowReads re = case re of
   -- The pattern's Filter over what the token is; the scaling is a number and
   -- the appended token is card data of its own, so neither reads a slot.
   ReplacementEffect.TokenR (TokenR.MkTokenR pat _ _) -> ([TokenPattern.whatToken pat], [])
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ rewrite) -> addFilter pat (turnUpRewriteReads rewrite)
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _ _ rewrite) -> addFilter pat (turnUpRewriteReads rewrite)
   ReplacementEffect.UntapR _ -> ([], [])
   -- A LifeLossPattern is one ControllerRelation and one LifeLossCause, and no arm
   -- of LifeLossRewrite carries a Filter or a Quantity: no read at all.
@@ -1576,6 +1576,7 @@ replacementRowReads re = case re of
   ReplacementEffect.DieRollR {} -> ([], [])
   ReplacementEffect.ProliferateR {} -> ([], [])
   ReplacementEffect.ScryR {} -> ([], [])
+  ReplacementEffect.VillainousChoiceR {} -> ([], [])
   ReplacementEffect.PhaseR _ -> ([], [])
 
 -- A row's pattern Filter joined onto what its rewrite reads.
@@ -1723,6 +1724,7 @@ replacementRowEffects re = case re of
   ReplacementEffect.DieRollR _ -> []
   ReplacementEffect.ProliferateR _ -> []
   ReplacementEffect.ScryR _ -> []
+  ReplacementEffect.VillainousChoiceR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The program an ENTRY rewrite runs. entryRewriteReads' discipline: no wildcard,

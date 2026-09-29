@@ -1244,7 +1244,8 @@ replaceWholeWord from to =
                       else go (done <> Text.take 1 match) (Text.drop 1 match)
    in go Text.empty
 
--- CR 612.1 through CR 106.6a's spending restriction: every half is a filter of
+-- CR 612.1 through CR 106.6a's spending restriction: every half but
+-- keywordActivations, a designator naming no quality, is a filter of
 -- printed text. See the AddMana arm above for why this is a fence rather than a
 -- proof.
 rewriteManaRestriction :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ManaRestriction.ManaRestriction -> ManaRestriction.ManaRestriction
@@ -1389,10 +1390,12 @@ rewriteReplacementEffect pairs effect = case effect of
   -- CR 614.1a / 706.1: a DieRollR is one CR 109.5 relation and one nullary
   -- rewrite, so CR 612.1's text change has nothing to walk into.
   ReplacementEffect.DieRollR {} -> effect
-  -- CR 614.1a / 701.34a / 701.22a: a ProliferateR or a ScryR is one CR 109.5
-  -- relation and one nullary rewrite, DieRollR's answer.
+  -- CR 614.1a / 701.34a / 701.22a / 701.55c: a ProliferateR, a ScryR or a
+  -- VillainousChoiceR is one CR 109.5 relation and one nullary rewrite,
+  -- DieRollR's answer.
   ReplacementEffect.ProliferateR {} -> effect
   ReplacementEffect.ScryR {} -> effect
+  ReplacementEffect.VillainousChoiceR {} -> effect
   -- A DrawR's pattern is one CR 109.5 relation, but the REWRITE can hold CR 400.11c's
   -- wish filter, which rewriteEffect's own Effect.FromOutsideTheGame arm swaps on
   -- the resolution road -- so it has to be swapped here too, or the same sentence

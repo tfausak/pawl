@@ -3,10 +3,10 @@
 
 -- Covers CR 716's Class cards, which need no engine subsystem of their own. A
 -- class level bar is a keyword ability (CR 716.2) whose meaning rule 716.2a spells
--- out in full, and both halves of that sentence are vocabulary the card model
--- already had: the activated half is an ordinary activated ability carrying rule
--- 716.2a's two riders as ActivationRestriction.OnlyIf and
--- ActivationRestriction.SorcerySpeed, and the static half is an ordinary
+-- out in full: the activated half is the card's activated ability written with
+-- Keyword.ClassLevel on it, which adds rule 716.2a's two riders as
+-- ActivationRestriction.OnlyIf and ActivationRestriction.SorcerySpeed
+-- (Pawl.Engine.Keyword.printedRiders), and the static half is an ordinary
 -- StaticAbility with a CR 604.2 clause. The mark both halves read is
 -- Object.classLevel, written by Effect.SetClassLevel and read by
 -- Quantity.ClassLevel.
@@ -39,10 +39,8 @@
 -- sideways type line -- so nothing here asserts about the layout, and
 -- data/cards/paladin-class.json states none.
 --
--- What is NOT proven here, because Paladin Class cannot reach it:
---
---   * CR 716.2c's "to gain a Class level", which only Sorcerer Class prints (gap
---     #1948).
+-- CR 716.2c's "to gain a Class level" needs Sorcerer Class, and
+-- gainClassLevelSpec below is what proves it.
 --
 -- CR 716's "when this Class becomes level N" trigger needs a second card, and
 -- becomesLevelSpec below is what proves it: Stormchaser's Talent, BLB, joins
@@ -50,6 +48,7 @@
 module Pawl.ClassSpec where
 
 import qualified Control.Monad as Monad
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -75,6 +74,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -85,8 +85,10 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -99,6 +101,7 @@ spec s registry = Spec.describe s "Class" $ do
   barsHadSpec s registry
   designationSpec s registry
   becomesLevelSpec s registry
+  gainClassLevelSpec s registry
 
 -- CR 716.3: the text above the first class level bar is an ability the Class has
 -- at ALL times -- no bar precedes it, so no level gates it. Paladin Class prints
@@ -858,3 +861,82 @@ becomesLevelSpec s registry = Spec.describe s "Becomes level trigger" $ do
     Spec.assertEqWith s "the Lightning Bolt is still in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [CardName.MkCardName (Text.pack "Lightning Bolt")]
     Spec.assertEqWith s "and her hand is empty" (namesIn Zone.Hand S.alice after) []
     Spec.assertEqWith s "CR 716.2a the level really did move on to 3" (levelOf classId after) (Just (ClassLevel.MkClassLevel 3))
+
+-- CR 716.2c: "to gain a Class level" means "to activate an ability indicated by
+-- a class level bar". Sorcerer Class, AFR 233, prints it: at level 2 creatures
+-- its controller controls have "{T}: Add {U} or {R}. Spend this mana only to
+-- cast an instant or sorcery spell or to gain a Class level." The clause is
+-- asked of the ABILITY being activated (Keyword.ClassLevel, which the card
+-- writes on each bar), not of its source.
+--
+-- alice's only mana is the granted ability on five creatures: Shivan Dragon and
+-- four Goblin Pikers. The level-3 bar costs {3}{U}{R}, all five; Shivan
+-- Dragon's firebreathing costs {R}, and the Mountain board differs from the
+-- other in that one land and nothing else.
+sorcererBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+sorcererBoard sorcererClass shivan piker =
+  let (classId, withClass) = S.addPermanent sorcererClass S.alice (Setup.emptyGame S.bothPlayers)
+      (shivanId, withShivan) = S.addPermanent shivan S.alice withClass
+      withPikers = iterate (snd . S.addPermanent piker S.alice) withShivan !! 4
+   in ( classId,
+        shivanId,
+        (atLevel classId 2 withPikers)
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The payment's one colour choice, pinned: the red mana comes from Shivan Dragon
+-- (the ability's second mode) and blue from everything else, so {3}{U}{R} is
+-- paid exactly. identityAnswer would take blue five times.
+redFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+redFrom redSource p = case p of
+  Prompt.ChooseManaYield _ _ oid options | oid == redSource -> NonEmpty.last options
+  _ -> S.identityAnswer p
+
+gainClassLevelSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gainClassLevelSpec s registry = Spec.describe s "Gaining a Class level" $ do
+  Spec.it s "CR 716.2c Sorcerer Class's mana pays to gain a Class level" $ do
+    sorcererClass <- S.printingOf s registry "Sorcerer Class"
+    shivan <- S.printingOf s registry "Shivan Dragon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (classId, shivanId, gs) = sorcererBoard sorcererClass shivan piker
+        after = case [ability | Action.Type.Activate o ability <- Action.legalActions S.alice gs, o == classId] of
+          [] -> gs
+          ability : _ ->
+            let activated = S.runPure (redFrom shivanId) gs (Activate.activateAbility S.alice classId ability)
+             in S.runPure S.identityAnswer activated Stack.resolveTop
+    Spec.assertEqWith s "CR 716.2c the level-3 bar is paid with the creatures' mana" (levelOf classId after) (Just (ClassLevel.MkClassLevel 3))
+    Spec.assertEqWith s "and every creature tapped for it" (S.tappedCount S.alice after) 5
+  -- The same mana refuses an activation no class level bar indicates; the
+  -- Mountain board is the control.
+  Spec.it s "CR 106.6 the same mana does not pay Shivan Dragon's firebreathing" $ do
+    sorcererClass <- S.printingOf s registry "Sorcerer Class"
+    shivan <- S.printingOf s registry "Shivan Dragon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, shivanId, gs) = sorcererBoard sorcererClass shivan piker
+    Spec.assertEqWith s "CR 106.6 firebreathing is not offered" (barsOffered shivanId gs) 0
+    Spec.assertEqWith s "and one Mountain makes it offered" (barsOffered shivanId (S.landsFor mountain S.alice 1 gs)) 1
+  -- Level 3: "Whenever you cast an instant or sorcery spell, that spell deals
+  -- damage to each opponent equal to the number of instant and sorcery spells
+  -- you've cast this turn." alice casts Goblin Piker, then Divination: two
+  -- spells, one of them a sorcery, so bob takes 1 and not 2.
+  Spec.it s "CR 716.2a / CR 120.1 the level-3 trigger has the spell deal damage by instants and sorceries cast" $ do
+    sorcererClass <- S.printingOf s registry "Sorcerer Class"
+    shivan <- S.printingOf s registry "Shivan Dragon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    divination <- S.printingOf s registry "Divination"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    let (classId, _, gs0) = sorcererBoard sorcererClass shivan piker
+        lands = S.landsFor island S.alice 3 (S.landsFor mountain S.alice 2 (atLevel classId 3 gs0))
+        (pikerCardId, withPiker) = S.addHandCard piker S.alice lands
+        (divinationId, ready) = S.addHandCard divination S.alice withPiker
+        pikerCast = S.runPure S.identityAnswer ready (S.cast S.alice pikerCardId >> Engine.priorityLoop)
+        after = S.runPure S.identityAnswer pikerCast (S.cast S.alice divinationId >> Engine.priorityLoop)
+        spellIds = [SpellWasCast.spell c | c <- Maybe.mapMaybe Game.castOf (S.eventsOf after), elem CardType.Sorcery (PC.cardTypes (SpellWasCast.characteristics c))]
+    Spec.assertEqWith s "bob is dealt 1" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "CR 120.1 by Divination, the spell" (fmap DamageEvent.source (S.damageEventsOf after)) spellIds
+    Spec.assertEqWith s "and alice cast both spells" (length (Maybe.mapMaybe Game.castOf (S.eventsOf after))) 2
