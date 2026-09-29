@@ -743,8 +743,8 @@ startGameFromCards perform exemptions = do
   planechase <- State.gets Planechase.isPlanechase
   Monad.when planechase (Planechase.setStartingPlane starting)
 
--- CR 103.1c: rotate the turn order to begin with the player a card functioning
--- from their command zone names as the starting player, superseding CR 103.1's
+-- CR 103.1c: rotate the turn order to begin with the player whose command zone
+-- holds a card naming them the starting player, superseding CR 103.1's
 -- (or CR 727.1a's) determination. Several such players are narrowed to one at
 -- random -- the card's own text, so randomness and not a choice -- drawn from
 -- exactly those players, in turn order. A rotation, not a reseat: the cyclic
