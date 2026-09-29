@@ -377,6 +377,7 @@ vanillaFace name typeLine =
       Face.defense = Nothing,
       Face.vanguard = Nothing,
       Face.canBeYourCommander = False,
+      Face.claimsStartingPlayer = False,
       Face.keywords = Map.empty,
       Face.colorIndicator = Set.empty,
       Face.staticAbilities = [],
@@ -6252,9 +6253,9 @@ activatedAbilityFilters ability =
 --     pregame actions, which `cardResolutionEffects` above does not reach.
 --
 -- The remaining fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
--- `defense`, `vanguard`, `canBeYourCommander`, `colorIndicator`,
--- `counterability`, `castingPermissions` and `castingRestrictions`. That is
--- checkable rather than asserted: none of the
+-- `defense`, `vanguard`, `canBeYourCommander`, `claimsStartingPlayer`,
+-- `colorIndicator`, `counterability`, `castingPermissions` and
+-- `castingRestrictions`. That is checkable rather than asserted: none of the
 -- types those fields reach imports Pawl.Types.Filter, which
 -- `grep -rl 'import qualified Pawl.Types.Filter' source/libraries/types/` over
 -- each one's closure answers.

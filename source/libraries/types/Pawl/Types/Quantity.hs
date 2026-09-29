@@ -91,13 +91,8 @@ data Quantity
   | -- | CR 702.131c \/ 702.195b: 1 if that player has that rest-of-game mark, else
     -- 0; a player who has never had it reads 0.
     HasPlayerDesignation PlayerDesignationTally.PlayerDesignationTally
-  | -- | CR 103.1: 1 if that player is the starting player -- the head of
-    -- GameState.turnOrder -- else 0.
-    --
-    -- Not implemented: CR 103.1c's Power Play, which makes its controller the
-    -- starting player after the determination. That card is not in
-    -- @data\/cards\/@ and there is no effect that reseats a turn order, so the
-    -- head of the roster is the whole answer today (#882).
+  | -- | CR 103.1 \/ 103.1c: 1 if that player is the starting player -- the head
+    -- of GameState.turnOrder -- else 0.
     IsStartingPlayer PlayerRef.PlayerRef
   | -- | CR 102.1: 1 if that player is the active player, else 0.
     IsActivePlayer PlayerRef.PlayerRef
