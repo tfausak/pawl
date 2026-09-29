@@ -22,4 +22,7 @@ data RevealCause
     -- under the miracle ability with this cost, whose linked trigger alone it
     -- fires (CR 607.2h).
     ForMiracle (Cost.Cost Keyword.Keyword)
+  | -- | CR 708.9: a face-down permanent, revealed by its owner as it leaves the
+    -- battlefield.
+    LeavingFaceDown
   deriving (Eq, Ord, Show)
