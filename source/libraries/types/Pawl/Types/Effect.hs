@@ -35,6 +35,7 @@ import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
+import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
@@ -500,6 +501,9 @@ data Effect card ability
     -- the other is blocked by" asks a question about the reassignment this
     -- opcode is, so no clause ahead of it can be handed the pairs to ask about.
     SwitchBlockers SlotName.SlotName
+  | -- | CR 509.3a's effect road: remove two blocking creatures from combat, then
+    -- each blocks what the other was blocking (Sorrow's Path), if each could.
+    ExchangeBlocks ExchangeBlocks.ExchangeBlocks
   | -- | CR 500.8: add phases to a turn, directly after the specified phase, in
     -- written order (Aggravated Assault). Targetless.
     AddPhases [ExtraPhase.ExtraPhase]

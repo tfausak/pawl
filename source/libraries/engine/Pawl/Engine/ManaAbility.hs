@@ -343,6 +343,7 @@ manaProduced effect = case effect of
   Effect.RemoveFromCombat _ -> Nothing
   Effect.BecomesBlocked _ -> Nothing
   Effect.SwitchBlockers _ -> Nothing
+  Effect.ExchangeBlocks _ -> Nothing
   Effect.MoveToZone {} -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
@@ -582,6 +583,7 @@ movesLibraryCard effect = case effect of
   Effect.RemoveFromCombat _ -> False
   Effect.BecomesBlocked _ -> False
   Effect.SwitchBlockers _ -> False
+  Effect.ExchangeBlocks _ -> False
   -- CR 701.22 and CR 701.29 rearrange a library's own cards; nothing enters or
   -- leaves it.
   Effect.Scry {} -> False

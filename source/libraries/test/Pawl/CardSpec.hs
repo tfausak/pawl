@@ -1311,6 +1311,7 @@ ownCounts effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
   Effect.PutCountersFrom {} -> []
@@ -1755,6 +1756,7 @@ effectNestedEffects effect = case effect of
   Effect.RemoveFromCombat {} -> []
   Effect.BecomesBlocked {} -> []
   Effect.SwitchBlockers {} -> []
+  Effect.ExchangeBlocks {} -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.PutCountersFrom {} -> []
@@ -2271,6 +2273,7 @@ effectReplacements effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.PutCountersFrom {} -> []
@@ -2754,6 +2757,7 @@ effectMintedFaces effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.PutCountersFrom {} -> []
@@ -5783,6 +5787,7 @@ effectFilters effect = case effect of
   Effect.RemoveFromCombat ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.BecomesBlocked _ -> []
   Effect.SwitchBlockers _ -> []
+  Effect.ExchangeBlocks _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
   Effect.Counter (Counter.MkCounter ref _ _) -> frame SourceHostFramed (objectRefFilters ref)

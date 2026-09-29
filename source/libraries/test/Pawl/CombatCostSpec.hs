@@ -13,6 +13,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import Pawl.CombatEffectSpec (addForests, attackThePlaneswalker, attackersOf, attacking, cursing, cursingBoard, imprisoning, runToEndOfCombat, tapStateOf, withPermanents)
 import qualified Pawl.Engine.Activate as Activate
@@ -60,6 +61,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -3008,6 +3010,118 @@ switchBlockersSpec s registry = Spec.describe s "SwitchBlockers" $ do
         Spec.assertEqWith s "though the switch really happened" (Combat.blockersOf elf used) (Set.fromList [c, d])
       _ -> Spec.assertFailure s "fixture should have three of alice's creatures and five of bob's"
 
+-- CR 509.3a's effect road that makes a creature block ANEW: Sorrow's Path (The
+-- Dark) prints "{T}: Choose two target blocking creatures controlled by the same
+-- opponent. If each of those creatures could block all creatures that the other
+-- is blocking, remove both of them from combat. Each one then blocks all
+-- creatures the other was blocking." Its 2009-10-01 ruling: blocks triggers
+-- of the two creatures fire again, since they left combat first. That is the
+-- producer rule 509.3e's blocker-side forms need, the count and quality a
+-- creature blocks changing with no declaration.
+--
+-- Alice controls the Path and attacks; its second ability deals her creatures 2
+-- as it taps, so every attacker has 3 toughness. Each case stops before combat
+-- damage.
+exchangeBlocksSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exchangeBlocksSpec s registry = Spec.describe s "ExchangeBlocks" $ do
+  -- CR 509.3e's count form: Lairwatch Giant ("can block an additional creature
+  -- each combat ... Whenever this creature blocks two or more creatures, it
+  -- gains first strike until end of turn"). The first Giant is declared against
+  -- one attacker and the second against two; the exchange hands the first the
+  -- second's two.
+  Spec.it s "CR 509.3e whole card: Sorrow's Path hands a Lairwatch Giant two attackers and it gains first strike" $ do
+    path <- S.printingOf s registry "Sorrow's Path"
+    giant <- S.printingOf s registry "Hill Giant"
+    lairwatch <- S.printingOf s registry "Lairwatch Giant"
+    case S.combatBoardOf [path, giant, giant, giant] [lairwatch, lairwatch] of
+      (gs0, [_, one, two, three], [lone, pair]) -> do
+        let blocks = Map.fromList [(lone, Set.singleton one), (pair, Set.fromList [two, three])]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (exchanging blocks lone pair) gs0
+            idle = S.runToStep (Phase.Combat CombatStep.CombatDamage) (declaring blocks) gs0
+        Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike lone used) "CR 509.3e: the Giant blocked two anew, so it gained first strike"
+        Spec.assertEqWith s "and it is blocking both of the other's attackers" (Set.filter (\a -> Set.member lone (Combat.blockersOf a used)) (Set.fromList [one, two, three])) (Set.fromList [two, three])
+        Spec.assertEqWith s "while the other blocks its one" (Combat.blockersOf one used) (Set.singleton pair)
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike lone idle)) "control: without the Path the lone Giant never gains first strike"
+        Spec.assertEqWith s "and the Path's tap trigger dealt alice 2" (S.lifeOf S.alice used) (Just 18)
+      _ -> Spec.assertFailure s "fixture should have the Path, three attackers and two Lairwatch Giants"
+
+  -- CR 509.3e's quality form: Serra Inquisitors ("Whenever this creature blocks
+  -- or becomes blocked by one or more black creatures, this creature gets +2/+0
+  -- until end of turn") is declared against a red Hill Giant, and the exchange
+  -- hands it the black Bog Wraith a second Hill Giant was blocking.
+  Spec.it s "CR 509.3e whole card: Sorrow's Path hands Serra Inquisitors a black attacker and it triggers" $ do
+    path <- S.printingOf s registry "Sorrow's Path"
+    giant <- S.printingOf s registry "Hill Giant"
+    wraith <- S.printingOf s registry "Bog Wraith"
+    inquisitors <- S.printingOf s registry "Serra Inquisitors"
+    case S.combatBoardOf [path, giant, wraith] [inquisitors, giant] of
+      (gs0, [_, red, black], [inq, other]) -> do
+        let blocks = Map.fromList [(inq, Set.singleton red), (other, Set.singleton black)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (exchanging blocks inq other) gs0
+            idle = S.runToStep (Phase.Combat CombatStep.CombatDamage) (declaring blocks) gs0
+        Spec.assertEqWith s "CR 509.3e: blocking the Wraith anew fired the Inquisitors' trigger" (S.powerToughnessOf inq used) (Just (5, 3))
+        Spec.assertEqWith s "and it is blocking the Wraith now" (Combat.blockersOf black used) (Set.singleton inq)
+        Spec.assertEqWith s "control: without the Path the Inquisitors' trigger never fired" (S.powerToughnessOf inq idle) (Just (3, 3))
+      _ -> Spec.assertFailure s "fixture should have the Path, two attackers and two of bob's creatures"
+
+  -- The printed "if each of those creatures could block all creatures that the
+  -- other is blocking", pairwise: the Inquisitors could not block the Pixie
+  -- Guide's flying (CR 702.9b), so nothing moves, though the Giant Spider's
+  -- reach could block the Hill Giant.
+  Spec.it s "CR 509.1b a pair the Path's hypothetical refuses on evasion moves nobody" $ do
+    path <- S.printingOf s registry "Sorrow's Path"
+    giant <- S.printingOf s registry "Hill Giant"
+    pixie <- S.printingOf s registry "Pixie Guide"
+    inquisitors <- S.printingOf s registry "Serra Inquisitors"
+    spider <- S.printingOf s registry "Giant Spider"
+    case S.combatBoardOf [path, giant, pixie] [inquisitors, spider] of
+      (gs0, [pathId, ground, flier], [inq, spiderId]) -> do
+        let blocks = Map.fromList [(inq, Set.singleton ground), (spiderId, Set.singleton flier)]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (exchanging blocks inq spiderId) gs0
+        Spec.assertEqWith s "CR 509.1b: the Inquisitors could not block the flier, so the Spider still does" (Combat.blockersOf flier used) (Set.singleton spiderId)
+        Spec.assertEqWith s "and the Inquisitors still blocks the Giant" (Combat.blockersOf ground used) (Set.singleton inq)
+        Spec.assertEqWith s "though the ability resolved and paid its {T}" (tapStateOf pathId used) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should have the Path, two attackers and two of bob's creatures"
+
+  -- The same hypothetical on CR 509.1a's arity: a Hill Giant can block one
+  -- creature, so it could not block the two the Lairwatch Giant is blocking.
+  Spec.it s "CR 509.1a a pair the Path's hypothetical refuses on arity moves nobody" $ do
+    path <- S.printingOf s registry "Sorrow's Path"
+    giant <- S.printingOf s registry "Hill Giant"
+    lairwatch <- S.printingOf s registry "Lairwatch Giant"
+    case S.combatBoardOf [path, giant, giant, giant] [giant, lairwatch] of
+      (gs0, [_, one, two, three], [single, pair]) -> do
+        let blocks = Map.fromList [(single, Set.singleton one), (pair, Set.fromList [two, three])]
+            used = S.runToStep (Phase.Combat CombatStep.CombatDamage) (exchanging blocks single pair) gs0
+        Spec.assertEqWith s "CR 509.1a: the Hill Giant could not block two, so it still blocks its one" (Combat.blockersOf one used) (Set.singleton single)
+        Spec.assertEqWith s "and the Lairwatch Giant still blocks the other two" (fmap (`Combat.blockersOf` used) [two, three]) [Set.singleton pair, Set.singleton pair]
+      _ -> Spec.assertFailure s "fixture should have the Path, three attackers and two of bob's creatures"
+
+  -- The same hypothetical on CR 509.1b's per-creature restrictions, which
+  -- Sorrow's Path's ruling names ("other blocking restrictions"): Blind-Spot
+  -- Giant ("can't attack or block unless you control another Giant") blocks
+  -- legally beside bob's Hill Giant, and once alice Bolts that Hill Giant it
+  -- could no longer block, though CR 506.4a leaves it blocking. The control
+  -- differs in ONE thing: the Bolt is never cast, and the exchange happens.
+  Spec.it s "CR 509.1b a creature that can no longer block is refused by the Path's hypothetical" $ do
+    path <- S.printingOf s registry "Sorrow's Path"
+    giant <- S.printingOf s registry "Hill Giant"
+    mountain <- S.printingOf s registry "Mountain"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    wraith <- S.printingOf s registry "Bog Wraith"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    case S.combatBoardOf [path, mountain, giant, giant] [blindSpot, wraith, giant] of
+      (gs0, [_, _, one, two], [spot, wraithId, enabler]) -> do
+        let (_, gs1) = S.addHandCard bolt S.alice gs0
+            blocks = Map.fromList [(spot, Set.singleton one), (wraithId, Set.singleton two)]
+            used = runToStepThreaded (Phase.Combat CombatStep.CombatDamage) (boltThenExchange True enabler blocks spot wraithId) gs1
+            unbolted = runToStepThreaded (Phase.Combat CombatStep.CombatDamage) (boltThenExchange False enabler blocks spot wraithId) gs1
+        Spec.assertEqWith s "CR 509.1b: the Blind-Spot Giant can no longer block, so nothing moved" (Combat.blockersOf one used) (Set.singleton spot)
+        Spec.assertEqWith s "and the Wraith still blocks its own attacker" (Combat.blockersOf two used) (Set.singleton wraithId)
+        Spec.assertBool s (not (S.onBattlefield enabler used)) "the Bolt really killed bob's other Giant"
+        Spec.assertEqWith s "control: with that Giant alive the two exchange" (Combat.blockersOf one unbolted) (Set.singleton wraithId)
+      _ -> Spec.assertFailure s "fixture should have the Path, a Mountain, two attackers and three of bob's creatures"
+
 -- Declare exactly `blocks` and otherwise answer as the aggressive interpreter
 -- does. Pinned rather than searched for: the two boards above both turn on WHICH
 -- attacker each blocker was declared against.
@@ -3054,6 +3168,61 @@ countFiredBy oid gs = length (filter fired (S.eventsOf gs))
           && case TriggeredAbility.condition (AbilityTriggered.ability record) of
             TriggerCondition.CreatureBecomesBlockedByAtLeast {} -> True
             _ -> False
+      _ -> False
+
+-- `declaring`, plus taking every activation offered and aiming Sorrow's Path's
+-- two slots at `firstBlocker` and `secondBlocker`, each FILTERED out of what
+-- that slot offers rather than built.
+exchanging :: Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId) -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+exchanging blocks firstBlocker secondBlocker p = case p of
+  Prompt.ChooseTargets _ _ _ slots ->
+    Map.mapWithKey (\slot (_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just (if slot == SlotName.MkSlotName (Text.pack "first") then firstBlocker else secondBlocker)) candidates) slots
+  _ -> switching blocks [] p
+
+-- S.runToStep with an answerer that threads a stage, for a leg whose answer
+-- depends on what already happened rather than on the prompt alone.
+runToStepThreaded :: Phase.Phase -> (forall r. Prompt.Prompt r -> State.State Int r) -> GameState.GameState -> GameState.GameState
+runToStepThreaded step answer gs0 =
+  let go n stage g =
+        if n <= (0 :: Int) || GameState.phase g == step
+          then g
+          else
+            let ((_, g1), stage1) = State.runState (Engine.runGame answer g Engine.runStep) stage
+             in go (n - 1) stage1 g1
+   in go 8 0 gs0
+
+-- `exchanging`, plus alice casting her Bolt at `victim` first. Stage 0 waits
+-- for the Path's activation to be offered (blockers are declared), then casts
+-- when `bolting`; stage 1 passes with the Bolt on the stack; stage 2 activates
+-- once it has resolved. The Bolt's target and the Path's two slots are each
+-- FILTERED out of what is offered.
+boltThenExchange :: Bool -> ObjectId.ObjectId -> Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId) -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+boltThenExchange bolting victim blocks firstBlocker secondBlocker p = case p of
+  Prompt.ChooseAction _ pid options
+    | pid == S.alice,
+      any isActivation options -> do
+        stage <- State.get
+        let casts = filter isCast options
+        case (stage, casts) of
+          (0, c : _) | bolting -> State.put 1 >> pure c
+          (0, _) -> State.put 2 >> pure (activation options)
+          (1, _) -> State.put 2 >> pure A.Pass
+          (2, _) -> State.put 3 >> pure (activation options)
+          _ -> pure A.Pass
+    | otherwise -> pure A.Pass
+  Prompt.ChooseTargets _ _ _ slots ->
+    pure (Map.mapWithKey (\slot (_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just (aimAt slot)) candidates) slots)
+  _ -> pure (exchanging blocks firstBlocker secondBlocker p)
+  where
+    aimAt slot
+      | slot == SlotName.MkSlotName (Text.pack "first") = firstBlocker
+      | slot == SlotName.MkSlotName (Text.pack "second") = secondBlocker
+      | otherwise = victim
+    activation options = case filter isActivation options of
+      a : _ -> a
+      [] -> A.Pass
+    isCast a = case a of
+      A.Cast {} -> True
       _ -> False
 
 isActivation :: A.Action -> Bool
@@ -3196,6 +3365,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   castingWindowSpec s registry
   putOntoBattlefieldBlockingSpec s registry
   switchBlockersSpec s registry
+  exchangeBlocksSpec s registry
   attackCostSpec s registry
   alluringSirenSpec s registry
   tauntSpec s registry
