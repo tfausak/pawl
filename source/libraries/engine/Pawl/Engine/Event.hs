@@ -230,6 +230,7 @@ import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import Pawl.Types.TurnWindow (TurnWindow)
 import qualified Pawl.Types.TurnWindow as TurnWindow
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import Pawl.Types.Zone (Zone)
@@ -3657,10 +3658,21 @@ apply batch candidate event =
     -- this candidate's own source. `consume` is skipped for the shield arm's
     -- reason: the counter IS the resource, so spending the row twice off one
     -- counter is what removing the counter already prevents.
-    (ReplacementEffect.UntapR rewrite, ProposedEvent.WouldUntap oid) -> case rewrite of
+    (ReplacementEffect.UntapR (UntapR.MkUntapR _ rewrite), ProposedEvent.WouldUntap oid) -> case rewrite of
       UntapRewrite.RemoveStunCounter -> do
         removeCounters oid CounterKind.Stun 1
         pure Nothing
+      -- Bewitching Leechcraft's "remove a +1/+1 counter from it instead. If you
+      -- do, untap it": the untap that survives is this same event, so CR 614.5
+      -- keeps the row off it, and the loop goes on to any other row. With none
+      -- of the kind on it, nothing is removed and it stays tapped.
+      UntapRewrite.RemoveCounterToUntap kind -> do
+        held <- State.gets (fmap (Map.findWithDefault 0 kind . Object.counters) . Game.lookupObject oid)
+        case held of
+          Just n | n > 0 -> do
+            removeCounters oid kind 1
+            pure (Just event)
+          _ -> pure Nothing
     -- Unreachable: `applies` admits UntapR only against WouldUntap.
     (ReplacementEffect.UntapR _, _) -> pure (Just event)
     -- CR 614.1a: the RESIZING arms leave the event standing at a rewritten loss,

@@ -97,6 +97,7 @@ import qualified Pawl.Types.Times as Times
 import Pawl.Types.Timestamp (Timestamp (MkTimestamp))
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
@@ -4968,7 +4969,7 @@ stunOf :: ObjectId -> GameState -> [ReplacementEffect Card.Type.Card (GrantedAbi
 stunOf oid gs =
   if stunCounters oid gs == 0
     then []
-    else [ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter]
+    else [ReplacementEffect.UntapR UntapR.MkUntapR {UntapR.during = Nothing, UntapR.rewrite = UntapRewrite.RemoveStunCounter}]
 
 -- CR 122.1d: how many stun counters this object has. shieldCounters' shape, and
 -- for its reason -- the count is what the board stores, and only whether it is
