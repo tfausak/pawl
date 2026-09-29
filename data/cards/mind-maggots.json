@@ -50,7 +50,12 @@
                               }
                             },
                             "discarded": "discarded",
-                            "slot": "you"
+                            "player": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
                           }
                         }
                       },

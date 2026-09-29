@@ -181,6 +181,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.ControlledByRecipient
       " {\"type\":\"ControlledByRecipient\"} "
+  Spec.it s "OwnedByRecipient" $
+    Common.assertCodec
+      s
+      codec
+      Filter.OwnedByRecipient
+      " {\"type\":\"OwnedByRecipient\"} "
   Spec.it s "ManaValueAtMost" $
     Common.assertCodec
       s
