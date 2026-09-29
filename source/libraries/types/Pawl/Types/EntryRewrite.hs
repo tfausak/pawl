@@ -9,6 +9,7 @@ import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.WithCounters as WithCounters
 
 -- | CR 614.1c-d: how an entry replacement modifies the entry. Each arm names its
@@ -25,13 +26,13 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- below carries a card's effects, and neither module may name the other. And in
 -- the ABILITY for Pawl.Types.CopyException's GainAbility, which AsCopy carries.
 --
--- SacrificeAnyNumber and ExileFromGraveyard are the constructors whose choice
--- SPENDS something, and CR 614.12b's combined budget across permanents entering
--- simultaneously holds for both without a budget being carried anywhere: the
--- choice is paid for inside the entry loop that made it, so the next member of
--- the batch cannot choose what an earlier one already spent (CR 614.13b).
--- Pawl.Engine.Event's SacrificeAnyNumber arm states the argument in full and
--- names the board that proves it. CR 614.13a is a separate exclusion and does
+-- SacrificeAnyNumber, ExileFromGraveyard, PayLifeOrTapped and SacrificeToEnter
+-- are the constructors whose choice SPENDS something. Each is paid inside the
+-- entry loop that made it, so the next member of a batch cannot choose what an
+-- earlier one already spent (CR 614.13b), and for the first three that is the
+-- whole of CR 614.12b: none can leave a later member owing what it cannot pay.
+-- SacrificeToEnter can, and carries CR 614.12b's forward check --
+-- Pawl.Engine.Event's arm states it. CR 614.13a is a separate exclusion and does
 -- NOT fall out with it -- see Pawl.Engine.Replacement.graveyardCandidates for the
 -- half that is unimplemented.
 data EntryRewrite ability effect
@@ -106,6 +107,9 @@ data EntryRewrite ability effect
     -- from the projection by Pawl.Engine.Keyword.mintedReplacementsFor rather
     -- than written by a card.
     SacrificeAnyNumber SacrificeAnyNumber.SacrificeAnyNumber
+  | -- | CR 614.1a / 614.12 / Heart of Yavimaya: sacrifice a fixed count of
+    -- permanents or be put into its owner's graveyard instead of entering.
+    SacrificeToEnter SacrificeToEnter.SacrificeToEnter
   | -- | CR 614.1c / 614.13 / Living Lore: exile one card matching the Filter out
     -- of the entering permanent's controller's graveyard as it enters. CR 614.14
     -- links the exiled card to the entering permanent, so a

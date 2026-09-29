@@ -213,6 +213,11 @@ data GameState = MkGameState
     -- Pawl.Engine.Projection.boardAsEntering subtracts. Empty at every priority
     -- window.
     enteringSubjects :: Set.Set ObjectId.ObjectId,
+    -- | CR 614.12b: the members of a CR 608.2f move onto the battlefield that
+    -- have not yet been moved, which CR 614.13a's one-at-a-time funnel would
+    -- otherwise hide from an earlier member's entry choice. Empty at every
+    -- priority window.
+    enteringPending :: Set.Set ObjectId.ObjectId,
     -- | CR 614.1c: the counters each entering permanent is so far going to
     -- enter with, pending until runEntry flushes them onto the object. Empty
     -- outside an entry.

@@ -182,6 +182,7 @@ import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
@@ -1618,6 +1619,7 @@ entryRewriteReads rewrite = case rewrite of
   -- per-sacrifice multiplier beside them, which is a Quantity that may name a
   -- slot exactly as the WithCounters arm above is.
   EntryRewrite.SacrificeAnyNumber sacrifice -> ([SacrificeAnyNumber.filter sacrifice], [SacrificeAnyNumber.each sacrifice])
+  EntryRewrite.SacrificeToEnter sacrifice -> ([SacrificeToEnter.filter sacrifice], [])
   -- CR 702.38a names no slot: its offer is a set of creature types read off the
   -- entering object's projection, never a Filter a resolution could bind.
   EntryRewrite.Amplify _ -> ([], [])
@@ -1736,6 +1738,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.EntersWith _ -> []
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.SacrificeAnyNumber _ -> []
+  EntryRewrite.SacrificeToEnter _ -> []
   EntryRewrite.Amplify _ -> []
   EntryRewrite.ExileFromGraveyard _ -> []
   EntryRewrite.EntersAttachedTo _ -> []

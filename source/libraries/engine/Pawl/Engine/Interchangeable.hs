@@ -152,6 +152,7 @@ quiet gs =
     && Seq.null (GameState.broughtIn gs)
     && Set.null (GameState.enteringBeside gs)
     && Set.null (GameState.enteringSubjects gs)
+    && Set.null (GameState.enteringPending gs)
     && Map.null (GameState.enteringCounters gs)
     && Map.null (GameState.detachedBindings gs)
     && Maybe.isNothing (GameState.enteringTogether gs)

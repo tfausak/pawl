@@ -149,6 +149,7 @@ codec resolve = Fields.object $ do
   pendingEntryEffects <- Fields.defaulted "pendingEntryEffects" Seq.empty (Common.seq PendingEntryEffect.codec) GameState.pendingEntryEffects
   enteringBeside <- Fields.defaulted "enteringBeside" Set.empty (Common.set ObjectId.codec) GameState.enteringBeside
   enteringSubjects <- Fields.defaulted "enteringSubjects" Set.empty (Common.set ObjectId.codec) GameState.enteringSubjects
+  enteringPending <- Fields.defaulted "enteringPending" Set.empty (Common.set ObjectId.codec) GameState.enteringPending
   enteringCounters <- Fields.defaulted "enteringCounters" Map.empty (Common.naturalMap ObjectId.codec (Common.multiset (CounterKind.codec Keyword.codec))) GameState.enteringCounters
   playerEffects <- Fields.defaulted "playerEffects" [] (Common.list ActivePlayerEffect.codec) GameState.playerEffects
   blockRequirements <- Fields.defaulted "blockRequirements" [] (Common.list ActiveBlockRequirement.codec) GameState.blockRequirements
@@ -251,6 +252,7 @@ codec resolve = Fields.object $ do
         GameState.pendingEntryEffects = pendingEntryEffects,
         GameState.enteringBeside = enteringBeside,
         GameState.enteringSubjects = enteringSubjects,
+        GameState.enteringPending = enteringPending,
         GameState.enteringCounters = enteringCounters,
         GameState.playerEffects = playerEffects,
         GameState.blockRequirements = blockRequirements,

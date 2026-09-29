@@ -137,6 +137,7 @@ import Pawl.Types.ReplacementEntry (ReplacementEntry)
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.ReplacementProvenance as ReplacementProvenance
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.ScryR as ScryR
 import qualified Pawl.Types.ScryRewrite as ScryRewrite
@@ -1103,6 +1104,9 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.EntersWith _ -> True
   EntryRewrite.UnderSourceControl -> True
   EntryRewrite.SacrificeAnyNumber {} -> True
+  -- CR 614.1a states no condition: too few candidates is the card's "if you
+  -- don't" branch, settled in Pawl.Engine.Event's arm rather than here.
+  EntryRewrite.SacrificeToEnter {} -> True
   -- CR 702.38a states no condition of its own, the arm above's answer: an empty
   -- hand is nothing to reveal rather than a row that does not apply.
   EntryRewrite.Amplify _ -> True
@@ -1250,6 +1254,55 @@ admitsEntry gs oid rewrite = case rewrite of
 -- Rule 614.1 gives it nothing to narrow by, so every cause satisfies it -- CR
 -- 120.3d's wither and infect counters included, which is the placement no other
 -- subject and no other axis of the pattern can reach.
+-- CR 614.12b: the FIXED sacrifice an entry rewrite demands, if it demands one
+-- -- how many, and matching what. Every other rewrite is optional, "any number"
+-- or spends nothing, so no earlier choice can leave it owing what it cannot pay.
+entryCostOf :: EntryRewrite.EntryRewrite ability effect -> Maybe (Natural, Filter.Type.Filter Keyword.Type.Keyword)
+entryCostOf rewrite = case rewrite of
+  EntryRewrite.SacrificeToEnter s -> Just (SacrificeToEnter.count s, SacrificeToEnter.filter s)
+  EntryRewrite.AsCopy _ -> Nothing
+  EntryRewrite.ChoiceOf _ -> Nothing
+  EntryRewrite.ChoiceByCoinFlip _ -> Nothing
+  EntryRewrite.ChooseColor -> Nothing
+  EntryRewrite.ChooseBasicLandType -> Nothing
+  EntryRewrite.ChooseCreatureType -> Nothing
+  EntryRewrite.ChoosePlayer -> Nothing
+  EntryRewrite.ChooseCardNames _ -> Nothing
+  EntryRewrite.ChooseCardName _ -> Nothing
+  EntryRewrite.WithCounters _ -> Nothing
+  EntryRewrite.EntersWith _ -> Nothing
+  EntryRewrite.UnderSourceControl -> Nothing
+  EntryRewrite.SacrificeAnyNumber _ -> Nothing
+  EntryRewrite.ExileFromGraveyard _ -> Nothing
+  EntryRewrite.EntersAttachedTo _ -> Nothing
+  EntryRewrite.Riot -> Nothing
+  EntryRewrite.ReadAhead -> Nothing
+  EntryRewrite.Unleash -> Nothing
+  EntryRewrite.Sunburst -> Nothing
+  EntryRewrite.Bloodthirst _ -> Nothing
+  EntryRewrite.Amplify _ -> Nothing
+  EntryRewrite.Tribute _ -> Nothing
+  EntryRewrite.Compleated _ -> Nothing
+  EntryRewrite.Tapped -> Nothing
+  EntryRewrite.PayLifeOrTapped _ -> Nothing
+  EntryRewrite.RevealOrTapped _ -> Nothing
+  EntryRewrite.EntersTransformed -> Nothing
+  EntryRewrite.RunEffects _ -> Nothing
+
+-- Every way to take exactly `n` of the candidates, in their order.
+subsetsOf :: Natural -> [a] -> [[a]]
+subsetsOf 0 _ = [[]]
+subsetsOf _ [] = []
+subsetsOf n (x : xs) = fmap (x :) (subsetsOf (n - 1) xs) <> subsetsOf n xs
+
+-- CR 614.12b with CR 614.13b: can every demand, each a count out of its own
+-- candidates, still be paid from what `used` has not already taken, no
+-- permanent paying twice?
+jointlyPayable :: Set ObjectId -> [(Natural, [ObjectId])] -> Bool
+jointlyPayable _ [] = True
+jointlyPayable used ((n, pool) : rest) =
+  any (\chosen -> jointlyPayable (used <> Set.fromList chosen) rest) (subsetsOf n (filter (`Set.notMember` used) pool))
+
 matchesPutter :: GameState -> ObjectId -> CounterSubject.CounterSubject -> CounterCause.CounterCause -> Bool
 matchesPutter gs src subject cause = case (subject, cause) of
   (CounterSubject.ByEffect, CounterCause.ByEffect _) -> True
@@ -1579,9 +1632,9 @@ sacrificeCandidates slots pid source filter_ gs =
 -- and are offered. The `batch` set the entry loop carries does not name them: it
 -- holds the siblings that have already ARRIVED, whose CR 400.7 incarnations are
 -- on the battlefield, which is why sacrificeCandidates' guard has nothing to do
--- here and no guard of that shape would fix it. Excluding them means threading
--- the move's remaining targets into the entry loop, and that lands with the
--- widening (#3293) -- unobservable until then, an instant or sorcery card being
+-- here and no guard of that shape would fix it. The members still to come are
+-- GameState.enteringPending, and excluding them lands with the widening
+-- (#3293) -- unobservable until then, an instant or sorcery card being
 -- the only thing this offer matches today and CR 110.4 keeping one off the
 -- battlefield.
 graveyardCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
@@ -1770,6 +1823,9 @@ bucketOfEffect re = case re of
   -- enters WITH is neither whose it is, what it copies nor which face is up.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.EntersWith _)) -> ReplacementBucket.Other
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> ReplacementBucket.Other
+  -- CR 616.1e: whether the permanent enters at all is neither whose it is, what
+  -- it copies nor which face is up.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeToEnter {})) -> ReplacementBucket.Other
   -- CR 616.1e for the arm above's reason: what the permanent enters WITH is
   -- neither whose it is, what it copies nor which face is up.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Amplify _)) -> ReplacementBucket.Other
@@ -1940,6 +1996,9 @@ readsApplier re = case re of
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
   -- the effect. Two such rows would offer the same player the same permanents.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> False
+  -- CR 614.1a: NO, for the arm above's reason -- the sacrificing player is the
+  -- ENTERING object's controller and the criterion rides the effect.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeToEnter {})) -> False
   -- CR 702.38a: NO despite showing a card, for the arm above's reason. The hand
   -- looked at is the ENTERING object's controller's, read live off the board at
   -- CR 614.12a's moment, and the multiplier rides the effect. Two such rows would

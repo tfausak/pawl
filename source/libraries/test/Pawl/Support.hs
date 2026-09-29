@@ -3431,6 +3431,7 @@ oneMountainState mountain ph =
           GameState.pendingEntryEffects = Seq.empty,
           GameState.enteringBeside = Set.empty,
           GameState.enteringSubjects = Set.empty,
+          GameState.enteringPending = Set.empty,
           GameState.enteringCounters = Map.empty,
           GameState.playerEffects = [],
           GameState.blockRequirements = [],
