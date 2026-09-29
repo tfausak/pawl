@@ -329,6 +329,25 @@ stillAttackedBattle :: ObjectId -> GameState -> Bool
 stillAttackedBattle oid gs =
   List.any (\defender -> List.elem oid (attackableBattles defender gs)) (Defender.defendingPlayers gs)
 
+-- CR 506.4 / 506.4e: is the permanent this announcement named still being
+-- attacked? The announcement's kind is only where the attack started: a
+-- permanent that is both a planeswalker and a battle stays attacked while it is
+-- either, so each arm also asks the other kind's list.
+--
+-- CR 506.4e's second sentence is the battle arm's second disjunct: one that
+-- stops being a battle stays attacked as a planeswalker only while its protector
+-- controls it. That conjunct is a regression fence: CR 310.9a and CR 310.11 keep
+-- a battle with no battle types protected by its controller, and no card makes a
+-- Siege a planeswalker. Pawl.PlaneswalkerCombatSpec's PlaneswalkerBattleInCombat
+-- proves both disjuncts.
+targetStillAttacked :: AttackTarget.AttackTarget -> GameState -> Bool
+targetStillAttacked target gs = case target of
+  AttackTarget.OfPlayer _ -> True
+  AttackTarget.OfPlaneswalker pw -> stillAttacked pw gs || stillAttackedBattle pw gs
+  AttackTarget.OfBattle battle ->
+    stillAttackedBattle battle gs
+      || (stillAttacked battle gs && Projection.controllerOf battle gs == Battle.protectorOf battle gs)
+
 -- CR 506.4's comparand for a CR 508.1b announcement that named a BATTLE: who
 -- controls that battle. Nothing for a player or a planeswalker --
 -- Pawl.Types.Combat's attackedControlledBy says why the planeswalker needs none.
@@ -1613,10 +1632,10 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- battlefield is a separate clause of CR 506.4, in Pawl.Engine.Departure and
 -- Pawl.Engine.Damage. Creatures only, which is what `combatants` gathers -- CR
 -- 506.4d falls out of that split (Pawl.PlaneswalkerCombatSpec's CreaturePlaneswalkerInCombat
--- is the proof), and the phases-out clause is Pawl.Engine.Phasing.phaseOut's. Not
--- implemented: CR 506.4e, an attacked permanent that is both a planeswalker and a
--- battle, which is about the ATTACKED object and so belongs to noteAttackingNothing
--- below rather than to this creature-scoped fold (#981).
+-- is the proof), and the phases-out clause is Pawl.Engine.Phasing.phaseOut's. CR
+-- 506.4e, an attacked permanent that is both a planeswalker and a battle, is about
+-- the ATTACKED object and so belongs to noteAttackingNothing below rather than to
+-- this creature-scoped fold.
 --
 -- The becomes-a-battle clause IS here, and it is sampled like the other two: a
 -- combatant that IS a battle became one, since CR 508.1a and CR 509.1a keep a
@@ -1651,8 +1670,8 @@ removeChanged gs =
 -- than re-derived -- Pawl.Types.Combat's attackingNothing field is the record and
 -- says why.
 --
--- The condition is stillAttacked / stillAttackedBattle themselves, so the sample
--- and the live read cannot disagree: what the record adds is that the answer
+-- The condition is targetStillAttacked itself, so the sample and the live read
+-- cannot disagree: what the record adds is that the answer
 -- STICKS. Rule 506.4 lists events, so a controller who changes and changes back
 -- inside one combat leaves the permanent removed, and every derivation from the
 -- current board puts it back (Pawl.CombatEffectSpec's two-Graft pair is the
@@ -1688,8 +1707,8 @@ noteAttackingNothing gs =
         -- CR 800.4e, not CR 506.4: a departed player is still being attacked, and
         -- Damage.combatRecipient is where the damage goes missing.
         AttackTarget.OfPlayer _ -> False
-        AttackTarget.OfPlaneswalker pw -> not (stillAttacked pw gs) || seatMoved attacker pw
-        AttackTarget.OfBattle battle -> not (stillAttackedBattle battle gs) || battleSeatMoved attacker battle
+        AttackTarget.OfPlaneswalker pw -> not (targetStillAttacked target gs) || seatMoved attacker pw
+        AttackTarget.OfBattle battle -> not (targetStillAttacked target gs) || battleSeatMoved attacker battle
       gone = Map.keysSet (Map.filterWithKey removed (Combat.attackers c))
    in gs {GameState.combat = c {Combat.attackingNothing = Set.union gone (Combat.attackingNothing c)}}
 

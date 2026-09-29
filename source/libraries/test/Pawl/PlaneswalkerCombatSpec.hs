@@ -15,6 +15,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import Pawl.CombatEffectSpec (attackJaceAndBob, attackThePlaneswalker, blockAndEnchant, blockAndWane, blockWithJace, creaturePlaneswalkerBoard, runToEndOfCombat, runToEndOfCombatWith, tapStateOf)
+import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -1976,9 +1978,184 @@ atLife :: PlayerId.PlayerId -> Integer -> GameState.GameState -> GameState.GameS
 atLife pid n gs =
   gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
 
+-- CR 506.4e: a permanent being attacked that is both a planeswalker and a battle
+-- stays attacked while it is either, whichever kind of announcement named it.
+--
+-- Jace Beleren is bob's, coated by Liquimetal Coating, animated by Karn's Touch
+-- ({U}{U} Instant, "Target noncreature artifact becomes an artifact creature with
+-- power and toughness each equal to its mana value until end of turn") so that
+-- Synthetic Besiege the Front can make him a battle too, all before the
+-- declaration: CR 310.11 only gives a protector to a battle that isn't being
+-- attacked. Then one of two cards takes a type away mid-combat:
+--
+--   * Magnetic Theft ({R} Instant, "Attach target Equipment to target
+--     creature") puts alice's Luxior, Giada's Gift ("Equipped permanent isn't a
+--     planeswalker and is a creature in addition to its other types") on him.
+--     Luxior is the one printing that removes the planeswalker type alone
+--     (Scryfall o:"isn't a planeswalker", 2026-09-29).
+--   * Synthetic Lift the Siege ({1}{W} Instant, "Until end of turn, target
+--     battle isn't a battle") takes the battle type. Synthetic because no printing
+--     removes it alone (Scryfall o:"isn't a battle" and o:"not a battle", both
+--     empty 2026-09-29).
+--
+-- Oracle texts checked against Scryfall, 2026-09-29. One Llanowar Elves attacks,
+-- so each reading is 5 against 4.
+planeswalkerBattleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+planeswalkerBattleSpec s registry = Spec.describe s "PlaneswalkerBattleInCombat" $ do
+  Spec.it s "CR 506.4e whole cards: attacked as a planeswalker, it stops being one and is still a battle that's being attacked" $ do
+    theft <- S.printingOf s registry "Magnetic Theft"
+    mountain <- S.printingOf s registry "Mountain"
+    board <- planeswalkerBattleBoard s registry
+    case board of
+      Nothing -> Spec.assertFailure s "fixture should give alice one Llanowar Elves, a Coating and Luxior, and bob a Jace"
+      Just (gs0, elf, jaceId, luxiorId) -> do
+        pinPlaneswalkerBattle s jaceId gs0
+        let (_, gs1) = S.addPermanent mountain S.alice gs0
+            (spell, gs) = S.addHandCard theft S.alice gs1
+            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (announceAt (AttackTarget.OfPlaneswalker jaceId) elf) gs
+            atEnd = runToEndOfCombat (castAt spell [luxiorId, jaceId]) atBlockers
+        Spec.assertEqWith s "CR 508.1b: the Elf really was announced at the planeswalker" (Map.lookup elf (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
+        -- GAMEPLAY FIRST: without CR 506.4e the Elf attacks nothing and the
+        -- defense stays at 5.
+        Spec.assertEqWith s "CR 506.4e / 310.6: the Elf's 1 came off his defense" (S.counterOf CounterKind.Defense jaceId atEnd) 4
+        Spec.assertEqWith s "CR 701.3a: Luxior is on Jace" (Projection.hostOf luxiorId atEnd) (Just jaceId)
+        Spec.assertBool s (not (Projection.isPlaneswalkerOf jaceId atEnd)) "CR 613.1d: so he is no planeswalker"
+        Spec.assertBool s (Projection.isBattleOf jaceId atEnd) "but still a battle"
+        Spec.assertEqWith s "and his loyalty is untouched" (S.counterOf CounterKind.Loyalty jaceId atEnd) 5
+        Spec.assertEqWith s "the leg reached the end of combat step" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
+  Spec.it s "CR 506.4e whole cards: attacked as a battle, it stops being one and is still a planeswalker that's being attacked" $ do
+    lift <- S.printingOf s registry "Synthetic Lift the Siege"
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    board <- planeswalkerBattleBoard s registry
+    case board of
+      Nothing -> Spec.assertFailure s "fixture should give alice one Llanowar Elves, a Coating and Luxior, and bob a Jace"
+      Just (gs0, elf, jaceId, _) -> do
+        let (_, gs1) = S.addPermanent plains S.alice gs0
+            (_, gs2) = S.addPermanent island S.alice gs1
+            (spell, gs) = S.addHandCard lift S.alice gs2
+            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (announceAt (AttackTarget.OfBattle jaceId) elf) gs
+            atEnd = runToEndOfCombat (castAt spell [jaceId]) atBlockers
+        Spec.assertEqWith s "CR 508.1b: the Elf really was announced at the battle" (Map.lookup elf (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfBattle jaceId))
+        -- GAMEPLAY FIRST: without CR 506.4e the Elf attacks nothing and the
+        -- loyalty stays at 5.
+        Spec.assertEqWith s "CR 506.4e / 306.8: the Elf's 1 came off his loyalty, his protector controlling him" (S.counterOf CounterKind.Loyalty jaceId atEnd) 4
+        Spec.assertBool s (not (Projection.isBattleOf jaceId atEnd)) "CR 613.1d: he is no battle"
+        Spec.assertBool s (Projection.isPlaneswalkerOf jaceId atEnd) "but still a planeswalker"
+        Spec.assertEqWith s "CR 310.9g: bob still protects him, and controls him" (Battle.protectorOf jaceId atEnd, Projection.controllerOf jaceId atEnd) (Just S.bob, Just S.bob)
+        Spec.assertEqWith s "and his defense is untouched" (S.counterOf CounterKind.Defense jaceId atEnd) 5
+  Spec.it s "CR 506.4e whole card: a creature attacking the planeswalker is attacking a battle bob protects, so his Snare exiles it" $ do
+    snare <- S.printingOf s registry "Synthetic Bulwark Snare"
+    plains <- S.printingOf s registry "Plains"
+    board <- planeswalkerBattleBoard s registry
+    case (board, Face.activatedAbilities (S.combinedFace snare)) of
+      (Just (gs0, elf, jaceId, _), [ability]) -> do
+        let (_, gs1) = S.addPermanent plains S.bob gs0
+            (snareId, gs) = S.addPermanent snare S.bob gs1
+            atEnd = runToEndOfCombat (snareAt snareId ability elf (announceAt (AttackTarget.OfPlaneswalker jaceId) elf)) gs
+        -- GAMEPLAY FIRST: the Snare's filter admits only a creature attacking bob
+        -- or a battle he protects, and the Elf was announced at the planeswalker.
+        Spec.assertBool s (not (S.onBattlefield elf atEnd)) "CR 506.4e: the Elf is attacking a battle bob protects, so his Snare exiled it"
+        Spec.assertBool s (not (S.onBattlefield snareId atEnd)) "the Snare paid its own sacrifice, so the ability really was activated"
+        Spec.assertEqWith s "so nothing came off Jace" (S.counterOf CounterKind.Defense jaceId atEnd, S.counterOf CounterKind.Loyalty jaceId atEnd) (5, 5)
+      _ -> Spec.assertFailure s "fixture should give alice one Llanowar Elves and bob a Jace, and the Snare one ability"
+
+-- alice has one Llanowar Elves, a Liquimetal Coating, an unattached Luxior and
+-- five tapped Islands; bob has Jace Beleren at five loyalty, made an artifact
+-- (the Coating), a 3/3 creature (Karn's Touch) and a battle with five defense
+-- counters (Synthetic Besiege the Front), protected by bob (CR 310.9a's last
+-- sentence, CR 310.11). The board sits at the declare attackers step, before the
+-- declaration. The Elf is seated after the casts, so no payment can tap it.
+-- Returns the state, the Elf, Jace and Luxior.
+planeswalkerBattleBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId))
+planeswalkerBattleBoard s registry = do
+  jace <- S.printingOf s registry "Jace Beleren"
+  elves <- S.printingOf s registry "Llanowar Elves"
+  coating <- S.printingOf s registry "Liquimetal Coating"
+  luxior <- S.printingOf s registry "Luxior, Giada's Gift"
+  island <- S.printingOf s registry "Island"
+  touch <- S.printingOf s registry "Karn's Touch"
+  besiege <- S.printingOf s registry "Synthetic Besiege the Front"
+  let (gs0, _, theirs) = S.combatBoardOf [] [jace]
+      (coatingId, gs1) = S.addPermanent coating S.alice gs0
+      (luxiorId, gs2) = S.addPermanent luxior S.alice gs1
+      gs3 = S.landsFor island S.alice 5 gs2
+      (touchId, gs4) = S.addHandCard touch S.alice gs3
+      (besiegeId, gs5) = S.addHandCard besiege S.alice gs4
+  pure $ case (theirs, Face.activatedAbilities (S.combinedFace coating)) of
+    ([jaceId], coat : _) ->
+      let ready = (S.addCounter CounterKind.Loyalty 5 jaceId gs5) {GameState.priority = Just S.alice}
+          made =
+            S.runPure (targetingOnly [jaceId]) ready $ do
+              Activate.activateAbility S.alice coatingId coat
+              Stack.resolveTop
+              S.cast S.alice touchId
+              Stack.resolveTop
+              S.cast S.alice besiegeId
+              Stack.resolveTop
+              Engine.settleForPriority
+          (elf, seated) = S.addPermanent elves S.alice made
+       in Just (seated, elf, jaceId, luxiorId)
+    _ -> Nothing
+
+-- The fixture's own preconditions, asserted on the board it returns.
+pinPlaneswalkerBattle :: (Monad m) => Spec.Spec m n -> ObjectId.ObjectId -> GameState.GameState -> m ()
+pinPlaneswalkerBattle s jaceId gs = do
+  Spec.assertBool s (Projection.isPlaneswalkerOf jaceId gs) "Jace is a planeswalker"
+  Spec.assertBool s (Projection.isBattleOf jaceId gs) "and a battle (Synthetic Besiege the Front)"
+  Spec.assertEqWith s "Karn's Touch made him a 3/3, his mana value" (S.powerToughnessOf jaceId gs) (Just (3, 3))
+  Spec.assertEqWith s "CR 310.9a / 310.11: bob protects him" (Battle.protectorOf jaceId gs) (Just S.bob)
+  Spec.assertEqWith s "with five defense counters" (S.counterOf CounterKind.Defense jaceId gs) 5
+
+-- Every target slot takes the offered members naming one of `oids`: FILTERED
+-- rather than built, so each slot keeps the recipient tag its pool offers.
+targetingOnly :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+targetingOnly oids p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (\r -> List.elem (Recipient.objectOf r) (fmap Just oids)) . snd) sets
+  _ -> S.identityAnswer p
+
+-- Declare `elf` alone and announce it at `target`; pass priority.
+announceAt :: AttackTarget.AttackTarget -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+announceAt target elf p = case p of
+  Prompt.DeclareAttackers _ _ ids -> filter (== elf) ids
+  Prompt.ChooseAttackTarget _ _ _ options -> if List.elem target (NonEmpty.toList options) then target else NonEmpty.head options
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.ChooseAction {} -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+-- Nobody blocks; whoever is offered the cast of `spell` takes it, aimed at
+-- `oids` through targetingOnly.
+castAt :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+castAt spell oids p = case p of
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseTargets {} -> targetingOnly oids p
+  _ -> S.aggressiveAnswer p
+
+-- `fallback`, plus: fire `snare` at `victim` the first time it is offered.
+snareAt ::
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) ->
+  ObjectId.ObjectId ->
+  (Prompt.Prompt r -> r) ->
+  Prompt.Prompt r ->
+  r
+snareAt snare ability victim fallback p = case p of
+  Prompt.ChooseAction _ _ actions
+    | List.elem (A.Activate snare ability) actions -> A.Activate snare ability
+  Prompt.ChooseTargets {} -> targetingOnly [victim] p
+  _ -> fallback p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   creaturePlaneswalkerCombatSpec s registry
+  planeswalkerBattleSpec s registry
   putOntoBattlefieldAttackingSpec s registry
   towershellSpec s registry
   planeswalkerAttackSpec s registry
