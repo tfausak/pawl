@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
@@ -40,6 +41,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CoinFace as CoinFace
@@ -60,6 +62,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -72,11 +75,14 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -728,7 +734,7 @@ littjaraKinseekersSpec s registry =
                 ready = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
                 onStack = S.runPure S.identityAnswer ready (S.cast S.alice kid)
              in S.runPure S.identityAnswer onStack Engine.priorityLoop
-          counters after = fmap (\oid -> S.counterOf CounterKind.PlusOnePlusOne oid after) (filter (`S.onBattlefield` after) (S.namedObjects (S.printingName kinseekers) after))
+          counters after = fmap (\oid -> S.counterOf CounterKind.PlusOnePlusOne oid after) (filter (`S.onBattlefield` after) (Scenario.namedObjects (S.printingName kinseekers) after))
       Spec.assertEqWith s "with two Giants, three Giants: the trigger put a +1/+1 counter" (counters (cast giant)) [1]
       Spec.assertEqWith s "with a Giant and a Goblin, no type is held three ways: the Kinseekers entered without one" (counters (cast piker)) [0]
 
@@ -3720,7 +3726,7 @@ marduSkullhunterSpec s registry = Spec.describe s "MarduSkullhunter" $ do
     built <- S.buildBoardOrFail s registry raidBoard
     case (aliasIn "jace" built, aliasIn "attacker" built) of
       (Just jaceId, Just attackerId) -> do
-        let atBlockers = S.runPure (aimAtPlaneswalker jaceId) (S.builtState built) Engine.runStep
+        let atBlockers = S.runPure (aimAtPlaneswalker jaceId) (Staged.state built) Engine.runStep
             after = S.runPure (aimAtPlaneswalker jaceId) atBlockers (Monad.replicateM_ 4 Engine.runStep)
         Spec.assertEqWith s "CR 603.4 / 608.2i: bob discarded, so raid saw the declaration" (S.handSize S.bob after) 1
         Spec.assertEqWith s "and it really was announced at the planeswalker (CR 508.1b), where OpponentsAttacked counts 0" (Map.lookup attackerId (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
@@ -3728,7 +3734,7 @@ marduSkullhunterSpec s registry = Spec.describe s "MarduSkullhunter" $ do
       _ -> Spec.assertFailure s "fixture should alias bob's Jace and alice's attacker"
   Spec.it s "CR 603.4 the control leg: with no attack declared the Skullhunter enters and nothing is discarded" $ do
     built <- S.buildBoardOrFail s registry raidBoard
-    let after = S.runPure decliningAttacks (S.builtState built) (Monad.replicateM_ 5 Engine.runStep)
+    let after = S.runPure decliningAttacks (Staged.state built) (Monad.replicateM_ 5 Engine.runStep)
     Spec.assertEqWith s "bob keeps both cards" (S.handSize S.bob after) 2
     -- CR 400.7's new object, so this counts by name rather than by the id the
     -- fixture aliased in alice's hand.
@@ -3738,14 +3744,14 @@ marduSkullhunterSpec s registry = Spec.describe s "MarduSkullhunter" $ do
 -- the {1}{B}, and the Skullhunter in hand; bob with a Jace Beleren to be attacked,
 -- a 3/3 to block with, and two cards to lose one of. Distinct values throughout:
 -- the blocker outlives the attacker it kills, and bob's hand goes 2 to 1.
-raidBoard :: S.Board
+raidBoard :: Board.Board
 raidBoard =
   S.board
     ( (S.battlefield S.alice [S.settled "attacker" "Cabal Evangel", S.permanent "Swamp", S.permanent "Swamp"])
-        { S.setupHand = Seq.singleton (S.aliased "skullhunter" (S.cardSetup "Mardu Skullhunter"))
+        { Seat.hand = Seq.singleton (S.aliased "skullhunter" (S.cardSetup "Mardu Skullhunter"))
         }
         NonEmpty.:| [ (S.battlefield S.bob [S.aliased "jace" (S.permanent "Jace Beleren"), S.settled "blocker" "Hill Giant"])
-                        { S.setupHand = Seq.fromList [S.cardSetup "Forest", S.cardSetup "Mountain"]
+                        { Seat.hand = Seq.fromList [S.cardSetup "Forest", S.cardSetup "Mountain"]
                         }
                     ]
     )
@@ -3773,14 +3779,14 @@ raidBoard =
 --
 -- The two legs are ONE board differing in one thing, the block: unblocked, the
 -- same five reach bob, which is CR 120.3's other recipient and no match.
-straxBoard :: S.Board
+straxBoard :: Board.Board
 straxBoard =
   S.duel
     S.declareAttackers
     [S.settled "strax" "Strax, Sontaran Nurse"]
     [S.settled "wall" "Wall of Stone"]
 
-straxAttack :: Seq.Seq S.Timed
+straxAttack :: Seq.Seq Timed.Timed
 straxAttack =
   S.turn
     1
@@ -3788,7 +3794,7 @@ straxAttack =
       S.on S.declareBlockers S.bob (S.block [])
     ]
 
-straxAttackBlocked :: Seq.Seq S.Timed
+straxAttackBlocked :: Seq.Seq Timed.Timed
 straxAttackBlocked =
   S.turn
     1
@@ -3820,8 +3826,8 @@ straxSpec s registry = Spec.describe s "Strax, Sontaran Nurse" $ do
         Spec.assertEqWith s "and the five landed, so the damage event happened" (S.lifeOf S.bob after) (Just 15)
       _ -> Spec.assertFailure s "the board should alias Strax"
 
-aliasIn :: String -> S.BuiltBoard -> Maybe ObjectId.ObjectId
-aliasIn name built = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
+aliasIn :: String -> Staged.Staged -> Maybe ObjectId.ObjectId
+aliasIn name built = Map.lookup (Label.MkLabel (Text.pack name)) (Staged.objects built)
 
 -- S.fightAnswer with CR 508.1b's announcement aimed at the planeswalker rather
 -- than at bob. Everything else is shared with the control answerer below, so the

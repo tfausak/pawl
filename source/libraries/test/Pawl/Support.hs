@@ -47,31 +47,32 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Action as A
-import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Activation as Activation
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
-import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Casting as Casting
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
-import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControlDuration as ControlDuration
-import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -82,7 +83,7 @@ import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Emperors as Emperors
 import qualified Pawl.Types.EndTurnSignal as EndTurnSignal
-import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.Entry as Entry
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
@@ -92,22 +93,21 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameSettings as GameSettings
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
-import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
-import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerControl as PlayerControl
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -121,21 +121,28 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.RangeOfInfluence as RangeOfInfluence
+import qualified Pawl.Types.Readiness as Readiness
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Reference as Reference
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RestartSignal as RestartSignal
+import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TeamId as TeamId
 import qualified Pawl.Types.Teams as Teams
+import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.When as When
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified System.Directory as Directory
@@ -146,112 +153,89 @@ bob = PlayerId.MkPlayerId 1
 carol = PlayerId.MkPlayerId 2
 dave = PlayerId.MkPlayerId 3
 
--- A human name for one arranged object. Unlike a card name plus occurrence, an
--- alias keeps two copies of the same card distinguishable without exposing an
--- ObjectId. It names only this incarnation; CR 400.7 gives a moved card a new
--- object, which a script resolves by its new card-name occurrence instead.
-newtype ObjectAlias = MkObjectAlias Text.Text
-  deriving (Eq, Ord, Show)
+-- The seat a fixture player sits in on a scenario board: its label is the name
+-- every spec calls it by, and its position is its PlayerId, since
+-- Pawl.Scenario.stage seats in order.
+seatLabel :: PlayerId.PlayerId -> Label.Label
+seatLabel pid =
+  Label.MkLabel . Text.pack $ case PlayerId.unwrap pid of
+    0 -> "alice"
+    1 -> "bob"
+    2 -> "carol"
+    3 -> "dave"
+    n -> "player " <> show n
 
--- The observable state of one arranged card object. Its PlayerSetup field
--- supplies the zone; the remaining fields are shared by hand and battlefield
--- objects.
-data ObjectSetup = MkObjectSetup
-  { objectName :: CardName.CardName,
-    objectAlias :: Maybe ObjectAlias,
-    objectTapState :: TapState.TapState,
-    -- | CR 302.6, in the engine's own vocabulary. WHICH seat a `Settled` names
-    -- is rewritten to the object's controller as the board is built: CR 302.6's
-    -- continuity is about the controller, and Engine.checkControlContinuity
-    -- drops a `Settled` naming anyone else, so no other value is observable.
-    objectSickness :: Sickness.Sickness,
-    objectDamage :: Natural,
-    objectCounters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural,
-    objectController :: Maybe PlayerId.PlayerId
-  }
-  deriving (Eq, Ord, Show)
+-- A reference to a fixture player, as a target or a damage recipient.
+seatRef :: PlayerId.PlayerId -> Reference.Reference
+seatRef = Reference.Labelled . seatLabel
 
-objectSetup :: CardName.CardName -> ObjectSetup
+objectSetup :: CardName.CardName -> Placement.Placement
 objectSetup name =
-  MkObjectSetup
-    { objectName = name,
-      objectAlias = Nothing,
-      objectTapState = TapState.Untapped,
-      objectSickness = Sickness.Sick,
-      objectDamage = 0,
-      objectCounters = Map.empty,
-      objectController = Nothing
+  Placement.MkPlacement
+    { Placement.card = name,
+      Placement.label = Nothing,
+      Placement.tapped = TapState.Untapped,
+      Placement.readiness = Readiness.Sick,
+      Placement.damage = 0,
+      Placement.counters = Map.empty,
+      Placement.controller = Nothing
     }
 
 -- Test-source spelling of objectSetup: a Magic card name, never a corpus slug.
-cardSetup :: String -> ObjectSetup
+cardSetup :: String -> Placement.Placement
 cardSetup = objectSetup . CardName.MkCardName . Text.pack
 
-permanent :: String -> ObjectSetup
+permanent :: String -> Placement.Placement
 permanent = cardSetup
 
-aliased :: String -> ObjectSetup -> ObjectSetup
-aliased name object = object {objectAlias = Just (MkObjectAlias (Text.pack name))}
+aliased :: String -> Placement.Placement -> Placement.Placement
+aliased name object = object {Placement.label = Just (Label.MkLabel (Text.pack name))}
 
--- CR 302.6: settled, so it may attack and may pay a tap cost. The seat is the
--- one objectSickness says the build rewrites, so naming alice here means "its
--- own controller" whoever that turns out to be.
-ready :: ObjectSetup -> ObjectSetup
-ready object = object {objectSickness = Sickness.Settled alice}
+-- CR 302.6: settled, so it may attack and may pay a tap cost.
+ready :: Placement.Placement -> Placement.Placement
+ready object = object {Placement.readiness = Readiness.Ready}
 
 -- ready, aliased and permanent at once: the arranged creature a combat script
 -- almost always wants, by alias and card name.
-settled :: String -> String -> ObjectSetup
+settled :: String -> String -> Placement.Placement
 settled name card = ready (aliased name (permanent card))
 
--- The observable part of one player's arranged state. The object sequences are
--- creation order, which makes name-plus-occurrence references deterministic.
-data PlayerSetup = MkPlayerSetup
-  { setupPlayer :: PlayerId.PlayerId,
-    setupLife :: Integer,
-    setupBattlefield :: Seq.Seq ObjectSetup,
-    setupHand :: Seq.Seq ObjectSetup
-  }
-  deriving (Eq, Ord, Show)
-
-playerSetup :: PlayerId.PlayerId -> PlayerSetup
+playerSetup :: PlayerId.PlayerId -> Seat.Seat
 playerSetup pid =
-  MkPlayerSetup
-    { setupPlayer = pid,
-      setupLife = 20,
-      setupBattlefield = Seq.empty,
-      setupHand = Seq.empty
+  Seat.MkSeat
+    { Seat.name = seatLabel pid,
+      Seat.life = 20,
+      Seat.battlefield = Seq.empty,
+      Seat.hand = Seq.empty
     }
 
-battlefield :: PlayerId.PlayerId -> [ObjectSetup] -> PlayerSetup
+battlefield :: PlayerId.PlayerId -> [Placement.Placement] -> Seat.Seat
 battlefield pid objects =
-  (playerSetup pid) {setupBattlefield = Seq.fromList objects}
+  (playerSetup pid) {Seat.battlefield = Seq.fromList objects}
 
-hand :: PlayerId.PlayerId -> [ObjectSetup] -> PlayerSetup
+hand :: PlayerId.PlayerId -> [Placement.Placement] -> Seat.Seat
 hand pid objects =
-  (playerSetup pid) {setupHand = Seq.fromList objects}
+  (playerSetup pid) {Seat.hand = Seq.fromList objects}
 
--- A structurally coherent board to construct, not a claim that it is
--- rules-reachable or settled. Construction performs no engine advancement.
-data Board = MkBoard
-  { players :: NonEmpty.NonEmpty PlayerSetup,
-    activePlayer :: PlayerId.PlayerId,
-    phase :: Phase.Phase
-  }
-  deriving (Eq, Ord, Show)
-
-board :: NonEmpty.NonEmpty PlayerSetup -> PlayerId.PlayerId -> Phase.Phase -> Board
+-- Seats in fixture order, which is the order Pawl.Scenario.stage numbers them
+-- in: a board seating bob before alice would give bob alice's PlayerId, and
+-- every S.alice assertion after it would read the wrong player.
+board :: NonEmpty.NonEmpty Seat.Seat -> PlayerId.PlayerId -> Phase.Phase -> Board.Board
 board seats active step =
-  MkBoard
-    { players = seats,
-      activePlayer = active,
-      phase = step
-    }
+  let expected = fmap (seatLabel . PlayerId.MkPlayerId) [0 ..]
+   in if and (zipWith (==) (fmap Seat.name (NonEmpty.toList seats)) expected)
+        then
+          Board.MkBoard
+            { Board.seats = seats,
+              Board.active = seatLabel active,
+              Board.phase = step
+            }
+        else error "S.board: seats must be listed alice, bob, carol, dave"
 
 -- CR 100.1a's two-player game, defaulted: alice active with the first
 -- battlefield, bob with the second, everything else as playerSetup leaves it.
 -- The shape nearly every combat script wants, written in one line.
-duel :: Phase.Phase -> [ObjectSetup] -> [ObjectSetup] -> Board
+duel :: Phase.Phase -> [Placement.Placement] -> [Placement.Placement] -> Board.Board
 duel step mine theirs =
   board (battlefield alice mine NonEmpty.:| [battlefield bob theirs]) alice step
 
@@ -266,200 +250,67 @@ combatDamage = Phase.Combat CombatStep.CombatDamage
 endOfCombat = Phase.Combat CombatStep.EndOfCombat
 postcombatMain = Phase.PostcombatMain
 
--- The state and setup aliases produced by a Board.
-data BuiltBoard = MkBuiltBoard
-  { builtState :: GameState.GameState,
-    builtAliases :: Map.Map ObjectAlias ObjectId.ObjectId
-  }
-  deriving (Eq, Show)
+aliasRef :: String -> Reference.Reference
+aliasRef = Reference.Labelled . Label.MkLabel . Text.pack
 
--- A script-level object name. Card-name occurrences are 1-based in creation
--- order among the live objects with that name, counted across EVERY zone and
--- not only the battlefield: creation order is what makes the numbering stable,
--- and a zone-scoped count would renumber the survivors every time something
--- moved. So a reference can name an object the prompt at hand does not offer
--- --- a Piker in a graveyard, an already-tapped attacker --- which is a script
--- error and reported as MkUnofferedObject rather than silently dropped.
-data ObjectRef
-  = MkAliasRef ObjectAlias
-  | MkNamedRef CardName.CardName Natural
-  deriving (Eq, Ord, Show)
+namedRef :: String -> Natural -> Reference.Reference
+namedRef name = Reference.Printed (CardName.MkCardName (Text.pack name))
 
-data DamageRecipient
-  = MkCreatureRecipient ObjectRef
-  | MkPlayerRecipient PlayerId.PlayerId
-  deriving (Eq, Ord, Show)
+attack :: [Reference.Reference] -> Move.Move
+attack = Move.Attack . Seq.fromList
 
-data TargetRef
-  = MkObjectTarget ObjectRef
-  | MkPlayerTarget PlayerId.PlayerId
-  deriving (Eq, Ord, Show)
-
--- Choices made while announcing and paying for one priority action. They live
--- on that action rather than in the timed-entry queue, so two casts at one
--- moment cannot consume one another's targets or payment plan.
-data ActionChoices = MkActionChoices
-  { choiceTargets :: Maybe [TargetRef],
-    choiceModes :: Maybe (Seq.Seq ModeIndex.ModeIndex),
-    choiceX :: Maybe Natural,
-    choiceCost :: Maybe ManaCost.ManaCost,
-    -- | CR 601.2h's permutation of the non-mana components' printed indices,
-    -- which Pawl.Engine.Cost raises only where the order is observable -- Door to
-    -- Nothingness's "{T}, Sacrifice this" is what needs it.
-    choiceCostOrder :: Maybe [Natural],
-    choiceManaSources :: Seq.Seq (Maybe ObjectRef),
-    choiceManaYields :: Seq.Seq Mana.Mana,
-    -- | Which of the source's activated abilities to activate, by its index in
-    -- Projection.abilitiesOf, for a source offering several (a planeswalker).
-    -- Nothing accepts any, and two offers are then ambiguous.
-    choiceAbility :: Maybe Natural
-  }
-  deriving (Eq, Ord, Show)
-
-noChoices :: ActionChoices
-noChoices =
-  MkActionChoices
-    { choiceTargets = Nothing,
-      choiceModes = Nothing,
-      choiceX = Nothing,
-      choiceCost = Nothing,
-      choiceCostOrder = Nothing,
-      choiceManaSources = Seq.empty,
-      choiceManaYields = Seq.empty,
-      choiceAbility = Nothing
-    }
-
--- The moment an entry is eligible: turn, phase or step, and WHO ANSWERS.
---
--- The answering seat is the decider, not the player the prompt is about: CR
--- 723.5 gives every choice a controlled player would make to the player
--- controlling them, and a script is a script of choices. The two coincide
--- except while CR 723.1's effect is running. CR 723.6 is the one prompt that
--- does not work that way -- conceding is never the controller's to make -- and
--- Prompt.Concede carries no Decider at all, so it keys on its own PlayerId.
-data When = MkWhen Natural Phase.Phase PlayerId.PlayerId
-  deriving (Eq, Ord, Show)
-
--- The decision vocabulary shared by gameplay tests. Choices that follow a
--- priority action are carried by that entry rather than timed independently.
-data Entry
-  = MkCast ObjectRef (Maybe (CardName.CardName, Facing.Facing)) ActionChoices
-  | MkPlayLand ObjectRef (Maybe CardName.CardName)
-  | MkActivate ObjectRef ActionChoices
-  | MkChooseDefender PlayerId.PlayerId
-  | MkChooseAttackTarget AttackTarget.AttackTarget
-  | MkAttack (Seq.Seq ObjectRef)
-  | MkBlock (Map.Map ObjectRef (Set.Set ObjectRef))
-  | MkAssignDamage (Map.Map DamageRecipient Natural)
-  | MkConcede
-  deriving (Eq, Ord, Show)
-
-data Timed = MkTimed
-  { when :: When,
-    -- | The object making the prompted decision, when several prompts share one
-    -- moment. The first slice uses this for combat-damage sources. Several
-    -- assignment prompts at one moment arrive in the engine's own order, which a
-    -- script cannot predict, so the qualifier SELECTS an entry rather than
-    -- annotating the head: the moment's first entry naming this source wins, and
-    -- the first unqualified entry answers when none does. A qualifier on a
-    -- prompt with no source of its own is a script error (MkUnexpectedQualifier).
-    qualifier :: Maybe ObjectRef,
-    entry :: Entry
-  }
-  deriving (Eq, Ord, Show)
-
-aliasRef :: String -> ObjectRef
-aliasRef = MkAliasRef . MkObjectAlias . Text.pack
-
-namedRef :: String -> Natural -> ObjectRef
-namedRef name = MkNamedRef (CardName.MkCardName (Text.pack name))
-
-attack :: [ObjectRef] -> Entry
-attack = MkAttack . Seq.fromList
-
-block :: [(ObjectRef, ObjectRef)] -> Entry
+block :: [(Reference.Reference, Reference.Reference)] -> Move.Move
 block =
-  MkBlock
+  Move.Block
     . Map.fromListWith Set.union
     . fmap (Bifunctor.second Set.singleton)
 
-assignDamage :: [(DamageRecipient, Natural)] -> Entry
-assignDamage = MkAssignDamage . Map.fromList
+assignDamage :: [(Reference.Reference, Natural)] -> Move.Move
+assignDamage = Move.AssignDamage . Map.fromList
 
-castAction :: ObjectRef -> ActionChoices -> Entry
-castAction ref = MkCast ref Nothing
+castAction :: Reference.Reference -> Choices.Choices -> Move.Move
+castAction ref = Move.Cast . Casting.MkCasting ref
 
-playLand :: ObjectRef -> Entry
-playLand ref = MkPlayLand ref Nothing
+playLand :: Reference.Reference -> Move.Move
+playLand = Move.PlayLand
 
-activateAction :: ObjectRef -> ActionChoices -> Entry
-activateAction = MkActivate
+activateAction :: Reference.Reference -> Choices.Choices -> Move.Move
+activateAction ref = Move.Activate . Activation.MkActivation ref Nothing
 
-chooseDefender :: PlayerId.PlayerId -> Entry
-chooseDefender = MkChooseDefender
+-- activateAction for a source offering several abilities (a planeswalker), by
+-- the ability's index in Projection.abilitiesOf.
+activateAbility :: Reference.Reference -> Natural -> Choices.Choices -> Move.Move
+activateAbility ref index = Move.Activate . Activation.MkActivation ref (Just index)
 
-attackPlayer :: PlayerId.PlayerId -> Entry
-attackPlayer = MkChooseAttackTarget . AttackTarget.OfPlayer
+chooseDefender :: PlayerId.PlayerId -> Move.Move
+chooseDefender = Move.ChooseDefender . seatLabel
+
+attackPlayer :: PlayerId.PlayerId -> Move.Move
+attackPlayer = Move.ChooseAttackTarget . seatRef
 
 -- One entry written without its turn number, which `turn` stamps on. The turn
 -- is written once per turn rather than once per entry, since a script names far
 -- more entries than turns.
-newtype Untimed = MkUntimed (Natural -> Timed)
+newtype Untimed = MkUntimed (Natural -> Timed.Timed)
 
-on :: Phase.Phase -> PlayerId.PlayerId -> Entry -> Untimed
+on :: Phase.Phase -> PlayerId.PlayerId -> Move.Move -> Untimed
 on step pid verb =
   MkUntimed $ \number ->
-    MkTimed
-      { when = MkWhen number step pid,
-        qualifier = Nothing,
-        entry = verb
+    Timed.MkTimed
+      { Timed.when = When.MkWhen number step (seatLabel pid),
+        Timed.source = Nothing,
+        Timed.entry = Entry.Do verb
       }
 
 -- `on`, qualified by the object whose prompt this answers -- the combat-damage
--- source, today. Timed's qualifier field says how it selects.
-onSource :: Phase.Phase -> PlayerId.PlayerId -> ObjectRef -> Entry -> Untimed
+-- source, today. Pawl.Types.Timed's source field says how it selects.
+onSource :: Phase.Phase -> PlayerId.PlayerId -> Reference.Reference -> Move.Move -> Untimed
 onSource step pid source verb =
   let MkUntimed f = on step pid verb
-   in MkUntimed (\number -> (f number) {qualifier = Just source})
+   in MkUntimed (\number -> (f number) {Timed.source = Just source})
 
-turn :: Natural -> [Untimed] -> Seq.Seq Timed
+turn :: Natural -> [Untimed] -> Seq.Seq Timed.Timed
 turn number entries = Seq.fromList (fmap (\(MkUntimed f) -> f number) entries)
-
-data PromptLocation = MkPromptLocation Natural Phase.Phase (Maybe PlayerId.PlayerId)
-  deriving (Eq, Ord, Show)
-
--- Testable failures rather than partial functions: malformed boards,
--- prompt drift, and scripts that silently stopped exercising their subject are
--- all ordinary assertion values.
-data HarnessFailure
-  = MkDuplicatePlayer PlayerId.PlayerId
-  | MkUnknownActivePlayer PlayerId.PlayerId
-  | MkUnknownController PlayerId.PlayerId
-  | MkDuplicateAlias ObjectAlias
-  | MkUnknownCard CardName.CardName
-  | -- | The reference named no live object, with whether the board did
-    -- record an alias by that name -- a stale alias and a typo read alike
-    -- otherwise. Always False for a card-name reference, which has no alias.
-    MkUnknownObject ObjectRef Bool
-  | -- | The reference resolved, but the prompt did not offer that object, so the
-    -- engine would have dropped it after the entry was popped and the script
-    -- would have passed while proving nothing. Carries the named thing and the
-    -- offered ones, rendered as a script would name them.
-    MkUnofferedObject When Text.Text Text.Text [Text.Text]
-  | -- | An onSource qualifier on a prompt with no source of its own, which
-    -- nothing could ever match.
-    MkUnexpectedQualifier When Text.Text ObjectRef
-  | MkNestedGamePrompt PromptLocation Text.Text
-  | MkUnscheduledPrompt PromptLocation Text.Text [Text.Text]
-  | MkUnexpectedPrompt When Entry Text.Text [Text.Text]
-  | MkActionNotOffered When Entry [Text.Text]
-  | MkAmbiguousAction When Entry [Text.Text]
-  | MkUnexpectedActionChoice When Entry Text.Text
-  | MkUnusedActionChoices When Entry ActionChoices
-  | -- | The turn and phase where a script stopped before reaching its remaining
-    -- entries, which usually means the board never got there.
-    MkUnreachedEntries Natural Phase.Phase (Seq.Seq Timed)
-  deriving (Eq, Ord, Show)
 
 bothPlayers :: NonEmpty.NonEmpty PlayerId.PlayerId
 bothPlayers = alice NonEmpty.:| [bob]
@@ -607,139 +458,12 @@ cardOf s registry name = do
     Nothing -> Spec.assertFailure s ("no such card: " <> name)
     Just card -> pure card
 
--- Construct a board directly, without zone-change events or settlement.
--- The guaranteed validity is REPRESENTATIONAL only: players and controllers
--- exist, aliases are unique, and every object is inserted into exactly the zone
--- its Object records. Rules-unreachable and pre-SBA positions are intentional
--- test inputs.
-buildBoard :: (Monad m) => Registry.Registry m -> Board -> m (Either HarnessFailure BuiltBoard)
-buildBoard registry setup = case boardFailure setup of
-  Just failure -> pure (Left failure)
-  Nothing ->
-    let seats = NonEmpty.toList (players setup)
-        ids = fmap setupPlayer (players setup)
-        base = Setup.emptyGame ids
-        positioned =
-          base
-            { GameState.activePlayer = activePlayer setup,
-              GameState.phase = phase setup,
-              GameState.remaining = phasesAfter (phase setup),
-              GameState.players =
-                List.foldl'
-                  ( \current seat ->
-                      Map.adjust
-                        (\p -> p {Player.life = setupLife seat})
-                        (setupPlayer seat)
-                        current
-                  )
-                  (GameState.players base)
-                  seats
-            }
-     in fmap (fmap designateBoardDefenders) (buildPlayers registry seats (MkBuiltBoard positioned Map.empty))
-
--- CR 506.2 / CR 703.4h: a board positioned AFTER the beginning of combat
--- step is one where the defending players are already settled, so it runs the
--- same turn-based action that step would have. Without it Combat.defenders stays
--- empty, declareAttackers finds nobody to attack and skips its prompt, and a
--- script that meant to attack fails as MkUnreachedEntries.
---
--- The engine's own answer to CR 507.1's choice, which is the first candidate in
--- turn order (Replay.defaultAnswer): a three-seat board that wants the
--- other opponent defending sets Combat.defenders itself.
-designateBoardDefenders :: BuiltBoard -> BuiltBoard
-designateBoardDefenders built =
-  let setupPhaseOf = GameState.phase . builtState
-   in case setupPhaseOf built of
-        Phase.Combat step
-          | step > CombatStep.BeginningOfCombat ->
-              built {builtState = runPure identityAnswer (builtState built) Combat.designateDefenders}
-        _ -> built
-
-buildBoardOrFail :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Board -> m BuiltBoard
+buildBoardOrFail :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Board.Board -> m Staged.Staged
 buildBoardOrFail s registry setup = do
-  result <- buildBoard registry setup
+  result <- Scenario.stage registry setup
   case result of
     Left failure -> Spec.assertFailure s (renderFailure failure)
     Right built -> pure built
-
-boardFailure :: Board -> Maybe HarnessFailure
-boardFailure setup =
-  let seats = NonEmpty.toList (players setup)
-      ids = fmap setupPlayer seats
-      counts = Map.fromListWith (+) (fmap (\pid -> (pid, 1 :: Natural)) ids)
-      duplicatePlayer = fmap fst (List.find ((> 1) . snd) (Map.toAscList counts))
-      known = Set.fromList ids
-      objects =
-        concatMap
-          (\seat -> Foldable.toList (setupBattlefield seat) <> Foldable.toList (setupHand seat))
-          seats
-      controllers = Maybe.mapMaybe objectController objects
-      unknownController = List.find (not . flip Set.member known) controllers
-      aliases = Maybe.mapMaybe objectAlias objects
-      aliasCounts = Map.fromListWith (+) (fmap (\name -> (name, 1 :: Natural)) aliases)
-      duplicateAlias = fmap fst (List.find ((> 1) . snd) (Map.toAscList aliasCounts))
-   in case duplicatePlayer of
-        Just pid -> Just (MkDuplicatePlayer pid)
-        Nothing ->
-          if not (Set.member (activePlayer setup) known)
-            then Just (MkUnknownActivePlayer (activePlayer setup))
-            else case unknownController of
-              Just pid -> Just (MkUnknownController pid)
-              Nothing -> fmap MkDuplicateAlias duplicateAlias
-
-buildPlayers :: (Monad m) => Registry.Registry m -> [PlayerSetup] -> BuiltBoard -> m (Either HarnessFailure BuiltBoard)
-buildPlayers registry seats built = case seats of
-  [] -> pure (Right built)
-  seat : rest -> do
-    battlefieldResult <- buildObjects registry Zone.Battlefield seat (Foldable.toList (setupBattlefield seat)) built
-    handResult <- case battlefieldResult of
-      Left failure -> pure (Left failure)
-      Right withBattlefield -> buildObjects registry Zone.Hand seat (Foldable.toList (setupHand seat)) withBattlefield
-    case handResult of
-      Left failure -> pure (Left failure)
-      Right next -> buildPlayers registry rest next
-
-buildObjects :: (Monad m) => Registry.Registry m -> Zone.Zone -> PlayerSetup -> [ObjectSetup] -> BuiltBoard -> m (Either HarnessFailure BuiltBoard)
-buildObjects registry zone player objects built = case objects of
-  [] -> pure (Right built)
-  object : rest -> do
-    found <- Registry.fetchCard registry (objectName object)
-    case found of
-      Nothing -> pure (Left (MkUnknownCard (objectName object)))
-      Just card -> do
-        let owner = setupPlayer player
-            (oid, withObject) = addObjectIn zone (Printing.ofCard card) owner (builtState built)
-            controller = Maybe.fromMaybe owner (objectController object)
-            -- objectSickness says why the arranged seat is discarded.
-            readiness = case objectSickness object of
-              Sickness.Sick -> Sickness.Sick
-              Sickness.Settled _ -> Sickness.Settled controller
-            adjust obj =
-              obj
-                { Object.enteredUnder =
-                    if controller == owner
-                      then Nothing
-                      else Just controller,
-                  Object.tapped = objectTapState object,
-                  Object.damage = objectDamage object,
-                  Object.sickness = readiness,
-                  Object.counters = objectCounters object
-                  -- Object.counterTimestamps is left empty on purpose. CR 613.7c
-                  -- reads a kind's timestamp through
-                  -- Pawl.Engine.Projection with the object's own timestamp as
-                  -- the default, so arranged counters are all as old as the
-                  -- permanent carrying them. A case that needs two kinds stamped
-                  -- apart writes the field itself.
-                }
-            state =
-              withObject
-                { GameState.objects = Map.adjust adjust oid (GameState.objects withObject)
-                }
-            aliases = case objectAlias object of
-              Nothing -> builtAliases built
-              Just name -> Map.insert name oid (builtAliases built)
-            next = MkBuiltBoard state aliases
-        buildObjects registry zone player rest next
 
 redRed :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed fetch = do
@@ -935,74 +659,13 @@ playLandAnswer p = case p of
           [] -> A.Pass
   _ -> identityAnswer p
 
--- Any printing, directly inserted into one zone with no event.
+-- Any printing, directly inserted into one zone with no event, and Settled.
 addObjectIn :: Zone.Zone -> Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addObjectIn zone printing pid gs =
-  let (printingId, gsP) = Game.intern printing gs
-      (oid, gs1) = Game.freshObjectId gsP
-      (ts, gs2) = Game.freshTimestamp gs1
-      obj =
-        Object.MkObject
-          { Object.owner = pid,
-            Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printingId,
-            Object.zone = zone,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Settled pid,
-            Object.controlClock = Map.empty,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColor = Nothing,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
-          }
-      withObject = gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
-   in (oid, Game.insertIntoZone zone LibraryPosition.Bottom pid oid withObject)
+  let (printingId, interned) = Game.intern printing gs
+      (oid, placed) = Setup.placeCard zone pid printingId interned
+      settle obj = obj {Object.sickness = Sickness.Settled pid}
+   in (oid, placed {GameState.objects = Map.adjust settle oid (GameState.objects placed)})
 
 -- Any printing, on the battlefield under pid's control, untapped and Settled.
 addPermanent :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
@@ -1921,56 +1584,17 @@ fightWith answer gs =
     Combat.declareBlockers Resolve.performManaAbility
     Damage.dealCombatDamage
 
-data HarnessState = MkHarnessState
-  { harnessQueues :: Map.Map When (Seq.Seq Timed),
-    harnessAliases :: Map.Map ObjectAlias ObjectId.ObjectId,
-    harnessAction :: Maybe (When, Entry, ActionChoices)
-  }
-
--- Run one explicit engine entry point under a keyed decision script. An entry
--- whose moment never arrives is a failure, not a silently skipped claim.
-runScript :: Seq.Seq Timed -> BuiltBoard -> Game.Type.Game a -> Either HarnessFailure (a, GameState.GameState)
-runScript script built game =
-  let add queue timed =
-        Map.insertWith
-          (flip (Seq.><))
-          (when timed)
-          (Seq.singleton timed)
-          queue
-      initial =
-        MkHarnessState
-          { harnessQueues = Foldable.foldl' add Map.empty script,
-            harnessAliases = builtAliases built,
-            harnessAction = Nothing
-          }
-   in case State.runStateT (Engine.runGameAsked answerPrompt (builtState built) game) initial of
-        Left failure -> Left failure
-        Right ((value, final), state) -> case harnessAction state of
-          Just (key, verb, choices)
-            | choices /= noChoices -> Left (MkUnusedActionChoices key verb choices)
-          _ ->
-            let remaining = foldMap snd (Map.toAscList (harnessQueues state))
-             in if Seq.null remaining
-                  then Right (value, final)
-                  else
-                    Left
-                      ( MkUnreachedEntries
-                          (GameState.turnNumber final)
-                          (GameState.phase final)
-                          remaining
-                      )
-
 -- Build a board, run a script against one engine entry point, and fail the case
 -- on either error: the whole of the common case in one call. A case that wants
 -- the entry point's own RESULT, or the board before the script, calls
 -- buildBoardOrFail and runScriptOrFail itself.
-play :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Board -> Seq.Seq Timed -> Game.Type.Game a -> m GameState.GameState
+play :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Board.Board -> Seq.Seq Timed.Timed -> Game.Type.Game a -> m GameState.GameState
 play s registry setup script game = do
   built <- buildBoardOrFail s registry setup
   fmap snd (runScriptOrFail s script built game)
 
-runScriptOrFail :: (Monad m) => Spec.Spec m n -> Seq.Seq Timed -> BuiltBoard -> Game.Type.Game a -> m (a, GameState.GameState)
-runScriptOrFail s script built game = case runScript script built game of
+runScriptOrFail :: (Monad m) => Spec.Spec m n -> Seq.Seq Timed.Timed -> Staged.Staged -> Game.Type.Game a -> m (a, GameState.GameState)
+runScriptOrFail s script built game = case Scenario.rehearse script built game of
   Left failure -> Spec.assertFailure s (renderFailure failure)
   Right result -> pure result
 
@@ -1980,966 +1604,9 @@ runScriptOrFail s script built game = case runScript script built game of
 priorityGame :: Game.Type.Game ()
 priorityGame = Engine.priorityLoop
 
-answerPrompt :: Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
-answerPrompt asked = do
-  let prompt = Asked.prompt asked
-      gs = Asked.game asked
-      kind = promptKind prompt
-      location = MkPromptLocation (GameState.turnNumber gs) (GameState.phase gs) (promptDecider prompt)
-  -- Hoisted above every arm: a nested game (CR 729.1) is out of scope for every
-  -- prompt alike, a pending action's sub-choices included.
-  if not (null (Asked.enclosing asked))
-    then failHarness (MkNestedGamePrompt location kind)
-    else do
-      pending <- State.gets harnessAction
-      case pending of
-        Just (key@(MkWhen _ _ pid), verb, choices)
-          | subChoiceFor pid prompt -> answerActionChoice key verb choices asked
-          -- Any other prompt means the action has finished. A choice it never
-          -- asked for is a script error, reported here rather than at the next
-          -- prompt that happens to want an answer.
-          | choices /= noChoices -> failHarness (MkUnusedActionChoices key verb choices)
-        Just {} -> do
-          State.modify' (\state -> state {harnessAction = Nothing})
-          answerTopPrompt location asked
-        Nothing -> answerTopPrompt location asked
-
--- Whether `prompt` is one a cast or activation asks its decider between the
--- ChooseAction that began it and its completion (CR 601.2b-h, CR 602.2b).
--- Matched on the decider, so another player's prompt of the same kind is not
--- answered from this player's pending action.
-subChoiceFor :: PlayerId.PlayerId -> Prompt.Prompt r -> Bool
-subChoiceFor pid prompt = case prompt of
-  Prompt.ChooseTargets decider _ _ _ -> Decider.unwrap decider == pid
-  Prompt.ChooseModes decider _ _ _ _ -> Decider.unwrap decider == pid
-  Prompt.ChooseX decider _ _ _ _ -> Decider.unwrap decider == pid
-  Prompt.ChooseCost decider _ _ _ -> Decider.unwrap decider == pid
-  Prompt.OrderCostComponents decider _ _ _ -> Decider.unwrap decider == pid
-  Prompt.ChooseManaSource decider _ _ -> Decider.unwrap decider == pid
-  Prompt.ChooseExtraManaSource decider _ _ -> Decider.unwrap decider == pid
-  Prompt.ChooseManaYield decider _ _ _ -> Decider.unwrap decider == pid
-  _ -> False
-
-answerTopPrompt :: PromptLocation -> Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
-answerTopPrompt location asked =
-  let prompt = Asked.prompt asked
-      gs = Asked.game asked
-      kind = promptKind prompt
-   in case prompt of
-        Prompt.ChooseAction decider _ actions ->
-          answerActionPrompt gs (Decider.unwrap decider) actions
-        -- CR 723.6: keyed on the conceding player rather than on a decider,
-        -- which this prompt does not carry.
-        Prompt.Concede pid -> do
-          let key = whenOf gs pid
-          found <- peekTimed key
-          case found of
-            Just timed
-              | entry timed == MkConcede -> case qualifier timed of
-                  Just ref -> failHarness (MkUnexpectedQualifier key kind ref)
-                  Nothing -> do
-                    popTimedAt key 0
-                    pure Concession.Concedes
-            _ -> pure Concession.Continues
-        Prompt.ChooseDefender decider _ candidates -> do
-          let key = whenOf gs (Decider.unwrap decider)
-              offers = fmap renderPlayer (NonEmpty.toList candidates)
-          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
-            MkChooseDefender pid
-              | List.elem pid candidates -> Just (pure pid)
-              | otherwise -> Just (failHarness (MkActionNotOffered key verb offers))
-            _ -> Nothing
-        Prompt.DeclareAttackers decider _ candidates -> do
-          let key = whenOf gs (Decider.unwrap decider)
-          offers <- describeAll gs candidates
-          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
-            MkAttack refs ->
-              Just $ do
-                resolved <- mapM (resolveOffered gs key kind candidates) refs
-                pure (Foldable.toList resolved)
-            _ -> Nothing
-        Prompt.ChooseAttackTarget decider _ source candidates -> do
-          let key = whenOf gs (Decider.unwrap decider)
-              offers = fmap (Text.pack . show) (NonEmpty.toList candidates)
-          onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
-            MkChooseAttackTarget target
-              | List.elem target candidates -> Just (pure target)
-              | otherwise -> Just (failHarness (MkActionNotOffered key verb offers))
-            _ -> Nothing
-        Prompt.DeclareBlockers decider _ blockers attackers -> do
-          let candidates = blockers <> attackers
-              key = whenOf gs (Decider.unwrap decider)
-          offers <- describeAll gs candidates
-          onEntry location key kind offers (takeUnqualified key kind) $ \verb -> case verb of
-            MkBlock blocks ->
-              Just $ do
-                pairs <- mapM (resolveBlock gs key kind candidates) (Map.toAscList blocks)
-                pure (Map.fromList pairs)
-            _ -> Nothing
-        Prompt.AssignCombatDamage decider _ source thresholds _ -> do
-          let key = whenOf gs (Decider.unwrap decider)
-              offered = Map.keysSet thresholds
-          offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
-          onEntry location key kind offers (takeForSource gs key source) $ \verb -> case verb of
-            MkAssignDamage assignment ->
-              Just $ do
-                pairs <- mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)
-                pure (Map.fromList pairs)
-            _ -> Nothing
-        _ -> failHarness (MkUnscheduledPrompt location kind [])
-
-answerActionPrompt :: GameState.GameState -> PlayerId.PlayerId -> [A.Action] -> State.StateT HarnessState (Either HarnessFailure) A.Action
-answerActionPrompt gs pid actions = do
-  let key = whenOf gs pid
-      isAction verb = case verb of
-        MkCast {} -> True
-        MkPlayLand {} -> True
-        MkActivate {} -> True
-        _ -> False
-      takeAction index timed verb = case qualifier timed of
-        Just ref -> failHarness (MkUnexpectedQualifier key (Text.pack "ChooseAction") ref)
-        Nothing -> do
-          offered <- mapM (describeAction gs) actions
-          matching <- actionsMatching gs verb actions
-          chosen <- case matching of
-            [] -> failHarness (MkActionNotOffered key verb offered)
-            [action] -> pure action
-            _ -> failHarness (MkAmbiguousAction key verb offered)
-          popTimedAt key index
-          -- The ability selector is spent by the match above.
-          State.modify' (\state -> state {harnessAction = Just (key, verb, (choicesOf verb) {choiceAbility = Nothing})})
-          pure chosen
-  entries <- queueAt key
-  -- The first ACTION entry at this key, not the head. An entry for a prompt the
-  -- engine elides (an attack target with one candidate, say) stays queued ahead
-  -- of the action behind it; it is reported as MkUnreachedEntries rather than
-  -- silently passing every priority at this key.
-  case List.find (isAction . entry . snd) (zip [0 ..] (Foldable.toList entries)) of
-    Nothing -> pure A.Pass
-    Just (index, timed) -> takeAction index timed (entry timed)
-
-choicesOf :: Entry -> ActionChoices
-choicesOf verb = case verb of
-  MkCast _ _ choices -> choices
-  MkActivate _ choices -> choices
-  _ -> noChoices
-
-actionsMatching :: GameState.GameState -> Entry -> [A.Action] -> State.StateT HarnessState (Either HarnessFailure) [A.Action]
-actionsMatching gs verb actions = case verb of
-  MkCast ref selector _ -> do
-    oid <- resolveObject ref gs
-    pure $ filter (matchesCast oid selector) actions
-  MkPlayLand ref face -> do
-    oid <- resolveObject ref gs
-    pure $ filter (matchesPlay oid face) actions
-  MkActivate ref choices -> do
-    oid <- resolveObject ref gs
-    pure $ filter (matchesActivation oid (fmap (\i -> List.genericDrop i (Projection.abilitiesOf oid gs)) (choiceAbility choices))) actions
-  _ -> pure []
-
-matchesCast :: ObjectId.ObjectId -> Maybe (CardName.CardName, Facing.Facing) -> A.Action -> Bool
-matchesCast oid selector action = case action of
-  A.Cast candidate name facing ->
-    candidate == oid
-      && Maybe.maybe True (== (name, facing)) selector
-  _ -> False
-
-matchesPlay :: ObjectId.ObjectId -> Maybe CardName.CardName -> A.Action -> Bool
-matchesPlay oid face action = case action of
-  A.Play candidate chosen ->
-    candidate == oid
-      && case face of
-        Nothing -> True
-        Just wanted -> chosen == Just wanted
-  _ -> False
-
-matchesActivation :: ObjectId.ObjectId -> Maybe [ActivatedAbility.ActivatedAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> A.Action -> Bool
-matchesActivation oid selected action = case action of
-  A.Activate candidate ability -> candidate == oid && maybe True ((== Just ability) . Maybe.listToMaybe) selected
-  _ -> False
-
-describeAction :: GameState.GameState -> A.Action -> State.StateT HarnessState (Either HarnessFailure) Text.Text
-describeAction gs action = case action of
-  A.Pass -> pure (Text.pack "pass")
-  A.Cast oid (CardName.MkCardName name) facing ->
-    fmap (\object -> Text.pack "cast " <> object <> Text.pack (" as " <> show facing <> " ") <> name) (describeOne gs oid)
-  A.Play oid face ->
-    fmap
-      ( \object ->
-          Text.pack "play "
-            <> object
-            <> foldMap (\(CardName.MkCardName name) -> Text.pack " as " <> name) face
-      )
-      (describeOne gs oid)
-  A.Activate oid _ -> fmap (Text.pack "activate " <>) (describeOne gs oid)
-  _ -> pure (Text.pack (show action))
-
-describeOne :: GameState.GameState -> ObjectId.ObjectId -> State.StateT HarnessState (Either HarnessFailure) Text.Text
-describeOne gs oid = State.gets (\state -> describeObject gs (harnessAliases state) oid)
-
-answerActionChoice :: When -> Entry -> ActionChoices -> Asked.Asked r -> State.StateT HarnessState (Either HarnessFailure) r
-answerActionChoice key verb choices asked =
-  let prompt = Asked.prompt asked
-      gs = Asked.game asked
-      kind = promptKind prompt
-      unexpected = failHarness (MkUnexpectedActionChoice key verb kind)
-   in case prompt of
-        Prompt.ChooseTargets _ _ _ offered -> case (choiceTargets choices, Map.toList offered) of
-          (Just targets, [(slot, (count, candidates))])
-            | Natural.length targets == count -> do
-                resolved <- mapM (resolveTarget gs key verb kind candidates) targets
-                let selected = Set.fromList resolved
-                if Natural.length selected == count
-                  then do
-                    updateActionChoices (\current -> current {choiceTargets = Nothing})
-                    pure (Map.singleton slot selected)
-                  else unexpected
-          _ -> unexpected
-        Prompt.ChooseModes _ _ _ legal selection -> case choiceModes choices of
-          Just modes
-            | Modal.selectionSatisfiedBy legal selection modes -> do
-                updateActionChoices (\current -> current {choiceModes = Nothing})
-                pure modes
-          _ -> unexpected
-        Prompt.ChooseX _ _ _ minimumX maximumX -> case choiceX choices of
-          Just x
-            | minimumX <= x && x <= maximumX -> do
-                updateActionChoices (\current -> current {choiceX = Nothing})
-                pure x
-          _ -> unexpected
-        Prompt.ChooseCost _ _ _ candidates -> case choiceCost choices of
-          Just wanted -> case filter ((== Just wanted) . Cost.Type.mana) candidates of
-            [cost] -> do
-              updateActionChoices (\current -> current {choiceCost = Nothing})
-              pure cost
-            _ -> unexpected
-          Nothing -> unexpected
-        -- A PERMUTATION is the only legal answer, so the script's list is checked
-        -- against the printed indices rather than trusted: an order naming an
-        -- index twice would otherwise pay one component twice and skip another.
-        Prompt.OrderCostComponents _ _ _ components -> case choiceCostOrder choices of
-          Just order
-            | List.sort order == fmap fst (zip [0 ..] components) -> do
-                updateActionChoices (\current -> current {choiceCostOrder = Nothing})
-                pure order
-          _ -> unexpected
-        Prompt.ChooseManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
-        Prompt.ChooseExtraManaSource _ _ candidates -> answerManaSource gs key verb choices kind candidates
-        Prompt.ChooseManaYield _ _ _ candidates -> case Seq.viewl (choiceManaYields choices) of
-          Seq.EmptyL -> unexpected
-          -- Recipient-blind, optionYielding's reason.
-          wanted Seq.:< rest -> case filter ((== Mana.unwrap wanted) . Mana.Engine.yieldUnits) (NonEmpty.toList candidates) of
-            [option] -> do
-              updateActionChoices (\current -> current {choiceManaYields = rest})
-              pure option
-            _ -> unexpected
-        _ -> unexpected
-
-answerManaSource ::
-  GameState.GameState ->
-  When ->
-  Entry ->
-  ActionChoices ->
-  Text.Text ->
-  NonEmpty.NonEmpty ObjectId.ObjectId ->
-  State.StateT HarnessState (Either HarnessFailure) (Maybe ObjectId.ObjectId)
-answerManaSource gs key verb choices kind candidates = case Seq.viewl (choiceManaSources choices) of
-  Seq.EmptyL -> failHarness (MkUnexpectedActionChoice key verb kind)
-  wanted Seq.:< rest -> do
-    resolved <- case wanted of
-      Nothing -> pure Nothing
-      Just ref -> fmap Just (resolveOffered gs key kind (NonEmpty.toList candidates) ref)
-    updateActionChoices (\current -> current {choiceManaSources = rest})
-    pure resolved
-
-resolveTarget :: GameState.GameState -> When -> Entry -> Text.Text -> Set.Set Recipient.Recipient -> TargetRef -> State.StateT HarnessState (Either HarnessFailure) Recipient.Recipient
-resolveTarget gs key verb kind offered target = case target of
-  MkPlayerTarget pid
-    | Set.member (Recipient.ToPlayer pid) offered -> pure (Recipient.ToPlayer pid)
-    | otherwise -> failHarness (MkUnexpectedActionChoice key verb kind)
-  MkObjectTarget ref -> do
-    oid <- resolveObject ref gs
-    case filter ((== Just oid) . Recipient.objectOf) (Set.toList offered) of
-      [recipient] -> pure recipient
-      _ -> failHarness (MkUnexpectedActionChoice key verb kind)
-
-updateActionChoices :: (ActionChoices -> ActionChoices) -> State.StateT HarnessState (Either HarnessFailure) ()
-updateActionChoices f =
-  State.modify' $ \state ->
-    state {harnessAction = fmap (\(key, verb, choices) -> (key, verb, f choices)) (harnessAction state)}
-
--- The require-match-pop sequence every entry arm shares: nothing at this moment
--- is an unscheduled prompt, an entry carrying some other verb is an unexpected
--- one, and the pop happens exactly once, before the arm resolves anything, so
--- an entry whose moment never arrives is still reported as unreached.
-onEntry ::
-  PromptLocation ->
-  When ->
-  Text.Text ->
-  [Text.Text] ->
-  State.StateT HarnessState (Either HarnessFailure) (Maybe (Int, Timed)) ->
-  (Entry -> Maybe (State.StateT HarnessState (Either HarnessFailure) a)) ->
-  State.StateT HarnessState (Either HarnessFailure) a
-onEntry location key kind offers select match = do
-  found <- select
-  case found of
-    Nothing -> failHarness (MkUnscheduledPrompt location kind offers)
-    Just (index, timed) -> case match (entry timed) of
-      Nothing -> failHarness (MkUnexpectedPrompt key (entry timed) kind offers)
-      Just action -> do
-        popTimedAt key index
-        action
-
--- The key an entry answered by `pid` would carry right now. `pid` is the
--- DECIDER, which is what When keys on (CR 723.5).
-whenOf :: GameState.GameState -> PlayerId.PlayerId -> When
-whenOf gs =
-  MkWhen
-    (GameState.turnNumber gs)
-    (GameState.phase gs)
-
-queueAt :: When -> State.StateT HarnessState (Either HarnessFailure) (Seq.Seq Timed)
-queueAt key = State.gets (Map.findWithDefault Seq.empty key . harnessQueues)
-
-peekTimed :: When -> State.StateT HarnessState (Either HarnessFailure) (Maybe Timed)
-peekTimed key = fmap (Seq.lookup 0) (queueAt key)
-
--- The head entry at `key`, for a prompt with no source of its own. A
--- qualifier here names something the prompt could never be matched against, so
--- it is a script error rather than an entry to skip.
-takeUnqualified :: When -> Text.Text -> State.StateT HarnessState (Either HarnessFailure) (Maybe (Int, Timed))
-takeUnqualified key kind = do
-  found <- peekTimed key
-  case found of
-    Nothing -> pure Nothing
-    Just timed -> case qualifier timed of
-      Just ref -> failHarness (MkUnexpectedQualifier key kind ref)
-      Nothing -> pure (Just (0, timed))
-
--- The first entry at `key` whose qualifier names `source`, else the first
--- unqualified entry. Two multi-blocked attackers are prompted in the engine's
--- own order over Combat.attackers, which a script cannot predict, so a qualified
--- assignment is found by its source and not by its position in the queue.
---
--- Every qualifier at this key is resolved, not only the matching one: a
--- dangling alias reports itself as MkUnknownObject here rather than sitting in
--- the queue until it surfaces as MkUnreachedEntries.
-takeForSource :: GameState.GameState -> When -> ObjectId.ObjectId -> State.StateT HarnessState (Either HarnessFailure) (Maybe (Int, Timed))
-takeForSource gs key source = do
-  entries <- queueAt key
-  qualifiers <-
-    mapM
-      ( \timed -> case qualifier timed of
-          Nothing -> pure Nothing
-          Just ref -> fmap Just (resolveObject ref gs)
-      )
-      (Foldable.toList entries)
-  let indexed = zip [0 ..] qualifiers
-      qualified = List.find ((== Just source) . snd) indexed
-      unqualified = List.find (Maybe.isNothing . snd) indexed
-      chosen = case qualified of
-        Just found -> Just (fst found)
-        Nothing -> fmap fst unqualified
-  pure $ do
-    index <- chosen
-    timed <- Seq.lookup index entries
-    pure (index, timed)
-
-popTimedAt :: When -> Int -> State.StateT HarnessState (Either HarnessFailure) ()
-popTimedAt key index =
-  State.modify' $ \state ->
-    let queues = case Map.lookup key (harnessQueues state) of
-          Nothing -> harnessQueues state
-          Just entries ->
-            let rest = Seq.deleteAt index entries
-             in if Seq.null rest
-                  then Map.delete key (harnessQueues state)
-                  else Map.insert key rest (harnessQueues state)
-     in state {harnessQueues = queues}
-
-failHarness :: HarnessFailure -> State.StateT HarnessState (Either HarnessFailure) a
-failHarness failure = State.StateT (const (Left failure))
-
--- Every live object whose card answers to `name`, in creation order. The scope
--- ObjectRef documents: every zone, not the battlefield alone.
-namedObjects :: CardName.CardName -> GameState.GameState -> [ObjectId.ObjectId]
-namedObjects name gs =
-  let wanted = Registry.slugFor name
-      matches oid = case Game.cardOf oid gs of
-        Nothing -> False
-        Just card ->
-          any
-            ((== wanted) . Registry.slugFor . Face.name)
-            (NonEmpty.toList (Card.Type.faces card))
-   in filter matches (Map.keys (GameState.objects gs))
-
-resolveObject :: ObjectRef -> GameState.GameState -> State.StateT HarnessState (Either HarnessFailure) ObjectId.ObjectId
-resolveObject ref gs = case ref of
-  MkAliasRef name -> do
-    found <- State.gets (Map.lookup name . harnessAliases)
-    case found of
-      Just oid
-        | Map.member oid (GameState.objects gs) -> pure oid
-      Just _ -> failHarness (MkUnknownObject ref True)
-      Nothing -> failHarness (MkUnknownObject ref False)
-  MkNamedRef name occurrence -> case occurrence of
-    0 -> failHarness (MkUnknownObject ref False)
-    _ -> case List.genericDrop (occurrence - 1) (namedObjects name gs) of
-      oid : _ -> pure oid
-      [] -> failHarness (MkUnknownObject ref False)
-
--- resolveObject, plus the check that the prompt actually offered what it found.
--- Without it the engine filters the non-candidate out AFTER the entry was
--- popped, and the script passes with nobody attacking.
-resolveOffered :: GameState.GameState -> When -> Text.Text -> [ObjectId.ObjectId] -> ObjectRef -> State.StateT HarnessState (Either HarnessFailure) ObjectId.ObjectId
-resolveOffered gs moment kind offered ref = do
-  oid <- resolveObject ref gs
-  if List.elem oid offered
-    then pure oid
-    else do
-      offers <- describeAll gs offered
-      failHarness (MkUnofferedObject moment kind (renderRef ref) offers)
-
-resolveBlock :: GameState.GameState -> When -> Text.Text -> [ObjectId.ObjectId] -> (ObjectRef, Set.Set ObjectRef) -> State.StateT HarnessState (Either HarnessFailure) (ObjectId.ObjectId, Set.Set ObjectId.ObjectId)
-resolveBlock gs moment kind offered (blocker, attackers) = do
-  blockerId <- resolveOffered gs moment kind offered blocker
-  attackerIds <- mapM (resolveOffered gs moment kind offered) (Set.toAscList attackers)
-  pure (blockerId, Set.fromList attackerIds)
-
--- CR 510.1a: the assignment's recipients must be ones the prompt offered a
--- threshold for, for resolveOffered's reason -- the engine drops an unoffered
--- recipient after the entry was popped.
-resolveDamage :: GameState.GameState -> When -> Text.Text -> Set.Set Recipient.Recipient -> (DamageRecipient, Natural) -> State.StateT HarnessState (Either HarnessFailure) (Recipient.Recipient, Natural)
-resolveDamage gs moment kind offered (recipient, amount) = do
-  resolved <- case recipient of
-    MkCreatureRecipient ref -> fmap Recipient.ToCreature (resolveObject ref gs)
-    MkPlayerRecipient pid -> pure (Recipient.ToPlayer pid)
-  if Set.member resolved offered
-    then pure (resolved, amount)
-    else do
-      offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
-      failHarness (MkUnofferedObject moment kind (renderRecipient recipient) offers)
-
--- How a failure message names one object: the alias the board gave it, or
--- its card name and 1-based occurrence -- the two ways a script could have
--- written it.
-describeObject :: GameState.GameState -> Map.Map ObjectAlias ObjectId.ObjectId -> ObjectId.ObjectId -> Text.Text
-describeObject gs aliases oid =
-  case List.find ((== oid) . snd) (Map.toAscList aliases) of
-    Just (MkObjectAlias name, _) -> Text.cons '@' name
-    Nothing -> case Game.cardOf oid gs of
-      Nothing -> Text.pack ("object " <> show (ObjectId.unwrap oid))
-      Just card ->
-        let name = Face.name (NonEmpty.head (Card.Type.faces card))
-            occurrence = Natural.length (takeWhile (/= oid) (namedObjects name gs)) + 1
-         in renderRef (MkNamedRef name occurrence)
-
-describeAll :: GameState.GameState -> [ObjectId.ObjectId] -> State.StateT HarnessState (Either HarnessFailure) [Text.Text]
-describeAll gs oids = do
-  aliases <- State.gets harnessAliases
-  pure (fmap (describeObject gs aliases) oids)
-
-renderRef :: ObjectRef -> Text.Text
-renderRef ref = case ref of
-  MkAliasRef (MkObjectAlias name) -> Text.cons '@' name
-  MkNamedRef (CardName.MkCardName name) occurrence ->
-    name <> Text.pack (" " <> show occurrence)
-
-renderRecipient :: DamageRecipient -> Text.Text
-renderRecipient recipient = case recipient of
-  MkCreatureRecipient ref -> renderRef ref
-  MkPlayerRecipient pid -> renderPlayer pid
-
--- The fixture seats by the names every spec calls them, so a failure message
--- reads the way the test that produced it is written.
-renderPlayer :: PlayerId.PlayerId -> Text.Text
-renderPlayer pid =
-  Text.pack $ case PlayerId.unwrap pid of
-    0 -> "alice"
-    1 -> "bob"
-    2 -> "carol"
-    3 -> "dave"
-    n -> "player " <> show n
-
-renderPhase :: Phase.Phase -> Text.Text
-renderPhase step =
-  Text.pack $ case step of
-    Phase.Beginning BeginningStep.Untap -> "untap"
-    Phase.Beginning BeginningStep.Upkeep -> "upkeep"
-    Phase.Beginning BeginningStep.DrawStep -> "draw"
-    Phase.PrecombatMain -> "precombat main"
-    Phase.Combat CombatStep.BeginningOfCombat -> "beginning of combat"
-    Phase.Combat CombatStep.DeclareAttackers -> "declare attackers"
-    Phase.Combat CombatStep.DeclareBlockers -> "declare blockers"
-    Phase.Combat CombatStep.CombatDamage -> "combat damage"
-    Phase.Combat CombatStep.EndOfCombat -> "end of combat"
-    Phase.PostcombatMain -> "postcombat main"
-    Phase.Ending EndingStep.EndStep -> "end"
-    Phase.Ending EndingStep.Cleanup -> "cleanup"
-
-renderTurn :: Natural -> Text.Text
-renderTurn number = Text.pack ("turn " <> show number)
-
-renderWhen :: When -> Text.Text
-renderWhen (MkWhen number step pid) =
-  Text.intercalate (Text.pack ", ") [renderTurn number, renderPhase step, renderPlayer pid]
-
-renderLocation :: PromptLocation -> Text.Text
-renderLocation (MkPromptLocation number step pid) =
-  Text.intercalate (Text.pack ", ") ([renderTurn number, renderPhase step] <> foldMap (pure . renderPlayer) pid)
-
-renderEntry :: Entry -> Text.Text
-renderEntry verb = case verb of
-  MkCast ref face _ ->
-    Text.pack "cast "
-      <> renderRef ref
-      <> foldMap (\(CardName.MkCardName name, facing) -> Text.pack (" as " <> show facing <> " ") <> name) face
-  MkPlayLand ref face ->
-    Text.pack "play "
-      <> renderRef ref
-      <> foldMap (\(CardName.MkCardName name) -> Text.pack " as " <> name) face
-  MkActivate ref _ -> Text.pack "activate " <> renderRef ref
-  MkChooseDefender pid -> Text.pack "choose " <> renderPlayer pid <> Text.pack " as defender"
-  MkChooseAttackTarget target -> Text.pack "attack " <> Text.pack (show target)
-  MkAttack refs -> Text.pack "attack " <> renderList (fmap renderRef (Foldable.toList refs))
-  MkBlock blocks ->
-    Text.pack "block "
-      <> renderList
-        ( fmap
-            (\(blocker, attackers) -> renderRef blocker <> Text.pack " blocks " <> renderList (fmap renderRef (Set.toAscList attackers)))
-            (Map.toAscList blocks)
-        )
-  MkAssignDamage assignment ->
-    Text.pack "assign "
-      <> renderList
-        ( fmap
-            (\(recipient, amount) -> renderRecipient recipient <> Text.pack (" " <> show amount))
-            (Map.toAscList assignment)
-        )
-  MkConcede -> Text.pack "concede"
-
-renderList :: [Text.Text] -> Text.Text
-renderList items = Text.pack "[" <> Text.intercalate (Text.pack ", ") items <> Text.pack "]"
-
-renderTimed :: Timed -> Text.Text
-renderTimed timed =
-  renderWhen (when timed)
-    <> Text.pack ": "
-    <> foldMap (\ref -> renderRef ref <> Text.pack "'s ") (qualifier timed)
-    <> renderEntry (entry timed)
-
-renderOffers :: [Text.Text] -> Text.Text
-renderOffers offers =
-  if null offers
-    then Text.empty
-    else Text.pack "; it offered " <> renderList offers
-
--- One human line per failure. Derived Show is kept for assertEq, which wants a
--- value; this is what a failing case prints, since a nested record of ids tells
--- a reader nothing about which entry went wrong where.
-renderFailure :: HarnessFailure -> String
-renderFailure failure =
-  Text.unpack $ case failure of
-    MkDuplicatePlayer pid -> renderPlayer pid <> Text.pack " was seated twice"
-    MkUnknownActivePlayer pid -> renderPlayer pid <> Text.pack " is active but was not seated"
-    MkUnknownController pid -> renderPlayer pid <> Text.pack " controls an arranged object but was not seated"
-    MkDuplicateAlias (MkObjectAlias name) -> Text.pack "@" <> name <> Text.pack " names two arranged objects"
-    MkUnknownCard (CardName.MkCardName name) -> Text.pack "no card named " <> name
-    MkUnknownObject ref known ->
-      renderRef ref
-        <> Text.pack " names nothing in the game"
-        <> ( if known
-               then Text.pack " (the board did alias it, so it has since left)"
-               else Text.empty
-           )
-    MkUnofferedObject moment kind named offers ->
-      renderWhen moment
-        <> Text.pack ": the "
-        <> kind
-        <> Text.pack " prompt did not offer "
-        <> named
-        <> renderOffers offers
-    MkUnexpectedQualifier moment kind ref ->
-      renderWhen moment
-        <> Text.pack ": the "
-        <> kind
-        <> Text.pack " prompt has no source, so the qualifier "
-        <> renderRef ref
-        <> Text.pack " matches nothing"
-    MkNestedGamePrompt location kind ->
-      renderLocation location <> Text.pack ": " <> kind <> Text.pack " was asked inside a nested game"
-    MkUnscheduledPrompt location kind offers ->
-      renderLocation location
-        <> Text.pack ": nothing is scheduled for the "
-        <> kind
-        <> Text.pack " prompt"
-        <> renderOffers offers
-    MkUnexpectedPrompt moment verb kind offers ->
-      renderWhen moment
-        <> Text.pack ": "
-        <> renderEntry verb
-        <> Text.pack " does not answer the "
-        <> kind
-        <> Text.pack " prompt"
-        <> renderOffers offers
-    MkActionNotOffered moment verb offers ->
-      renderWhen moment
-        <> Text.pack ": "
-        <> renderEntry verb
-        <> Text.pack " was not offered"
-        <> renderOffers offers
-    MkAmbiguousAction moment verb offers ->
-      renderWhen moment
-        <> Text.pack ": "
-        <> renderEntry verb
-        <> Text.pack " matched more than one offered action"
-        <> renderOffers offers
-    MkUnexpectedActionChoice moment verb kind ->
-      renderWhen moment
-        <> Text.pack ": "
-        <> renderEntry verb
-        <> Text.pack " has no matching answer for "
-        <> kind
-    MkUnusedActionChoices moment verb choices ->
-      renderWhen moment
-        <> Text.pack ": "
-        <> renderEntry verb
-        <> Text.pack " finished without using "
-        <> Text.pack (show choices)
-    MkUnreachedEntries number step timed ->
-      Text.intercalate (Text.pack "; ") (fmap renderTimed (Foldable.toList timed))
-        <> Text.pack " was never reached; the game stopped at "
-        <> renderTurn number
-        <> Text.pack ", "
-        <> renderPhase step
-
--- WHO ANSWERS a prompt: the Decider it carries, which CR 723.5 makes the seat
--- that makes every choice a controlled player would make. Not the PlayerId the
--- prompt is about; the two differ only while CR 723.1's effect is running.
--- Prompt.Concede is the exception CR 723.6 names and answers with its own seat,
--- and the random and shuffle prompts answer Nothing -- randomness is not a
--- choice, so no seat makes it.
---
--- Total on purpose: a hand-kept catalog over a GADT this size drifts silently,
--- and the wildcard that would let it drift is what -Wincomplete-patterns is here
--- to refuse.
-promptDecider :: Prompt.Prompt r -> Maybe PlayerId.PlayerId
-promptDecider prompt = case prompt of
-  Prompt.ChooseAction decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.Concede pid -> Just pid
-  Prompt.Shuffle {} -> Nothing
-  Prompt.RandomFirstPlayer {} -> Nothing
-  Prompt.RandomObject {} -> Nothing
-  Prompt.RandomPlayer {} -> Nothing
-  Prompt.RandomCard {} -> Nothing
-  Prompt.ChooseConjuredCard decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.RollDie {} -> Nothing
-  Prompt.RandomDepth {} -> Nothing
-  Prompt.LookUpCard {} -> Nothing
-  Prompt.ReferenceCards {} -> Nothing
-  Prompt.ReferenceNames {} -> Nothing
-  Prompt.ChooseDieResult decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.FlipCoin {} -> Nothing
-  Prompt.CallCoin decider _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCoinResult decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseDiscard decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseScry decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseSurveil decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseFateseal decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseExplore decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.RerollDie decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.AdjustDieRoll decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseDefender decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseManaSource decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseExtraManaSource decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ReverseManaAbilities decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseManaYield decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseManaToSpend decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseProliferate decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseRedistribution decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseRingBearer decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseBolster decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAmass decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseBlight decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseBehold decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCounterRemoval decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCounterRemovalAmong decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCounterRemovalAtLeast decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCounterRemovalUpTo decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseMixedCounterRemoval decider _ _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseVote decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseVoteWord decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseMovedCounter decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseMovedCountersAtLeastOne decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseDistributedMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseMovedCounterOrNone decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChoosePaidEnergy decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseNumber decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseReadAheadChapter decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseDamageSource decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseDelayedTriggerEvent decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCardInGraveyard decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCardInHand decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCardFromAmong decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseDungeon decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCompanion decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseFromOutsideTheGame decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseRoom decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseHalf decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseLegend decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.DeclareAttackers decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAttackTarget decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseExert decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.DeclareBlockers decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.AssignCombatDamage decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseTargets decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.AnnounceTargets decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseLandTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCreatureTypeSwap decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseBasicLandType decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCreatureType decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseSearchZones decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.Search decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.CastWhileSearching decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseX decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseMutateSide decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseForage decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseLearn decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseTimeTravel decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseClash decider _ _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseEntwine decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseBuyback decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseSplice decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAssistant decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAssistAmount decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseKicker decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ReturnCommander decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCommandZoneOfferFirst decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseLibraryEnd decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ArrangeLibraryArrivals decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ArrangeLibraryCards decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseModes decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCopyTarget decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseEntryOption decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseRiot decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseUnleash decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseTribute decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseDredge decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChoosePayLifeOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseRevealOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseEnlist decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseEncode decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseColor decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseManaType decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCardName decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseOpponent decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseProtector decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChoosePlayer decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseActivePlayer decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.OrderTriggers decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.OrderDamage decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.AllocateDamage decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseReplacement decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseSacrifices decider _ _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseExilesFromGraveyard decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseMaterials decider _ _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCollectEvidence decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAnyNumberToSacrifice decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAnyNumberToReveal decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAnyNumberOfPermanents decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAnyNumberToDiscard decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChoosePermanent decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseTapsForTotalPower decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseTaps decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseReturns decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseAttachment decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseTurnUpAttachment decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseCost decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChoosePlayPermission decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.OrderCostComponents decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.OrderCombatTolls decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.OrderComponentCards decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.OrderForEach decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseLoopMembers decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseRepeat decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.OrderTimestamps decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.OrderManaActivations decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.DeclareMulligan decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.Bottom decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.MulliganAction decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.OpeningHandAction decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseOptional decider _ _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseClause decider _ _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.OfferedCast decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseOfferedCastSpell decider _ _ -> Just (Decider.unwrap decider)
-  Prompt.OfferedMiracleReveal decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseToPay decider _ _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.AnnouncePhyrexianPayment decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.AnnounceHybridPayment decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.AnnounceHybridHalf decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseReductionHalf decider _ _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseReducedCost decider _ _ _ -> Just (Decider.unwrap decider)
-
--- The prompt's constructor name, for failure messages. Total for promptDecider's
--- reason.
-promptKind :: Prompt.Prompt r -> Text.Text
-promptKind prompt = Text.pack $ case prompt of
-  Prompt.ChooseAction {} -> "ChooseAction"
-  Prompt.Concede {} -> "Concede"
-  Prompt.Shuffle {} -> "Shuffle"
-  Prompt.RandomFirstPlayer {} -> "RandomFirstPlayer"
-  Prompt.RandomObject {} -> "RandomObject"
-  Prompt.RandomPlayer {} -> "RandomPlayer"
-  Prompt.RandomCard {} -> "RandomCard"
-  Prompt.ChooseConjuredCard {} -> "ChooseConjuredCard"
-  Prompt.RollDie {} -> "RollDie"
-  Prompt.RandomDepth {} -> "RandomDepth"
-  Prompt.LookUpCard {} -> "LookUpCard"
-  Prompt.ReferenceCards {} -> "ReferenceCards"
-  Prompt.ReferenceNames {} -> "ReferenceNames"
-  Prompt.ChooseDieResult {} -> "ChooseDieResult"
-  Prompt.FlipCoin {} -> "FlipCoin"
-  Prompt.CallCoin {} -> "CallCoin"
-  Prompt.ChooseCoinResult {} -> "ChooseCoinResult"
-  Prompt.ChooseDiscard {} -> "ChooseDiscard"
-  Prompt.ChooseScry {} -> "ChooseScry"
-  Prompt.ChooseSurveil {} -> "ChooseSurveil"
-  Prompt.ChooseFateseal {} -> "ChooseFateseal"
-  Prompt.ChooseExplore {} -> "ChooseExplore"
-  Prompt.RerollDie {} -> "RerollDie"
-  Prompt.AdjustDieRoll {} -> "AdjustDieRoll"
-  Prompt.ChooseDefender {} -> "ChooseDefender"
-  Prompt.ChooseManaSource {} -> "ChooseManaSource"
-  Prompt.ChooseExtraManaSource {} -> "ChooseExtraManaSource"
-  Prompt.ReverseManaAbilities {} -> "ReverseManaAbilities"
-  Prompt.ChooseManaYield {} -> "ChooseManaYield"
-  Prompt.ChooseManaToSpend {} -> "ChooseManaToSpend"
-  Prompt.ChooseProliferate {} -> "ChooseProliferate"
-  Prompt.ChooseRedistribution {} -> "ChooseRedistribution"
-  Prompt.ChooseRingBearer {} -> "ChooseRingBearer"
-  Prompt.ChooseBolster {} -> "ChooseBolster"
-  Prompt.ChooseAmass {} -> "ChooseAmass"
-  Prompt.ChooseBlight {} -> "ChooseBlight"
-  Prompt.ChooseBehold {} -> "ChooseBehold"
-  Prompt.ChooseCounterRemoval {} -> "ChooseCounterRemoval"
-  Prompt.ChooseCounterRemovalAmong {} -> "ChooseCounterRemovalAmong"
-  Prompt.ChooseCounterRemovalAtLeast {} -> "ChooseCounterRemovalAtLeast"
-  Prompt.ChooseCounterRemovalUpTo {} -> "ChooseCounterRemovalUpTo"
-  Prompt.ChooseMixedCounterRemoval {} -> "ChooseMixedCounterRemoval"
-  Prompt.ChooseVote {} -> "ChooseVote"
-  Prompt.ChooseVoteWord {} -> "ChooseVoteWord"
-  Prompt.ChooseMovedCounter {} -> "ChooseMovedCounter"
-  Prompt.ChooseMovedCounters {} -> "ChooseMovedCounters"
-  Prompt.ChooseMovedCountersAtLeastOne {} -> "ChooseMovedCountersAtLeastOne"
-  Prompt.ChooseDistributedMovedCounters {} -> "ChooseDistributedMovedCounters"
-  Prompt.ChooseMovedCounterOrNone {} -> "ChooseMovedCounterOrNone"
-  Prompt.ChoosePaidEnergy {} -> "ChoosePaidEnergy"
-  Prompt.ChooseNumber {} -> "ChooseNumber"
-  Prompt.ChooseReadAheadChapter {} -> "ChooseReadAheadChapter"
-  Prompt.ChooseDamageSource {} -> "ChooseDamageSource"
-  Prompt.ChooseDelayedTriggerEvent {} -> "ChooseDelayedTriggerEvent"
-  Prompt.ChooseCardInGraveyard {} -> "ChooseCardInGraveyard"
-  Prompt.ChooseCardInHand {} -> "ChooseCardInHand"
-  Prompt.ChooseCardFromAmong {} -> "ChooseCardFromAmong"
-  Prompt.ChooseDungeon {} -> "ChooseDungeon"
-  Prompt.ChooseCompanion {} -> "ChooseCompanion"
-  Prompt.ChooseFromOutsideTheGame {} -> "ChooseFromOutsideTheGame"
-  Prompt.ChooseRoom {} -> "ChooseRoom"
-  Prompt.ChooseHalf {} -> "ChooseHalf"
-  Prompt.ChooseLegend {} -> "ChooseLegend"
-  Prompt.DeclareAttackers {} -> "DeclareAttackers"
-  Prompt.ChooseAttackTarget {} -> "ChooseAttackTarget"
-  Prompt.ChooseExert {} -> "ChooseExert"
-  Prompt.DeclareBlockers {} -> "DeclareBlockers"
-  Prompt.AssignCombatDamage {} -> "AssignCombatDamage"
-  Prompt.ChooseTargets {} -> "ChooseTargets"
-  Prompt.AnnounceTargets {} -> "AnnounceTargets"
-  Prompt.ChooseLandTypeSwap {} -> "ChooseLandTypeSwap"
-  Prompt.ChooseCreatureTypeSwap {} -> "ChooseCreatureTypeSwap"
-  Prompt.ChooseBasicLandType {} -> "ChooseBasicLandType"
-  Prompt.ChooseCreatureType {} -> "ChooseCreatureType"
-  Prompt.ChooseSearchZones {} -> "ChooseSearchZones"
-  Prompt.Search {} -> "Search"
-  Prompt.CastWhileSearching {} -> "CastWhileSearching"
-  Prompt.ChooseX {} -> "ChooseX"
-  Prompt.ChooseMutateSide {} -> "ChooseMutateSide"
-  Prompt.ChooseForage {} -> "ChooseForage"
-  Prompt.ChooseLearn {} -> "ChooseLearn"
-  Prompt.ChooseTimeTravel {} -> "ChooseTimeTravel"
-  Prompt.ChooseClash {} -> "ChooseClash"
-  Prompt.ChooseEntwine {} -> "ChooseEntwine"
-  Prompt.ChooseBuyback {} -> "ChooseBuyback"
-  Prompt.ChooseSplice {} -> "ChooseSplice"
-  Prompt.ChooseAssistant {} -> "ChooseAssistant"
-  Prompt.ChooseAssistAmount {} -> "ChooseAssistAmount"
-  Prompt.ChooseKicker {} -> "ChooseKicker"
-  Prompt.ReturnCommander {} -> "ReturnCommander"
-  Prompt.ChooseCommandZoneOfferFirst {} -> "ChooseCommandZoneOfferFirst"
-  Prompt.ChooseLibraryEnd {} -> "ChooseLibraryEnd"
-  Prompt.ArrangeLibraryArrivals {} -> "ArrangeLibraryArrivals"
-  Prompt.ArrangeLibraryCards {} -> "ArrangeLibraryCards"
-  Prompt.ChooseModes {} -> "ChooseModes"
-  Prompt.ChooseCopyTarget {} -> "ChooseCopyTarget"
-  Prompt.ChooseEntryOption {} -> "ChooseEntryOption"
-  Prompt.ChooseRiot {} -> "ChooseRiot"
-  Prompt.ChooseUnleash {} -> "ChooseUnleash"
-  Prompt.ChooseTribute {} -> "ChooseTribute"
-  Prompt.ChooseDredge {} -> "ChooseDredge"
-  Prompt.ChoosePayLifeOnEntry {} -> "ChoosePayLifeOnEntry"
-  Prompt.ChooseRevealOnEntry {} -> "ChooseRevealOnEntry"
-  Prompt.ChooseEnlist {} -> "ChooseEnlist"
-  Prompt.ChooseEncode {} -> "ChooseEncode"
-  Prompt.ChooseColor {} -> "ChooseColor"
-  Prompt.ChooseManaType {} -> "ChooseManaType"
-  Prompt.ChooseCardName {} -> "ChooseCardName"
-  Prompt.ChooseOpponent {} -> "ChooseOpponent"
-  Prompt.ChooseProtector {} -> "ChooseProtector"
-  Prompt.ChoosePlayer {} -> "ChoosePlayer"
-  Prompt.ChooseActivePlayer {} -> "ChooseActivePlayer"
-  Prompt.OrderTriggers {} -> "OrderTriggers"
-  Prompt.OrderDamage {} -> "OrderDamage"
-  Prompt.AllocateDamage {} -> "AllocateDamage"
-  Prompt.ChooseReplacement {} -> "ChooseReplacement"
-  Prompt.ChooseSacrifices {} -> "ChooseSacrifices"
-  Prompt.ChooseExilesFromGraveyard {} -> "ChooseExilesFromGraveyard"
-  Prompt.ChooseMaterials {} -> "ChooseMaterials"
-  Prompt.ChooseCollectEvidence {} -> "ChooseCollectEvidence"
-  Prompt.ChooseAnyNumberToSacrifice {} -> "ChooseAnyNumberToSacrifice"
-  Prompt.ChooseAnyNumberToReveal {} -> "ChooseAnyNumberToReveal"
-  Prompt.ChooseAnyNumberOfPermanents {} -> "ChooseAnyNumberOfPermanents"
-  Prompt.ChooseAnyNumberToDiscard {} -> "ChooseAnyNumberToDiscard"
-  Prompt.ChoosePermanent {} -> "ChoosePermanent"
-  Prompt.ChooseTapsForTotalPower {} -> "ChooseTapsForTotalPower"
-  Prompt.ChooseTaps {} -> "ChooseTaps"
-  Prompt.ChooseReturns {} -> "ChooseReturns"
-  Prompt.ChooseAttachment {} -> "ChooseAttachment"
-  Prompt.ChooseTurnUpAttachment {} -> "ChooseTurnUpAttachment"
-  Prompt.ChooseCost {} -> "ChooseCost"
-  Prompt.ChoosePlayPermission {} -> "ChoosePlayPermission"
-  Prompt.OrderCostComponents {} -> "OrderCostComponents"
-  Prompt.OrderCombatTolls {} -> "OrderCombatTolls"
-  Prompt.OrderComponentCards {} -> "OrderComponentCards"
-  Prompt.OrderForEach {} -> "OrderForEach"
-  Prompt.ChooseLoopMembers {} -> "ChooseLoopMembers"
-  Prompt.ChooseRepeat {} -> "ChooseRepeat"
-  Prompt.OrderTimestamps {} -> "OrderTimestamps"
-  Prompt.OrderManaActivations {} -> "OrderManaActivations"
-  Prompt.DeclareMulligan {} -> "DeclareMulligan"
-  Prompt.Bottom {} -> "Bottom"
-  Prompt.MulliganAction {} -> "MulliganAction"
-  Prompt.OpeningHandAction {} -> "OpeningHandAction"
-  Prompt.ChooseOptional {} -> "ChooseOptional"
-  Prompt.ChooseClause {} -> "ChooseClause"
-  Prompt.OfferedCast {} -> "OfferedCast"
-  Prompt.ChooseOfferedCastSpell {} -> "ChooseOfferedCastSpell"
-  Prompt.OfferedMiracleReveal {} -> "OfferedMiracleReveal"
-  Prompt.ChooseToPay {} -> "ChooseToPay"
-  Prompt.AnnouncePhyrexianPayment {} -> "AnnouncePhyrexianPayment"
-  Prompt.AnnounceHybridPayment {} -> "AnnounceHybridPayment"
-  Prompt.AnnounceHybridHalf {} -> "AnnounceHybridHalf"
-  Prompt.ChooseReductionHalf {} -> "ChooseReductionHalf"
-  Prompt.ChooseReducedCost {} -> "ChooseReducedCost"
+-- What a failing case prints.
+renderFailure :: ScenarioFailure.ScenarioFailure -> String
+renderFailure = Text.unpack . Scenario.render
 
 -- Run a Game action purely under an answerer and keep only the final state. The
 -- shape every direct-call test needs now that the change-and-emit funnels are

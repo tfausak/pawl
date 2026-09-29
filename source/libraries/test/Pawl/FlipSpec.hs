@@ -53,6 +53,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Board as Board
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -60,6 +61,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -68,8 +70,10 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Protection as Protection
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.Zone as Zone
 
 akkiName, tokTokName :: CardName.CardName
@@ -162,13 +166,13 @@ redirectPair s registry = do
 -- alice's Akki alone against bob, with combat about to start. Nothing else is on
 -- the battlefield, so the only thing that can deal bob combat damage is the
 -- creature this unit is about.
-akkiDuel :: S.Board
+akkiDuel :: Board.Board
 akkiDuel = S.duel S.beginningOfCombat [S.settled "akki" "Akki Lavarunner"] []
 
 -- Akki attacks bob, unblocked, and the whole combat phase runs -- so CR 510.2's
 -- damage, CR 603.3's trigger placement and CR 608's resolution all happen inside
 -- the engine rather than being poked in.
-attackScript :: Seq.Seq S.Timed
+attackScript :: Seq.Seq Timed.Timed
 attackScript = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "akki"])]
 
 -- Point Soul's Fire's `victim` slot at one player, leaving its `dealer` slot to
@@ -249,11 +253,11 @@ spec s registry = Spec.describe s "Flip" $ do
   -- other assertion in this case.
   Spec.it s "CR 710.2 Akki flips into Tok-Tok, keeping CR 710.1c's mana value and colour" $ do
     built <- S.buildBoardOrFail s registry akkiDuel
-    case Map.lookup (S.MkObjectAlias (Text.pack "akki")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "akki")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted the Akki alias"
       Just oid -> do
-        Spec.assertEqWith s "before: Akki Lavarunner" (halfReadings oid (S.builtState built)) normalHalf
-        Spec.assertBool s (not (isLegendary oid (S.builtState built))) "and a legendary pump does not reach Akki"
+        Spec.assertEqWith s "before: Akki Lavarunner" (halfReadings oid (Staged.state built)) normalHalf
+        Spec.assertBool s (not (isLegendary oid (Staged.state built))) "and a legendary pump does not reach Akki"
         (_, after) <- S.runScriptOrFail s attackScript built S.combatGame
         Spec.assertEqWith s "the 1/1 connected" (S.lifeOf S.bob after) (Just 19)
         Spec.assertEqWith s "after: Tok-Tok, Volcano Born" (halfReadings oid after) alternativeHalf
@@ -272,7 +276,7 @@ spec s registry = Spec.describe s "Flip" $ do
   -- so every reader is Akki's again.
   Spec.it s "CR 710.4 a flipped permanent that leaves the battlefield comes back unflipped" $ do
     built <- S.buildBoardOrFail s registry akkiDuel
-    case Map.lookup (S.MkObjectAlias (Text.pack "akki")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "akki")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted the Akki alias"
       Just oid -> do
         (_, flipped) <- S.runScriptOrFail s attackScript built S.combatGame

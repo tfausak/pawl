@@ -43,6 +43,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario.Prompt as Scenario.Prompt
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
@@ -1215,7 +1216,7 @@ delayedSpec s registry =
       -- and the two casts differ only in the doubler.
       recordKinds :: Prompt.Prompt r -> State.State [Text.Text] r
       recordKinds p = do
-        State.modify' (<> [S.promptKind p])
+        State.modify' (<> [Scenario.Prompt.kindOf p])
         pure (S.identityAnswer p)
       -- Stamp an expiry onto every armed delayed ability, so the CR 603.7b
       -- stated-duration mechanism can be exercised on a real armed entry.
@@ -1521,7 +1522,7 @@ tokenSetSpec s registry =
       -- prompt.
       recordPrompts :: Prompt.Prompt r -> State.State [Text.Text] r
       recordPrompts p = do
-        State.modify' (<> [S.promptKind p])
+        State.modify' (<> [Scenario.Prompt.kindOf p])
         pure (S.identityAnswer p)
       castUnderPrompts gs oid =
         State.runState

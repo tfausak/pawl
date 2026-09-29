@@ -51,6 +51,12 @@ partialCodec = Arm.tagged tagOf [Arm.nullary "Plain" Plain]
 crossedCodec :: Codec.Codec Example
 crossedCodec = Arm.tagged (\x -> case x of Sized {} -> "Plain"; _ -> tagOf x) arms
 
+keyedCodec :: Codec.Codec Example
+keyedCodec = Arm.keyed tagOf arms
+
+flatKeyedCodec :: Codec.Codec Flat
+flatKeyedCodec = Arm.keyedEnum
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
   Spec.it s "round trips a nullary arm" $
@@ -112,6 +118,43 @@ spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
     Common.assertCodec s codec (Sized 1) " {\"type\":\"Sized\",\"value\":1} "
 
   Spec.it s "enum has a schema" $ Common.assertHasSchema s flatCodec
+
+  Spec.describe s "keyed" $ do
+    Spec.it s "writes a nullary arm as its bare tag" $
+      Common.assertCodec s keyedCodec Plain " \"Plain\" "
+
+    Spec.it s "writes a payload arm as an object keyed by its tag" $
+      Common.assertCodec s keyedCodec (Sized 2) " {\"Sized\":2} "
+
+    Spec.it s "reads an optional-payload arm in both shapes" $ do
+      Common.assertCodec s keyedCodec (Loose (Just 2)) " {\"Loose\":2} "
+      Common.assertCodec s keyedCodec (Loose Nothing) " \"Loose\" "
+
+    Spec.it s "rejects a payload arm written bare" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.parse (Text.pack " \"Sized\" ") >>= Codec.decode keyedCodec))
+        "expected a decode failure"
+
+    Spec.it s "rejects an object with two keys" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.parse (Text.pack " {\"Sized\":1,\"Loose\":2} ") >>= Codec.decode keyedCodec))
+        "expected a decode failure"
+
+    Spec.it s "rejects an unknown tag" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.parse (Text.pack " \"Nope\" ") >>= Codec.decode keyedCodec))
+        "expected a decode failure"
+
+    Spec.it s "keyedEnum writes every constructor as a bare string" $ do
+      Common.assertEnumCodec s flatKeyedCodec
+      Common.assertCodec s flatKeyedCodec Middle " \"Middle\" "
+
+    Spec.it s "has a schema" $ do
+      Common.assertHasSchema s keyedCodec
+      Common.assertHasSchema s flatKeyedCodec
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec

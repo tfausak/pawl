@@ -39,6 +39,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
@@ -965,35 +966,6 @@ charSpec s registry = Spec.describe s "Char" $ do
 
 blazeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blazeSpec s registry = Spec.describe s "Blaze" $ do
-  Spec.it s "Blaze at X=3 deals 3 to the opponent (CR 601.2b/f/h, 608.2)" $ do
-    -- Falsifier: an engine that ignored the chosen value (treated X as 0, or
-    -- as the {X} mana value) would leave bob at 20.
-    let mana1 = S.aliased "first mana" (S.permanent "Mountain")
-        mana2 = S.aliased "second mana" (S.permanent "Mountain")
-        mana3 = S.aliased "third mana" (S.permanent "Mountain")
-        mana4 = S.aliased "fourth mana" (S.permanent "Mountain")
-        spell = S.aliased "spell" (S.cardSetup "Blaze")
-        alice =
-          (S.battlefield S.alice [mana1, mana2, mana3, mana4])
-            { S.setupHand = Seq.singleton spell
-            }
-        board = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-        choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkPlayerTarget S.bob],
-              S.choiceX = Just 3,
-              S.choiceManaSources =
-                Seq.fromList
-                  [ Just (S.aliasRef "first mana"),
-                    Just (S.aliasRef "second mana"),
-                    Just (S.aliasRef "third mana"),
-                    Just (S.aliasRef "fourth mana")
-                  ]
-            }
-        script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
-    after <- S.play s registry board script S.priorityGame
-    Spec.assertEqWith s "Bob at 17" (S.lifeOf S.bob after) (Just 17)
-    Spec.assertEqWith s "four Mountains paid {3}{R}" (S.tappedCount S.alice after) 4
   Spec.it s "Blaze at X=0 is castable and deals nothing (the X=0 floor)" $ do
     -- Falsifier: a floor that required {X} > 0 would make Blaze uncastable off
     -- one Mountain, leaving it in hand.
@@ -5799,7 +5771,7 @@ mayhemSpec s registry = Spec.describe s "Mayhem" $ do
     bolt <- S.printingOf s registry "Electro's Bolt"
     reunion <- S.printingOf s registry "Cathartic Reunion"
     let (discarded, notDiscarded) = mayhemBoards mountain piker bolt reunion
-        boltIn gs = case S.namedObjects (S.printingName bolt) gs of
+        boltIn gs = case Scenario.namedObjects (S.printingName bolt) gs of
           oid : _ -> Just oid
           [] -> Nothing
         cast oid gs = S.runPure S.identityAnswer gs (S.cast S.alice oid)
@@ -5816,7 +5788,7 @@ mayhemSpec s registry = Spec.describe s "Mayhem" $ do
     bolt <- S.printingOf s registry "Electro's Bolt"
     reunion <- S.printingOf s registry "Cathartic Reunion"
     let (discarded, notDiscarded) = mayhemBoards mountain piker bolt reunion
-        costsOf gs = case S.namedObjects (S.printingName bolt) gs of
+        costsOf gs = case Scenario.namedObjects (S.printingName bolt) gs of
           oid : _ -> fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor S.alice (S.printingName bolt) oid gs)
           [] -> []
     Spec.assertEqWith

@@ -301,75 +301,83 @@ emptyGame order =
 createCard :: PlayerId -> PrintingId.PrintingId -> Game ObjectId
 createCard pid printingId = do
   gs <- State.get
+  let (oid, placed) = placeCard Zone.Library pid printingId gs
+  State.put placed
+  pure oid
+
+-- | One card put straight into a zone, owned by pid and firing nothing: the
+-- object a game begins with (createCard), and the one a scenario's board places
+-- (Pawl.Scenario), which is a state rather than a history.
+placeCard :: Zone.Zone -> PlayerId -> PrintingId.PrintingId -> GameState -> (ObjectId, GameState)
+placeCard zone pid printingId gs =
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
-      obj =
-        Object.MkObject
-          { Object.owner = pid,
-            Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printingId,
-            Object.zone = Zone.Library,
-            Object.tapped = TapState.Untapped,
-            Object.facing = Facing.FaceUp,
-            Object.flipped = False,
-            Object.exiledFaceDown = False,
-            Object.exileLookers = Set.empty,
-            Object.damage = 0,
-            Object.sickness = Sickness.Sick,
-            Object.controlClock = Map.empty,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            Object.counterTimestamps = Map.empty,
-            Object.attachedTo = Nothing,
-            Object.chosenColor = Nothing,
-            Object.chosenSubtype = Nothing,
-            Object.chosenNames = Set.empty,
-            Object.chosenPlayer = Nothing,
-            Object.timestamp = ts,
-            Object.face = Nothing,
-            Object.turnedOverAt = Nothing,
-            Object.worldSince = Nothing,
-            Object.playableFromExile = Nothing,
-            Object.plotted = Nothing,
-            Object.foretold = Nothing,
-            Object.foretellCostReduction = Nothing,
-            Object.warped = Nothing,
-            Object.preparedCopyOf = Nothing,
-            Object.ringBearerFor = Nothing,
-            Object.duplicate = Nothing,
-            Object.paired = Nothing,
-            Object.protector = Nothing,
-            Object.ventureRoom = Nothing,
-            Object.classLevel = Nothing,
-            Object.unlockedHalves = Set.empty,
-            Object.designations = Set.empty,
-            Object.designationValues = Map.empty,
-            Object.paidCosts = Map.empty,
-            Object.tributePaid = False,
-            Object.bestowed = False,
-            Object.mutating = False,
-            Object.prototyped = False,
-            Object.boughtBack = False,
-            Object.spliced = Seq.empty,
-            Object.phyrexianLifePaid = 0,
-            Object.manaSpent = Mana.MkMana [],
-            Object.announcedX = Nothing,
-            Object.castFrom = Nothing,
-            Object.castUsing = Nothing,
-            Object.castGrant = Nothing,
-            Object.detainedUntil = Set.empty,
-            Object.goadedBy = Set.empty,
-            Object.doesNotUntapFor = 0,
-            Object.exertedBy = Set.empty,
-            Object.activatedOnce = Set.empty
-          }
-      gs3 =
-        gs2
-          { GameState.objects = Map.insert oid obj (GameState.objects gs2),
-            GameState.library = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.library gs2)
-          }
-  State.put gs3
-  pure oid
+      obj = blankObject zone pid printingId ts
+      withObject = gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
+   in (oid, Game.insertIntoZone zone LibraryPosition.Bottom pid oid withObject)
+
+-- | A card's object as it first exists, before anything has happened to it.
+blankObject :: Zone.Zone -> PlayerId -> PrintingId.PrintingId -> Timestamp.Timestamp -> Object.Object
+blankObject zone pid printingId ts =
+  Object.MkObject
+    { Object.owner = pid,
+      Object.enteredUnder = Nothing,
+      Object.source = Source.OfCard printingId,
+      Object.zone = zone,
+      Object.tapped = TapState.Untapped,
+      Object.facing = Facing.FaceUp,
+      Object.flipped = False,
+      Object.exiledFaceDown = False,
+      Object.exileLookers = Set.empty,
+      Object.damage = 0,
+      Object.sickness = Sickness.Sick,
+      Object.controlClock = Map.empty,
+      Object.bindings = Map.empty,
+      Object.counters = Map.empty,
+      Object.counterTimestamps = Map.empty,
+      Object.attachedTo = Nothing,
+      Object.chosenColor = Nothing,
+      Object.chosenSubtype = Nothing,
+      Object.chosenNames = Set.empty,
+      Object.chosenPlayer = Nothing,
+      Object.timestamp = ts,
+      Object.face = Nothing,
+      Object.turnedOverAt = Nothing,
+      Object.worldSince = Nothing,
+      Object.playableFromExile = Nothing,
+      Object.plotted = Nothing,
+      Object.foretold = Nothing,
+      Object.foretellCostReduction = Nothing,
+      Object.warped = Nothing,
+      Object.preparedCopyOf = Nothing,
+      Object.ringBearerFor = Nothing,
+      Object.duplicate = Nothing,
+      Object.paired = Nothing,
+      Object.protector = Nothing,
+      Object.ventureRoom = Nothing,
+      Object.classLevel = Nothing,
+      Object.unlockedHalves = Set.empty,
+      Object.designations = Set.empty,
+      Object.designationValues = Map.empty,
+      Object.paidCosts = Map.empty,
+      Object.tributePaid = False,
+      Object.bestowed = False,
+      Object.mutating = False,
+      Object.prototyped = False,
+      Object.boughtBack = False,
+      Object.spliced = Seq.empty,
+      Object.phyrexianLifePaid = 0,
+      Object.manaSpent = Mana.MkMana [],
+      Object.announcedX = Nothing,
+      Object.castFrom = Nothing,
+      Object.castUsing = Nothing,
+      Object.castGrant = Nothing,
+      Object.detainedUntil = Set.empty,
+      Object.goadedBy = Set.empty,
+      Object.doesNotUntapFor = 0,
+      Object.exertedBy = Set.empty,
+      Object.activatedOnce = Set.empty
+    }
 
 -- Build each player's library from their deck's multiset, shuffle, draw.
 -- CR 103.1: build this player's library from their deck -- and, for a Commander

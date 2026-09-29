@@ -84,6 +84,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario.Prompt as Scenario.Prompt
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
@@ -802,7 +803,7 @@ thumbRun faces called kept (skyId, board) =
   let answering :: Prompt.Prompt r -> State.State ([CoinFace.CoinFace], [Text.Text]) r
       answering p = do
         (pending0, log0) <- State.get
-        State.put (pending0, S.promptKind p : log0)
+        State.put (pending0, Scenario.Prompt.kindOf p : log0)
         case p of
           Prompt.FlipCoin -> do
             (pending, log_) <- State.get
