@@ -745,7 +745,7 @@ data Object = MkObject
     -- its activated abilities can't be activated" -- until the next turn of each
     -- player named here.
     --
-    -- On the VICTIM rather than in a GameState list, doesNotUntapNext below's
+    -- On the VICTIM rather than in a GameState list, doesNotUntapFor below's
     -- reason: the mark names no source and carries no duration of its own (the
     -- next paragraph), so there is no row for a list to hold. As a field it is
     -- per-incarnation, and newIncarnation below is CR 400.7's forgetting.
@@ -769,28 +769,30 @@ data Object = MkObject
     -- Pawl.Types.Designation: that type's marks are per-permanent and permanent,
     -- where this one is per-PLAYER and expires. Per-incarnation (CR 400.7).
     goadedBy :: Set.Set PlayerId.PlayerId,
-    -- | CR 502.3 / CR 611.2: a ONE-SHOT untap prohibition standing over this
-    -- permanent, said of ITS CONTROLLER's next untap step (Elvish Hunter).
-    -- Written by Effect.DoesNotUntapNext and by nothing else, CR 701.43a's exert
-    -- naming a PLAYER instead and riding exertedBy below.
+    -- | CR 502.3 / CR 611.2: how many of ITS CONTROLLER's next untap steps this
+    -- permanent doesn't untap during (Elvish Hunter's one, Telekinesis' two); 0
+    -- for none. Written by Effect.DoesNotUntapNext and by nothing else, CR
+    -- 701.43a's exert naming a PLAYER instead and riding exertedBy below.
     --
     -- Pawl.Types.UntapRestriction's stored counterpart: that one is a field on
     -- the PRINTING that forbids and is re-derived live, where this outlives the
-    -- object that made it. On the VICTIM for detainedUntil's reason, and cleared
-    -- where it applies by Engine.untapAll, so it needs no Pawl.Types.Expiry --
-    -- CR 611.2a gives the effect the duration its own sentence states, and CR
-    -- 502.3 runs that step for whoever controls the permanent then.
+    -- object that made it. On the VICTIM for detainedUntil's reason, and counted
+    -- down where it applies by Engine.untapAll, so it needs no
+    -- Pawl.Types.Expiry -- CR 611.2a gives the effect the duration its own
+    -- sentence states, and CR 502.3 runs each step for whoever controls the
+    -- permanent then (Telekinesis' ruling of 2007-09-16).
     --
-    -- Not implemented: Telekinesis' "next TWO untap steps", which a Bool cannot
-    -- hold and no card in the pool prints (gap #1653).
-    doesNotUntapNext :: Bool,
+    -- A COUNT of steps rather than a tally of effects: every prohibition's steps
+    -- run from the next one, so two over the same step expire together (CR
+    -- 701.43b says it of exert) and the writer keeps the larger count.
+    doesNotUntapFor :: Natural.Natural,
     -- | CR 701.43a: the players who have EXERTED this permanent -- "you choose to
     -- have it not untap during your next untap step". Written by
     -- Pawl.Engine.Combat.declareAttackers paying CR 508.1g's optional cost, and
     -- read and emptied of a seat by Pawl.Engine.Engine.untapAll at that seat's
     -- untap step.
     --
-    -- SEPARATE from doesNotUntapNext above because the two sentences name
+    -- SEPARATE from doesNotUntapFor above because the two sentences name
     -- different untap steps: rule 701.43a's is keyed to a player and survives a
     -- control change, where Elvish Hunter's is a live read of whoever controls
     -- the permanent at the step. A SET for detainedUntil's reason, CR 701.43b
@@ -959,7 +961,7 @@ newIncarnation object =
       goadedBy = Set.empty,
       -- Nothing writes it back: the effect named a permanent, and the object
       -- that returns is not that permanent.
-      doesNotUntapNext = False,
+      doesNotUntapFor = 0,
       -- CR 701.43c: nobody exerted the object that comes back.
       exertedBy = Set.empty,
       -- CR 400.7 over CR 602.5b: the object that comes back has activated

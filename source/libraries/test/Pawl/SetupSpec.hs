@@ -348,7 +348,7 @@ dirtied pid object =
       Object.designationValues = Map.empty,
       Object.detainedUntil = Set.singleton pid,
       Object.goadedBy = Set.empty,
-      Object.doesNotUntapNext = True,
+      Object.doesNotUntapFor = 3,
       Object.exertedBy = Set.singleton pid,
       Object.activatedOnce = Set.empty
     }
