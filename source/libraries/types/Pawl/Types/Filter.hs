@@ -155,9 +155,9 @@ data Filter keyword
     -- starts, while CR 108.4 gives a card outside the battlefield and the stack
     -- no controller. False off an object, a printed card being none (CR 109.1).
     OwnedBy PlayerRelation.PlayerRelation
-  | -- | CR 108.3: the candidate's OWNER is the player the surrounding effect is
-    -- currently being applied to -- ControlledByRecipient's owner twin, Flux's
-    -- "discards any number of cards, then draws THAT MANY", read per drawer.
+  | -- | CR 108.3 / 701.9a: the candidate's OWNER is the player the surrounding
+    -- effect is currently being applied to -- ControlledByRecipient's owner
+    -- twin, Flux's "discards any number of cards, then draws THAT MANY".
     OwnedByRecipient
   | -- | The candidate IS the evaluation's source object. @Not IsSource@ is how CR
     -- 601.2c's "another" and a continuous effect's own "each other" card text are

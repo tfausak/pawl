@@ -2036,7 +2036,8 @@ freezeRiders viewOf context gs resolving source riders =
 -- recipientSeat is what says whose an object's amount is.
 --
 -- Two spellings, because a card asks two different questions: Filter.Context's
--- `recipient`, which Filter.ControlledByRecipient reads (see #161); and
+-- `recipient`, which Filter.ControlledByRecipient and OwnedByRecipient read
+-- (see #161); and
 -- Quantity.forCandidate, which substitutes PlayerRef.Candidate. Both are no-ops
 -- for a quantity naming neither, so this is no departure from CR 608.2f's single
 -- determination -- every amount is read off the same pre-effect GameState.

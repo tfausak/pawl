@@ -1071,9 +1071,9 @@ data Context = MkContext
     -- LAZY like sourcePower, and load-bearingly so: filling it costs a
     -- control-grant walk, and no filter that omits the atom ever forces it.
     defendingPlayer :: Maybe PlayerId.PlayerId,
-    -- The player the surrounding effect is CURRENTLY BEING APPLIED TO, for the one
-    -- atom that asks (ControlledByRecipient) -- Biorhythm's "the number of
-    -- creatures they control", Stronghold Discipline's "1 life for each creature
+    -- The player the surrounding effect is CURRENTLY BEING APPLIED TO, for the
+    -- two atoms that ask (ControlledByRecipient, OwnedByRecipient) --
+    -- Biorhythm's "the number of creatures they control", Stronghold Discipline's "1 life for each creature
     -- they control". Supplied by the caller for defendingPlayer's reason, and by
     -- two callers: Pawl.Engine.Resolve's evaluateForRecipient, which every
     -- per-player opcode evaluates its amount through, once per recipient with this
