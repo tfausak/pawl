@@ -172,6 +172,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -838,6 +839,7 @@ effectObjectRefs effect = case effect of
   Effect.ForEach (ForEach.MkForEach ref _ _ _ _ _) -> [ref]
   Effect.ForEachNumber {} -> []
   Effect.Repeat {} -> []
+  Effect.RepeatIf {} -> []
   Effect.Heal ref -> [ref]
 
 -- Every PlayerRef this ONE effect holds in a field of its own: not the ones
@@ -1034,6 +1036,7 @@ effectPlayerRefs effect = case effect of
   Effect.ForEach {} -> []
   Effect.ForEachNumber {} -> []
   Effect.Repeat {} -> []
+  Effect.RepeatIf {} -> []
   Effect.Heal {} -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
@@ -1422,6 +1425,9 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ gate) -> joinSlots (maybe Map.empty payGateSlots gate : fmap slotsOf (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> joinTwo (quantitySlots upTo) (joinSlots (fmap slotsOf (Foldable.toList body)))
   Effect.Repeat body -> joinSlots (fmap slotsOf (Foldable.toList body))
+  -- What the process and the "if" read, and the condition itself: a read of
+  -- what the process bound, which boundSlots below defines.
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> joinSlots (conditionSlots condition : fmap slotsOf (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Map.empty
 
 -- Every PlayerRef nested in a Duration: the seat CR 611.2a's window is counted
@@ -2028,6 +2034,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ gate) -> all slotsAreExhaustive body && all (all Quantity.slotsAreExhaustive . PayGate.perEach) gate
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.slotsAreExhaustive upTo && all slotsAreExhaustive body
   Effect.Repeat body -> all slotsAreExhaustive body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> conditionSlotsAreExhaustive condition && all slotsAreExhaustive (process <> ifHolds)
   Effect.Heal _ -> True
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
@@ -2059,6 +2066,13 @@ conditionSlotsAreExhaustive condition = case condition of
     Quantity.slotsAreExhaustive (Compares.measured c) && Quantity.slotsAreExhaustive (Compares.threshold c)
   Condition.Type.Any conditions -> all conditionSlotsAreExhaustive conditions
   Condition.Type.All conditions -> all conditionSlotsAreExhaustive conditions
+
+-- conditionSlots' mirror for X: does either side of any comparison read it?
+conditionReadsX :: Condition.Type.Condition -> Bool
+conditionReadsX condition = case condition of
+  Condition.Type.Compares c -> Quantity.readsX (Compares.measured c) || Quantity.readsX (Compares.threshold c)
+  Condition.Type.Any conditions -> any conditionReadsX conditions
+  Condition.Type.All conditions -> any conditionReadsX conditions
 
 -- Does any of these effects read X? A card that reads X must declare it in its
 -- cost (CR 107.3, CR 107.3a, CR 118.4), the same reads-equal-declares contract
@@ -2253,6 +2267,7 @@ readsX =
         Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> readsX (Foldable.toList body)
         Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.readsX upTo || readsX (Foldable.toList body)
         Effect.Repeat body -> readsX (Foldable.toList body)
+        Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> conditionReadsX condition || readsX (Foldable.toList (process <> ifHolds))
         Effect.Heal _ -> False
    in any effectReadsX
 
@@ -2489,6 +2504,7 @@ boundSlots effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ slot body _ _) -> Set.insert slot (foldMap boundSlots body)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ slot body) -> Set.insert slot (foldMap boundSlots body)
   Effect.Repeat body -> foldMap boundSlots body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> foldMap boundSlots (process <> ifHolds)
   Effect.Heal _ -> Set.empty
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take

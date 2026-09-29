@@ -50,6 +50,7 @@ import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -465,6 +466,7 @@ manaProduced effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
   Effect.Repeat body -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList (process <> ifHolds)))
   Effect.Heal _ -> Nothing
 
 -- CR 605.1a's fourth clause, asked of one effect: does it move a card to or from
@@ -729,6 +731,7 @@ movesLibraryCard effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> any movesLibraryCard body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> any movesLibraryCard body
   Effect.Repeat body -> any movesLibraryCard body
+  Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> any movesLibraryCard (process <> ifHolds)
   Effect.Heal _ -> False
 
 -- Which zone an ObjectRef reaches, asked of libraries alone: does the ref name

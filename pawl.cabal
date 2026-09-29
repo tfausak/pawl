@@ -948,6 +948,8 @@ library codec
     Pawl.Codec.RemoveCounters
     Pawl.Codec.RemoveCountersAmong
     Pawl.Codec.RemoveCountersSpec
+    Pawl.Codec.RepeatIf
+    Pawl.Codec.RepeatIfSpec
     Pawl.Codec.Replace
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.ReplacementEffectSpec
@@ -2226,6 +2228,7 @@ library types
     Pawl.Types.RemovalCount
     Pawl.Types.RemoveCounters
     Pawl.Types.RemoveCountersAmong
+    Pawl.Types.RepeatIf
     Pawl.Types.Replace
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate
