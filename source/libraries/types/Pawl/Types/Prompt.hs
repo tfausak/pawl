@@ -295,8 +295,9 @@ data Prompt r where
   -- rule leaves 0 as the only payable amount.
   ChoosePaidEnergy :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 107.1c / 608.2d: the number an Effect.ChooseNumber binds as the object
-  -- resolves, zero included. Answers as Response.ChoseNumber.
-  ChooseNumber :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Natural.Natural
+  -- resolves, zero included; the Maybe is its bound, the answer clamped to it.
+  -- Answers as Response.ChoseNumber.
+  ChooseNumber :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Natural.Natural -> Prompt Natural.Natural
   -- | CR 702.155b / 714.3b: which chapter a Saga with read ahead enters on; the
   -- Natural is the final chapter (CR 714.2d), the answer clamped into the
   -- range. Not raised for a range of one, nor for a bound of 0.
