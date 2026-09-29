@@ -71,6 +71,7 @@ codec keywordCodec =
       Arm.nullary "ManaValueEqualToAmount" Filter.ManaValueEqualToAmount,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy (\x -> case x of Filter.ControlledBy y -> Just y; _ -> Nothing),
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy (\x -> case x of Filter.OwnedBy y -> Just y; _ -> Nothing),
+      Arm.nullary "OwnedByRecipient" Filter.OwnedByRecipient,
       Arm.payload "IsPlayer" PlayerRelation.codec Filter.IsPlayer (\x -> case x of Filter.IsPlayer y -> Just y; _ -> Nothing),
       Arm.payload "IsControllerOfBound" SlotName.codec Filter.IsControllerOfBound (\x -> case x of Filter.IsControllerOfBound y -> Just y; _ -> Nothing),
       -- Recursive like Not below, and for the atom's own reason rather than the
@@ -193,6 +194,7 @@ tagOf x = case x of
   Filter.ManaValueEqualToAmount {} -> "ManaValueEqualToAmount"
   Filter.ControlledBy {} -> "ControlledBy"
   Filter.OwnedBy {} -> "OwnedBy"
+  Filter.OwnedByRecipient {} -> "OwnedByRecipient"
   Filter.IsPlayer {} -> "IsPlayer"
   Filter.IsControllerOfBound {} -> "IsControllerOfBound"
   Filter.ControlsMoreThanYou {} -> "ControlsMoreThanYou"

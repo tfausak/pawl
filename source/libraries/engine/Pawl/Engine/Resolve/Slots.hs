@@ -901,7 +901,10 @@ effectPlayerRefs effect = case effect of
   Effect.Explore {} -> []
   Effect.ArrangeInLibrary {} -> []
   Effect.Connive {} -> []
-  Effect.Discard {} -> []
+  Effect.Discard subject -> case subject of
+    Discard.Counted {} -> []
+    Discard.These {} -> []
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard ref _ _) -> [ref]
   Effect.LoseLife (LifeLoss.MkLifeLoss ref _ _ _) -> [ref]
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.ExchangeLifeTotals {} -> []
@@ -1191,10 +1194,10 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
     -- resolution arm below folds over every player the slot names.
     Discard.Counted (CountedDiscard.MkCountedDiscard slot quantity _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots quantity)
     Discard.These {} -> Map.empty
-    -- Counted's read, the ceiling standing where its count does, joined with
-    -- what the card filter reads.
-    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) _) ->
-      joinSlots [Map.singleton slot SlotArity.Many, maybe Map.empty quantitySlots atMost, filterSlotsOf filter_]
+    -- The ceiling's read joined with what the card filter reads. The discarders
+    -- are a PlayerRef, reported at the head with every other one.
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard _ (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) _) ->
+      joinTwo (maybe Map.empty quantitySlots atMost) (filterSlotsOf filter_)
   Effect.LoseLife (LifeLoss.MkLifeLoss _ quantity _ _) -> quantitySlots quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
