@@ -1,5 +1,6 @@
 module Pawl.Types.TurnUpR where
 
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
@@ -29,6 +30,10 @@ data TurnUpR = MkTurnUpR
     -- it so a minted row round-trips, and Pawl.CardSpec holds that no printing
     -- authors one.
     requiring :: Maybe TurnUpProcedure.TurnUpProcedure,
+    -- | WHICH cost that procedure must have paid, or Nothing for any: CR
+    -- 702.37b's "its MEGAMORPH cost", where CR 702.37e's procedure may pay a
+    -- plain morph cost instead. Engine-baked, `requiring`'s posture.
+    paying :: Maybe (Cost.Cost Keyword.Keyword),
     rewrite :: TurnUpRewrite.TurnUpRewrite
   }
   deriving (Eq, Ord, Show)

@@ -88,10 +88,10 @@ data Action
     -- procedures at two different prices, on one permanent. Offering each as its
     -- own legal action is how the engine declines to pick.
     --
-    -- What each one COSTS is not a choice: CR 702.37e fixes one as "the
+    -- What each one COSTS is not carried: CR 702.37e fixes one as "the
     -- permanent's morph cost ... if it were face up" and CR 701.40b the other as
-    -- the card's mana cost, so Pawl.Engine.FaceDown reads both off the card
-    -- rather than the player naming either. Nor is the RESULT one -- turning
+    -- the card's mana cost, so Pawl.Engine.FaceDown reads both off the card, and
+    -- asks (Prompt.ChooseCost) only when the card prints two morph costs. Nor is the RESULT one -- turning
     -- face up reveals what the card is, and the card is already decided.
     TurnFaceUp ObjectId.ObjectId TurnUpProcedure.TurnUpProcedure
   | -- | CR 116.2m / 709.5e: pay a locked half's mana cost to give this permanent

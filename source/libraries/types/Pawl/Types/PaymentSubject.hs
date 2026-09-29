@@ -1,5 +1,6 @@
 module Pawl.Types.PaymentSubject where
 
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | WHAT a cost is being paid for, at the one grain CR 106.6's restrictions ask
@@ -37,7 +38,10 @@ data PaymentSubject
     -- Which is why CR 400.7d's record of the mana spent does NOT read this: the
     -- ability object is what the record belongs on, and Pawl.Engine.Cost.pay takes
     -- it as its own argument.
-    Activating ObjectId.ObjectId
+    --
+    -- The keyword is the ability's own Pawl.Types.ActivatedAbility.keyword, which
+    -- CR 716.2c's "to gain a Class level" asks about rather than the source.
+    Activating ObjectId.ObjectId (Maybe Keyword.Keyword)
   | -- | CR 116.2m \/ 709.5e: the PERMANENT whose locked half's unlock cost is
     -- being paid.
     Unlocking ObjectId.ObjectId

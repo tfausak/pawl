@@ -2,6 +2,7 @@ module Pawl.Types.ProposedEvent where
 
 import qualified Data.Sequence as Seq
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -49,12 +50,13 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- by the time it raises this -- so every property a CR 614.1e replacement can
 -- modify is read off, and written to, the object.
 --
--- It carries the PROCEDURE beside it, which no other arm needs, because CR
--- 702.37b's rewrite is conditional on WHICH COST WAS PAID -- "put a +1/+1 counter
+-- It carries the PROCEDURE and the COST it paid beside it, which no other arm
+-- needs, because CR 702.37b's rewrite is conditional on WHICH COST WAS PAID -- "put a +1/+1 counter
 -- on it if its megamorph cost was paid to turn it face up" -- and CR 701.40c gives
 -- a manifested megamorph card a second, cheaper way over that pays no megamorph
--- cost at all. Nothing on the object records which road it came by, so the event
--- has to.
+-- cost at all, and CR 702.37e's own procedure may pay a plain morph cost printed
+-- beside the megamorph one. Nothing on the object records which road it came
+-- by or what it paid, so the event has to.
 --
 -- MAYBE the procedure, because CR 708.7's two procedures are CR 116.2b special
 -- actions and an Effect.TurnFaceUp is neither: it takes no procedure, shows
@@ -118,7 +120,7 @@ data ProposedEvent
     -- Raised by Pawl.Engine.FaceDown.performTurnFaceUp, the only place in the
     -- engine that turns anything face up -- the one funnel CR 116.2b's special
     -- action and Effect.TurnFaceUp both go through.
-    WouldTurnFaceUp ObjectId.ObjectId (Maybe TurnUpProcedure.TurnUpProcedure)
+    WouldTurnFaceUp ObjectId.ObjectId (Maybe (TurnUpProcedure.TurnUpProcedure, Cost.Cost Keyword.Keyword))
   | -- | CR 701.26b / 122.1d: a permanent would become untapped. Raised by
     -- Pawl.Engine.Event.proposeUntap, the one funnel CR 502.3's turn-based
     -- action, Effect.Untap and CR 107.6's untap symbol in a cost all go through.

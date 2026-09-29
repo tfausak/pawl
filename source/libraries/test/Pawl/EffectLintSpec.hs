@@ -119,6 +119,7 @@ import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
+import qualified Pawl.Types.ManaRestriction as ManaRestriction
 import qualified Pawl.Types.Meld as Meld
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.Modal as Modal
@@ -719,9 +720,9 @@ isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
   _ -> False
 
--- phasePatternOffends one replacement class over, for the other field the codec
--- accepts and only the engine writes: TurnUpR.requiring, CR 702.37b's "if its
--- megamorph cost was paid to turn it face up". That is a RULE's condition, minted
+-- phasePatternOffends one replacement class over, for the other fields the codec
+-- accepts and only the engine writes: TurnUpR.requiring and TurnUpR.paying, CR
+-- 702.37b's "if its megamorph cost was paid to turn it face up". That is a RULE's condition, minted
 -- by Pawl.Engine.Keyword.mintedReplacementsFor; a card's own CR 614.1e clause
 -- states no procedure and applies down every road (Bubble Smuggler); see #987.
 --
@@ -729,7 +730,7 @@ isPhaseR replacement = case replacement of
 -- engine-baked field on this class must break this build rather than pass.
 turnUpRequiringOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 turnUpRequiringOffends replacement = case replacement of
-  ReplacementEffect.TurnUpR turnUpR -> Maybe.isJust (TurnUpR.requiring turnUpR)
+  ReplacementEffect.TurnUpR turnUpR -> Maybe.isJust (TurnUpR.requiring turnUpR) || Maybe.isJust (TurnUpR.paying turnUpR)
   ReplacementEffect.CounterR {} -> False
   ReplacementEffect.ZoneChangeR {} -> False
   ReplacementEffect.EntryR {} -> False
@@ -1726,7 +1727,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
           Effect.AddMana addition -> case ManaAddition.restriction addition of
-            Just restriction -> null (restrictionFilters restriction)
+            Just restriction -> null (restrictionFilters restriction) && Maybe.isNothing (ManaRestriction.keywordActivations restriction)
             Nothing -> False
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
