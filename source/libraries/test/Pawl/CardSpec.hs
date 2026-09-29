@@ -706,6 +706,7 @@ playerRefPositions =
         ("shuffle-into-library", Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary (Just (plantedPlayer "si")) (NonEmpty.singleton (plantedRef "si"))), [plantedPlayer "si"]),
         ("shuffle", Effect.Shuffle (plantedPlayer "sh"), [plantedPlayer "sh"]),
         ("cloak", Effect.Cloak (plantedPlayer "ck"), [plantedPlayer "ck"]),
+        ("discard-any-number", Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard (plantedPlayer "da") (AnyNumberMatching.MkAnyNumberMatching (Filter.Type.And []) Nothing) Nothing)), [plantedPlayer "da"]),
         ("player-sacrifices", Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (plantedPlayer "ps") (Filter.Type.And []) one), [plantedPlayer "ps"]),
         ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional PermissionVerb.Cast CastOffer.defaultValue CastRepetition.Once False False), [plantedPlayer "oc-caster"]),
@@ -4585,6 +4586,7 @@ filterSlotsReadSingly predicate = case predicate of
   Filter.Type.ControlledByPlayer _ -> []
   Filter.Type.ControlledByRecipient -> []
   Filter.Type.OwnedBy _ -> []
+  Filter.Type.OwnedByRecipient -> []
   Filter.Type.IsSource -> []
   Filter.Type.IsObject _ -> []
   Filter.Type.TargetsSource -> []
@@ -4762,6 +4764,11 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.1a / 601.3b's play-scoped sibling, the same shape (Scout's Warning's
   -- is HasCardType Creature).
   PlayerEffect.MayPlayAsThoughItHadFlash f -> [f]
+  -- CR 602.5d's timing permission names a rule-702 keyword, not an object.
+  PlayerEffect.ActivateKeywordAtInstantSpeed _ -> []
+  -- CR 606.3's names the permanent whose loyalty abilities it reaches (The
+  -- Wandering Emperor's is `IsSource`).
+  PlayerEffect.ActivateLoyaltyAtInstantSpeed f -> [f]
   -- CR 701.6a's "a spell or ability", narrowed by the victim's own qualities
   -- exactly as a cost modifier's is (Spider-Punk's is `And []`, Prowling
   -- Serpopard's is HasCardType Creature).

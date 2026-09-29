@@ -249,6 +249,7 @@ canHostSubjects predicate = case predicate of
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
   -- PlayerRelation, which holds no Filter for a card author to reach.
   Filter.Type.OwnedBy _ -> 0
+  Filter.Type.OwnedByRecipient -> 0
   Filter.Type.IsSource -> 0
   Filter.Type.IsObject _ -> 0
   Filter.Type.TargetsSource -> 0

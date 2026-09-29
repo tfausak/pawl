@@ -56,6 +56,8 @@ codec =
           Arm.payload "CantBeTargetedBy" PlayerScope.codec PlayerEffect.CantBeTargetedBy (\x -> case x of PlayerEffect.CantBeTargetedBy y -> Just y; _ -> Nothing),
           Arm.payload "CastAsThoughItHadFlash" filterCodec PlayerEffect.CastAsThoughItHadFlash (\x -> case x of PlayerEffect.CastAsThoughItHadFlash y -> Just y; _ -> Nothing),
           Arm.payload "MayPlayAsThoughItHadFlash" filterCodec PlayerEffect.MayPlayAsThoughItHadFlash (\x -> case x of PlayerEffect.MayPlayAsThoughItHadFlash y -> Just y; _ -> Nothing),
+          Arm.payload "ActivateKeywordAtInstantSpeed" KeywordDesignator.codec PlayerEffect.ActivateKeywordAtInstantSpeed (\x -> case x of PlayerEffect.ActivateKeywordAtInstantSpeed y -> Just y; _ -> Nothing),
+          Arm.payload "ActivateLoyaltyAtInstantSpeed" filterCodec PlayerEffect.ActivateLoyaltyAtInstantSpeed (\x -> case x of PlayerEffect.ActivateLoyaltyAtInstantSpeed y -> Just y; _ -> Nothing),
           Arm.payload "CantBeCountered" filterCodec PlayerEffect.CantBeCountered (\x -> case x of PlayerEffect.CantBeCountered y -> Just y; _ -> Nothing),
           Arm.payload "DamageCantBePrevented" DamagePattern.codec PlayerEffect.DamageCantBePrevented (\x -> case x of PlayerEffect.DamageCantBePrevented y -> Just y; _ -> Nothing),
           Arm.payload "DamageCantBeRedirected" DamagePattern.codec PlayerEffect.DamageCantBeRedirected (\x -> case x of PlayerEffect.DamageCantBeRedirected y -> Just y; _ -> Nothing),
@@ -105,6 +107,8 @@ tagOf x = case x of
   PlayerEffect.CantBeTargetedBy {} -> "CantBeTargetedBy"
   PlayerEffect.CastAsThoughItHadFlash {} -> "CastAsThoughItHadFlash"
   PlayerEffect.MayPlayAsThoughItHadFlash {} -> "MayPlayAsThoughItHadFlash"
+  PlayerEffect.ActivateKeywordAtInstantSpeed {} -> "ActivateKeywordAtInstantSpeed"
+  PlayerEffect.ActivateLoyaltyAtInstantSpeed {} -> "ActivateLoyaltyAtInstantSpeed"
   PlayerEffect.CantBeCountered {} -> "CantBeCountered"
   PlayerEffect.DamageCantBePrevented {} -> "DamageCantBePrevented"
   PlayerEffect.DamageCantBeRedirected {} -> "DamageCantBeRedirected"

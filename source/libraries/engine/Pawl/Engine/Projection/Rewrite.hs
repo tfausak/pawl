@@ -431,6 +431,10 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost f components scale) -> PlayerEffect.AddSpellCost (AddSpellCost.MkAddSpellCost (Filter.rewrite pairs f) (fmap (Filter.rewriteComponent pairs) components) scale)
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.MayPlayAsThoughItHadFlash f -> PlayerEffect.MayPlayAsThoughItHadFlash (Filter.rewrite pairs f)
+  -- A rule-702 designator is no word CR 612.1 swaps; the loyalty arm's Filter
+  -- names the permanent, so it descends as CastAsThoughItHadFlash's does.
+  PlayerEffect.ActivateKeywordAtInstantSpeed _ -> effect
+  PlayerEffect.ActivateLoyaltyAtInstantSpeed f -> PlayerEffect.ActivateLoyaltyAtInstantSpeed (Filter.rewrite pairs f)
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
   -- CR 305.1's play-side prohibition, narrowed by the same kind of Filter.
@@ -638,8 +642,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Discard subject -> case subject of
     Discard.Counted x -> Effect.Discard (Discard.Counted x {CountedDiscard.quantity = rewriteQuantity pairs (CountedDiscard.quantity x)})
     Discard.These (TheseDiscard.MkTheseDiscard ref mDiscarded) -> Effect.Discard (Discard.These (TheseDiscard.MkTheseDiscard (rewriteObjectRef pairs ref) mDiscarded))
-    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching f n) mDiscarded) ->
-      Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n)) mDiscarded))
+    Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard player (AnyNumberMatching.MkAnyNumberMatching f n) mDiscarded) ->
+      Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard player (AnyNumberMatching.MkAnyNumberMatching (Filter.rewrite pairs f) (fmap (rewriteQuantity pairs) n)) mDiscarded))
   Effect.LoseLife x -> Effect.LoseLife x {LifeLoss.quantity = rewriteQuantity pairs (LifeLoss.quantity x)}
   Effect.GainLife x -> Effect.GainLife (rewritePlayerQuantity pairs x)
   Effect.ExchangeLifeTotals _ -> effect

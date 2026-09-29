@@ -28,7 +28,7 @@ data Discard
     -- ref reaching several hands (Pawl.Types.EachCardInHand) can name cards
     -- belonging to several owners at once.
     These TheseDiscard.TheseDiscard
-  | -- | CR 701.9b / 107.1c: the slot names the players, each of whom picks any
-    -- number of matching cards, none included.
+  | -- | CR 701.9b / 107.1c: the reference names the players, each of whom picks
+    -- any number of matching cards, none included.
     AnyNumber AnyNumberDiscard.AnyNumberDiscard
   deriving (Eq, Ord, Show)

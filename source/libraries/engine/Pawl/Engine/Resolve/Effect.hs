@@ -2036,7 +2036,8 @@ freezeRiders viewOf context gs resolving source riders =
 -- recipientSeat is what says whose an object's amount is.
 --
 -- Two spellings, because a card asks two different questions: Filter.Context's
--- `recipient`, which Filter.ControlledByRecipient reads (see #161); and
+-- `recipient`, which Filter.ControlledByRecipient and OwnedByRecipient read
+-- (see #161); and
 -- Quantity.forCandidate, which substitutes PlayerRef.Candidate. Both are no-ops
 -- for a quantity naming neither, so this is no departure from CR 608.2f's single
 -- determination -- every amount is read off the same pre-effect GameState.
@@ -5905,7 +5906,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- asked in turn order from the active player" reads the sequence of prompts.
     doomed <- traverse pickFor victims
     buryDiscards resolving mDiscarded doomed
-  -- CR 107.1c: each player the slot names picks any number of the matching
+  -- CR 107.1c: each player the reference names picks any number of the matching
   -- cards in their own hand, none included (CR 701.9b's chooser), and the picks
   -- are then discarded together -- the Counted arm's two phases and burial, for
   -- its reasons. The candidates are read off one `gs` (CR 608.2f), the filter in
@@ -5915,11 +5916,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- only answer, and asked at ONE, anyNumberMatching's posture: "any number"
   -- leaves two distinguishable answers there. FILTERED, not trusted (#222), and
   -- capped at the ceiling.
-  Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard slot (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) mDiscarded)) -> do
+  Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard ref (AnyNumberMatching.MkAnyNumberMatching filter_ atMost) mDiscarded)) -> do
     gs <- State.get
     let viewOf = effectViewOf source legal gs
         context = effectContext gs controller source legal (slotBindings resolving gs)
-        named = Maybe.mapMaybe Recipient.playerOf (legalMany slot legal)
+        named = playerRefPlayers legal controller gs ref
         victims = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
         pickFor victim = do
           let candidates = handCardsOf context gs victim filter_
