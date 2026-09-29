@@ -1551,7 +1551,7 @@ tappedAtUpkeep printing =
             GameState.priority = Just (GameState.activePlayer board),
             GameState.remaining = Seq.drop 1 (GameState.remaining board)
           }
-   in S.runPure S.identityAnswer upkeep (Cost.tapForMana S.manaPerformer oid)
+   in S.runPure S.identityAnswer upkeep (S.tapForMana oid)
 
 -- carolMain one seat over: alice active with priority in her own precombat main
 -- phase, which is what a sorcery-speed cast of hers needs (CR 307.1 / 117.1a).

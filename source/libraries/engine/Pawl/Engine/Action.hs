@@ -332,7 +332,8 @@ legalActions pid gs =
       -- list CR 605.3a's other two windows are served from (Cost.payMana's
       -- candidates, where CR 605.3c drops whichever ability is already
       -- mid-activation):
-      -- controlled, and offering some route Cost.manaActivations admits
+      -- controlled or open to any player (CR 602.1b, Mana.permitsRoute), and
+      -- offering some route Cost.manaActivations admits
       -- -- CR 118.3's payability of the ability's own cost (CR 602.2b), which
       -- carries CR 107.5's tapped permanent and CR 302.6's sick creature with
       -- it, plus CR 602.5's printed "activate only ..." rider, which CR 605.1

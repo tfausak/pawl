@@ -4052,7 +4052,7 @@ tappingNothing p = case p of
 -- payment adds nothing and taps nothing. announcedReversalSpec below is the
 -- payer who keeps them.
 pooledFrom :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Int
-pooledFrom answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana S.manaPerformer oid)) of
+pooledFrom answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (S.tapForMana oid)) of
   Mana.Type.MkMana units -> length units
 
 isTapped :: ObjectId.ObjectId -> GameState.GameState -> Bool
@@ -4060,7 +4060,7 @@ isTapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState
 
 -- The board after tapping the Drum for mana with `answer`.
 afterDrum :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-afterDrum answer drumId gs = S.runPure answer gs (Cost.tapForMana S.manaPerformer drumId)
+afterDrum answer drumId gs = S.runPure answer gs (S.tapForMana drumId)
 
 springleafDrumSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 springleafDrumSpec s registry = Spec.describe s "Springleaf Drum" $ do
@@ -5838,7 +5838,7 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (ignusId, altarId, pikerId, gs) = altarBoard ignus altar mountain piker 1
-        after = S.runPure (feeding altarId pikerId) gs (Cost.tapForMana S.manaPerformer ignusId)
+        after = S.runPure (feeding altarId pikerId) gs (S.tapForMana ignusId)
     Spec.assertBool s (S.onBattlefield ignusId after) "the Ignus is back on the battlefield"
     Spec.assertEqWith s "with nothing of alice's in hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
     Spec.assertEqWith s "nothing in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
@@ -5849,7 +5849,7 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (ignusId, altarId, pikerId, gs) = altarBoard ignus altar mountain piker 1
-        after = S.runPure (sparing altarId pikerId) gs (Cost.tapForMana S.manaPerformer ignusId)
+        after = S.runPure (sparing altarId pikerId) gs (S.tapForMana ignusId)
     Spec.assertBool s (not (S.onBattlefield ignusId after)) "CR 400.3 the Ignus returned to its owner's hand"
     Spec.assertEqWith s "which is alice's" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
     Spec.assertEqWith s "and the ability added its three mana" (poolSize S.alice after) 3
@@ -6203,7 +6203,7 @@ announcedReversalSpec s registry = Spec.describe s "Reversal after an announceme
     island <- S.printingOf s registry "Island"
     let (gateId, g1) = S.addPermanent gate S.alice (Setup.emptyGame S.bothPlayers)
         (islandId, gs) = S.addPermanent island S.alice g1
-        run decision = State.runState (Engine.runGame (keepingOrNot decision [gateId, islandId] gateRoute) gs (Cost.tapForMana S.manaPerformer gateId)) 0
+        run decision = State.runState (Engine.runGame (keepingOrNot decision [gateId, islandId] gateRoute) gs (S.tapForMana gateId)) 0
         ((paid, kept), asked) = run OptionalDecision.Declines
         ((_, reversed), _) = run OptionalDecision.Exercises
     Spec.assertEqWith s "CR 106.4 the Island's {U} and the Gate's {C} are floating" (poolSize S.alice kept) 2

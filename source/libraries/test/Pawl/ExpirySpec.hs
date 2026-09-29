@@ -27,7 +27,6 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Condition as Condition
-import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -1119,7 +1118,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     let staged expiry =
           let gs0 = Setup.emptyGame S.bothPlayers
               (mtn, gs1) = S.addPermanent mountain S.alice gs0
-              floated = S.runPure S.identityAnswer gs1 (Cost.tapForMana S.manaPerformer mtn)
+              floated = S.runPure S.identityAnswer gs1 (S.tapForMana mtn)
            in S.addPlayerEffect
                 expiry
                 (AffectedPlayers.Scoped PlayerScope.EachPlayer)

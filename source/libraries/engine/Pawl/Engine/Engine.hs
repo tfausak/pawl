@@ -1487,7 +1487,7 @@ priorityLoop = do
                               -- mana ability whose cost went unpaid having changed
                               -- nothing (CR 601.2h).
                               Action.Type.ActivateManaAbility oid -> do
-                                Monad.void (Cost.tapForMana Resolve.performManaAbility oid)
+                                Monad.void (Cost.tapForMana Resolve.performManaAbility p oid)
                                 State.modify' (\g -> g {GameState.passed = Set.empty, GameState.priority = Just p})
                                 settleForPriority
                                 loop

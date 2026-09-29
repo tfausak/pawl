@@ -22,7 +22,6 @@ import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
-import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -3077,7 +3076,7 @@ spymastersVaultSpec s registry =
             (pikerId, g4) = S.addPermanent piker S.alice g3
             (_, g5) = S.addLibraryCard giant S.alice g4
             g6 = if killFirst then S.runPure S.identityAnswer g5 (Event.destroy Regenerability.Regenerable [pikerId]) else g5
-            floated = S.runPure S.identityAnswer g6 (Cost.tapForMana S.manaPerformer swampId)
+            floated = S.runPure S.identityAnswer g6 (S.tapForMana swampId)
             ability = case Face.activatedAbilities (S.combinedFace vault) of
               _ : connive : _ -> connive
               _ -> error "Pawl.CardTriggerSpec: Spymaster's Vault has two activated abilities"

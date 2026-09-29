@@ -1944,6 +1944,7 @@ rewriteRestriction pairs restriction = case restriction of
   ActivationRestriction.AttackedThisStep -> restriction
   ActivationRestriction.AfterBlockersDeclared -> restriction
   ActivationRestriction.BeforeCombatDamage -> restriction
+  ActivationRestriction.BeforeEndStep -> restriction
   ActivationRestriction.OnlyOnce -> restriction
   ActivationRestriction.OnlyOnceEachTurn -> restriction
   ActivationRestriction.DuringDieRoll -> restriction
