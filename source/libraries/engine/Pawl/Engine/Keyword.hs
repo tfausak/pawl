@@ -39,6 +39,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
@@ -551,6 +552,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
@@ -801,6 +803,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -1377,6 +1380,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -2035,6 +2039,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
   -- rather than the stack.
   Keyword.Exert -> []
@@ -2812,6 +2817,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -4599,6 +4605,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
   -- writes Object.exertedBy directly.
   Keyword.Exert -> []
@@ -4891,6 +4898,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
   -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
@@ -5197,6 +5205,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -5241,6 +5250,7 @@ addsRulesToPrintedAbility keyword = case keyword of
   Keyword.Boast -> True
   Keyword.Forecast -> True
   Keyword.PowerUp -> True
+  Keyword.ClassLevel _ -> True
   _ -> False
 
 -- CR 602.5b: the riders rule 702 adds to the printed ability a keyword is
@@ -5249,7 +5259,9 @@ addsRulesToPrintedAbility keyword = case keyword of
 -- for a card in a hand is its owner (CR 602.2, CR 108.4a). Exhaust's and
 -- power-up's is CR 702.177a's and CR 702.193a's "activate only once"; boast's
 -- are CR 702.142a's two. Power-up's cost reduction is no rider, and
--- reducesByManaCostOnEntry below answers for it.
+-- reducesByManaCostOnEntry below answers for it. A class level bar's are CR
+-- 716.2a's "only if this Class is level N-1 and only as a sorcery"; its effect,
+-- "this Class's level becomes N", is the card's (Effect.SetClassLevel).
 printedRiders :: Keyword -> [ActivationRestriction.ActivationRestriction]
 printedRiders keyword = case keyword of
   Keyword.Forecast ->
@@ -5258,6 +5270,17 @@ printedRiders keyword = case keyword of
     ]
   Keyword.Exhaust -> [ActivationRestriction.OnlyOnce]
   Keyword.PowerUp -> [ActivationRestriction.OnlyOnce]
+  Keyword.ClassLevel level ->
+    [ ActivationRestriction.OnlyIf
+        ( Condition.Compares
+            ( Compares.MkCompares
+                Quantity.ClassLevel
+                Comparison.Exactly
+                (Quantity.Literal (toInteger (ClassLevel.unwrap level) - 1))
+            )
+        ),
+      ActivationRestriction.SorcerySpeed
+    ]
   -- "This creature attacked this turn" is a count of the source among the
   -- battlefield's permanents that did (Filter.AttackedThisTurn), EachPlayer's
   -- battlefield because CR 400.1 makes it one shared zone.
@@ -5530,6 +5553,7 @@ familyOf keyword = case keyword of
   Keyword.Boast -> Nothing
   Keyword.Forecast -> Nothing
   Keyword.PowerUp -> Nothing
+  Keyword.ClassLevel _ -> Just KeywordFamily.ClassLevel
   Keyword.Exert -> Nothing
   Keyword.Enlist -> Nothing
   Keyword.Persist -> Nothing

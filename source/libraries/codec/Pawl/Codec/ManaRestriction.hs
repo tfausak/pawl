@@ -4,6 +4,7 @@ module Pawl.Codec.ManaRestriction where
 
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.KeywordDesignator as KeywordDesignator
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -23,12 +24,14 @@ codec :: Codec.Codec ManaRestriction.ManaRestriction
 codec = Fields.object $ do
   casts <- Fields.defaulted "casts" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.casts
   activations <- Fields.defaulted "activations" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.activations
+  keywordActivations <- Fields.defaulted "keywordActivations" Nothing (Common.maybe KeywordDesignator.codec) ManaRestriction.keywordActivations
   unlocks <- Fields.defaulted "unlocks" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.unlocks
   turnsFaceUp <- Fields.defaulted "turnsFaceUp" Nothing (Common.maybe (Filter.codec Keyword.codec)) ManaRestriction.turnsFaceUp
   pure
     ManaRestriction.MkManaRestriction
       { ManaRestriction.casts = casts,
         ManaRestriction.activations = activations,
+        ManaRestriction.keywordActivations = keywordActivations,
         ManaRestriction.unlocks = unlocks,
         ManaRestriction.turnsFaceUp = turnsFaceUp
       }

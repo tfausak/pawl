@@ -2861,6 +2861,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Boast -> keyword
   Keyword.Type.Forecast -> keyword
   Keyword.Type.PowerUp -> keyword
+  -- CR 716.2 names no quality: the level is a number, so CR 612.2 has nothing
+  -- here to swap.
+  Keyword.Type.ClassLevel _ -> keyword
   Keyword.Type.StartYourEngines -> keyword
   -- CR 701.43d names no quality and carries no cost, so CR 612.2 has nothing here
   -- to swap.
