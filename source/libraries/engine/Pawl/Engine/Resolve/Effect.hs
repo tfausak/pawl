@@ -195,6 +195,7 @@ import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.EventGroup as EventGroup
+import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
@@ -3126,6 +3127,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.RemoveFromCombat {} -> False
   Effect.BecomesBlocked {} -> False
   Effect.SwitchBlockers {} -> False
+  Effect.ExchangeBlocks {} -> False
   Effect.AddPhases {} -> False
   Effect.EndTurn {} -> False
   Effect.EndCombatPhase {} -> False
@@ -4642,6 +4644,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     State.modify' $ \gs ->
       case Maybe.mapMaybe Recipient.objectOf (legalMany slot legal) of
         [firstAttacker, secondAttacker] -> Combat.switchBlockers firstAttacker secondAttacker gs
+        _ -> gs
+  -- CR 509.3a's effect road, through Combat.exchangeBlocks, which owns the gate
+  -- and the events (Sorrow's Path). Both targets or nothing: CR 608.2b having
+  -- taken one away leaves no exchange to make.
+  Effect.ExchangeBlocks (ExchangeBlocks.MkExchangeBlocks firstSlot secondSlot) ->
+    State.modify' $ \gs ->
+      case (legalOne firstSlot legal >>= Recipient.objectOf, legalOne secondSlot legal >>= Recipient.objectOf) of
+        (Just firstBlocker, Just secondBlocker) -> Combat.exchangeBlocks firstBlocker secondBlocker gs
         _ -> gs
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone entry mSlot _ placement duration) ->
     -- ONE object through CR 400.7's funnel, shared by the two arms below.

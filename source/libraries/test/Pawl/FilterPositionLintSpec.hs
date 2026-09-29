@@ -1479,11 +1479,19 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
       "Glamer Spinners' is in its attach destination"
       (sameControllerAsBoundCounts (S.combinedFace spinners))
       (1, 0)
+    -- Sorrow's Path's "controlled by the same opponent", in its second
+    -- target slot.
+    path <- S.printingOf s registry "Sorrow's Path"
     Spec.assertEqWith
       s
-      "and those three are the pool's whole authorship of it"
+      "Sorrow's Path's is in its second target slot"
+      (sameControllerAsBoundCounts (S.combinedFace path))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and those four are the pool's whole authorship of it"
       (sum (fmap (uncurry (+) . sameControllerAsBoundCounts . S.combinedFace) ps))
-      3
+      4
     -- The REJECTING direction, hand-built for the reason every sibling lint's is:
     -- a card that offends must not be loadable, so no file can carry one. Buried
     -- under all three combinators, so an implementation reading only the top of a
