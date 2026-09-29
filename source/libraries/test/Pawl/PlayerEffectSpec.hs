@@ -99,6 +99,7 @@
 -- same per-player question of a filtered count of the turn's casts.
 module Pawl.PlayerEffectSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Maybe as Maybe
@@ -141,6 +142,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
+import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -1612,6 +1614,19 @@ takesHalf half p = case p of
     if elem half offers then half else NonEmpty.head offers
   _ -> S.identityAnswer p
 
+-- Records each CR 601.2b monocolored hybrid offer as its symbol's type and the
+-- routes offered, in the order asked, answering `way` where it is on offer. Taps
+-- `first` before any other source, so a {R}{B} is not paid Swamp-first into a
+-- floating {B}; every other prompt goes to `takesHalf half`.
+recordsHybridOffers :: HybridPayment.HybridPayment -> ManaSymbol.ManaSymbol -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State [(ManaType.ManaType, [HybridPayment.HybridPayment])] r
+recordsHybridOffers way half first p = case p of
+  Prompt.AnnounceHybridPayment _ _ _ manaType offers -> do
+    State.modify' (<> [(manaType, NonEmpty.toList offers)])
+    pure (if elem way offers then way else NonEmpty.head offers)
+  Prompt.ChooseManaSource _ _ candidates ->
+    pure (Just (if elem first candidates then first else NonEmpty.head candidates))
+  _ -> pure (takesHalf half p)
+
 -- alice controls `copies` reducers and `n` untapped lands of one printing; her
 -- hand holds one `spell` and one Sol Ring ({1} colourless Artifact). Shared by
 -- the two hybrid-reduction groups below, which differ in which hybrid symbol
@@ -1781,6 +1796,34 @@ monocoloredHybridDiscountSpec s registry =
       Spec.assertBool s (S.castable S.alice ghoulId gs) "the gate allows the cast"
       Spec.assertEqWith s "the {2} half taps one Swamp" (S.tappedCount S.alice takenAsGeneric) 1
       Spec.assertEqWith s "the {B} half taps both" (S.tappedCount S.alice takenAsBlack) 2
+
+    -- CR 601.2b's announcement measured through CR 601.2f's reduction, and
+    -- through SOME CR 118.7e half of it. Defibrillating Current
+    -- ({2/R}{2/W}{2/B}, black) off two Swamps and a Mountain: its {2/R}'s {2}
+    -- route is payable only as {2}{2}{B} less the {2} half, and its {2/B}'s
+    -- {2} route (after {R}{2}) only as {R}{2}{2} less the same half. The {B}
+    -- half comes first, so an offer measured through one resolution drops
+    -- both {2} routes and asks nothing.
+    Spec.it s "CR 601.2b a hybrid reduction's {2} half keeps a {2/X}'s generic route on offer" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      current <- S.printingOf s registry "Defibrillating Current"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (currentId, _, board) = hybridDiscountBoard swamp discount current solRing 1 2
+          (mountainId, withMountain) = S.addPermanent mountain S.alice board
+          (pikerId, gs) = S.addPermanent piker S.bob withMountain
+          play way = State.runState (Engine.runGame (recordsHybridOffers way (ManaSymbol.Generic 2) mountainId) gs (S.cast S.alice currentId >> Stack.resolveTop)) []
+          ((_, offGeneric), genericOffers) = play HybridPayment.PaysGeneric
+          ((_, offTyped), typedOffers) = play HybridPayment.PaysTyped
+          both = [HybridPayment.PaysTyped, HybridPayment.PaysGeneric]
+      Spec.assertEqWith s "the {2/R} offers both routes" genericOffers [(ManaType.Colored Color.Red, both)]
+      Spec.assertEqWith s "after {R}, the {2/B} offers both routes too" typedOffers [(ManaType.Colored Color.Red, both), (ManaType.Colored Color.Black, both)]
+      Spec.assertEqWith s "{2}{2}{B} less {2} taps all three lands" (S.tappedCount S.alice offGeneric) 3
+      Spec.assertEqWith s "{R}{2}{B} less {2} taps two" (S.tappedCount S.alice offTyped) 2
+      Spec.assertEqWith s "the Current resolved: 2 life gained" (S.lifeOf S.alice offGeneric, S.lifeOf S.alice offTyped) (Just 22, Just 22)
+      Spec.assertEqWith s "and 4 damage to the Piker" (S.damageOf pikerId offGeneric, S.damageOf pikerId offTyped) (Just 4, Just 4)
 
 -- Synthetic Hybrid Discount {2} Artifact: "Black spells you cast cost {W/B}
 -- less to cast."
