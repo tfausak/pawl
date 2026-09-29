@@ -550,6 +550,14 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.AdditionalVotes 1)
       " {\"type\":\"AdditionalVotes\",\"value\":1} "
+  -- CR 701.25b as Enhanced Surveillance prints it, and the wire form
+  -- data/cards/enhanced-surveillance.json writes.
+  Spec.it s "AdditionalSurveilCards, Enhanced Surveillance's two" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.AdditionalSurveilCards 2)
+      " {\"type\":\"AdditionalSurveilCards\",\"value\":2} "
   -- CR 119.7 as Giant Cindermaw prints it, and the wire form
   -- data/cards/giant-cindermaw.json writes.
   Spec.it s "CantGainLife, Giant Cindermaw's restriction" $
