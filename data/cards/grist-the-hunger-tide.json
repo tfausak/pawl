@@ -6,6 +6,138 @@
           "cost": {
             "components": [
               {
+                "type": "AddLoyaltyToThis",
+                "value": 1
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "RepeatIf",
+                        "value": {
+                          "condition": {
+                            "type": "Compares",
+                            "value": {
+                              "comparison": {
+                                "type": "AtLeast"
+                              },
+                              "measured": {
+                                "type": "InSlot",
+                                "value": "milled"
+                              },
+                              "threshold": {
+                                "type": "Literal",
+                                "value": 1
+                              }
+                            }
+                          },
+                          "ifHolds": [
+                            {
+                              "type": "PutCounters",
+                              "value": {
+                                "kind": {
+                                  "type": "Loyalty"
+                                },
+                                "quantity": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "ref": {
+                                  "type": "InSlot",
+                                  "value": "self"
+                                }
+                              }
+                            }
+                          ],
+                          "process": [
+                            {
+                              "type": "Create",
+                              "value": {
+                                "card": {
+                                  "faces": [
+                                    {
+                                      "colorIndicator": [
+                                        {
+                                          "type": "Black"
+                                        },
+                                        {
+                                          "type": "Green"
+                                        }
+                                      ],
+                                      "name": "Insect Token",
+                                      "power": {
+                                        "type": "Literal",
+                                        "value": 1
+                                      },
+                                      "toughness": {
+                                        "type": "Literal",
+                                        "value": 1
+                                      },
+                                      "typeLine": {
+                                        "subtypes": [
+                                          {
+                                            "type": "Insect"
+                                          }
+                                        ],
+                                        "types": [
+                                          {
+                                            "type": "Creature"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                },
+                                "quantity": {
+                                  "type": "Literal",
+                                  "value": 1
+                                }
+                              }
+                            },
+                            {
+                              "type": "Mill",
+                              "value": {
+                                "player": {
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                "quantity": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "tally": {
+                                  "filter": {
+                                    "type": "HasSubtype",
+                                    "value": {
+                                      "type": "Insect"
+                                    }
+                                  },
+                                  "slot": "milled"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
                 "type": "RemoveLoyaltyFromThis",
                 "value": 2
               }

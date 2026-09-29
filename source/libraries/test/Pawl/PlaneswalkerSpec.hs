@@ -996,19 +996,19 @@ variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
     Spec.assertBool s (all (Set.member Subtype.Elemental . PC.subtypes) animated) "each is an Elemental"
     Spec.assertBool s (all (\pc -> Map.member Keyword.Flying (PC.keywords pc) && Map.member Keyword.Haste (PC.keywords pc)) animated) "with flying and haste"
 
--- Grist, the Hunger Tide's abilities in the order the card file carries them: the
--- -2 then the -5. Indexed for the reason Jace's are. The printed +1 has no index
--- because pawl's Grist does not carry it (#1932).
-minusTwo, minusFive :: Int
-minusTwo = 0
-minusFive = 1
+-- Grist, the Hunger Tide's abilities in the order the card file carries them:
+-- the +1, the -2, then the -5. Indexed for the reason Jace's are; the +1 is
+-- prefixed apart from Chandra's.
+gristPlusOne, minusTwo, minusFive :: Int
+gristPlusOne = 0
+minusTwo = 1
+minusFive = 2
 
 -- Grist on the battlefield under alice's control with this many loyalty counters.
 -- PLACED and not cast, unlike jaceOnBattlefield: no case below is about CR 306.5b,
--- and the -5 needs more loyalty than the printed 3 -- the +1 that would climb
--- there is the half of the card pawl cannot write (#1932). The -5 case is the one
+-- and the -5 needs more loyalty than the printed 3. The -5 case is the one
 -- whose loyalty is not the printed 3, so it asserts the six the fixture put on
--- before reading what the cost took off; the -2 boards keep the printed number.
+-- before reading what the cost took off; the other boards keep the printed number.
 gristWith :: Natural -> Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 gristWith loyalty grist gs =
   let (oid, placed) = S.addPermanent grist S.alice gs
@@ -1081,18 +1081,18 @@ gristMinusTwoBoard grist piker jace ogre mountain =
    in (gristId, pikerId, jaceId, mountainId, board)
 
 -- Grist, the Hunger Tide -- {1}{B}{G} Legendary Planeswalker -- Grist, printed
--- loyalty 3 (Oracle text fetched from Scryfall 2026-08-25) -- carries two of its
--- three loyalty abilities here:
+-- loyalty 3 (Oracle text fetched from Scryfall 2026-09-29) -- carries all three
+-- of its loyalty abilities here:
 --
+--   +1: "Create a 1/1 black and green Insect creature token, then mill a card.
+--       If an Insect card was milled this way, put a loyalty counter on Grist
+--       and repeat this process."
 --   -2: "You may sacrifice a creature. When you do, destroy target creature or
 --       planeswalker."
 --   -5: "Each opponent loses life equal to the number of creature cards in your
 --       graveyard."
 --
--- Not implemented: the +1, "create a 1/1 black and green Insect creature token,
--- then mill a card. If an Insect card was milled this way, put a loyalty counter
--- on Grist and repeat this process" -- the repeat is a loop the effect DSL has no
--- shape for (#1932). That leaves pawl's Grist STRICTER than printed.
+-- The +1 is Effect.RepeatIf, CR 608.2c's condition-gated loop.
 --
 -- The -2 is a CR 603.12 reflexive trigger whose armed ability targets a
 -- PERMANENT; Pawl.CastSpec's FugitiveDoctor group reads the shape against a card
@@ -1100,6 +1100,55 @@ gristMinusTwoBoard grist piker jace ogre mountain =
 -- "each opponent" from "each player" and from "target opponent" at once.
 gristLoyaltySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gristLoyaltySpec s registry = Spec.describe s "GristLoyalty" $ do
+  -- alice's library, top first: a Mind Maggots, a Grist card, a Goblin Piker and a
+  -- Lightning Bolt. Two Insect cards and then one that is not, so the process runs
+  -- three times and stops with the Bolt unmilled. The Grist card is an Insect card
+  -- in a library by its own CR 113.6c ability, so a tally blind to that stops a
+  -- run early.
+  Spec.it s "CR 608.2c the +1 repeats while an Insect card is milled, and stops at the first that is not" $ do
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    maggots <- S.printingOf s registry "Mind Maggots"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (boltId, withBolt) = S.addLibraryCard bolt S.alice (Setup.emptyGame S.bothPlayers)
+        stocked =
+          snd
+            . S.addLibraryCard maggots S.alice
+            . snd
+            . S.addLibraryCard grist S.alice
+            . snd
+            $ S.addLibraryCard piker S.alice withBolt
+        (gristId, board) = gristWith 3 grist stocked
+        after = useLoyaltyAbility S.identityAnswer gristPlusOne grist gristId board
+    Spec.assertEqWith
+      s
+      "three runs: three Insect tokens, and a loyalty counter for each of the two Insect cards on top of the +1's"
+      (length (S.tokensOf after), S.counterOf CounterKind.Loyalty gristId after)
+      (3, 6)
+    Spec.assertEqWith s "CR 701.17a: the Bolt under the Piker was never milled" (Game.zoneMembers Zone.Library S.alice after) [boltId]
+    Spec.assertEqWith s "the three milled cards are in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 3
+
+  -- Two Insect cards and nothing under them: the third run mills nothing, which
+  -- mills no Insect card, so the loop ends on an empty library rather than
+  -- reading the second run's tally again.
+  Spec.it s "CR 701.17b the +1 stops when the library runs out" $ do
+    grist <- S.printingOf s registry "Grist, the Hunger Tide"
+    maggots <- S.printingOf s registry "Mind Maggots"
+    lithophage <- S.printingOf s registry "Lithophage"
+    let stocked =
+          snd
+            . S.addLibraryCard maggots S.alice
+            . snd
+            $ S.addLibraryCard lithophage S.alice (Setup.emptyGame S.bothPlayers)
+        (gristId, board) = gristWith 3 grist stocked
+        after = useLoyaltyAbility S.identityAnswer gristPlusOne grist gristId board
+    Spec.assertEqWith
+      s
+      "three runs, and loyalty for the two Insect cards alone"
+      (length (S.tokensOf after), S.counterOf CounterKind.Loyalty gristId after)
+      (3, 6)
+    Spec.assertEqWith s "the library is empty" (Game.zoneMembers Zone.Library S.alice after) []
+
   -- Three graveyards, no two of which agree. alice's holds three creature cards
   -- and two Lightning Bolts, bob's four creature cards and carol's one -- so
   -- "creature cards in your graveyard" is 3, "cards in your graveyard" is 5, and
