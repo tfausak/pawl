@@ -819,7 +819,7 @@ hasRider = not . null . replacementEffectRiders
 -- 615.5's rider is one lint up.
 shufflingOutsideLibraryOffends :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 shufflingOutsideLibraryOffends replacement = case replacement of
-  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ destination _ shuffling) -> shuffling && destination /= Zone.Library
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ destination _ shuffling _ _) -> shuffling && destination /= Zone.Library
   ReplacementEffect.DamageR {} -> False
   ReplacementEffect.CounterR {} -> False
   ReplacementEffect.EntryR {} -> False
@@ -842,7 +842,7 @@ shufflingOutsideLibraryOffends replacement = case replacement of
 -- The non-vacuity half of shufflingOutsideLibraryOffends' lint, isPhaseR's shape.
 hasZoneChangeRider :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect.Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Bool
 hasZoneChangeRider replacement = case replacement of
-  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ _ revealing shuffling) -> revealing || shuffling
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ _ revealing shuffling _ _) -> revealing || shuffling
   _ -> False
 
 -- The non-vacuity half of engineOnlyOffends' lint, isPhaseR's shape.
@@ -2941,7 +2941,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
     nexus <- S.printingOf s registry "Nexus of Fate"
     let printed = cardReplacementEffects (S.combinedFace nexus)
         toExile replacement = case replacement of
-          ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ revealing shuffling) -> ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern Zone.Exile revealing shuffling)
+          ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ revealing shuffling position optional) -> ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern Zone.Exile revealing shuffling position optional)
           other -> other
     Spec.assertBool s (any hasZoneChangeRider printed) "setup: the Nexus prints both riders to move"
     Spec.assertBool s (not (any shufflingOutsideLibraryOffends printed)) "the real Nexus shuffles into a library"

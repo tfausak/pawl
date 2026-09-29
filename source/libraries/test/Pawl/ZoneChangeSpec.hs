@@ -44,6 +44,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Facing as Facing
@@ -99,6 +100,31 @@ atBobAnswer :: Prompt.Prompt r -> r
 atBobAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
+
+-- atBobAnswer with Library of Leng's CR 614.1a "may" answered as given.
+lengAnswer :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+lengAnswer decision p = case p of
+  Prompt.ChooseRedirect {} -> decision
+  _ -> atBobAnswer p
+
+-- The Wheel of Sun and Moon board with Library of Leng under BOB in the Wheel's
+-- place: alice casts Psychic Miasma at bob, who holds one swamp over a stocked
+-- library, and bob answers Leng's "may" as given. Returns the resolved state and
+-- the three printings the assertions name.
+lengBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> OptionalDecision.OptionalDecision -> m (GameState.GameState, Printing.Printing, Printing.Printing, Printing.Printing)
+lengBoard s registry decision = do
+  swamp <- S.printingOf s registry "Swamp"
+  piker <- S.printingOf s registry "Goblin Piker"
+  miasma <- S.printingOf s registry "Psychic Miasma"
+  leng <- S.printingOf s registry "Library of Leng"
+  let base = S.landsInPlay swamp 3
+      (_, withLeng) = S.addPermanent leng S.bob base
+      (_, stocked) = S.addLibraryCard piker S.bob withLeng
+      withHand = handCards swamp S.bob 1 stocked
+      (gs, spellId) = S.handOne miasma withHand
+      cast = snd (Engine.runGamePure (lengAnswer decision) gs (S.cast S.alice spellId))
+      after = snd (Engine.runGamePure (lengAnswer decision) cast Stack.resolveTop)
+  pure (after, swamp, piker, miasma)
 
 -- atBobAnswer with CR 701.9a's choice pinned by INDEX rather than left to the
 -- identity answerer, so a discard of two takes two distinct cards.
@@ -738,8 +764,8 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   -- Miasma -- alice's card -- returns to alice's hand. Bob's library is stocked
   -- first, so "the bottom" is a position and not the whole library. Dropping the
   -- reveal read in findableAfterMove leaves the spell in alice's graveyard; the
-  -- first assertion is what reddens. The unrevealed side -- a discard hidden
-  -- without a reveal -- has no producer in the pool (#2230).
+  -- first assertion is what reddens. The unrevealed side is Library of Leng's,
+  -- below.
   Spec.it s "CR 701.9c a land discarded into a library revealed still returns Psychic Miasma" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -760,6 +786,45 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "bob's discarded swamp is on the bottom of his library" (namesIn Zone.Library S.bob after) [Just (S.printingName piker), Just (S.printingName swamp)]
     Spec.assertEqWith s "and bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
+  -- The same rider through a discard hidden WITHOUT a reveal: CR 701.9c
+  -- undefines the card's characteristics, so CR 400.7j's find has nothing to
+  -- ask and the rider must not fire. Library of Leng, {1} Artifact: "If an
+  -- effect causes you to discard a card, discard it, but you may put it on top
+  -- of your library instead of into your graveyard." Its ruling: the card "is
+  -- not revealed unless the spell or ability requiring the discard specifically
+  -- says it is". Bob controls it and takes the option.
+  --
+  -- The pair differs in bob's answer alone: declining sends the swamp to his
+  -- graveyard, where the rider finds it and the spell returns. Making
+  -- findableAfterMove's hidden-zone arm answer True returns the spell in the
+  -- first case too, and its first assertion is what reddens.
+  Spec.it s "CR 701.9c a land discarded into a library unrevealed does not return Psychic Miasma" $ do
+    (after, swamp, piker, miasma) <- lengBoard s registry OptionalDecision.Exercises
+    Spec.assertEqWith s "psychic miasma stayed in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "and did not return to alice's hand" (namesIn Zone.Hand S.alice after) []
+    -- The guard against a pass that never hid the card: CR 401.2's top, and no
+    -- CR 701.20a reveal on the way.
+    Spec.assertEqWith s "bob's discarded swamp is on top of his library" (namesIn Zone.Library S.bob after) [Just (S.printingName swamp), Just (S.printingName piker)]
+    Spec.assertEqWith s "and nobody revealed it" (S.revealsOf after) []
+    Spec.assertEqWith s "bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
+  Spec.it s "CR 614.1a Library of Leng declined leaves the discard in the graveyard, and Psychic Miasma returns" $ do
+    (after, swamp, piker, miasma) <- lengBoard s registry OptionalDecision.Declines
+    Spec.assertEqWith s "psychic miasma returned to alice's hand" (namesIn Zone.Hand S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "bob's discarded swamp is in his graveyard" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName swamp)]
+    Spec.assertEqWith s "and his library is untouched" (namesIn Zone.Library S.bob after) [Just (S.printingName piker)]
+  -- The row's other gate, its ruling's "you can't use the Library of Leng
+  -- ability ... when you discard a card as a cost, because costs aren't
+  -- effects": a DiscardCause.Ordinary discard is never offered the row, so an
+  -- answerer that would take it is never asked and the card reaches the
+  -- graveyard.
+  Spec.it s "CR 701.9a Library of Leng does not reach a discard no effect caused" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    leng <- S.printingOf s registry "Library of Leng"
+    let (_, withLeng) = S.addPermanent leng S.bob (S.landsInPlay swamp 3)
+        (swampId, gs) = S.addHandCard swamp S.bob withLeng
+        after = S.runPure (lengAnswer OptionalDecision.Exercises) gs (Event.discard DiscardCause.Ordinary S.bob swampId)
+    Spec.assertEqWith s "bob's swamp is in his graveyard" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName swamp)]
+    Spec.assertEqWith s "and not in his library" (namesIn Zone.Library S.bob after) []
   -- The Wheel's own relation, CR 303.4b's enchanted player
   -- (ControllerRelation.EnchantedPlayers, judged by Replacement.relationHolds),
   -- as the whole card: cast at bob, then one card of each seat's headed for its

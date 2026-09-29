@@ -21,7 +21,8 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [],
-          ZoneChangePattern.whoseObject = ControllerRelation.Anyones
+          ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+          ZoneChangePattern.whenDiscarded = Nothing
         }
       " {\"whenDestination\":{\"type\":\"Graveyard\"}} "
   -- CR 614.1a: Anafenza, the Foremost's "a nontoken creature an opponent owns
@@ -34,7 +35,8 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsToken],
-          ZoneChangePattern.whoseObject = ControllerRelation.Opponents
+          ZoneChangePattern.whoseObject = ControllerRelation.Opponents,
+          ZoneChangePattern.whenDiscarded = Nothing
         }
       " {\"whatObject\":{\"type\":\"And\",\"value\":[{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}},{\"type\":\"Not\",\"value\":{\"type\":\"IsToken\"}}]},\"whenDestination\":{\"type\":\"Graveyard\"},\"whoseObject\":{\"type\":\"Opponents\"}} "
   -- CR 702.34a's "instead of putting it anywhere else": no destination named,
@@ -46,7 +48,8 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Nothing,
           ZoneChangePattern.whatObject = Filter.IsSource,
-          ZoneChangePattern.whoseObject = ControllerRelation.Anyones
+          ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+          ZoneChangePattern.whenDiscarded = Nothing
         }
       " {\"whatObject\":{\"type\":\"IsSource\"}} "
   Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChangePattern.codec

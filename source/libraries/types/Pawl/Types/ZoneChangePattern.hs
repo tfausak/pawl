@@ -1,6 +1,7 @@
 module Pawl.Types.ZoneChangePattern where
 
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Zone as Zone
@@ -52,6 +53,10 @@ import qualified Pawl.Types.Zone as Zone
 data ZoneChangePattern = MkZoneChangePattern
   { whenDestination :: Maybe Zone.Zone,
     whoseObject :: ControllerRelation.ControllerRelation,
-    whatObject :: Filter.Filter Keyword.Keyword
+    whatObject :: Filter.Filter Keyword.Keyword,
+    -- | CR 701.9a: admit only a discard of this cause -- Library of Leng's "if
+    -- an effect causes you to discard a card" is ByEffect, which its ruling
+    -- parts from a discard paid as a cost. Nothing admits any move.
+    whenDiscarded :: Maybe DiscardCause.DiscardCause
   }
   deriving (Eq, Ord, Show)

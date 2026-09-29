@@ -13,6 +13,12 @@ spec s = Spec.describe s "Pawl.Codec.DiscardCause" $ do
       DiscardCause.codec
       DiscardCause.Ordinary
       " {\"type\":\"Ordinary\"} "
+  Spec.it s "ByEffect" $
+    Common.assertCodec
+      s
+      DiscardCause.codec
+      DiscardCause.ByEffect
+      " {\"type\":\"ByEffect\"} "
   Spec.it s "ToPayCyclingCost" $
     Common.assertCodec
       s

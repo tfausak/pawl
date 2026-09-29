@@ -1541,9 +1541,9 @@ conditionSlots condition = case condition of
 -- declares them and replacementRowSlots joins slotsOf over the answer.
 replacementRowReads :: ReplacementEffect.ReplacementEffect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card) (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> ([Filter.Type.Filter Keyword.Type.Keyword], [Quantity.Type.Quantity])
 replacementRowReads re = case re of
-  -- The rewrite is a Zone and two Bools (Pawl.Types.ZoneChangeR): nothing that can
-  -- name a slot, so the pattern is the whole of it.
-  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _) -> ([ZoneChangePattern.whatObject pat], [])
+  -- The rewrite is a Zone, a LibraryPosition and Bools (Pawl.Types.ZoneChangeR):
+  -- nothing that can name a slot, so the pattern is the whole of it.
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _ _ _ _ _) -> ([ZoneChangePattern.whatObject pat], [])
   ReplacementEffect.EntryR (EntryR.MkEntryR pat rewrite) -> addFilter pat (entryRewriteReads rewrite)
   ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _) ->
     ( DamagePattern.whatSource pat : (Maybe.maybeToList (DamagePattern.whatRecipient pat) <> damageRewriteFilters rewrite),

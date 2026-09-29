@@ -28,6 +28,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LearnMode as LearnMode
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -83,6 +84,29 @@ discardedBy cram gs = List.sort (filter (/= cram) (printingsIn Zone.Graveyard S.
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Learn" $ do
+  -- CR 118.12 / 701.48a: learn's discard is a cost paid on resolution, and
+  -- Library of Leng's ruling -- "costs aren't effects" -- keeps its "if an effect
+  -- causes you to discard" off it. The first branch's board with Leng under
+  -- alice and an answerer that would take the redirect: the Hill Giant still
+  -- reaches her graveyard. Passing DiscardCause.ByEffect from Pawl.Engine.Learn
+  -- puts it on top of her library instead, and the first assertion reddens.
+  Spec.it s "CR 118.12 Library of Leng does not reach learn's discard" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    cram <- S.printingOf s registry "Cram Session"
+    giant <- S.printingOf s registry "Hill Giant"
+    plains <- S.printingOf s registry "Plains"
+    lesson <- S.printingOf s registry "Airbending Lesson"
+    sorcery <- S.printingOf s registry "Sign in Blood"
+    leng <- S.printingOf s registry "Library of Leng"
+    let (spell, bare) = board swamp cram giant plains lesson sorcery
+        (_, before) = S.addPermanent leng S.alice bare
+        taking p = case p of
+          Prompt.ChooseRedirect {} -> OptionalDecision.Exercises
+          _ -> learning (Just LearnMode.DiscardAndDraw) p
+        cast = S.runPure taking before (S.cast S.alice spell)
+        after = S.runPure taking cast Stack.resolveTop
+    Spec.assertEqWith s "the discarded Hill Giant is in her graveyard" (discardedBy cram after) [giant]
+    Spec.assertEqWith s "and she drew the Plains" (printingsIn Zone.Hand S.alice after) [plains]
   Spec.it s "CR 701.48a the first branch discards a card and then draws one" $ do
     swamp <- S.printingOf s registry "Swamp"
     cram <- S.printingOf s registry "Cram Session"

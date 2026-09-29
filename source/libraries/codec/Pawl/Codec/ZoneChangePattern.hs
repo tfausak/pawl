@@ -3,6 +3,7 @@
 module Pawl.Codec.ZoneChangePattern where
 
 import qualified Pawl.Codec.ControllerRelation as ControllerRelation
+import qualified Pawl.Codec.DiscardCause as DiscardCause
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Zone as Zone
@@ -10,6 +11,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Zone as Zone
@@ -33,14 +35,21 @@ defaultWhenDestination = Nothing
 defaultWhoseObject :: ControllerRelation.ControllerRelation
 defaultWhoseObject = ControllerRelation.Anyones
 
+-- | Every move is admitted unless the card says it watches a discard, so no
+-- cause is what a pattern that says nothing means.
+defaultWhenDiscarded :: Maybe DiscardCause.DiscardCause
+defaultWhenDiscarded = Nothing
+
 codec :: Codec.Codec ZoneChangePattern.ZoneChangePattern
 codec = Fields.object $ do
   whenDestination <- Fields.defaulted "whenDestination" defaultWhenDestination (Common.maybe Zone.codec) ZoneChangePattern.whenDestination
   whoseObject <- Fields.defaulted "whoseObject" defaultWhoseObject ControllerRelation.codec ZoneChangePattern.whoseObject
   whatObject <- Fields.defaulted "whatObject" defaultWhatObject (Filter.codec Keyword.codec) ZoneChangePattern.whatObject
+  whenDiscarded <- Fields.defaulted "whenDiscarded" defaultWhenDiscarded (Common.maybe DiscardCause.codec) ZoneChangePattern.whenDiscarded
   pure
     ZoneChangePattern.MkZoneChangePattern
       { ZoneChangePattern.whenDestination = whenDestination,
         ZoneChangePattern.whoseObject = whoseObject,
-        ZoneChangePattern.whatObject = whatObject
+        ZoneChangePattern.whatObject = whatObject,
+        ZoneChangePattern.whenDiscarded = whenDiscarded
       }

@@ -635,6 +635,11 @@ data Prompt r where
   -- answers' reason. Never elided: rule 702.52a's "you may" is a real choice
   -- wherever Pawl.Engine.Replacement.applies offers the row.
   ChooseDredge :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 614.1a: whether an optional redirect ("you may put it on top of your
+  -- library instead", Library of Leng) whose source is the first ObjectId
+  -- applies to the moving card the second names. Never elided, ChooseDredge's
+  -- reason.
+  ChooseRedirect :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 701.21a: which of the payer's matching permanents are sacrificed to
   -- pay a cost, the Natural how many; asked only with more candidates than the
   -- count. Not ChooseTargets: CR 115.1 makes a target only what the word

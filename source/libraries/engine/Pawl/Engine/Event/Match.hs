@@ -1254,6 +1254,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.SelfCycled -> case event of
     GameEvent.Discarded (Discarded.MkDiscarded _ oid DiscardCause.ToPayCyclingCost _) -> oid == bearer
     GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary _) -> False
+    GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.ByEffect _) -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -1748,6 +1749,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   TriggerCondition.PlayerCycles relation -> case event of
     GameEvent.Discarded (Discarded.MkDiscarded discarder _ DiscardCause.ToPayCyclingCost _) -> PlayerRelation.holds (Game.teams gs) relation you discarder
     GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary _) -> False
+    GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.ByEffect _) -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False

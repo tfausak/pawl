@@ -1532,20 +1532,24 @@ bringInFrom destination pid outerId gs = case Map.lookup outerId (GameState.outs
 -- alongside it because it acts on the card in the zone it is leaving, and
 -- `apply` already holds that id -- see the arm there for why that is a
 -- convenience rather than a constraint.
-resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool, Maybe PrintingId.PrintingId)
-resolveZoneChange asOf zc = do
-  (outcome, _, _, exiledBy, shuffling, splitEarly) <- applyReplacementsFully asOf Set.empty Map.empty (ProposedEvent.WouldChangeZone zc)
+resolveZoneChange :: Maybe GameState -> Maybe DiscardCause.DiscardCause -> LibraryPosition.LibraryPosition -> ZoneChange -> Game (Maybe ZoneChange, Maybe ObjectId, Bool, Maybe PrintingId.PrintingId, LibraryPosition.LibraryPosition)
+resolveZoneChange asOf discarded requestedPosition zc = do
+  (outcome, _, _, exiledBy, shuffling, splitEarly) <- applyReplacementsFully asOf Set.empty Map.empty (ProposedEvent.WouldChangeZone zc discarded requestedPosition)
+  -- CR 401.2's end as the loop left it: a redirect into a library may state one.
+  let position = case outcome of
+        Just (ProposedEvent.WouldChangeZone _ _ settledPosition) -> settledPosition
+        _ -> requestedPosition
   case outcome >>= Replacement.asZoneChange of
-    Nothing -> pure (Nothing, exiledBy, shuffling, Nothing)
+    Nothing -> pure (Nothing, exiledBy, shuffling, Nothing, position)
     Just settled -> do
       gs <- State.get
       case splitEarly of
         -- CR 903.9c's split already taken inside the loop: the commander card is
         -- spoken for, so the rest is not offered again.
-        Just component -> pure (Just (toJunkyard gs settled), exiledBy, shuffling, Just component)
+        Just component -> pure (Just (toJunkyard gs settled), exiledBy, shuffling, Just component, position)
         Nothing -> do
           (redirected, splitOff) <- offerCommandZone (toJunkyard gs settled)
-          pure (Just redirected, exiledBy, shuffling, splitOff)
+          pure (Just redirected, exiledBy, shuffling, splitOff, position)
 
 -- CR 717.6: a card with an Astrotorium back bound anywhere but the battlefield,
 -- exile or the command zone goes to the command zone instead, where it is face
@@ -1567,9 +1571,9 @@ toJunkyard gs zc
 -- static abilities and the floating rows a resolution installed -- both things a
 -- CARD carries. Synthesizing a ReplacementEffect.ZoneChangeR from rule 903.9b
 -- would put a rules-invented value into the structure whose whole point is that it
--- came from data, and rule 903.9b's "may" has no home on that type in any case:
--- every ZoneChangeR is unconditional, so the prompt would have to be asked from
--- `apply`'s generic arm under a guard on WHICH candidate this is.
+-- came from data. ZoneChangeR.optional is a card's printed "you may", asked of
+-- the row's controller, where rule 903.9b's is the commander's owner's and is
+-- asked again after the loop (below), which no row can be.
 -- Pawl.Engine.Cast.legendaryRestrictionOk takes the same posture toward CR 205.4e:
 -- a restriction the rulebook states is asked by the engine, not modelled as
 -- something a card carries.
@@ -1639,7 +1643,7 @@ offerCommandZone zc = do
 -- ZONE and whether its subject is a commander, as `offerCommandZone`'s.
 offerCommandZoneFirst :: GameState -> ProposedEvent -> [ReplacementCandidate] -> Maybe PrintingId.PrintingId -> Game (Maybe (ProposedEvent, Maybe PrintingId.PrintingId))
 offerCommandZoneFirst gs event bucket split = case (event, split, fmap Replacement.bucketOf (Maybe.listToMaybe bucket)) of
-  (ProposedEvent.WouldChangeZone zc, Nothing, Just ReplacementBucket.Other)
+  (ProposedEvent.WouldChangeZone zc discarded position, Nothing, Just ReplacementBucket.Other)
     | Just owner <- Commander.commandZoneOffer zc gs -> do
         picked <- case Replacement.chooserOf gs event of
           Just chooser | chooser /= owner -> do
@@ -1653,7 +1657,7 @@ offerCommandZoneFirst gs event bucket split = case (event, split, fmap Replaceme
             pure $ case component of
               Just _ -> Just (event, component)
               Nothing
-                | ZoneChange.to redirected /= ZoneChange.to zc -> Just (ProposedEvent.WouldChangeZone redirected, Nothing)
+                | ZoneChange.to redirected /= ZoneChange.to zc -> Just (ProposedEvent.WouldChangeZone redirected discarded position, Nothing)
                 | otherwise -> Nothing
   _ -> pure Nothing
 
@@ -2106,33 +2110,53 @@ applyInertly candidate rewrite event = do
 apply :: Set ObjectId -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply batch candidate event =
   case (ReplacementCandidate.effect candidate, event) of
-    (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ toDest revealing _), ProposedEvent.WouldChangeZone zc) -> do
-      Replacement.consume (ReplacementCandidate.identity candidate)
-      -- CR 701.20a: the card is shown in the zone it is LEAVING, so the id the
-      -- reveal names is the departing one rather than the incarnation CR 400.7
-      -- mints on arrival. Here because that is where the loop already has it in
-      -- hand, and because Nexus of Fate's "reveal Nexus of Fate and shuffle it
-      -- into its owner's library instead" reads in that order -- not because
-      -- nowhere else could: changeZoneAttaching still holds `oid` before
-      -- placeObject, and with no reveal trigger and no row that cancels a zone
-      -- change in the pool, the two placements are observationally identical
-      -- today. The shuffle half genuinely cannot be here; see resolveZoneChange.
-      --
-      -- The OWNER shows it, which is who CR 400.3's destination library belongs
-      -- to and who holds the card: a redirect naming Filter.IsSource acts on a
-      -- card that is nobody's permanent in the hidden zones this fires from, so
-      -- Projection.controllerOf would answer the owner anyway, and Wheel of Sun
-      -- and Moon's "revealed and put on the bottom of that player's library"
-      -- names the enchanted player, whose graveyard the card was headed for --
-      -- its owner (CR 400.3) even when it dies under another player's control.
-      -- Pawl.ZoneChangeSpec's "Wheel of Sun and Moon reroutes only the enchanted
-      -- player's cards" reads the reveal off the log; no test drives the stolen
-      -- permanent.
-      Monad.when revealing $ do
-        gs <- State.get
-        Monad.forM_ (Game.lookupObject (ZoneChange.departed zc) gs) $ \obj ->
-          reveal RevealCause.Ordinary (Object.owner obj) (ZoneChange.departed zc)
-      pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest}))
+    (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ toDest revealing _ toPosition optional), ProposedEvent.WouldChangeZone zc discarded position) -> do
+      -- CR 614.1a's "you may ... instead" (Library of Leng): the row's
+      -- controller is asked as it applies, DrawRewrite.Dredge's posture below.
+      -- Declining leaves the event standing, and `applyChosen` still records the
+      -- candidate under CR 614.5. With no controller nobody is asked, and the
+      -- row is applied on nobody's behalf.
+      exercised <-
+        if not optional
+          then pure True
+          else case ReplacementCandidate.controller candidate of
+            Nothing -> pure False
+            Just pid -> do
+              gs <- State.get
+              answer <- Game.choose (Prompt.ChooseRedirect (Decide.deciderFor pid gs) pid (ReplacementCandidate.source candidate) (ZoneChange.departed zc))
+              pure (answer == OptionalDecision.Exercises)
+      -- CR 401.2: a row redirecting INTO a library states its end; any other
+      -- destination keeps the end the move proposed.
+      let settledPosition = if toDest == Zone.Library then toPosition else position
+      if not exercised
+        then pure (Just event)
+        else do
+          Replacement.consume (ReplacementCandidate.identity candidate)
+          -- CR 701.20a: the card is shown in the zone it is LEAVING, so the id the
+          -- reveal names is the departing one rather than the incarnation CR 400.7
+          -- mints on arrival. Here because that is where the loop already has it in
+          -- hand, and because Nexus of Fate's "reveal Nexus of Fate and shuffle it
+          -- into its owner's library instead" reads in that order -- not because
+          -- nowhere else could: changeZoneAttaching still holds `oid` before
+          -- placeObject, and with no reveal trigger and no row that cancels a zone
+          -- change in the pool, the two placements are observationally identical
+          -- today. The shuffle half genuinely cannot be here; see resolveZoneChange.
+          --
+          -- The OWNER shows it, which is who CR 400.3's destination library belongs
+          -- to and who holds the card: a redirect naming Filter.IsSource acts on a
+          -- card that is nobody's permanent in the hidden zones this fires from, so
+          -- Projection.controllerOf would answer the owner anyway, and Wheel of Sun
+          -- and Moon's "revealed and put on the bottom of that player's library"
+          -- names the enchanted player, whose graveyard the card was headed for --
+          -- its owner (CR 400.3) even when it dies under another player's control.
+          -- Pawl.ZoneChangeSpec's "Wheel of Sun and Moon reroutes only the enchanted
+          -- player's cards" reads the reveal off the log; no test drives the stolen
+          -- permanent.
+          Monad.when revealing $ do
+            gs <- State.get
+            Monad.forM_ (Game.lookupObject (ZoneChange.departed zc) gs) $ \obj ->
+              reveal RevealCause.Ordinary (Object.owner obj) (ZoneChange.departed zc)
+          pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest} discarded settledPosition))
     -- Unreachable: `applies` admits ZoneChangeR only against WouldChangeZone.
     (ReplacementEffect.ZoneChangeR {}, _) -> pure (Just event)
     -- CR 707.5 / 614.1c / 614.12a: the entering object's controller chooses a
@@ -5413,7 +5437,7 @@ castFromOutside caster oid requestedDest shown facing = do
   case Game.lookupObject oid gs of
     Nothing -> pure Seq.empty
     Just obj -> do
-      (resolved, _, _, _) <- resolveZoneChange Nothing (ZoneChange.MkZoneChange oid oid (Object.zone obj) requestedDest)
+      (resolved, _, _, _, _) <- resolveZoneChange Nothing Nothing LibraryPosition.defaultValue (ZoneChange.MkZoneChange oid oid (Object.zone obj) requestedDest)
       case resolved of
         Nothing -> pure Seq.empty
         Just settled -> do
@@ -5569,9 +5593,17 @@ changeZoneResolvingReturning oid requestedDest = changeZoneAttaching Nothing Set
 -- below: it is inert everywhere but a library, so a CR 616.1 redirect AWAY from
 -- one drops it for free, and a redirect INTO one from a move that named no
 -- position carries the default -- which is the right answer, since nothing said
--- top.
+-- top. A redirect that DOES state an end (Library of Leng's "on top of your
+-- library") restates it on the proposed event, and the settled end is placed.
+--
+-- `discarded` is CR 701.9a's cause, Nothing for every door but
+-- discardReturning; it rides the proposed event so a redirect watching a
+-- discard (ZoneChangePattern.whenDiscarded) sees it.
 changeZoneAttaching :: Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Game (Seq.Seq ObjectId)
-changeZoneAttaching asOf batch oid requestedDest position seed tapped entering under shown facing concealed carrying resolving = do
+changeZoneAttaching = changeZoneWithCause Nothing
+
+changeZoneWithCause :: Maybe DiscardCause.DiscardCause -> Maybe GameState -> Set ObjectId -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> CarryOver.CarryOver -> Bool -> Game (Seq.Seq ObjectId)
+changeZoneWithCause discarded asOf batch oid requestedDest requestedPosition seed tapped entering under shown facing concealed carrying resolving = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Seq.empty
@@ -5656,7 +5688,7 @@ changeZoneAttaching asOf batch oid requestedDest position seed tapped entering u
       -- loop.
       --
       -- Both ids are `oid` in the PROPOSED event: nothing has moved yet.
-      (resolved, exiledBy, shuffling, splitOff) <- resolveZoneChange asOf (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
+      (resolved, exiledBy, shuffling, splitOff, position) <- resolveZoneChange asOf discarded requestedPosition (ZoneChange.MkZoneChange oid oid fromZone requestedDest)
       case resolved of
         -- CR 614.6: nothing survived the loop, so no zone change happens. No
         -- producer today -- no ReplacementEffect in data/cards cancels a zone
@@ -8358,7 +8390,7 @@ discardReturning cause pid oid = do
   -- READ BEFORE THE MOVE: CR 400.7 deletes this incarnation, so the hand card's
   -- own keywords are unreadable by the time the funnel returns.
   let hasMadness = maybe False (not . null . Keyword.madnessCosts . Face.keywordSet) (Game.faceOf oid before)
-  moved <- changeZoneReturning oid Zone.Graveyard
+  moved <- changeZoneWithCause (Just cause) Nothing Set.empty oid Zone.Graveyard LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
   after <- State.get
   -- CR 702.35a's "exiled THIS WAY": which redirect the CR 616.1 loop applied,
   -- not where the card wound up. GameState.exiledWith is the funnel's own record

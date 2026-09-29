@@ -11,9 +11,13 @@ module Pawl.Types.DiscardCause where
 -- makes that hold by construction; two events would make it a rule every reader
 -- had to remember.
 data DiscardCause
-  = -- | CR 701.9a's plain discard, whatever asked for it: an effect, a cost
-    -- component naming cards, or CR 514.1's cleanup step.
+  = -- | CR 701.9a's plain discard asked for by anything but an effect: a cost
+    -- component naming cards, a CR 116.2e special action, or CR 514.1's cleanup
+    -- step.
     Ordinary
+  | -- | CR 609.1 / 701.9a: a resolving spell or ability's effect makes the player
+    -- discard -- Library of Leng's "if an effect causes you to discard a card".
+    ByEffect
   | -- | CR 702.29c: discarding this card to pay a cycling ability's activation
     -- cost. Carried by Pawl.Types.CostComponent's DiscardThis, since the rule
     -- that mints that component is the one that knows whether the ability is a

@@ -1487,10 +1487,13 @@ unearth cost =
                       ZoneChangePattern.MkZoneChangePattern
                         { ZoneChangePattern.whenDestination = Nothing,
                           ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-                          ZoneChangePattern.whatObject = Filter.IsBound unearthSlot
+                          ZoneChangePattern.whatObject = Filter.IsBound unearthSlot,
+                          ZoneChangePattern.whenDiscarded = Nothing
                         }
                       Zone.Exile
                       False
+                      False
+                      LibraryPosition.defaultValue
                       False
                   )
             }
@@ -3931,10 +3934,13 @@ castFromGraveyardExile =
         ZoneChangePattern.MkZoneChangePattern
           { ZoneChangePattern.whenDestination = Nothing,
             ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-            ZoneChangePattern.whatObject = Filter.IsSource
+            ZoneChangePattern.whatObject = Filter.IsSource,
+            ZoneChangePattern.whenDiscarded = Nothing
           }
         Zone.Exile
         False
+        False
+        LibraryPosition.defaultValue
         False
     )
 
@@ -4001,9 +4007,10 @@ graveyardReplacementsOf keywords =
 -- because rule 702.35a names one: it redirects the graveyard alone, so a discard
 -- some other effect has already sent elsewhere is not redirected again.
 --
--- The pattern states no CAUSE, and Pawl.Types.ZoneChangePattern has no such
--- field, so what this row actually intercepts is "would be put into a graveyard
--- from a hand" rather than rule 701.9a's discard. The row is gathered only while
+-- The pattern states no CAUSE: ZoneChangePattern.whenDiscarded names ONE
+-- discard cause, and rule 702.35a's reaches a discard of any, so what this row
+-- actually intercepts is "would be put into a graveyard from a hand" rather than
+-- rule 701.9a's discard. The row is gathered only while
 -- its source is in a hand, which is what supplies the from-zone -- finality's
 -- argument in Pawl.Engine.Projection.finalityOf.
 --
@@ -4027,10 +4034,13 @@ madnessDiscardExile =
         ZoneChangePattern.MkZoneChangePattern
           { ZoneChangePattern.whenDestination = Just Zone.Graveyard,
             ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-            ZoneChangePattern.whatObject = Filter.IsSource
+            ZoneChangePattern.whatObject = Filter.IsSource,
+            ZoneChangePattern.whenDiscarded = Nothing
           }
         Zone.Exile
         False
+        False
+        LibraryPosition.defaultValue
         False
     )
 
