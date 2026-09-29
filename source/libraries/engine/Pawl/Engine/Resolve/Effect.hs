@@ -194,6 +194,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryAttack as EntryAttack
 import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
@@ -9858,9 +9859,6 @@ runPreventionRider prevention = Foldable.for_ (Prevention.rider prevention) $ \r
 -- power is read after its own sweep" proves it. Pawl.Engine.Engine.performSettle
 -- runs it for every other road onto the battlefield (a permanent spell, a land
 -- play), before the SBA pass and the trigger scan.
---
--- Not implemented: keeping what entered in the same batch out of the effects'
--- reach, where CR 614.12 has it not yet on the battlefield (#4389).
 runEntryEffects :: Game ()
 runEntryEffects = do
   queued <- State.gets GameState.pendingEntryEffects
@@ -9884,6 +9882,11 @@ runEntryEffect pending = do
   let announced = entering >>= Object.announcedX
       before = entering >>= Map.lookup Binding.variableX . Object.bindings
   Foldable.for_ announced $ \n -> State.modify' (setX (Just (Binding.toAmount n)))
+  -- CR 614.12: what entered in the same event is held off the battlefield while
+  -- the effects run, as it was when the rewrite applied (enteredBeside).
+  outer <- State.gets GameState.enteringBeside
+  beside <- State.gets (enteredBeside oid)
+  State.modify' (\gs -> gs {GameState.enteringBeside = Set.union outer beside})
   Foldable.traverse_
     ( applyEffect
         oid
@@ -9893,6 +9896,7 @@ runEntryEffect pending = do
         Map.empty
     )
     (PendingEntryEffect.effects pending)
+  State.modify' (\gs -> gs {GameState.enteringBeside = outer})
   Foldable.for_ announced $ \_ -> State.modify' (setX before)
   State.modify' (resampleEntry oid)
 
@@ -9904,13 +9908,35 @@ runEntryEffect pending = do
 -- it. Only an existing sample is replaced; a group without one reads the live
 -- board anyway (Trigger.battlefieldAt).
 resampleEntry :: ObjectId -> GameState -> GameState
-resampleEntry oid gs =
+resampleEntry oid gs = case entryGroup oid gs of
+  Nothing -> gs
+  Just group -> gs {GameState.battlefieldWhenTriggered = Map.adjust (const (Trigger.battlefieldCandidates gs)) group (GameState.battlefieldWhenTriggered gs)}
+
+-- CR 614.12: the other permanents that entered in the same event as `oid` (CR
+-- 608.2f's group, which an Event.simultaneously bracket shares) -- not yet on the
+-- battlefield as its entry's replacement effects apply. Ixidron's ruling: "If
+-- Ixidron and another creature are entering at the same time, the other creature
+-- enters face up." Read off the log at the drain, since a later member of the
+-- batch has not entered when the rewrite queues the effects. Pawl.FaceDownSpec's
+-- "CR 614.12 a creature entering beside Ixidron enters face up" (one MoveToZone)
+-- and Pawl.TargetPerPlayerSpec's Sepulchral Primordial pair (a ForEach) prove it.
+enteredBeside :: ObjectId -> GameState -> Set ObjectId
+enteredBeside oid gs = case entryGroup oid gs of
+  Nothing -> Set.empty
+  Just group ->
+    Set.delete oid . Set.fromList $
+      [ ZoneChange.object zc
+      | logged <- Foldable.toList (GameState.events gs),
+        LoggedEvent.group logged == group,
+        Just zc <- [Trigger.movedOf (LoggedEvent.event logged)],
+        ZoneChange.to zc == Zone.Battlefield
+      ]
+
+-- The event group of the log entry that put `oid` onto the battlefield.
+entryGroup :: ObjectId -> GameState -> Maybe EventGroup.EventGroup
+entryGroup oid gs =
   let entered logged = maybe False (\zc -> ZoneChange.object zc == oid && ZoneChange.to zc == Zone.Battlefield) (Trigger.movedOf (LoggedEvent.event logged))
-   in case Seq.findIndexR entered (GameState.events gs) of
-        Nothing -> gs
-        Just i ->
-          let group = LoggedEvent.group (Seq.index (GameState.events gs) i)
-           in gs {GameState.battlefieldWhenTriggered = Map.adjust (const (Trigger.battlefieldCandidates gs)) group (GameState.battlefieldWhenTriggered gs)}
+   in fmap (LoggedEvent.group . Seq.index (GameState.events gs)) (Seq.findIndexR entered (GameState.events gs))
 
 -- CR 614.1a: run the effects a DamageRewrite.RunEffects rewrite put in a damage
 -- event's place -- Kill-Suit Cultist's destruction. Drains

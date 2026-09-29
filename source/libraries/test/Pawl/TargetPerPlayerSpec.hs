@@ -30,7 +30,9 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prompt as Prompt
@@ -244,6 +246,38 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" . Spec.describe s "PerPla
         after = resolveTaking (Set.fromList [pikerId, elvesId]) (exile pikerId placed)
     Spec.assertEqWith s "no Goblin Piker entered" (controls "Goblin Piker" S.alice after) 0
     Spec.assertEqWith s "alice controls carol's Llanowar Elves" (controls "Llanowar Elves" S.alice after) 1
+  -- CR 614.12 and Ixidron's ruling ("If Ixidron and another creature are entering
+  -- at the same time, the other creature enters face up") on the ForEach road:
+  -- the Primordial returns its members one at a time inside one bracket, so the
+  -- Soul Warden entering beside Ixidron stays face up in EITHER order. bob's Hill
+  -- Giant and the Primordial itself, already on the battlefield, are what the
+  -- sweep does reach.
+  let primordialSweep wardenSeat ixidronSeat = do
+        primordial <- S.printingOf s registry "Sepulchral Primordial"
+        ixidron <- S.printingOf s registry "Ixidron"
+        warden <- S.printingOf s registry "Soul Warden"
+        giant <- S.printingOf s registry "Hill Giant"
+        let (wardenId, g1) = S.addGraveyardCard warden wardenSeat S.threePlayerGame
+            (ixidronId, g2) = S.addGraveyardCard ixidron ixidronSeat g1
+            (_, g3) = S.addPermanent giant S.bob g2
+            (gs, cardId) = S.handOne primordial g3
+            picks = Set.fromList [wardenId, ixidronId]
+            after = resolveTaking picks (fst (enter picks cardId gs))
+            faceDown =
+              [ fmap S.nameOf (Game.cardOf oid after)
+              | oid <- Set.toList (GameState.battlefield after),
+                maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid after)
+              ]
+        pure (List.sort faceDown, controls "Soul Warden" S.alice after + controls "Ixidron" S.alice after)
+      swept = List.sort (fmap named ["Hill Giant", "Sepulchral Primordial"])
+  Spec.it s "CR 614.12 Sepulchral Primordial returning a Soul Warden before Ixidron leaves the Warden face up" $ do
+    (faceDown, returned) <- primordialSweep S.bob S.carol
+    Spec.assertEqWith s "CR 614.12 the sweep turned over the Giant and the Primordial, not the Warden entering beside Ixidron" faceDown swept
+    Spec.assertEqWith s "both creature cards entered under alice" returned 2
+  Spec.it s "CR 614.12 Sepulchral Primordial returning Ixidron before a Soul Warden leaves the Warden face up" $ do
+    (faceDown, returned) <- primordialSweep S.carol S.bob
+    Spec.assertEqWith s "CR 614.12 the sweep turned over the Giant and the Primordial, not the Warden entering beside Ixidron" faceDown swept
+    Spec.assertEqWith s "both creature cards entered under alice" returned 2
   -- "For each player": alice's own graveyard gets a copy too, and every returned
   -- card is a Zombie under alice's control.
   Spec.it s "CR 601.2c Afterlife from the Loam takes one creature card from each player's graveyard as Zombies" $ do
