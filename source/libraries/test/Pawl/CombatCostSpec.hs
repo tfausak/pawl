@@ -3097,6 +3097,31 @@ exchangeBlocksSpec s registry = Spec.describe s "ExchangeBlocks" $ do
         Spec.assertEqWith s "and the Lairwatch Giant still blocks the other two" (fmap (`Combat.blockersOf` used) [two, three]) [Set.singleton pair, Set.singleton pair]
       _ -> Spec.assertFailure s "fixture should have the Path, three attackers and two of bob's creatures"
 
+  -- The same hypothetical on CR 509.1b's per-creature restrictions, which
+  -- Sorrow's Path's ruling names ("other blocking restrictions"): Blind-Spot
+  -- Giant ("can't attack or block unless you control another Giant") blocks
+  -- legally beside bob's Hill Giant, and once alice Bolts that Hill Giant it
+  -- could no longer block, though CR 506.4a leaves it blocking. The control
+  -- differs in ONE thing: the Bolt is never cast, and the exchange happens.
+  Spec.it s "CR 509.1b a creature that can no longer block is refused by the Path's hypothetical" $ do
+    path <- S.printingOf s registry "Sorrow's Path"
+    giant <- S.printingOf s registry "Hill Giant"
+    mountain <- S.printingOf s registry "Mountain"
+    blindSpot <- S.printingOf s registry "Blind-Spot Giant"
+    wraith <- S.printingOf s registry "Bog Wraith"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    case S.combatBoardOf [path, mountain, giant, giant] [blindSpot, wraith, giant] of
+      (gs0, [_, _, one, two], [spot, wraithId, enabler]) -> do
+        let (_, gs1) = S.addHandCard bolt S.alice gs0
+            blocks = Map.fromList [(spot, Set.singleton one), (wraithId, Set.singleton two)]
+            used = runToStepThreaded (Phase.Combat CombatStep.CombatDamage) (boltThenExchange True enabler blocks spot wraithId) gs1
+            unbolted = runToStepThreaded (Phase.Combat CombatStep.CombatDamage) (boltThenExchange False enabler blocks spot wraithId) gs1
+        Spec.assertEqWith s "CR 509.1b: the Blind-Spot Giant can no longer block, so nothing moved" (Combat.blockersOf one used) (Set.singleton spot)
+        Spec.assertEqWith s "and the Wraith still blocks its own attacker" (Combat.blockersOf two used) (Set.singleton wraithId)
+        Spec.assertBool s (not (S.onBattlefield enabler used)) "the Bolt really killed bob's other Giant"
+        Spec.assertEqWith s "control: with that Giant alive the two exchange" (Combat.blockersOf one unbolted) (Set.singleton wraithId)
+      _ -> Spec.assertFailure s "fixture should have the Path, a Mountain, two attackers and three of bob's creatures"
+
 -- Declare exactly `blocks` and otherwise answer as the aggressive interpreter
 -- does. Pinned rather than searched for: the two boards above both turn on WHICH
 -- attacker each blocker was declared against.
@@ -3153,6 +3178,52 @@ exchanging blocks firstBlocker secondBlocker p = case p of
   Prompt.ChooseTargets _ _ _ slots ->
     Map.mapWithKey (\slot (_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just (if slot == SlotName.MkSlotName (Text.pack "first") then firstBlocker else secondBlocker)) candidates) slots
   _ -> switching blocks [] p
+
+-- S.runToStep with an answerer that threads a stage, for a leg whose answer
+-- depends on what already happened rather than on the prompt alone.
+runToStepThreaded :: Phase.Phase -> (forall r. Prompt.Prompt r -> State.State Int r) -> GameState.GameState -> GameState.GameState
+runToStepThreaded step answer gs0 =
+  let go n stage g =
+        if n <= (0 :: Int) || GameState.phase g == step
+          then g
+          else
+            let ((_, g1), stage1) = State.runState (Engine.runGame answer g Engine.runStep) stage
+             in go (n - 1) stage1 g1
+   in go 8 0 gs0
+
+-- `exchanging`, plus alice casting her Bolt at `victim` first. Stage 0 waits
+-- for the Path's activation to be offered (blockers are declared), then casts
+-- when `bolting`; stage 1 passes with the Bolt on the stack; stage 2 activates
+-- once it has resolved. The Bolt's target and the Path's two slots are each
+-- FILTERED out of what is offered.
+boltThenExchange :: Bool -> ObjectId.ObjectId -> Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId) -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+boltThenExchange bolting victim blocks firstBlocker secondBlocker p = case p of
+  Prompt.ChooseAction _ pid options
+    | pid == S.alice,
+      any isActivation options -> do
+        stage <- State.get
+        let casts = filter isCast options
+        case (stage, casts) of
+          (0, c : _) | bolting -> State.put 1 >> pure c
+          (0, _) -> State.put 2 >> pure (activation options)
+          (1, _) -> State.put 2 >> pure A.Pass
+          (2, _) -> State.put 3 >> pure (activation options)
+          _ -> pure A.Pass
+    | otherwise -> pure A.Pass
+  Prompt.ChooseTargets _ _ _ slots ->
+    pure (Map.mapWithKey (\slot (_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just (aimAt slot)) candidates) slots)
+  _ -> pure (exchanging blocks firstBlocker secondBlocker p)
+  where
+    aimAt slot
+      | slot == SlotName.MkSlotName (Text.pack "first") = firstBlocker
+      | slot == SlotName.MkSlotName (Text.pack "second") = secondBlocker
+      | otherwise = victim
+    activation options = case filter isActivation options of
+      a : _ -> a
+      [] -> A.Pass
+    isCast a = case a of
+      A.Cast {} -> True
+      _ -> False
 
 isActivation :: A.Action -> Bool
 isActivation a = case a of

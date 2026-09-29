@@ -1536,8 +1536,10 @@ switchBlockers first second gs =
 --
 -- The GATE is the printed "if each of those creatures could block all creatures
 -- that the other is blocking", all or nothing: CR 509.1b's pairwise
--- restrictions (pairAllowed), the creature's CR 509.1a arity, and CR 509.1a's
--- "must be untapped" -- a tapped creature could block nothing. Only attackers
+-- restrictions (pairAllowed), the creature's CR 509.1a arity, and canBlock's
+-- per-creature questions: CR 509.1a's "must be untapped" and CR 509.1b's
+-- restrictions on the creature itself (Blind-Spot Giant), which CR 506.4a
+-- leaves standing in combat once they bite. Only attackers
 -- still attacking count, so one whose attackers have all left combat hands the
 -- other nothing and it is removed from combat to block nothing.
 --
@@ -1553,7 +1555,7 @@ exchangeBlocks first second gs =
       arity = blockArityGiven [first, second] gs
       couldBlock blocker attackers =
         Set.null attackers
-          || ( not (Game.isTapped blocker gs)
+          || ( maybe False (\pid -> canBlock pid blocker gs) (Projection.controllerOf blocker gs)
                  && withinLimit (arity blocker) (Set.size attackers)
                  && all (\attacker -> pairAllowed [first, second] attacking blocker attacker gs) (Set.toList attackers)
              )
