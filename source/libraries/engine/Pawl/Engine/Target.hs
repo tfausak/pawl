@@ -1846,7 +1846,8 @@ selectionLegal perspective seed source x slots sets chosen gs =
 -- between them the moments an announcement over declared slots is accepted --
 -- selectionLegal above -- CR 601.2e's cast, CR 602.2's activation and CR
 -- 603.3d's trigger placement alike -- and
--- Pawl.Engine.Resolve.Effect.chooseNewTargetsFor (the CR 707.10c / 115.7d re-target). The
+-- Pawl.Engine.Resolve.Effect.chooseNewTargetsFor (the CR 707.10c / 115.7d re-target,
+-- through jointlyIllegal). The
 -- re-derivation is exactly the one CR 608.2b will make at resolution, so a
 -- selection this admits cannot be one resolution then drops.
 --
@@ -1854,20 +1855,29 @@ selectionLegal perspective seed source x slots sets chosen gs =
 -- slotCapacities by selectionLegal, and the CR 707.10c / 115.7d caller has no
 -- count to judge at all, its re-target taking the recipients the object has.
 jointlyCoherent :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
-jointlyCoherent perspective seed source slots chosen gs =
-  let pcs = Projection.projectAll gs
-   in jointlyCoherentGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots chosen gs
+jointlyCoherent perspective seed source slots chosen gs = all Set.null (jointlyIllegal perspective seed source slots chosen gs)
 
--- The same answer on a board the caller already walked -- see
+-- The same check, answering WHICH chosen recipients it refuses, per jointly
+-- judged slot. CR 115.7d's re-target needs the set rather than the verdict: an
+-- unchanged target already refused before the change may stand.
+jointlyIllegal :: Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Map SlotName (Set Recipient)
+jointlyIllegal perspective seed source slots chosen gs =
+  let pcs = Projection.projectAll gs
+   in jointlyIllegalGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots chosen gs
+
+-- The same answers on a board the caller already walked -- see
 -- legalRecipientsGiven.
 jointlyCoherentGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Bool
-jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs =
+jointlyCoherentGiven pcs grants pools perspective seed source slots chosen gs = all Set.null (jointlyIllegalGiven pcs grants pools perspective seed source slots chosen gs)
+
+jointlyIllegalGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName Binding.Type.Binding -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> GameState -> Map SlotName (Set Recipient)
+jointlyIllegalGiven pcs grants pools perspective seed source slots chosen gs =
   let bindings = Map.union (fmap Binding.toRecipients chosen) seed
-      coherent slot targetSlot =
-        Set.isSubsetOf
+      refused slot targetSlot =
+        Set.difference
           (Map.findWithDefault Set.empty slot chosen)
           (legalRecipientsGiven pcs grants pools perspective False bindings source targetSlot gs)
-   in and (Map.elems (Map.mapWithKey coherent (Map.filter (jointlyJudged (Map.keysSet slots)) slots)))
+   in Map.mapWithKey refused (Map.filter (jointlyJudged (Map.keysSet slots)) slots)
 
 -- CR 601.2c: is there ONE announcement that fills every slot at once, rather than
 -- a minimum each slot can meet by itself? jointlyJudged's filter and bound halves
