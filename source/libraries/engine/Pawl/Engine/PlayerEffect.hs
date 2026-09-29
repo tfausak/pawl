@@ -3073,9 +3073,8 @@ votesAllowed pid gs =
 -- grant, votesAllowed's posture: rule 701.25b makes no two such effects
 -- redundant, and the card's own ruling (2018-10-05) makes two of them four.
 --
--- The "may" is not asked separately: declining leaves the extra cards where
--- they are, which is exactly the answer to the widened Prompt.ChooseSurveil
--- that names none of them, so that one answer already holds the choice.
+-- Not implemented: the card's "may" is not asked; the extra cards are always
+-- looked at (#4391).
 surveilExtra :: PlayerId -> GameState -> Natural
 surveilExtra pid gs =
   let grantOf effect = case effect of
