@@ -3,6 +3,7 @@ module Pawl.Types.Keyword where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Craft as Craft
 import qualified Pawl.Types.Cycling as Cycling
@@ -829,6 +830,8 @@ data Keyword
     -- -- exhaust's "activate only once", plus a reduction by the permanent's mana
     -- cost if it entered this turn (Pawl.Engine.PlayerEffect's activation gather).
     PowerUp
+  | -- | 716.2: a class level bar, written on the activated ability it indicates.
+    ClassLevel ClassLevel.ClassLevel
   | -- | 702.57a: a forecast ability is the activated ability printed after it,
     -- activatable only from a hand, during its owner's upkeep, once each turn
     -- (CR 702.57b); written on Pawl.Types.ActivatedAbility.keyword.

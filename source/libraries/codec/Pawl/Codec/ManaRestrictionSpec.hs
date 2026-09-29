@@ -5,6 +5,8 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaRestriction as ManaRestriction
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -35,6 +37,17 @@ spec s = Spec.describe s "Pawl.Codec.ManaRestriction" $ do
           ManaRestriction.activations = Just (Filter.HasCardType CardType.Artifact)
         }
       " {\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}},\"activations\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Artifact\"}}} "
+  -- Sorcerer Class's "only to cast an instant or sorcery spell or to gain a
+  -- Class level": a cast key beside CR 716.2c's ability key.
+  Spec.it s "casts and keyword activations" $
+    Common.assertCodec
+      s
+      ManaRestriction.codec
+      ManaRestriction.none
+        { ManaRestriction.casts = Just (Filter.HasCardType CardType.Instant),
+          ManaRestriction.keywordActivations = Just (KeywordDesignator.OfFamily KeywordFamily.ClassLevel)
+        }
+      " {\"casts\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Instant\"}},\"keywordActivations\":{\"type\":\"OfFamily\",\"value\":{\"type\":\"ClassLevel\"}}} "
   -- Overgrown Zealot's "spend this mana only to turn permanents face up": the
   -- special-action key alone, with CR 116.2b saying nothing about WHICH
   -- permanents.

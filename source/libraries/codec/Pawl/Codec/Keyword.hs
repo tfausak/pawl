@@ -2,6 +2,7 @@ module Pawl.Codec.Keyword where
 
 import qualified Pawl.Codec.Backup as Backup
 import qualified Pawl.Codec.CardName as CardName
+import qualified Pawl.Codec.ClassLevel as ClassLevel
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Craft as Craft
 import qualified Pawl.Codec.Cycling as Cycling
@@ -220,6 +221,7 @@ codec =
       Arm.nullary "Boast" Keyword.Boast,
       Arm.nullary "Forecast" Keyword.Forecast,
       Arm.nullary "PowerUp" Keyword.PowerUp,
+      Arm.payload "ClassLevel" ClassLevel.codec Keyword.ClassLevel (\x -> case x of Keyword.ClassLevel y -> Just y; _ -> Nothing),
       Arm.payload "Mobilize" (KeywordCount.codec codec) Keyword.Mobilize (\x -> case x of Keyword.Mobilize y -> Just y; _ -> Nothing),
       Arm.payload "Firebending" (KeywordCount.codec codec) Keyword.Firebending (\x -> case x of Keyword.Firebending y -> Just y; _ -> Nothing),
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines,
@@ -418,6 +420,7 @@ tagOf x = case x of
   Keyword.Boast {} -> "Boast"
   Keyword.Forecast {} -> "Forecast"
   Keyword.PowerUp {} -> "PowerUp"
+  Keyword.ClassLevel {} -> "ClassLevel"
   Keyword.Mobilize {} -> "Mobilize"
   Keyword.Firebending {} -> "Firebending"
   Keyword.StartYourEngines {} -> "StartYourEngines"
