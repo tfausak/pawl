@@ -127,6 +127,7 @@ codec keywordCodec =
       -- rather than the host.
       Arm.payload "HasAttached" (codec keywordCodec) Filter.HasAttached (\x -> case x of Filter.HasAttached y -> Just y; _ -> Nothing),
       Arm.nullary "IsAttachedToSource" Filter.IsAttachedToSource,
+      Arm.nullary "IsAttachedToEvaluated" Filter.IsAttachedToEvaluated,
       Arm.nullary "IsHostOfSource" Filter.IsHostOfSource,
       Arm.nullary "EnteredWithSource" Filter.EnteredWithSource,
       Arm.nullary "CanHostSubject" Filter.CanHostSubject,
@@ -239,6 +240,7 @@ tagOf x = case x of
   Filter.AttachedTo {} -> "AttachedTo"
   Filter.HasAttached {} -> "HasAttached"
   Filter.IsAttachedToSource {} -> "IsAttachedToSource"
+  Filter.IsAttachedToEvaluated {} -> "IsAttachedToEvaluated"
   Filter.IsHostOfSource {} -> "IsHostOfSource"
   Filter.EnteredWithSource {} -> "EnteredWithSource"
   Filter.CanHostSubject {} -> "CanHostSubject"

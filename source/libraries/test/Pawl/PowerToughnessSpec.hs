@@ -63,6 +63,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -644,6 +645,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   livingLoreSpec s registry
   unleashFurySpec s registry
   threefoldGrowthSpec s registry
+  attachedToEachSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -2357,3 +2359,72 @@ threefoldGrowthSpec s registry = Spec.describe s "Synthetic Threefold Growth" $ 
     after <- S.play s registry setup script S.priorityGame
     Spec.assertEqWith s "the Arbiter is a -9/3: twice -3 down and twice 1 up, off the folded box" (boxesOfNamed "Silent Arbiter" after) [Just (-9, 3)]
     Spec.assertEqWith s "three Forests paid {2}{G}" (S.tappedCount S.alice after) 3
+
+-- Filter.IsAttachedToEvaluated's producers: a CR 613.4c pump whose count is of
+-- what is attached to EACH creature it affects, not to its own source. Oracle
+-- text re-fetched from Scryfall 2026-09-29 for all four.
+attachedToEachSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attachedToEachSpec s registry = Spec.describe s "attached to it" $ do
+  -- Bruenor Battlehammer {2}{R}{W} 5/3: "Each creature you control gets +2/+0
+  -- for each Equipment attached to it." Golem-Skin Gauntlets: "Equipped creature
+  -- gets +1/+0 for each Equipment attached to it." The Piker wears two Equipment
+  -- and Bruenor one, so the source's count (1) and the Piker's (2) differ, and a
+  -- read of the source's would leave the Gauntlets counting nothing at all.
+  Spec.it s "CR 613.4c Bruenor and Golem-Skin Gauntlets count what is attached to each creature they pump" $ do
+    bruenor <- S.printingOf s registry "Bruenor Battlehammer"
+    gauntlets <- S.printingOf s registry "Golem-Skin Gauntlets"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (dwarf, g1) = S.addPermanent bruenor S.alice (Setup.emptyGame S.bothPlayers)
+        (carrier, g2) = S.addPermanent piker S.alice g1
+        (bare, g3) = S.addPermanent giant S.alice g2
+        (worn, g4) = S.addPermanent gauntlets S.alice g3
+        (split, g5) = S.addPermanent bonesplitter S.alice g4
+        (own, g6) = S.addPermanent bonesplitter S.alice g5
+        gs = S.attach own dwarf (S.attach split carrier (S.attach worn carrier g6))
+    Spec.assertEqWith s "the Piker is 2/1 + 2/+0 (Bonesplitter) + 2/+0 (Gauntlets) + 4/+0 (Bruenor)" (S.powerToughnessOf carrier gs) (Just (10, 1))
+    Spec.assertEqWith s "Bruenor is 5/3 + 2/+0 (Bonesplitter) + 2/+0 (itself)" (S.powerToughnessOf dwarf gs) (Just (9, 3))
+    Spec.assertEqWith s "and the unequipped Giant is a plain 3/3" (S.powerToughnessOf bare gs) (Just (3, 3))
+  -- CR 707.2: bob's Clone of alice's Bruenor has the static ability and pumps
+  -- bob's creatures by what each of THEM wears -- alice's Piker is untouched.
+  Spec.it s "CR 707.2 a Clone of Bruenor counts what is attached to each creature its controller controls" $ do
+    bruenor <- S.printingOf s registry "Bruenor Battlehammer"
+    clone <- S.printingOf s registry "Clone"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (dwarf, g1) = S.addPermanent bruenor S.alice (Setup.emptyGame S.bothPlayers)
+        (carrier, g2) = S.addPermanent piker S.alice g1
+        (bobs, g3) = S.addPermanent giant S.bob g2
+        (split, g4) = S.addPermanent bonesplitter S.bob g3
+        (_, staged) = S.spellOnStack clone S.bob (S.attach split bobs g4)
+        copyBruenor :: Prompt.Prompt r -> r
+        copyBruenor p = case p of
+          Prompt.ChooseCopyTarget {} -> Just dwarf
+          _ -> S.identityAnswer p
+        after = snd (Engine.runGamePure copyBruenor staged (Stack.resolveTop >> Engine.settleForPriority))
+    Spec.assertEqWith s "bob's Giant is 3/3 + 2/+0 (Bonesplitter) + 2/+0 (the Clone)" (S.powerToughnessOf bobs after) (Just (7, 3))
+    Spec.assertEqWith s "and alice's unequipped Piker is a plain 2/1" (S.powerToughnessOf carrier after) (Just (2, 1))
+  -- Auramancer's Guise {2}{U}{U}: "Enchanted creature gets +2/+2 for each Aura
+  -- attached to it and has vigilance." Thran Power Suit {2}: "Equipped creature
+  -- gets +1/+1 for each Aura and Equipment attached to it and has ward {2}." The
+  -- Giant carries two Auras and one Equipment, so the Guise's count (2) and the
+  -- Suit's (3) differ.
+  Spec.it s "CR 613.4c Auramancer's Guise counts Auras and Thran Power Suit Auras and Equipment on the creature" $ do
+    guise <- S.printingOf s registry "Auramancer's Guise"
+    suit <- S.printingOf s registry "Thran Power Suit"
+    unholy <- S.printingOf s registry "Unholy Strength"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (carrier, g1) = S.addPermanent giant S.alice (Setup.emptyGame S.bothPlayers)
+        (guised, g2) = S.addPermanent guise S.alice g1
+        (strength, g3) = S.addPermanent unholy S.alice g2
+        (suited, g4) = S.addPermanent suit S.alice g3
+        gs = S.attach suited carrier (S.attach strength carrier (S.attach guised carrier g4))
+    Spec.assertEqWith s "the Giant is 3/3 + 4/+4 (Guise) + 3/+3 (Suit) + 2/+1 (Unholy Strength)" (S.powerToughnessOf carrier gs) (Just (12, 11))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Vigilance carrier gs) "the Guise grants vigilance"
+    Spec.assertBool s (any isWard (Map.keys (Projection.keywordsOf carrier gs))) "the Suit grants ward"
+  where
+    isWard k = case k of
+      Keyword.Ward {} -> True
+      _ -> False
