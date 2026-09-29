@@ -1136,10 +1136,12 @@ library codec
     Pawl.Codec.TurnWindowSpec
     Pawl.Codec.TypeLine
     Pawl.Codec.TypeLineSpec
+    Pawl.Codec.UntapR
     Pawl.Codec.UntapRestriction
     Pawl.Codec.UntapRestrictionSpec
     Pawl.Codec.UntapRewrite
     Pawl.Codec.UntapRewriteSpec
+    Pawl.Codec.UntapRSpec
     Pawl.Codec.Uses
     Pawl.Codec.UsesSpec
     Pawl.Codec.Vanguard
@@ -2328,6 +2330,7 @@ library types
     Pawl.Types.TurnUpRewrite
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
+    Pawl.Types.UntapR
     Pawl.Types.UntapRestriction
     Pawl.Types.UntapRewrite
     Pawl.Types.Uses

@@ -97,6 +97,7 @@ import qualified Pawl.Types.Times as Times
 import Pawl.Types.Timestamp (Timestamp (MkTimestamp))
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapR as UntapR
 import qualified Pawl.Types.UntapRewrite as UntapRewrite
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
@@ -3328,6 +3329,7 @@ filterReads f = case f of
   -- reason too: no Modification writes Object.attachedTo.
   Filter.Type.HasAttached g -> filterReads g
   Filter.Type.IsAttachedToSource -> Set.empty
+  Filter.Type.IsAttachedToEvaluated -> Set.empty
   Filter.Type.IsHostOfSource -> Set.empty
   Filter.Type.EnteredWithSource -> Set.empty
   -- Over-declared deliberately, per the note on Aspect above: the characteristics
@@ -3594,6 +3596,7 @@ filterReadsPeers f = case f of
   Filter.Type.SaddledSourceThisTurn -> False
   Filter.Type.ControlledSinceTurnBegan -> False
   Filter.Type.IsAttachedToSource -> False
+  Filter.Type.IsAttachedToEvaluated -> False
   Filter.Type.IsHostOfSource -> False
   Filter.Type.EnteredWithSource -> False
   Filter.Type.IsToken -> False
@@ -4970,7 +4973,7 @@ stunOf :: ObjectId -> GameState -> [ReplacementEffect Card.Type.Card (GrantedAbi
 stunOf oid gs =
   if stunCounters oid gs == 0
     then []
-    else [ReplacementEffect.UntapR UntapRewrite.RemoveStunCounter]
+    else [ReplacementEffect.UntapR UntapR.MkUntapR {UntapR.during = Nothing, UntapR.rewrite = UntapRewrite.RemoveStunCounter}]
 
 -- CR 122.1d: how many stun counters this object has. shieldCounters' shape, and
 -- for its reason -- the count is what the board stores, and only whether it is

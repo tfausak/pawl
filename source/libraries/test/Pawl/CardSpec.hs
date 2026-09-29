@@ -4655,6 +4655,7 @@ filterSlotsReadSingly predicate = case predicate of
   -- DESCENT, for the atom above's reason.
   Filter.Type.HasAttached f -> filterSlotsReadSingly f
   Filter.Type.IsAttachedToSource -> []
+  Filter.Type.IsAttachedToEvaluated -> []
   Filter.Type.IsHostOfSource -> []
   Filter.Type.EnteredWithSource -> []
   Filter.Type.CanHostSubject -> []
@@ -5666,7 +5667,7 @@ effectFilters effect = case effect of
   Effect.ControlPlayerNextTurn _ -> []
   Effect.ControlPlayerThisResolution _ -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _ _) -> frame SourceHostFramed (objectRefFilters ref)
   -- The riders reach a Filter by TWO roads one level further down than the
   -- ObjectRef: CR 122.6's counters are keyed by CounterKind, and CR 122.1b's
   -- keyword counter carries a whole Keyword; and each count is a Quantity, which

@@ -603,7 +603,7 @@ rewriteEffect pairs effect = case effect of
   -- whose sacrifice carries a Filter at all, and CR 206.3a/b's names are not
   -- words CR 612.2's two families can swap, so mutating this line reddens
   -- nothing.
-  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref sacrificer) -> Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect (rewriteObjectRef pairs ref) sacrificer)
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref sacrificer mSacrificed) -> Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect (rewriteObjectRef pairs ref) sacrificer mSacrificed)
   -- CR 612.1: the ref carries a Filter of printed card text, so a text-changer
   -- reaches it exactly as Destroy's above. The listed characteristics hold no word
   -- this rewrites: a type line is CR 205's, not CR 201.4a's changeable text.

@@ -456,6 +456,12 @@ data Filter keyword
     -- own view; vacuously False where the candidate is attached to nothing or to
     -- a player, and where no source frames the match.
     IsAttachedToSource
+  | -- | CR 701.3a / 301.5a: the candidate is attached to the object the
+    -- surrounding QUANTITY is evaluated against -- Bruenor Battlehammer's "each
+    -- creature you control gets +2/+0 for each Equipment attached to it", the
+    -- affected creature under CR 613.4c. Vacuously False where no quantity aims
+    -- the match.
+    IsAttachedToEvaluated
   | -- | CR 303.4b's "enchanted": the candidate is what the evaluation's SOURCE is
     -- attached to -- Ray of Frost's "enchanted creature", the third attachment
     -- direction. Vacuously False where the source is attached to nothing or to a

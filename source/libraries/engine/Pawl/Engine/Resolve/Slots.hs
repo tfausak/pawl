@@ -658,7 +658,7 @@ effectObjectRefs effect = case effect of
   Effect.ControlPlayerNextTurn {} -> []
   Effect.ControlPlayerThisResolution {} -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> [ref]
-  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> [ref]
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _ _) -> [ref]
   Effect.Attach {} -> []
   Effect.AttachAsThoughCreature {} -> []
   Effect.AttachTarget {} -> []
@@ -2292,6 +2292,8 @@ boundSlots effect = case effect of
   -- incarnations); and the PERMANENTS it destroyed, for a later clause that
   -- walks them one at a time.
   Effect.Destroy (Destroy.MkDestroy _ _ mSlot mBuried mPermanents) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mBuried <> foldMap Set.singleton mPermanents
+  -- How many permanents CR 701.21a actually sacrificed, Destroy's `slot`.
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect _ _ mSacrificed) -> foldMap Set.singleton mSacrificed
   -- How many milled cards matched the tally's filter (CR 728.1), and WHICH cards
   -- the mill put in the graveyard, for a later clause that names them (CR
   -- 701.17c). Two slots and not one: a card may write either without the other.
@@ -2363,7 +2365,6 @@ boundSlots effect = case effect of
   Effect.RestartGame _ -> Set.empty
   Effect.ControlPlayerNextTurn _ -> Set.empty
   Effect.ControlPlayerThisResolution _ -> Set.empty
-  Effect.Sacrifice _ -> Set.empty
   Effect.TurnFaceDown _ -> Set.empty
   Effect.TurnFaceUp _ -> Set.empty
   Effect.RemoveFromCombat _ -> Set.empty

@@ -1816,7 +1816,7 @@ encoreSacrificeName = AbilityName.MkAbilityName (Text.pack "encore")
 -- 603.7b), on any player's turn. CR 701.21a keeps it a sacrifice, so an
 -- indestructible token still goes.
 encoreSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-encoreSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot encoreTokenSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController})
+encoreSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot encoreTokenSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing})
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
 -- sibling one zone over.
@@ -5798,7 +5798,7 @@ mobilizeSacrificeName = AbilityName.MkAbilityName (Text.pack "mobilize")
 -- 603.7b), on any player's turn. CR 701.21a keeps it a sacrifice, so an
 -- indestructible token still goes.
 mobilizeSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-mobilizeSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot mobilizeTokenSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController})
+mobilizeSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot mobilizeTokenSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing})
 
 -- CR 702.181a. CR 508.3a is what "attacks" means, so the condition is battle
 -- cry's SelfAttacks EveryTime.
@@ -6815,7 +6815,7 @@ dashReturn =
 -- the spell's, and CR 701.21a lets that player sacrifice only a permanent they
 -- control.
 blitzSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
-blitzSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot becameSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController})
+blitzSacrifice = atNextEndStep (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot becameSlot, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing})
 
 -- CR 513.2's "at the beginning of the next end step", once (CR 603.7b), on any
 -- player's turn.
@@ -6901,7 +6901,7 @@ decayedSacrificeName = AbilityName.MkAbilityName (Text.pack "decayed")
 -- indestructible attacker still goes.
 decayedSacrifice :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 decayedSacrifice =
-  let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController}
+  let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) Nothing TurnScope.EachTurn),
           TriggeredAbility.modal =
@@ -7072,7 +7072,7 @@ returns kind =
 -- for the rule's "its controller".
 evoke :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 evoke =
-  let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.PermanentController}
+  let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.PermanentController, SacrificeEffect.sacrificed = Nothing}
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
@@ -9248,7 +9248,7 @@ vanishingUpkeep =
 -- destruction, so an indestructible permanent with vanishing still goes.
 vanishingLastCounter :: TriggeredAbility Card (GrantedAbility.GrantedAbility Card)
 vanishingLastCounter =
-  let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController}
+  let effect = Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
           TriggeredAbility.modal =
@@ -9300,7 +9300,7 @@ fading =
           Nothing
           Optionality.Mandatory
           Nothing
-          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController}))
+          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
       removeClause =
         Clause.MkClause
           Nothing
@@ -9369,7 +9369,7 @@ cumulativeUpkeep cost =
           Nothing
           Optionality.Mandatory
           (Just gate)
-          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController}))
+          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
       gate =
         PayGate.MkPayGate
           { PayGate.payer = PlayerRef.Relative PlayerRelation.You,
@@ -9441,7 +9441,7 @@ echo cost =
           Nothing
           Optionality.Mandatory
           (Just gate)
-          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController}))
+          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
           TriggeredAbility.modal =
@@ -9561,7 +9561,7 @@ championEnters quality =
           Nothing
           Optionality.Mandatory
           Nothing
-          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController}))
+          (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.triggerSource, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
