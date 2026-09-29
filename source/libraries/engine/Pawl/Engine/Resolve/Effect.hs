@@ -1297,8 +1297,8 @@ offerCast context named caster optionality verb retake repetition copied offer =
 -- printed ones), and an original carrying none leaves the copy reading its
 -- printing, which is what Pawl.Engine.Projection.View.copiableCharacteristics
 -- answers for both. That first limb is a REGRESSION FENCE rather than a proved
--- line: every object a producer in data/cards/ offers a copy of is a card in a
--- graveyard or in exile, and nothing stamps a snapshot on one of those.
+-- line: the one stamped original a producer in data/cards/ reaches is paradigm's
+-- archived spell below, whose stamp is its own printed values.
 --
 -- Object.newIncarnation for everything else, CR 400.7's forgetting: the copy is
 -- a new object, so no counter, designation or announced cost of the original's

@@ -535,7 +535,8 @@ applyEpic oid controller = do
 -- sorcery, and from Pawl.Engine.Stack for a permanent spell -- and from neither
 -- fizzle, since a spell CR 608.2b removes did not resolve. The names come off
 -- the PROJECTION, so a spell that is a copy of another (CR 707.2) files the
--- copied name.
+-- copied name. The permanent road is a REGRESSION FENCE: no permanent card in
+-- data/cards/ shares a paradigm card's name.
 noteResolved :: ObjectId -> PlayerId -> Game Bool
 noteResolved oid controller = do
   gs <- State.get

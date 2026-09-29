@@ -6191,6 +6191,10 @@ epicSpec s registry = Spec.describe s "Epic" $ do
 -- after the one after. A copy that armed a delayed ability of its own -- the
 -- first-resolution gate missing -- would make that last reading 12.
 --
+-- Cast in alice's POSTCOMBAT main: the harness's first step re-begins the phase
+-- the fixture names, and a precombat main begun again after the card resolved
+-- would fire the delayed ability that very turn.
+--
 -- FIVE SWAMPS pay the card and nothing else. Twelve library cards apiece: CR
 -- 104.3c takes a player who draws from an empty library out before any
 -- assertion runs, and bob draws twice per resolution.
@@ -6199,7 +6203,7 @@ paradigmBoard swamp fog dissertation =
   let stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard fog pid h)) g [1 :: Int .. 12]
       stocked = List.foldl' stock (S.landsInPlay swamp 5) [S.alice, S.bob]
       (dissertationId, ready) = S.addHandCard dissertation S.alice stocked
-   in ((aliceOnTurn ready) {GameState.remaining = S.phasesAfter Phase.PrecombatMain}, dissertationId)
+   in ((aliceOnTurn ready) {GameState.phase = Phase.PostcombatMain, GameState.remaining = S.phasesAfter Phase.PostcombatMain}, dissertationId)
 
 -- Aims every target at bob and takes rule 702.192a's "you may cast the copy".
 lecturing :: Prompt.Prompt r -> r
@@ -6208,7 +6212,7 @@ lecturing p = case p of
   Prompt.OfferedCast {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
 
-paradigmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+paradigmSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 paradigmSpec s registry = Spec.describe s "Paradigm" $ do
   -- Both of rule 702.192a's abilities, driven through two of alice's later
   -- precombat main phases. The once-not-twice reading comes first: it is the

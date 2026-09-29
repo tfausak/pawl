@@ -125,7 +125,8 @@ data GameState = MkGameState
     lastKnown :: Map.Map ObjectId.ObjectId LastKnown.LastKnown,
     -- | CR 608.2h for a STACK object, keyed by the id it had before it left the
     -- stack (CR 400.7): the whole object, so an effect armed while it was still
-    -- there can put a copy of it onto the stack afterwards (CR 707.10).
+    -- there can put a copy of it onto the stack afterwards (CR 707.10), or cast
+    -- one from exile (rule 702.192a's paradigm).
     --
     -- The whole object and not a LastKnown record, because CR 707.10 copies the
     -- DECISIONS -- the modes, the targets, the value of X, the announced costs --
