@@ -7013,7 +7013,8 @@ counterOne source controller oid = do
 -- this and none of them knows what watches. Pawl.Engine.Resolve's CopyStackObject arm
 -- is the fourth caller and the one that announces nothing: CR 115.1 declares a
 -- spell's targets as part of putting it on the stack, and CR 707.10c puts the
--- copy there with the targets its controller settled on.
+-- copy there with the targets its controller settled on. Its ChooseNewTargets
+-- arm is the fifth, CR 115.7d's re-target of an object already on the stack.
 --
 -- ONE EVENT PER SLOT PER RECIPIENT, which is rule 601.2c's own arity: that rule
 -- lets one object be chosen once for each instance of the word "target" and
