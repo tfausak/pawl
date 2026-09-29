@@ -45,14 +45,9 @@ data SpendManaAsThough = MkSpendManaAsThough
     -- mana may be spent as, so it replaces rather than forbids
     -- (Pawl.Engine.Mana.spendableAs).
     --
-    -- Not implemented: no card in data/cards/ tells the two readings of a
-    -- non-only clause apart (#1804). Celestial Dawn's permission names white and
-    -- permits white among the five, so adding the mana's own type and replacing
-    -- it agree, and a rule that always replaced would come out right here by
-    -- luck. Chromatic Orrery ("You may spend mana as though it were mana of any
-    -- color", which = Any) is the card that separates them: under always-replace
-    -- its controller's colorless mana could no longer pay CR 107.4c's {C}, which
-    -- CR 609.4b does not say.
+    -- Sunglasses of Urza's clause names red and not white, so it is the card that
+    -- tells adding from replacing: Pawl.ManaSymbolSpec's "Sunglasses of Urza"
+    -- cases prove white mana still pays {W} under it.
     only :: Bool
   }
   deriving (Eq, Ord, Show)
