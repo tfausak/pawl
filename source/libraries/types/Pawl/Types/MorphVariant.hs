@@ -7,9 +7,9 @@ module Pawl.Types.MorphVariant where
 -- of the morph ability".
 --
 -- A SIBLING constructor would be the same claim written so that every reader
--- could ignore it. Pawl.Engine.Keyword.morphCost and Pawl.Engine.Cast's
+-- could ignore it. Pawl.Engine.Keyword.morphCosts and Pawl.Engine.Cast's
 -- face-down gate both read morph through a case with a WILDCARD, so a
--- `Megamorph` constructor beside `Morph` would compile clean and answer Nothing
+-- `Megamorph` constructor beside `Morph` would compile clean and answer nothing
 -- for a megamorph card -- uncastable face down, unturnable face up, with no
 -- warning anywhere. Widening the one constructor makes every reader of it break
 -- loudly instead, which is what the rule's own wording asks for.

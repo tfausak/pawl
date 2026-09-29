@@ -41,10 +41,13 @@ module Pawl.Engine.FaceDown where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -69,13 +72,15 @@ import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
 import Pawl.Types.TurnUpProcedure (TurnUpProcedure)
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TypeLine as TypeLine
 
--- CR 702.37e: "what the permanent's morph cost WOULD BE if it were face up".
--- Nothing when the card underneath has no morph ability, which is the rule's own
+-- CR 702.37e: "what the permanent's morph cost WOULD BE if it were face up",
+-- one entry per distinct morph cost the card prints (Keyword.morphCosts). Empty
+-- when the card underneath has no morph ability, which is the rule's own
 -- parenthesis -- "if the permanent wouldn't have a morph cost if it were face
 -- up, it can't be turned face up this way".
 --
@@ -94,17 +99,16 @@ import qualified Pawl.Types.TypeLine as TypeLine
 --
 -- CR 707.2: morph is copiable, so a card carrying copied values has the copied
 -- card's (Game.faceUpCastingFaceOf), as do the two readers below.
-morphCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
-morphCostOf oid gs = do
-  face <- Game.faceUpCastingFaceOf oid gs
-  Keyword.morphCost (Face.keywordSet face)
+morphCostsOf :: ObjectId -> GameState -> [Cost Keyword]
+morphCostsOf oid gs =
+  foldMap (Keyword.morphCosts . Face.keywordSet) (Game.faceUpCastingFaceOf oid gs)
 
 -- CR 702.168d: "show all players what the permanent's disguise cost WOULD BE if
 -- it were face up". Nothing when the card underneath has no disguise ability,
 -- which is the rule's own parenthesis -- "if the permanent wouldn't have a
 -- disguise cost if it were face up, it can't be turned face up this way".
 --
--- morphCostOf with rule 702.168d's price list in place of rule 702.37e's, and
+-- morphCostsOf with rule 702.168d's price list in place of rule 702.37e's, and
 -- every note above applies here word for word: the read goes through
 -- Game.faceUpFaceOf because CR 708.2's substitution has taken the card's
 -- keywords away, and the rule's counterfactual is what licenses it. The face-down
@@ -125,14 +129,14 @@ disguiseCostOf oid gs = do
 -- which permanents each rule is open to is its subject rather than its cost, and
 -- that lives in canTurnFaceUp's `eligible` below.
 --
--- Read through Game.faceUpFaceOf for morphCostOf's reason, and the rule words it
+-- Read through Game.faceUpFaceOf for morphCostsOf's reason, and the rule words it
 -- even more plainly: both guards are about "the CARD representing that
 -- permanent" rather than about the permanent, and CR 708.2a has left the
 -- permanent itself with no card type and no mana cost at all -- so a projected
 -- read would refuse every manifested permanent ever put onto the battlefield.
 --
 -- The card's own printed types, not its projected ones, for the same reason and
--- morphCostOf's: the rule's subject is the card, so a CR 613 read of the
+-- morphCostsOf's: the rule's subject is the card, so a CR 613 read of the
 -- permanent answers a different question.
 creatureCardCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 creatureCardCostOf oid gs = do
@@ -143,16 +147,16 @@ creatureCardCostOf oid gs = do
   manaCost <- Face.manaCost face
   pure (Cost.Type.MkCost (Just manaCost) [])
 
--- What one of CR 708.7's four procedures costs on this permanent, or Nothing
--- when that procedure is closed to it. A classification of the four rules,
--- never of a card: which procedure is which is CR 701.40c's own distinction.
-costOf :: TurnUpProcedure -> ObjectId -> GameState -> Maybe (Cost Keyword)
-costOf procedure oid gs = case procedure of
-  TurnUpProcedure.Morph -> morphCostOf oid gs
-  TurnUpProcedure.Disguise -> disguiseCostOf oid gs
-  TurnUpProcedure.Manifest -> creatureCardCostOf oid gs
+-- What one of CR 708.7's four procedures may cost on this permanent, empty when
+-- that procedure is closed to it. A classification of the four rules, never of
+-- a card: which procedure is which is CR 701.40c's own distinction.
+costsOf :: TurnUpProcedure -> ObjectId -> GameState -> [Cost Keyword]
+costsOf procedure oid gs = case procedure of
+  TurnUpProcedure.Morph -> morphCostsOf oid gs
+  TurnUpProcedure.Disguise -> Maybe.maybeToList (disguiseCostOf oid gs)
+  TurnUpProcedure.Manifest -> Maybe.maybeToList (creatureCardCostOf oid gs)
   -- CR 701.58b's price list is rule 701.40b's, so the same reader answers both.
-  TurnUpProcedure.Cloak -> creatureCardCostOf oid gs
+  TurnUpProcedure.Cloak -> Maybe.maybeToList (creatureCardCostOf oid gs)
 
 -- CR 116.2b: may this player turn this permanent face up right now, by this
 -- procedure? Five conjuncts, each a clause of the rule:
@@ -166,7 +170,7 @@ costOf procedure oid gs = case procedure of
 --   * the procedure is one this permanent is ELIGIBLE for, which is the only
 --     conjunct the two rules disagree on and is `eligible` below;
 --   * the procedure's cost exists on the card underneath;
---   * that cost is payable. An action the player cannot take is not offered,
+--   * one such cost is payable. An action the player cannot take is not offered,
 --     which is Pawl.Engine.Action.legalActions' posture for every other action
 --     on the menu.
 --
@@ -213,9 +217,12 @@ canTurnFaceUp pid procedure oid gs =
    in maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs)
         && Projection.controllerOf oid gs == Just pid
         && eligible
-        && case costOf procedure oid gs of
-          Nothing -> False
-          Just cost -> Cost.canPay (PaymentSubject.TurningFaceUp oid) pid oid cost gs
+        && any (payable pid oid gs) (costsOf procedure oid gs)
+
+-- Cost.canPay for the special action, canTurnFaceUp's last conjunct and the
+-- filter turnFaceUp offers its choice through.
+payable :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payable pid oid gs cost = Cost.canPay (PaymentSubject.TurningFaceUp oid) pid oid cost gs
 
 -- Every way this player may turn a permanent face up right now, in battlefield
 -- order -- what Action.TurnFaceUp is built from.
@@ -263,9 +270,19 @@ turnFaceUp perform pid procedure oid = do
   before <- State.get
   if not (canTurnFaceUp pid procedure oid before)
     then pure ()
-    else case costOf procedure oid before of
-      Nothing -> pure ()
-      Just cost -> do
+    else do
+      -- CR 702.37b's "a megamorph cost is a morph cost": a card printing two
+      -- morph abilities has two prices for one procedure, and which is paid is
+      -- the player's (Prompt.ChooseCost, Activate's posture), since CR 702.37b's
+      -- counter hangs on it. Only the payable ones are offered, and a question
+      -- with one answer is not asked.
+      chosen <- case filter (payable pid oid before) (costsOf procedure oid before) of
+        [] -> pure Nothing
+        [only] -> pure (Just only)
+        offered -> do
+          answer <- Game.choose (Prompt.ChooseCost (Decide.deciderFor pid before) pid oid offered)
+          pure (List.find (== answer) offered)
+      Monad.forM_ chosen $ \cost -> do
         -- CR 118.13c: a symbol payable in multiple ways is announced by the player
         -- taking the special action "immediately before they pay that cost" -- after
         -- the gate above, since what is announced is how to pay a cost already
@@ -288,7 +305,7 @@ turnFaceUp perform pid procedure oid = do
           Payment.Unpaid -> pure ()
           -- The payment's bound slots are dropped, Pawl.Engine.Ignore's reason:
           -- turning a permanent face up resolves nothing.
-          Payment.Paid _ -> performTurnFaceUp (Just procedure) oid
+          Payment.Paid _ -> performTurnFaceUp (Just (procedure, cost)) oid
 
 -- CR 701.40g and CR 701.58g, one sentence each and the same sentence: "if a
 -- manifested [cloaked] permanent that's represented by an instant or sorcery
@@ -340,7 +357,8 @@ revealsInsteadOfTurningUp oid gs =
 -- says nothing about what proposed it, so a guard on one road would leave the
 -- other one wrong.
 --
--- The procedure is Maybe for that same asymmetry -- see Pawl.Types.ProposedEvent.
+-- The procedure and the cost it paid are Maybe for that same asymmetry -- see
+-- Pawl.Types.ProposedEvent.
 --
 -- CR 708.8 falls out of the shape and is not implemented anywhere: "any effects
 -- that have been applied to the face-down permanent still apply to the face-up
@@ -361,8 +379,8 @@ revealsInsteadOfTurningUp oid gs =
 -- being turned face up, NOT AFTERWARD". That is why the CR 616.1 loop runs
 -- between the two writes below rather than after both -- see the note at the
 -- call.
-performTurnFaceUp :: Maybe TurnUpProcedure -> ObjectId -> Game ()
-performTurnFaceUp procedure oid = do
+performTurnFaceUp :: Maybe (TurnUpProcedure, Cost Keyword) -> ObjectId -> Game ()
+performTurnFaceUp road oid = do
   gs <- State.get
   if revealsInsteadOfTurningUp oid gs
     then
@@ -406,7 +424,7 @@ performTurnFaceUp procedure oid = do
       -- 614.1e's abilities add to the turning over rather than replacing it
       -- -- and there is nothing left to cancel by this point anyway: the
       -- status is already written.
-      Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid procedure))
+      Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid road))
       -- CR 708.7 through CR 603.2: Skirk Marauder's "when this creature is
       -- turned face up" watches for this, and this is the only place in the
       -- engine that writes it.
