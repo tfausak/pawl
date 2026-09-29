@@ -5514,7 +5514,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         count = maybe 0 Integer.toNaturalSaturating (evaluateForRecipient viewOf context gs0 resolving source controller upTo)
     Event.simultaneously . Event.together . Monad.forM_ [1 .. count] $ \n -> do
       State.modify' (bindAmountSlot resolving source slot n)
-      applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
+      applyLoopBody runSubgame resolving source controller legal chosen (foldMap boundSlots body) body
   -- CR 608.2d: the body in written order, then the chooser's "may repeat",
   -- asked after each run and never in advance. No event bracket: each run is its
   -- own process, so each run's damage is its own event. What the body binds is
@@ -5532,7 +5532,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     rescope <- State.gets (rescopeRun resolving (foldMap boundSlots body))
     let run runs = do
           State.modify' rescope
-          applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
+          applyLoopBody runSubgame resolving source controller legal chosen (foldMap boundSlots body) body
           gs <- State.get
           let ask done pid =
                 if done
@@ -5550,7 +5550,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.PlaneswalkerSpec's GristLoyalty group proves the run count.
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> do
     rescope <- State.gets (rescopeRun resolving (foldMap boundSlots (process <> ifHolds)))
-    let apply effects = applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList effects)
+    let apply = applyLoopBody runSubgame resolving source controller legal chosen (foldMap boundSlots (process <> ifHolds))
         run = do
           State.modify' rescope
           apply process
@@ -10548,19 +10548,20 @@ removableAmong gs which candidates = Map.filter (not . Map.null) (Map.fromList [
 carrying :: GameState -> CounterKind.CounterKind Keyword.Type.Keyword -> [ObjectId] -> Map.Map ObjectId Natural
 carrying gs kind candidates = Map.filter (> 0) (Map.fromList [(candidate, Cost.countersOn kind candidate gs) | candidate <- candidates])
 
--- CR 701.8b: bind how many permanents a destruction actually destroyed into
--- `slot` on `holder`, readable as Quantity.InSlot. Binds a NUMBER, which rides
--- the binding field CR 601.2b's chosen X rides. Left behind after the resolution,
--- harmless and unreadable: only an effect naming this slot can see it, and a
--- second sweep overwrites the value before reading it.
---
--- The holder is the effect's `source`, NOT `resolving`, because an amount is
--- read back by Quantity.evaluateFor aimed at `source` (CR 608.2h) while an
--- object binding is read back by ArmDelayedTrigger off the stack object. Where
--- the source has LEFT (CR 400.7) -- Sensational Spider-Man bounced with its
--- trigger on the stack -- the amount goes on `resolving`, the object
--- Quantity.InSlot falls back to, since CR 113.7a resolves the ability anyway.
--- Pawl.RemoveCounterSpec's bounced Spider-Man proves it.
+-- CR 608.2c: a loop body's instructions in written order, each read against what
+-- the loop's earlier instructions bound -- a clause re-reads its bindings per
+-- instruction (Pawl.Engine.Resolve's applyOne), and a body is read the same way
+-- over the slots the loop defines, Effect.ForEach's `defined`. The maps handed
+-- down win, being CR 608.2b's re-validated targets. Pawl.ZoneChangeSpec's Ad
+-- Nauseam group proves it: the loss reads the card the body's own move put into
+-- the hand.
+applyLoopBody :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Set SlotName -> Seq.Seq (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Game ()
+applyLoopBody runSubgame resolving source controller legal chosen bodyDefined body =
+  let applyOne effect = do
+        defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (slotBindings resolving gs)) bodyDefined)
+        applyEffectWith runSubgame resolving source controller (Map.union legal defined) (Map.union chosen defined) effect
+   in applyClauseEffects source applyOne (Foldable.toList body)
+
 -- A loop's per-run scope (CR 608.2c): the slots its body defines put back to
 -- what the resolving object held before the first run, so a run that binds
 -- nothing does not read what the previous run bound. Takes the pre-loop state
@@ -10578,6 +10579,19 @@ rescopeRun resolving bodyDefined gs0 =
                 (GameState.objects gs)
           }
 
+-- CR 701.8b: bind how many permanents a destruction actually destroyed into
+-- `slot` on `holder`, readable as Quantity.InSlot. Binds a NUMBER, which rides
+-- the binding field CR 601.2b's chosen X rides. Left behind after the resolution,
+-- harmless and unreadable: only an effect naming this slot can see it, and a
+-- second sweep overwrites the value before reading it.
+--
+-- The holder is the effect's `source`, NOT `resolving`, because an amount is
+-- read back by Quantity.evaluateFor aimed at `source` (CR 608.2h) while an
+-- object binding is read back by ArmDelayedTrigger off the stack object. Where
+-- the source has LEFT (CR 400.7) -- Sensational Spider-Man bounced with its
+-- trigger on the stack -- the amount goes on `resolving`, the object
+-- Quantity.InSlot falls back to, since CR 113.7a resolves the ability anyway.
+-- Pawl.RemoveCounterSpec's bounced Spider-Man proves it.
 bindAmountSlot :: ObjectId -> ObjectId -> SlotName -> Natural -> GameState -> GameState
 bindAmountSlot resolving source slot n gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}

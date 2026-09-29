@@ -1,7 +1,6 @@
 module Pawl.Types.Effect where
 
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Data.Sequence as Seq
 import qualified Pawl.Types.ActivateManaAbilities as ActivateManaAbilities
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Amass as Amass

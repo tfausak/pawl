@@ -260,6 +260,8 @@ library codec
     Pawl.Codec.ChooseBetween
     Pawl.Codec.ChooseBetweenSpec
     Pawl.Codec.ChooseCardName
+    Pawl.Codec.ChooseNumber
+    Pawl.Codec.ChooseNumberSpec
     Pawl.Codec.ChoosePlayer
     Pawl.Codec.ChoosePlayerAtRandom
     Pawl.Codec.ChoosePlayerAtRandomSpec
@@ -956,8 +958,10 @@ library codec
     Pawl.Codec.RemoveCounters
     Pawl.Codec.RemoveCountersAmong
     Pawl.Codec.RemoveCountersSpec
+    Pawl.Codec.Repeat
     Pawl.Codec.RepeatIf
     Pawl.Codec.RepeatIfSpec
+    Pawl.Codec.RepeatSpec
     Pawl.Codec.Replace
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.ReplacementEffectSpec
@@ -1845,6 +1849,7 @@ library types
     Pawl.Types.CharacteristicPT
     Pawl.Types.ChooseBetween
     Pawl.Types.ChooseCardName
+    Pawl.Types.ChooseNumber
     Pawl.Types.ChoosePlayer
     Pawl.Types.ChoosePlayerAtRandom
     Pawl.Types.Chooser
@@ -2242,6 +2247,7 @@ library types
     Pawl.Types.RemovalCount
     Pawl.Types.RemoveCounters
     Pawl.Types.RemoveCountersAmong
+    Pawl.Types.Repeat
     Pawl.Types.RepeatIf
     Pawl.Types.Replace
     Pawl.Types.ReplacementBucket
