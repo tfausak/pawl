@@ -1,0 +1,120 @@
+{
+  "faces": [
+    {
+      "enchant": [
+        {
+          "pool": {
+            "type": "Creatures"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Kenrith's Transformation",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "LoseAllAbilities"
+            },
+            {
+              "type": "SetColor",
+              "value": [
+                {
+                  "type": "Green"
+                }
+              ]
+            },
+            {
+              "type": "SetCardType",
+              "value": {
+                "type": "Creature"
+              }
+            },
+            {
+              "type": "SetCreatureSubtype",
+              "value": {
+                "type": "Elk"
+              }
+            },
+            {
+              "type": "SetBasePowerToughness",
+              "value": {
+                "power": {
+                  "type": "Literal",
+                  "value": 3
+                },
+                "toughness": {
+                  "type": "Literal",
+                  "value": 3
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Draw",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

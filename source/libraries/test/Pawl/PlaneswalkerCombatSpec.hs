@@ -14,7 +14,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
-import Pawl.CombatEffectSpec (attackJaceAndBob, attackThePlaneswalker, blockAndSong, blockAndWane, blockWithJace, creaturePlaneswalkerBoard, runToEndOfCombat, runToEndOfCombatWith, tapStateOf)
+import Pawl.CombatEffectSpec (attackJaceAndBob, attackThePlaneswalker, blockAndEnchant, blockAndWane, blockWithJace, creaturePlaneswalkerBoard, runToEndOfCombat, runToEndOfCombatWith, tapStateOf)
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
@@ -64,7 +64,7 @@ import qualified Pawl.Types.Zone as Zone
 -- membership, tap state, creature-ness and CR 509.1b's restrictions, none of which
 -- excludes a permanent that is itself being attacked.
 --
--- Six pool cards carry the rule, every oracle text checked against Scryfall (two
+-- Seven pool cards carry the rule, every oracle text checked against Scryfall (two
 -- Llanowar Elves, a Plains and three Forests are scaffolding -- see
 -- creaturePlaneswalkerBoard):
 --
@@ -91,22 +91,18 @@ import qualified Pawl.Types.Zone as Zone
 --     Enchanted permanent is a colorless Forest land") is the first sentence's
 --     card: CR 205.1a makes the set REPLACE the existing card types, so the
 --     animated Jace stops being a creature and a planeswalker in one resolution.
---     It is the only card in data/cards/ whose SetCardType is aimed at ANOTHER
---     permanent (grep the constructor name: Gliding Licid's sets Enchantment on
---     itself), and it sets Land, which is why the mirror leg below is still
---     waiting on card data.
+--   * Kenrith's Transformation ({1}{G} Enchantment -- Aura, "Enchant creature /
+--     ... Enchanted creature loses all abilities and is a green Elk creature
+--     with base power and toughness 3/3") is the mirror: the same CR 205.1a set,
+--     but to Creature, so the animated Jace stops being a planeswalker and stays
+--     a creature. "Enchant creature" is legal on him only because March has
+--     animated him.
 --   * Vedalken Orrery ({4} Artifact, "You may cast spells as though they had
---     flash") is alice's, and is what makes that cast reachable: CR 303.1 admits
---     an enchantment only in a main phase, and the block has to be declared first
---     (CR 601.3b for the permission, CR 702.8a for the window it carries).
+--     flash") is alice's, and is what makes both Aura casts reachable: CR 303.1
+--     admits an enchantment only in a main phase, and the block has to be
+--     declared first (CR 601.3b for the permission, CR 702.8a for the window it carries).
 --     March animates it too, exactly as it animates the Coating, which changes
 --     nothing here: attackJaceAndBob declares only the two Elves as attackers.
---
--- The mirror case, where the permanent stops being a PLANESWALKER and stays a
--- creature, is unproven here rather than asserted (gap #1846): it needs an effect
--- that sets the card type to Creature, and the Song -- the corpus's only
--- SetCardType aimed at another permanent -- sets Land. Kenrith's Transformation prints one and is not in the
--- pool yet.
 --
 -- Every leg hands over at the declare blockers step, typeChangeRemovalSpec's
 -- pattern, so the block is declared before the type change lands, and stops at the
@@ -214,7 +210,7 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         Spec.assertBool s (Projection.isCreatureOf jaceId gs) "CR 613.8: so March animates him"
         Spec.assertEqWith s "a 3/3, his mana value" (S.powerToughnessOf jaceId gs) (Just (3, 3))
         let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackJaceAndBob atJace atBob) gs
-            atEnd = runToEndOfCombat (blockAndSong jaceId atBob) atBlockers
+            atEnd = runToEndOfCombat (blockAndEnchant (Text.pack "Song of the Dryads") (Recipient.ToObject jaceId) jaceId atBob) atBlockers
             attackers = Combat.Type.attackers (GameState.combat atEnd)
         Spec.assertEqWith s "one attacker really was announced at the planeswalker (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
         Spec.assertEqWith s "and the other at bob" (Map.lookup atBob (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlayer S.bob))
@@ -243,6 +239,52 @@ creaturePlaneswalkerCombatSpec s registry = Spec.describe s "CreaturePlaneswalke
         -- planeswalker -- asserting that entry is gone would fail a correct
         -- engine.
         Spec.assertBool s (not (Combat.stillAttacked jaceId atEnd)) "CR 506.4: and he stops being attacked"
+        Spec.assertEqWith s "CR 506.4c: while the attacker aimed at him stays in combat, record entry and all" (Map.lookup atJace attackers) (Just (AttackTarget.OfPlaneswalker jaceId))
+  Spec.it s "CR 506.4d whole cards: a blocking Jace that stops being a planeswalker is still a blocking creature" $ do
+    jace <- S.printingOf s registry "Jace Beleren"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    coating <- S.printingOf s registry "Liquimetal Coating"
+    march <- S.printingOf s registry "March of the Machines"
+    plains <- S.printingOf s registry "Plains"
+    waxWane <- S.printingOf s registry "Wane"
+    forest <- S.printingOf s registry "Forest"
+    kenrith <- S.printingOf s registry "Kenrith's Transformation"
+    orrery <- S.printingOf s registry "Vedalken Orrery"
+    case creaturePlaneswalkerBoard jace elves coating march plains waxWane of
+      Nothing -> Spec.assertFailure s "fixture should give alice two Llanowar Elves and a Coating with one activated ability, and bob a Jace"
+      Just (gs0, atJace, atBob, jaceId, marchId) -> do
+        -- Seated after the fixture returns, for the Song leg's reason. The
+        -- library card is what the Aura's enters trigger draws: an empty library
+        -- would lose alice the game to CR 704.5b before the end of combat step.
+        let (_, gs1) = S.addPermanent forest S.alice gs0
+            (_, gs2) = S.addPermanent forest S.alice gs1
+            (_, gs3) = S.addPermanent orrery S.alice gs2
+            (_, gs4) = S.addLibraryCard plains S.alice gs3
+            (_, gs) = S.addHandCard kenrith S.alice gs4
+        Spec.assertBool s (Projection.isCreatureOf jaceId gs) "CR 613.8: March animates Jace, so enchant creature can reach him"
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackJaceAndBob atJace atBob) gs
+            atEnd = runToEndOfCombat (blockAndEnchant (Text.pack "Kenrith's Transformation") (Recipient.ToCreature jaceId) jaceId atBob) atBlockers
+            attackers = Combat.Type.attackers (GameState.combat atEnd)
+        Spec.assertEqWith s "one attacker really was announced at the planeswalker (CR 508.1b)" (Map.lookup atJace (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlaneswalker jaceId))
+        Spec.assertEqWith s "and the other at bob" (Map.lookup atBob (Combat.Type.attackers (GameState.combat atBlockers))) (Just (AttackTarget.OfPlayer S.bob))
+        Spec.assertEqWith s "the leg reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
+        Spec.assertBool s (S.onBattlefield marchId atEnd) "March of the Machines survives -- this leg destroys nothing"
+        Spec.assertEqWith s "the enters trigger drew alice's one library card" (length (Game.zoneMembers Zone.Library S.alice atEnd)) 0
+        -- CR 205.1a: the set to Creature replaces Planeswalker.
+        Spec.assertBool s (not (Projection.isPlaneswalkerOf jaceId atEnd)) "CR 205.1a: Jace stopped being a planeswalker"
+        Spec.assertBool s (Projection.isCreatureOf jaceId atEnd) "and is still a creature"
+        Spec.assertBool s (S.onBattlefield jaceId atEnd) "and is still on the battlefield, so this is the card-types clause and not the leaves-the-battlefield one"
+        -- The gameplay readings first. The block surviving is what marks 1 on
+        -- him and kills the 1/1 he blocks (CR 510.1c); the attacker aimed at him
+        -- assigning nothing (CR 506.4c) is what keeps the mark at 1 rather than
+        -- 2. His loyalty counters stay on him (CR 205.1a) at an untouched 5.
+        Spec.assertEqWith s "CR 510.1c: the attacker Jace still blocks marks its 1 on him, and nothing else does" (S.damageOf jaceId atEnd) (Just 1)
+        Spec.assertBool s (not (S.onBattlefield atBob atEnd)) "CR 506.4d: he kept blocking, so his 3 power killed that attacker"
+        Spec.assertEqWith s "CR 205.1a: his loyalty counters remain, untouched at 5" (S.counterOf CounterKind.Loyalty jaceId atEnd) 5
+        Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob atEnd) (Just 20)
+        -- CR 506.4d's second sentence, the engine-level readings.
+        Spec.assertEqWith s "CR 506.4d: he continues to be a blocking creature" (Combat.blockersOf atBob atEnd) (Set.singleton jaceId)
+        Spec.assertBool s (not (Combat.stillAttacked jaceId atEnd)) "CR 506.4: but he stops being a planeswalker that's being attacked"
         Spec.assertEqWith s "CR 506.4c: while the attacker aimed at him stays in combat, record entry and all" (Map.lookup atJace attackers) (Just (AttackTarget.OfPlaneswalker jaceId))
 
 -- CR 508.4: "If a creature is put onto the battlefield attacking, its controller
