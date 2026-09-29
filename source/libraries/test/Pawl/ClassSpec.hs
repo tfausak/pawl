@@ -456,10 +456,10 @@ auditBoard audit paladinClass piker level =
 -- Song of the Dryads is what makes a Class stop being one: "Enchanted
 -- permanent is a colorless Forest land" is a Modification.SetCardType, and CR
 -- 205.1a's third clause then takes the Class subtype away with the Enchantment
--- card type it correlates with (CR 205.3h). It and Gliding Licid are the corpus's
--- two SetCardType cards (grep it over data/cards/), and the Licid's sets
--- Enchantment on itself, so this is the one board in the pool on which a Class
--- stops being one.
+-- card type it correlates with (CR 205.3h). Of the corpus's other SetCardType
+-- cards (grep it over data/cards/), Gliding Licid's sets Enchantment on itself
+-- and Kenrith's Transformation's enchants a creature, which a Class is not
+-- without a second effect, so this is the board on which a Class stops being one.
 --
 -- The retention is observable across the ROUND TRIP rather than during it, and
 -- that is a rules fact rather than a shortcut: the same Aura's SetLandSubtype
