@@ -1863,6 +1863,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentTransforms f -> TriggerCondition.PermanentTransforms (Filter.rewrite pairs f)
   TriggerCondition.PermanentTurnedFaceUp f -> TriggerCondition.PermanentTurnedFaceUp (Filter.rewrite pairs f)
   TriggerCondition.PermanentTurnedFaceDown f -> TriggerCondition.PermanentTurnedFaceDown (Filter.rewrite pairs f)
+  TriggerCondition.FaceDownPermanentLeavesRevealed -> condition
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d f) -> TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d (Filter.rewrite pairs f))
   TriggerCondition.SelfEvolves -> condition
   TriggerCondition.SelfMutates -> condition

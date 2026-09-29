@@ -2742,6 +2742,8 @@ representativeEvents cond =
         -- CR 701.27b's event for the other direction, on `departed` for the arm
         -- above's reason.
         TriggerCondition.PermanentTurnedFaceDown _ -> one (GameEvent.TurnedFaceDown departed)
+        -- CR 708.9's reveal, the only event this condition admits.
+        TriggerCondition.FaceDownPermanentLeavesRevealed -> one (GameEvent.Revealed (Revealed.MkRevealed S.alice departed RevealCause.LeavingFaceDown S.emptyCharacteristics))
         -- CR 702.112b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
         TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d _) -> one (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated d departed))
@@ -3103,6 +3105,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentTransforms (Filter.Type.And []),
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
     TriggerCondition.PermanentTurnedFaceDown (Filter.Type.And []),
+    TriggerCondition.FaceDownPermanentLeavesRevealed,
     TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Renowned (Filter.Type.And [])),
     TriggerCondition.SelfEvolves,
     TriggerCondition.SelfMutates,

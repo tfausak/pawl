@@ -122,6 +122,10 @@
 -- event: Scryfall `o:"turned face down" include:extras`, 2026-09-10, answers
 -- Vesuvan Shapeshifter alone, whose clause is a duration, see #3606. Thraben
 -- Gargoyle is CR 712.16's double-faced permanent. turnedFaceDownSpec has both.
+--
+-- Synthetic Unmasking Witness is the watcher of CR 708.9's departure reveal:
+-- Scryfall `o:"face-down" o:/revealed/`, 2026-09-29, no hit. unmaskingSpec
+-- says the rest.
 module Pawl.FaceDownSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -170,6 +174,7 @@ import qualified Pawl.Types.FaceDownReason as FaceDownReason
 import qualified Pawl.Types.FaceDownState as FaceDownState
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
@@ -189,6 +194,8 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -219,6 +226,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   breakOpenSpec s registry
   primalWhispererSpec s registry
   shriekerSpec s registry
+  unmaskingSpec s registry
   disguiseSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
@@ -3346,6 +3354,78 @@ shriekerSpec s registry = Spec.describe s "Revealing a face-down permanent (CR 7
         -- THE GAMEPLAY ASSERTION, and the falsifier for a projected read.
         Spec.assertEqWith s "CR 708.12 the land card stayed face down" (fmap Object.facing (Game.lookupObject oid after)) (Just (Facing.faceDown FaceDownReason.Manifested))
       Nothing -> Spec.assertFailure s "the face-down permanent did not reach the battlefield"
+
+-- CR 708.9: Synthetic Unmasking Witness, "Whenever a face-down permanent is
+-- revealed as it leaves the battlefield, draw a card". alice's library count is
+-- the observable: nothing else on unmaskBoard draws.
+unmaskingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+unmaskingSpec s registry = Spec.describe s "Revealed as it leaves (CR 708.9)" $ do
+  -- THE PROVING TEST. The negative leg is the same Murder from the same board at
+  -- the face-up Piker.
+  Spec.it s "CR 708.9 the Witness draws when Murder destroys a face-down permanent" $ do
+    (board, murder, _, manifest, piker, _, _) <- unmaskBoard s registry
+    murderPrinting <- S.printingOf s registry "Murder"
+    let destroyed = castAtAndSettle murderPrinting murder manifest board
+        control = castAtAndSettle murderPrinting murder piker board
+    Spec.assertEqWith s "CR 708.9 the Witness drew one card" (libraryCount board - libraryCount destroyed) 1
+    Spec.assertEqWith s "a face-up Piker destroyed draws nothing" (libraryCount board - libraryCount control) 0
+    Spec.assertEqWith s "CR 708.9 bob, the owner, revealed it" (departureReveals destroyed) [S.bob]
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject manifest destroyed)) "setup: the manifest left the battlefield"
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject piker control)) "setup: the Piker left the battlefield"
+
+  -- The fence: Hauntwoods Shrieker reveals the same face-down permanent in
+  -- place (CR 701.20b), an Ordinary reveal the Witness must ignore. Forest is
+  -- underneath, so CR 708.12 leaves it face down.
+  Spec.it s "CR 701.20b a face-down permanent revealed in place draws nothing" $ do
+    (board, _, _, manifest, _, _, shriekerId) <- unmaskBoard s registry
+    shrieker <- S.printingOf s registry "Hauntwoods Shrieker"
+    -- The priority loop after `shriek` is what resolves anything that triggered.
+    let shrieked = S.runPure S.identityAnswer (shriek shrieker shriekerId manifest board) Engine.priorityLoop
+    Spec.assertEqWith s "CR 701.20b no card drawn" (libraryCount board - libraryCount shrieked) 0
+    Spec.assertEqWith s "setup: the Shrieker revealed it" [RevealCause.Ordinary | GameEvent.Revealed r <- S.eventsOf shrieked, Revealed.card r == manifest, RevealCause.Ordinary <- [Revealed.cause r]] [RevealCause.Ordinary]
+    Spec.assertBool s (isFaceDown manifest shrieked) "setup: and it stayed face down"
+
+  -- CR 603.10a: Day of Judgment destroys the Witness beside the face-down
+  -- permanent, and the Witness looks back.
+  Spec.it s "CR 603.10a the Witness destroyed alongside it still draws" $ do
+    (board, _, judgment, manifest, _, witness, _) <- unmaskBoard s registry
+    judgmentPrinting <- S.printingOf s registry "Day of Judgment"
+    let wiped = castAtAndSettle judgmentPrinting judgment manifest board
+    Spec.assertEqWith s "CR 603.10a the Witness drew one card" (libraryCount board - libraryCount wiped) 1
+    Spec.assertEqWith s "setup: CR 708.9 the manifest was revealed" (departureReveals wiped) [S.bob]
+    Spec.assertBool s (Maybe.isNothing (Game.lookupObject witness wiped)) "setup: the Witness was destroyed too"
+
+-- alice's main phase with priority: three Swamps for Murder, two Forests for
+-- Hauntwoods Shrieker, four Plains for Day of Judgment, Murder and Day of
+-- Judgment in hand, the Witness and the Shrieker under her, and her library
+-- stocked. bob controls a face-down manifest with a Forest card underneath and a
+-- face-up Goblin Piker. Returns the board, Murder, Day of Judgment, the
+-- manifest, the Piker, the Witness and the Shrieker.
+unmaskBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+unmaskBoard s registry = do
+  swamp <- S.printingOf s registry "Swamp"
+  forest <- S.printingOf s registry "Forest"
+  plains <- S.printingOf s registry "Plains"
+  murder <- S.printingOf s registry "Murder"
+  judgment <- S.printingOf s registry "Day of Judgment"
+  witness <- S.printingOf s registry "Synthetic Unmasking Witness"
+  shrieker <- S.printingOf s registry "Hauntwoods Shrieker"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let lands = S.landsFor plains S.alice 4 (S.landsFor forest S.alice 2 (S.landsInPlay swamp 3))
+      (g1, murderId) = S.handOne murder lands
+      (g2, judgmentId) = S.handOne judgment g1
+      (witnessId, g3) = S.addPermanent witness S.alice g2
+      (shriekerId, g4) = S.addPermanent shrieker S.alice g3
+      (pikerId, g5) = S.addPermanent piker S.bob g4
+      (g6, entered) = enterFaceDown forest S.bob g5
+      board = stockLibrary piker g6 {GameState.priority = Just S.alice}
+  case entered of
+    Just manifest -> pure (board, murderId, judgmentId, manifest, pikerId, witnessId, shriekerId)
+    Nothing -> Spec.assertFailure s "the manifest did not reach the battlefield"
+
+-- Who made each CR 708.9 departure reveal on the log, in order.
+departureReveals :: GameState.GameState -> [PlayerId.PlayerId]
+departureReveals gs = [Revealed.player r | GameEvent.Revealed r <- S.eventsOf gs, Revealed.cause r == RevealCause.LeavingFaceDown]
 
 -- The board rule 708.12 is read on, returned as (the board, the Shrieker's
 -- printing, the Shrieker, the face-down permanent).

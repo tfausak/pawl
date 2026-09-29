@@ -21,5 +21,11 @@ spec s = Spec.describe s "Pawl.Codec.RevealCause" $ do
       RevealCause.codec
       (RevealCause.ForMiracle (Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}))
       " {\"type\":\"ForMiracle\",\"value\":{\"mana\":[]}} "
+  Spec.it s "LeavingFaceDown" $
+    Common.assertCodec
+      s
+      RevealCause.codec
+      RevealCause.LeavingFaceDown
+      " {\"type\":\"LeavingFaceDown\"} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s RevealCause.codec

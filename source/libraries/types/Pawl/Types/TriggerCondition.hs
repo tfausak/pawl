@@ -463,6 +463,9 @@ data TriggerCondition
   | -- | CR 701.27b: a permanent the Filter admits was turned face down (Synthetic
     -- Veiled Witness), read live after the turning.
     PermanentTurnedFaceDown (Filter.Filter Keyword.Keyword)
+  | -- | CR 708.9: "whenever a face-down permanent is revealed as it leaves the
+    -- battlefield" (Synthetic Unmasking Witness).
+    FaceDownPermanentLeavesRevealed
   | -- | A permanent the Filter admits gained this designation -- CR 702.112b's
     -- renown (Valeron Wardens) and CR 701.37b's monstrous (Arbor Colossus).
     PermanentBecomesDesignated PermanentBecomesDesignated.PermanentBecomesDesignated

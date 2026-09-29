@@ -965,6 +965,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- PermanentEnters' reason.
   TriggerCondition.PermanentTurnedFaceUp _ -> []
   TriggerCondition.PermanentTurnedFaceDown _ -> []
+  TriggerCondition.FaceDownPermanentLeavesRevealed -> []
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
   TriggerCondition.PermanentBecomesDesignated {} -> []
   TriggerCondition.SelfEvolves -> []
@@ -4092,6 +4093,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
   TriggerCondition.PermanentTurnedFaceUp f -> unframed [f]
   TriggerCondition.PermanentTurnedFaceDown f -> unframed [f]
+  TriggerCondition.FaceDownPermanentLeavesRevealed -> []
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated _ f) -> unframed [f]
   TriggerCondition.SelfEvolves -> []
@@ -4474,6 +4476,7 @@ triggerConditionSlots triggerCondition = case triggerCondition of
   TriggerCondition.PermanentTransforms _ -> []
   TriggerCondition.PermanentTurnedFaceUp _ -> []
   TriggerCondition.PermanentTurnedFaceDown _ -> []
+  TriggerCondition.FaceDownPermanentLeavesRevealed -> []
   TriggerCondition.PermanentBecomesDesignated _ -> []
   TriggerCondition.SelfEvolves -> []
   TriggerCondition.SelfMutates -> []
