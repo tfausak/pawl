@@ -3948,10 +3948,11 @@ handReplacementsOf keywords = [madnessDiscardExile | not (null (madnessCosts key
 --
 -- Its own mint point for `handReplacementsOf`'s reason: rule 702.52a functions
 -- "only while the card with dredge is in a player's graveyard", which is a zone
--- `mintedReplacementsFor`'s projection walk does not reach. Read off the
--- PRINTED face by Pawl.Engine.Projection.replacementsAffecting's graveyard
--- walk, so a dredge an effect granted to a card in a graveyard mints nothing
--- (gap #1859).
+-- `mintedReplacementsFor`'s projection walk does not reach.
+-- Pawl.Engine.Projection.replacementsAffecting's graveyard walk hands it the
+-- PROJECTION's keywords, but only for a card whose printed face has dredge,
+-- so a dredge an effect granted to a card in a graveyard mints nothing (gap
+-- #1859).
 --
 -- ONE ROW PER DISTINCT dredge ability, which is what a keyword SET gives and
 -- what rule 702.52 asks for: each ability states its own N, so two unlike ones
