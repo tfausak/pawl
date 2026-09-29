@@ -2900,6 +2900,69 @@ chronicleWardenSpec s registry =
           -- lore counter on, so chapter III really was the final chapter.
           Spec.assertEqWith s "the turn-based action put the third lore counter on" (S.counterOf CounterKind.Lore sagaId advanced) 3
 
+-- CR 603.3b's second class armed as a CR 603.7 DELAYED ability. Synthetic
+-- Epilogue Vigil, {1}{W} Instant, "When the final chapter ability of a Saga you
+-- control next triggers, create a 4/4 white Angel creature token with flying
+-- and vigilance." SYNTHETIC: MTGJSON's oracle text (2026-09-29) and Scryfall
+-- `o:/next time .*abilit.* triggers?/` and `o:/whenever .*abilit.* triggers?
+-- this turn/`, 2026-09-29, have no delayed ability watching an ability
+-- trigger; Historian's Boon is the object-borne twin.
+--
+-- THE PAIR differs in one thing, how many lore counters History of Benalia
+-- stands on when CR 714.3c's turn-based action adds one. At two, chapter III
+-- (the final one, CR 714.2d) triggers and the entry fires in CR 603.3b's same
+-- batch. At one, chapter II triggers instead: its record reaches the entry and
+-- does not match, so CR 603.7b's one shot is NOT spent, and the next lore
+-- counter fires it. A second Saga's chapter III after the first firing is what
+-- shows the one shot WAS spent.
+delayedSecondClassSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+delayedSecondClassSpec s registry =
+  let angelToken = CardName.MkCardName (Text.pack "Angel Token")
+      atMain gs =
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      -- alice casts the Vigil off two Plains with the Saga on `lore` counters;
+      -- (the Saga's id, the board with the entry armed).
+      armed lore = do
+        plains <- S.printingOf s registry "Plains"
+        benalia <- S.printingOf s registry "History of Benalia"
+        vigil <- S.printingOf s registry "Synthetic Epilogue Vigil"
+        let (sagaId, base) = S.addPermanent benalia S.alice (S.landsFor plains S.alice 2 (Setup.emptyGame S.bothPlayers))
+            (vigilId, withVigil) = S.addHandCard vigil S.alice (S.addCounter CounterKind.Lore lore sagaId base)
+            cast = S.runPure S.identityAnswer (atMain withVigil) (S.cast S.alice vigilId >> Engine.priorityLoop)
+        pure (sagaId, cast)
+      -- One more lore counter by CR 714.3c, and everything that triggers resolved.
+      chapter gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer (atMain gs) (Engine.runTurnBasedActions Phase.PrecombatMain)) Engine.priorityLoop
+   in Spec.describe s "CR 603.7 a delayed ability watching an ability trigger" $ do
+        Spec.it s "CR 603.3b the Vigil's entry fires off chapter III triggering" $ do
+          (sagaId, gs) <- armed 2
+          let after = chapter gs
+              settled = S.runPure S.identityAnswer (S.runPure S.identityAnswer (atMain gs) (Engine.runTurnBasedActions Phase.PrecombatMain)) Engine.settleForPriority
+          Spec.assertEqWith s "alice gets the Vigil's Angel" (S.countOnBattlefieldByName angelToken S.alice after) 1
+          -- CR 603.7b's one shot, read at gameplay level: a second Saga's final
+          -- chapter later fires nothing more.
+          benalia <- S.printingOf s registry "History of Benalia"
+          let (againId, withAgain) = S.addPermanent benalia S.alice after
+              staged = S.addCounter CounterKind.Lore 2 againId withAgain
+          Spec.assertEqWith s "CR 603.7b a second final chapter brings no second Angel" (S.countOnBattlefieldByName angelToken S.alice (chapter staged)) 1
+          Spec.assertEqWith s "the second Saga did reach chapter III" (S.counterOf CounterKind.Lore againId (S.runPure S.identityAnswer (atMain staged) (Engine.runTurnBasedActions Phase.PrecombatMain))) 3
+          Spec.assertEqWith s "CR 603.7b and the one shot is spent" (Seq.length (GameState.delayedTriggers after)) 0
+          -- Second class, so placed in the second pass above chapter III.
+          Spec.assertEqWith s "chapter III sits under the Vigil's trigger" (chaptersOnStackFrom sagaId settled) [3]
+          Spec.assertEqWith s "two triggers on the stack" (length (GameState.stack settled)) 2
+          Spec.assertEqWith s "the entry was armed before the lore counter" (Seq.length (GameState.delayedTriggers gs)) 1
+        Spec.it s "CR 603.7b a non-final chapter triggering leaves the one-shot entry armed" $ do
+          (_, gs) <- armed 1
+          let second = chapter gs
+              third = chapter second
+          Spec.assertEqWith s "chapter II's triggering fires nothing" (S.countOnBattlefieldByName angelToken S.alice second) 0
+          Spec.assertEqWith s "chapter III's triggering then fires it" (S.countOnBattlefieldByName angelToken S.alice third) 1
+          Spec.assertEqWith s "the store still held the entry between" (Seq.length (GameState.delayedTriggers second)) 1
+          Spec.assertEqWith s "and spends it" (Seq.length (GameState.delayedTriggers third)) 0
+
 -- CR 608.2h read by CR 603.3b's second class: the Saga whose final chapter fired
 -- is already in the graveyard when CR 117.5 gathers the watcher's trigger.
 --
@@ -3148,6 +3211,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   secondPlacementPassSpec s registry
   matchedClausePassSpec s registry
   chronicleWardenSpec s registry
+  delayedSecondClassSpec s registry
   sagaDiesBeforeScanSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
