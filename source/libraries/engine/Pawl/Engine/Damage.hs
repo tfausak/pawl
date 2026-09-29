@@ -334,6 +334,11 @@ combatRecipient gs attacker target =
           | notNotedAsAttackingNothing,
             Combat.stillAttacked oid gs ->
               Just (Recipient.ToPlaneswalker oid)
+          -- CR 506.4e: one that stopped being a planeswalker but is still a
+          -- battle is still being attacked, as a battle.
+          | notNotedAsAttackingNothing,
+            Combat.targetStillAttacked target gs ->
+              Just (Recipient.ToBattle oid)
           | Projection.hasKeyword Keyword.TrampleOverPlaneswalkers attacker gs ->
               stillPlaying =<< Defender.defenderOfAttack Projection.controllerWithLastKnown attacker target gs
           | otherwise -> Nothing
@@ -341,10 +346,18 @@ combatRecipient gs attacker target =
         -- battlefield is removed from combat and stops being attacked, so CR 510.1b
         -- gives the creature nothing to assign to. No CR 702.19e for a battle: that
         -- rule names a planeswalker only.
-        AttackTarget.OfBattle oid ->
-          if notNotedAsAttackingNothing && Combat.stillAttackedBattle oid gs
-            then Just (Recipient.ToBattle oid)
-            else Nothing
+        --
+        -- CR 506.4e: one that stopped being a battle but is still a planeswalker
+        -- is still being attacked, as a planeswalker, where Combat's
+        -- targetStillAttacked says.
+        AttackTarget.OfBattle oid
+          | notNotedAsAttackingNothing,
+            Combat.stillAttackedBattle oid gs ->
+              Just (Recipient.ToBattle oid)
+          | notNotedAsAttackingNothing,
+            Combat.targetStillAttacked target gs ->
+              Just (Recipient.ToPlaneswalker oid)
+          | otherwise -> Nothing
 
 -- What one attacking creature ANNOUNCES it assigns, as damage events carrying the
 -- source, paired with the thresholds its CR 702.19b/702.19c gates are stated over.

@@ -132,11 +132,19 @@ lastKnownProtectorOf oid gs = LastKnown.protector =<< Map.lookup oid (GameState.
 -- map and stops attacking the battle, while the historical set keeps the entry
 -- forever. That difference is the whole content of the rider.
 --
+-- CR 506.4e: a planeswalker announcement counts too, since a planeswalker that
+-- is also a battle is a battle being attacked. An attacker already recorded as
+-- attacking nothing (CR 506.4c) is not attacking it; that exclusion is a
+-- regression fence, no test reaching it. Pawl.PlaneswalkerCombatSpec's
+-- PlaneswalkerBattleInCombat "becomes a battle mid-combat" case is the board.
+--
 -- Reads Pawl.Types.Combat directly rather than going through Pawl.Engine.Combat,
 -- which imports THIS module for CR 310.5's attackable battles.
 isBeingAttacked :: ObjectId.ObjectId -> GameState -> Bool
 isBeingAttacked oid gs =
-  List.elem (AttackTarget.OfBattle oid) (Map.elems (Combat.attackers (GameState.combat gs)))
+  let c = GameState.combat gs
+      names target = target == AttackTarget.OfBattle oid || target == AttackTarget.OfPlaneswalker oid
+   in List.any names (Map.elems (Map.withoutKeys (Combat.attackers c) (Combat.attackingNothing c)))
 
 -- CR 205.3q: the battle types this battle has, which is not the same question as
 -- which subtypes it has -- a permanent that is a battle and a creature has

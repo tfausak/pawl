@@ -827,12 +827,14 @@ matchesPrinted viewOf gs event candidate =
         -- have ... after it's turned face up" is answered by asking about the
         -- board rather than by a counterfactual.
         --
-        -- TurnUpR.requiring is the second conjunct, and it is the ROW's own
-        -- condition rather than the rewrite class's. CR 702.37b's megamorph
-        -- counter is the one row that carries it -- "put a +1/+1 counter on it IF
-        -- ITS MEGAMORPH COST WAS PAID to turn it face up" -- so the row is
-        -- refused down CR 701.40c's manifest road and off an Effect.TurnFaceUp
-        -- that names no procedure at all, neither having paid that cost. Refused
+        -- TurnUpR.requiring and TurnUpR.paying are the second and third
+        -- conjuncts, and they are the ROW's own condition rather than the
+        -- rewrite class's. CR 702.37b's megamorph counter is the one row that
+        -- carries them -- "put a +1/+1 counter on it IF ITS MEGAMORPH COST WAS
+        -- PAID to turn it face up" -- so the row is refused down CR 701.40c's
+        -- manifest road, off an Effect.TurnFaceUp that names no procedure at
+        -- all, and down CR 702.37e's own procedure when it paid a plain morph
+        -- cost, none having paid that megamorph cost. Refused
         -- rather than consumed and skipped, which is CR 614.1's own shape for an
         -- ability whose condition is not met.
         --
@@ -841,11 +843,12 @@ matchesPrinted viewOf gs event candidate =
         -- it" clause of its own -- Bubble Smuggler, whose road up is CR 702.168d's
         -- disguise procedure -- states no such condition; see #987. CR 303.4k's
         -- MayAttachTo has none either. Pawl.CardSpec holds that no printing
-        -- authors a `requiring` at all, which is what keeps a card's row
-        -- unconditional here.
-        (ReplacementEffect.TurnUpR turnUpR, ProposedEvent.WouldTurnFaceUp oid procedure) ->
+        -- authors a `requiring` or a `paying` at all, which is what keeps a
+        -- card's row unconditional here.
+        (ReplacementEffect.TurnUpR turnUpR, ProposedEvent.WouldTurnFaceUp oid road) ->
           matchesFiltered viewOf gs candidate (TurnUpR.matching turnUpR) oid
-            && maybe True (\required -> procedure == Just required) (TurnUpR.requiring turnUpR)
+            && maybe True (\required -> fmap fst road == Just required) (TurnUpR.requiring turnUpR)
+            && maybe True (\required -> fmap snd road == Just required) (TurnUpR.paying turnUpR)
         -- CR 122.1d's "a permanent with a stun counter on it" is the self-scope
         -- DestructionR's arm reads one event class over: the row is minted onto
         -- the permanent holding the counters, so `src` IS the rule's subject and
@@ -2117,13 +2120,13 @@ readsApplier re = case re of
   -- WithCounters' answer one event class over. The inner sum is cased so a
   -- second TurnUpRewrite -- CR 208.2b's power-and-toughness setter -- has to be
   -- decided here rather than inheriting this answer.
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.WithCounters {})) -> False
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ _ (TurnUpRewrite.WithCounters {})) -> False
   -- CR 303.4k: "the AURA's controller" makes the choice, and the Aura is the
   -- object the event already named -- so the player asked is read off the event
   -- rather than off whose row is applying, and two identical rows would put the
   -- same question to the same player. The destination Filter is the effect's own
   -- field, inside `choose`'s comparison already.
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.MayAttachTo _)) -> False
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ _ (TurnUpRewrite.MayAttachTo _)) -> False
   -- CR 122.1d acts on the permanent becoming untapped and names no player -- CR
   -- 701.19a's answer one event class over, and for its reason.
   ReplacementEffect.UntapR _ -> False

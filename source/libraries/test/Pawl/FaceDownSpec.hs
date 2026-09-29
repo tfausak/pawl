@@ -363,9 +363,8 @@ turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
     case giftBoard swamp piker mammoth gift of
       Nothing -> Spec.assertFailure s "the morph cast of Gift of Doom did not reach the battlefield"
       Just (before, fodder, mine, _, aura) ->
-        case FaceDown.morphCostOf aura before of
-          Nothing -> Spec.assertFailure s "Gift of Doom should have a morph cost"
-          Just cost -> case Cost.components cost of
+        case FaceDown.morphCostsOf aura before of
+          [cost] -> case Cost.components cost of
             [CostComponent.Sacrifice (Sacrifice.MkSacrifice _ criterion)] ->
               Spec.assertEqWith
                 s
@@ -373,6 +372,7 @@ turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
                 (Replacement.sacrificeCandidates Map.empty S.alice (Just aura) criterion before)
                 (List.sort [fodder, mine])
             _ -> Spec.assertFailure s "Gift of Doom's morph cost should be one sacrifice component"
+          _ -> Spec.assertFailure s "Gift of Doom should have one morph cost"
 
 -- CR 708.2a in the OTHER direction: a face-up permanent turned face down, which
 -- is Backslide's Effect.TurnFaceDown.
@@ -1615,6 +1615,35 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "CR 708.11 asking again adds no second counter" (S.counterOf CounterKind.PlusOnePlusOne permanent again) 1
         Spec.assertEqWith s "CR 708.11 and it is still a 3/2" (S.powerToughnessOf permanent again) (Just (3, 2))
 
+  -- THE PROVING TEST for CR 702.37b's "if its MEGAMORPH cost was paid", and for
+  -- CR 702.37e's choice between two morph costs. Synthetic Twice-Veiled Adept
+  -- prints Morph {1}{G} and Megamorph {4}{G}; one board, cast face down for {3},
+  -- then turned up twice, differing only in the cost the player picks. Eight
+  -- Forests pay {3} and either cost, so both are offered and the prompt is real.
+  --
+  -- The counter is read first in each leg: it is the behaviour. The 3/3 against
+  -- 4/4 and the tapped count (five against eight) say which cost was paid.
+  Spec.it s "CR 702.37b turning Synthetic Twice-Veiled Adept face up puts a +1/+1 counter on it only for its megamorph cost" $ do
+    forest <- S.printingOf s registry "Forest"
+    adept <- S.printingOf s registry "Synthetic Twice-Veiled Adept"
+    let green n = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n, ManaSymbol.OfType (ManaType.Colored Color.Green)])) []
+        paying :: Cost.Cost Keyword.Keyword -> Prompt.Prompt r -> r
+        paying want p = case p of
+          Prompt.ChooseCost _ _ _ offered -> Maybe.fromMaybe (S.identityAnswer p) (List.find (== want) offered)
+          _ -> S.identityAnswer p
+        turnedFor want before permanent = S.runPure (paying want) before (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph permanent)
+    case faceDownWith forest adept 8 of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (before, permanent) -> do
+        let plain = turnedFor (green 1) before permanent
+            mega = turnedFor (green 4) before permanent
+        Spec.assertEqWith s "CR 702.37b no counter for the plain morph cost" (S.counterOf CounterKind.PlusOnePlusOne permanent plain) 0
+        Spec.assertEqWith s "CR 702.37b one counter for the megamorph cost" (S.counterOf CounterKind.PlusOnePlusOne permanent mega) 1
+        Spec.assertEqWith s "CR 708.8 the printed 3/3 for the plain morph cost" (S.powerToughnessOf permanent plain) (Just (3, 3))
+        Spec.assertEqWith s "CR 122.1a a 4/4 for the megamorph cost" (S.powerToughnessOf permanent mega) (Just (4, 4))
+        Spec.assertEqWith s "CR 702.37e {3} then {1}{G}" (S.tappedCount S.alice plain) 5
+        Spec.assertEqWith s "CR 702.37e {3} then {4}{G}" (S.tappedCount S.alice mega) 8
+
   -- THE PROVING TEST for CR 708.7's SECOND written form -- the watcher-scoped
   -- one. Aven Farseer stands on the battlefield doing nothing; Ainok Tracker is
   -- cast face down for CR 702.37a's {3} in front of it and turned face up for its
@@ -1913,7 +1942,7 @@ declining fodder p = case p of
 giftDestinationFilter :: Printing.Printing -> Maybe (Filter.Type.Filter Keyword.Keyword)
 giftDestinationFilter printing =
   case Face.replacementEffects (S.combinedFace printing) of
-    [PrintedReplacement.MkPrintedReplacement _ (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ (TurnUpRewrite.MayAttachTo f))) _ _] -> Just f
+    [PrintedReplacement.MkPrintedReplacement _ (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ _ _ (TurnUpRewrite.MayAttachTo f))) _ _] -> Just f
     _ -> Nothing
 
 -- CR 701.40a / 708.3: a permanent PUT onto the battlefield face down, which is
