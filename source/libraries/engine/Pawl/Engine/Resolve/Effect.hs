@@ -233,6 +233,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLoss as LifeLoss
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
+import qualified Pawl.Types.LoggedEvent as LoggedEvent
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.MakeForetold as MakeForetold
@@ -728,7 +729,8 @@ attachTogether movers recipient = do
 -- The permanents an ObjectRef names, for an instruction that acts on them
 -- together: the one ref that is a CR 608.2d question rather than a read has to
 -- be answered in the Game monad, and every other is objectRefObjects' pure
--- sweep. Shared by turnPermanentsOver, Effect.AttachAll and Effect.Untap.
+-- sweep. Shared by turnPermanentsOver, Effect.AttachAll, Effect.Untap and
+-- Effect.Sacrifice.
 permanentsGathered ::
   Map.Map SlotName (Set Recipient) ->
   ObjectId ->
@@ -4478,13 +4480,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- iterations (CR 101.3).
     Monad.forM_ mPermanents $ \slot ->
       Monad.unless (null destroyed) (State.modify' (bindObjectsSlot resolving slot (Seq.fromList (fmap fst destroyed))))
-  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref sacrificer) -> do
+  Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref sacrificer mSacrificed) -> do
     -- CR 701.21 through the single funnel, which is NOT Event.destroy (CR
     -- 701.21a): a sacrifice is not a destruction, so indestructible (CR 702.12b)
     -- and a regeneration shield leave it alone.
     --
-    -- The victims come from objectRefObjects like every other ObjectRef reader,
-    -- which is what lets Golgothian Sylex's EachMatching sweep the battlefield.
+    -- The victims come from permanentsGathered, objectRefObjects' sweep plus
+    -- CR 608.2d's asked ref: Golgothian Sylex's EachMatching sweeps the
+    -- battlefield, and God-Eternal Bontu's AnyNumberMatching is asked here.
     -- Its InSlot arm keeps what a bare SlotName did: a slot a Create bound to a
     -- GROUP names every token at once, in mint order, ahead of the target read
     -- and owing CR 608.2b nothing; an illegal slot (CR 608.2b) and a player
@@ -4497,8 +4500,22 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- member's CR 616.1 loop reads the board the batch began on -- All Is Dust
     -- sacrificing Rest in Peace beside another coloured permanent exiles both.
     -- Pawl.EventSpec's All Is Dust case is the proof.
+    victims <- permanentsGathered legal resolving controller source ref
     gs <- State.get
-    Event.sacrificeAll (Maybe.mapMaybe (sacrificerFor sacrificer controller gs) (objectRefObjects legal resolving controller source gs ref))
+    Event.sacrificeAll (Maybe.mapMaybe (sacrificerFor sacrificer controller gs) victims)
+    -- "That many" is what the funnel SACRIFICED, never what the sweep named: a
+    -- permanent it refused (CR 701.21a's control clause, CR 101.2's "can't") is
+    -- not counted. Read off the GameEvent.PermanentSacrificed entries the batch
+    -- appended, which the funnel records before any CR 614 redirection, so a
+    -- permanent Rest in Peace exiles instead still counts. Bound even at zero,
+    -- the Destroy arm's `slot` and for its reason.
+    Monad.forM_ mSacrificed $ \slot -> do
+      after <- State.get
+      let isSacrifice logged = case LoggedEvent.event logged of
+            GameEvent.PermanentSacrificed _ -> True
+            _ -> False
+          count = Natural.length (Seq.filter isSacrifice (Seq.drop (Seq.length (GameState.events gs)) (GameState.events after)))
+      State.modify' (bindAmountSlot resolving source slot count)
   Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown ref listed) -> do
     -- CR 708.2: ONE assignment to Object.facing per victim is the whole effect.
     -- What each permanent becomes is the list the effect carries (CR 708.2a's
