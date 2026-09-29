@@ -1472,6 +1472,29 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and carol, who announced the other limb, keeps both Constructs" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Bonded Construct")) S.carol after) 2
     Spec.assertEqWith s "CR 701.55a carol's limb ran once and bob's did not, so alice has exactly one token" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dalek Token")) S.alice after) 1
     Spec.assertEqWith s "and alice, whose creature nobody was facing a choice about, still has the Emperor" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "The Dalek Emperor")) S.alice after) 1
+  -- CR 701.55c: "a replacement effect may replace an instruction to face a
+  -- villainous choice with an instruction to face that choice some number of
+  -- additional times", each performed "one at a time". The Valeyard -- "If an
+  -- opponent would face a villainous choice, they face that choice an
+  -- additional time." -- is the producer, on the Emperor's board with BOB
+  -- controlling it: carol is bob's opponent and faces the choice twice, while
+  -- bob, facing alice's Emperor too, is not his own opponent and faces it once.
+  --
+  -- Each seat's answers are a QUEUE, so the two facings get different answers:
+  -- carol sacrifices the first time and takes the token the second, and bob's
+  -- queue holds a sacrifice behind his token that only a wrong second facing
+  -- would reach, sacrificing one of his three creatures.
+  Spec.it s "CR 701.55c The Valeyard: an opponent faces the choice twice" $ do
+    board <- valeyardBoard s registry True
+    let after = valeyardCombat board
+    Spec.assertEqWith s "CR 701.55c carol's second facing ran: alice has a token from each of bob's one facing and carol's second" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dalek Token")) S.alice after) 2
+    Spec.assertEqWith s "CR 701.55a and carol's first facing, a different choice, ran too: one Construct is gone" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Bonded Construct")) S.carol after) 1
+    Spec.assertEqWith s "The Valeyard reads only its controller's opponents, so bob faced the choice once and keeps all three creatures" (length (Game.zoneMembers Zone.Battlefield S.bob after)) 3
+  -- The same board and answers without The Valeyard: carol faces the choice
+  -- once, her queue's first answer, so no token of hers is made.
+  Spec.it s "CR 701.55a without The Valeyard carol faces the choice once" $ do
+    board <- valeyardBoard s registry False
+    Spec.assertEqWith s "CR 701.55a only bob's token was made" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Dalek Token")) S.alice (valeyardCombat board)) 1
   Spec.it s "CR 608.2d a tapped Piker leaves Teardrop Kami only its untap" $ do
     (gs, ability, kamiId, pikerId) <- kamiBoard s registry True
     case ability of
@@ -3722,6 +3745,40 @@ emperorCombat picks (gs, _) =
           }
       ((_, after), asks) = State.runState (Engine.runGame (emperorAnswer picks) atCombat (Engine.runStep >> Engine.priorityLoop)) []
    in (reverse asks, after)
+
+-- CR 701.55c: the Emperor's board with The Valeyard under BOB's control when
+-- `withValeyard`, and nothing else different.
+valeyardBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (GameState.GameState, ObjectId.ObjectId)
+valeyardBoard s registry withValeyard = do
+  valeyard <- S.printingOf s registry "The Valeyard"
+  (gs, emperorId) <- emperorBoard s registry
+  pure (if withValeyard then snd (S.addPermanent valeyard S.bob gs) else gs, emperorId)
+
+-- The Valeyard's combat: emperorCombat's step, with each seat's answers taken
+-- in order from its queue -- limb 0 is the sacrifice, limb 1 the token.
+valeyardCombat :: (GameState.GameState, ObjectId.ObjectId) -> GameState.GameState
+valeyardCombat (gs, _) =
+  let atCombat =
+        gs
+          { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      queues = Map.fromList [(S.bob, [ClauseIndex.MkClauseIndex 1, ClauseIndex.MkClauseIndex 0]), (S.carol, [ClauseIndex.MkClauseIndex 0, ClauseIndex.MkClauseIndex 1])]
+   in snd (State.evalState (Engine.runGame (valeyardAnswer queues) atCombat (Engine.runStep >> Engine.priorityLoop)) Map.empty)
+
+-- The branch is the seat's next queued answer, counted in State because a
+-- seat's two ChooseClause prompts are structurally identical; filtered back
+-- through the offer and pinned, emperorAnswer's posture.
+valeyardAnswer :: Map.Map PlayerId.PlayerId [ClauseIndex.ClauseIndex] -> Prompt.Prompt r -> State.State (Map.Map PlayerId.PlayerId Int) r
+valeyardAnswer queues p = case p of
+  Prompt.ChooseClause _ pid _ _ live _ -> do
+    asked <- State.gets (Map.findWithDefault 0 pid)
+    State.modify' (Map.insertWith (+) pid 1)
+    let wanted = Maybe.fromMaybe (NonEmpty.head live) (Maybe.listToMaybe (drop asked (Map.findWithDefault [] pid queues)))
+    pure (if elem wanted live then wanted else NonEmpty.head live)
+  Prompt.ChooseSacrifices _ _ _ offered _ _ -> pure (Set.fromList (take 1 offered))
+  _ -> pure (S.identityAnswer p)
 
 -- The Emperor's two answers: the branch, pinned per seat and filtered back
 -- through the offer, and CR 701.21a's sacrifice, pinned to the head of whatever

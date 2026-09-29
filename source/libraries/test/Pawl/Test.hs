@@ -555,6 +555,8 @@ import qualified Pawl.Codec.UntapRewriteSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.VanguardSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
+import qualified Pawl.Codec.VillainousChoiceRSpec
+import qualified Pawl.Codec.VillainousChoiceRewriteSpec
 import qualified Pawl.Codec.VoteSpec
 import qualified Pawl.Codec.WardSpec
 import qualified Pawl.Codec.WhichCountersSpec
@@ -891,6 +893,8 @@ spec s registry = do
   Pawl.Codec.CoinFlipRSpec.spec s
   Pawl.Codec.ProliferateRewriteSpec.spec s
   Pawl.Codec.ProliferateRSpec.spec s
+  Pawl.Codec.VillainousChoiceRewriteSpec.spec s
+  Pawl.Codec.VillainousChoiceRSpec.spec s
   Pawl.Codec.ScryRewriteSpec.spec s
   Pawl.Codec.ScryRSpec.spec s
   Pawl.Codec.ColorSpec.spec s

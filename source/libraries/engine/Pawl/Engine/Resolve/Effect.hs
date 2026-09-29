@@ -1928,6 +1928,7 @@ referentsOfReplacement re = case re of
   ReplacementEffect.DieRollR _ -> []
   ReplacementEffect.ProliferateR _ -> []
   ReplacementEffect.ScryR _ -> []
+  ReplacementEffect.VillainousChoiceR _ -> []
   ReplacementEffect.PhaseR _ -> []
 
 -- The recipients a damage REWRITE bakes, which is CR 614.9's redirect destination

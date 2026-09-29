@@ -66,9 +66,6 @@ data OrElse = MkOrElse
     -- whose option is running is bound under Binding.facingPlayers.
     -- Pawl.ResolveSpec's "CR 701.55d two opponents each taking The Dalek
     -- Emperor's token limb make two tokens" is what proves it.
-    --
-    -- Not implemented: rule 701.55c's replacement of one facing by several,
-    -- The Valeyard's (#3898).
     villainous :: Bool
   }
   deriving (Eq, Ord, Show)
