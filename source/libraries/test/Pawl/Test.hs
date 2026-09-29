@@ -84,6 +84,7 @@ import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockCostSpec
 import qualified Pawl.Codec.BlockPermissionSpec
+import qualified Pawl.Codec.BlockProducerSpec
 import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.BlocksDeclaredSpec
 import qualified Pawl.Codec.CandidateIdSpec
@@ -836,6 +837,7 @@ spec s registry = do
   Pawl.Codec.BlockPermissionSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
   Pawl.Codec.BecameBlockingSpec.spec s
+  Pawl.Codec.BlockProducerSpec.spec s
   Pawl.Codec.ConvokingSpec.spec s
   Pawl.Codec.CrewingSpec.spec s
   Pawl.Codec.SaddlingSpec.spec s

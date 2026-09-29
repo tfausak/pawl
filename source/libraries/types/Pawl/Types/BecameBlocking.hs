@@ -1,6 +1,7 @@
 module Pawl.Types.BecameBlocking where
 
 import qualified Data.Set as Set
+import qualified Pawl.Types.BlockProducer as BlockProducer
 import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | CR 509.1g: a creature became a blocking creature, and which attacking
@@ -11,33 +12,13 @@ import qualified Pawl.Types.ObjectId as ObjectId
 data BecameBlocking = MkBecameBlocking
   { blocker :: ObjectId.ObjectId,
     attacker :: ObjectId.ObjectId,
-    -- | CR 509.4: whether this creature was PUT ONTO THE BATTLEFIELD blocking
-    -- rather than declared under CR 509.1a. Such a creature is "blocking" but,
-    -- for the purposes of trigger events, it never "blocked", and two of this
-    -- event's readers split on exactly that: CR 509.3b's "whenever [a creature]
-    -- blocks a creature" won't trigger ("It won't trigger if the creature is put
-    -- onto the battlefield blocking"), where CR 509.3d's "whenever [a creature]
-    -- becomes blocked by a creature" will ("In addition, it will trigger if a
-    -- creature is put onto the battlefield blocking that creature").
-    --
-    -- The THIRD reader wants the flag SET, which is the one reading rule 509.4
-    -- does not govern: CR 509.3e's "effects that add or remove blockers", where
-    -- the arrival is what pushes an already-blocked attacker over a count. That
-    -- one is about the ATTACKER's tally rather than about whether this creature
-    -- blocked, so rule 509.4's denial does not reach it.
-    --
-    -- The flag names the PRODUCER rather than negating "declared", because the
-    -- rules' third producer -- an effect that causes a creature to block
-    -- (Pawl.Engine.Combat.switchBlockers, General Jarkeld) -- is neither a
-    -- declaration nor an entry, and CR 509.3b does trigger for it. That road
-    -- records this event with the flag CLEAR, which is what puts it through the
-    -- same arm a declaration takes.
-    --
-    -- Not implemented: a Bool cannot then tell a declaration's pair from that
-    -- third road's, and CR 509.3e's two arms that guard on this flag being True
-    -- (Pawl.Engine.Event.Match's SelfBecomesBlockedByOneOrMore and
-    -- CreatureBecomesBlockedByAtLeast) therefore miss it (#1146).
-    putOntoBattlefield :: Bool,
+    -- | Which road made this creature a blocking creature. Three of this
+    -- event's readers split on it: CR 509.3b's "whenever [a creature] blocks a
+    -- creature" won't trigger for CR 509.4's road and will for the other two,
+    -- CR 509.3d's "becomes blocked by a creature" triggers for all three, and
+    -- CR 509.3e's attacker-side forms read the declared road off
+    -- GameEvent.AttackerBlocked instead and so refuse it here.
+    producer :: BlockProducer.BlockProducer,
     -- | CR 509.1h: whether the ATTACKER was already a blocked creature
     -- immediately before this event, read before the write that made it.
     --
@@ -61,12 +42,13 @@ data BecameBlocking = MkBecameBlocking
     -- | CR 509.3e's comparand: the creatures blocking the ATTACKER immediately
     -- before this event, read before the write that added this blocker.
     --
-    -- On CR 509.4's road, the one both readers guard on, exactly one creature
-    -- joins per event -- so the attacker is blocked by one more than this many
-    -- the moment after, a count trigger's floor is crossed here when this many
-    -- plus one equals it, and a filtered one's when nothing here matched the
-    -- Filter. CR 509.1's declaration is simultaneous instead, so every pair it
-    -- records carries the same pre-declaration set; no reader looks.
+    -- On CR 509.4's road exactly one creature joins per event -- so the
+    -- attacker is blocked by one more than this many the moment after, a count
+    -- trigger's floor is crossed here when this many plus one equals it, and a
+    -- filtered one's when nothing here matched the Filter. The effect road
+    -- (BlockProducer.ByEffect) is one simultaneous change instead, so every
+    -- pair it records carries the same set here and the same set after it on
+    -- the producer. So is CR 509.1's declaration; no reader looks there.
     --
     -- Not derivable from Combat.blockers when the condition is scanned, and for
     -- a sharper reason than the flag above: several creatures can be put onto

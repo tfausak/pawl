@@ -149,14 +149,15 @@ data GameEvent
     AttackersDeclared PlayerId.PlayerId
   | -- | CR 509.1g: a creature BECAME A BLOCKING CREATURE, naming it and one
     -- attacking creature it is blocking -- one event per PAIR, CR 509.3b's arity.
-    -- Two appenders: Pawl.Engine.Combat.declareBlockers (CR 509.1a) and
-    -- Pawl.Engine.Combat.putOntoBattlefieldBlocking (CR 509.4).
+    -- Three appenders: Pawl.Engine.Combat.declareBlockers (CR 509.1a),
+    -- Pawl.Engine.Combat.putOntoBattlefieldBlocking (CR 509.4) and
+    -- Pawl.Engine.Combat.switchBlockers (an effect, CR 509.3b).
     --
-    -- Which producer it was rides on the payload's putOntoBattlefield, because CR
-    -- 509.4 makes CR 509.3b's "blocks a creature" and CR 509.3d's "becomes
-    -- blocked by a creature" disagree about it, and Combat.blockers cannot tell
-    -- them apart. The payload's blockersBefore is the only record of what was
-    -- blocking the attacker before this arrival joined them.
+    -- Which one it was rides on the payload's producer, because CR 509.4 makes
+    -- CR 509.3b's "blocks a creature" and CR 509.3d's "becomes blocked by a
+    -- creature" disagree about it, and Combat.blockers cannot tell them apart.
+    -- The payload's blockersBefore is the only record of what was blocking the
+    -- attacker before this arrival joined them.
     BecameBlocking BecameBlocking.BecameBlocking
   | -- | CR 509.1h: an attacking creature BECAME a blocked creature -- one event
     -- per attacker, CR 509.3c's arity where BecameBlocking above has CR 509.3b's.

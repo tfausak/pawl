@@ -22,6 +22,7 @@ import qualified Pawl.Types.BecameBlocking as BecameBlocking
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BecameUnattached as BecameUnattached
+import qualified Pawl.Types.BlockProducer as BlockProducer
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.CardName as CardName
@@ -212,7 +213,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 6, BecameBlocking.attacker = ObjectId.MkObjectId 7, BecameBlocking.putOntoBattlefield = False, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
+      (GameEvent.BecameBlocking (BecameBlocking.MkBecameBlocking {BecameBlocking.blocker = ObjectId.MkObjectId 6, BecameBlocking.attacker = ObjectId.MkObjectId 7, BecameBlocking.producer = BlockProducer.Declared, BecameBlocking.attackerWasBlocked = False, BecameBlocking.blockersBefore = Set.empty}))
       " {\"type\":\"BecameBlocking\",\"value\":{\"blocker\":6,\"attacker\":7}} "
   -- An object and a COUNT: CR 509.3a's event is per blocking creature, and the
   -- number beside it is how many attackers it took (CR 509.3e). Distinct
