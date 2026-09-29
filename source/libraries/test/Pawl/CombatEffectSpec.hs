@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
@@ -39,6 +40,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -53,6 +55,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
@@ -1887,13 +1890,13 @@ battleGrantRemovalSpec s registry = Spec.describe s "BattleGrantRemoval" $ do
   Spec.it s "CR 506.4 whole cards: an attacking creature that becomes a battle is removed from combat" $ do
     let mine =
           (S.battlefield S.alice [S.settled "grantee" "Goblin Piker", S.settled "other" "Goblin Piker", S.settled "first" "Island", S.settled "second" "Island", S.settled "third" "Island"])
-            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
+            { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
             }
         setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.beginningOfCombat
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "grantee")],
-              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
+          Choices.none
+            { Choices.targets = Just [S.aliasRef "grantee"],
+              Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
             }
         script =
           S.turn
@@ -1902,7 +1905,7 @@ battleGrantRemovalSpec s registry = Spec.describe s "BattleGrantRemoval" $ do
               S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "spell") choices)
             ]
     after <- S.play s registry setup script S.combatGame
-    let pikers = S.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) after
+    let pikers = Scenario.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) after
         battles = filter (\oid -> Projection.isBattleOf oid after) pikers
     -- The discriminating assertion: without the clause the grantee is still an
     -- attacking creature and bob takes both Pikers' two, for 16.

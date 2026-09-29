@@ -1,57 +1,73 @@
--- Covers the board builder and keyed script interpreter in Pawl.Support: what a
--- structurally coherent board construction guarantees and what it does not, how
--- an entry is keyed to a moment and matched to a prompt, and which script
--- mistakes are reported rather than silently absorbed. The fixtures and
--- answerers in the rest of Pawl.Support are proved by the specs that use them.
-module Pawl.SupportSpec where
+-- Covers Pawl.Scenario: what placing a board guarantees and what it does not,
+-- how an entry is keyed to a moment and matched to a prompt, when a check runs,
+-- and which scenario mistakes are reported rather than silently absorbed. The
+-- scenarios under data/scenarios are its gameplay-level cases.
+module Pawl.ScenarioSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.ByteString as ByteString
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Encoding
+import qualified Pawl.Codec.Scenario as Codec.Scenario
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonSchema.Define as Define
+import qualified Pawl.JsonSchema.Validate as Validate
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Move as Move
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Readiness as Readiness
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.Scenario as Scenario.Type
+import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.When as When
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-spec s registry = Spec.describe s "Support" $ do
+spec s registry = Spec.describe s "Scenario" $ do
   Spec.it s "a board is structurally coherent but not implicitly settled" $ do
     let piker = CardName.MkCardName (Text.pack "Goblin Piker")
         attacker =
           (S.objectSetup piker)
-            { S.objectAlias = Just (S.MkObjectAlias (Text.pack "attacker")),
-              S.objectDamage = 1,
-              S.objectSickness = Sickness.Settled S.alice
+            { Placement.label = Just (Label.MkLabel (Text.pack "attacker")),
+              Placement.damage = 1,
+              Placement.readiness = Readiness.Ready
             }
         alice =
           (S.playerSetup S.alice)
-            { S.setupBattlefield = Seq.singleton attacker
+            { Seat.battlefield = Seq.singleton attacker
             }
         setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.beginningOfCombat
-    result <- S.buildBoard registry setup
+    result <- Scenario.stage registry setup
     case result of
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right built -> do
-        let raw = S.builtState built
+        let raw = Staged.state built
             settled = S.runPure S.identityAnswer raw Engine.settleForPriority
         Spec.assertEqWith s "the raw board still has its lethally damaged creature" (S.creaturesInPlay S.alice raw) 1
         Spec.assertEqWith s "construction emitted no history" (S.eventsOf raw) []
@@ -59,17 +75,17 @@ spec s registry = Spec.describe s "Support" $ do
 
   Spec.it s "duplicate aliases are rejected" $ do
     let same = S.aliased "same" (S.permanent "Goblin Piker")
-        alice = (S.playerSetup S.alice) {S.setupBattlefield = Seq.fromList [same, same]}
+        alice = (S.playerSetup S.alice) {Seat.battlefield = Seq.fromList [same, same]}
         setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-    result <- S.buildBoard registry setup
-    Spec.assertEqWith s "duplicate alias" result (Left (S.MkDuplicateAlias (S.MkObjectAlias (Text.pack "same"))))
+    result <- Scenario.stage registry setup
+    Spec.assertEqWith s "duplicate alias" result (Left (ScenarioFailure.MkDuplicateLabel (Label.MkLabel (Text.pack "same"))))
 
   Spec.it s "unreached scheduled entries fail" $ do
     let setup = S.duel S.precombatMain [] []
         script = S.turn 1 [S.on S.precombatMain S.alice (S.attack [])]
     built <- S.buildBoardOrFail s registry setup
-    case S.runScript script built (pure ()) of
-      Left (S.MkUnreachedEntries _ _ entries) ->
+    case Scenario.rehearse script built (pure ()) of
+      Left (ScenarioFailure.MkUnreachedEntries _ _ entries) ->
         Spec.assertEqWith s "the unreached entry" entries script
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the unreached entry was silently ignored"
@@ -87,11 +103,11 @@ spec s registry = Spec.describe s "Support" $ do
               S.on S.declareAttackers S.alice (S.attack [S.namedRef "Goblin Piker" 2])
             ]
     built <- S.buildBoardOrFail s registry setup
-    case (Map.lookup (S.MkObjectAlias (Text.pack "first")) (S.builtAliases built), Map.lookup (S.MkObjectAlias (Text.pack "second")) (S.builtAliases built)) of
+    case (Map.lookup (Label.MkLabel (Text.pack "first")) (Staged.objects built), Map.lookup (Label.MkLabel (Text.pack "second")) (Staged.objects built)) of
       (Just first, Just second) -> do
         let prompt = Prompt.DeclareAttackers (Decider.MkDecider S.alice) S.alice [first, second]
             askTwice = (,) <$> Game.ask prompt <*> Game.ask prompt
-        case S.runScript script built askTwice of
+        case Scenario.rehearse script built askTwice of
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right (chosen, _) ->
             Spec.assertEqWith s "same-moment source order" chosen ([first], [second])
@@ -103,16 +119,16 @@ spec s registry = Spec.describe s "Support" $ do
     let setup = S.duel S.declareAttackers [S.settled "attacker" "Goblin Piker"] []
         attack = S.attack [S.aliasRef "attacker"]
     built <- S.buildBoardOrFail s registry setup
-    case Map.lookup (S.MkObjectAlias (Text.pack "attacker")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "attacker")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted an alias"
       Just attacker -> do
         let prompt = Prompt.DeclareAttackers (Decider.MkDecider S.alice) S.bob [attacker]
             ask = Game.ask prompt
-        case S.runScript (S.turn 1 [S.on S.declareAttackers S.alice attack]) built ask of
+        case Scenario.rehearse (S.turn 1 [S.on S.declareAttackers S.alice attack]) built ask of
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right (chosen, _) -> Spec.assertEqWith s "alice's entry answered bob's prompt" chosen [attacker]
-        case S.runScript (S.turn 1 [S.on S.declareAttackers S.bob attack]) built ask of
-          Left (S.MkUnscheduledPrompt _ kind _) ->
+        case Scenario.rehearse (S.turn 1 [S.on S.declareAttackers S.bob attack]) built ask of
+          Left (ScenarioFailure.MkUnscheduledPrompt _ _ _ kind _) ->
             Spec.assertEqWith s "bob's entry answered nothing" kind (Text.pack "DeclareAttackers")
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right _ -> Spec.assertFailure s "an entry keyed on the affected player was consumed"
@@ -124,8 +140,8 @@ spec s registry = Spec.describe s "Support" $ do
     let priority = do
           State.modify' (\gs -> gs {GameState.priority = Just S.alice})
           Engine.priorityLoop
-    case S.runScript script built priority of
-      Left (S.MkUnreachedEntries _ _ entries) ->
+    case Scenario.rehearse script built priority of
+      Left (ScenarioFailure.MkUnreachedEntries _ _ entries) ->
         Spec.assertEqWith s "ChooseAction passed and left the combat entry alone" entries script
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the unrelated combat entry was consumed"
@@ -134,15 +150,15 @@ spec s registry = Spec.describe s "Support" $ do
     let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
         alice = S.hand S.alice [spell]
         setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-        verb = S.castAction (S.aliasRef "spell") S.noChoices
+        verb = S.castAction (S.aliasRef "spell") Choices.none
         script = S.turn 1 [S.on S.precombatMain S.alice verb]
     built <- S.buildBoardOrFail s registry setup
-    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "spell")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted the hand alias"
       Just oid -> do
         let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
             prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
-        case S.runScript script built (Game.ask prompt) of
+        case Scenario.rehearse script built (Game.ask prompt) of
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right (chosen, after) -> do
             Spec.assertEqWith s "the offered cast" chosen action
@@ -151,12 +167,12 @@ spec s registry = Spec.describe s "Support" $ do
   Spec.it s "a scheduled action that was not offered fails" $ do
     let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
         setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-        verb = S.castAction (S.aliasRef "spell") S.noChoices
+        verb = S.castAction (S.aliasRef "spell") Choices.none
         script = S.turn 1 [S.on S.precombatMain S.alice verb]
         prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass]
     built <- S.buildBoardOrFail s registry setup
-    case S.runScript script built (Game.ask prompt) of
-      Left (S.MkActionNotOffered _ failed _) ->
+    case Scenario.rehearse script built (Game.ask prompt) of
+      Left (ScenarioFailure.MkActionNotOffered _ failed _) ->
         Spec.assertEqWith s "the rejected verb" failed verb
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the unoffered cast was accepted"
@@ -164,17 +180,17 @@ spec s registry = Spec.describe s "Support" $ do
   Spec.it s "an underspecified action that matches two offers fails" $ do
     let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
         setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-        verb = S.castAction (S.aliasRef "spell") S.noChoices
+        verb = S.castAction (S.aliasRef "spell") Choices.none
         script = S.turn 1 [S.on S.precombatMain S.alice verb]
     built <- S.buildBoardOrFail s registry setup
-    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "spell")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted the hand alias"
       Just oid -> do
         let front = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
             back = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker Back")) Facing.FaceUp
             prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [front, back]
-        case S.runScript script built (Game.ask prompt) of
-          Left (S.MkAmbiguousAction _ failed _) ->
+        case Scenario.rehearse script built (Game.ask prompt) of
+          Left (ScenarioFailure.MkAmbiguousAction _ failed _) ->
             Spec.assertEqWith s "the ambiguous verb" failed verb
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right _ -> Spec.assertFailure s "the ambiguous cast was guessed"
@@ -182,19 +198,19 @@ spec s registry = Spec.describe s "Support" $ do
   Spec.it s "attached choices are consumed by their action" $ do
     let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
         target = S.aliased "target" (S.permanent "Goblin Piker")
-        alice = (S.hand S.alice [spell]) {S.setupBattlefield = Seq.singleton target}
+        alice = (S.hand S.alice [spell]) {Seat.battlefield = Seq.singleton target}
         setup = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "target")],
-              S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
-              S.choiceX = Just 3,
-              S.choiceCost = Just (ManaCost.MkManaCost [])
+          Choices.none
+            { Choices.targets = Just [S.aliasRef "target"],
+              Choices.modes = Just (Seq.singleton (ModeIndex.MkModeIndex 1)),
+              Choices.x = Just 3,
+              Choices.cost = Just (ManaCost.MkManaCost [])
             }
         verb = S.castAction (S.aliasRef "spell") choices
         script = S.turn 1 [S.on S.precombatMain S.alice verb]
     built <- S.buildBoardOrFail s registry setup
-    case (Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built), Map.lookup (S.MkObjectAlias (Text.pack "target")) (S.builtAliases built)) of
+    case (Map.lookup (Label.MkLabel (Text.pack "spell")) (Staged.objects built), Map.lookup (Label.MkLabel (Text.pack "target")) (Staged.objects built)) of
       (Just spellId, Just targetId) -> do
         let action = A.Cast spellId (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
             actionPrompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
@@ -211,7 +227,7 @@ spec s registry = Spec.describe s "Support" $ do
                 spellId
                 (Map.singleton slot (1, Set.singleton (Recipient.ToCreature targetId)))
             asks = (,,,,) <$> Game.ask actionPrompt <*> Game.ask modePrompt <*> Game.ask xPrompt <*> Game.ask costPrompt <*> Game.ask targetPrompt
-        case S.runScript script built asks of
+        case Scenario.rehearse script built asks of
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right ((chosen, modes, x, chosenCost, targets), _) -> do
             Spec.assertEqWith s "the priority action" chosen action
@@ -224,17 +240,17 @@ spec s registry = Spec.describe s "Support" $ do
   Spec.it s "an unused attached choice fails" $ do
     let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
         setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-        choices = S.noChoices {S.choiceX = Just 3}
+        choices = Choices.none {Choices.x = Just 3}
         verb = S.castAction (S.aliasRef "spell") choices
         script = S.turn 1 [S.on S.precombatMain S.alice verb]
     built <- S.buildBoardOrFail s registry setup
-    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "spell")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted the hand alias"
       Just oid -> do
         let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
             prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
-        case S.runScript script built (Game.ask prompt) of
-          Left (S.MkUnusedActionChoices _ failed _) ->
+        case Scenario.rehearse script built (Game.ask prompt) of
+          Left (ScenarioFailure.MkUnusedActionChoices _ failed _) ->
             Spec.assertEqWith s "the unfinished verb" failed verb
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right _ -> Spec.assertFailure s "the unused X was ignored"
@@ -242,17 +258,17 @@ spec s registry = Spec.describe s "Support" $ do
   Spec.it s "a leftover choice fails at the next prompt rather than answering it" $ do
     let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
         setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-        choices = S.noChoices {S.choiceManaSources = Seq.singleton Nothing}
+        choices = Choices.none {Choices.manaSources = Seq.singleton Nothing}
         verb = S.castAction (S.aliasRef "spell") choices
         script = S.turn 1 [S.on S.precombatMain S.alice verb]
     built <- S.buildBoardOrFail s registry setup
-    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "spell")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted the hand alias"
       Just oid -> do
         let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
             prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
-        case S.runScript script built (Game.ask prompt *> Game.ask prompt) of
-          Left (S.MkUnusedActionChoices _ failed _) ->
+        case Scenario.rehearse script built (Game.ask prompt *> Game.ask prompt) of
+          Left (ScenarioFailure.MkUnusedActionChoices _ failed _) ->
             Spec.assertEqWith s "the unfinished verb" failed verb
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right _ -> Spec.assertFailure s "the leftover mana source was carried into the next priority"
@@ -260,18 +276,18 @@ spec s registry = Spec.describe s "Support" $ do
   Spec.it s "another decider's sub-choice is not answered from the pending action" $ do
     let spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
         setup = S.board (S.hand S.alice [spell] NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
-        choices = S.noChoices {S.choiceX = Just 3}
+        choices = Choices.none {Choices.x = Just 3}
         verb = S.castAction (S.aliasRef "spell") choices
         script = S.turn 1 [S.on S.precombatMain S.alice verb]
     built <- S.buildBoardOrFail s registry setup
-    case Map.lookup (S.MkObjectAlias (Text.pack "spell")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "spell")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted the hand alias"
       Just oid -> do
         let action = A.Cast oid (CardName.MkCardName (Text.pack "Goblin Piker")) Facing.FaceUp
             actionPrompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
             xPrompt = Prompt.ChooseX (Decider.MkDecider S.bob) S.bob oid 0 9
-        case S.runScript script built (Game.ask actionPrompt *> Game.ask xPrompt) of
-          Left (S.MkUnusedActionChoices _ failed _) ->
+        case Scenario.rehearse script built (Game.ask actionPrompt *> Game.ask xPrompt) of
+          Left (ScenarioFailure.MkUnusedActionChoices _ failed _) ->
             Spec.assertEqWith s "the unfinished verb" failed verb
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right _ -> Spec.assertFailure s "bob's X was answered from alice's cast"
@@ -282,13 +298,13 @@ spec s registry = Spec.describe s "Support" $ do
         stranded = S.on S.precombatMain S.alice (S.attack [])
         script = S.turn 1 [stranded, S.on S.precombatMain S.alice (S.playLand (S.aliasRef "land"))]
     built <- S.buildBoardOrFail s registry setup
-    case Map.lookup (S.MkObjectAlias (Text.pack "land")) (S.builtAliases built) of
+    case Map.lookup (Label.MkLabel (Text.pack "land")) (Staged.objects built) of
       Nothing -> Spec.assertFailure s "the board omitted the hand alias"
       Just oid -> do
         let action = A.Play oid Nothing
             prompt = Prompt.ChooseAction (Decider.MkDecider S.alice) S.alice [A.Pass, action]
-        case S.runScript script built (Game.ask prompt) of
-          Left (S.MkUnreachedEntries _ _ entries) ->
+        case Scenario.rehearse script built (Game.ask prompt) of
+          Left (ScenarioFailure.MkUnreachedEntries _ _ entries) ->
             Spec.assertEqWith s "only the stranded entry remains" entries (S.turn 1 [stranded])
           Left failure -> Spec.assertFailure s (S.renderFailure failure)
           Right _ -> Spec.assertFailure s "the stranded entry was consumed"
@@ -299,15 +315,15 @@ spec s registry = Spec.describe s "Support" $ do
         script = S.turn 1 [S.on S.beginningOfCombat S.alice verb]
         prompt = Prompt.ChooseDefender (Decider.MkDecider S.alice) S.alice (S.bob NonEmpty.:| [S.carol])
     built <- S.buildBoardOrFail s registry setup
-    case S.runScript script built (Game.ask prompt) of
+    case Scenario.rehearse script built (Game.ask prompt) of
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right (chosen, _) -> Spec.assertEqWith s "the named defender" chosen S.carol
 
   Spec.it s "concession is opt-in at its scheduled moment" $ do
     let setup = S.duel S.precombatMain [] []
-        concede = S.turn 1 [S.on S.precombatMain S.alice S.MkConcede]
+        concede = S.turn 1 [S.on S.precombatMain S.alice Move.Concede]
     built <- S.buildBoardOrFail s registry setup
-    case S.runScript concede built (Game.ask (Prompt.Concede S.alice)) of
+    case Scenario.rehearse concede built (Game.ask (Prompt.Concede S.alice)) of
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right (answer, _) ->
         Spec.assertEqWith s "scheduled concession" answer Concession.Concedes
@@ -315,8 +331,8 @@ spec s registry = Spec.describe s "Support" $ do
   Spec.it s "an unscheduled non-action prompt fails" $ do
     let setup = S.duel S.beginningOfCombat [S.ready (S.permanent "Goblin Piker")] []
     built <- S.buildBoardOrFail s registry setup
-    case S.runScript Seq.empty built S.combatGame of
-      Left (S.MkUnscheduledPrompt _ kind _) ->
+    case Scenario.rehearse Seq.empty built S.combatGame of
+      Left (ScenarioFailure.MkUnscheduledPrompt _ _ _ kind _) ->
         Spec.assertEqWith s "the prompt kind" kind (Text.pack "DeclareAttackers")
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the attackers prompt was silently answered"
@@ -332,19 +348,19 @@ spec s registry = Spec.describe s "Support" $ do
     Spec.assertEqWith s "bob took the attacker's two" (S.lifeOf S.bob after) (Just 18)
 
   Spec.it s "a reference the prompt did not offer is a failure, not a dropped entry" $ do
-    -- Both Pikers are alice's, so "Goblin Piker 1" resolves; only the untapped
+    -- Both Pikers are alice's, so "Goblin Piker" resolves; only the untapped
     -- one is a legal attacker (CR 508.1a), so the prompt never offers the first.
     -- The engine would filter it out AFTER the entry was popped, leaving a green
     -- script with nobody attacking.
-    let tapped = (S.ready (S.permanent "Goblin Piker")) {S.objectTapState = TapState.Tapped}
+    let tapped = (S.ready (S.permanent "Goblin Piker")) {Placement.tapped = TapState.Tapped}
         setup = S.duel S.declareAttackers [tapped, S.ready (S.permanent "Goblin Piker")] []
         script = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.namedRef "Goblin Piker" 1])]
     built <- S.buildBoardOrFail s registry setup
-    case S.runScript script built S.combatGame of
-      Left (S.MkUnofferedObject _ kind named offers) -> do
-        Spec.assertEqWith s "the unoffered reference" named (Text.pack "Goblin Piker 1")
+    case Scenario.rehearse script built S.combatGame of
+      Left (ScenarioFailure.MkUnofferedObject _ kind named offers) -> do
+        Spec.assertEqWith s "the unoffered reference" named (Text.pack "Goblin Piker")
         Spec.assertEqWith s "the prompt it came from" kind (Text.pack "DeclareAttackers")
-        Spec.assertEqWith s "what it did offer" offers [Text.pack "Goblin Piker 2"]
+        Spec.assertEqWith s "what it did offer" offers [Text.pack "Goblin Piker#2"]
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the unoffered attacker was silently dropped"
 
@@ -383,8 +399,8 @@ spec s registry = Spec.describe s "Support" $ do
                 S.alice
                 right
                 ( S.assignDamage
-                    [ (S.MkCreatureRecipient (S.aliasRef "right first"), 1),
-                      (S.MkCreatureRecipient (S.aliasRef "right second"), 1)
+                    [ (S.aliasRef "right first", 1),
+                      (S.aliasRef "right second", 1)
                     ]
                 ),
               S.onSource
@@ -392,8 +408,8 @@ spec s registry = Spec.describe s "Support" $ do
                 S.alice
                 left
                 ( S.assignDamage
-                    [ (S.MkCreatureRecipient (S.aliasRef "left first"), 1),
-                      (S.MkCreatureRecipient (S.aliasRef "left second"), 1)
+                    [ (S.aliasRef "left first", 1),
+                      (S.aliasRef "left second", 1)
                     ]
                 )
             ]
@@ -406,9 +422,94 @@ spec s registry = Spec.describe s "Support" $ do
         setup = S.duel S.declareAttackers [S.settled "attacker" "Goblin Piker"] []
         script = S.turn 1 [S.onSource S.declareAttackers S.alice attacker (S.attack [attacker])]
     built <- S.buildBoardOrFail s registry setup
-    case S.runScript script built S.combatGame of
-      Left (S.MkUnexpectedQualifier _ kind ref) -> do
+    case Scenario.rehearse script built S.combatGame of
+      Left (ScenarioFailure.MkUnexpectedQualifier _ kind ref) -> do
         Spec.assertEqWith s "the prompt that has no source" kind (Text.pack "DeclareAttackers")
         Spec.assertEqWith s "the qualifier it carried" ref attacker
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the dangling qualifier was ignored"
+
+  -- The two ways a check can fail are never spelled alike: one that ran and
+  -- read false, and one whose moment never came and so asserted nothing.
+  Spec.it s "a check that reads false fails as a false check, naming what it saw" $ do
+    result <- runJson s registry (attackThen "{\"turn\":1,\"step\":\"EndOfCombat\",\"player\":\"alice\",\"check\":{\"Life\":{\"player\":\"bob\",\"life\":17}}}" "[]")
+    case result of
+      Left (ScenarioFailure.MkCheckFailed (Just key) _ observed) -> do
+        Spec.assertEqWith s "the moment it ran at" key (When.MkWhen 1 S.endOfCombat (S.seatLabel S.alice))
+        Spec.assertEqWith s "what it saw" observed (Text.pack "18")
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "a false check passed"
+
+  Spec.it s "a check whose moment never comes fails as unrun, not as false" $ do
+    -- CR 514.3: no player receives priority in the cleanup step, so a check
+    -- waiting for alice's priority there never runs.
+    result <- runJson s registry (attackThen "{\"turn\":1,\"step\":\"Cleanup\",\"player\":\"alice\",\"check\":{\"Life\":{\"player\":\"bob\",\"life\":18}}}" "[]")
+    case result of
+      Left (ScenarioFailure.MkUnrunChecks _ _ entries) -> Spec.assertEqWith s "the unrun check" (length entries) 1
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "an unrun check passed"
+
+  Spec.it s "a final check runs where the run stopped, once the timeline is spent" $ do
+    -- The attack is the last entry, so the run stops after the declare
+    -- attackers step, before any damage: bob is still at 20 there.
+    result <- runJson s registry (attackThen "" "[{\"Life\":{\"player\":\"bob\",\"life\":18}}]")
+    case result of
+      Left (ScenarioFailure.MkCheckFailed Nothing _ observed) -> Spec.assertEqWith s "bob before damage" observed (Text.pack "20")
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "the final check read a state past the run's end"
+
+  Spec.it s "a label naming a seat is not an object" $ do
+    result <- runJson s registry (attackThenAttacking "@bob")
+    case result of
+      Left (ScenarioFailure.MkNotAnObject _) -> pure ()
+      Left failure -> Spec.assertFailure s (S.renderFailure failure)
+      Right _ -> Spec.assertFailure s "a seat was declared as an attacker"
+
+-- Every scenario under data/scenarios: each file matches the schema pawl
+-- emits for it, and runs clean.
+corpusSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> [(FilePath, Either Text.Text Scenario.Type.Scenario)] -> n ()
+corpusSpec s registry = Spec.describe s "Scenarios" . mapM_ (uncurry (scenarioCase s registry))
+
+scenarioCase :: Spec.Spec IO n -> Registry.Registry IO -> FilePath -> Either Text.Text Scenario.Type.Scenario -> n ()
+scenarioCase s registry path decoded =
+  let file = reverse (takeWhile (/= '/') (reverse path))
+      name = case decoded of
+        Left _ -> file
+        Right scenario -> file <> ": " <> Text.unpack (Scenario.Type.description scenario)
+   in Spec.it s name $ case decoded of
+        Left problem -> Spec.assertFailure s (path <> ": " <> Text.unpack problem)
+        Right scenario -> do
+          bytes <- ByteString.readFile path
+          case Encoding.decodeUtf8' bytes of
+            Left problem -> Spec.assertFailure s (path <> ": " <> show problem)
+            Right contents -> case Common.parse contents of
+              Left problem -> Spec.assertFailure s (path <> ": " <> Text.unpack problem)
+              Right value -> Spec.assertEqWith s "matches the scenario schema" (Validate.validate (Define.run (Codec.schema Codec.Scenario.codec)) value) []
+          result <- Scenario.run registry scenario
+          case result of
+            Left failure -> Spec.assertFailure s (S.renderFailure failure)
+            Right _ -> pure ()
+
+-- One scenario decoded and run, failing the case if it will not decode.
+runJson :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (Either ScenarioFailure.ScenarioFailure GameState.GameState)
+runJson s registry json = case Common.parse (Text.pack json) >>= Codec.decode Codec.Scenario.codec of
+  Left problem -> Spec.assertFailure s (Text.unpack problem)
+  Right scenario -> Scenario.run registry scenario
+
+-- alice's settled Piker attacks bob, then `entry` (if any) and `final`.
+attackThen :: String -> String -> String
+attackThen entry final =
+  "{\"description\":\"x\",\"board\":{\"seats\":[{\"name\":\"alice\",\"battlefield\":[{\"card\":\"Goblin Piker\",\"label\":\"attacker\",\"ready\":true}]},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"DeclareAttackers\"},"
+    <> "\"timeline\":[{\"turn\":1,\"step\":\"DeclareAttackers\",\"player\":\"alice\",\"do\":{\"Attack\":[\"@attacker\"]}}"
+    <> (if null entry then "" else "," <> entry)
+    <> "],\"final\":"
+    <> final
+    <> "}"
+
+-- The same board, attacking with whatever `attacker` names.
+attackThenAttacking :: String -> String
+attackThenAttacking attacker =
+  "{\"description\":\"x\",\"board\":{\"seats\":[{\"name\":\"alice\",\"battlefield\":[{\"card\":\"Goblin Piker\",\"label\":\"attacker\",\"ready\":true}]},{\"name\":\"bob\"}],\"active\":\"alice\",\"step\":\"DeclareAttackers\"},"
+    <> "\"timeline\":[{\"turn\":1,\"step\":\"DeclareAttackers\",\"player\":\"alice\",\"do\":{\"Attack\":[\""
+    <> attacker
+    <> "\"]}}]}"

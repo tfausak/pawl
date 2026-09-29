@@ -1,0 +1,24 @@
+{
+  "description": "CR 120.6 combat damage stays marked on a blocker that survives it",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Hill Giant", "label": "giant", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Wall of Stone", "label": "wall", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@giant"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@wall": ["@giant"] } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@wall", "damage": 3 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Tapped": { "object": "@giant", "tapped": true } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

@@ -83,6 +83,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
@@ -91,6 +92,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
@@ -101,22 +103,28 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
+import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
+import qualified Pawl.Types.Seat as Seat
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
@@ -1571,14 +1579,14 @@ wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
       plains = fmap (\i -> S.settled ("plains" <> show i) "Plains") [1 .. 4 :: Int]
       setup battlefield hand =
         S.board
-          ( (S.battlefield S.alice (plains <> battlefield)) {S.setupHand = Seq.fromList hand}
+          ( (S.battlefield S.alice (plains <> battlefield)) {Seat.hand = Seq.fromList hand}
               NonEmpty.:| [S.battlefield S.bob [S.settled "giant" "Hill Giant"]]
           )
           S.bob
           S.beginningOfCombat
-      casting = S.noChoices {S.choiceManaSources = Seq.fromList (fmap (\i -> Just (S.aliasRef ("plains" <> show i))) [1 .. 4 :: Int])}
+      casting = Choices.none {Choices.manaSources = Seq.fromList (fmap (\i -> Just (S.aliasRef ("plains" <> show i))) [1 .. 4 :: Int])}
       -- The -2, her third printed ability.
-      exiling = S.noChoices {S.choiceAbility = Just 2, S.choiceTargets = Just [S.MkObjectTarget giant]}
+      exiling = Choices.none {Choices.targets = Just [giant]}
       attacking = S.on S.declareAttackers S.bob (S.attack [giant])
       toEndOfCombat =
         let go n = do
@@ -1591,7 +1599,7 @@ wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
             1
             [ attacking,
               S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "emperor") casting),
-              S.on S.declareBlockers S.alice (S.activateAction (S.namedRef "The Wandering Emperor" 1) exiling)
+              S.on S.declareBlockers S.alice (S.activateAbility (S.namedRef "The Wandering Emperor" 1) 2 exiling)
             ]
     built <- S.buildBoardOrFail s registry (setup [] [S.aliased "emperor" (S.cardSetup "The Wandering Emperor")])
     (_, after) <- S.runScriptOrFail s script built toEndOfCombat
@@ -1600,13 +1608,13 @@ wanderingEmperorSpec s registry = Spec.describe s "WanderingEmperor" $ do
     Spec.assertEqWith s "alice gained 2 life" (S.lifeOf S.alice after) (Just 22)
     Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
   Spec.it s "CR 606.3 already on the battlefield, she is not offered on bob's turn" $ do
-    let resident = (S.aliased "emperor" (S.permanent "The Wandering Emperor")) {S.objectCounters = Map.singleton CounterKind.Loyalty 3}
+    let resident = (S.aliased "emperor" (S.permanent "The Wandering Emperor")) {Placement.counters = Map.singleton CounterKind.Loyalty 3}
         -- She is attackable now, so bob also names where the Giant attacks.
-        script = S.turn 1 [attacking, S.on S.declareAttackers S.bob (S.attackPlayer S.alice), S.on S.declareAttackers S.alice (S.activateAction (S.aliasRef "emperor") exiling)]
+        script = S.turn 1 [attacking, S.on S.declareAttackers S.bob (S.attackPlayer S.alice), S.on S.declareAttackers S.alice (S.activateAbility (S.aliasRef "emperor") 2 exiling)]
     built <- S.buildBoardOrFail s registry (setup [resident] [])
-    let emperorId = Map.lookup (S.MkObjectAlias (Text.pack "emperor")) (S.builtAliases built)
-    Spec.assertEqWith s "setup: she stands with three loyalty" (fmap (\oid -> S.counterOf CounterKind.Loyalty oid (S.builtState built)) emperorId) (Just 3)
-    case S.runScript script built toEndOfCombat of
-      Left (S.MkActionNotOffered _ (S.MkActivate {}) _) -> pure ()
+    let emperorId = Map.lookup (Label.MkLabel (Text.pack "emperor")) (Staged.objects built)
+    Spec.assertEqWith s "setup: she stands with three loyalty" (fmap (\oid -> S.counterOf CounterKind.Loyalty oid (Staged.state built)) emperorId) (Just 3)
+    case Scenario.rehearse script built toEndOfCombat of
+      Left (ScenarioFailure.MkActionNotOffered _ (Move.Activate {}) _) -> pure ()
       Left failure -> Spec.assertFailure s (S.renderFailure failure)
       Right _ -> Spec.assertFailure s "the -2 was offered anyway"

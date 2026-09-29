@@ -49,11 +49,13 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
@@ -69,6 +71,7 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -81,6 +84,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
@@ -2228,7 +2232,7 @@ livingLoreSpec s registry = Spec.describe s "Living Lore" $ do
 -- assertion also says HOW MANY such objects there were: a doubling that somehow
 -- left two is a different failure from one that doubled wrong.
 boxesOfNamed :: String -> GameState.GameState -> [Maybe (Integer, Integer)]
-boxesOfNamed name gs = fmap (`S.powerToughnessOf` gs) (S.namedObjects (CardName.MkCardName (Text.pack name)) gs)
+boxesOfNamed name gs = fmap (`S.powerToughnessOf` gs) (Scenario.namedObjects (CardName.MkCardName (Text.pack name)) gs)
 
 -- Unleash Fury ({1}{R} Instant -- "Double the power of target creature until end
 -- of turn", Oracle text verified against Scryfall 2026-09-10).
@@ -2267,13 +2271,13 @@ unleashFurySpec s registry = Spec.describe s "Unleash Fury" $ do
                            ]
                     )
                 )
-                  { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Unleash Fury"))
+                  { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Unleash Fury"))
                   }
            in S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "victim")],
-              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
+          Choices.none
+            { Choices.targets = Just [S.aliasRef "victim"],
+              Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
             }
         script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
     after <- S.play s registry (furyBoard [S.permanent "Glorious Anthem"]) script S.priorityGame
@@ -2292,17 +2296,17 @@ unleashFurySpec s registry = Spec.describe s "Unleash Fury" $ do
   Spec.it s "CR 701.10c/107.1b doubling a power below zero modifies it downwards" $ do
     let arbiter =
           (S.aliased "victim" (S.permanent "Silent Arbiter"))
-            { S.objectCounters = Map.singleton CounterKind.MinusOneMinusOne 4
+            { Placement.counters = Map.singleton CounterKind.MinusOneMinusOne 4
             }
         mine =
           (S.battlefield S.alice [arbiter, S.aliased "first" (S.permanent "Mountain"), S.aliased "second" (S.permanent "Mountain")])
-            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Unleash Fury"))
+            { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Unleash Fury"))
             }
         setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "victim")],
-              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
+          Choices.none
+            { Choices.targets = Just [S.aliasRef "victim"],
+              Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
             }
         script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
     after <- S.play s registry setup script S.priorityGame
@@ -2335,7 +2339,7 @@ threefoldGrowthSpec s registry = Spec.describe s "Synthetic Threefold Growth" $ 
   Spec.it s "CR 701.11b/701.11c tripling is doubling's shape with the multiplier moved" $ do
     let arbiter =
           (S.aliased "victim" (S.permanent "Silent Arbiter"))
-            { S.objectCounters = Map.singleton CounterKind.MinusOneMinusOne 4
+            { Placement.counters = Map.singleton CounterKind.MinusOneMinusOne 4
             }
         mine =
           ( S.battlefield
@@ -2346,13 +2350,13 @@ threefoldGrowthSpec s registry = Spec.describe s "Synthetic Threefold Growth" $ 
                 S.aliased "third" (S.permanent "Forest")
               ]
           )
-            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Threefold Growth"))
+            { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Threefold Growth"))
             }
         setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "victim")],
-              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
+          Choices.none
+            { Choices.targets = Just [S.aliasRef "victim"],
+              Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
             }
         script = S.turn 1 [S.on S.precombatMain S.alice (S.castAction (S.aliasRef "spell") choices)]
     after <- S.play s registry setup script S.priorityGame

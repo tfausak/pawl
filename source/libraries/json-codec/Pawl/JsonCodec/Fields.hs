@@ -94,6 +94,12 @@ defaulted key d c get =
         pure ([Value.pair key (Schema.unwrap (Schema.withDefault (Codec.encode c d) s))], [])
     }
 
+-- | The fields of one record written into another's object, through the getter
+-- that reaches it: Pawl.Codec.Casting spells a Choices' keys beside its own.
+-- Keys must still be distinct across the whole object.
+contramap :: (p -> o) -> Fields o a -> Fields p a
+contramap get fields = fields {encode = encode fields . get}
+
 -- | Like 'object', but runs a check against the assembled record after
 -- 'decode' succeeds, rejecting it on 'Left' -- e.g. 'TypeLine' rejecting
 -- an empty @types@ set per CR 205.1. Encoding cannot fail, so the check never

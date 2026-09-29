@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
@@ -43,6 +44,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
@@ -60,6 +62,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.GrantedAbility as GrantedAbility
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.Move as Move
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -72,6 +75,8 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ScenarioFailure as ScenarioFailure
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.VariableChoice as VariableChoice
 import qualified Pawl.Types.Zone as Zone
@@ -107,7 +112,7 @@ extraLandDropsSpec s registry =
           second = S.aliased "second land" (S.cardSetup "Mountain")
           alice =
             (S.battlefield S.alice [S.permanent "Exploration"])
-              { S.setupHand = Seq.fromList [first, second, S.cardSetup "Mountain", S.cardSetup "Mountain", S.cardSetup "Mountain"]
+              { Seat.hand = Seq.fromList [first, second, S.cardSetup "Mountain", S.cardSetup "Mountain", S.cardSetup "Mountain"]
               }
           board = S.board (alice NonEmpty.:| [S.playerSetup S.bob]) S.alice S.precombatMain
           script =
@@ -236,12 +241,12 @@ vedalkenOrrerySpec s registry =
           spell = S.aliased "spell" (S.cardSetup "Goblin Piker")
           alice extras =
             (S.battlefield S.alice ([mana1, mana2] <> replicate 7 (S.permanent "Mountain") <> extras))
-              { S.setupHand = Seq.fromList [spell, S.cardSetup "Mountain"]
+              { Seat.hand = Seq.fromList [spell, S.cardSetup "Mountain"]
               }
           setup extras = S.board (alice extras NonEmpty.:| [S.playerSetup S.bob]) S.bob S.precombatMain
           choices =
-            S.noChoices
-              { S.choiceManaSources =
+            Choices.none
+              { Choices.manaSources =
                   Seq.fromList
                     [ Just (S.aliasRef "first mana"),
                       Just (S.aliasRef "second mana"),
@@ -253,8 +258,8 @@ vedalkenOrrerySpec s registry =
       Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
       Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
       bare <- S.buildBoardOrFail s registry (setup [])
-      case S.runScript script bare S.priorityGame of
-        Left (S.MkActionNotOffered _ (S.MkCast {}) _) -> pure ()
+      case Scenario.rehearse script bare S.priorityGame of
+        Left (ScenarioFailure.MkActionNotOffered _ (Move.Cast {}) _) -> pure ()
         Left failure -> Spec.assertFailure s (S.renderFailure failure)
         Right _ -> Spec.assertFailure s "without the Orrery the cast was offered anyway"
 

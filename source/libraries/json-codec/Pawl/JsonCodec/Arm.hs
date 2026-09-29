@@ -33,6 +33,8 @@ import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Json.Pair as Pair
+import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -213,6 +215,65 @@ taggedWith enc arms =
 -- replaces a hand-written list of the same length rather than adding one.
 enum :: forall a. (Bounded a, Enum a, Eq a, Show a, Typeable.Typeable a) => Codec.Codec a
 enum = taggedWith (Common.nullary . show) (fmap (\c -> nullary (show c) c) [minBound .. maxBound :: a])
+
+-- | The arms EXTERNALLY tagged: a nullary arm is its bare tag, a payload arm an
+-- object whose one key is its tag. For a document people write by hand, where
+-- @{"type": "Pass"}@ says nothing @"Pass"@ does not; Pawl.Codec.Move is the
+-- first caller. The arms, @tagOf@ and an unmatched value behave as in
+-- 'tagged'. An 'optionalPayload' arm reads both shapes, bare when it has no
+-- value.
+--
+-- The schema, like 'armObject'\'s, does not forbid a second key the decoder
+-- rejects: two arms' keys in one object match two branches of the @oneOf@ and
+-- fail it anyway.
+keyed :: forall a. (Typeable.Typeable a) => (a -> String) -> [Arm a] -> Codec.Codec a
+keyed tagOf arms =
+  let codec = keyedAnonymous tagOf arms
+   in codec {Codec.schema = Define.define (Name.typeName (Typeable.Proxy :: Typeable.Proxy a)) (Codec.schema codec)}
+
+-- | 'keyed' for an ALL-NULLARY type, derived as 'enum' is: every value is a
+-- bare string. Not filed in @$defs@, because a type with one wire format there
+-- already -- 'Pawl.Types.TapState' has 'enum''s -- would collide on its name,
+-- and 'Define.define' memoizes on the name alone.
+keyedEnum :: forall a. (Bounded a, Enum a, Eq a, Show a) => Codec.Codec a
+keyedEnum = keyedAnonymous show (fmap (\c -> nullary (show c) c) [minBound .. maxBound :: a])
+
+-- | 'keyed' not filed in @$defs@, on 'anonymous'\'s ground: for a second wire
+-- format of a type that already has one there. Pawl.Codec.Phase's flat step
+-- names are the caller.
+keyedAnonymous :: (a -> String) -> [Arm a] -> Codec.Codec a
+keyedAnonymous tagOf arms =
+  Codec.MkCodec
+    { Codec.encode = \x ->
+        let written = do
+              arm <- List.find ((== tagOf x) . tag) arms
+              mv <- projectValue arm x
+              pure $ case mv of
+                Nothing -> Value.string (tag arm)
+                Just v -> Value.object [Value.pair (tag arm) v]
+         in Maybe.fromMaybe (Value.object []) written,
+      Codec.decode = \value -> do
+        (t, mv) <- case value of
+          Value.String _ -> fmap (\t -> (Text.unpack t, Nothing)) (Common.asText value)
+          _ -> do
+            ps <- Common.asObject value
+            case ps of
+              [p] -> Right (Text.unpack (String.unwrap (Pair.name p)), Just (Pair.value p))
+              _ -> Left . Text.pack $ "expected a string or an object with one key but got " <> show value
+        case List.find ((== t) . tag) arms of
+          Nothing -> Left . Text.pack $ "unknown tag: " <> t
+          Just arm -> decodeValue arm mv,
+      Codec.schema = fmap (Schema.oneOf . concat) (traverse keyedSchema arms)
+    }
+
+keyedSchema :: Arm a -> Define.SchemaM [Schema.Schema]
+keyedSchema arm =
+  let bare = Schema.constant (Text.pack (tag arm))
+      wrapped s = Schema.object [Value.pair (tag arm) (Schema.unwrap s)] [Text.pack (tag arm)]
+   in case valueSchema arm of
+        NoValue -> pure [bare]
+        RequiredValue s -> fmap (pure . wrapped) s
+        OptionalValue s -> fmap (\x -> [bare, wrapped x]) s
 
 armSchema :: Arm a -> Define.SchemaM Schema.Schema
 armSchema arm = case valueSchema arm of

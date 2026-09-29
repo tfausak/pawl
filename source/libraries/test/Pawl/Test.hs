@@ -2,6 +2,7 @@ module Pawl.Test where
 
 import qualified Control.Monad.Trans.Writer as Writer
 import qualified Data.List as List
+import qualified Data.Text as Text
 import qualified Pawl.AbilitySlotLintSpec
 import qualified Pawl.ActivateSpec
 import qualified Pawl.ActivationProhibitionSpec
@@ -34,6 +35,7 @@ import qualified Pawl.Codec.ActivatedAbilitySourceSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationProhibitionSpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
+import qualified Pawl.Codec.ActivationSpec
 import qualified Pawl.Codec.ActivatorSpec
 import qualified Pawl.Codec.ActiveActivationProhibitionSpec
 import qualified Pawl.Codec.ActiveAttackProhibitionSpec
@@ -87,6 +89,7 @@ import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockProducerSpec
 import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.BlocksDeclaredSpec
+import qualified Pawl.Codec.BoardSpec
 import qualified Pawl.Codec.CandidateIdSpec
 import qualified Pawl.Codec.CantAttackPlayerSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
@@ -107,9 +110,12 @@ import qualified Pawl.Codec.CastOfferSpec
 import qualified Pawl.Codec.CastRepetitionSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
+import qualified Pawl.Codec.CastingSpec
 import qualified Pawl.Codec.ChangeSubtypeWordSpec
 import qualified Pawl.Codec.ChangeTextSpec
 import qualified Pawl.Codec.CharacteristicPTSpec
+import qualified Pawl.Codec.CheckSpec
+import qualified Pawl.Codec.ChoicesSpec
 import qualified Pawl.Codec.ChooseBetweenSpec
 import qualified Pawl.Codec.ChoosePlayerAtRandomSpec
 import qualified Pawl.Codec.ChoosePlayerSpec
@@ -158,6 +164,7 @@ import qualified Pawl.Codec.CostDirectionSpec
 import qualified Pawl.Codec.CostReductionSpec
 import qualified Pawl.Codec.CostScaleSpec
 import qualified Pawl.Codec.CostSpec
+import qualified Pawl.Codec.CountIsSpec
 import qualified Pawl.Codec.CountSpec
 import qualified Pawl.Codec.CountedDiscardSpec
 import qualified Pawl.Codec.CounterChangeSpec
@@ -184,6 +191,7 @@ import qualified Pawl.Codec.CrewingSpec
 import qualified Pawl.Codec.CyclingSpec
 import qualified Pawl.Codec.DamageDirectionSpec
 import qualified Pawl.Codec.DamageEventSpec
+import qualified Pawl.Codec.DamageIsSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePartSpec
 import qualified Pawl.Codec.DamagePatternSpec
@@ -241,6 +249,7 @@ import qualified Pawl.Codec.EntryRSpec
 import qualified Pawl.Codec.EntryRestrictionSpec
 import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
+import qualified Pawl.Codec.EntrySpec
 import qualified Pawl.Codec.EquipSpec
 import qualified Pawl.Codec.EventGroupSpec
 import qualified Pawl.Codec.EventShapeSpec
@@ -302,6 +311,7 @@ import qualified Pawl.Codec.KeywordCountSpec
 import qualified Pawl.Codec.KeywordDesignatorSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
+import qualified Pawl.Codec.LabelSpec
 import qualified Pawl.Codec.LastKnownSpec
 import qualified Pawl.Codec.LayoutSpec
 import qualified Pawl.Codec.LibraryDepthSpec
@@ -310,6 +320,7 @@ import qualified Pawl.Codec.LibraryPositionSpec
 import qualified Pawl.Codec.LifeChangeSpec
 import qualified Pawl.Codec.LifeGainRSpec
 import qualified Pawl.Codec.LifeGainRewriteSpec
+import qualified Pawl.Codec.LifeIsSpec
 import qualified Pawl.Codec.LifeLossCauseSpec
 import qualified Pawl.Codec.LifeLossPatternSpec
 import qualified Pawl.Codec.LifeLossRSpec
@@ -364,6 +375,7 @@ import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveCountersSpec
 import qualified Pawl.Codec.MoveDurationSpec
 import qualified Pawl.Codec.MoveManaSpec
+import qualified Pawl.Codec.MoveSpec
 import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.MovedBetweenSpec
 import qualified Pawl.Codec.MovedKindsSpec
@@ -402,6 +414,7 @@ import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PhasedOutSpec
 import qualified Pawl.Codec.PileSpec
+import qualified Pawl.Codec.PlacementSpec
 import qualified Pawl.Codec.PlanarDieFaceSpec
 import qualified Pawl.Codec.PlanarDieRolledSpec
 import qualified Pawl.Codec.PlayPermissionOriginSpec
@@ -444,10 +457,12 @@ import qualified Pawl.Codec.PutCountersFromSpec
 import qualified Pawl.Codec.PutCountersSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RangeOfInfluenceSpec
+import qualified Pawl.Codec.ReadinessSpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RedirectDamageSpec
 import qualified Pawl.Codec.ReduceActivationCostSpec
 import qualified Pawl.Codec.ReduceSpellCostSpec
+import qualified Pawl.Codec.ReferenceSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReinforceSpec
 import qualified Pawl.Codec.RemoveCountersSpec
@@ -481,12 +496,14 @@ import qualified Pawl.Codec.SacrificeToEnterSpec
 import qualified Pawl.Codec.SacrificerSpec
 import qualified Pawl.Codec.SaddlingSpec
 import qualified Pawl.Codec.ScalingSpec
+import qualified Pawl.Codec.ScenarioSpec
 import qualified Pawl.Codec.SchemeSetInMotionSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.ScryRSpec
 import qualified Pawl.Codec.ScryRewriteSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SearchSpec
+import qualified Pawl.Codec.SeatSpec
 import qualified Pawl.Codec.SelfCountersReachedSpec
 import qualified Pawl.Codec.SetBasePowerToughnessSpec
 import qualified Pawl.Codec.SetClassLevelSpec
@@ -521,11 +538,13 @@ import qualified Pawl.Codec.TapForTotalPowerSpec
 import qualified Pawl.Codec.TapPermanentsSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TappedForManaSpec
+import qualified Pawl.Codec.TappedIsSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TeamIdSpec
 import qualified Pawl.Codec.TeamsSpec
 import qualified Pawl.Codec.TheseDiscardSpec
+import qualified Pawl.Codec.TimedSpec
 import qualified Pawl.Codec.TimesSpec
 import qualified Pawl.Codec.TimestampSpec
 import qualified Pawl.Codec.TokenPatternSpec
@@ -555,6 +574,7 @@ import qualified Pawl.Codec.VanguardSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
 import qualified Pawl.Codec.VoteSpec
 import qualified Pawl.Codec.WardSpec
+import qualified Pawl.Codec.WhenSpec
 import qualified Pawl.Codec.WhichCountersSpec
 import qualified Pawl.Codec.WhileSpec
 import qualified Pawl.Codec.WithCountersSpec
@@ -691,6 +711,8 @@ import qualified Pawl.RoomSpec
 import qualified Pawl.SacrificeRestrictionSpec
 import qualified Pawl.SaddleSpec
 import qualified Pawl.SagaSpec
+import qualified Pawl.Scenario.Load as Load
+import qualified Pawl.ScenarioSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.ShieldCounterSpec
 import qualified Pawl.SlugSpec
@@ -699,7 +721,6 @@ import qualified Pawl.SpecialActionSpec
 import qualified Pawl.SpeedSpec
 import qualified Pawl.SplitSecondSpec
 import qualified Pawl.StationSpec
-import qualified Pawl.SupportSpec
 import qualified Pawl.TargetPerPlayerSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TeamSpec
@@ -707,6 +728,7 @@ import qualified Pawl.TimeTravelSpec
 import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
+import qualified Pawl.Types.Scenario as Scenario
 import qualified Pawl.UntapRestrictionSpec
 import qualified Pawl.Uri.FragmentSpec
 import qualified Pawl.VanguardSpec
@@ -722,7 +744,9 @@ main :: IO ()
 main = do
   root <- Registry.defaultRoot
   registry <- Registry.fileRegistry root
-  Tasty.defaultMain (testTree registry)
+  scenarioRoot <- Load.defaultRoot
+  scenarios <- Load.loadRoot scenarioRoot
+  Tasty.defaultMain (testTree registry scenarios)
 
 tasty :: Spec.Spec IO (Writer.Writer [Tasty.TestTree])
 tasty =
@@ -732,8 +756,8 @@ tasty =
       Spec.it = \s -> Writer.tell . List.singleton . HU.testCase s
     }
 
-testTree :: Registry.Registry IO -> Tasty.TestTree
-testTree registry =
+testTree :: Registry.Registry IO -> [(FilePath, Either Text.Text Scenario.Scenario)] -> Tasty.TestTree
+testTree registry scenarios =
   Tasty.testGroup
     "pawl"
     ( -- Pawl.EngineSpec comes first because tasty hands tests to its thread
@@ -741,6 +765,7 @@ testTree registry =
       -- by an order of magnitude. Started last they were the whole tail.
       Writer.execWriter (Pawl.EngineSpec.spec tasty registry)
         <> [Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry]
+        <> Writer.execWriter (Pawl.ScenarioSpec.corpusSpec tasty registry scenarios)
         -- ONE budget for the whole suite, and it is the command line's: the
         -- figure CI passes lives in flake.nix's testFlags and in the workflow's
         -- own `cabal run pawl -- test`, and nothing here overrides it. Two
@@ -1159,6 +1184,25 @@ spec s registry = do
   Pawl.Codec.PhasePatternSpec.spec s
   Pawl.Codec.PhaseSelectorSpec.spec s
   Pawl.Codec.PhaseSpec.spec s
+  Pawl.Codec.WhenSpec.spec s
+  Pawl.Codec.TimedSpec.spec s
+  Pawl.Codec.TappedIsSpec.spec s
+  Pawl.Codec.SeatSpec.spec s
+  Pawl.Codec.ScenarioSpec.spec s
+  Pawl.Codec.ReferenceSpec.spec s
+  Pawl.Codec.ReadinessSpec.spec s
+  Pawl.Codec.PlacementSpec.spec s
+  Pawl.Codec.MoveSpec.spec s
+  Pawl.Codec.LifeIsSpec.spec s
+  Pawl.Codec.LabelSpec.spec s
+  Pawl.Codec.EntrySpec.spec s
+  Pawl.Codec.DamageIsSpec.spec s
+  Pawl.Codec.CountIsSpec.spec s
+  Pawl.Codec.ChoicesSpec.spec s
+  Pawl.Codec.CheckSpec.spec s
+  Pawl.Codec.CastingSpec.spec s
+  Pawl.Codec.BoardSpec.spec s
+  Pawl.Codec.ActivationSpec.spec s
   Pawl.Codec.PhasedOutSpec.spec s
   Pawl.Codec.PileSpec.spec s
   Pawl.Codec.PlayPermissionOriginSpec.spec s
@@ -1477,7 +1521,7 @@ spec s registry = do
   Pawl.SpeedSpec.spec s registry
   Pawl.SplitSecondSpec.spec s registry
   Pawl.StationSpec.spec s registry
-  Pawl.SupportSpec.spec s registry
+  Pawl.ScenarioSpec.spec s registry
   Pawl.TargetSpec.spec s registry
   Pawl.TargetPerPlayerSpec.spec s registry
   Pawl.RangeOfInfluenceSpec.spec s registry

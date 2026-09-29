@@ -112,6 +112,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -553,7 +554,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
     built <- S.buildBoardOrFail s registry setup
     (_, after) <- S.runScriptOrFail s script built throughEndStep
     (_, withMonkey) <- case ragavans of
-      [ragavan] -> S.runScriptOrFail s script built {S.builtState = snd (S.addPermanent (Printing.ofCard ragavan) S.alice (S.builtState built))} throughEndStep
+      [ragavan] -> S.runScriptOrFail s script built {Staged.state = snd (S.addPermanent (Printing.ofCard ragavan) S.alice (Staged.state built))} throughEndStep
       _ -> pure ((), after)
     Spec.assertEqWith
       s
@@ -577,7 +578,7 @@ spec s registry = Spec.describe s "Pawl.Conjure" $ do
         script = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "kari"])]
         exiledAfter top = do
           built <- S.buildBoardOrFail s registry setup
-          let stocked = built {S.builtState = snd (S.addLibraryCard top S.bob (S.builtState built))}
+          let stocked = built {Staged.state = snd (S.addLibraryCard top S.bob (Staged.state built))}
           (_, gs) <- S.runScriptOrFail s script stocked (runStepsUntil S.postcombatMain)
           pure (Game.zoneMembers Zone.Exile S.bob gs, gs {GameState.priority = Just S.alice})
         playsLand oid gs = any (\action -> case action of Action.Play played _ -> played == oid; _ -> False) (Action.legalActions S.alice gs)

@@ -1,0 +1,34 @@
+{
+  "description": "CR 608.2 Lightning Bolt changes nothing until it resolves",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      {
+        "name": "alice",
+        "hand": [
+          { "card": "Mountain", "label": "land" },
+          { "card": "Lightning Bolt", "label": "bolt" }
+        ]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "PlayLand": "@land" } },
+    {
+      "turn": 1,
+      "step": "PrecombatMain",
+      "player": "alice",
+      "do": { "Cast": { "object": "@bolt", "targets": ["@bob"], "mana": ["Mountain"] } }
+    },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 17 } } }
+  ],
+  "final": [
+    { "Tapped": { "object": "Mountain", "tapped": true } },
+    { "Count": { "player": "alice", "zone": "Battlefield", "card": "Mountain", "count": 1 } },
+    { "Count": { "player": "alice", "zone": "Graveyard", "card": "Lightning Bolt", "count": 1 } }
+  ]
+}

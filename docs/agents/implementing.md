@@ -206,12 +206,15 @@ conflict resolution can neuter a test while leaving the suite green.
 
 ## Gameplay harness
 
-Prefer `Pawl.Support`'s `Board`, timed script entries and `play` for gameplay
-tests whose state and player decisions they can state directly. The harness
-checks that a scheduled action was actually offered, keeps its follow-up
-choices attached to it, and fails when a scripted moment or choice was not
-reached. Extend its vocabulary only alongside a gameplay test that needs the
-new decision.
+Prefer a scenario for a gameplay test whose state, decisions and checks it can
+state directly: a JSON file under `data/scenarios/` (its README has the
+format), or, for a test that must drive one engine entry point or assert what
+no `Check` names yet, `Pawl.Support`'s `S.board`, `S.turn`/`S.on` and `play`
+over the same runner, `Pawl.Scenario`. The runner checks that a scheduled
+action was actually offered, keeps its follow-up choices attached to it, and
+fails when a scheduled moment, choice or check was not reached. Extend its
+vocabulary only alongside a gameplay test that needs the new decision or
+check.
 
 Keep a test-local answerer when the prompt protocol itself is the subject, when
 structurally identical prompts must receive different answers, or when the
@@ -223,10 +226,10 @@ pattern) and says so at the site. A spec that matches on `Prompt` needs
 `GADTs`, which implies `MonoLocalBinds`, so a local `let` over a polymorphic
 helper there wants its own signature. A hand-built combat board needs
 `S.combatBoardOf`, which fills `combat.defenders` and `remaining`; without it
-`S.runCombat` runs no combat and a negative passes vacuously. Nested games, replayed or randomized decisions, serialized scenarios,
-and end-state check programs remain outside this harness. Do not migrate a
-working test merely to reduce its line count; migrate when the harness makes
-the rule's preconditions and decisions more explicit.
+`S.runCombat` runs no combat and a negative passes vacuously. Nested games
+and replayed or randomized decisions remain outside this harness. Do not
+migrate a working test merely to reduce its line count; migrate when the
+harness makes the rule's preconditions and decisions more explicit.
 
 ## Vacuity traps
 

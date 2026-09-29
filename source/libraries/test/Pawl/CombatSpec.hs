@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
+import qualified Pawl.Scenario as Scenario
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
@@ -49,6 +50,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Choices as Choices
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -62,6 +64,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -74,20 +77,16 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestrictedCreatures as RestrictedCreatures
+import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 combatDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
-  Spec.it s "CR 510.1b an unblocked attacker damages the defending player" $ do
-    let board = S.duel S.beginningOfCombat [S.settled "attacker" "Goblin Piker"] []
-        script = S.turn 1 [S.on S.declareAttackers S.alice (S.attack [S.aliasRef "attacker"])]
-    after <- S.play s registry board script S.combatGame
-    -- A Piker is a 2/1, and bob starts at 20.
-    Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
   Spec.it s "CR 510.1a Tapestry Warden substitutes toughness only where greater than power" $ do
     warden <- S.printingOf s registry "Tapestry Warden"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -176,56 +175,6 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
           _ -> S.aggressiveAnswer p
         after = S.settleSba (S.fightWith dump gs)
     Spec.assertEqWith s "one blocker survives" (S.creaturesInPlay S.bob after) 1
-  Spec.it s "CR 510.1e an illegal division is rejected and deals nothing" $ do
-    -- Not a reachable game state: this is the engine's defense against a
-    -- broken interpreter. See the spec, section 3.
-    let board =
-          S.duel
-            S.beginningOfCombat
-            [S.settled "attacker" "Goblin Piker"]
-            [S.settled "first" "Goblin Piker", S.settled "second" "Goblin Piker"]
-        attacker = S.aliasRef "attacker"
-        first = S.aliasRef "first"
-        second = S.aliasRef "second"
-        script =
-          S.turn
-            1
-            [ S.on S.declareAttackers S.alice (S.attack [attacker]),
-              S.on S.declareBlockers S.bob (S.block [(first, attacker), (second, attacker)]),
-              S.onSource
-                S.combatDamage
-                S.alice
-                attacker
-                (S.assignDamage [(S.MkCreatureRecipient first, 99), (S.MkCreatureRecipient second, 99)])
-            ]
-    fought <- S.play s registry board script S.combatGame
-    Spec.assertEqWith s "both blockers survive" (S.creaturesInPlay S.bob (S.settleSba fought)) 2
-  Spec.it s "CR 510.1a a legal division deals the damage it names" $ do
-    -- The accepting counterpart to the rejection above: the same board, a legal
-    -- 1/1 division, and both blockers dead. A rejection outcome alone is green
-    -- for any recipient-resolution bug, since a misdirected map is illegal too.
-    let board =
-          S.duel
-            S.beginningOfCombat
-            [S.settled "attacker" "Goblin Piker"]
-            [S.settled "first" "Goblin Piker", S.settled "second" "Goblin Piker"]
-        attacker = S.aliasRef "attacker"
-        first = S.aliasRef "first"
-        second = S.aliasRef "second"
-        script =
-          S.turn
-            1
-            [ S.on S.declareAttackers S.alice (S.attack [attacker]),
-              S.on S.declareBlockers S.bob (S.block [(first, attacker), (second, attacker)]),
-              S.onSource
-                S.combatDamage
-                S.alice
-                attacker
-                (S.assignDamage [(S.MkCreatureRecipient first, 1), (S.MkCreatureRecipient second, 1)])
-            ]
-    fought <- S.play s registry board script S.combatGame
-    -- A Piker is a 2/1, so one point is lethal (CR 510.1c) and both blockers die.
-    Spec.assertEqWith s "both blockers died" (S.creaturesInPlay S.bob (S.settleSba fought)) 0
   -- The deterministic successor to the retired "combat happens" property: an
   -- unblocked 2/1 attacker reduces the defender's life by its power.
   Spec.it s "combat deals damage to the defending player" $ do
@@ -913,7 +862,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
               S.onSource S.declareAttackers S.alice attacker (S.attackPlayer who)
             ]
     built <- S.buildBoardOrFail s registry board
-    let crowned = built {S.builtState = S.withMonarch S.bob (S.builtState built)}
+    let crowned = built {Staged.state = S.withMonarch S.bob (Staged.state built)}
     (_, hitBob) <- S.runScriptOrFail s (script S.bob) crowned S.combatGame
     (_, hitCarol) <- S.runScriptOrFail s (script S.carol) crowned S.combatGame
     -- Run A: attacking the monarch takes the crown.
@@ -5276,7 +5225,7 @@ wallBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m (O
 wallBoard s registry blocker = do
   let bobsSide =
         (S.battlefield S.bob (S.settled "blocker" blocker : replicate 3 (S.ready (S.permanent "Mountain"))))
-          { S.setupHand = Seq.singleton (S.aliased "treason" (S.cardSetup "Act of Treason"))
+          { Seat.hand = Seq.singleton (S.aliased "treason" (S.cardSetup "Act of Treason"))
           }
       setup =
         S.board
@@ -5295,8 +5244,8 @@ wallBoard s registry blocker = do
     (Just giant, Just treason) -> pure (giant, treason, after)
     _ -> Spec.assertFailure s "the board omitted an alias"
 
-aliasOf :: String -> S.BuiltBoard -> Maybe ObjectId.ObjectId
-aliasOf name built = Map.lookup (S.MkObjectAlias (Text.pack name)) (S.builtAliases built)
+aliasOf :: String -> Staged.Staged -> Maybe ObjectId.ObjectId
+aliasOf name built = Map.lookup (Label.MkLabel (Text.pack name)) (Staged.objects built)
 
 -- bob's Act of Treason, cast from his hand in his own precombat main phase and
 -- resolved with its one target slot aimed at the Giant: he gains control of it
@@ -5389,17 +5338,17 @@ creatureBattleDeclarationSpec s registry = Spec.describe s "CreatureBattleDeclar
   Spec.it s "CR 508.1a a creature that is also a battle is not offered as an attacker" $ do
     let mine =
           (S.battlefield S.alice [S.settled "grantee" "Goblin Piker", S.settled "other" "Goblin Piker", S.settled "first" "Island", S.settled "second" "Island", S.settled "third" "Island"])
-            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
+            { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
             }
         setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.beginningOfCombat
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "grantee")],
-              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
+          Choices.none
+            { Choices.targets = Just [S.aliasRef "grantee"],
+              Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
             }
         script = S.turn 1 [S.on S.beginningOfCombat S.alice (S.castAction (S.aliasRef "spell") choices)]
     granted <- S.play s registry setup script S.priorityGame
-    let pikers = S.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) granted
+    let pikers = Scenario.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) granted
         (battles, plain) = List.partition (\oid -> Projection.isBattleOf oid granted) pikers
         fought = S.runCombat S.aggressiveAnswer granted
     -- Gameplay level, and first. The life delta is NOT the discriminator here and
@@ -5419,20 +5368,20 @@ creatureBattleDeclarationSpec s registry = Spec.describe s "CreatureBattleDeclar
     -- taking one 2/1 Piker's two and living is the control on the other axis.
     let theirs =
           (S.battlefield S.bob [S.settled "grantee" "Goblin Piker", S.settled "other" "Goblin Piker", S.settled "first" "Island", S.settled "second" "Island", S.settled "third" "Island"])
-            { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
+            { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Besiege the Front"))
             }
         setup = S.board (S.battlefield S.alice [S.settled "warden" "Tapestry Warden"] NonEmpty.:| [theirs]) S.alice S.beginningOfCombat
         choices =
-          S.noChoices
-            { S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "grantee")],
-              S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
+          Choices.none
+            { Choices.targets = Just [S.aliasRef "grantee"],
+              Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second"), Just (S.aliasRef "third")]
             }
         script = S.turn 1 [S.on S.beginningOfCombat S.bob (S.castAction (S.aliasRef "spell") choices)]
     granted <- S.play s registry setup script S.priorityGame
-    let pikers = S.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) granted
+    let pikers = Scenario.namedObjects (CardName.MkCardName (Text.pack "Goblin Piker")) granted
         (battles, plain) = List.partition (\oid -> Projection.isBattleOf oid granted) pikers
         fought = S.settleSba (S.runCombat S.aggressiveAnswer granted)
-        wardens = S.namedObjects (CardName.MkCardName (Text.pack "Tapestry Warden")) granted
+        wardens = Scenario.namedObjects (CardName.MkCardName (Text.pack "Tapestry Warden")) granted
     Spec.assertEqWith s "CR 509.1a the offer holds the Piker that is not a battle, and only it" (Set.fromList (Combat.legalBlockers S.bob granted)) (Set.fromList plain)
     Spec.assertEqWith s "CR 510.1c and one Piker really blocked, so the Warden took two and lived" (fmap (\oid -> (S.onBattlefield oid fought, S.damageOf oid fought)) wardens) [(True, Just 2)]
     Spec.assertEqWith s "and the spell really left the other one a creature that is a battle" (length pikers, fmap (\oid -> Projection.isCreatureOf oid granted) battles) (2, [True])
@@ -5448,19 +5397,19 @@ creatureBattleDeclarationSpec s registry = Spec.describe s "CreatureBattleDeclar
     let muster mode = do
           let mine =
                 (S.battlefield S.alice [S.settled "first" "Plains", S.settled "second" "Plains"])
-                  { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Siege Muster"))
+                  { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Siege Muster"))
                   }
               setup = S.board (mine NonEmpty.:| [S.playerSetup S.bob]) S.alice S.declareAttackers
               choices =
-                S.noChoices
-                  { S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex mode)),
-                    S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
+                Choices.none
+                  { Choices.modes = Just (Seq.singleton (ModeIndex.MkModeIndex mode)),
+                    Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
                   }
               script = S.turn 1 [S.on S.declareAttackers S.alice (S.castAction (S.aliasRef "spell") choices)]
           S.play s registry setup script Engine.runStep
     plain <- muster 0
     battle <- muster 1
-    let soldiers = S.namedObjects (CardName.MkCardName (Text.pack "Soldier Token"))
+    let soldiers = Scenario.namedObjects (CardName.MkCardName (Text.pack "Soldier Token"))
     Spec.assertEqWith s "CR 508.8 the creature-battle attacked nothing, so the step after declare attackers is end of combat" (GameState.phase battle) S.endOfCombat
     Spec.assertEqWith s "CR 508.8 while the plain Soldier keeps the declare blockers step" (GameState.phase plain) S.declareBlockers
     Spec.assertEqWith s "and each mode really made one tapped Soldier, the second a creature that is a battle" (fmap (\gs -> fmap (\oid -> (fmap Object.tapped (Game.lookupObject oid gs), Projection.isCreatureOf oid gs, Projection.isBattleOf oid gs)) (soldiers gs)) [plain, battle]) [[(Just TapState.Tapped, True, False)], [(Just TapState.Tapped, True, True)]]
@@ -5472,14 +5421,14 @@ creatureBattleDeclarationSpec s registry = Spec.describe s "CreatureBattleDeclar
     let muster mode = do
           let mine =
                 (S.battlefield S.alice [S.settled "first" "Plains", S.settled "second" "Plains"])
-                  { S.setupHand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Siege Muster"))
+                  { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Siege Muster"))
                   }
-              setup = S.board (S.battlefield S.bob [S.settled "piker" "Goblin Piker"] NonEmpty.:| [mine]) S.bob S.beginningOfCombat
+              setup = S.board (mine NonEmpty.:| [S.battlefield S.bob [S.settled "piker" "Goblin Piker"]]) S.bob S.beginningOfCombat
               choices =
-                S.noChoices
-                  { S.choiceModes = Just (Seq.singleton (ModeIndex.MkModeIndex mode)),
-                    S.choiceTargets = Just [S.MkObjectTarget (S.aliasRef "piker")],
-                    S.choiceManaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
+                Choices.none
+                  { Choices.modes = Just (Seq.singleton (ModeIndex.MkModeIndex mode)),
+                    Choices.targets = Just [S.aliasRef "piker"],
+                    Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
                   }
               script =
                 S.turn
@@ -5490,7 +5439,7 @@ creatureBattleDeclarationSpec s registry = Spec.describe s "CreatureBattleDeclar
           S.play s registry setup script S.combatGame
     plain <- muster 2
     battle <- muster 3
-    let soldiers = S.namedObjects (CardName.MkCardName (Text.pack "Soldier Token"))
+    let soldiers = Scenario.namedObjects (CardName.MkCardName (Text.pack "Soldier Token"))
     Spec.assertEqWith s "CR 510.1b the creature-battle never blocked, so the unblocked Piker's two reached alice" (S.lifeOf S.alice battle) (Just 18)
     Spec.assertEqWith s "CR 510.1c while the plain Soldier blocked it and alice took nothing" (S.lifeOf S.alice plain) (Just 20)
     Spec.assertEqWith s "and the second mode really made a creature that is a battle, left alive" (fmap (\oid -> (Projection.isCreatureOf oid battle, Projection.isBattleOf oid battle)) (soldiers battle)) [(True, True)]

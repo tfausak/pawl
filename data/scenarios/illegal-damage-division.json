@@ -1,0 +1,26 @@
+{
+  "description": "CR 510.1e an illegal division is rejected and deals nothing",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "first", "ready": true },
+          { "card": "Goblin Piker", "label": "second", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@first": ["@attacker"], "@second": ["@attacker"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@attacker", "do": { "AssignDamage": { "@first": 99, "@second": 99 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 2 } } }
+  ]
+}
