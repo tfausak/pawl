@@ -172,7 +172,7 @@ activateAbility pid srcId ability = do
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -411,10 +411,11 @@ activateAbility pid srcId ability = do
               -- cost the gates measured -- one reduction cannot be gathered twice
               -- from two states.
               --
-              -- CR 118.7e asks nothing today: every activation-cost reducer in the
-              -- pool reduces by generic mana (Heartstone's {1}), which has no halves
-              -- to choose between. The seam is here rather than skipped so that the
-              -- one that does cannot arrive at a path that never asks.
+              -- CR 118.7e asks only of a reduction written with a hybrid symbol.
+              -- Heartstone's {1} is generic, and power-up's (CR 702.193b) is the
+              -- permanent's mana cost, colored mana included. The seam is here
+              -- rather than skipped so that a hybrid reduction cannot arrive at a
+              -- path that never asks.
               --
               -- CR 601.2f's ORDER is asked at the same seam and does reach a board:
               -- Heartstone's floor beside Blossoming Tortoise's absence of one on an

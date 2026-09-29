@@ -238,7 +238,7 @@ placeInherent pending = do
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }

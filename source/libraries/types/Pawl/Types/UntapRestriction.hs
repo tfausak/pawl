@@ -32,7 +32,7 @@ import qualified Pawl.Types.Affected as Affected
 -- forbids the untap for as long as the printing is on the battlefield, while
 -- Elvish Hunter's "doesn't untap during its controller's NEXT untap step" is a
 -- one-shot left behind and outliving its source. That one is
--- Object.doesNotUntapNext, written by Effect.DoesNotUntapNext; CR 508.1g's exert
+-- Object.doesNotUntapFor, written by Effect.DoesNotUntapNext; CR 508.1g's exert
 -- payment writes Object.exertedBy beside it, keyed to the exerting player rather
 -- than to the victim's controller (CR 701.43a). Both are stored on the victim and
 -- spent by Pawl.Engine.Engine.untapAll, which is the one place all three carriers
