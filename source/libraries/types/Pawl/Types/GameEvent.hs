@@ -186,22 +186,20 @@ data GameEvent
     -- unblocked half -- Scryfall has no card whose text makes a creature become
     -- unblocked.
     AttackerUnblocked ObjectId.ObjectId
-  | -- | CR 509.1i: a creature was declared BLOCKING -- one event per blocking
-    -- creature the CR 509.1 declaration named, appended by
-    -- Pawl.Engine.Combat.declareBlockers alone. BecameBlocking's grouped twin,
-    -- splitting a blocker's declaration by CR 509.3a against CR 509.3b. The
-    -- Natural is how many attacking creatures it was declared against, CR
-    -- 509.3e's number.
+  | -- | CR 509.1i / 509.3a: a creature BLOCKED -- one event per blocking
+    -- creature, BecameBlocking's grouped twin, splitting a blocker's block by CR
+    -- 509.3a against CR 509.3b. The Natural is how many attacking creatures it
+    -- blocks, CR 509.3e's number. Two appenders: Pawl.Engine.Combat.declareBlockers
+    -- and Pawl.Engine.Combat.exchangeBlocks (Sorrow's Path), whose creatures have
+    -- left combat before they block again.
     --
-    -- The declaration is the only producer, and rule 509.3a's other two sentences
-    -- are why rather than a shortfall. Its last: a creature put onto the
-    -- battlefield blocking never "blocked", so Combat.putOntoBattlefieldBlocking
-    -- records BecameBlocking and deliberately not this. Its second, an effect
-    -- that causes a creature to block: the guard there is "only if it wasn't a
-    -- blocking creature at that time", and the pool's one such effect
-    -- (Combat.switchBlockers, General Jarkeld) moves creatures that were all
-    -- blocking already. Pawl.CombatCostSpec's "CR 509.3a the Pride Guardian moved
-    -- onto the other attacker does not block again" is the proof.
+    -- Rule 509.3a's last sentence is why Combat.putOntoBattlefieldBlocking does
+    -- not record it: a creature put onto the battlefield blocking never
+    -- "blocked". Its guard on an effect, "only if it wasn't a blocking creature
+    -- at that time", is why Combat.switchBlockers does not: General Jarkeld
+    -- moves creatures that were all blocking already. Pawl.CombatCostSpec's "CR
+    -- 509.3a the Pride Guardian moved onto the other attacker does not block
+    -- again" is the proof.
     BlocksDeclared BlocksDeclared.BlocksDeclared
   | -- | CR 701.20a: a player revealed a card. The log is where it has to live, CR
     -- 701.20b moving nothing, and it carries the CARD's characteristics beside

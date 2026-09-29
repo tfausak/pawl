@@ -533,6 +533,8 @@ library codec
     Pawl.Codec.EventShapeSpec
     Pawl.Codec.ExcessDestination
     Pawl.Codec.ExcessDestinationSpec
+    Pawl.Codec.ExchangeBlocks
+    Pawl.Codec.ExchangeBlocksSpec
     Pawl.Codec.ExchangedValue
     Pawl.Codec.ExchangedValueSpec
     Pawl.Codec.ExchangeSides
@@ -1006,6 +1008,8 @@ library codec
     Pawl.Codec.SacrificeRestrictionSpec
     Pawl.Codec.SacrificerSpec
     Pawl.Codec.SacrificeSpec
+    Pawl.Codec.SacrificeToEnter
+    Pawl.Codec.SacrificeToEnterSpec
     Pawl.Codec.Saddling
     Pawl.Codec.SaddlingSpec
     Pawl.Codec.Scaling
@@ -1991,6 +1995,7 @@ library types
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
     Pawl.Types.ExcessDestination
+    Pawl.Types.ExchangeBlocks
     Pawl.Types.ExchangedValue
     Pawl.Types.ExchangeSides
     Pawl.Types.ExchangeValues
@@ -2266,6 +2271,7 @@ library types
     Pawl.Types.SacrificeEffect
     Pawl.Types.Sacrificer
     Pawl.Types.SacrificeRestriction
+    Pawl.Types.SacrificeToEnter
     Pawl.Types.Saddling
     Pawl.Types.Scaling
     Pawl.Types.SchemeSetInMotion

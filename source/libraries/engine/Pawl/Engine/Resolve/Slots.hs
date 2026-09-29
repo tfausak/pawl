@@ -99,6 +99,7 @@ import qualified Pawl.Types.EntryBlock as EntryBlock
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeBlocks as ExchangeBlocks
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExchangeValues as ExchangeValues
 import qualified Pawl.Types.ExchangeZones as ExchangeZones
@@ -183,6 +184,7 @@ import qualified Pawl.Types.Reveal as Reveal
 import qualified Pawl.Types.RollDie as RollDie
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
+import qualified Pawl.Types.SacrificeToEnter as SacrificeToEnter
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SetClassLevel as SetClassLevel
 import qualified Pawl.Types.SetHalfLocked as SetHalfLocked
@@ -756,6 +758,7 @@ effectObjectRefs effect = case effect of
   Effect.BecomesBlocked {} -> []
   -- The two attackers come out of a target SLOT, not an ObjectRef.
   Effect.SwitchBlockers {} -> []
+  Effect.ExchangeBlocks {} -> []
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
@@ -958,6 +961,7 @@ effectPlayerRefs effect = case effect of
   Effect.RemoveFromCombat {} -> []
   Effect.BecomesBlocked {} -> []
   Effect.SwitchBlockers {} -> []
+  Effect.ExchangeBlocks {} -> []
   Effect.AddPhases {} -> []
   Effect.EndTurn -> []
   Effect.EndCombatPhase -> []
@@ -1177,6 +1181,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- SlotArity.Many, unlike the arm above: CR 601.2c gives this one instance of
   -- the word "target" exactly two recipients and resolution reads both.
   Effect.SwitchBlockers slot -> Map.singleton slot SlotArity.Many
+  Effect.ExchangeBlocks (ExchangeBlocks.MkExchangeBlocks firstSlot secondSlot) -> insertOne firstSlot (oneSlot secondSlot)
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ placement _) -> joinTwo (joinSlots (fmap quantitySlots (riderQuantities riders <> placementQuantities placement))) (riderSlots riders)
   -- CR 121.1's bound slot is a DEFINITION, not a read: see boundSlots below.
   Effect.Draw (Draw.MkDraw _ quantity _) -> quantitySlots quantity
@@ -1619,6 +1624,7 @@ entryRewriteReads rewrite = case rewrite of
   -- per-sacrifice multiplier beside them, which is a Quantity that may name a
   -- slot exactly as the WithCounters arm above is.
   EntryRewrite.SacrificeAnyNumber sacrifice -> ([SacrificeAnyNumber.filter sacrifice], [SacrificeAnyNumber.each sacrifice])
+  EntryRewrite.SacrificeToEnter sacrifice -> ([SacrificeToEnter.filter sacrifice], [])
   -- CR 702.38a names no slot: its offer is a set of creature types read off the
   -- entering object's projection, never a Filter a resolution could bind.
   EntryRewrite.Amplify _ -> ([], [])
@@ -1737,6 +1743,7 @@ entryRewriteEffects rewrite = case rewrite of
   EntryRewrite.EntersWith _ -> []
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.SacrificeAnyNumber _ -> []
+  EntryRewrite.SacrificeToEnter _ -> []
   EntryRewrite.Amplify _ -> []
   EntryRewrite.ExileFromGraveyard _ -> []
   EntryRewrite.EntersAttachedTo _ -> []
@@ -1868,6 +1875,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.RemoveFromCombat _ -> True
   Effect.BecomesBlocked _ -> True
   Effect.SwitchBlockers _ -> True
+  Effect.ExchangeBlocks _ -> True
   -- The entry rider nests a Quantity of its own, CR 122.6's count per kind; the
   -- ref's is effectObjectRefs' above.
   Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ placement _) -> all Quantity.slotsAreExhaustive (riderQuantities riders <> placementQuantities placement)
@@ -2141,6 +2149,7 @@ readsX =
         Effect.RemoveFromCombat _ -> False
         Effect.BecomesBlocked _ -> False
         Effect.SwitchBlockers _ -> False
+        Effect.ExchangeBlocks _ -> False
         -- The entry rider is a nested position of its own, CR 122.6's count per
         -- kind, and no ObjectRef holds it.
         Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ placement _) -> any Quantity.readsX (riderQuantities riders <> placementQuantities placement)
@@ -2391,6 +2400,7 @@ boundSlots effect = case effect of
   Effect.RemoveFromCombat _ -> Set.empty
   Effect.BecomesBlocked _ -> Set.empty
   Effect.SwitchBlockers _ -> Set.empty
+  Effect.ExchangeBlocks _ -> Set.empty
   -- CR 121.1's cards "drawn this way", as CR 400.7's incarnations in the hand
   -- they arrived in.
   Effect.Draw (Draw.MkDraw _ _ mSlot) -> foldMap Set.singleton mSlot
