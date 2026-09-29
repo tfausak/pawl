@@ -4,7 +4,9 @@ module Pawl.Codec.SacrificeEffect where
 
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Sacrificer as Sacrificer
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.SacrificeEffect as SacrificeEffect
 import qualified Pawl.Types.Sacrificer as Sacrificer
@@ -12,13 +14,16 @@ import qualified Pawl.Types.Sacrificer as Sacrificer
 -- | The sacrificer is ELIDED when it is CR 701.21a's ordinary "sacrifice it",
 -- which is every card in the pool but Golgothian Sylex and City in a Bottle;
 -- the other arm is otherwise written only by the emblem Pawl.Engine.Ring mints,
--- and that is not card data.
+-- and that is not card data. The count slot is elided when absent, as
+-- Pawl.Codec.Destroy's are.
 codec :: Codec.Codec SacrificeEffect.SacrificeEffect
 codec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec SacrificeEffect.ref
   sacrificer <- Fields.defaulted "sacrificer" Sacrificer.EffectController Sacrificer.codec SacrificeEffect.sacrificer
+  sacrificed <- Fields.defaulted "sacrificed" Nothing (Common.maybe SlotName.codec) SacrificeEffect.sacrificed
   pure
     SacrificeEffect.MkSacrificeEffect
       { SacrificeEffect.ref = ref,
-        SacrificeEffect.sacrificer = sacrificer
+        SacrificeEffect.sacrificer = sacrificer,
+        SacrificeEffect.sacrificed = sacrificed
       }

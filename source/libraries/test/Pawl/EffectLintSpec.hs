@@ -1175,9 +1175,10 @@ data Asks
     -- arm falls through to the pure sweep.
     AsksDiscardArm
   | -- | Pawl.Engine.Resolve's permanentsGathered, shared by Effect.Transform,
-    -- Effect.Convert, Effect.AttachAll and Effect.Untap. It asks the any-number arm and
-    -- nothing else: the four card-shaped chosen arms name cards in a graveyard,
-    -- a hand or a group, and both instructions act on PERMANENTS.
+    -- Effect.Convert, Effect.AttachAll, Effect.Untap and Effect.Sacrifice. It asks
+    -- the any-number arm and nothing else: the four card-shaped chosen arms name
+    -- cards in a graveyard, a hand or a group, and these instructions act on
+    -- PERMANENTS.
     AsksTransformGather
   | -- | Pawl.Engine.Resolve's Effect.LookAt arm. It asks the hand chooser --
     -- Word of Command's "look at target opponent's hand and choose a card from
@@ -1352,7 +1353,7 @@ effectObjectRefs effect =
         Effect.ControlPlayerNextTurn {} -> []
         Effect.ControlPlayerThisResolution {} -> []
         Effect.Destroy (Destroy.MkDestroy ref _ _ _ _) -> read_ [ref]
-        Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _) -> read_ [ref]
+        Effect.Sacrifice (SacrificeEffect.MkSacrificeEffect ref _ _) -> [(AsksTransformGather, ref)]
         -- THE gather that asks every choosing arm.
         Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _ _) -> [(AsksMoveGather, ref)]
         Effect.Draw {} -> []

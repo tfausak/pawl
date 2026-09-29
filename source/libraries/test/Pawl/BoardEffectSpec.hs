@@ -4081,8 +4081,66 @@ avariceTotemSpec s registry = Spec.describe s "AvariceTotem" $ do
         -- above cannot pass by the exchange never having been reached.
         Spec.assertEqWith s "the ability was activated and then resolved" (length (GameState.stack activated), length (GameState.stack after)) (1, 0)
 
+-- God-Eternal Bontu {3}{B}{B} 5/6 menace: "When God-Eternal Bontu enters,
+-- sacrifice any number of other permanents, then draw that many cards."
+-- (Scryfall, 2026-09-29.)
+--
+-- alice holds five Swamps, a Goblin Piker, an Ogre Sentry and a Bird Maiden;
+-- bob a Hill Giant. She names the Piker and the Sentry, so "that many" is two,
+-- where the offer is eight and every other permanent on the battlefield nine.
+godEternalBontuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+godEternalBontuSpec s registry =
+  let -- Records each ChooseAnyNumberOfPermanents' candidates and answers with
+      -- exactly `wanted`, so the offer is read off the engine.
+      answering :: Set.Set ObjectId.ObjectId -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+      answering wanted p = case p of
+        Prompt.ChooseAnyNumberOfPermanents _ _ _ candidates _ -> do
+          State.modify (<> [candidates])
+          pure wanted
+        _ -> pure (S.identityAnswer p)
+      run withPeace = do
+        bontu <- S.printingOf s registry "God-Eternal Bontu"
+        swamp <- S.printingOf s registry "Swamp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        maiden <- S.printingOf s registry "Bird Maiden"
+        giant <- S.printingOf s registry "Hill Giant"
+        peace <- S.printingOf s registry "Rest in Peace"
+        let addLand (ids, g) _ = let (oid, g') = S.addPermanent swamp S.alice g in (ids <> [oid], g')
+            (swamps, g0) = List.foldl' addLand ([], Setup.emptyGame S.bothPlayers) [1 .. (5 :: Int)]
+            (pikerId, g1) = S.addPermanent piker S.alice g0
+            (sentryId, g2) = S.addPermanent sentry S.alice g1
+            (maidenId, g3) = S.addPermanent maiden S.alice g2
+            (giantId, g4) = S.addPermanent giant S.bob g3
+            (peaceIds, g5) = if withPeace then let (oid, g') = S.addPermanent peace S.alice g4 in ([oid], g') else ([], g4)
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) g5 [1 .. (6 :: Int)]
+            (withSpell, spell) = S.handOne bontu stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+            afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+            (after, asked) = State.runState (fmap snd (Engine.runGame (answering (Set.fromList [pikerId, sentryId])) afterCast Engine.priorityLoop)) []
+            offered = Set.fromList (swamps <> [pikerId, sentryId, maidenId] <> peaceIds)
+        pure (after, asked, offered, (pikerId, sentryId, maidenId, giantId))
+      drew gs = length (Game.zoneMembers Zone.Hand S.alice gs)
+   in Spec.describe s "GodEternalBontu" $ do
+        Spec.it s "CR 701.21a draws one card for each permanent she named and sacrificed" $ do
+          (after, asked, offered, (pikerId, sentryId, maidenId, giantId)) <- run False
+          Spec.assertEqWith s "alice drew two cards, the two she sacrificed" (drew after) 2
+          Spec.assertEqWith s "CR 701.21a the Piker and the Sentry went to her graveyard" (List.sort (namesIn Zone.Graveyard S.alice after)) (List.sort [Just (named "Goblin Piker"), Just (named "Ogre Sentry")])
+          Spec.assertBool s (not (S.onBattlefield pikerId after || S.onBattlefield sentryId after)) "neither named creature is on the battlefield"
+          Spec.assertBool s (S.onBattlefield maidenId after && S.onBattlefield giantId after) "the Maiden she passed over and bob's Giant stay"
+          Spec.assertEqWith s "asked once, offered her eight other permanents and neither Bontu nor bob's Giant" (fmap Set.fromList asked) [offered]
+          Spec.assertBool s (Maybe.isJust (namedOnBattlefield "God-Eternal Bontu" after)) "Bontu herself stays"
+        -- CR 701.21a names the sacrifice, not the graveyard arrival: under Rest in
+        -- Peace (CR 614.1a) both creatures are exiled instead and still counted.
+        Spec.it s "CR 614.1a a sacrifice Rest in Peace exiles instead still counts toward that many" $ do
+          (after, _, _, _) <- run True
+          Spec.assertEqWith s "alice still drew two cards" (drew after) 2
+          Spec.assertEqWith s "and nothing reached her graveyard" (namesIn Zone.Graveyard S.alice after) []
+  where
+    named = CardName.MkCardName . Text.pack
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
+  godEternalBontuSpec s registry
   switcherooSpec s registry
   avariceTotemSpec s registry
   plummetSpec s registry

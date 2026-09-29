@@ -1882,7 +1882,7 @@ filterPositionLintSpec s registry = Spec.describe s "Lint" $ do
                                           PayGate.offeredAt = Nothing
                                         }
                                   )
-                                  (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot slot, SacrificeEffect.sacrificer = Sacrificer.EffectController}))
+                                  (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot slot, SacrificeEffect.sacrificer = Sacrificer.EffectController, SacrificeEffect.sacrificed = Nothing}))
                               )
                           )
                           Map.empty

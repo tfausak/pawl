@@ -379,7 +379,7 @@ theRingBlockerSacrifice =
             },
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.blockingCreature, SacrificeEffect.sacrificer = Sacrificer.PermanentController})))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Nothing Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice SacrificeEffect.MkSacrificeEffect {SacrificeEffect.ref = ObjectRef.InSlot Binding.blockingCreature, SacrificeEffect.sacrificer = Sacrificer.PermanentController, SacrificeEffect.sacrificed = Nothing})))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing,
       TriggeredAbility.limit = TriggerLimit.Unlimited
