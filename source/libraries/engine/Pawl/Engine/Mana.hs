@@ -2026,10 +2026,10 @@ multisets k xs = case (k, xs) of
 -- So it is an assignment question, and it is answered exactly. Model each
 -- available mana as a SUPPLY carrying the set of types it could be and the
 -- production-time tags it would carry (CR 106.3). A source is a CHOICE among such
--- supplies, one option per yield it could add and each option as wide as the
--- number of activations that yield admits (sourceOptions above). Each typed
--- symbol of the cost is a DEMAND, which `serves` matches against a supply;
--- generic symbols demand a count and nothing more.
+-- supplies, one option per way its activations could fill a pool: k activations
+-- at one cost taking k of the yields it buys, each on its own (sourceOptions).
+-- Each typed symbol of the cost is a DEMAND, which `serves` matches against a
+-- supply; generic symbols demand a count and nothing more.
 --
 -- A BOARD is the pool plus one option taken from every source -- the mana the
 -- player would actually have in front of them after tapping everything -- and it
