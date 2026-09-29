@@ -86,6 +86,7 @@ import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
@@ -1444,7 +1445,7 @@ effectObjectRefs effect =
         Effect.MakePlotted ref -> read_ [ref]
         Effect.MakeForetold x -> read_ [MakeForetold.cards x]
         Effect.MakeWarped ref -> read_ [ref]
-        Effect.DoesNotUntapNext ref -> read_ [ref]
+        Effect.DoesNotUntapNext payload -> read_ [DoesNotUntapNext.ref payload]
         Effect.Transform ref -> [(AsksTransformGather, ref)]
         -- The SAME gather, CR 701.28a routing a convert through CR 701.27a-f and
         -- Pawl.Engine.Resolve applying both opcodes through one turnPermanentsOver.

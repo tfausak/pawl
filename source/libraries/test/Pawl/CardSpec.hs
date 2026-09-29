@@ -152,6 +152,7 @@ import qualified Pawl.Types.Devour as Devour
 import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCards as DiscardCards
+import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
@@ -635,7 +636,7 @@ objectRefPositions =
         ("earthbend", Effect.Earthbend (Earthbend.MkEarthbend (Quantity.Type.Literal 1) (plantedRef "eb")), [plantedRef "eb"]),
         ("airbend", Effect.Airbend (plantedRef "ab"), [plantedRef "ab"]),
         ("goad", Effect.Goad (plantedRef "go"), [plantedRef "go"]),
-        ("does-not-untap-next", Effect.DoesNotUntapNext (plantedRef "du"), [plantedRef "du"]),
+        ("does-not-untap-next", Effect.DoesNotUntapNext (DoesNotUntapNext.MkDoesNotUntapNext (plantedRef "du") 1), [plantedRef "du"]),
         ("transform", Effect.Transform (plantedRef "tr"), [plantedRef "tr"]),
         ("convert", Effect.Convert (plantedRef "cv"), [plantedRef "cv"]),
         ("meld", Effect.Meld (Meld.MkMeld (plantedRef "me") ()), [plantedRef "me"]),
@@ -5825,7 +5826,7 @@ effectFilters effect = case effect of
   Effect.MakePlotted ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.MakeForetold x -> frame SourceHostFramed (objectRefFilters (MakeForetold.cards x))
   Effect.MakeWarped ref -> frame SourceHostFramed (objectRefFilters ref)
-  Effect.DoesNotUntapNext ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.DoesNotUntapNext payload -> frame SourceHostFramed (objectRefFilters (DoesNotUntapNext.ref payload))
   Effect.Transform ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Convert ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.Flip ref -> frame SourceHostFramed (objectRefFilters ref)

@@ -31,6 +31,7 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Earthbend as Earthbend
@@ -442,10 +443,10 @@ data Effect card ability
     -- and CR 702.95d's "only one other creature" are the opcode's own gate, in
     -- Pawl.Engine.Soulbond.
     Pair ObjectRef.ObjectRef
-  | -- | CR 502.3 / 611.2: the permanents the ObjectRef names don't untap during
-    -- their controller's next untap step (Elvish Hunter). CR 701.43a's exert is
-    -- a different clause, riding Object.exertedBy.
-    DoesNotUntapNext ObjectRef.ObjectRef
+  | -- | CR 502.3 / 611.2a: the permanents named don't untap during their
+    -- controller's next untap step or steps (Elvish Hunter, Telekinesis). CR
+    -- 701.43a's exert is a different clause, riding Object.exertedBy.
+    DoesNotUntapNext DoesNotUntapNext.DoesNotUntapNext
   | -- | CR 701.27a: turn the permanents the ObjectRef names over, so each shows
     -- its other face. The transform wording only; CR 701.28's convert is Convert
     -- below.

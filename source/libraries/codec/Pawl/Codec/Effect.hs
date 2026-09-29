@@ -42,6 +42,7 @@ import qualified Pawl.Codec.DealDamage as DealDamage
 import qualified Pawl.Codec.Designate as Designate
 import qualified Pawl.Codec.Destroy as Destroy
 import qualified Pawl.Codec.Discard as Discard
+import qualified Pawl.Codec.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Codec.Draw as Draw
 import qualified Pawl.Codec.DurationRef as DurationRef
 import qualified Pawl.Codec.Earthbend as Earthbend
@@ -221,7 +222,7 @@ codec cardCodec abilityCodec =
           Arm.payload "Airbend" ObjectRef.codec Effect.Airbend (\x -> case x of Effect.Airbend y -> Just y; _ -> Nothing),
           Arm.payload "Goad" ObjectRef.codec Effect.Goad (\x -> case x of Effect.Goad y -> Just y; _ -> Nothing),
           Arm.payload "Pair" ObjectRef.codec Effect.Pair (\x -> case x of Effect.Pair y -> Just y; _ -> Nothing),
-          Arm.payload "DoesNotUntapNext" ObjectRef.codec Effect.DoesNotUntapNext (\x -> case x of Effect.DoesNotUntapNext y -> Just y; _ -> Nothing),
+          Arm.payload "DoesNotUntapNext" DoesNotUntapNext.codec Effect.DoesNotUntapNext (\x -> case x of Effect.DoesNotUntapNext y -> Just y; _ -> Nothing),
           Arm.payload "Transform" ObjectRef.codec Effect.Transform (\x -> case x of Effect.Transform y -> Just y; _ -> Nothing),
           Arm.payload "Convert" ObjectRef.codec Effect.Convert (\x -> case x of Effect.Convert y -> Just y; _ -> Nothing),
           Arm.payload "Flip" ObjectRef.codec Effect.Flip (\x -> case x of Effect.Flip y -> Just y; _ -> Nothing),

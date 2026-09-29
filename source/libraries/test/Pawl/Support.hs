@@ -997,7 +997,7 @@ addObjectIn zone printing pid gs =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -1264,7 +1264,7 @@ addToken card pid gs =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -1337,7 +1337,7 @@ addLibraryCard printing pid gs =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -1415,7 +1415,7 @@ addGraveyardCard printing pid gs =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -1497,7 +1497,7 @@ addExiledCard printing pid gs =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -1584,7 +1584,7 @@ addHandCard printing pid gs =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -1680,7 +1680,7 @@ landsFor land pid n base =
                   Object.castGrant = Nothing,
                   Object.detainedUntil = Set.empty,
                   Object.goadedBy = Set.empty,
-                  Object.doesNotUntapNext = False,
+                  Object.doesNotUntapFor = 0,
                   Object.exertedBy = Set.empty,
                   Object.activatedOnce = Set.empty
                 }
@@ -1752,7 +1752,7 @@ handOne printing base =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -1830,7 +1830,7 @@ pikerInHand land piker n ph =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -3387,7 +3387,7 @@ oneMountainState mountain ph =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
@@ -3635,7 +3635,7 @@ spellOnStack printing pid gs =
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }

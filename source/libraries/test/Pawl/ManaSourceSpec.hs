@@ -2065,7 +2065,7 @@ plainColor color = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored col
 -- gives up a 3/1 attacker rather than a 1/1 -- and it separates them through the
 -- projection. Elvish Hunter's "target creature doesn't untap during its
 -- controller's next untap step" separates them where no projection can see it, on
--- Object.doesNotUntapNext.
+-- Object.doesNotUntapFor.
 interchangeableSourcesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana sources" $ do
   Spec.it s "CR 601.2g three indistinguishable Elves are offered as one candidate" $ do
@@ -2124,7 +2124,7 @@ interchangeableSourcesSpec s registry = Spec.describe s "Interchangeable mana so
     Spec.assertBool s paid "the {G} was paid"
     Spec.assertEqWith s "off exactly one Elf" (tappedCount (NonEmpty.toList elves) after) 1
 
-  -- Object.doesNotUntapNext, which Elvish Hunter writes. Nothing about the Elf's
+  -- Object.doesNotUntapFor, which Elvish Hunter writes. Nothing about the Elf's
   -- characteristics changes, so this is the case a projection-only test would
   -- collapse: tapping the frozen Elf costs nothing, tapping either other one
   -- costs a whole untap step.
@@ -2270,7 +2270,7 @@ haunts hauntingCard haunted gs =
 freeze :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 freeze oid gs =
   gs
-    { GameState.objects = Map.adjust (\o -> o {Object.doesNotUntapNext = True}) oid (GameState.objects gs)
+    { GameState.objects = Map.adjust (\o -> o {Object.doesNotUntapFor = 1}) oid (GameState.objects gs)
     }
 
 -- One mana of one type carrying no production tag: what a basic land really puts
