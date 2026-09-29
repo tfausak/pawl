@@ -127,6 +127,7 @@ import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
+import qualified Pawl.Types.ChooseNumber as ChooseNumber
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Chooser as Chooser
@@ -322,6 +323,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -799,11 +801,18 @@ anyNumberMatching legal resolving controller source (AnyNumberMatching.MkAnyNumb
 -- recorded for a trigger to read. The funnel's own answers come back for the
 -- binding below; a move that did not complete answers Nothing and is dropped.
 -- One event group across the seats, CR 101.4's "simultaneously".
+--
+-- Not implemented: an optional discard gated by a later clause's "if you do"
+-- is a CR 118.12 cost, yet is recorded here as DiscardCause.ByEffect (#4416).
+--
+-- Not implemented: CR 401.4's arrangement by the owner of two or more cards a
+-- redirect puts at one end of a library together; they land in move order
+-- (#4417).
 buryDiscards :: ObjectId -> Maybe SlotName -> [(PlayerId, [ObjectId])] -> Game ()
 buryDiscards resolving mDiscarded doomed = do
   moved <-
     Event.simultaneously . fmap concat . Monad.forM doomed $ \(victim, oids) ->
-      fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary victim) oids)
+      fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.ByEffect victim) oids)
   -- The cards "discarded this way", for a later effect of the same resolution
   -- to look back at -- Psychic Miasma's "if a land card is discarded this way".
   -- The CR 400.7 incarnations the funnel MINTED, never the hand ids it was
@@ -1297,8 +1306,8 @@ offerCast context named caster optionality verb retake repetition copied offer =
 -- printed ones), and an original carrying none leaves the copy reading its
 -- printing, which is what Pawl.Engine.Projection.View.copiableCharacteristics
 -- answers for both. That first limb is a REGRESSION FENCE rather than a proved
--- line: every object a producer in data/cards/ offers a copy of is a card in a
--- graveyard or in exile, and nothing stamps a snapshot on one of those.
+-- line: the one stamped original a producer in data/cards/ reaches is paradigm's
+-- archived spell below, whose stamp is its own printed values.
 --
 -- Object.newIncarnation for everything else, CR 400.7's forgetting: the copy is
 -- a new object, so no counter, designation or announced cost of the original's
@@ -1314,15 +1323,24 @@ offerCast context named caster optionality verb retake repetition copied offer =
 -- in that zone rather than moved there, so nothing was exiled or discarded and
 -- no zone-change trigger has an event to watch.
 --
--- Nothing for an object that has left (CR 400.7) and for one with no card behind
--- it (Game.printingIdOfSource): an offer over a copy that cannot be made is not
--- made, which is offerCastOnce's own posture for a reference that named nothing.
+-- A SPELL that has left the stack is copied from GameState.stackArchive (CR
+-- 608.2h), and its copy is created in exile: an object in no zone has no "same
+-- zone", and rule 702.192a's "create a copy of this object in exile" is the one
+-- producer whose reference outlives its spell (Keyword.paradigmCopy).
+--
+-- Nothing for any other object that has left (CR 400.7) and for one with no card
+-- behind it (Game.printingIdOfSource): an offer over a copy that cannot be made is
+-- not made, which is offerCastOnce's own posture for a reference that named
+-- nothing.
 castableCopy :: PlayerId -> ObjectId -> Game (Maybe ObjectId)
 castableCopy caster original = do
   gs <- State.get
-  case Game.lookupObject original gs of
+  let found = case Game.lookupObject original gs of
+        Just obj -> Just (obj, Object.zone obj)
+        Nothing -> fmap (\obj -> (obj, Zone.Exile)) (Map.lookup original (GameState.stackArchive gs))
+  case found of
     Nothing -> pure Nothing
-    Just obj -> case Game.printingIdOfSource (Object.source obj) of
+    Just (obj, zone) -> case Game.printingIdOfSource (Object.source obj) of
       Nothing -> pure Nothing
       Just printingId -> do
         let (copyId, gs1) = Game.freshObjectId gs
@@ -1331,11 +1349,11 @@ castableCopy caster original = do
               (Object.newIncarnation obj)
                 { Object.source = Source.OfCardCopy printingId,
                   Object.owner = caster,
-                  Object.zone = Object.zone obj,
+                  Object.zone = zone,
                   Object.timestamp = ts,
                   Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) (Game.copyStampOf obj)
                 }
-        State.put (Game.insertIntoZone (Object.zone obj) LibraryPosition.Top caster copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
+        State.put (Game.insertIntoZone zone LibraryPosition.Top caster copyId gs2 {GameState.objects = Map.insert copyId copy (GameState.objects gs2)})
         pure (Just copyId)
 
 -- CR 707.13 / 707.14: offer the cast of a copy of this printing created outside
@@ -5513,23 +5531,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         count = maybe 0 Integer.toNaturalSaturating (evaluateForRecipient viewOf context gs0 resolving source controller upTo)
     Event.simultaneously . Event.together . Monad.forM_ [1 .. count] $ \n -> do
       State.modify' (bindAmountSlot resolving source slot n)
-      applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
-  -- CR 608.2d: the body in written order, then the resolving controller's "may
-  -- repeat", asked after each run and never in advance. No event bracket: each
-  -- run is its own process, so each run's damage is its own event. What the body
-  -- binds is rescoped per run, ForEach's reason: a run whose discard found an
-  -- empty hand must not read the card the previous run discarded.
+      applyLoopBody runSubgame resolving source controller legal chosen (foldMap boundSlots body) body
+  -- CR 608.2d: the body in written order, then the chooser's "may repeat",
+  -- asked after each run and never in advance. No event bracket: each run is its
+  -- own process, so each run's damage is its own event. What the body binds is
+  -- rescoped per run, ForEach's reason: a run whose discard found an empty hand
+  -- must not read the card the previous run discarded.
+  --
+  -- The chooser is the ONE player the payload names, which is Trade Secrets'
+  -- target opponent rather than the resolving controller, read through
+  -- askedChooser so CR 800.4g hands a departed chooser's ask to another player.
+  -- A reference naming anything but one player asks nobody and ends the loop.
   --
   -- Pawl.ZoneChangeSpec's Kindle the Carnage group proves both the second run and
-  -- the rescope.
-  Effect.Repeat body -> do
+  -- the rescope, and its Trade Secrets group the chooser. The CR 800.4g
+  -- reassignment is a fence here: no board lets a player leave the game partway
+  -- through a resolution.
+  Effect.Repeat (Repeat.MkRepeat chooser body) -> do
     rescope <- State.gets (rescopeRun resolving (foldMap boundSlots body))
     let run runs = do
           State.modify' rescope
-          applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
-          gs <- State.get
-          again <- Game.choose (Prompt.ChooseRepeat (Decide.deciderFor controller gs) controller resolving runs)
-          Monad.when (again == OptionalDecision.Exercises) (run (runs + 1))
+          applyLoopBody runSubgame resolving source controller legal chosen (foldMap boundSlots body) body
+          asked <- askedChooser source controller legal chooser
+          Monad.forM_ asked $ \who -> do
+            gs <- State.get
+            again <- Game.choose (Prompt.ChooseRepeat (Decide.deciderFor who gs) who resolving runs)
+            Monad.when (again == OptionalDecision.Exercises) (run (runs + 1))
     run 1
   -- CR 608.2c: the process in written order, then its printed "if" asked of the
   -- state that run left -- live, so the tally the run's own mill just bound is
@@ -5540,7 +5567,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- Pawl.PlaneswalkerSpec's GristLoyalty group proves the run count.
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> do
     rescope <- State.gets (rescopeRun resolving (foldMap boundSlots (process <> ifHolds)))
-    let apply effects = applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList effects)
+    let apply = applyLoopBody runSubgame resolving source controller legal chosen (foldMap boundSlots (process <> ifHolds))
         run = do
           State.modify' rescope
           apply process
@@ -9292,10 +9319,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- number past what a later instruction can act on is that instruction's CR
   -- 609.3 shortfall, not this prompt's. Bound even at zero, PayAnyEnergy's
   -- reason.
-  Effect.ChooseNumber slot -> do
+  -- CR 608.2d: a player "can't choose an option that's illegal", so an answer
+  -- past the bound is clamped to it.
+  Effect.ChooseNumber (ChooseNumber.MkChooseNumber slot upTo) -> do
     gs <- State.get
-    answer <- Game.choose (Prompt.ChooseNumber (Decide.deciderFor controller gs) controller resolving)
-    State.modify' (bindAmountSlot resolving source slot answer)
+    answer <- Game.choose (Prompt.ChooseNumber (Decide.deciderFor controller gs) controller resolving upTo)
+    State.modify' (bindAmountSlot resolving source slot (maybe answer (min answer) upTo))
   -- CR 701.26a: turn each named permanent sideways. The victims are enumerated
   -- ONCE (CR 608.2f) and off the board as it stands before any of them is tapped,
   -- so an illegal slot (CR 608.2b), a player recipient and a set that matched
@@ -10536,19 +10565,20 @@ removableAmong gs which candidates = Map.filter (not . Map.null) (Map.fromList [
 carrying :: GameState -> CounterKind.CounterKind Keyword.Type.Keyword -> [ObjectId] -> Map.Map ObjectId Natural
 carrying gs kind candidates = Map.filter (> 0) (Map.fromList [(candidate, Cost.countersOn kind candidate gs) | candidate <- candidates])
 
--- CR 701.8b: bind how many permanents a destruction actually destroyed into
--- `slot` on `holder`, readable as Quantity.InSlot. Binds a NUMBER, which rides
--- the binding field CR 601.2b's chosen X rides. Left behind after the resolution,
--- harmless and unreadable: only an effect naming this slot can see it, and a
--- second sweep overwrites the value before reading it.
---
--- The holder is the effect's `source`, NOT `resolving`, because an amount is
--- read back by Quantity.evaluateFor aimed at `source` (CR 608.2h) while an
--- object binding is read back by ArmDelayedTrigger off the stack object. Where
--- the source has LEFT (CR 400.7) -- Sensational Spider-Man bounced with its
--- trigger on the stack -- the amount goes on `resolving`, the object
--- Quantity.InSlot falls back to, since CR 113.7a resolves the ability anyway.
--- Pawl.RemoveCounterSpec's bounced Spider-Man proves it.
+-- CR 608.2c: a loop body's instructions in written order, each read against what
+-- the loop's earlier instructions bound -- a clause re-reads its bindings per
+-- instruction (Pawl.Engine.Resolve's applyOne), and a body is read the same way
+-- over the slots the loop defines, Effect.ForEach's `defined`. The maps handed
+-- down win, being CR 608.2b's re-validated targets. Pawl.ZoneChangeSpec's Ad
+-- Nauseam group proves it: the loss reads the card the body's own move put into
+-- the hand.
+applyLoopBody :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Set SlotName -> Seq.Seq (Effect Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)) -> Game ()
+applyLoopBody runSubgame resolving source controller legal chosen bodyDefined body =
+  let applyOne effect = do
+        defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (slotBindings resolving gs)) bodyDefined)
+        applyEffectWith runSubgame resolving source controller (Map.union legal defined) (Map.union chosen defined) effect
+   in applyClauseEffects source applyOne (Foldable.toList body)
+
 -- A loop's per-run scope (CR 608.2c): the slots its body defines put back to
 -- what the resolving object held before the first run, so a run that binds
 -- nothing does not read what the previous run bound. Takes the pre-loop state
@@ -10566,6 +10596,19 @@ rescopeRun resolving bodyDefined gs0 =
                 (GameState.objects gs)
           }
 
+-- CR 701.8b: bind how many permanents a destruction actually destroyed into
+-- `slot` on `holder`, readable as Quantity.InSlot. Binds a NUMBER, which rides
+-- the binding field CR 601.2b's chosen X rides. Left behind after the resolution,
+-- harmless and unreadable: only an effect naming this slot can see it, and a
+-- second sweep overwrites the value before reading it.
+--
+-- The holder is the effect's `source`, NOT `resolving`, because an amount is
+-- read back by Quantity.evaluateFor aimed at `source` (CR 608.2h) while an
+-- object binding is read back by ArmDelayedTrigger off the stack object. Where
+-- the source has LEFT (CR 400.7) -- Sensational Spider-Man bounced with its
+-- trigger on the stack -- the amount goes on `resolving`, the object
+-- Quantity.InSlot falls back to, since CR 113.7a resolves the ability anyway.
+-- Pawl.RemoveCounterSpec's bounced Spider-Man proves it.
 bindAmountSlot :: ObjectId -> ObjectId -> SlotName -> Natural -> GameState -> GameState
 bindAmountSlot resolving source slot n gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toAmount n) (Object.bindings obj)}
@@ -11083,7 +11126,7 @@ conniveOne n oid = Monad.when (n > 0) $ do
               filler = filter (\c -> List.notElem c valid) held
           pure (List.genericTake n (valid <> filler))
     -- One event group: CR 701.50d discards the N cards as one action.
-    moved <- Event.simultaneously (fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary pid) chosen))
+    moved <- Event.simultaneously (fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.ByEffect pid) chosen))
     after <- State.get
     let nonland c = not (Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject c after)))
         grown = Natural.length (filter nonland moved)

@@ -100,7 +100,8 @@ representatives pcs gs candidates =
 --     GameState.monarch,
 --     GameState.initiative, GameState.drewFromEmpty,
 --     GameState.extraTurns and the per-player counters (landsPlayed,
---     drawsThisTurn, departedThisTurn, spellsCastLastTurn, castsLastTurn) are
+--     drawsThisTurn, departedThisTurn, spellsCastLastTurn, castsLastTurn,
+--     resolvedNames) are
 --     keyed by or valued at a PLAYER and name no object.
 --   * GameState.lastKnown is about objects that have LEFT, and so is
 --     GameState.castsBeforeThisTurn: its spells were cast on an earlier turn,

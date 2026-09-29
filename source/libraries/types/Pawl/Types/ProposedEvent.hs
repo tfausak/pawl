@@ -8,7 +8,9 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DiceRoll as DiceRoll
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeLossCause as LifeLossCause
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -64,7 +66,11 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- Not every replaceable event class the rules define: each of the rest
 -- is one more arm plus the funnel that raises it.
 data ProposedEvent
-  = WouldChangeZone ZoneChange.ZoneChange
+  = -- | CR 400.7. The DiscardCause is CR 701.9a's, Nothing for a move that is
+    -- not a discard; it gates which redirects are offered, DestructionCause's
+    -- posture below. The LibraryPosition is CR 401.2's end, which a redirect
+    -- into a library may restate (Library of Leng's "on top").
+    WouldChangeZone ZoneChange.ZoneChange (Maybe DiscardCause.DiscardCause) LibraryPosition.LibraryPosition
   | WouldEnter ObjectId.ObjectId
   | WouldDealDamage DamageEvent.DamageEvent
   | -- | CR 701.8 / 701.19c: a permanent would be destroyed. The Regenerability is

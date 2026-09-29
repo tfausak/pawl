@@ -69,6 +69,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaUnit as ManaUnit
@@ -4934,10 +4935,13 @@ finalityOf oid gs =
                   -- CR 122.1h says nothing about whose graveyard, and CR 400.3
                   -- makes it the owner's whoever controlled the permanent.
                   ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-                  ZoneChangePattern.whatObject = Filter.Type.IsSource
+                  ZoneChangePattern.whatObject = Filter.Type.IsSource,
+                  ZoneChangePattern.whenDiscarded = Nothing
                 }
               Zone.Exile
               False
+              False
+              LibraryPosition.defaultValue
               False
           )
       ]

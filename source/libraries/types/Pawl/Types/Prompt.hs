@@ -295,8 +295,9 @@ data Prompt r where
   -- rule leaves 0 as the only payable amount.
   ChoosePaidEnergy :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | CR 107.1c / 608.2d: the number an Effect.ChooseNumber binds as the object
-  -- resolves, zero included. Answers as Response.ChoseNumber.
-  ChooseNumber :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Natural.Natural
+  -- resolves, zero included; the Maybe is its bound, the answer clamped to it.
+  -- Answers as Response.ChoseNumber.
+  ChooseNumber :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Natural.Natural -> Prompt Natural.Natural
   -- | CR 702.155b / 714.3b: which chapter a Saga with read ahead enters on; the
   -- Natural is the final chapter (CR 714.2d), the answer clamped into the
   -- range. Not raised for a range of one, nor for a bound of 0.
@@ -634,6 +635,11 @@ data Prompt r where
   -- answers' reason. Never elided: rule 702.52a's "you may" is a real choice
   -- wherever Pawl.Engine.Replacement.applies offers the row.
   ChooseDredge :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 614.1a: whether an optional redirect ("you may put it on top of your
+  -- library instead", Library of Leng) whose source is the first ObjectId
+  -- applies to the moving card the second names. Never elided, ChooseDredge's
+  -- reason.
+  ChooseRedirect :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 701.21a: which of the payer's matching permanents are sacrificed to
   -- pay a cost, the Natural how many; asked only with more candidates than the
   -- count. Not ChooseTargets: CR 115.1 makes a target only what the word

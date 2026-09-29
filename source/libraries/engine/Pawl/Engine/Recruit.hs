@@ -170,7 +170,7 @@ recruit pid = do
       let valid = ListUtils.nubOrd (filter (\c -> List.elem c offered) answer)
           filler = filter (\c -> List.notElem c valid) offered
       pure (take 1 (valid <> filler))
-  moved <- fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.Ordinary pid) chosen)
+  moved <- fmap (concatMap Foldable.toList) (Monad.mapM (Event.discardReturning DiscardCause.ByEffect pid) chosen)
   after <- State.get
   let nonland c = not (Set.member CardType.Land (Filter.cardTypes (Projection.viewOfObject c after)))
   -- CR 701.70a's second sentence: one token, and only where a nonland card was

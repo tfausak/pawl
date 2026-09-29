@@ -51,6 +51,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Phase as Phase
@@ -337,7 +338,7 @@ gamerPower gs = fmap (`Projection.powerOf` gs) (namedOn gamerName gs)
 exileEnteringAttractions :: ObjectId -> ActiveReplacement.ActiveReplacement
 exileEnteringAttractions src =
   ActiveReplacement.MkActiveReplacement
-    { ActiveReplacement.effect = ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Battlefield) ControllerRelation.Anyones (Filter.Type.HasSubtype Subtype.Attraction)) Zone.Exile False False),
+    { ActiveReplacement.effect = ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern (Just Zone.Battlefield) ControllerRelation.Anyones (Filter.Type.HasSubtype Subtype.Attraction) Nothing) Zone.Exile False False LibraryPosition.defaultValue False),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.bob,
       ActiveReplacement.timestamp = Timestamp.MkTimestamp 0,

@@ -44,6 +44,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Facing as Facing
@@ -99,6 +100,31 @@ atBobAnswer :: Prompt.Prompt r -> r
 atBobAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
+
+-- atBobAnswer with Library of Leng's CR 614.1a "may" answered as given.
+lengAnswer :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+lengAnswer decision p = case p of
+  Prompt.ChooseRedirect {} -> decision
+  _ -> atBobAnswer p
+
+-- The Wheel of Sun and Moon board with Library of Leng under BOB in the Wheel's
+-- place: alice casts Psychic Miasma at bob, who holds one swamp over a stocked
+-- library, and bob answers Leng's "may" as given. Returns the resolved state and
+-- the three printings the assertions name.
+lengBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> OptionalDecision.OptionalDecision -> m (GameState.GameState, Printing.Printing, Printing.Printing, Printing.Printing)
+lengBoard s registry decision = do
+  swamp <- S.printingOf s registry "Swamp"
+  piker <- S.printingOf s registry "Goblin Piker"
+  miasma <- S.printingOf s registry "Psychic Miasma"
+  leng <- S.printingOf s registry "Library of Leng"
+  let base = S.landsInPlay swamp 3
+      (_, withLeng) = S.addPermanent leng S.bob base
+      (_, stocked) = S.addLibraryCard piker S.bob withLeng
+      withHand = handCards swamp S.bob 1 stocked
+      (gs, spellId) = S.handOne miasma withHand
+      cast = snd (Engine.runGamePure (lengAnswer decision) gs (S.cast S.alice spellId))
+      after = snd (Engine.runGamePure (lengAnswer decision) cast Stack.resolveTop)
+  pure (after, swamp, piker, miasma)
 
 -- atBobAnswer with CR 701.9a's choice pinned by INDEX rather than left to the
 -- identity answerer, so a discard of two takes two distinct cards.
@@ -738,8 +764,8 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
   -- Miasma -- alice's card -- returns to alice's hand. Bob's library is stocked
   -- first, so "the bottom" is a position and not the whole library. Dropping the
   -- reveal read in findableAfterMove leaves the spell in alice's graveyard; the
-  -- first assertion is what reddens. The unrevealed side -- a discard hidden
-  -- without a reveal -- has no producer in the pool (#2230).
+  -- first assertion is what reddens. The unrevealed side is Library of Leng's,
+  -- below.
   Spec.it s "CR 701.9c a land discarded into a library revealed still returns Psychic Miasma" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -760,6 +786,45 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "bob's discarded swamp is on the bottom of his library" (namesIn Zone.Library S.bob after) [Just (S.printingName piker), Just (S.printingName swamp)]
     Spec.assertEqWith s "and bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
     Spec.assertEqWith s "bob's hand emptied" (S.handSize S.bob after) 0
+  -- The same rider through a discard hidden WITHOUT a reveal: CR 701.9c
+  -- undefines the card's characteristics, so CR 400.7j's find has nothing to
+  -- ask and the rider must not fire. Library of Leng, {1} Artifact: "If an
+  -- effect causes you to discard a card, discard it, but you may put it on top
+  -- of your library instead of into your graveyard." Its ruling: the card "is
+  -- not revealed unless the spell or ability requiring the discard specifically
+  -- says it is". Bob controls it and takes the option.
+  --
+  -- The pair differs in bob's answer alone: declining sends the swamp to his
+  -- graveyard, where the rider finds it and the spell returns. Making
+  -- findableAfterMove's hidden-zone arm answer True returns the spell in the
+  -- first case too, and its first assertion is what reddens.
+  Spec.it s "CR 701.9c a land discarded into a library unrevealed does not return Psychic Miasma" $ do
+    (after, swamp, piker, miasma) <- lengBoard s registry OptionalDecision.Exercises
+    Spec.assertEqWith s "psychic miasma stayed in alice's graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "and did not return to alice's hand" (namesIn Zone.Hand S.alice after) []
+    -- The guard against a pass that never hid the card: CR 401.2's top, and no
+    -- CR 701.20a reveal on the way.
+    Spec.assertEqWith s "bob's discarded swamp is on top of his library" (namesIn Zone.Library S.bob after) [Just (S.printingName swamp), Just (S.printingName piker)]
+    Spec.assertEqWith s "and nobody revealed it" (S.revealsOf after) []
+    Spec.assertEqWith s "bob's graveyard is empty" (namesIn Zone.Graveyard S.bob after) []
+  Spec.it s "CR 614.1a Library of Leng declined leaves the discard in the graveyard, and Psychic Miasma returns" $ do
+    (after, swamp, piker, miasma) <- lengBoard s registry OptionalDecision.Declines
+    Spec.assertEqWith s "psychic miasma returned to alice's hand" (namesIn Zone.Hand S.alice after) [Just (S.printingName miasma)]
+    Spec.assertEqWith s "bob's discarded swamp is in his graveyard" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName swamp)]
+    Spec.assertEqWith s "and his library is untouched" (namesIn Zone.Library S.bob after) [Just (S.printingName piker)]
+  -- The row's other gate, its ruling's "you can't use the Library of Leng
+  -- ability ... when you discard a card as a cost, because costs aren't
+  -- effects": a DiscardCause.Ordinary discard is never offered the row, so an
+  -- answerer that would take it is never asked and the card reaches the
+  -- graveyard.
+  Spec.it s "CR 701.9a Library of Leng does not reach a discard no effect caused" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    leng <- S.printingOf s registry "Library of Leng"
+    let (_, withLeng) = S.addPermanent leng S.bob (S.landsInPlay swamp 3)
+        (swampId, gs) = S.addHandCard swamp S.bob withLeng
+        after = S.runPure (lengAnswer OptionalDecision.Exercises) gs (Event.discard DiscardCause.Ordinary S.bob swampId)
+    Spec.assertEqWith s "bob's swamp is in his graveyard" (namesIn Zone.Graveyard S.bob after) [Just (S.printingName swamp)]
+    Spec.assertEqWith s "and not in his library" (namesIn Zone.Library S.bob after) []
   -- The Wheel's own relation, CR 303.4b's enchanted player
   -- (ControllerRelation.EnchantedPlayers, judged by Replacement.relationHolds),
   -- as the whole card: cast at bob, then one card of each seat's headed for its
@@ -3426,12 +3491,79 @@ randomDiscardProcessSpec s registry = Spec.describe s "CR 701.9b random discards
     Spec.assertEqWith s "alice's hand is empty" handLeft 0
     Spec.assertEqWith s "alice was asked after each of three runs" asked 3
 
+-- Ad Nauseam {3}{B}{B} Instant -- "Reveal the top card of your library and put
+-- that card into your hand. You lose life equal to its mana value. You may
+-- repeat this process any number of times."
+--
+-- Trade Secrets {1}{U}{U} Sorcery -- "Target opponent draws two cards, then you
+-- draw up to four cards. That opponent may repeat this process as many times as
+-- they choose."
+repeatProcessSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+repeatProcessSpec s registry = Spec.describe s "CR 608.2d processes a player may repeat" $ do
+  -- Ad Nauseam off five Swamps. alice's library, top down: Hill Giant (mana
+  -- value 4), Lightning Bolt (1), Goblin Piker (2). `runs` is how many times she
+  -- runs the process before declining.
+  let named = Just . CardName.MkCardName . Text.pack
+      nauseam runs = do
+        swamp <- S.printingOf s registry "Swamp"
+        spell <- S.printingOf s registry "Ad Nauseam"
+        library <- traverse (S.printingOf s registry) ["Goblin Piker", "Lightning Bolt", "Hill Giant"]
+        let lands = S.landsFor swamp S.alice 5 S.threePlayerGame
+            (withSpell, spellId) = S.handOne spell lands
+            stocked = List.foldl' (\gs p -> snd (S.addLibraryCard p S.alice gs)) withSpell library
+            limit :: Natural
+            limit = runs
+            answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              Prompt.ChooseRepeat _ _ _ done -> if done < limit then OptionalDecision.Exercises else OptionalDecision.Declines
+              _ -> S.identityAnswer p
+            cast = S.runPure answer stocked (S.cast S.alice spellId)
+            after = S.runPure answer cast Stack.resolveTop
+        pure (S.lifeOf S.alice after, namesIn Zone.Hand S.alice after)
+  -- CR 701.20a: the card stays revealed for the part of the effect it is
+  -- relevant to, so the loss reads its mana value in the hand.
+  Spec.it s "CR 701.20a Ad Nauseam loses life equal to the mana value of the card it put into hand" $ do
+    (life, hand) <- nauseam 1
+    Spec.assertEqWith s "alice lost the Hill Giant's 4" life (Just 16)
+    Spec.assertEqWith s "the Hill Giant is in alice's hand" hand [named "Hill Giant"]
+  Spec.it s "CR 608.2d Ad Nauseam repeated loses each card's mana value" $ do
+    (life, hand) <- nauseam 2
+    Spec.assertEqWith s "alice lost 4 then 1" life (Just 15)
+    Spec.assertEqWith s "both cards are in alice's hand" (List.sort hand) (List.sort [named "Hill Giant", named "Lightning Bolt"])
+  -- Trade Secrets off three Islands, aimed at carol rather than bob, so "that
+  -- opponent" is not the one APNAP order reaches first. Whoever is asked to
+  -- repeat answers by seat: carol takes a second run and declines a third, and
+  -- anyone else declines outright. alice names six each time, past the four the
+  -- card allows.
+  Spec.it s "CR 608.2d Trade Secrets' target opponent chooses to repeat, and alice draws at most four" $ do
+    island <- S.printingOf s registry "Island"
+    spell <- S.printingOf s registry "Trade Secrets"
+    filler <- S.printingOf s registry "Mountain"
+    let lands = S.landsFor island S.alice 3 S.threePlayerGame
+        (withSpell, spellId) = S.handOne spell lands
+        stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard filler pid g)) gs [1 :: Int .. 12]
+        stocked = stock S.carol (stock S.alice withSpell)
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer S.carol) . snd) sets
+          Prompt.ChooseRepeat _ pid _ done -> if pid == S.carol && done < 2 then OptionalDecision.Exercises else OptionalDecision.Declines
+          Prompt.ChooseNumber {} -> 6
+          _ -> S.identityAnswer p
+        cast = S.runPure answer stocked (S.cast S.alice spellId)
+        ((_, after), transcript) = Replay.record answer cast Stack.resolveTop
+        numbers = filter (\r -> case r of Response.ChoseNumber _ -> True; _ -> False) transcript
+    Spec.assertEqWith s "carol drew two cards in each of two runs" (S.handSize S.carol after) 4
+    Spec.assertEqWith s "alice drew four, not six, in each of two runs" (S.handSize S.alice after) 8
+    Spec.assertEqWith s "bob drew nothing" (S.handSize S.bob after) 0
+    Spec.assertEqWith s "CR 608.2d alice named each run's number" numbers [Response.ChoseNumber 6, Response.ChoseNumber 6]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   zoneChangeSpec s registry
   discardExceptionsSpec s registry
   discardedThisWaySpec s registry
   randomDiscardProcessSpec s registry
+  repeatProcessSpec s registry
   anyNumberDiscardSpec s registry
   elkinLairSpec s registry
   castTheCardSpec s registry

@@ -71,7 +71,7 @@ deciderOf prompt = case prompt of
   Prompt.ChooseDistributedMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCounterOrNone decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePaidEnergy decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseNumber decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseNumber decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseReadAheadChapter decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDamageSource decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDelayedTriggerEvent decider _ _ _ -> Just (Decider.unwrap decider)
@@ -122,6 +122,7 @@ deciderOf prompt = case prompt of
   Prompt.ChooseUnleash decider _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseTribute decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDredge decider _ _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseRedirect decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePayLifeOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseRevealOnEntry decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseEnlist decider _ _ _ -> Just (Decider.unwrap decider)
@@ -282,6 +283,7 @@ kindOf prompt = Text.pack $ case prompt of
   Prompt.ChooseUnleash {} -> "ChooseUnleash"
   Prompt.ChooseTribute {} -> "ChooseTribute"
   Prompt.ChooseDredge {} -> "ChooseDredge"
+  Prompt.ChooseRedirect {} -> "ChooseRedirect"
   Prompt.ChoosePayLifeOnEntry {} -> "ChoosePayLifeOnEntry"
   Prompt.ChooseRevealOnEntry {} -> "ChooseRevealOnEntry"
   Prompt.ChooseEnlist {} -> "ChooseEnlist"

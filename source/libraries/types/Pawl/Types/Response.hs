@@ -466,6 +466,9 @@ data Response
     -- reason: a transcript that answered one "may" must not silently answer a
     -- different one.
     ChoseDredge OptionalDecision.OptionalDecision
+  | -- | CR 614.1a: whether an optional redirect applied (Exercises) or the move
+    -- stood (Declines). Distinct from ChoseDredge for its reason.
+    ChoseRedirect OptionalDecision.OptionalDecision
   | -- | CR 733.1: whether the payer of an action that could not be legally
     -- completed also reversed the mana abilities they activated while making it
     -- (Exercises) or kept them and the mana they made (Declines). Distinct from
@@ -569,7 +572,7 @@ data Response
   | -- | CR 608.2d: the members of a per-member loop a resolving spell's
     -- controller chose for its body to run for.
     ChoseLoopMembers (Set.Set Recipient.Recipient)
-  | -- | CR 608.2d: whether an Effect.Repeat's controller ran its body again. Its
+  | -- | CR 608.2d: whether an Effect.Repeat's chooser ran its body again. Its
     -- own constructor for ChoseRiot's reason: no other OptionalDecision answer
     -- may replay as this one.
     ChoseRepeat OptionalDecision.OptionalDecision

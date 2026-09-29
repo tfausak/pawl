@@ -291,6 +291,7 @@ import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -715,6 +716,7 @@ playerRefPositions =
         ("discard-any-number", Effect.Discard (Discard.AnyNumber (AnyNumberDiscard.MkAnyNumberDiscard (plantedPlayer "da") (AnyNumberMatching.MkAnyNumberMatching (Filter.Type.And []) Nothing) Nothing)), [plantedPlayer "da"]),
         ("player-sacrifices", Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (plantedPlayer "ps") (Filter.Type.And []) one), [plantedPlayer "ps"]),
         ("choose-card-name", Effect.ChooseCardName (ChooseCardName.MkChooseCardName (plantedPlayer "cn") (Filter.Type.And [])), [plantedPlayer "cn"]),
+        ("repeat", Effect.Repeat (Repeat.MkRepeat (plantedPlayer "rp-chooser") Seq.empty), [plantedPlayer "rp-chooser"]),
         ("offer-cast", Effect.OfferCast (OfferCast.MkOfferCast (plantedRef "oc-ref") (plantedPlayer "oc-caster") CastObligation.Optional PermissionVerb.Cast CastOffer.defaultValue CastRepetition.Once False False), [plantedPlayer "oc-caster"]),
         ("grant-play-from-exile", Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (plantedPlayer "gp-player") (plantedRef "gp-ref") ManaSpending.AsProduced False PermissionVerb.Play), [plantedPlayer "gp-player"]),
         -- CR 611.2a's reference nested in the DURATION rather than in a field of
@@ -1407,7 +1409,7 @@ ownCounts effect = case effect of
   -- card's -- the rider's recursion one opcode over.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectCounts body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> quantityCounts upTo <> concatMap effectCounts body
-  Effect.Repeat body -> concatMap effectCounts body
+  Effect.Repeat (Repeat.MkRepeat _ body) -> concatMap effectCounts body
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> conditionCounts condition <> concatMap effectCounts (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
@@ -1675,7 +1677,7 @@ effectNestedEffects effect = case effect of
   -- CR 608.2f's body, run once per member of the fold.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> Foldable.toList body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Foldable.toList body
-  Effect.Repeat body -> Foldable.toList body
+  Effect.Repeat (Repeat.MkRepeat _ body) -> Foldable.toList body
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> Foldable.toList (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
@@ -2268,7 +2270,7 @@ effectReplacements effect = case effect of
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectReplacements body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectReplacements body
-  Effect.Repeat body -> concatMap effectReplacements body
+  Effect.Repeat (Repeat.MkRepeat _ body) -> concatMap effectReplacements body
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> concatMap effectReplacements (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
@@ -2750,7 +2752,7 @@ effectMintedFaces effect = case effect of
   -- CR 608.2f's body can too, for the same reason.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ _) -> concatMap effectMintedFaces body
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectMintedFaces body
-  Effect.Repeat body -> concatMap effectMintedFaces body
+  Effect.Repeat (Repeat.MkRepeat _ body) -> concatMap effectMintedFaces body
   Effect.RepeatIf (RepeatIf.MkRepeatIf process _ ifHolds) -> concatMap effectMintedFaces (process <> ifHolds)
   Effect.Heal _ -> []
   Effect.ChooseNewTargets _ -> []
@@ -3493,6 +3495,7 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Station -> []
   Keyword.UmbraArmor -> []
   Keyword.Epic -> []
+  Keyword.Paradigm -> []
   Keyword.Cipher -> []
   Keyword.Convoke -> []
   Keyword.Delve -> []
@@ -5027,7 +5030,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   -- rather than a kind holding nothing.
   ReplacementEffect.CounterR (CounterR.MkCounterR counterPattern _) ->
     unframed [CounterPattern.onWhat counterPattern] <> concatMap counterKindFilters (Maybe.maybeToList (CounterPattern.whichKind counterPattern))
-  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ _ _) -> unframed [ZoneChangePattern.whatObject zoneChangePattern]
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _ _ _ _ _) -> unframed [ZoneChangePattern.whatObject zoneChangePattern]
   ReplacementEffect.EntryR (EntryR.MkEntryR entryPattern entryRewrite) -> unframed [entryPattern] <> entryRewriteFilters entryRewrite
   -- CR 615.1's shields narrow by their source, which is a Filter over the object
   -- dealing the damage (Luminesce's "black sources and red sources", Galvanic
@@ -5949,7 +5952,7 @@ effectFilters effect = case effect of
   -- list is exactly what this traversal must not stop at.
   Effect.ForEach (ForEach.MkForEach ref _ _ body _ gate) -> frame SourceHostFramed (objectRefFilters ref) <> concatMap effectFilters body <> concatMap payGateFilters (Maybe.maybeToList gate)
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectFilters body
-  Effect.Repeat body -> concatMap effectFilters body
+  Effect.Repeat (Repeat.MkRepeat _ body) -> concatMap effectFilters body
   Effect.RepeatIf (RepeatIf.MkRepeatIf process condition ifHolds) -> frame Unframed (conditionFilters condition) <> concatMap effectFilters (process <> ifHolds)
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
   Effect.ChooseNewTargets ref -> frame SourceHostFramed (objectRefFilters ref)

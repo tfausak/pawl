@@ -1576,6 +1576,7 @@ eventTriggers events gs =
             Nothing -> Map.empty
             Just _ -> Map.singleton oid (Object.owner obj, fmap whole (Projection.triggeredAbilitiesOf oid gs))
         GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary _) -> Map.empty
+        GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.ByEffect _) -> Map.empty
         -- A draw names no object either. The card it puts in a hand may well bear
         -- an ability that triggers from there -- CR 702.94a's miracle -- but that
         -- one fires on the REVEAL rather than on the draw, and `revealedInHand`
