@@ -81,6 +81,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
@@ -742,7 +743,7 @@ effectObjectRefs effect = case effect of
   Effect.Detain ref -> [ref]
   Effect.Goad ref -> [ref]
   Effect.Pair ref -> [ref]
-  Effect.DoesNotUntapNext ref -> [ref]
+  Effect.DoesNotUntapNext payload -> [DoesNotUntapNext.ref payload]
   Effect.Transform ref -> [ref]
   Effect.Convert ref -> [ref]
   Effect.Flip ref -> [ref]

@@ -3462,9 +3462,10 @@ queensBayPaladinSpec s registry = Spec.describe s "Queen's Bay Paladin (CR 122.1
 --     undo -- an engine that tapped nothing and one that untapped it are
 --     different answers.
 --   * REPLACED versus PROHIBITED. The second untap step untaps it, so a stun
---     counter is told apart from Object.doesNotUntapNext and from an
---     UntapRestriction: those two leave the permanent tapped for one step and
---     for as long as they stand respectively, and neither spends anything.
+--     counter is told apart from Object.doesNotUntapFor and from an
+--     UntapRestriction: those two leave the permanent tapped for the steps
+--     named and for as long as they stand respectively, and neither spends
+--     anything.
 --   * SPENT versus IGNORED. The counter count is read after each step, so an
 --     engine that left the permanent tapped without paying a counter would fail
 --     the second step's assertion rather than the first's.

@@ -181,6 +181,7 @@ import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.DieResult as DieResult
 import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -9344,17 +9345,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     State.modify' $ \gs -> case partners of
       [partner] -> Soulbond.pair controller source partner gs
       _ -> gs
-  Effect.DoesNotUntapNext ref ->
+  Effect.DoesNotUntapNext payload ->
     State.modify' $ \gs ->
       -- CR 502.3's untap prohibition, as a one-shot; the victims are enumerated
-      -- ONCE (CR 608.2f). No duration is stored: CR 701.43b makes the untap step
-      -- the prohibition bites in the step it expires in, and Engine.untapAll
-      -- clears the flag there. Marking an already-marked permanent is a no-op,
-      -- that rule's non-stacking said as a state assignment.
-      let mark o = o {Object.doesNotUntapNext = True}
+      -- ONCE (CR 608.2f). No duration is stored: each victim carries how many of
+      -- its controller's untap steps are still to skip, and Engine.untapAll
+      -- counts one off at each. The LARGER count is kept, never the sum: every
+      -- prohibition runs from the next step, so two over the same step expire
+      -- together (CR 701.43b says it of exert).
+      let steps = DoesNotUntapNext.steps payload
+          mark o = o {Object.doesNotUntapFor = max steps (Object.doesNotUntapFor o)}
        in gs
             { GameState.objects =
-                foldr (Map.adjust mark) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
+                foldr (Map.adjust mark) (GameState.objects gs) (objectRefObjects legal resolving controller source gs (DoesNotUntapNext.ref payload))
             }
   Effect.Transform ref -> turnPermanentsOver legal resolving controller source ref
   -- CR 701.28a routes a convert through rules 701.27a-f unchanged, so it is the

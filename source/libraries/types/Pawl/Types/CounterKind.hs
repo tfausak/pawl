@@ -151,8 +151,8 @@ data CounterKind keyword
     --
     -- NOT Pawl.Types.Effect's DoesNotUntapNext, which is CR 502.3's "effects can
     -- keep one or more of a player's permanents from untapping": that one
-    -- suppresses the turn-based action for one step and reaches nothing else,
-    -- where this replaces the untap EVENT wherever it comes from -- rule
+    -- suppresses the turn-based action for the steps named and reaches nothing
+    -- else, where this replaces the untap EVENT wherever it comes from -- rule
     -- 701.26b's action, so an Effect.Untap and CR 107.6's untap symbol too -- and
     -- spends a counter each time.
     --

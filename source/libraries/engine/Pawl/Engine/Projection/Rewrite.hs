@@ -89,6 +89,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.DrawR as DrawR
 import qualified Pawl.Types.DrawRewrite as DrawRewrite
@@ -825,7 +826,7 @@ rewriteEffect pairs effect = case effect of
   Effect.MakeForetold (MakeForetold.MkMakeForetold ref reduction) ->
     Effect.MakeForetold (MakeForetold.MkMakeForetold (rewriteObjectRef pairs ref) reduction)
   Effect.MakeWarped ref -> Effect.MakeWarped (rewriteObjectRef pairs ref)
-  Effect.DoesNotUntapNext ref -> Effect.DoesNotUntapNext (rewriteObjectRef pairs ref)
+  Effect.DoesNotUntapNext payload -> Effect.DoesNotUntapNext payload {DoesNotUntapNext.ref = rewriteObjectRef pairs (DoesNotUntapNext.ref payload)}
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.Convert ref -> Effect.Convert (rewriteObjectRef pairs ref)
   Effect.Flip ref -> Effect.Flip (rewriteObjectRef pairs ref)

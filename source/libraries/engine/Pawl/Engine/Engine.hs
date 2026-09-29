@@ -233,23 +233,25 @@ checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 -- THREE carriers, subtracted together. The printed static one is re-derived live;
 -- the other two are stored on the victim, and this is where each both applies and
 -- ENDS, CR 701.43b putting the expiry in the untap step it bites in. They are two
--- fields because they name different seats: Object.doesNotUntapNext says "its
--- controller's next untap step", so it is applied and cleared against `ids`,
+-- fields because they name different seats: Object.doesNotUntapFor says "its
+-- controller's next untap step[s]", so it is applied and counted down against
+-- `ids`, one step apiece,
 -- while Object.exertedBy says "YOUR next untap step" (CR 701.43a), so `pid` is
 -- dropped from EVERY permanent -- one that changed hands is neither held back at
 -- its new controller's step nor left carrying a rider past the step that ends it.
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
-  let clear obj = obj {Object.doesNotUntapNext = False}
+  let -- Only ever applied to `held`, whose count is above 0.
+      countDown obj = obj {Object.doesNotUntapFor = Object.doesNotUntapFor obj - 1}
       unexert obj = obj {Object.exertedBy = Set.delete pid (Object.exertedBy obj)}
       ids = Projection.controls pid gs
       prohibited = UntapRestriction.doesNotUntap ids gs
       asks f oid = maybe False f (Game.lookupObject oid gs)
-      oneShot = asks Object.doesNotUntapNext
+      oneShot = asks ((> 0) . Object.doesNotUntapFor)
       exerted = asks (Set.member pid . Object.exertedBy)
       untapping = filter (\oid -> not (Set.member oid prohibited) && not (oneShot oid) && not (exerted oid)) ids
-      expiring = filter oneShot ids
+      held = filter oneShot ids
   -- CR 502.3's two sentences, in its own order: DETERMINE which permanents will
   -- untap, then untap them all SIMULTANEOUSLY. Event.proposeUntap is the
   -- determining half -- rule 701.26b's guard plus the CR 614 loop, which is where
@@ -270,7 +272,7 @@ untapAll pid = do
   survivors <- Monad.filterM Event.proposeUntap untapping
   Event.simultaneously $ do
     State.modify' $ \live ->
-      let untapped = foldr (Map.adjust clear) (foldr Event.writeUntappedIn (GameState.objects live) survivors) expiring
+      let untapped = foldr (Map.adjust countDown) (foldr Event.writeUntappedIn (GameState.objects live) survivors) held
        in live
             { GameState.objects =
                 if any (Set.member pid . Object.exertedBy) untapped
@@ -913,7 +915,7 @@ placeBorne srcId pending = do
             Object.castGrant = Nothing,
             Object.detainedUntil = Set.empty,
             Object.goadedBy = Set.empty,
-            Object.doesNotUntapNext = False,
+            Object.doesNotUntapFor = 0,
             Object.exertedBy = Set.empty,
             Object.activatedOnce = Set.empty
           }
