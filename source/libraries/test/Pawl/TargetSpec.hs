@@ -134,6 +134,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetCount as TargetCount
@@ -2858,6 +2859,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   cuombajjSpec s registry
   -- And CR 115.7d, a spell that is already on the stack given new targets.
   redirectSpec s registry
+  -- And its joint half, over a spell whose second slot reads its first.
+  redirectBioshiftSpec s registry
 
 -- CR 115.1 fixes the ability's controller as the seat that announces its
 -- targets. Cuombajj Witches overrides that for one of its two slots -- "{T}:
@@ -3847,6 +3850,59 @@ redirectSpec s registry =
               let after = drainDeclining (retarget (ricochetOf ids) (Recipient.ToCreature (bobPikerOf ids)) growthSpell cast)
               Spec.assertEqWith s "bob's Piker took the Growth and its copy" (S.powerToughnessOf (bobPikerOf ids) after) (Just (8, 7))
               Spec.assertEqWith s "and alice's Piker neither" (S.powerToughnessOf (pikerOf ids) after) (Just (2, 1))
+
+-- CR 115.7d's two halves over a jointly judged slot: Bioshift's `to` must be
+-- "another target creature with the same controller" as its `from`. alice casts
+-- it from her Goblin Piker to her other Piker; bob's Redirect moves `from` to his
+-- Tomakul Honor Guard ("Ward {2}") and leaves `to` where it is. Two boards
+-- differing in one thing: whether the second Piker died in response.
+--
+-- Dead, `to` was ALREADY illegal and may stay unchanged, so the re-target
+-- stands and ward fires. Alive, the new `from` is what makes `to` illegal
+-- ("must not cause any unchanged targets to become illegal"), so it is refused.
+redirectBioshiftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+redirectBioshiftSpec s registry =
+  let from = SlotName.MkSlotName (Text.pack "from")
+      to = SlotName.MkSlotName (Text.pack "to")
+      run killed = do
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        guard <- S.printingOf s registry "Tomakul Honor Guard"
+        piker <- S.printingOf s registry "Goblin Piker"
+        bioshift <- S.printingOf s registry "Bioshift"
+        redirect <- S.printingOf s registry "Redirect"
+        let lands = S.landsFor island S.bob 2 (S.landsFor forest S.alice 1 S.threePlayerGame)
+            (withBioshift, bioshiftId) = S.handOne bioshift lands
+            (redirectId, g1) = S.addHandCard redirect S.bob withBioshift
+            (guardId, g2) = S.addPermanent guard S.bob g1
+            (giverId, g3) = S.addPermanent piker S.alice g2
+            (takerId, board) = S.addPermanent piker S.alice g3
+            aimed = Map.fromList [(from, Recipient.ToCreature giverId), (to, Recipient.ToCreature takerId)]
+            cast = S.runPure (aimingSlots S.alice aimed) board (S.cast S.alice bioshiftId)
+            responded = if killed then S.runPure S.identityAnswer cast (Event.destroy Regenerability.Regenerable [takerId]) else cast
+        case topOfStack cast of
+          Nothing -> Spec.assertFailure s "Bioshift never reached the stack"
+          Just spell -> do
+            let bobCast = S.runPure (aimingAs S.bob (Recipient.ToObject spell)) responded (S.cast S.bob redirectId)
+                redirected = S.runPure (aimingSlots S.bob (Map.insert from (Recipient.ToCreature guardId) aimed)) bobCast (Stack.resolveTop >> Engine.settleForPriority)
+                targets = maybe Map.empty (flip Map.restrictKeys (Map.keysSet aimed) . Binding.targetsOf . Object.bindings) (Game.lookupObject spell redirected)
+            pure (aimed, targets, length (GameState.stack redirected))
+   in Spec.describe s "Redirect over Bioshift (CR 115.7d)" $ do
+        Spec.it s "CR 115.7d / 702.21a an unchanged target already illegal may stay, and the new one draws ward" $ do
+          (aimed, targets, depth) <- run True
+          Spec.assertEqWith s "CR 702.21a the Guard became a target, so its ward trigger sits over Bioshift" depth 2
+          Spec.assertEqWith s "and `to` still names the dead Piker" (Map.lookup to targets) (fmap Set.singleton (Map.lookup to aimed))
+        Spec.it s "CR 115.7d a new target that makes an unchanged target illegal is refused" $ do
+          (aimed, targets, depth) <- run False
+          Spec.assertEqWith s "no ward trigger: the re-target was refused" depth 1
+          Spec.assertEqWith s "and Bioshift keeps both its targets" targets (fmap Set.singleton aimed)
+
+-- Answer every target prompt put to `who` by FILTERING each slot's offered set
+-- down to the one recipient `aimed` names for it.
+aimingSlots :: PlayerId.PlayerId -> Map.Map SlotName.SlotName Recipient.Recipient -> Prompt.Prompt r -> r
+aimingSlots who aimed p = case p of
+  Prompt.ChooseTargets _ player _ asked | player == who -> Map.mapWithKey (\slot (_, offered) -> Set.filter ((== Map.lookup slot aimed) . Just) offered) asked
+  _ -> S.identityAnswer p
 
 -- The objects redirectSpec's board holds.
 data RedirectBoard = MkRedirectBoard
