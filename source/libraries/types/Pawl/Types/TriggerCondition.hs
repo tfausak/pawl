@@ -204,11 +204,9 @@ data TriggerCondition
     -- (Serra Inquisitors' first half) -- SelfBlocksAtLeast spending the number
     -- on a quality instead.
     --
-    -- Not implemented: rule 509.3e's "effects that add or remove blockers" reach
-    -- neither this nor SelfBlocksAtLeast (#4384). The pool's one effect that
-    -- makes an already-blocking creature block (General Jarkeld) is not that
-    -- producer either: it moves a blocker between two attackers, leaving the
-    -- number of creatures each blocker blocks exactly where it was.
+    -- Rule 509.3e's "effects that add or remove blockers" reach this and
+    -- SelfBlocksAtLeast through Sorrow's Path, and Pawl.CombatCostSpec's
+    -- ExchangeBlocks group is the proof.
     SelfBlocksOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3c: "whenever [a creature] becomes blocked" (Sacred Prey) -- the
     -- attacking side of SelfBlocks, once per attacker that got a blocker.
