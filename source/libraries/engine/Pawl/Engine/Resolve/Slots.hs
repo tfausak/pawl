@@ -839,6 +839,7 @@ effectObjectRefs effect = case effect of
   Effect.ForEachNumber {} -> []
   Effect.Repeat {} -> []
   Effect.Heal ref -> [ref]
+  Effect.ChooseNewTargets ref -> [ref]
 
 -- Every PlayerRef this ONE effect holds in a field of its own: not the ones
 -- nested in an ObjectRef it carries (objectRefPlayerRefs), not the ones nested
@@ -1035,6 +1036,7 @@ effectPlayerRefs effect = case effect of
   Effect.ForEachNumber {} -> []
   Effect.Repeat {} -> []
   Effect.Heal {} -> []
+  Effect.ChooseNewTargets {} -> []
 
 -- The slots a MonarchTarget reads: only the targeted arm names one.
 monarchTargetSlots :: MonarchTarget.MonarchTarget -> Map.Map SlotName SlotArity
@@ -1423,6 +1425,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> joinTwo (quantitySlots upTo) (joinSlots (fmap slotsOf (Foldable.toList body)))
   Effect.Repeat body -> joinSlots (fmap slotsOf (Foldable.toList body))
   Effect.Heal _ -> Map.empty
+  Effect.ChooseNewTargets _ -> Map.empty
 
 -- Every PlayerRef nested in a Duration: the seat CR 611.2a's window is counted
 -- against, which only UntilEndOfNextTurnOf states. durationSlots' twin one type
@@ -2029,6 +2032,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.slotsAreExhaustive upTo && all slotsAreExhaustive body
   Effect.Repeat body -> all slotsAreExhaustive body
   Effect.Heal _ -> True
+  Effect.ChooseNewTargets _ -> True
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
 durationSlotsAreExhaustive :: Duration.Duration -> Bool
@@ -2254,6 +2258,7 @@ readsX =
         Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> Quantity.readsX upTo || readsX (Foldable.toList body)
         Effect.Repeat body -> readsX (Foldable.toList body)
         Effect.Heal _ -> False
+        Effect.ChooseNewTargets _ -> False
    in any effectReadsX
 
 -- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads, which
@@ -2491,6 +2496,7 @@ boundSlots effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ slot body) -> Set.insert slot (foldMap boundSlots body)
   Effect.Repeat body -> foldMap boundSlots body
   Effect.Heal _ -> Set.empty
+  Effect.ChooseNewTargets _ -> Set.empty
 
 -- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
 -- only one -- nothing when the slot named none, its target became illegal, or it

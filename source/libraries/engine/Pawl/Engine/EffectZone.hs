@@ -322,3 +322,4 @@ zoneFunctionedFrom itself delayed effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.Repeat body -> Maybe.listToMaybe (Maybe.mapMaybe (zoneFunctionedFrom itself delayed) (Foldable.toList body))
   Effect.Heal _ -> Nothing
+  Effect.ChooseNewTargets _ -> Nothing

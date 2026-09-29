@@ -988,6 +988,7 @@ rewriteEffect pairs effect = case effect of
     Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo slot (fmap (rewriteEffect pairs) body))
   Effect.Repeat body -> Effect.Repeat (fmap (rewriteEffect pairs) body)
   Effect.Heal ref -> Effect.Heal (rewriteObjectRef pairs ref)
+  Effect.ChooseNewTargets ref -> Effect.ChooseNewTargets (rewriteObjectRef pairs ref)
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.

@@ -2334,6 +2334,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       )
       "Heal and Untap of the same slot encode differently"
+  -- CR 115.7d: Redirect's "you may choose new targets for target spell".
+  Spec.it s "ChooseNewTargets" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ChooseNewTargets (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))))
+      " {\"type\":\"ChooseNewTargets\",\"value\":{\"type\":\"InSlot\",\"value\":\"spell\"}} "
   -- CR 701.36a: nullary, rule 701.36a fixing the quality, the count and the
   -- chooser, leaving an author nothing to write.
   Spec.it s "Populate" $

@@ -659,6 +659,7 @@ objectRefPositions =
         ("make-warped", Effect.MakeWarped (plantedRef "mw"), [plantedRef "mw"]),
         ("for-each", Effect.ForEach (ForEach.MkForEach (plantedRef "fe") LoopMembers.Every (SlotName.MkSlotName (Text.pack "each")) Seq.empty False Nothing), [plantedRef "fe"]),
         ("heal", Effect.Heal (plantedRef "he"), [plantedRef "he"]),
+        ("choose-new-targets", Effect.ChooseNewTargets (plantedRef "cnt"), [plantedRef "cnt"]),
         ("exchange-values", Effect.ExchangeValues (ExchangeValues.MkExchangeValues (ExchangedValue.Power (plantedRef "xv-power")) (ExchangedValue.Toughness (plantedRef "xv-toughness")) Duration.Indefinite), [plantedRef "xv-power", plantedRef "xv-toughness"])
       ]
 
@@ -1400,6 +1401,7 @@ ownCounts effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber upTo _ body) -> quantityCounts upTo <> concatMap effectCounts body
   Effect.Repeat body -> concatMap effectCounts body
   Effect.Heal _ -> []
+  Effect.ChooseNewTargets _ -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -1666,6 +1668,7 @@ effectNestedEffects effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> Foldable.toList body
   Effect.Repeat body -> Foldable.toList body
   Effect.Heal _ -> []
+  Effect.ChooseNewTargets _ -> []
   Effect.Create {} -> []
   Effect.Conjure {} -> []
   Effect.CreateCopy {} -> []
@@ -2253,6 +2256,7 @@ effectReplacements effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectReplacements body
   Effect.Repeat body -> concatMap effectReplacements body
   Effect.Heal _ -> []
+  Effect.ChooseNewTargets _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed replacement abilities.
   Effect.TurnFaceDown turn -> listedReplacements (TurnFaceDown.characteristics turn)
@@ -2732,6 +2736,7 @@ effectMintedFaces effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectMintedFaces body
   Effect.Repeat body -> concatMap effectMintedFaces body
   Effect.Heal _ -> []
+  Effect.ChooseNewTargets _ -> []
   Effect.RedirectDamage {} -> []
   -- CR 708.2's listed characteristics are not a minted FACE: they replace an
   -- existing object's, and Pawl.Engine.Card.faceDownFace supplies every field
@@ -5920,6 +5925,7 @@ effectFilters effect = case effect of
   Effect.ForEachNumber (ForEachNumber.MkForEachNumber _ _ body) -> concatMap effectFilters body
   Effect.Repeat body -> concatMap effectFilters body
   Effect.Heal ref -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.ChooseNewTargets ref -> frame SourceHostFramed (objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check

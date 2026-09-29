@@ -2856,6 +2856,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   crescendoSpec s registry
   -- And the one slot in the corpus its CONTROLLER does not announce.
   cuombajjSpec s registry
+  -- And CR 115.7d, a spell that is already on the stack given new targets.
+  redirectSpec s registry
 
 -- CR 115.1 fixes the ability's controller as the seat that announces its
 -- targets. Cuombajj Witches overrides that for one of its two slots -- "{T}:
@@ -3750,3 +3752,135 @@ aimingCrescendo oids p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (\(count, legal) -> TargetCount.ceilingOn (Natural.length legal) count) offers
   Prompt.ChooseTargets _ _ _ asked -> fmap (\(_, offered) -> Set.filter (maybe False (`elem` oids) . Recipient.objectOf) offered) asked
   _ -> S.identityAnswer p
+
+-- CR 115.7d over an ORIGINAL spell: Redirect ({U}{U} Instant, "You may choose new
+-- targets for target spell"), with CR 702.21a's ward as the observer of what
+-- became a target, and Wild Ricochet as the same instruction ahead of a copy.
+--
+-- THREE SEATS, Pawl.CopySpec's wardedCopyBoard's reason: alice casts the Giant
+-- Growth, bob casts the re-target and controls every creature it can reach
+-- (Tomakul Honor Guard, "Ward {2}"; Slippery Bogle, hexproof; a Goblin Piker of
+-- his own), and carol is neither. alice's Goblin Piker is what the Growth names
+-- first. alice's three Forests are the Growth and a {2} ward payment she CAN make,
+-- so a countered Growth is her declining rather than being unable.
+redirectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+redirectSpec s registry =
+  let boardOf = do
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        guard <- S.printingOf s registry "Tomakul Honor Guard"
+        bogle <- S.printingOf s registry "Slippery Bogle"
+        piker <- S.printingOf s registry "Goblin Piker"
+        growth <- S.printingOf s registry "Giant Growth"
+        redirect <- S.printingOf s registry "Redirect"
+        ricochet <- S.printingOf s registry "Wild Ricochet"
+        let lands = S.landsFor mountain S.bob 4 (S.landsFor island S.bob 2 (S.landsFor forest S.alice 3 S.threePlayerGame))
+            (withGrowth, growthId) = S.handOne growth lands
+            (redirectId, g1) = S.addHandCard redirect S.bob withGrowth
+            (ricochetId, g2) = S.addHandCard ricochet S.bob g1
+            (guardId, g3) = S.addPermanent guard S.bob g2
+            (bogleId, g4) = S.addPermanent bogle S.bob g3
+            (bobPikerId, g5) = S.addPermanent piker S.bob g4
+            (pikerId, gs) = S.addPermanent piker S.alice g5
+        pure (MkRedirectBoard guardId bogleId bobPikerId pikerId growthId redirectId ricochetId, gs)
+      -- alice casts the Growth at `aim`; the Growth's id and the board with it
+      -- on the stack, any trigger its announcement raised not yet placed.
+      growthAt aim board ids = S.runPure (aimingAs S.alice aim) board (S.cast S.alice (growthOf ids))
+      -- bob casts `card` at the Growth, then it resolves with every target
+      -- prompt put to bob answered by `aim`.
+      retarget card aim growthSpell gs =
+        let cast = S.runPure (aimingAs S.bob (Recipient.ToObject growthSpell)) gs (S.cast S.bob card)
+         in S.runPure (aimingAs S.bob aim) cast (Stack.resolveTop >> Engine.settleForPriority)
+   in Spec.describe s "Redirect (CR 115.7d)" $ do
+        -- CR 115.7 makes the new target a target of the Growth, so bob's ward
+        -- fires against alice's spell. The Growth first named alice's Piker, so
+        -- nothing but the re-target ever names the Guard: 3/1 is the Growth
+        -- countered, 6/4 is a re-target nothing observed.
+        Spec.it s "CR 115.7d / 702.21a Redirect's NEW target becomes a target, and ward fires" $ do
+          (ids, board) <- boardOf
+          let cast = growthAt (Recipient.ToCreature (pikerOf ids)) board ids
+          case topOfStack cast of
+            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
+            Just growthSpell -> do
+              let redirected = retarget (redirectOf ids) (Recipient.ToCreature (guardOf ids)) growthSpell cast
+                  after = drainDeclining redirected
+              Spec.assertEqWith s "CR 702.21a alice declined the ward cost, so the Growth was countered and the Guard is still a 3/1" (S.powerToughnessOf (guardOf ids) after) (Just (3, 1))
+              Spec.assertEqWith s "and it never reached alice's Piker" (S.powerToughnessOf (pikerOf ids) after) (Just (2, 1))
+              Spec.assertEqWith s "the ward trigger went on the stack over the Growth" (length (GameState.stack redirected)) 2
+        -- The same board, bob naming his Slippery Bogle instead. CR 115.7d's new
+        -- target "must be legal", judged for the GROWTH, whose controller is
+        -- alice -- so CR 702.11b's hexproof refuses it though bob is the one
+        -- choosing, and the Growth resolves on its old target.
+        Spec.it s "CR 115.7d / 702.11b legality is the spell's controller's, so bob cannot aim alice's Growth at his hexproof Bogle" $ do
+          (ids, board) <- boardOf
+          let cast = growthAt (Recipient.ToCreature (pikerOf ids)) board ids
+          case topOfStack cast of
+            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
+            Just growthSpell -> do
+              let after = drainDeclining (retarget (redirectOf ids) (Recipient.ToCreature (bogleOf ids)) growthSpell cast)
+              Spec.assertEqWith s "the Growth resolved on alice's Piker, its old target" (S.powerToughnessOf (pikerOf ids) after) (Just (5, 4))
+              Spec.assertEqWith s "and the Bogle is untouched" (S.powerToughnessOf (bogleOf ids) after) (Just (1, 1))
+        -- A target LEFT unchanged did not become one: it already was. The Growth
+        -- names the Guard as it is cast, alice pays that ward, and Redirect keeps
+        -- the Guard -- so no second ward fires and the Growth resolves, where a
+        -- second trigger alice declines leaves a 3/1.
+        Spec.it s "CR 115.7d a target Redirect leaves unchanged does not become a target again" $ do
+          (ids, board) <- boardOf
+          let cast = growthAt (Recipient.ToCreature (guardOf ids)) board ids
+          case topOfStack cast of
+            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
+            Just growthSpell -> do
+              let paid = S.runPure alicePaysWard cast (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+                  after = drainDeclining (retarget (redirectOf ids) (Recipient.ToCreature (guardOf ids)) growthSpell paid)
+              Spec.assertEqWith s "the Growth resolved on the Guard" (S.powerToughnessOf (guardOf ids) after) (Just (6, 4))
+              Spec.assertEqWith s "alice paid the one ward cost, spending all three Forests" (S.tappedCount S.alice paid) 3
+        -- Wild Ricochet: "You may choose new targets for target instant or sorcery
+        -- spell. Then copy that spell. You may choose new targets for the copy."
+        -- The copy is of the RE-AIMED Growth, so bob's own Piker takes both.
+        Spec.it s "CR 115.7d / 707.10 Wild Ricochet re-aims the spell, then copies it" $ do
+          (ids, board) <- boardOf
+          let cast = growthAt (Recipient.ToCreature (pikerOf ids)) board ids
+          case topOfStack cast of
+            Nothing -> Spec.assertFailure s "Giant Growth never reached the stack"
+            Just growthSpell -> do
+              let after = drainDeclining (retarget (ricochetOf ids) (Recipient.ToCreature (bobPikerOf ids)) growthSpell cast)
+              Spec.assertEqWith s "bob's Piker took the Growth and its copy" (S.powerToughnessOf (bobPikerOf ids) after) (Just (8, 7))
+              Spec.assertEqWith s "and alice's Piker neither" (S.powerToughnessOf (pikerOf ids) after) (Just (2, 1))
+
+-- The objects redirectSpec's board holds.
+data RedirectBoard = MkRedirectBoard
+  { guardOf :: ObjectId.ObjectId,
+    bogleOf :: ObjectId.ObjectId,
+    bobPikerOf :: ObjectId.ObjectId,
+    pikerOf :: ObjectId.ObjectId,
+    growthOf :: ObjectId.ObjectId,
+    redirectOf :: ObjectId.ObjectId,
+    ricochetOf :: ObjectId.ObjectId
+  }
+
+-- Answer every target prompt put to `who` by FILTERING the offered set down to
+-- `recipient`; a target prompt put to another seat gets the identity answer.
+aimingAs :: PlayerId.PlayerId -> Recipient.Recipient -> Prompt.Prompt r -> r
+aimingAs who recipient p = case p of
+  Prompt.ChooseTargets _ player _ asked | player == who -> fmap (\(_, offered) -> Set.filter (== recipient) offered) asked
+  _ -> S.identityAnswer p
+
+-- alice pays every cost she is offered; everything else is the identity answer.
+alicePaysWard :: Prompt.Prompt r -> r
+alicePaysWard p = case p of
+  Prompt.ChooseToPay _ player _ _ _ _ | player == S.alice -> PaymentDecision.Pays
+  _ -> S.identityAnswer p
+
+topOfStack :: GameState.GameState -> Maybe ObjectId.ObjectId
+topOfStack = Maybe.listToMaybe . GameState.stack
+
+-- Resolve until the stack is empty, every payment declined: a ward trigger is
+-- one object more, so a fixed count would read two boards at different depths.
+drainDeclining :: GameState.GameState -> GameState.GameState
+drainDeclining =
+  let go :: Int -> GameState.GameState -> GameState.GameState
+      go fuel gs
+        | fuel <= 0 || null (GameState.stack gs) = gs
+        | otherwise = go (fuel - 1) (S.runPure S.identityAnswer gs (Stack.resolveTop >> Engine.settleForPriority))
+   in go 10

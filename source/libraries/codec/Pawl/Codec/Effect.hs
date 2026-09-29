@@ -278,7 +278,8 @@ codec cardCodec abilityCodec =
           Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing),
           Arm.payload "ForEachNumber" forEachNumberCodec Effect.ForEachNumber (\x -> case x of Effect.ForEachNumber y -> Just y; _ -> Nothing),
           Arm.payload "Repeat" (Common.seq (codec cardCodec abilityCodec)) Effect.Repeat (\x -> case x of Effect.Repeat y -> Just y; _ -> Nothing),
-          Arm.payload "Heal" ObjectRef.codec Effect.Heal (\x -> case x of Effect.Heal y -> Just y; _ -> Nothing)
+          Arm.payload "Heal" ObjectRef.codec Effect.Heal (\x -> case x of Effect.Heal y -> Just y; _ -> Nothing),
+          Arm.payload "ChooseNewTargets" ObjectRef.codec Effect.ChooseNewTargets (\x -> case x of Effect.ChooseNewTargets y -> Just y; _ -> Nothing)
         ]
 
 tagOf :: Effect.Effect card ability -> String
@@ -440,3 +441,4 @@ tagOf x = case x of
   Effect.ForEachNumber {} -> "ForEachNumber"
   Effect.Repeat {} -> "Repeat"
   Effect.Heal {} -> "Heal"
+  Effect.ChooseNewTargets {} -> "ChooseNewTargets"
