@@ -514,6 +514,75 @@ jugglerAnswer victim fodder p = case p of
   Prompt.ChooseSacrifices {} -> sacrifices fodder p
   _ -> takingTargets 1 [victim] p
 
+-- CR 701.60a's transition read as a TRIGGER EVENT (CR 603.2), proved by Synthetic
+-- Neighborhood Watch {1}{W} Enchantment, "Whenever a permanent becomes suspected,
+-- draw a card." Synthetic: Scryfall `o:/becomes? suspected/`, 2026-09-29, finds
+-- only Airtight Alibi, whose clause ends the designation rather than watching it
+-- begin; a printed "whenever ... becomes suspected" would replace it.
+--
+-- The Watch and two library cards are added under alice, and a Juggler's enters
+-- trigger is resolved down to an empty stack, so a trigger that did fire has also
+-- resolved by the time the hand is read. The first three cases are jugglerBoard
+-- and differ in one thing each: the target announced, and whether the Piker was
+-- suspected already. The last moves the Juggler and its target to bob's side.
+neighborhoodWatchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+neighborhoodWatchSpec s registry =
+  let handSize gs = length (Game.zoneMembers Zone.Hand S.alice gs)
+      resolveDown :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      resolveDown answer gs =
+        S.runPure answer gs $ do
+          Engine.settleForPriority
+          Stack.resolveTop
+          Engine.settleForPriority
+          Stack.resolveTop
+          Engine.settleForPriority
+      watching gs0 = do
+        watch <- S.printingOf s registry "Synthetic Neighborhood Watch"
+        piker <- S.printingOf s registry "Goblin Piker"
+        brute <- S.printingOf s registry "Boggart Brute"
+        let (_, g1) = S.addPermanent watch S.alice gs0
+            (_, g2) = S.addLibraryCard piker S.alice g1
+        pure (snd (S.addLibraryCard brute S.alice g2))
+      suspect oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.designations = Set.insert Designation.Suspected (Object.designations o)}) oid (GameState.objects gs)}
+   in Spec.describe s "SyntheticNeighborhoodWatch" $ do
+        -- The proving test.
+        Spec.it s "CR 701.60a the Piker becoming suspected draws alice a card" $ do
+          (_, pikerId, _, _, board) <- jugglerBoard s registry
+          gs <- watching board
+          let after = resolveDown (takingTargets 1 [pikerId]) gs
+          Spec.assertEqWith s "the Watch drew one card" (handSize gs, handSize after) (0, 1)
+          Spec.assertEqWith s "because the Piker became suspected" (suspectedOf pikerId after) (Just True)
+          Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+        -- The same board with the target declined (CR 115.6): nothing becomes
+        -- suspected, so nothing triggers.
+        Spec.it s "CR 603.2 with nothing suspected the Watch draws nothing" $ do
+          (_, pikerId, bruteId, _, board) <- jugglerBoard s registry
+          gs <- watching board
+          let after = resolveDown decliningTargets gs
+          Spec.assertEqWith s "the Watch drew nothing" (handSize after) 0
+          Spec.assertEqWith s "since no creature is suspected" (fmap (`suspectedOf` after) [pikerId, bruteId]) [Just False, Just False]
+        -- CR 701.60d: the Juggler aims at a Piker that is suspected already, so its
+        -- suspect writes nothing and there is no event to trigger on.
+        Spec.it s "CR 701.60d re-suspecting a suspected permanent draws nothing" $ do
+          (_, pikerId, _, _, board) <- jugglerBoard s registry
+          gs <- watching (suspect pikerId board)
+          let after = resolveDown (takingTargets 1 [pikerId]) gs
+          Spec.assertEqWith s "the Watch drew nothing" (handSize after) 0
+          Spec.assertEqWith s "though the Piker is still suspected" (suspectedOf pikerId after) (Just True)
+        -- "a permanent", not "a permanent you control": bob's Juggler suspects his
+        -- own Wall, and alice's Watch still draws her the card. alice's Juggler is
+        -- not on this board, so bob's is the only suspect.
+        Spec.it s "CR 701.60a an opponent's permanent becoming suspected draws alice a card" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          wall <- S.printingOf s registry "Wall of Stone"
+          juggler <- S.printingOf s registry "Rune-Brand Juggler"
+          let (wallId, g1) = S.addPermanent wall S.bob (S.landsInPlay swamp 4)
+              (_, g2) = S.entersWithTrigger juggler S.bob g1
+          gs <- watching g2 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+          let after = resolveDown (takingTargets 1 [wallId]) gs
+          Spec.assertEqWith s "the Watch drew one card" (handSize gs, handSize after) (0, 1)
+          Spec.assertEqWith s "because bob's Wall became suspected" (suspectedOf wallId after, Projection.controllerOf wallId after) (Just True, Just S.bob)
+
 -- The library alice searches, the ids of whichever of its cards the ability
 -- names, and every id in it. The last is what lets an assertion say which SUBSET
 -- the search offered rather than how many.
@@ -1524,6 +1593,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   angelicSleuthSpec s registry
   repeatOffenderSpec s registry
   runeBrandJugglerSpec s registry
+  neighborhoodWatchSpec s registry
   randomRevealSpec s registry
   wildEvocationSpec s registry
   trumpetingCarnosaurSpec s registry
