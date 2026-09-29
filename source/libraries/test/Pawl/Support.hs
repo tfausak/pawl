@@ -2675,7 +2675,7 @@ promptDecider prompt = case prompt of
   Prompt.ChooseDistributedMovedCounters decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseMovedCounterOrNone decider _ _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChoosePaidEnergy decider _ _ _ -> Just (Decider.unwrap decider)
-  Prompt.ChooseNumber decider _ _ -> Just (Decider.unwrap decider)
+  Prompt.ChooseNumber decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseReadAheadChapter decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDamageSource decider _ _ _ -> Just (Decider.unwrap decider)
   Prompt.ChooseDelayedTriggerEvent decider _ _ _ -> Just (Decider.unwrap decider)

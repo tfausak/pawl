@@ -21,7 +21,9 @@
                 "effects": [
                   {
                     "type": "ChooseNumber",
-                    "value": "number"
+                    "value": {
+                      "slot": "number"
+                    }
                   },
                   {
                     "type": "Discard",

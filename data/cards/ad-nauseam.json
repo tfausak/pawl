@@ -1,0 +1,127 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Ad Nauseam",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Repeat",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "Reveal",
+                          "value": {
+                            "ref": {
+                              "type": "TopOfLibrary",
+                              "value": {
+                                "count": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "player": {
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                }
+                              }
+                            },
+                            "slot": "revealed"
+                          }
+                        },
+                        {
+                          "type": "MoveToZone",
+                          "value": {
+                            "ref": {
+                              "type": "InSlot",
+                              "value": "revealed"
+                            },
+                            "slot": "put",
+                            "zone": {
+                              "type": "Hand"
+                            }
+                          }
+                        },
+                        {
+                          "type": "LoseLife",
+                          "value": {
+                            "player": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            },
+                            "quantity": {
+                              "type": "Count",
+                              "value": {
+                                "aggregation": {
+                                  "type": "Total",
+                                  "value": {
+                                    "type": "ManaValue"
+                                  }
+                                },
+                                "filter": {
+                                  "type": "IsBound",
+                                  "value": "put"
+                                },
+                                "scope": {
+                                  "type": "OverBound",
+                                  "value": "put"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "chooser": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

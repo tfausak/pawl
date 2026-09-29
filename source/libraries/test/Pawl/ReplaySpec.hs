@@ -344,7 +344,7 @@ combatReplaySpec s =
           Spec.assertEqWith s "a short transcript stops" (Replay.defaultAnswer p) OptionalDecision.Declines
         -- CR 107.1c: any number, zero included, and not a paid-energy answer.
         Spec.it s "ChooseNumber records and replays a Natural, and rejects a paid-energy answer" $ do
-          let p = Prompt.ChooseNumber decider S.alice oid
+          let p = Prompt.ChooseNumber decider S.alice oid Nothing
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 7)) (Just (7 :: Natural.Natural))
           Spec.assertEqWith s "a paid-energy answer is not an answer to it" (Replay.decode p (Response.ChosePaidEnergy 7)) Nothing
           Spec.assertEqWith s "a short transcript names zero" (Replay.defaultAnswer p) 0

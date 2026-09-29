@@ -16,6 +16,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
+import qualified Pawl.Types.ChooseNumber as ChooseNumber
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Conjure as Conjure
@@ -79,6 +80,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.RequireAttack as RequireAttack
@@ -422,10 +424,9 @@ data Effect card ability
     -- Pawl.VariableEffectSpec's "CR 118.12 paying nothing declines the offer" is
     -- what proves paying zero does not take a gate hung off this opcode.
     PayAnyEnergy SlotName.SlotName
-  | -- | CR 107.1c / 608.2d: the resolving controller chooses any number, zero
-    -- included, bound to this SlotName for a later effect to read -- Rites of
-    -- Initiation's "discard any number of cards at random".
-    ChooseNumber SlotName.SlotName
+  | -- | CR 107.1c / 608.2d: the resolving controller chooses a number, zero
+    -- included and at most the payload's bound, bound for a later effect to read.
+    ChooseNumber ChooseNumber.ChooseNumber
   | -- | CR 701.26a: tap the permanents the ObjectRef names, leaving an already
     -- tapped one alone.
     Tap ObjectRef.ObjectRef
@@ -837,10 +838,9 @@ data Effect card ability
   | -- | CR 608.2f: run the body once for each number from 1 up to the payload's
     -- quantity, that number bound under the payload's slot.
     ForEachNumber (ForEachNumber.ForEachNumber (Effect card ability))
-  | -- | CR 608.2d: run the body, then ask the resolving controller whether to
-    -- run it again, until they decline -- Kindle the Carnage's "you may repeat
-    -- this process any number of times".
-    Repeat (Seq.Seq (Effect card ability))
+  | -- | CR 608.2d: run the body, then ask the payload's chooser whether to run
+    -- it again, until they decline.
+    Repeat (Repeat.Repeat (Effect card ability))
   | -- | CR 608.2c: run the process, then run it again for as long as the
     -- payload's condition holds after a run -- Grist, the Hunger Tide's "if an
     -- Insect card was milled this way, put a loyalty counter on Grist and repeat

@@ -127,6 +127,7 @@ import qualified Pawl.Types.CastRepetition as CastRepetition
 import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.ChooseCardName as ChooseCardName
+import qualified Pawl.Types.ChooseNumber as ChooseNumber
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
 import qualified Pawl.Types.Chooser as Chooser
@@ -322,6 +323,7 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemovalCount as RemovalCount
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.RemoveCountersAmong as RemoveCountersAmong
+import qualified Pawl.Types.Repeat as Repeat
 import qualified Pawl.Types.RepeatIf as RepeatIf
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -5513,22 +5515,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Event.simultaneously . Event.together . Monad.forM_ [1 .. count] $ \n -> do
       State.modify' (bindAmountSlot resolving source slot n)
       applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
-  -- CR 608.2d: the body in written order, then the resolving controller's "may
-  -- repeat", asked after each run and never in advance. No event bracket: each
-  -- run is its own process, so each run's damage is its own event. What the body
-  -- binds is rescoped per run, ForEach's reason: a run whose discard found an
-  -- empty hand must not read the card the previous run discarded.
+  -- CR 608.2d: the body in written order, then the chooser's "may repeat",
+  -- asked after each run and never in advance. No event bracket: each run is its
+  -- own process, so each run's damage is its own event. What the body binds is
+  -- rescoped per run, ForEach's reason: a run whose discard found an empty hand
+  -- must not read the card the previous run discarded.
+  --
+  -- The chooser is whoever the payload names, which is Trade Secrets' target
+  -- opponent rather than the resolving controller. Every printing names one
+  -- player; a reference naming several asks them in APNAP order until one
+  -- repeats, and one naming nobody ends the loop.
   --
   -- Pawl.ZoneChangeSpec's Kindle the Carnage group proves both the second run and
-  -- the rescope.
-  Effect.Repeat body -> do
+  -- the rescope, and its Trade Secrets group the chooser.
+  Effect.Repeat (Repeat.MkRepeat chooser body) -> do
     rescope <- State.gets (rescopeRun resolving (foldMap boundSlots body))
     let run runs = do
           State.modify' rescope
           applyClauseEffects source (applyEffectWith runSubgame resolving source controller legal chosen) (Foldable.toList body)
           gs <- State.get
-          again <- Game.choose (Prompt.ChooseRepeat (Decide.deciderFor controller gs) controller resolving runs)
-          Monad.when (again == OptionalDecision.Exercises) (run (runs + 1))
+          let ask done pid =
+                if done
+                  then pure True
+                  else fmap (== OptionalDecision.Exercises) (Game.choose (Prompt.ChooseRepeat (Decide.deciderFor pid gs) pid resolving runs))
+          again <- Monad.foldM ask False (apnapPlayersOf chooser legal controller gs)
+          Monad.when again (run (runs + 1))
     run 1
   -- CR 608.2c: the process in written order, then its printed "if" asked of the
   -- state that run left -- live, so the tally the run's own mill just bound is
@@ -9291,10 +9302,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- number past what a later instruction can act on is that instruction's CR
   -- 609.3 shortfall, not this prompt's. Bound even at zero, PayAnyEnergy's
   -- reason.
-  Effect.ChooseNumber slot -> do
+  -- CR 608.2d: a player "can't choose an option that's illegal", so an answer
+  -- past the bound is clamped to it.
+  Effect.ChooseNumber (ChooseNumber.MkChooseNumber slot upTo) -> do
     gs <- State.get
-    answer <- Game.choose (Prompt.ChooseNumber (Decide.deciderFor controller gs) controller resolving)
-    State.modify' (bindAmountSlot resolving source slot answer)
+    answer <- Game.choose (Prompt.ChooseNumber (Decide.deciderFor controller gs) controller resolving upTo)
+    State.modify' (bindAmountSlot resolving source slot (maybe answer (min answer) upTo))
   -- CR 701.26a: turn each named permanent sideways. The victims are enumerated
   -- ONCE (CR 608.2f) and off the board as it stands before any of them is tapped,
   -- so an illegal slot (CR 608.2b), a player recipient and a set that matched
