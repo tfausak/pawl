@@ -2,6 +2,7 @@ module Pawl.Types.ManaRestriction where
 
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordDesignator as KeywordDesignator
 
 -- | CR 106.6's first shape: "some spells or abilities that produce mana restrict
 -- how that mana can be spent".
@@ -19,7 +20,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- predicate could carry: the payments are about different objects, a spell being
 -- cast, an ability's source, and the permanent a special action is taken on.
 --
--- FOUR fields and not one per payment the engine can make: CR 116.2 alone lists
+-- FIVE fields and not one per payment the engine can make: CR 116.2 alone lists
 -- eleven special actions, and what earns a field is a PRINTED rider naming that
 -- payment. Foretelling (CR 116.2h), plotting (CR 116.2k), CR 508.1j \/ 509.1f's
 -- combat toll and CR 118.12's resolution-time payment share
@@ -48,6 +49,10 @@ data ManaRestriction = MkManaRestriction
     -- filter is evaluated against the ability's SOURCE, which is the object
     -- "activate abilities of artifacts" is about.
     activations :: Maybe (Filter.Filter Keyword.Keyword),
+    -- | CR 602.2b again, asked of the ABILITY rather than its source: an
+    -- activation of an ability that keyword indicates, whatever its source --
+    -- CR 716.2c's "to gain a Class level" (Sorcerer Class).
+    keywordActivations :: Maybe KeywordDesignator.KeywordDesignator,
     -- | CR 116.2m \/ 709.5e: the unlock cost of a locked half, paid as a special
     -- action. The filter is evaluated against the PERMANENT being unlocked.
     unlocks :: Maybe (Filter.Filter Keyword.Keyword),
@@ -67,6 +72,7 @@ none =
   MkManaRestriction
     { casts = Nothing,
       activations = Nothing,
+      keywordActivations = Nothing,
       unlocks = Nothing,
       turnsFaceUp = Nothing
     }

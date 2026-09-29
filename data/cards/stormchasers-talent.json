@@ -20,6 +20,10 @@
               }
             ]
           },
+          "keyword": {
+            "type": "ClassLevel",
+            "value": 2
+          },
           "modal": {
             "modes": [
               {
@@ -38,30 +42,7 @@
                 ]
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "OnlyIf",
-              "value": {
-                "type": "Compares",
-                "value": {
-                  "comparison": {
-                    "type": "Exactly"
-                  },
-                  "measured": {
-                    "type": "ClassLevel"
-                  },
-                  "threshold": {
-                    "type": "Literal",
-                    "value": 1
-                  }
-                }
-              }
-            },
-            {
-              "type": "SorcerySpeed"
-            }
-          ]
+          }
         },
         {
           "cost": {
@@ -81,6 +62,10 @@
               }
             ]
           },
+          "keyword": {
+            "type": "ClassLevel",
+            "value": 3
+          },
           "modal": {
             "modes": [
               {
@@ -99,30 +84,17 @@
                 ]
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "OnlyIf",
-              "value": {
-                "type": "Compares",
-                "value": {
-                  "comparison": {
-                    "type": "Exactly"
-                  },
-                  "measured": {
-                    "type": "ClassLevel"
-                  },
-                  "threshold": {
-                    "type": "Literal",
-                    "value": 2
-                  }
-                }
-              }
-            },
-            {
-              "type": "SorcerySpeed"
-            }
-          ]
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "ClassLevel",
+          "value": 2
+        },
+        {
+          "type": "ClassLevel",
+          "value": 3
         }
       ],
       "manaCost": [

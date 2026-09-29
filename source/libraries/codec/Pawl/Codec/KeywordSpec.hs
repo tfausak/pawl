@@ -9,6 +9,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Craft as Craft
@@ -1498,6 +1499,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.PowerUp
       " {\"type\":\"PowerUp\"} "
+  -- CR 716.2. The payload is the level the bar makes the Class.
+  Spec.it s "ClassLevel" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.ClassLevel (ClassLevel.MkClassLevel 2))
+      " {\"type\":\"ClassLevel\",\"value\":2} "
   -- CR 702.179a. Nullary, and the tag is the whole encoding.
   Spec.it s "StartYourEngines" $
     Common.assertCodec

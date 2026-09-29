@@ -3444,6 +3444,8 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Forecast -> []
   -- CR 702.193a is payload-free for exhaust's reason: the ability is the CARD's.
   Keyword.PowerUp -> []
+  -- CR 716.2's payload is a level; the ability it indicates is the CARD's.
+  Keyword.ClassLevel _ -> []
   Keyword.StartYourEngines -> []
   -- CR 701.43d is payload-free: the linked trigger it permits is the CARD's own
   -- TriggeredAbility, so any Filter in it is swept there rather than here.
@@ -5041,7 +5043,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   -- "creature tokens"). The appended token's own Filters are the MINTED
   -- object's, and reach the sweep through replacementMintedCards instead.
   ReplacementEffect.TokenR (TokenR.MkTokenR tokenPattern _ _) -> unframed [TokenPattern.whatToken tokenPattern]
-  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ turnUpRewrite) -> unframed [turnUpPattern] <> turnUpRewriteFilters turnUpRewrite
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern _ _ turnUpRewrite) -> unframed [turnUpPattern] <> turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.UntapR _ -> []
   ReplacementEffect.LifeLossR {} -> []
   ReplacementEffect.LifeGainR {} -> []

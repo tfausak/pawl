@@ -1089,17 +1089,23 @@ admitsUnder subject pid gs =
   let paidFor = case subject of
         PaymentSubject.ForNeither -> Nothing
         PaymentSubject.Casting oid -> Just (ManaRestriction.casts, oid)
-        PaymentSubject.Activating oid -> Just (ManaRestriction.activations, oid)
+        PaymentSubject.Activating oid _ -> Just (ManaRestriction.activations, oid)
         PaymentSubject.Unlocking oid -> Just (ManaRestriction.unlocks, oid)
         PaymentSubject.TurningFaceUp oid -> Just (ManaRestriction.turnsFaceUp, oid)
+      -- CR 716.2c: the one half asked of the ABILITY rather than of an object --
+      -- its keyword stamp against the designator, no view needed.
+      byKeyword restriction = case subject of
+        PaymentSubject.Activating _ stamp -> any (\designator -> any (Keyword.Engine.designates designator) stamp) (ManaRestriction.keywordActivations restriction)
+        _ -> False
       asked = fmap (\(half, oid) -> (half, Filter.contextFor (Game.teams gs) (Just pid) Nothing, Projection.viewOfObject oid gs)) paidFor
    in \unit -> case ManaUnit.restriction unit of
         Nothing -> True
-        Just restriction -> case asked of
-          Nothing -> False
-          Just (half, context, view) -> case half restriction of
+        Just restriction ->
+          byKeyword restriction || case asked of
             Nothing -> False
-            Just wanted -> Filter.matches (context {Filter.sourceChosenSubtype = ManaUnit.sourceChosenSubtype unit}) view wanted
+            Just (half, context, view) -> case half restriction of
+              Nothing -> False
+              Just wanted -> Filter.matches (context {Filter.sourceChosenSubtype = ManaUnit.sourceChosenSubtype unit}) view wanted
 
 -- A pool unit as a supply. Its type is settled, so the option set is a
 -- singleton, and its tags are the ones production stamped on it
@@ -2166,7 +2172,11 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
       -- it, which `admits` reads per demand. Mishra's Workshop's three
       -- colourless are still no supply for the instant it may not buy, because
       -- the cost's own demands -- typed and generic alike -- ask that same set.
-      subjects = Set.toList (Set.fromList (subject : fmap PaymentSubject.Activating sources))
+      --
+      -- A nested source's subject carries no keyword stamp: Sorcerer Class's
+      -- CR 716.2c clause names a class level bar, whose ability sets a level and
+      -- so is no mana ability (CR 605.1a).
+      subjects = Set.toList (Set.fromList (subject : fmap (\oid -> PaymentSubject.Activating oid Nothing) sources))
       admittedBy = fmap (\each -> (each, admitsUnder each pid gs)) subjects
       admitting unit = Set.fromList (fmap fst (filter (\(_, ok) -> ok unit) admittedBy))
       -- CR 609.4b, resolved ONCE for this whole question and applied to both
@@ -2233,7 +2243,7 @@ payableResolutionsGiven subject capacity spending sources pcs pid committed clai
               <> concatMap (\(k, (_, option)) -> fmap ((,) k) (optionSupplies option)) ranked,
             concatMap (\(k, (_, option)) -> fmap ((,) k) (optionDemands option)) ranked,
             costPosition,
-            Map.fromList ((costPosition, subject) : fmap (\(k, (oid, _)) -> (k, PaymentSubject.Activating oid)) ranked),
+            Map.fromList ((costPosition, subject) : fmap (\(k, (oid, _)) -> (k, PaymentSubject.Activating oid Nothing)) ranked),
             sum (fmap (optionLife . snd) taken)
           )
       -- Whether there is a walk for the relaxation below to save: one option per

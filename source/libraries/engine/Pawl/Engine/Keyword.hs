@@ -39,6 +39,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChosenCardFromAmong as ChosenCardFromAmong
 import qualified Pawl.Types.ChosenPermanent as ChosenPermanent
+import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
@@ -551,6 +552,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   -- CR 701.43d's static ability mints NO triggered ability: the rule lets a card
   -- print a linked "when you do" beside it without saying what that ability does,
   -- so each printing authors its own on TriggerCondition.SelfExerted.
@@ -802,6 +804,7 @@ handAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -1379,6 +1382,7 @@ graveyardAbilitiesFor keyword = fmap (mintedBy keyword) $ case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -1887,7 +1891,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Intimidate -> []
   -- CR 702.37e: turning a face-down permanent face up is a SPECIAL ACTION and
   -- doesn't use the stack (CR 116), so morph gives no activated ability;
-  -- morphCost below serves that action instead.
+  -- morphCosts below serves that action instead.
   Keyword.Morph {} -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
@@ -2038,6 +2042,7 @@ battlefieldAbilitiesFor keyword count = fmap (mintedBy keyword) $ case keyword o
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   -- Exerting is a cost paid at CR 508.1g, which Combat.declareAttackers offers
   -- rather than the stack.
   Keyword.Exert -> []
@@ -2816,6 +2821,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -2887,7 +2893,7 @@ hasFlash = Set.member Keyword.Flash
 -- keywords add one to a cast from a graveyard. Read by Cost.costsFor only while
 -- the object is in a graveyard, the zone half of the same sentence.
 --
--- A Bool rather than morphCost's Maybe Cost: rule 702.133a states the cost
+-- A Bool rather than morphCosts' list: rule 702.133a states the cost
 -- itself, so there is nothing to read off the card. Membership rather than a
 -- count, the rule taking no parameter.
 hasJumpStart :: Set Keyword -> Bool
@@ -3462,8 +3468,8 @@ mutateTarget =
     Pool.Creatures
     (Just (Filter.And [Filter.Not (Filter.HasSubtype Subtype.Human), Filter.SameOwnerAsSource]))
 
--- CR 702.37a / 702.37e: the MORPH cost -- what a face-down permanent's controller
--- pays to turn it face up as CR 116.2b's special action -- or Nothing when the
+-- CR 702.37a / 702.37e: the MORPH costs -- what a face-down permanent's controller
+-- pays to turn it face up as CR 116.2b's special action -- empty when the
 -- card has no morph ability. NOT the cost of the morph CAST, which rule 702.37a
 -- writes into the rule itself, so that one comes from Cost.faceDownCost.
 --
@@ -3473,18 +3479,20 @@ mutateTarget =
 --
 -- CR 702.37b: MEGAMORPH REACHES HERE TOO, which is why Pawl.Types.Keyword's Morph
 -- carries a variant rather than having a sibling constructor -- the case below is
--- a WILDCARD, so a `Megamorph` constructor beside `Morph` would fall through to
--- Nothing and silently make every megamorph card uncastable face down and
+-- a WILDCARD, so a `Megamorph` constructor beside `Morph` would fall through to the
+-- empty list and silently make every megamorph card uncastable face down and
 -- unturnable face up, with nothing for -Werror to report.
 --
--- ONE cost per card: the ascending-least printed instance, ordered by
--- Pawl.Types.Morph's derived Ord, which compares the Cost before the variant.
-morphCost :: Set Keyword -> Maybe (Cost Keyword)
-morphCost keywords =
+-- A LIST for flashbackCosts' reason: rule 702.37 states no limit on how many
+-- morph abilities a card has, and CR 702.37b's "a megamorph cost is a morph
+-- cost" puts both variants in it (Synthetic Twice-Veiled Adept). Distinct costs
+-- only: two abilities at one cost are one price to pay.
+morphCosts :: Set Keyword -> [Cost Keyword]
+morphCosts keywords =
   let costOf keyword = case keyword of
         Keyword.Morph (Morph.MkMorph cost _) -> Just cost
         _ -> Nothing
-   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+   in Set.toAscList (Set.fromList (Maybe.mapMaybe costOf (Set.toAscList keywords)))
 
 -- CR 702.168a / 702.168d: the DISGUISE cost -- what a face-down permanent's
 -- controller pays to turn it face up as CR 116.2b's special action -- or Nothing
@@ -3492,16 +3500,18 @@ morphCost keywords =
 -- which rule 702.168a fixes at {3} for every printing, so that one comes from
 -- Cost.faceDownCost as morph's does.
 --
--- Asked of the card's PRINTED keywords, morphCost's reason exactly: CR 702.168b
+-- Asked of the card's PRINTED keywords, morphCosts' reason exactly: CR 702.168b
 -- leaves the face-down permanent with no keyword but the ward it lists, so a
 -- projected read would find no disguise ability to charge for.
 --
--- A SEPARATE function from morphCost and not a widening of it, which is what
+-- A SEPARATE function from morphCosts and not a widening of it, which is what
 -- keeps CR 702.168d's price apart from CR 702.37e's: a permanent with both
 -- abilities is turnable by either procedure at either cost, and one function
 -- answering for both would charge whichever the Set happened to hold first.
 --
--- ONE cost per card (the ascending-least), morphCost's shape.
+-- ONE cost per card: the ascending-least printed instance. Not implemented: a
+-- card printing disguise twice at two costs, whose dearer cost is unreachable
+-- (#1831).
 disguiseCost :: Set Keyword -> Maybe (Cost Keyword)
 disguiseCost keywords =
   let costOf keyword = case keyword of
@@ -3718,11 +3728,11 @@ escalateCosts keywords =
 -- Nothing when the card has no buyback. Offered at CR 601.2b and added to
 -- whichever candidate cost was announced (CR 601.2f).
 --
--- A Maybe where optionalCosts above is a list, morphCost's shape: rule 702.27a
+-- A Maybe where optionalCosts above is a list, disguiseCost's shape: rule 702.27a
 -- states one cost and one payment of it, and Scryfall kw:buyback, 2026-09-07,
 -- has no printing with two -- a card printing "Buyback [cost 1]" and "Buyback
 -- [cost 2]" the way Sunscape Battlemage prints two kickers would refute this and
--- would want optionalCosts' list. First in ascending Set order, morphCost's tie
+-- would want optionalCosts' list. First in ascending Set order, disguiseCost's tie
 -- break, which no printing reaches.
 buybackCost :: Set Keyword -> Maybe (Cost Keyword)
 buybackCost keywords =
@@ -3747,8 +3757,8 @@ splices keywords =
 -- N is what the exile puts on the card, and Pawl.Engine.Suspend needs the two in
 -- the same breath.
 --
--- A wildcard, and ONE ability per card (the ascending-least), morphCost's shape.
--- No printing has two.
+-- A wildcard, and ONE ability per card (the ascending-least), disguiseCost's
+-- shape. No printing has two.
 suspend :: Set Keyword -> Maybe (Suspend.Suspend Keyword)
 suspend keywords =
   let abilityOf keyword = case keyword of
@@ -3762,7 +3772,9 @@ suspend keywords =
 -- The cost of the ACTION and never of the cast: rule 702.170d makes the later cast
 -- free, so nothing consults this from Pawl.Engine.Cost.
 --
--- A wildcard, and ONE cost per card (the ascending-least), morphCost's shape.
+-- A wildcard, and ONE cost per card (the ascending-least), disguiseCost's shape.
+-- Not implemented: a card printing plot twice at two costs, whose dearer cost
+-- is unreachable (#1831).
 plotCost :: Set Keyword -> Maybe (Cost Keyword)
 plotCost keywords =
   let costOf keyword = case keyword of
@@ -3783,7 +3795,9 @@ plotCost keywords =
 -- (Dream Devourer's grant): Pawl.Engine.Cost.foretellCostFor settles it against
 -- a face.
 --
--- A wildcard, and ONE cost per card (the ascending-least), morphCost's shape.
+-- A wildcard, and ONE cost per card (the ascending-least), disguiseCost's
+-- shape. Not implemented: a card printing foretell twice at two costs, whose
+-- dearer cost is unreachable (#1831).
 foretellCost :: Set Keyword -> Maybe (ForetellCost Keyword)
 foretellCost keywords =
   let costOf keyword = case keyword of
@@ -3834,7 +3848,7 @@ data Substitute
 -- spend mana to cast this spell" has no representation -- so the two-entry answer
 -- is a fence rather than proven behaviour.
 --
--- The case is a WILDCARD, morphCost's caveat and for its reason: a new keyword
+-- The case is a WILDCARD, morphCosts' caveat and for its reason: a new keyword
 -- stating this kind of substitute owes an arm here, and -Werror will not ask for
 -- it.
 manaSubstitutesFor :: ManaSymbol.ManaSymbol -> Set Keyword -> [Substitute]
@@ -4386,17 +4400,16 @@ mintedReplacementsFor keyword count = case keyword of
   -- permanent's own.
   --
   -- The rule's "IF ITS MEGAMORPH COST WAS PAID" rides the ROW, as
-  -- TurnUpR.requiring: CR 702.37e's procedure is the only one that pays a
-  -- megamorph cost, and CR 701.40c gives a manifested megamorph card a second
-  -- road face up at its MANA cost, down which Replacement.applies refuses the row
-  -- (Pawl.FaceDownSpec's Misthoof Kirin pair). On the row rather than on the
+  -- TurnUpR.requiring and TurnUpR.paying: CR 702.37e's procedure, at THIS
+  -- megamorph cost. CR 701.40c gives a manifested megamorph card a second road
+  -- face up at its MANA cost, down which Replacement.applies refuses the row
+  -- (Pawl.FaceDownSpec's Misthoof Kirin pair), and a card with a plain morph
+  -- cost beside it pays that one down the same procedure (Pawl.FaceDownSpec's
+  -- Synthetic Twice-Veiled Adept pair). On the row rather than on the
   -- WithCounters class, because a CARD's own CR 614.1e counter clause carries no
-  -- such condition; see #987. Not implemented: a permanent holding morph and
-  -- megamorph at two different costs, which morphCost cannot express -- it answers
-  -- ONE cost per permanent, so the rest of rule 702.37b's condition is untestable
-  -- (#1831).
-  Keyword.Morph (Morph.MkMorph _ MorphVariant.Mega) ->
-    List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (Just TurnUpProcedure.Morph) (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
+  -- such condition; see #987.
+  Keyword.Morph (Morph.MkMorph cost MorphVariant.Mega) ->
+    List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (Just TurnUpProcedure.Morph) (Just cost) (TurnUpRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal 1)))))
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Cycling {} -> []
@@ -4604,6 +4617,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   -- CR 508.1g's choice is a step of a turn-based action, and the exert itself
   -- writes Object.exertedBy directly.
   Keyword.Exert -> []
@@ -4897,6 +4911,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   -- CR 701.43d's optional COST to attack never makes an attack illegal: the active
   -- player may always decline it (CR 508.1g).
   Keyword.Exert -> []
@@ -5204,6 +5219,7 @@ mintedAttachRestrictionsFor keyword = case keyword of
   Keyword.Boast -> []
   Keyword.Forecast -> []
   Keyword.PowerUp -> []
+  Keyword.ClassLevel _ -> []
   Keyword.Exert -> []
   Keyword.Enlist -> []
   Keyword.Persist -> []
@@ -5249,6 +5265,7 @@ addsRulesToPrintedAbility keyword = case keyword of
   Keyword.Boast -> True
   Keyword.Forecast -> True
   Keyword.PowerUp -> True
+  Keyword.ClassLevel _ -> True
   _ -> False
 
 -- CR 602.5b: the riders rule 702 adds to the printed ability a keyword is
@@ -5257,7 +5274,9 @@ addsRulesToPrintedAbility keyword = case keyword of
 -- for a card in a hand is its owner (CR 602.2, CR 108.4a). Exhaust's and
 -- power-up's is CR 702.177a's and CR 702.193a's "activate only once"; boast's
 -- are CR 702.142a's two. Power-up's cost reduction is no rider, and
--- reducesByManaCostOnEntry below answers for it.
+-- reducesByManaCostOnEntry below answers for it. A class level bar's are CR
+-- 716.2a's "only if this Class is level N-1 and only as a sorcery"; its effect,
+-- "this Class's level becomes N", is the card's (Effect.SetClassLevel).
 printedRiders :: Keyword -> [ActivationRestriction.ActivationRestriction]
 printedRiders keyword = case keyword of
   Keyword.Forecast ->
@@ -5266,6 +5285,17 @@ printedRiders keyword = case keyword of
     ]
   Keyword.Exhaust -> [ActivationRestriction.OnlyOnce]
   Keyword.PowerUp -> [ActivationRestriction.OnlyOnce]
+  Keyword.ClassLevel level ->
+    [ ActivationRestriction.OnlyIf
+        ( Condition.Compares
+            ( Compares.MkCompares
+                Quantity.ClassLevel
+                Comparison.Exactly
+                (Quantity.Literal (toInteger (ClassLevel.unwrap level) - 1))
+            )
+        ),
+      ActivationRestriction.SorcerySpeed
+    ]
   -- "This creature attacked this turn" is a count of the source among the
   -- battlefield's permanents that did (Filter.AttackedThisTurn), EachPlayer's
   -- battlefield because CR 400.1 makes it one shared zone.
@@ -5538,6 +5568,7 @@ familyOf keyword = case keyword of
   Keyword.Boast -> Nothing
   Keyword.Forecast -> Nothing
   Keyword.PowerUp -> Nothing
+  Keyword.ClassLevel _ -> Just KeywordFamily.ClassLevel
   Keyword.Exert -> Nothing
   Keyword.Enlist -> Nothing
   Keyword.Persist -> Nothing
