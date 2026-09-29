@@ -74,6 +74,7 @@ import qualified Pawl.Types.DestructionR as DestructionR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiceReading as DiceReading
 import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.DoesNotUntapNext as DoesNotUntapNext
 import qualified Pawl.Types.Draw as Draw
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -1473,25 +1474,25 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           /= toJson (Effect.Goad (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "became"))))
       )
       "Pair and Goad of the same slot encode differently"
-  -- CR 502.3's one-shot prohibition, which shares Tap's and Untap's wire shape
-  -- and must not collapse into either: a card printing "tap target creature. That
-  -- creature doesn't untap ..." writes two effects over the same slot.
+  -- CR 502.3's one-shot prohibition, which must not collapse into Tap or
+  -- Untap: a card printing "tap target creature. That creature doesn't untap
+  -- ..." writes two effects over the same slot.
   Spec.it s "DoesNotUntapNext round-trips, and is neither Tap nor Untap" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.DoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      " {\"type\":\"DoesNotUntapNext\",\"value\":{\"type\":\"InSlot\",\"value\":\"target\"}} "
+      (Effect.DoesNotUntapNext (DoesNotUntapNext.MkDoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) 1))
+      " {\"type\":\"DoesNotUntapNext\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"target\"}}} "
     Spec.assertBool
       s
-      ( toJson (Effect.DoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      ( toJson (Effect.DoesNotUntapNext (DoesNotUntapNext.MkDoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) 1))
           /= toJson (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       )
       "DoesNotUntapNext and Untap of the same slot encode differently"
     Spec.assertBool
       s
-      ( toJson (Effect.DoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      ( toJson (Effect.DoesNotUntapNext (DoesNotUntapNext.MkDoesNotUntapNext (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) 1))
           /= toJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       )
       "DoesNotUntapNext and Tap of the same slot encode differently"

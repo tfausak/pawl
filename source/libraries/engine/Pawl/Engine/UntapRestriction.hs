@@ -14,7 +14,7 @@
 -- a shortcut.
 --
 -- The PRINTED carrier alone. The one-shot prohibitions stored on the victim
--- (Object.doesNotUntapNext, written by Effect.DoesNotUntapNext, and
+-- (Object.doesNotUntapFor, written by Effect.DoesNotUntapNext, and
 -- Object.exertedBy, written by CR 508.1g's exert payment) are not gathered here
 -- and could not be: they are fields on the VICTIM rather than on anything the
 -- battlefield walk below would reach. Engine.untapAll subtracts all three.

@@ -138,7 +138,7 @@ codec = Fields.object $ do
   exileLookers <- Fields.defaulted "exileLookers" Set.empty (Common.set ExileLooker.codec) Object.exileLookers
   detainedUntil <- Fields.defaulted "detainedUntil" Set.empty (Common.set PlayerId.codec) Object.detainedUntil
   goadedBy <- Fields.defaulted "goadedBy" Set.empty (Common.set PlayerId.codec) Object.goadedBy
-  doesNotUntapNext <- Fields.defaulted "doesNotUntapNext" False Common.boolean Object.doesNotUntapNext
+  doesNotUntapFor <- Fields.defaulted "doesNotUntapFor" 0 Common.natural Object.doesNotUntapFor
   exertedBy <- Fields.defaulted "exertedBy" Set.empty (Common.set PlayerId.codec) Object.exertedBy
   activatedOnce <- Fields.defaulted "activatedOnce" Set.empty (Common.set (ActivatedAbility.codec Card.codec (GrantedAbility.codec Card.codec))) Object.activatedOnce
   pure
@@ -197,7 +197,7 @@ codec = Fields.object $ do
         Object.exileLookers = exileLookers,
         Object.detainedUntil = detainedUntil,
         Object.goadedBy = goadedBy,
-        Object.doesNotUntapNext = doesNotUntapNext,
+        Object.doesNotUntapFor = doesNotUntapFor,
         Object.exertedBy = exertedBy,
         Object.activatedOnce = activatedOnce
       }
