@@ -337,7 +337,7 @@ combatRecipient gs attacker target =
           -- CR 506.4e: one that stopped being a planeswalker but is still a
           -- battle is still being attacked, as a battle.
           | notNotedAsAttackingNothing,
-            Combat.stillAttackedBattle oid gs ->
+            Combat.targetStillAttacked target gs ->
               Just (Recipient.ToBattle oid)
           | Projection.hasKeyword Keyword.TrampleOverPlaneswalkers attacker gs ->
               stillPlaying =<< Defender.defenderOfAttack Projection.controllerWithLastKnown attacker target gs

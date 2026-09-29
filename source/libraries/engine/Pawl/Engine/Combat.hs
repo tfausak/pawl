@@ -334,19 +334,38 @@ stillAttackedBattle oid gs =
 -- permanent that is both a planeswalker and a battle stays attacked while it is
 -- either, so each arm also asks the other kind's list.
 --
+-- The planeswalker arm's third disjunct is a battle with NO protector: one that
+-- became a battle while being attacked, which CR 704.5x leaves unprotected for as
+-- long as it is, and which stays attacked as a battle once it stops being a
+-- planeswalker.
+--
 -- CR 506.4e's second sentence is the battle arm's second disjunct: one that
 -- stops being a battle stays attacked as a planeswalker only while its protector
 -- controls it. That conjunct is a regression fence: CR 310.9a and CR 310.11 keep
--- a battle with no battle types protected by its controller, and no card makes a
--- Siege a planeswalker. Pawl.PlaneswalkerCombatSpec's PlaneswalkerBattleInCombat
--- proves both disjuncts.
+-- a battle with no battle types protected by its controller.
+--
+-- The planeswalker arm asks neither question, so it answers by announcement kind
+-- where CR 506.4e does not: a Siege that is a planeswalker, attacked as one,
+-- stays attacked on losing the battle type though its protector does not control
+-- it, and leaves combat on losing the planeswalker type if its protector is no
+-- defending player. A regression fence too: no card makes a Siege a planeswalker
+-- (Scryfall t:battle t:planeswalker finds only Invasion of New Phyrexia, whose
+-- planeswalker is its back face, 2026-09-29).
+--
+-- Pawl.PlaneswalkerCombatSpec's PlaneswalkerBattleInCombat proves the other
+-- disjuncts.
 targetStillAttacked :: AttackTarget.AttackTarget -> GameState -> Bool
 targetStillAttacked target gs = case target of
   AttackTarget.OfPlayer _ -> True
-  AttackTarget.OfPlaneswalker pw -> stillAttacked pw gs || stillAttackedBattle pw gs
+  AttackTarget.OfPlaneswalker pw -> stillAttacked pw gs || stillAttackedBattle pw gs || unprotectedBattle pw
   AttackTarget.OfBattle battle ->
     stillAttackedBattle battle gs
       || (stillAttacked battle gs && Projection.controllerOf battle gs == Battle.protectorOf battle gs)
+  where
+    unprotectedBattle oid =
+      Set.member oid (GameState.battlefield gs)
+        && Maybe.isNothing (Battle.protectorOf oid gs)
+        && Battle.isBattle (Projection.project oid gs)
 
 -- CR 506.4's comparand for a CR 508.1b announcement that named a BATTLE: who
 -- controls that battle. Nothing for a player or a planeswalker --
