@@ -1,0 +1,50 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "name": "Sunglasses of Urza",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "SpendManaAsThough",
+            "value": {
+              "asThough": [
+                {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                }
+              ],
+              "only": false,
+              "which": {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "White"
+                  }
+                }
+              }
+            }
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
