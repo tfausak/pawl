@@ -9,7 +9,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 --
 -- Parametric in the effect for Pawl.Types.ForEach's reason.
 data Repeat effect = MkRepeat
-  { -- | Who is asked after each run; every printing names one player.
+  { -- | Who is asked after each run.
     chooser :: PlayerRef.PlayerRef,
     -- | The process, run in written order (CR 608.2c) before each ask.
     body :: Seq.Seq effect

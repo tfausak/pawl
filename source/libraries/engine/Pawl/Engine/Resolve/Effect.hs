@@ -5522,9 +5522,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- must not read the card the previous run discarded.
   --
   -- The chooser is whoever the payload names, which is Trade Secrets' target
-  -- opponent rather than the resolving controller. Every printing names one
-  -- player; a reference naming several asks them in APNAP order until one
-  -- repeats, and one naming nobody ends the loop.
+  -- opponent rather than the resolving controller. A reference naming several
+  -- players asks them in APNAP order until one repeats, and one naming nobody
+  -- ends the loop.
   --
   -- Pawl.ZoneChangeSpec's Kindle the Carnage group proves both the second run and
   -- the rescope, and its Trade Secrets group the chooser.

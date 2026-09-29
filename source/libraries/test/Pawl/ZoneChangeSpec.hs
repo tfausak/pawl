@@ -3455,9 +3455,9 @@ repeatProcessSpec s registry = Spec.describe s "CR 608.2d processes a player may
             cast = S.runPure answer stocked (S.cast S.alice spellId)
             after = S.runPure answer cast Stack.resolveTop
         pure (S.lifeOf S.alice after, namesIn Zone.Hand S.alice after)
-  -- CR 608.2h / 701.20a: the card was revealed on its way into the hand, so the
-  -- loss reads its mana value there.
-  Spec.it s "CR 608.2h Ad Nauseam loses life equal to the mana value of the card it put into hand" $ do
+  -- CR 701.20a: the card stays revealed for the part of the effect it is
+  -- relevant to, so the loss reads its mana value in the hand.
+  Spec.it s "CR 701.20a Ad Nauseam loses life equal to the mana value of the card it put into hand" $ do
     (life, hand) <- nauseam 1
     Spec.assertEqWith s "alice lost the Hill Giant's 4" life (Just 16)
     Spec.assertEqWith s "the Hill Giant is in alice's hand" hand [named "Hill Giant"]
