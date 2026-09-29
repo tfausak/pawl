@@ -1,0 +1,27 @@
+{
+  "description": "CR 802.4/509.1a a defending player with nothing attacking them is not asked to declare blockers (attacking bob)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Palace Guard", "label": "bob guard", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Palace Guard", "label": "carol guard", "ready": true }]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@attacker", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@bob guard": ["@attacker"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@attacker", "blockers": ["@bob guard"] } } }
+  ]
+}

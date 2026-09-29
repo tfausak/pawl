@@ -1,0 +1,22 @@
+{
+  "description": "CR 508.1c whole cards: the condition decides a real declare attackers step (with the Hill Giant)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Blind-Spot Giant", "label": "giant", "ready": true },
+          { "card": "Hill Giant", "label": "hill", "ready": true }
+        ]
+      },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@giant", "@hill"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "Attackers": { "attackers": { "@giant": "@bob", "@hill": "@bob" } } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 13 } } }
+  ]
+}

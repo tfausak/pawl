@@ -1,0 +1,23 @@
+{
+  "description": "CR 725.2/802.3 the crown follows whichever defending player was attacked (attacking bob)",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "monarch": "bob",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Goblin Piker", "label": "attacker", "ready": true }]
+      },
+      { "name": "bob" },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@attacker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@attacker", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Monarch": { "player": "alice" } } }
+  ]
+}

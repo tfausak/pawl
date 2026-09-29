@@ -1,0 +1,16 @@
+{
+  "description": "CR 507.1 a multiplayer game down to one opponent is not asked either",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      { "name": "alice" },
+      { "name": "bob" },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "carol", "do": "Concede" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Defenders": { "players": ["bob"] } } }
+  ]
+}

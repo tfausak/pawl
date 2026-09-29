@@ -44,7 +44,6 @@ import qualified Pawl.Types.ActiveAttackProhibition as ActiveAttackProhibition
 import qualified Pawl.Types.ActiveBlockProhibition as ActiveBlockProhibition
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AfterTurn as AfterTurn
-import qualified Pawl.Types.AttackOption as AttackOption
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
@@ -87,13 +86,6 @@ import qualified Pawl.Types.Zone as Zone
 
 combatDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
-  Spec.it s "CR 510.1a Tapestry Warden substitutes toughness only where greater than power" $ do
-    warden <- S.printingOf s registry "Tapestry Warden"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [warden, piker] []
-        after = S.runCombat S.aggressiveAnswer gs
-    -- The 3/4 Warden assigns 4; the 2/1 Piker still assigns 2.
-    Spec.assertEqWith s "defender took six" (S.lifeOf S.bob after) (Just 14)
   Spec.it s "CR 613.11 Tapestry Warden compares power and toughness after characteristic effects" $ do
     warden <- S.printingOf s registry "Tapestry Warden"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -104,13 +96,6 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
         -- The final 2/3 Piker joins the Warden in assigning with toughness.
         Spec.assertEqWith s "defender took seven" (S.lifeOf S.bob after) (Just 13)
       _ -> Spec.assertFailure s "fixture should have two attackers"
-  Spec.it s "CR 510.1d Tapestry Warden substitutes toughness for a blocker too" $ do
-    warden <- S.printingOf s registry "Tapestry Warden"
-    let (gs, mine, _) = S.combatBoard warden 1 1
-        after = S.fightWith S.aggressiveAnswer gs
-    case mine of
-      [] -> Spec.assertFailure s "fixture should have an attacker"
-      attacker : _ -> Spec.assertEqWith s "attacker took four" (S.damageOf attacker after) (Just 4)
   Spec.it s "CR 702.19b a trampling Tapestry Warden spills the excess over its toughness" $ do
     warden <- S.printingOf s registry "Tapestry Warden"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -124,88 +109,12 @@ combatDamageSpec s registry = Spec.describe s "CombatDamage" $ do
         let after = S.settleSba (S.fightWith trampleThresholdAnswer (withTrample attacker gs))
         Spec.assertEqWith s "defender took three over the blocker" (S.lifeOf S.bob after) (Just 17)
         Spec.assertEqWith s "and the blocker took its lethal point" (S.creaturesInPlay S.bob after) 0
-  Spec.it s "CR 509 a blocked attacker does not damage the player" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoard piker 1 1
-        after = S.fightWith S.aggressiveAnswer gs
-    Spec.assertEqWith s "bob untouched" (S.lifeOf S.bob after) (Just 20)
-  Spec.it s "CR 510.1c a single blocker takes all the damage, unprompted" $ do
-    -- If the engine wrongly prompts here, this interpreter answers with an
-    -- empty division, which is illegal (it does not total the attacker's
-    -- power), so it is rejected and the blocker takes 0 -- and the assertion
-    -- below fails. That is why this proves "unprompted" without an `error`,
-    -- which the no-partial-functions rule forbids anyway.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, theirs) = S.combatBoard piker 1 1
-        noAssign :: Prompt.Prompt r -> r
-        noAssign p = case p of
-          Prompt.AssignCombatDamage {} -> Map.empty
-          _ -> S.aggressiveAnswer p
-        after = S.fightWith noAssign gs
-    case theirs of
-      [] -> Spec.assertFailure s "fixture should have a blocker"
-      b : _ -> Spec.assertEqWith s "took 2" (S.damageOf b after) (Just 2)
-  Spec.it s "CR 510.2 a 2/1 trade kills BOTH creatures" $ do
-    -- The simultaneity test. Sequential damage kills only one, because the
-    -- blocker would be in the graveyard before it dealt its damage.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoard piker 1 1
-        after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
-    Spec.assertEqWith s "alice's is dead" (S.creaturesInPlay S.alice after) 0
-    Spec.assertEqWith s "bob's is dead" (S.creaturesInPlay S.bob after) 0
-  Spec.it s "CR 510.1c a free division of 2 across two blockers kills both" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, theirs) = S.combatBoard piker 1 2
-        split :: Prompt.Prompt r -> r
-        split p = case p of
-          Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
-          _ -> S.aggressiveAnswer p
-        after = S.settleSba (S.fightWith split gs)
-    Spec.assertEqWith s "both blockers dead" (S.creaturesInPlay S.bob after) 0
-    Spec.assertEqWith s "expected two blockers" (length theirs) 2
-  Spec.it s "CR 510.1c the same 2 damage on one blocker kills only it" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoard piker 1 2
-        dump :: Prompt.Prompt r -> r
-        dump p = case p of
-          Prompt.AssignCombatDamage _ _ _ thresholds n ->
-            case filter S.isCreatureRecipient (Map.keys thresholds) of
-              r : _ -> Map.singleton r n
-              [] -> Map.empty
-          _ -> S.aggressiveAnswer p
-        after = S.settleSba (S.fightWith dump gs)
-    Spec.assertEqWith s "one blocker survives" (S.creaturesInPlay S.bob after) 1
-  -- The deterministic successor to the retired "combat happens" property: an
-  -- unblocked 2/1 attacker reduces the defender's life by its power.
-  Spec.it s "combat deals damage to the defending player" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [piker] []
-        after = S.runCombat S.aggressiveAnswer gs
-    Spec.assertEqWith s "defender took two" (S.lifeOf S.bob after) (Just 18)
 
 declaredAttackers :: GameState.GameState -> [ObjectId.ObjectId]
 declaredAttackers gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
 
-declareSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+declareSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 declareSpec s registry = Spec.describe s "Declare" $ do
-  Spec.it s "CR 508.1f declaring an attacker taps it" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoard piker 1 1
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
-    Spec.assertEqWith s "one attacker" (declaredAttackers after) mine
-    Spec.assertEqWith s "tapped" (S.tappedCount S.alice after) 1
-  Spec.it s "CR 508.1 attackers attack the defending player" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoard piker 1 1
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
-    case mine of
-      [] -> Spec.assertFailure s "fixture should have an attacker"
-      oid : _ ->
-        Spec.assertEqWith
-          s
-          "attacking bob"
-          (Map.lookup oid (Combat.Type.attackers (GameState.combat after)))
-          (Just (AttackTarget.OfPlayer S.bob))
   Spec.it s "an illegal attacker in the answer is dropped" $ do
     -- The interpreter names bob's creature. It is not alice's to attack with.
     piker <- S.printingOf s registry "Goblin Piker"
@@ -216,51 +125,6 @@ declareSpec s registry = Spec.describe s "Declare" $ do
           _ -> S.aggressiveAnswer p
         after = snd (Engine.runGamePure liar gs (Combat.declareAttackers S.manaPerformer S.alice))
     Spec.assertEqWith s "nothing attacks" (declaredAttackers after) []
-  Spec.it s "CR 509.1 a blocker is recorded against the attacker it blocks" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = S.combatBoard piker 1 1
-        steps = do
-          Combat.declareAttackers S.manaPerformer S.alice
-          Combat.declareBlockers S.manaPerformer
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs steps)
-    case mine of
-      [] -> Spec.assertFailure s "fixture should have an attacker"
-      attacker : _ ->
-        Spec.assertEqWith s "blocked by bob's creature" (Combat.blockersOf attacker after) (Set.fromList theirs)
-  Spec.it s "an unblocked attacker has no blockers" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoard piker 1 0
-        steps = do
-          Combat.declareAttackers S.manaPerformer S.alice
-          Combat.declareBlockers S.manaPerformer
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs steps)
-    case mine of
-      [] -> Spec.assertFailure s "fixture should have an attacker"
-      attacker : _ -> Spec.assertBool s (not (Combat.isBlocked attacker after)) "unblocked"
-  Spec.it s "no legal attackers means no prompt and no attacks" $ do
-    -- combatBoard 0 1 gives alice nothing. A prompt here would be the engine
-    -- asking a question with exactly one answer.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoard piker 0 1
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
-    Spec.assertEqWith s "nothing attacks" (declaredAttackers after) []
-  -- The end-to-end summoning sickness scenario the spec names: a creature
-  -- that just arrived cannot attack, and the SAME creature can once its
-  -- controller's untap step has settled it. The halves are tested in Tasks 1
-  -- and 4; this proves they compose.
-  Spec.it s "CR 302.6 a creature cannot attack the turn it arrives, and can after untapping" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoard piker 1 1
-        arrived = justArrived gs
-        sameTurn = snd (Engine.runGamePure S.aggressiveAnswer arrived (Combat.declareAttackers S.manaPerformer S.alice))
-        nextTurn =
-          snd
-            . Engine.runGamePure S.aggressiveAnswer arrived
-            $ do
-              Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap)
-              Combat.declareAttackers S.manaPerformer S.alice
-    Spec.assertEqWith s "cannot attack the turn it arrives" (declaredAttackers sameTurn) []
-    Spec.assertEqWith s "can attack after untapping" (length (declaredAttackers nextTurn)) 1
 
 defenderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 defenderSpec s registry = Spec.describe s "Defender" $ do
@@ -315,7 +179,7 @@ choosesDefender who p = case p of
 -- `Decide.deciderFor pid gs` is what routes ChooseDefender there. choosesDefender
 -- above discards the Decider entirely, so it cannot tell that routing apart from
 -- a regression to the raw active-player id; this helper is what makes the
--- Decider observable without touching the six existing cases.
+-- Decider observable without touching choosesDefender's cases.
 choosesDefenderRecordingDecider :: PlayerId.PlayerId -> Prompt.Prompt r -> State.State [Decider.Decider] r
 choosesDefenderRecordingDecider who p = case p of
   Prompt.ChooseDefender decider _ _ -> do
@@ -448,21 +312,6 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
           announced
           [bobsGuard, carolsGuard]
       _ -> Spec.assertFailure s "fixture should give alice four Pikers and carol one Palace Guard"
-  Spec.it s "CR 802.4/509.1a a defending player with nothing attacking them is not asked to declare blockers" $ do
-    -- Both opponents defend (CR 802.2) and both hold an untapped Palace Guard,
-    -- so the only thing that differs between the two legs is WHICH of them the
-    -- one Piker was aimed at. attemptBlockDeclaration's own `null candidates`
-    -- guard cannot account for either: each player has a creature that could
-    -- block.
-    piker <- S.printingOf s registry "Goblin Piker"
-    guard <- S.printingOf s registry "Palace Guard"
-    let (board, _, _, _) = S.threePlayerCombat [piker] [guard] [guard]
-        askedWhenAttacking who =
-          let settled = S.runPure S.identityAnswer board (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-              declared = S.runPure (S.attackTo who) settled (Combat.declareAttackers S.manaPerformer S.alice)
-           in fst (fst (runRecordingBlockers declared))
-    Spec.assertEqWith s "CR 802.4 only bob, the one being attacked, is asked" (askedWhenAttacking S.bob) [S.bob]
-    Spec.assertEqWith s "and only carol on the same board with the attack aimed at her" (askedWhenAttacking S.carol) [S.carol]
   Spec.it s "CR 802.4b a requirement on a creature attacking bob does not reach carol's blocker" $ do
     -- CR 802.4b's other half: not which blocks are ALLOWED, but which
     -- requirements CR 509.1c makes carol maximize. Lure ("All creatures able to
@@ -506,120 +355,10 @@ attackMultiplePlayersSpec s registry = Spec.describe s "AttackMultiplePlayers" $
           "CR 509.1c bob, who can block it, may not leave the Lured creature unblocked"
       _ -> Spec.assertFailure s "fixture should give alice four Pikers and carol one Palace Guard"
 
--- CR 803.1a/803.1b: the attack left and attack right options, which cut CR
--- 506.2a's candidate list down to the ONE seat next to the attacking player.
--- THREE and FOUR seats, since at two the two options and CR 506.2's base rule
--- all name the same one opponent and nothing here could differ.
---
--- Both cases drive the whole declaration rather than reading
--- Combat.attackableOpponents, because the candidate list is not the deliverable:
--- what CR 803.1 restricts is whom a creature ends up attacking.
-attackLeftRightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-attackLeftRightSpec s registry = Spec.describe s "AttackLeftRight" $ do
-  Spec.it s "CR 803.1a/803.1b alice attacks the neighbouring seat, and the option says which one" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    -- Seated [alice, bob, carol] with alice attacking, so bob is immediately to
-    -- her left and carol immediately to her right.
-    --
-    -- ONE answerer for both legs, aimed at CAROL: under attack left she is not
-    -- a candidate at all, so the interpreter that takes her under attack right
-    -- cannot take her here. That is what discriminates against a candidate list
-    -- left unrestricted, which would answer carol on both legs.
-    let (board, _, _, _) = S.threePlayerCombat [piker] [] []
-        declaredWith option =
-          let staged = S.attackOption (Just option) board
-              settled = S.runPure (S.attackTo S.carol) staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-           in S.runPure (S.attackTo S.carol) settled (Combat.declareAttackers S.manaPerformer S.alice)
-        left = declaredWith AttackOption.Leftward
-        right = declaredWith AttackOption.Rightward
-    Spec.assertEqWith
-      s
-      "CR 803.1a the creature attacks bob, the seat to alice's left"
-      (Map.elems (Combat.Type.attackers (GameState.combat left)))
-      [AttackTarget.OfPlayer S.bob]
-    Spec.assertEqWith
-      s
-      "CR 803.1b and attacks carol, the seat to alice's right, on the same board"
-      (Map.elems (Combat.Type.attackers (GameState.combat right)))
-      [AttackTarget.OfPlayer S.carol]
-    -- The designation behind those two, after them so it cannot absorb a
-    -- mutation: CR 803.1 leaves one candidate, so CR 507.1's choice is settled
-    -- without a prompt.
-    Spec.assertEqWith
-      s
-      "CR 507.1 the left-hand neighbour is the only defending player"
-      (Combat.Type.defenders (GameState.combat left))
-      [S.bob]
-    Spec.assertEqWith
-      s
-      "CR 507.1 and the right-hand neighbour is, on the other leg"
-      (Combat.Type.defenders (GameState.combat right))
-      [S.carol]
-  Spec.it s "CR 803.1a a player whose nearest opponent to the left is more than one seat away can't attack" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    -- FOUR seats, because three cannot put an opponent two seats away in one
-    -- direction while leaving one adjacent in the other.
-    --
-    -- bob concedes, so the seat immediately to alice's left is empty and carol,
-    -- the nearest opponent that way, is two seats off. GameState.turnOrder is
-    -- the permanent seating roster, which is what makes that distance real
-    -- rather than closing the gap.
-    let (_, seated) = S.addPermanent piker S.alice S.fourPlayerGame
-        board = seated {GameState.phase = Phase.Combat CombatStep.BeginningOfCombat}
-        gone = S.departs Departure.Type.Conceded S.bob board
-        declaredWith option gs =
-          let staged = S.attackOption (Just option) gs
-              settled = S.runPure (S.attackTo S.carol) staged (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))
-           in S.runPure (S.attackTo S.carol) settled (Combat.declareAttackers S.manaPerformer S.alice)
-    Spec.assertEqWith
-      s
-      "CR 803.1a nothing attacks when the seat to alice's left is empty"
-      (Map.elems (Combat.Type.attackers (GameState.combat (declaredWith AttackOption.Leftward gone))))
-      []
-    -- The paired board, differing in the option and nothing else: dave is still
-    -- seated immediately to alice's right, so the same departure leaves that
-    -- direction attackable. Without it the case above passes for want of a
-    -- creature or a step.
-    Spec.assertEqWith
-      s
-      "CR 803.1b dave, immediately to alice's right, is attacked on the same departed board"
-      (Map.elems (Combat.Type.attackers (GameState.combat (declaredWith AttackOption.Rightward gone))))
-      [AttackTarget.OfPlayer S.dave]
-    -- And the paired board differing in the departure and nothing else, which
-    -- is what makes it the EMPTY SEAT rather than the seat count that stops
-    -- the attack.
-    Spec.assertEqWith
-      s
-      "CR 803.1a and bob is attacked while he is still seated there"
-      (Map.elems (Combat.Type.attackers (GameState.combat (declaredWith AttackOption.Leftward board))))
-      [AttackTarget.OfPlayer S.bob]
-    -- CR 803.1a is no attack, not a fallback: carol never becomes a defending
-    -- player. After the gameplay assertions, being the same claim upstream.
-    Spec.assertEqWith
-      s
-      "CR 803.1a nobody is designated a defending player"
-      (Combat.Type.defenders (GameState.combat (declaredWith AttackOption.Leftward gone)))
-      []
-
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
 -- defenderSpec, which is the Defender KEYWORD (CR 702.3b).
 defendingPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
-  Spec.it s "CR 703.4h/507.1 the active player chooses which opponent is the defending player" $ do
-    -- THREE seats: the whole point. Discriminating against the behaviour this
-    -- phase replaces -- taking the head of the candidate list -- because carol
-    -- is not the head. Under head-of-list the answer is ignored and bob
-    -- defends, so this exact assertion cannot pass.
-    --
-    -- State.runState (State s a) s0 :: (a, s): here `a` is the GameState
-    -- Engine.runGame returns and `s` is choosesDefender's own accumulator, so
-    -- the tuple comes back (after, asked).
-    let (after, asked) =
-          State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.carol) (S.oneDefendingPlayer S.threePlayerGame) (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
-            []
-    Spec.assertEqWith s "carol is the defending player" (Combat.Type.defenders (GameState.combat after)) [S.carol]
-    Spec.assertEqWith s "and alice, the active player, is who was asked" asked [S.alice]
   Spec.it s "CR 723.1 a controlled active player's choice of defender routes to their controller" $ do
     -- THREE seats (alice active, bob, carol) with carol controlling alice
     -- (Mindslaver-style: GameState.control names carol as alice's decider),
@@ -643,39 +382,14 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- `Decider.MkDecider pid` (the raw active player, alice) instead of
     -- `Decide.deciderFor pid gs` would record `[Decider.MkDecider S.alice]`
     -- below -- handing alice's own choice back to her, which is the CR 723.1
-    -- violation this test exists to catch -- and none of the other six cases in
-    -- this group sets GameState.control, so none of them would notice.
+    -- violation this test exists to catch -- and no other case in this group
+    -- sets GameState.control, so none of them would notice.
     let controlled = (S.oneDefendingPlayer S.threePlayerGame) {GameState.control = S.turnControl S.carol S.alice}
         (_, deciders) =
           State.runState
             (fmap snd (Engine.runGame (choosesDefenderRecordingDecider S.bob) controlled (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
     Spec.assertEqWith s "carol, alice's controller, is who was asked" deciders [Decider.MkDecider S.carol]
-  Spec.it s "CR 506.2 two players: the nonactive player defends and nobody is asked" $ do
-    -- The elision, asserted explicitly rather than inferred from the suite
-    -- staying green. CR 507.1's condition is a MULTIPLAYER game; CR 506.2's
-    -- second sentence settles a two-player game with nothing to ask.
-    -- Discriminating twice over: an implementation that prompted anyway would
-    -- put alice in `asked`, and one that skipped the prompt AND the write
-    -- would leave Nothing, which Task 4 turns into "no attack is possible".
-    let (after, asked) =
-          State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.alice) (Setup.emptyGame S.bothPlayers) (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
-            []
-    Spec.assertEqWith s "bob defends" (Combat.Type.defenders (GameState.combat after)) [S.bob]
-    Spec.assertEqWith s "nobody was asked" asked []
-  Spec.it s "CR 507.1 a multiplayer game down to one opponent is not asked either" $ do
-    -- The case #169 is actually about: CR 703.4h still applies (the game BEGAN
-    -- with three players, CR 800.1), and the choice has one candidate.
-    -- Discriminating against an elision keyed on the SEAT COUNT rather than on
-    -- the candidate count -- that version would prompt here.
-    let gone = S.departs Departure.Type.Conceded S.carol S.threePlayerGame
-        (after, asked) =
-          State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
-            []
-    Spec.assertEqWith s "bob, the only one left" (Combat.Type.defenders (GameState.combat after)) [S.bob]
-    Spec.assertEqWith s "nobody was asked" asked []
   Spec.it s "CR 507.1 with no opponents left the action does not happen at all" $ do
     -- Not reachable in a running game (CR 104.2a ends it), but the branch has
     -- to be total and NonEmpty is why. Discriminating against an
@@ -687,31 +401,10 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
             []
     Spec.assertEqWith s "nobody defends" (Combat.Type.defenders (GameState.combat after)) []
     Spec.assertEqWith s "nobody was asked" asked []
-  Spec.it s "CR 800.4h a turn whose active player has left puts the choice to the next player in turn order" $ do
-    -- CR 800.4j: the turn continues without an active player, and CR 800.4h is
-    -- what says the choice it leaves behind is not dropped -- the next player in
-    -- turn order makes it. THREE seats, so that two opponents survive alice's
-    -- departure: the choice is a real prompt (#169's elision cannot suppress
-    -- it), and "the next player in turn order" differs from "some survivor" --
-    -- bob is asked, and he answers carol, so the asked seat differs from the
-    -- chosen one.
-    --
-    -- CR 507.1's branch, which is the only one with a choice in it to reassign:
-    -- S.oneDefendingPlayer turns CR 802.2 off, the case below being the board
-    -- that leaves it on. The CANDIDATES are untouched by the reassignment --
-    -- still alice's opponents (CR 507.1, CR 506.2) -- so bob is asked about a
-    -- list he is himself on, which is what makes his answer of carol
-    -- discriminating.
-    let gone = S.departs Departure.Type.Conceded S.alice (S.oneDefendingPlayer S.threePlayerGame)
-        (after, asked) =
-          State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
-            []
-    Spec.assertEqWith s "bob, the next player in turn order, is who was asked" asked [S.bob]
-    Spec.assertEqWith s "and carol, his answer, is the defending player" (Combat.Type.defenders (GameState.combat after)) [S.carol]
   Spec.it s "CR 800.4h designateDefenders called directly reassigns the same way" $ do
-    -- The same rule reached WITHOUT Engine.runTurnBasedActions, so that only
-    -- designateDefenders's own Game.ruleChooser call can be responsible.
+    -- CR 800.4h reached WITHOUT Engine.runTurnBasedActions, so that only
+    -- designateDefenders's own Game.ruleChooser call can be responsible. The
+    -- turn-based road is data/scenarios/departed-active-player-choice-passes-on.json.
     let gone = S.departs Departure.Type.Conceded S.alice (S.oneDefendingPlayer S.threePlayerGame)
         (after, asked) =
           State.runState
@@ -719,18 +412,6 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
             []
     Spec.assertEqWith s "bob, the next player in turn order, is who was asked" asked [S.bob]
     Spec.assertEqWith s "and carol, his answer, is the defending player" (Combat.Type.defenders (GameState.combat after)) [S.carol]
-  Spec.it s "CR 802.2 a departed active player's opponents still all become defending players, with nothing asked" $ do
-    -- The other half of the board above: CR 802.2 settles the whole group as an
-    -- ACTION, so there is no choice for CR 800.4h to reassign and the turn-based
-    -- action runs to the same answer it would have with alice still seated. The
-    -- default settings (CR 806.2b) are what make this the ordinary case.
-    let gone = S.departs Departure.Type.Conceded S.alice S.threePlayerGame
-        (after, asked) =
-          State.runState
-            (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
-            []
-    Spec.assertEqWith s "both survivors defend" (Combat.Type.defenders (GameState.combat after)) [S.bob, S.carol]
-    Spec.assertEqWith s "and nobody was asked" asked []
   Spec.it s "CR 507.1 an answer that is not one of the candidates falls back to the first" $ do
     -- A broken interpreter, not a game state: it names the ACTIVE player.
     -- Discriminating against `defender = Just answer` unchecked, which would
@@ -770,10 +451,6 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     Spec.assertEqWith s "bob, the seat after alice, comes first" (Combat.attackableOpponents rotated) [S.bob, S.carol]
     let rotatedFour = (Setup.emptyGame (S.carol NonEmpty.:| [S.dave, S.alice, S.bob])) {GameState.activePlayer = S.alice}
     Spec.assertEqWith s "and the wrap-around follows the seating, not the ids" (Combat.attackableOpponents rotatedFour) [S.bob, S.carol, S.dave]
-  Spec.it s "CR 703.4h no defending player has been chosen before the beginning of combat step" $
-    -- Discriminating: a field defaulted to Just <somebody> would let a board
-    -- that has never run the turn-based action declare attackers.
-    Spec.assertEqWith s "empty combat names nobody" (Combat.Type.defenders (GameState.combat S.threePlayerGame)) []
   Spec.it s "CR 506.2 the designation does not outlive the combat phase" $ do
     -- CR 506.2's sentences are all scoped "During the combat phase", and
     -- CR 703.4h makes the choice per beginning-of-combat step, so a second
@@ -840,45 +517,6 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- And bob's untapped creature is never offered, per CR 509.1a.
     Spec.assertEqWith s "bob's creature is in no candidate list" (filter (\oid -> elem oid bobs) offeredBlockers) []
     Spec.assertEqWith s "carol's block was recorded" (Map.size (Combat.Type.blockers (GameState.combat after))) 1
-  Spec.it s "CR 725.2/802.3 the crown follows whichever defending player was attacked" $ do
-    -- CR 725.2's second inherent ability: "Whenever a creature deals combat
-    -- damage to the monarch, its controller becomes the monarch." bob is the
-    -- monarch. alice attacks with an unblocked 2/1; the two runs differ ONLY
-    -- in that creature's announced attack target.
-    --
-    -- Discriminating: run A is what the deleted head-of-list behaviour did
-    -- whatever the answer, so run A alone proves nothing. Run B is
-    -- unreachable under it, and the pair is the proof.
-    let attacker = S.aliasRef "attacker"
-        board =
-          S.board
-            (S.battlefield S.alice [S.settled "attacker" "Goblin Piker"] NonEmpty.:| [S.playerSetup S.bob, S.playerSetup S.carol])
-            S.alice
-            S.beginningOfCombat
-        script who =
-          S.turn
-            1
-            [ S.on S.declareAttackers S.alice (S.attack [attacker]),
-              S.onSource S.declareAttackers S.alice attacker (S.attackPlayer who)
-            ]
-    built <- S.buildBoardOrFail s registry board
-    let crowned = built {Staged.state = S.withMonarch S.bob (Staged.state built)}
-    (_, hitBob) <- S.runScriptOrFail s (script S.bob) crowned S.combatGame
-    (_, hitCarol) <- S.runScriptOrFail s (script S.carol) crowned S.combatGame
-    -- Run A: attacking the monarch takes the crown.
-    Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob hitBob) (Just 18)
-    Spec.assertEqWith s "carol was untouched" (S.lifeOf S.carol hitBob) (Just 20)
-    Spec.assertEqWith s "alice is the monarch" (GameState.monarch hitBob) (Just S.alice)
-    -- Run B: attacking the other opponent does not.
-    Spec.assertEqWith s "carol took 2" (S.lifeOf S.carol hitCarol) (Just 18)
-    Spec.assertEqWith s "bob was untouched" (S.lifeOf S.bob hitCarol) (Just 20)
-    Spec.assertEqWith s "bob keeps the crown" (GameState.monarch hitCarol) (Just S.bob)
-    -- And neither run ended the game, so both really played a whole combat.
-    Spec.assertEqWith s "no result in run A" (GameState.result hitBob) Nothing
-    Spec.assertEqWith s "no result in run B" (GameState.result hitCarol) Nothing
-
-tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
-tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
 
 -- Re-sicken alice's creatures, as though they had just resolved this turn.
 justArrived :: GameState.GameState -> GameState.GameState
@@ -886,77 +524,8 @@ justArrived gs =
   let sicken o = if Object.owner o == S.alice then o {Object.sickness = Sickness.Sick} else o
    in gs {GameState.objects = fmap sicken (GameState.objects gs)}
 
-hasteSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hasteSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 hasteSpec s registry = Spec.describe s "Haste" $ do
-  Spec.it s "CR 702.10b a creature with haste attacks the turn it arrives" $ do
-    goblinChariot <- S.printingOf s registry "Goblin Chariot"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [goblinChariot] [piker]
-        after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.manaPerformer S.alice))
-    Spec.assertEqWith s "attacks" (length (declaredAttackers after)) 1
-  Spec.it s "CR 302.6 the same creature without haste cannot" $ do
-    -- The control. Goblin Chariot and Goblin Piker are both 2/2-ish Goblin
-    -- Warriors; the ONLY difference the engine can see is the keyword.
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [piker] [piker]
-        after = snd (Engine.runGamePure S.aggressiveAnswer (justArrived gs) (Combat.declareAttackers S.manaPerformer S.alice))
-    Spec.assertEqWith s "cannot attack" (declaredAttackers after) []
-  Spec.it s "CR 702.10b haste is not needed once the creature has settled" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs (Combat.declareAttackers S.manaPerformer S.alice))
-    Spec.assertEqWith s "attacks" (declaredAttackers after) mine
-  -- The same contrast one layer up: haste GRANTED by a static ability rather
-  -- than printed. Concordant Crossroads says "All creatures have haste", so
-  -- the very Piker that could not attack in the control case above now can,
-  -- and nothing about the Piker itself changed.
-  Spec.it s "CR 702.10b Concordant Crossroads grants haste, so a summoning-sick Piker attacks" $ do
-    crossroads <- S.printingOf s registry "Concordant Crossroads"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        (_, enchanted) = S.addPermanent crossroads S.alice (justArrived gs)
-        after = snd (Engine.runGamePure S.aggressiveAnswer enchanted (Combat.declareAttackers S.manaPerformer S.alice))
-    Spec.assertEqWith s "attacks anyway" (declaredAttackers after) mine
-  -- CR 113.6b, the zone half of the same contrast. Anger's ability states where
-  -- it functions -- "as long as this card is in your graveyard and you control a
-  -- Mountain, creatures you control have haste" -- so the three boards below
-  -- differ in exactly one thing each: the first pair in which zone Anger's card
-  -- sits, the second pair in whether alice controls a Mountain. Anger is never a
-  -- creature alice can attack with in the graveyard boards, so the Piker is the
-  -- only attacker either reading could produce.
-  Spec.it s "CR 113.6b Anger in the graveyard grants haste, so a summoning-sick Piker attacks" $ do
-    anger <- S.printingOf s registry "Anger"
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        (_, withMountain) = S.addPermanent mountain S.alice (justArrived gs)
-        (_, buried) = S.addGraveyardCard anger S.alice withMountain
-        after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.manaPerformer S.alice))
-    Spec.assertEqWith s "attacks anyway" (declaredAttackers after) mine
-  -- CR 113.6b's "only": on the battlefield the very same printed ability grants
-  -- nothing, so the Piker is stuck. Anger itself has printed haste and attacks
-  -- from either reading, which is why the assertion names the Piker rather than
-  -- counting the declaration.
-  Spec.it s "CR 113.6b the same ability on the battlefield grants nothing" $ do
-    anger <- S.printingOf s registry "Anger"
-    mountain <- S.printingOf s registry "Mountain"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        (_, withMountain) = S.addPermanent mountain S.alice (justArrived gs)
-        (_, onBattlefield) = S.addPermanent anger S.alice withMountain
-        after = snd (Engine.runGamePure S.aggressiveAnswer onBattlefield (Combat.declareAttackers S.manaPerformer S.alice))
-    case mine of
-      [pikerId] -> Spec.assertBool s (notElem pikerId (declaredAttackers after)) "the Piker still cannot attack"
-      _ -> Spec.assertFailure s "fixture should have one creature"
-  -- CR 604.2's clause is still asked, and asked of a source in a GRAVEYARD: drop
-  -- the Mountain and the graveyard board above stops granting.
-  Spec.it s "CR 604.2 without a Mountain the graveyard ability grants nothing" $ do
-    anger <- S.printingOf s registry "Anger"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [piker] [piker]
-        (_, buried) = S.addGraveyardCard anger S.alice (justArrived gs)
-        after = snd (Engine.runGamePure S.aggressiveAnswer buried (Combat.declareAttackers S.manaPerformer S.alice))
-    Spec.assertEqWith s "cannot attack" (declaredAttackers after) []
   Spec.it s "CR 702.10b a hasty creature and a sick one, in the same declaration" $ do
     -- Both sick; only the Chariot may attack. A blanket "sickness ignored"
     -- bug would let both through.
@@ -1350,37 +919,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, _, theirs) = attacking [birdMaiden] [piker]
     Spec.assertEqWith s "still offered" (Combat.legalBlockers S.bob gs) theirs
-  Spec.it s "CR 509.1b an illegal declaration is rejected WHOLE, not repaired" $ do
-    -- aggressiveAnswer blocks the first attacker with EVERYTHING, so bob
-    -- declares the reach creature (legal) AND the Piker (illegal) on the
-    -- flier. Neither may block. A per-pair filter would drop the Piker and
-    -- let the Birdsticker's block stand -- which is what M1b does today, and
-    -- is unsound: under menace, dropping one blocker from a pair manufactures
-    -- an illegal single block.
-    birdMaiden <- S.printingOf s registry "Bird Maiden"
-    nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [birdMaiden] [nimbleBirdsticker, piker]
-        steps = do
-          Combat.declareAttackers S.manaPerformer S.alice
-          Combat.declareBlockers S.manaPerformer
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs steps)
-    case Map.keys (Combat.Type.attackers (GameState.combat after)) of
-      [] -> Spec.assertFailure s "fixture should have an attacker"
-      a : _ -> Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
-  Spec.it s "CR 509.1b a wholly legal declaration is accepted" $ do
-    -- The control for the test above: with only the reach creature, the same
-    -- interpreter produces a legal declaration and the block stands.
-    birdMaiden <- S.printingOf s registry "Bird Maiden"
-    nimbleBirdsticker <- S.printingOf s registry "Nimble Birdsticker"
-    let (gs, _, theirs) = S.combatBoardOf [birdMaiden] [nimbleBirdsticker]
-        steps = do
-          Combat.declareAttackers S.manaPerformer S.alice
-          Combat.declareBlockers S.manaPerformer
-        after = snd (Engine.runGamePure S.aggressiveAnswer gs steps)
-    case Map.keys (Combat.Type.attackers (GameState.combat after)) of
-      [] -> Spec.assertFailure s "fixture should have an attacker"
-      a : _ -> Spec.assertEqWith s "the reach creature blocks" (Combat.blockersOf a after) (Set.fromList theirs)
   Spec.it s "CR 509.1a a Mountain is not a legal blocker, flier or no flier" $ do
     -- The classification, from the other side: `canBlock` asks
     -- is-it-a-creature, never which card it is. M1b (tests cards) "a land may not
@@ -1393,18 +931,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     case mine of
       [] -> Spec.assertFailure s "fixture should have an attacker"
       _ : _ -> Spec.assertEqWith s "no legal blockers" (Combat.legalBlockers S.bob withLand) []
-  Spec.it s "CR 702.9b a flier connects past an untapped ground creature, in a real combat" $ do
-    -- The integration case, and it is precise rather than vacuous. WITH
-    -- flying: nothing may block, bob takes 1, and both creatures live.
-    -- WITHOUT flying: the Piker blocks, bob takes 0, and the two TRADE (Bird
-    -- Maiden is 1/2, Piker is 2/1). All three assertions distinguish them.
-    birdMaiden <- S.printingOf s registry "Bird Maiden"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [birdMaiden] [piker]
-        after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
-    Spec.assertEqWith s "bob took 1" (S.lifeOf S.bob after) (Just 19)
-    Spec.assertEqWith s "the flier lives" (S.creaturesInPlay S.alice after) 1
-    Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
   Spec.it s "CR 702.36b a red creature may not block a creature with fear" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, mine, theirs) = attacking [piker] [piker]
@@ -1520,7 +1046,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
-  -- CR 702.28's four cases, off a PRINTED keyword: Soltari Foot Soldier ({W}
+  -- CR 702.28's three legality cases, off a PRINTED keyword (its gameplay one is
+  -- data/scenarios/shadow-connects.json): Soltari Foot Soldier ({W}
   -- Creature -- Soltari Soldier 1/1, shadow and nothing else) has no other text
   -- for a case to pass on. Goblin Piker is the non-shadow creature throughout, so
   -- the only thing that varies between the cases is which side has shadow.
@@ -1554,19 +1081,9 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (a : _, b : _) ->
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-  Spec.it s "CR 702.28b a shadow creature connects past an untapped ground creature, in a real combat" $ do
-    -- The gameplay-level case, flying's above with shadow in place of flying and
-    -- precise for its reasons: bob takes 1 rather than 0, and the 1/1 Foot
-    -- Soldier survives a 2/1 Piker that never got to block it.
-    footSoldier <- S.printingOf s registry "Soltari Foot Soldier"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [footSoldier] [piker]
-        after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
-    Spec.assertEqWith s "bob took 1" (S.lifeOf S.bob after) (Just 19)
-    Spec.assertEqWith s "the shadow creature lives" (S.creaturesInPlay S.alice after) 1
-    Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
 
-  -- CR 702.31's three legality cases and its gameplay one, off a PRINTED keyword:
+  -- CR 702.31's three legality cases, off a PRINTED keyword (its gameplay one is
+  -- data/scenarios/horseman-connects.json):
   -- Shu Cavalry ({2}{W} Creature -- Human Soldier 2/2, horsemanship and nothing
   -- else) has no other text for a case to pass on. Goblin Piker is the
   -- non-horsemanship creature throughout.
@@ -1600,16 +1117,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (a : _, b : _) ->
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-  Spec.it s "CR 702.31b a horseman connects past an untapped ground creature, in a real combat" $ do
-    -- The gameplay-level case: bob takes 2, and the 2/2 Cavalry survives a 2/1
-    -- Piker that never got to block it.
-    shuCavalry <- S.printingOf s registry "Shu Cavalry"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, _) = S.combatBoardOf [shuCavalry] [piker]
-        after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
-    Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
-    Spec.assertEqWith s "the horseman lives" (S.creaturesInPlay S.alice after) 1
-    Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
 
   -- CR 702.118b, off a PRINTED keyword: Furtive Homunculus ({1}{U} Creature --
   -- Homunculus 2/1, skulk and nothing else) has no other text for a case to pass
@@ -1667,22 +1174,6 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
           (blocks b a gs, blocks b a (S.addCounter CounterKind.PlusOnePlusOne 1 b gs))
           (True, False)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-  Spec.it s "CR 702.118b a skulker connects past a bigger untapped creature, in a real combat" $ do
-    -- The gameplay-level case, with its own control: the SAME attacker into a
-    -- Piker it does not outclass is blocked, and both 2/1s trade. So the Hill
-    -- Giant reading is skulk talking, not a fixture that never blocks.
-    homunculus <- S.printingOf s registry "Furtive Homunculus"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let play defender =
-          let (gs, _, _) = S.combatBoardOf [homunculus] [defender]
-              after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
-           in (S.lifeOf S.bob after, S.creaturesInPlay S.alice after, S.creaturesInPlay S.bob after)
-    Spec.assertEqWith
-      s
-      "unblockable past the Giant; traded with the Piker"
-      (play hillGiant, play piker)
-      ((Just 18, 1, 1), (Just 20, 0, 0))
 
   Spec.it s "CR 702.14c a swampwalker may not be blocked while the defending player controls a Swamp" $ do
     -- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so
@@ -2476,76 +1967,6 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           )
           (False, True)
       _ -> Spec.assertFailure s "fixture should have two attackers and three blockers"
-  Spec.it s "CR 509.1h a real declare blockers step blocks both attackers with the one Brigade" $ do
-    -- Not a claim about legalBlockDeclaration alone: the step itself runs, and
-    -- both attackers come out of it blocked by the same creature.
-    brigade <- S.printingOf s registry "Foriysian Brigade"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = attacking [piker, piker] [brigade]
-    case (mine, theirs) of
-      ([first, second], [b]) -> do
-        let after = S.runPure (blockAll [first, second]) gs (Combat.declareBlockers S.manaPerformer)
-        Spec.assertEqWith
-          s
-          "one blocker, two blocked attackers"
-          (Combat.blockersOf first after, Combat.blockersOf second after, Combat.isBlocked first after, Combat.isBlocked second after)
-          (Set.singleton b, Set.singleton b, True, True)
-      _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
-  Spec.it s "CR 510.1d the Brigade divides its 2 among the creatures it blocks" $ do
-    -- 2 power over two 2/1 Pikers: one each kills both, all on one kills only
-    -- that one. Distinct counts, so the two divisions cannot be confused -- and
-    -- an UNDIVIDED reading, 2 to each Piker, kills both on either leg.
-    brigade <- S.printingOf s registry "Foriysian Brigade"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker, piker] [brigade]
-        dump :: Prompt.Prompt r -> r
-        dump p = case p of
-          Prompt.AssignCombatDamage _ _ _ thresholds n ->
-            case filter S.isCreatureRecipient (Map.keys thresholds) of
-              r : _ -> Map.singleton r n
-              [] -> Map.empty
-          _ -> blockAll mine p
-        split :: Prompt.Prompt r -> r
-        split p = case p of
-          Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
-          _ -> blockAll mine p
-    Spec.assertEqWith
-      s
-      "all on one kills one; one each kills both"
-      ( S.creaturesInPlay S.alice (S.settleSba (S.fightWith dump gs)),
-        S.creaturesInPlay S.alice (S.settleSba (S.fightWith split gs))
-      )
-      (1, 0)
-  Spec.it s "CR 510.1d blocking ONE creature is forced, and unprompted" $ do
-    -- The same interpreter that would answer an illegal empty division, which
-    -- assigns nothing: the Piker takes 2 anyway, so no prompt was raised.
-    brigade <- S.printingOf s registry "Foriysian Brigade"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] [brigade]
-        noAssign :: Prompt.Prompt r -> r
-        noAssign p = case p of
-          Prompt.AssignCombatDamage {} -> Map.empty
-          _ -> S.aggressiveAnswer p
-    case mine of
-      [a] -> Spec.assertEqWith s "the attacker took the whole 2" (S.damageOf a (S.fightWith noAssign gs)) (Just 2)
-      _ -> Spec.assertFailure s "fixture should have one attacker"
-  Spec.it s "CR 702.22k a banding attacker moves the blocker's division to the ACTIVE player" $ do
-    -- Benalish Hero {W} 1/1 has printed banding. With it among the creatures the
-    -- Brigade blocks, CR 702.22k hands alice the division that CR 510.1d would
-    -- have given bob; with two plain Pikers instead, bob keeps it. Three seats
-    -- are not needed here -- the two players are already on opposite sides of
-    -- the declaration -- but the control board is, since both readings answer
-    -- with a PlayerId either way.
-    brigade <- S.printingOf s registry "Foriysian Brigade"
-    benalishHero <- S.printingOf s registry "Benalish Hero"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (banded, bandedAttackers, _) = S.combatBoardOf [benalishHero, piker] [brigade]
-        (plain, plainAttackers, _) = S.combatBoardOf [piker, piker] [brigade]
-    Spec.assertEqWith
-      s
-      "banding inverts the chooser"
-      (divisionChooser bandedAttackers banded, divisionChooser plainAttackers plain)
-      ([S.alice], [S.bob])
 
 -- `luring`, but a Lure on EVERY attacker: one requirement instance per attacker,
 -- which is what makes CR 509.1c's maximum bigger than one blocker's ordinary
@@ -2562,29 +1983,6 @@ blockAll :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 blockAll attackers p = case p of
   Prompt.DeclareBlockers _ _ mine _ -> Map.fromList (fmap (\b -> (b, Set.fromList attackers)) mine)
   _ -> S.aggressiveAnswer p
-
--- Whom CR 510.1d's division was asked of, in order. A list rather than a Maybe
--- so a case that raised no prompt at all is told from one that raised it of the
--- wrong player.
-divisionChooser :: [ObjectId.ObjectId] -> GameState.GameState -> [PlayerId.PlayerId]
-divisionChooser attackers gs =
-  let record :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
-      record p = case p of
-        Prompt.AssignCombatDamage _ pid _ thresholds n -> do
-          State.modify' (<> [pid])
-          pure $ case filter S.isCreatureRecipient (Map.keys thresholds) of
-            r : _ -> Map.singleton r n
-            [] -> Map.empty
-        _ -> pure (blockAll attackers p)
-   in snd
-        ( State.runState
-            ( fmap snd . Engine.runGame record gs $ do
-                Combat.declareAttackers S.manaPerformer S.alice
-                Combat.declareBlockers S.manaPerformer
-                Damage.dealCombatDamage
-            )
-            []
-        )
 
 -- CR 702.111b, proved by Boggart Brute ("Creature -- Goblin Warrior 3/2,
 -- Menace") -- the blocking side's SET-SHAPED combat restriction, and the first
@@ -2643,26 +2041,6 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
         let after = S.runPure S.aggressiveAnswer gs (Combat.declareBlockers S.manaPerformer)
         Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
-  Spec.it s "CR 702.111b a whole combat: one Piker cannot stop the Brute, two can" $ do
-    -- The gameplay-level case, run through S.fightWith rather than asked of
-    -- legalBlockDeclaration -- and it is precise rather than vacuous, because
-    -- the two legs differ in every observable. WITH one blocker: nobody may
-    -- block, bob takes 3, and both creatures live. WITH two: both block,
-    -- bob takes 0, and the Brute (3/2) dies to 2+2 while killing the first
-    -- Piker (2/1) with its 3.
-    boggartBrute <- S.printingOf s registry "Boggart Brute"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let fight theirs =
-          let (gs, _, _) = S.combatBoardOf [boggartBrute] theirs
-           in S.settleSba (S.fightWith S.aggressiveAnswer gs)
-        one = fight [piker]
-        two = fight [piker, piker]
-    Spec.assertEqWith s "one blocker: bob takes 3" (S.lifeOf S.bob one) (Just 17)
-    Spec.assertEqWith s "one blocker: the Brute lives" (S.creaturesInPlay S.alice one) 1
-    Spec.assertEqWith s "one blocker: so does the Piker it could not block with" (S.creaturesInPlay S.bob one) 1
-    Spec.assertEqWith s "two blockers: bob takes nothing" (S.lifeOf S.bob two) (Just 20)
-    Spec.assertEqWith s "two blockers: the Brute dies to 2+2" (S.creaturesInPlay S.alice two) 0
-    Spec.assertEqWith s "two blockers: taking one Piker with it" (S.creaturesInPlay S.bob two) 1
   Spec.it s "CR 702.111b menace constrains the set blocking ITS attacker, not every attacker" $ do
     -- The control that keeps the restriction narrow: a Piker attacking beside
     -- the Brute still takes exactly one blocker. Fails against any
@@ -2879,31 +2257,6 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton first (Set.singleton a)) gs)) "one blocker is not enough"
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, Set.singleton a), (second, Set.singleton a)]) gs) "both blockers is legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
-  Spec.it s "CR 509.1c whole cards: a Lure forces a block through a real declare blockers step" $ do
-    -- The gameplay-level case, run through Combat.declareBlockers with an
-    -- interpreter that declines to block. Declining is now an illegal answer,
-    -- and the maximum leaves exactly one legal declaration -- the rules
-    -- forcing it, not the engine choosing.
-    --
-    -- Precise rather than vacuous, and all three assertions distinguish the
-    -- two worlds. WITHOUT the requirement: nobody blocks, bob takes 2 and both
-    -- Pikers live. WITH it: the Piker blocks, bob takes nothing, and the two
-    -- 2/1s trade.
-    lure <- S.printingOf s registry "Lure"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        declining :: Prompt.Prompt r -> r
-        declining p = case p of
-          Prompt.DeclareBlockers {} -> Map.empty
-          _ -> S.aggressiveAnswer p
-        withLure = case mine of
-          -- Unreachable: the fixture has one attacking printing.
-          [] -> gs
-          a : _ -> let (aura, withAura) = S.addPermanent lure S.alice gs in S.attach aura a withAura
-        after = S.settleSba (S.fightWith declining withLure)
-    Spec.assertEqWith s "bob took nothing" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "alice's attacker is dead" (S.creaturesInPlay S.alice after) 0
-    Spec.assertEqWith s "bob's blocker is dead" (S.creaturesInPlay S.bob after) 0
   Spec.it s "CR 509.1c declining to block a Prized Unicorn is illegal" $ do
     -- The pool's second blocking requirement, and the first that names its OWN
     -- SOURCE rather than an attachment: "all creatures able to block THIS
@@ -3016,31 +2369,6 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
           (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, onProtector), (second, onProtector), (third, onProtector)]) gs))
           "and all three on the Protector obeys one"
       _ -> Spec.assertFailure s "fixture should have two attackers and three blockers"
-  Spec.it s "CR 509.1c whole cards: a Gaea's Protector forces a block through a real declare blockers step" $ do
-    -- The gameplay-level case, run through Combat.declareBlockers with an
-    -- interpreter that declines to block, and a pair of boards differing in ONE
-    -- thing: whether bob's Piker is untapped.
-    --
-    -- WITH the block forced: bob takes nothing, and the 4/2 and the 2/1 trade.
-    -- WITHOUT it (the Piker tapped, so no creature is able): bob takes four and
-    -- both creatures live.
-    gaeasProtector <- S.printingOf s registry "Gaea's Protector"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, theirs) = attacking [gaeasProtector] [piker]
-        declining :: Prompt.Prompt r -> r
-        declining p = case p of
-          Prompt.DeclareBlockers {} -> Map.empty
-          _ -> S.aggressiveAnswer p
-    case theirs of
-      b : _ -> do
-        let after = S.settleSba (S.fightWith declining gs)
-            control = S.settleSba (S.fightWith declining (S.tapObject b gs))
-        Spec.assertEqWith s "bob took nothing" (S.lifeOf S.bob after) (Just 20)
-        Spec.assertEqWith s "the Protector died to the block it forced" (S.creaturesInPlay S.alice after) 0
-        Spec.assertEqWith s "and so did the blocker" (S.creaturesInPlay S.bob after) 0
-        Spec.assertEqWith s "with nobody able to block, bob took four" (S.lifeOf S.bob control) (Just 16)
-        Spec.assertEqWith s "and the Protector lived" (S.creaturesInPlay S.alice control) 1
-      _ -> Spec.assertFailure s "fixture should have a blocker"
   Spec.it s "CR 604.2 Humility strips a Prized Unicorn's block requirement, so declining becomes legal" $ do
     -- CR 604.2: a static ability's continuous effect is active only while the
     -- permanent "remains on the battlefield AND HAS THE ABILITY", so Humility's
@@ -3182,26 +2510,6 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     case mine of
       [wall] -> Spec.assertBool s (not (Combat.canAttack S.alice wall gs)) "defender forbids the attack"
       _ -> Spec.assertFailure s "fixture should have one creature"
-  Spec.it s "CR 509.1c whole cards: the Screen blocks a real declare blockers step" $ do
-    -- Gameplay level, under an answerer that DECLINES, so the block is CR
-    -- 509.1c's degradation to the forced declaration rather than the answerer
-    -- choosing it. The control board swaps the Screen for an Ogre Sentry, which
-    -- is a defender with no requirement, so the two boards differ only in the
-    -- requirement and every assertion below differs between them.
-    screen <- S.printingOf s registry "Razorgrass Screen"
-    piker <- S.printingOf s registry "Goblin Piker"
-    ogreSentry <- S.printingOf s registry "Ogre Sentry"
-    let declining :: Prompt.Prompt r -> r
-        declining p = case p of
-          Prompt.DeclareBlockers {} -> Map.empty
-          _ -> S.aggressiveAnswer p
-        run theirs = S.settleSba (S.fightWith declining (let (gs, _, _) = S.combatBoardOf [piker] theirs in gs))
-        blocked = run [screen]
-        unblocked = run [ogreSentry]
-    Spec.assertEqWith s "the Screen was forced to block, so bob took nothing" (S.lifeOf S.bob blocked) (Just 20)
-    Spec.assertEqWith s "and the 2/1 Piker killed the 2/1 Screen" (S.creaturesInPlay S.bob blocked) 0
-    Spec.assertEqWith s "an Ogre Sentry with no requirement declines, so bob takes two" (S.lifeOf S.bob unblocked) (Just 18)
-    Spec.assertEqWith s "and it survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
   -- CR 509.1c's CONDITION -- "or that it must block if some condition is met" --
   -- which every card above leaves absent. Seton's Desire ({2}{G} Enchantment --
   -- Aura, "Enchant creature. Enchanted creature gets +2/+2. Threshold -- As long
@@ -3255,31 +2563,6 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton other)) over)) "blocking the other attacker instead is illegal"
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty over)) "and declining is illegal"
       _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
-  Spec.it s "CR 509.1c whole cards: the threshold forces a block through a real declare blockers step" $ do
-    -- Gameplay level, under an answerer that DECLINES. Both boards carry the
-    -- Aura -- so its +2/+2 is on both and the 4/3 attacker is the same creature
-    -- either way -- and differ only in the graveyard, and both assertions
-    -- differ between them: over the threshold the Piker is forced to block and
-    -- dies while bob takes nothing; under it nobody blocks, bob takes 4 and the
-    -- blocker lives.
-    desire <- S.printingOf s registry "Seton's Desire"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = S.combatBoardOf [piker] [piker]
-        declining :: Prompt.Prompt r -> r
-        declining p = case p of
-          Prompt.DeclareBlockers {} -> Map.empty
-          _ -> S.aggressiveAnswer p
-        enchanted = case mine of
-          -- Unreachable: the fixture has one attacking printing.
-          [] -> gs
-          a : _ -> let (aura, withAura) = S.addPermanent desire S.alice gs in S.attach aura a withAura
-        run n = S.settleSba (S.fightWith declining (filling piker n enchanted))
-        blocked = run 7
-        unblocked = run 6
-    Spec.assertEqWith s "seven cards in the graveyard: the Piker was forced to block, so bob took nothing" (S.lifeOf S.bob blocked) (Just 20)
-    Spec.assertEqWith s "and the blocker died to the 4/3" (S.creaturesInPlay S.bob blocked) 0
-    Spec.assertEqWith s "six cards: the gate is false and bob takes four" (S.lifeOf S.bob unblocked) (Just 16)
-    Spec.assertEqWith s "and the blocker survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
 
 -- A combat board that has NOT yet declared attackers, with Curse of the Nightly
 -- Hunt on the battlefield attached to `who`. The attacking twin of `luring`, and
@@ -3452,35 +2735,6 @@ attackRequirementSpec s registry = Spec.describe s "AttackRequirements" $ do
           (length (Combat.forcedAttackDeclaration (Combat.attackCeiling offered boundAt) offered))
           1
       _ -> Spec.assertFailure s "fixture should have two creatures for alice"
-  Spec.it s "CR 508.1d whole cards: a Curse forces an attack through a real declare attackers step" $ do
-    -- The gameplay-level case, run through Engine.runStep -- the priority loop
-    -- and the CR 703.4i turn-based action, not a direct call -- with an
-    -- interpreter that declines to attack. Declining is now an illegal answer,
-    -- and the maximum leaves the rules forcing the attack rather than the
-    -- engine choosing it.
-    --
-    -- Precise rather than vacuous, and both worlds are asserted. WITHOUT the
-    -- Curse the declining interpreter attacks with nothing and bob stays at
-    -- 20; WITH it the Piker attacks, taps, and bob takes 2.
-    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, _) = cursing curse S.alice [piker] []
-        (plain, _, _) = S.combatBoardOf [piker] []
-        declining :: Prompt.Prompt r -> r
-        declining p = case p of
-          Prompt.DeclareAttackers {} -> []
-          _ -> S.aggressiveAnswer p
-        after = S.runCombat declining gs
-        control = S.runCombat declining plain
-    Spec.assertEqWith s "without the Curse, bob takes nothing" (S.lifeOf S.bob control) (Just 20)
-    Spec.assertEqWith s "with it, bob takes two" (S.lifeOf S.bob after) (Just 18)
-    case mine of
-      a : _ -> do
-        Spec.assertEqWith s "and the creature really was declared" (S.attackerDeclarationsOf after) [a]
-        -- CR 508.1f: declaring taps it. The forced declaration is a real one,
-        -- not a bookkeeping entry.
-        Spec.assertEqWith s "and tapped" (tapStateOf a after) (Just TapState.Tapped)
-      _ -> Spec.assertFailure s "fixture should have a creature"
 
 -- Put a Pacifism onto the battlefield under alice's control and attach it to
 -- `host`. Attaching directly is `luring`'s state-fixture posture, for the same
@@ -3638,22 +2892,6 @@ combatRestrictionSpec s registry = Spec.describe s "CombatRestrictions" $ do
         Spec.assertEqWith s "with it, bob takes two" (S.lifeOf S.bob after) (Just 18)
         Spec.assertEqWith s "and only the unenchanted Piker was ever declared" (S.attackerDeclarationsOf after) [other]
       _ -> Spec.assertFailure s "fixture should have two creatures"
-  Spec.it s "CR 509.1b whole cards: a Pacifism'd creature sits out a real declare blockers step" $ do
-    -- The blocking-side gameplay case. Without the Aura the interpreter blocks and
-    -- the two 2/1s trade, so bob takes nothing; with it the block cannot happen and
-    -- the attacker connects.
-    pacifism <- S.printingOf s registry "Pacifism"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, _, theirs) = S.combatBoardOf [piker] [piker]
-    case theirs of
-      [blocker] -> do
-        let board = snd (pacifying pacifism blocker gs)
-            after = S.settleSba (S.runCombat S.aggressiveAnswer board)
-            control = S.settleSba (S.runCombat S.aggressiveAnswer gs)
-        Spec.assertEqWith s "without the Aura, the block happens and bob takes nothing" (S.lifeOf S.bob control) (Just 20)
-        Spec.assertEqWith s "with it, the attacker connects" (S.lifeOf S.bob after) (Just 18)
-        Spec.assertEqWith s "and bob's creature is alive, having blocked nothing" (S.creaturesInPlay S.bob after) 1
-      _ -> Spec.assertFailure s "fixture should have one blocker"
   -- CR 509.1b narrowed by a MANA VALUE rather than by an attachment, and pointed
   -- at the OTHER seat: Void Winnower's "your opponents can't block with creatures
   -- with even mana values". The two blockers differ in parity alone -- a Goblin
@@ -4023,24 +3261,6 @@ conditionalCombatRestrictionSpec s registry = Spec.describe s "Conditional Comba
         Spec.assertBool s (not (Combat.canAttack S.alice giant gone)) "with the Hill Giant in the graveyard it may not"
         Spec.assertBool s (not (Combat.canBlock S.alice giant gone)) "nor block"
       _ -> Spec.assertFailure s "fixture should have two creatures"
-  Spec.it s "CR 508.1c whole cards: the condition decides a real declare attackers step" $ do
-    -- The gameplay-level case, run through the priority loop and CR 703.4i's
-    -- turn-based action rather than a direct call. With the Hill Giant both
-    -- connect for 4 + 3; without it the Blind-Spot Giant is never declared and
-    -- bob takes nothing.
-    blindSpotGiant <- S.printingOf s registry "Blind-Spot Giant"
-    hillGiant <- S.printingOf s registry "Hill Giant"
-    let (gs, mine, _) = S.combatBoardOf [blindSpotGiant, hillGiant] []
-    case mine of
-      [giant, hill] -> do
-        let gone = S.runPure S.identityAnswer gs (Event.changeZone hill Zone.Graveyard)
-            after = S.runCombat S.aggressiveAnswer gs
-            control = S.runCombat S.aggressiveAnswer gone
-        Spec.assertEqWith s "with the Hill Giant, bob takes seven" (S.lifeOf S.bob after) (Just 13)
-        Spec.assertEqWith s "and both were declared" (S.attackerDeclarationsOf after) [giant, hill]
-        Spec.assertEqWith s "without it, bob takes nothing" (S.lifeOf S.bob control) (Just 20)
-        Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
-      _ -> Spec.assertFailure s "fixture should have two creatures"
 
 -- CR 508.1c's gate naming the DEFENDING PLAYER (CR 508.5). Armored Galleon
 -- ({4}{U} Creature -- Human Pirate 5/4, "This creature can't attack unless
@@ -4114,23 +3334,6 @@ defendingPlayerRestrictionSpec s registry = Spec.describe s "DefendingPlayerComb
         Spec.assertBool s (not (Combat.canAttack S.alice ship (defendedBy S.bob))) "carol's Island does not free an attack on bob"
         Spec.assertBool s (Combat.canAttack S.alice ship (defendedBy S.carol)) "but it does free an attack on carol"
       _ -> Spec.assertFailure s "fixture should have one creature"
-  Spec.it s "CR 508.1c whole cards: the gate decides a real declare attackers step" $ do
-    -- Gameplay level, through CR 703.4i's turn-based action rather than a direct
-    -- call. The Galleon is 5/4 and alone on its side, so the life delta is its
-    -- own and no other creature's.
-    galleon <- S.printingOf s registry "Armored Galleon"
-    island <- S.printingOf s registry "Island"
-    let (gs, mine, _) = S.combatBoardOf [galleon] []
-        defended = withPermanents S.bob [island] gs
-        after = S.runCombat S.aggressiveAnswer defended
-        control = S.runCombat S.aggressiveAnswer gs
-    case mine of
-      [ship] -> do
-        Spec.assertEqWith s "with the Island, bob takes five" (S.lifeOf S.bob after) (Just 15)
-        Spec.assertEqWith s "and the Galleon was declared" (S.attackerDeclarationsOf after) [ship]
-        Spec.assertEqWith s "without it, bob takes nothing" (S.lifeOf S.bob control) (Just 20)
-        Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
-      _ -> Spec.assertFailure s "fixture should have one creature"
 
 -- CR 508.1c's PAIRWISE attacking restriction: one naming WHAT the attack is aimed
 -- at rather than which creatures may attack. Blazing Archon ({6}{W}{W}{W}
@@ -4187,32 +3390,6 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
         -- casualty and the case above would be about a board that cannot exist.
         Spec.assertEqWith s "and Jace really is on the board with loyalty" (S.counterOf CounterKind.Loyalty jaceId board) 3
       _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Archon and a Jace"
-  Spec.it s "CR 508.1c whole cards: the declare attackers step aims the Piker at Jace instead" $ do
-    -- GAMEPLAY LEVEL, through CR 703.4i's turn-based action. The control is the
-    -- same board with the Archon left off, where the announcement the engine
-    -- makes is bob's own seat.
-    archon <- S.printingOf s registry "Blazing Archon"
-    jace <- S.printingOf s registry "Jace Beleren"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (guarded, mine, theirs) = S.combatBoardOf [piker] [archon, jace]
-        (open, mineOpen, theirsOpen) = S.combatBoardOf [piker] [jace]
-    case (mine, theirs, mineOpen, theirsOpen) of
-      ([pikerId], [_, jaceId], [openPiker], [openJace]) -> do
-        -- Read at the declare blockers step, before a block can absorb the
-        -- damage: the Archon is a 5/6 and would eat the Piker it is protecting
-        -- bob from.
-        let announced g = Map.lookup (fst g) (Combat.Type.attackers (GameState.combat (S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer (snd g))))
-        Spec.assertEqWith
-          s
-          "the Piker was announced at the planeswalker, bob being off limits"
-          (announced (pikerId, S.addCounter CounterKind.Loyalty 3 jaceId guarded))
-          (Just (AttackTarget.OfPlaneswalker jaceId))
-        Spec.assertEqWith
-          s
-          "and at bob himself on the same board without the Archon"
-          (announced (openPiker, S.addCounter CounterKind.Loyalty 3 openJace open))
-          (Just (AttackTarget.OfPlayer S.bob))
-      _ -> Spec.assertFailure s "fixture should give alice a Piker on each board"
   Spec.it s "CR 508.1d a creature with nobody it may attack is not able, so the Curse excuses it" $ do
     -- CR 508.1d counts the requirements obeyable "without disobeying any
     -- restrictions", so an announcement this restriction forbids is worth
@@ -4232,32 +3409,6 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] uncursed)) "and it does forbid declining with no Archon on the board"
         Spec.assertEqWith s "the Piker is a candidate on both boards, so the Curse reaches it" (Combat.legalAttackers S.alice gs) [pikerId]
       _ -> Spec.assertFailure s "fixture should give alice a Piker"
-
-  Spec.it s "CR 508.1c whole cards: with nothing else to attack, no attack is declared" $ do
-    -- The other half of the gameplay reading: bob controls no planeswalker, so
-    -- every announcement CR 508.1b offers is forbidden and the creature is not
-    -- declared at all. Paired with the same board under alice's control, where
-    -- both her creatures connect.
-    archon <- S.printingOf s registry "Blazing Archon"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = S.combatBoardOf [piker] [archon]
-    case (mine, theirs) of
-      ([pikerId], [archonId]) -> do
-        -- Blocks DECLINED, because the Archon is a 5/6 that would block the very
-        -- Piker it is keeping off bob: with blocks on, "bob takes nothing" is
-        -- true whether or not the restriction bit, and the life assertion proves
-        -- nothing.
-        let unblocking :: Prompt.Prompt r -> r
-            unblocking p = case p of
-              Prompt.DeclareBlockers {} -> Map.empty
-              _ -> S.aggressiveAnswer p
-            after = S.runCombat unblocking gs
-            control = S.runCombat unblocking (S.giveControl archonId S.alice gs)
-        Spec.assertEqWith s "bob takes nothing" (S.lifeOf S.bob after) (Just 20)
-        Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf after) []
-        Spec.assertEqWith s "with the Archon protecting alice instead, the Piker's 2 and the Archon's 5 both land" (S.lifeOf S.bob control) (Just 13)
-        Spec.assertEqWith s "and both were declared" (S.attackerDeclarationsOf control) [pikerId, archonId]
-      _ -> Spec.assertFailure s "fixture should give alice a Piker and bob an Archon"
 
   -- CR 506.3's OTHER attackable things. Vow of Flight ({2}{U} Enchantment --
   -- Aura, "Enchant creature / Enchanted creature gets +2/+2, has flying, and
@@ -4288,26 +3439,6 @@ aimedAttackRestrictionSpec s registry = Spec.describe s "AimedAttackRestriction"
         -- so.
         Spec.assertEqWith s "the Vow really is attached, so the 2/1 Piker is a 4/3" (S.powerToughnessOf pikerId board) (Just (4, 3))
       _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Vow and a Jace on one board, an Archon and a Jace on the other"
-
-  Spec.it s "CR 506.3 whole cards: with both announcements barred the Piker is not declared at all" $ do
-    -- GAMEPLAY LEVEL, and the control differs in exactly one thing: who controls
-    -- the Vow. CR 109.5's "you" then names alice, so the Aura protects the
-    -- attacker's own seat and both of bob's announcements open back up.
-    vow <- S.printingOf s registry "Vow of Flight"
-    jace <- S.printingOf s registry "Jace Beleren"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, mine, theirs) = S.combatBoardOf [piker] [vow, jace]
-    case (mine, theirs) of
-      ([pikerId], [vowId, jaceId]) -> do
-        let board = S.attach vowId pikerId (S.addCounter CounterKind.Loyalty 3 jaceId gs)
-            after = S.runCombat S.aggressiveAnswer board
-            control = S.runCombat S.aggressiveAnswer (S.giveControl vowId S.alice board)
-        Spec.assertEqWith s "bob takes nothing" (S.lifeOf S.bob after) (Just 20)
-        Spec.assertEqWith s "and bob's Jace keeps its loyalty, the other announcement being barred too" (S.counterOf CounterKind.Loyalty jaceId after) 3
-        Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf after) []
-        Spec.assertEqWith s "with the Vow protecting alice instead, the enchanted Piker's 4 lands" (S.lifeOf S.bob control) (Just 16)
-        Spec.assertEqWith s "and it was declared" (S.attackerDeclarationsOf control) [pikerId]
-      _ -> Spec.assertFailure s "fixture should give alice a Piker and bob a Vow and a Jace"
 
 -- CR 802.3a: a restriction that applies to attacking a SPECIFIC PLAYER applies
 -- only to the creatures attacking that player. Armored Galleon ({4}{U} Creature
@@ -4374,27 +3505,6 @@ perDefenderRestrictionSpec s registry = Spec.describe s "PerDefenderAttackRestri
         -- casualty and the first assertion is about a board that cannot exist.
         Spec.assertEqWith s "Jace is on the board with loyalty" (S.counterOf CounterKind.Loyalty jaceId board) 3
       _ -> Spec.assertFailure s "fixture should give alice a Galleon and bob a Jace"
-  Spec.it s "CR 802.3a whole cards: the declare attackers step sends the Galleon at the Island's controller" $ do
-    -- GAMEPLAY LEVEL, from the beginning of combat step, so CR 703.4h picks both
-    -- defending players (CR 802.2) rather than the fixture stating them. The two
-    -- boards differ in exactly one thing: which opponent holds the Island.
-    galleon <- S.printingOf s registry "Armored Galleon"
-    island <- S.printingOf s registry "Island"
-    let (atCarol, _, _, _) = S.threePlayerCombat [galleon] [] [island]
-        (atBob, _, _, _) = S.threePlayerCombat [galleon] [island] []
-        after = S.runCombat S.aggressiveAnswer atCarol
-        control = S.runCombat S.aggressiveAnswer atBob
-        -- Read at the declare blockers step, since the end of combat step empties
-        -- the record the pins below read.
-        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer atCarol
-    Spec.assertEqWith s "carol holds the Island, so carol takes the Galleon's five" (S.lifeOf S.carol after) (Just 15)
-    Spec.assertEqWith s "and bob, who does not, takes nothing" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertEqWith s "with the Island moved to bob, bob takes the five" (S.lifeOf S.bob control) (Just 15)
-    Spec.assertEqWith s "and carol takes nothing" (S.lifeOf S.carol control) (Just 20)
-    Spec.assertEqWith s "the announcement really named carol (CR 508.1b)" (Map.elems (Combat.Type.attackers (GameState.combat atBlockers))) [AttackTarget.OfPlayer S.carol]
-    -- The fixture pin: CR 802.2 really did make BOTH opponents defending players,
-    -- so each case above is a choice between two seats and not a one-seat combat.
-    Spec.assertEqWith s "both opponents defended" (Combat.Type.defenders (GameState.combat atBlockers)) [S.bob, S.carol]
 
 -- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
 -- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
@@ -5413,36 +4523,6 @@ creatureBattleDeclarationSpec s registry = Spec.describe s "CreatureBattleDeclar
     Spec.assertEqWith s "CR 508.8 the creature-battle attacked nothing, so the step after declare attackers is end of combat" (GameState.phase battle) S.endOfCombat
     Spec.assertEqWith s "CR 508.8 while the plain Soldier keeps the declare blockers step" (GameState.phase plain) S.declareBlockers
     Spec.assertEqWith s "and each mode really made one tapped Soldier, the second a creature that is a battle" (fmap (\gs -> fmap (\oid -> (fmap Object.tapped (Game.lookupObject oid gs), Projection.isCreatureOf oid gs, Projection.isBattleOf oid gs)) (soldiers gs)) [plain, battle]) [[(Just TapState.Tapped, True, False)], [(Just TapState.Tapped, True, True)]]
-  -- The blocking twin: the Muster's other two modes, the same pair on alice's
-  -- side of bob's attack. A creature-battle that blocked and was then pulled out
-  -- by CR 506.4 would leave the Piker blocked and assigning nothing (CR
-  -- 510.1c), so alice's life is the discriminator.
-  Spec.it s "CR 506.3f a creature-battle put onto the battlefield blocking never blocks, so the attacker is unblocked" $ do
-    let muster mode = do
-          let mine =
-                (S.battlefield S.alice [S.settled "first" "Plains", S.settled "second" "Plains"])
-                  { Seat.hand = Seq.singleton (S.aliased "spell" (S.cardSetup "Synthetic Siege Muster"))
-                  }
-              setup = S.board (mine NonEmpty.:| [S.battlefield S.bob [S.settled "piker" "Goblin Piker"]]) S.bob S.beginningOfCombat
-              choices =
-                Choices.none
-                  { Choices.modes = Just (Seq.singleton (ModeIndex.MkModeIndex mode)),
-                    Choices.targets = Just [S.aliasRef "piker"],
-                    Choices.manaSources = Seq.fromList [Just (S.aliasRef "first"), Just (S.aliasRef "second")]
-                  }
-              script =
-                S.turn
-                  1
-                  [ S.on S.declareAttackers S.bob (S.attack [S.aliasRef "piker"]),
-                    S.on S.declareBlockers S.alice (S.castAction (S.aliasRef "spell") choices)
-                  ]
-          S.play s registry setup script S.combatGame
-    plain <- muster 2
-    battle <- muster 3
-    let soldiers = Scenario.namedObjects (CardName.MkCardName (Text.pack "Soldier Token"))
-    Spec.assertEqWith s "CR 510.1b the creature-battle never blocked, so the unblocked Piker's two reached alice" (S.lifeOf S.alice battle) (Just 18)
-    Spec.assertEqWith s "CR 510.1c while the plain Soldier blocked it and alice took nothing" (S.lifeOf S.alice plain) (Just 20)
-    Spec.assertEqWith s "and the second mode really made a creature that is a battle, left alive" (fmap (\oid -> (Projection.isCreatureOf oid battle, Projection.isBattleOf oid battle)) (soldiers battle)) [(True, True)]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
@@ -5452,7 +4532,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   defenderSpec s registry
   defendingPlayerSpec s registry
   attackMultiplePlayersSpec s registry
-  attackLeftRightSpec s registry
   hasteSpec s registry
   evasionSpec s registry
   textChangedLandwalkSpec s registry

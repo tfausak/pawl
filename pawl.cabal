@@ -175,6 +175,8 @@ library codec
     Pawl.Codec.AttackerBlockedSpec
     Pawl.Codec.AttackerDeclared
     Pawl.Codec.AttackerDeclaredSpec
+    Pawl.Codec.AttackersAre
+    Pawl.Codec.AttackersAreSpec
     Pawl.Codec.AttackingPlayers
     Pawl.Codec.AttackingPlayersSpec
     Pawl.Codec.AttackLimitUnless
@@ -209,6 +211,8 @@ library codec
     Pawl.Codec.Blight
     Pawl.Codec.BlockCost
     Pawl.Codec.BlockCostSpec
+    Pawl.Codec.BlockersAre
+    Pawl.Codec.BlockersAreSpec
     Pawl.Codec.BlockPermission
     Pawl.Codec.BlockPermissionSpec
     Pawl.Codec.BlockProducer
@@ -395,6 +399,8 @@ library codec
     Pawl.Codec.CounterRestriction
     Pawl.Codec.CounterRestrictionSpec
     Pawl.Codec.CounterRSpec
+    Pawl.Codec.CountersAre
+    Pawl.Codec.CountersAreSpec
     Pawl.Codec.CountersFromPermanents
     Pawl.Codec.CountersFromPermanentsSpec
     Pawl.Codec.CountersFromThis
@@ -447,6 +453,8 @@ library codec
     Pawl.Codec.DealDamageSpec
     Pawl.Codec.Decider
     Pawl.Codec.DeciderSpec
+    Pawl.Codec.DefendersAre
+    Pawl.Codec.DefendersAreSpec
     Pawl.Codec.Defense
     Pawl.Codec.DefenseSpec
     Pawl.Codec.DelayedTrigger
@@ -787,6 +795,8 @@ library codec
     Pawl.Codec.ModifyPowerToughnessSpec
     Pawl.Codec.ModifyTarget
     Pawl.Codec.ModifyTargetSpec
+    Pawl.Codec.MonarchIs
+    Pawl.Codec.MonarchIsSpec
     Pawl.Codec.MonarchTarget
     Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.MonarchWatch
@@ -1192,6 +1202,8 @@ library codec
     Pawl.Codec.TurnWindowSpec
     Pawl.Codec.TypeLine
     Pawl.Codec.TypeLineSpec
+    Pawl.Codec.TypesAre
+    Pawl.Codec.TypesAreSpec
     Pawl.Codec.UntapR
     Pawl.Codec.UntapRestriction
     Pawl.Codec.UntapRestrictionSpec
@@ -1874,6 +1886,7 @@ library types
     Pawl.Types.AttackCostScope
     Pawl.Types.AttackerBlocked
     Pawl.Types.AttackerDeclared
+    Pawl.Types.AttackersAre
     Pawl.Types.AttackingPlayers
     Pawl.Types.AttackLimitUnless
     Pawl.Types.AttackOption
@@ -1893,6 +1906,7 @@ library types
     Pawl.Types.Binding
     Pawl.Types.Blight
     Pawl.Types.BlockCost
+    Pawl.Types.BlockersAre
     Pawl.Types.BlockPermission
     Pawl.Types.BlockProducer
     Pawl.Types.BlockRequirement
@@ -1999,6 +2013,7 @@ library types
     Pawl.Types.CounterPlacement
     Pawl.Types.CounterR
     Pawl.Types.CounterRestriction
+    Pawl.Types.CountersAre
     Pawl.Types.CountersFromPermanents
     Pawl.Types.CountersFromThis
     Pawl.Types.CounterSpread
@@ -2026,6 +2041,7 @@ library types
     Pawl.Types.Decider
     Pawl.Types.DecisionLog
     Pawl.Types.Deck
+    Pawl.Types.DefendersAre
     Pawl.Types.Defense
     Pawl.Types.DelayedTrigger
     Pawl.Types.Departure
@@ -2216,6 +2232,7 @@ library types
     Pawl.Types.ModifiedRoll
     Pawl.Types.ModifyPowerToughness
     Pawl.Types.ModifyTarget
+    Pawl.Types.MonarchIs
     Pawl.Types.MonarchTarget
     Pawl.Types.MonarchWatch
     Pawl.Types.Morph
@@ -2449,6 +2466,7 @@ library types
     Pawl.Types.TurnUpRewrite
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
+    Pawl.Types.TypesAre
     Pawl.Types.UntapR
     Pawl.Types.UntapRestriction
     Pawl.Types.UntapRewrite

@@ -1,0 +1,14 @@
+{
+  "description": "CR 506.2 two players: the nonactive player defends and nobody is asked",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      { "name": "alice" },
+      { "name": "bob" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "BeginningOfCombat", "player": "alice", "check": { "Defenders": { "players": ["bob"] } } }
+  ]
+}

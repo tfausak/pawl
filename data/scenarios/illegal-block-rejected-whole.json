@@ -1,0 +1,26 @@
+{
+  "description": "CR 509.1b an illegal declaration is rejected WHOLE, not repaired",
+  "board": {
+    "active": "alice",
+    "step": "BeginningOfCombat",
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Bird Maiden", "label": "flier", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Nimble Birdsticker", "label": "reacher", "ready": true },
+          { "card": "Goblin Piker", "label": "ground", "ready": true }
+        ]
+      }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@flier"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@reacher": ["@flier"], "@ground": ["@flier"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@reacher": ["@flier"], "@ground": ["@flier"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Blockers": { "attacker": "@flier", "blockers": null } } }
+  ]
+}

@@ -24,9 +24,11 @@ spec s = Spec.describe s "Pawl.Codec.Seat" $ do
       (empty "alice")
         { Seat.Type.life = 7,
           Seat.Type.battlefield = Seq.singleton (card "Mountain"),
-          Seat.Type.hand = Seq.singleton (card "Lightning Bolt")
+          Seat.Type.hand = Seq.singleton (card "Lightning Bolt"),
+          Seat.Type.graveyard = Seq.singleton (card "Goblin Piker"),
+          Seat.Type.library = Seq.singleton (card "Island")
         }
-      " {\"name\":\"alice\",\"life\":7,\"battlefield\":[{\"card\":\"Mountain\"}],\"hand\":[{\"card\":\"Lightning Bolt\"}]} "
+      " {\"name\":\"alice\",\"life\":7,\"battlefield\":[{\"card\":\"Mountain\"}],\"hand\":[{\"card\":\"Lightning Bolt\"}],\"graveyard\":[{\"card\":\"Goblin Piker\"}],\"library\":[{\"card\":\"Island\"}]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Seat.codec
 
@@ -36,7 +38,9 @@ empty name =
     { Seat.Type.name = Label.Type.MkLabel (Text.pack name),
       Seat.Type.life = 20,
       Seat.Type.battlefield = Seq.empty,
-      Seat.Type.hand = Seq.empty
+      Seat.Type.hand = Seq.empty,
+      Seat.Type.graveyard = Seq.empty,
+      Seat.Type.library = Seq.empty
     }
 
 card :: String -> Placement.Type.Placement
@@ -48,5 +52,6 @@ card name =
       Placement.Type.readiness = Readiness.Type.Sick,
       Placement.Type.damage = 0,
       Placement.Type.counters = Map.empty,
-      Placement.Type.controller = Nothing
+      Placement.Type.controller = Nothing,
+      Placement.Type.attached = Nothing
     }

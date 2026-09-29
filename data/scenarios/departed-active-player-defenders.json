@@ -1,0 +1,16 @@
+{
+  "description": "CR 802.2 a departed active player's opponents still all become defending players, with nothing asked",
+  "board": {
+    "active": "alice",
+    "step": "PrecombatMain",
+    "seats": [
+      { "name": "alice" },
+      { "name": "bob" },
+      { "name": "carol" }
+    ]
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Concede" },
+    { "turn": 1, "step": "BeginningOfCombat", "player": "bob", "check": { "Defenders": { "players": ["bob", "carol"] } } }
+  ]
+}
