@@ -970,6 +970,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.PermanentTurnedFaceDown (Filter.ControlledBy PlayerRelation.You))
       " {\"type\":\"PermanentTurnedFaceDown\",\"value\":{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}} "
+  -- CR 708.9: Synthetic Unmasking Witness's condition.
+  Spec.it s "FaceDownPermanentLeavesRevealed round-trips" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.FaceDownPermanentLeavesRevealed
+      " {\"type\":\"FaceDownPermanentLeavesRevealed\"} "
   -- CR 702.112b's designation, carrying Valeron Wardens' own narrowing: the pair of
   -- designation and Filter is the whole payload, so both have to survive both
   -- directions -- a dropped designation would make this condition match Arbor

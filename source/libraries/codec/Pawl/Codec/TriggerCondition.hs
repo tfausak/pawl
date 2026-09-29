@@ -147,6 +147,7 @@ codec =
           Arm.payload "PermanentTransforms" filterCodec TriggerCondition.PermanentTransforms (\x -> case x of TriggerCondition.PermanentTransforms y -> Just y; _ -> Nothing),
           Arm.payload "PermanentTurnedFaceUp" filterCodec TriggerCondition.PermanentTurnedFaceUp (\x -> case x of TriggerCondition.PermanentTurnedFaceUp y -> Just y; _ -> Nothing),
           Arm.payload "PermanentTurnedFaceDown" filterCodec TriggerCondition.PermanentTurnedFaceDown (\x -> case x of TriggerCondition.PermanentTurnedFaceDown y -> Just y; _ -> Nothing),
+          Arm.nullary "FaceDownPermanentLeavesRevealed" TriggerCondition.FaceDownPermanentLeavesRevealed,
           Arm.payload "PermanentBecomesDesignated" PermanentBecomesDesignated.codec TriggerCondition.PermanentBecomesDesignated (\x -> case x of TriggerCondition.PermanentBecomesDesignated y -> Just y; _ -> Nothing),
           Arm.nullary "SelfEvolves" TriggerCondition.SelfEvolves,
           Arm.nullary "SelfMutates" TriggerCondition.SelfMutates,
@@ -305,6 +306,7 @@ tagOf x = case x of
   TriggerCondition.PermanentTransforms {} -> "PermanentTransforms"
   TriggerCondition.PermanentTurnedFaceUp {} -> "PermanentTurnedFaceUp"
   TriggerCondition.PermanentTurnedFaceDown {} -> "PermanentTurnedFaceDown"
+  TriggerCondition.FaceDownPermanentLeavesRevealed {} -> "FaceDownPermanentLeavesRevealed"
   TriggerCondition.PermanentBecomesDesignated {} -> "PermanentBecomesDesignated"
   TriggerCondition.SelfEvolves {} -> "SelfEvolves"
   TriggerCondition.SelfMutates {} -> "SelfMutates"

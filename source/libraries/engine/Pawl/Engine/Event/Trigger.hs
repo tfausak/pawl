@@ -496,6 +496,11 @@ looksBack condition = case condition of
   TriggerCondition.SelfLeavesTheBattlefield -> True
   TriggerCondition.SelfPutFromBattlefieldInto _ -> True
   TriggerCondition.PermanentLeavesTheBattlefield _ -> True
+  -- CR 603.6c's family too: CR 708.9's reveal happens only as the permanent
+  -- moves from the battlefield, so this triggers on that move. A watcher swept
+  -- up in the same batch is offered it (Pawl.FaceDownSpec's Day of Judgment
+  -- case).
+  TriggerCondition.FaceDownPermanentLeavesRevealed -> True
   -- CR 603.10a twice over: this is a leaves-the-battlefield ability, and it is
   -- also an ability that triggers when an object all players can see is put
   -- into a hand.
@@ -851,6 +856,7 @@ batchScoped condition = case condition of
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   TriggerCondition.PermanentTurnedFaceDown _ -> False
+  TriggerCondition.FaceDownPermanentLeavesRevealed -> False
   TriggerCondition.SelfTransformedInto _ -> False
   TriggerCondition.PermanentTransforms _ -> False
   TriggerCondition.PermanentBecomesDesignated {} -> False
@@ -2021,6 +2027,7 @@ eventTriggers events gs =
               abilities -> Map.singleton oid (Object.owner obj, abilities)
           _ -> Map.empty
         GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.Ordinary _) -> Map.empty
+        GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.LeavingFaceDown _) -> Map.empty
         GameEvent.Discarded {} -> Map.empty
         GameEvent.Drew {} -> Map.empty
         GameEvent.Moved {} -> Map.empty
@@ -2591,6 +2598,7 @@ zonesTriggeredFrom cond =
         -- battlefield at all, does not apply.
         TriggerCondition.PermanentTurnedFaceUp _ -> battlefield
         TriggerCondition.PermanentTurnedFaceDown _ -> battlefield
+        TriggerCondition.FaceDownPermanentLeavesRevealed -> battlefield
         -- The same default: CR 702.112b's "only permanents can be or become renowned"
         -- keeps the subject on the battlefield, and Valeron Wardens watches from it.
         TriggerCondition.PermanentBecomesDesignated {} -> battlefield
@@ -3133,6 +3141,7 @@ stateTriggers gs
             -- is no state here to read at all.
             TriggerCondition.PermanentTurnedFaceUp _ -> False
             TriggerCondition.PermanentTurnedFaceDown _ -> False
+            TriggerCondition.FaceDownPermanentLeavesRevealed -> False
             -- CR 702.112b's designation is exactly that shape once more: the
             -- permanent keeps it, so a state read would fire every settle.
             TriggerCondition.PermanentBecomesDesignated {} -> False
