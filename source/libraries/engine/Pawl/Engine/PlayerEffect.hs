@@ -2462,8 +2462,8 @@ landPermissionOptions rides pid oid gs = case Game.lookupObject oid gs of
 
 -- CR 702.187c: may `pid` play `oid` out of their graveyard under the card's own
 -- costless mayhem? It is in `pid`'s graveyard (rule 702.187c's "your
--- graveyard"), has the keyword there (CR 113.6f, read off the projection, so a
--- granted instance counts), and `pid` discarded THIS object this turn -- CR
+-- graveyard"), has the keyword there (CR 702.187a, read off the projection, so
+-- a granted instance counts), and `pid` discarded THIS object this turn -- CR
 -- 400.7 makes a card that left the graveyard and came back a new object with no
 -- discard behind it. Read live at the moment of the play, as the mayhem cast's
 -- own clause is (Pawl.Engine.Cost.candidateCostsGiven).
