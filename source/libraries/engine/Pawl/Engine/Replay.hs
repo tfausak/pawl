@@ -106,6 +106,7 @@ encode p answer = case p of
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseCardInHand {} -> Response.ChoseCardInHand answer
   Prompt.ChooseCardFromAmong {} -> Response.ChoseCardFromAmong answer
+  Prompt.ChooseCardsFromAmong {} -> Response.ChoseCardsFromAmong answer
   Prompt.ChooseDungeon {} -> Response.ChoseDungeon answer
   Prompt.ChooseCompanion {} -> Response.ChoseCompanion answer
   Prompt.ChooseFromOutsideTheGame {} -> Response.ChoseFromOutsideTheGame answer
@@ -383,6 +384,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseCardFromAmong {} -> case response of
     Response.ChoseCardFromAmong oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseCardsFromAmong {} -> case response of
+    Response.ChoseCardsFromAmong ids -> Just ids
     _ -> Nothing
   Prompt.ChooseDungeon {} -> case response of
     Response.ChoseDungeon printingId -> Just printingId
@@ -888,6 +892,10 @@ defaultAnswer p = case p of
   -- CR 608.2d again: the prompt is only raised with two or more cards of the
   -- bound group matching, and every one of them is a legal choice.
   Prompt.ChooseCardFromAmong _ _ _ candidates -> NonEmpty.head candidates
+  -- The first candidates up to the ceiling, ChooseAnyNumberOfPermanents'
+  -- maximal subset: every subset no larger is legal. A deterministic fallback,
+  -- not a recommendation.
+  Prompt.ChooseCardsFromAmong _ _ _ candidates atMost -> Set.fromList (List.genericTake atMost candidates)
   -- CR 309.2a: the prompt is only raised where the player owns two or more
   -- dungeon cards, and every one of them is a dungeon they may bring in.
   Prompt.ChooseDungeon _ _ candidates -> NonEmpty.head candidates

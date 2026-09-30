@@ -2232,6 +2232,10 @@ chooseCardsInHand resolving source controller legal (ChosenCardInHand.MkChosenCa
 -- of a player's own simultaneous choices to that player. Elided at one candidate
 -- and skipped at none (CR 101.3, CR 609.3). Filtered, not trusted: an answer
 -- naming a card never offered falls back to the first candidate.
+--
+-- An "up to" count (Uncovered Clues) is ONE ask over every candidate instead,
+-- asked at one and answerable with none, since declining is an answer the
+-- per-card ask cannot give.
 chooseCardFromAmong ::
   ObjectId ->
   ObjectId ->
@@ -2240,7 +2244,7 @@ chooseCardFromAmong ::
   Map.Map SlotName (Set Recipient) ->
   ChosenCardFromAmong.ChosenCardFromAmong ->
   Game [ObjectId]
-chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count chooser) = do
+chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count chooser upTo) = do
   members <- fromAmongMembers legal resolving chosen slot
   gs <- State.get
   let viewOf = effectViewOf source legal gs
@@ -2258,9 +2262,18 @@ chooseCardFromAmong resolving source controller legal chosen (ChosenCardFromAmon
               let taken = if List.elem answer (NonEmpty.toList offered) then answer else first
               rest <- pick asked (n - 1) (List.delete taken available)
               pure (taken : rest)
+      -- Filtered rather than trusted, and cut to the ceiling in the offer's
+      -- order.
+      pickUpTo asked
+        | wanted <= 0 || null candidates = pure []
+        | otherwise = do
+            answer <- Game.choose (Prompt.ChooseCardsFromAmong (Decide.deciderFor asked gs) asked source candidates wanted)
+            pure (List.genericTake wanted (filter (`Set.member` answer) candidates))
   asked <- askedChooser source controller legal chooser
   case asked of
-    Just who -> pick who wanted candidates
+    Just who
+      | upTo -> pickUpTo who
+      | otherwise -> pick who wanted candidates
     Nothing -> pure []
 
 -- CR 701.20a / 701.9b: the cards randomness names out of each hand the ref
@@ -3302,7 +3315,7 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
             let scoped = zoneScopePlayers legal controller gs scope
              in not (null scoped) && all (\pid -> null (graveyardCardsOf context gs pid filter_)) scoped
           Chooser.BoundInSlot _ -> False
-      ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count _) ->
+      ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot filter_ count _ _) ->
         positive count && maybe False (null . matchingFromAmong legal resolving controller source gs filter_) (fromAmongBound slot)
       ObjectRef.ChosenPermanent (ChosenPermanent.MkChosenPermanent filter_ _) -> null (battlefieldMatching legal resolving controller source gs filter_)
       _ -> False
@@ -5780,14 +5793,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- ObjectId allows and all rule 701.20a asks for.
   Effect.Reveal (Reveal.MkReveal ref mSlot) -> do
     gs <- State.get
-    -- Show one card, and name it if the card asked for a name. bindSlot and NOT
-    -- bindObjectsSlot: the single shape is the one every reader sees -- slotOne
-    -- included, where Filter.IsBound reads either. Used by the ChosenCardFromAmong
-    -- arm alone, which is where that write-once-per-card shape is elided (#2859);
-    -- the random arm below binds the whole group it named in one write.
-    let showOne pid oid = do
-          Event.reveal RevealCause.Ordinary pid oid
-          Monad.forM_ mSlot $ \slot -> State.modify' (bindSlot resolving slot oid)
+    -- Name what was shown, if the card asked for a name, in ONE write per
+    -- reveal: LookAt's one-versus-many line. A lone card takes the SINGLE
+    -- binding, which every reader sees; several take the group binding, which
+    -- the ObjectRef readers and Filter.IsBound see and slotOne does not.
+    let bindShown named = Monad.forM_ mSlot $ \slot -> case named of
+          [] -> pure ()
+          [only] -> State.modify' (bindSlot resolving slot only)
+          several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
     case ref of
       -- A QUESTION rather than a read, so it is answered here, by
       -- randomCardsInHand -- the one asking read of the ref, shared with the
@@ -5799,24 +5812,19 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- last card alone.
         picked <- randomCardsInHand resolving source controller legal random
         Monad.mapM_ (uncurry (Event.reveal RevealCause.Ordinary)) picked
-        Monad.forM_ mSlot $ \slot -> case fmap snd picked of
-          [] -> pure ()
-          [only] -> State.modify' (bindSlot resolving slot only)
-          several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
+        bindShown (fmap snd picked)
       -- CR 608.2d's "from among them", the ONE choice the printed "reveal ... and
       -- put it into your hand" makes: chooseCardFromAmong asks it, this arm shows
       -- what it named (CR 701.20a), and mSlot below is what a later clause moves
       -- -- so the card revealed and the card moved cannot come apart. Asked here
       -- rather than read, which is why it is not among the refs objectRefObjects
-      -- answers.
-      --
-      -- Not implemented: a reveal whose ref names SEVERAL cards. showOne binds one
-      -- card at a time, so the last write wins and a later clause reading the slot
-      -- would find one card rather than the group (#2859). Every reveal of a group
-      -- member in the pool has a count of one, Carth the Lion's included.
+      -- answers. Uncovered Clues' "put the revealed cards into your hand" reads
+      -- every card picked, which Pawl.MassEffectSpec's UncoveredClues group
+      -- proves.
       ObjectRef.ChosenCardFromAmong from -> do
         picked <- chooseCardFromAmong resolving source controller legal chosen from
-        Monad.mapM_ (showOne controller) picked
+        Monad.mapM_ (Event.reveal RevealCause.Ordinary controller) picked
+        bindShown picked
       _ -> do
         let named = objectRefObjects legal resolving controller source gs ref
             -- A card in a hand is shown by the seat whose hand it is -- Duress's
@@ -5825,13 +5833,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Just obj | Object.zone obj == Zone.Hand -> Object.owner obj
               _ -> controller
         Monad.mapM_ (\oid -> Event.reveal RevealCause.Ordinary (shower oid) oid) named
-        -- LookAt's one-versus-many line: a lone card takes the SINGLE binding,
-        -- which every reader sees, and several take the group binding, which the
-        -- ObjectRef readers and Filter.IsBound see and slotOne does not.
-        Monad.forM_ mSlot $ \slot -> case named of
-          [] -> pure ()
-          [only] -> State.modify' (bindSlot resolving slot only)
-          several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
+        bindShown named
   Effect.LookAt (LookAt.MkLookAt ref slot) -> do
     -- CR 608.2c: the cards are named as this instruction is reached, and CR 701.20b
     -- (via rule 701.20e) leaves every one where it is -- so this whole arm is the

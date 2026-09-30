@@ -327,6 +327,10 @@ data Prompt r where
   -- takes, asked once per card with what earlier asks did not take; the
   -- PlayerId is the ref's chooser.
   ChooseCardFromAmong :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 608.2d: which cards of a bound group an "up to" ChosenCardFromAmong
+  -- takes, at most the Natural and none included; asked at one candidate,
+  -- skipped at zero. The PlayerId is the ref's chooser.
+  ChooseCardsFromAmong :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 309.2a \/ 701.49a: which of the dungeon printings they own a venturing
   -- player brings in from outside the game (CR 400.11), there being no object
   -- for it yet.

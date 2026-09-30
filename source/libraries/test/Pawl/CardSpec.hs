@@ -3839,7 +3839,7 @@ objectRefFilters ref = case ref of
   -- Commune with the Gods' "a creature or enchantment card from among them"; its
   -- slot names the group and holds no characteristic, so the Filter is the whole
   -- of what there is to lint -- the two chosen arms above's answer.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ f _ _) -> unframed [f]
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ f _ _ _) -> unframed [f]
   -- The arm above's plural: the same Filter position, saying which members are
   -- taken rather than which may be picked, and linted the same way.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ f) -> unframed [f]
