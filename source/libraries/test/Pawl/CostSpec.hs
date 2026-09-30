@@ -3278,6 +3278,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   waterbendersRestorationSpec s registry
   spiritWaterRevivalSpec s registry
   kataraSeekingRevengeSpec s registry
+  hamaSpec s registry
   mindGrindSpec s registry
   flashSpec s registry
 
@@ -7219,6 +7220,81 @@ kataraSeekingRevengeSpec s registry = Spec.describe s "Katara, Seeking Revenge" 
     Spec.assertEqWith s "CR 701.67a paid, six permanents are tapped -- two for the waterbend cost and all four Islands" (S.tappedCount S.alice (resolved True)) 6
     -- The graveyard's Water Whip is a Lesson; unpaid, the discarded Island is not.
     Spec.assertEqWith s "and she is 4/4 off the Water Whip in alice's graveyard" (fmap (`S.powerToughnessOf` resolved True) (katara (resolved True))) [Just (4, 4)]
+
+-- Hama, the Bloodbender {2}{U/B}{U/B}{U/B} Legendary Creature -- Human Warlock
+-- 3/3 (data/cards/hama-the-bloodbender.json): "When Hama enters, target
+-- opponent mills three cards. Exile up to one noncreature, nonland card from
+-- that player's graveyard. For as long as you control Hama, you may cast the
+-- exiled card during your turn by waterbending {X} rather than paying its mana
+-- cost, where X is its mana value."
+--
+-- CR 118.9's alternative cost stated by a CR 601.3 permission, as a CR 701.67a
+-- waterbend scaled to the card: bob mills Think Twice (mana value 2), which
+-- alice exiles. An instant, so CR 307.1 would let her cast it on bob's turn and
+-- the permission's window is the only thing refusing it there.
+hamaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hamaSpec s registry = Spec.describe s "Hama, the Bloodbender" $ do
+  -- Hama's five Islands are all tapped, so the {2} can only be paid by tapping
+  -- two of the three Pikers.
+  Spec.it s "CR 118.9 alice casts the exiled card by waterbending its mana value, during her turn only" $ do
+    (exiled, pikers, gs) <- hamaBoard s registry "Think Twice" False 0
+    let answer :: Prompt.Prompt r -> r
+        answer = waterbending (ManaCost.MkManaCost []) (take 2 pikers)
+        resolved = S.runPure answer (S.runPure answer gs (S.cast S.alice exiled)) Stack.resolveTop
+        offered board = any (S.isCastOf exiled) (Action.legalActions S.alice board)
+    Spec.assertEqWith s "CR 701.67a Think Twice resolved off two Pikers: alice drew a card, and seven permanents are tapped -- Hama's five Islands and two Pikers" (S.handSize S.alice resolved, S.tappedCount S.alice resolved) (1, 7)
+    Spec.assertEqWith s "CR 601.3 the cast is offered during alice's turn and not during bob's" (offered gs, offered gs {GameState.activePlayer = S.bob}) (True, False)
+  -- CR 701.67b: bob's Thalia taxes the noncreature spell {1} more (CR 601.2f),
+  -- so the total is {3} of which the waterbend is {2}. A pair varying one spare
+  -- Island and nothing else: the third Piker cannot pay the tax.
+  Spec.it s "CR 701.67b the waterbend's taps pay its own {2} and not Thalia's tax" $ do
+    (spared, sparedPikers, withIsland) <- hamaBoard s registry "Think Twice" True 1
+    (short, _, withoutIsland) <- hamaBoard s registry "Think Twice" True 0
+    let answer :: Prompt.Prompt r -> r
+        answer = waterbending (ManaCost.MkManaCost [ManaSymbol.Generic 1]) (take 2 sparedPikers)
+        paid = S.runPure answer (S.runPure answer withIsland (S.cast S.alice spared)) Stack.resolveTop
+        unpaid = S.runPure waterbendingGreedily (S.runPure waterbendingGreedily withoutIsland (S.cast S.alice short)) Stack.resolveTop
+    Spec.assertEqWith s "CR 701.67b with a spare Island alice drew a card; with three Pikers and no Island Think Twice is still in exile" (S.handSize S.alice paid, Game.zoneOf short unpaid) (1, Just Zone.Exile)
+  -- CR 118.9 against CR 118.8b: Hama's waterbend {3} is an ALTERNATIVE cost, so
+  -- Spirit Water Revival cast through it with the optional {6} declined reads
+  -- its additional cost as unpaid. Three Pikers pay the {3}.
+  Spec.it s "CR 118.8b Spirit Water Revival cast through Hama without its {6} draws two" $ do
+    (exiled, _, gs) <- hamaBoard s registry "Spirit Water Revival" False 0
+    let answer :: Prompt.Prompt r -> r
+        answer = optionalWaterbending False
+        resolved = S.runPure answer (S.runPure answer gs (S.cast S.alice exiled)) Stack.resolveTop
+    Spec.assertEqWith s "CR 118.8b alice drew two and her graveyard's Water Whip stayed, and eight permanents are tapped -- Hama's five Islands and three Pikers" (S.handSize S.alice resolved, length (Game.zoneMembers Zone.Graveyard S.alice resolved), S.tappedCount S.alice resolved) (2, 1, 8)
+
+-- alice casts Hama off five Islands (plus `spare` more) beside three Goblin
+-- Pikers, and her enters trigger mills bob's `milled` card, an Island and a
+-- Goblin Piker; she takes the "up to one" and exiles `milled`, the only
+-- candidate. bob controls Thalia, Guardian of Thraben where `taxed`. alice has
+-- eight Islands in her library for a draw of seven (CR 104.3c), a Water Whip in
+-- her graveyard, and priority in her own precombat main phase. Returns the
+-- exiled card, the Pikers and that state.
+hamaBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Bool -> Int -> m (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+hamaBoard s registry milled taxed spare = do
+  hama <- S.printingOf s registry "Hama, the Bloodbender"
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  card <- S.printingOf s registry milled
+  whip <- S.printingOf s registry "Water Whip"
+  thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+  let (pikers, gs1) = List.foldl' (\(ids, gs) printing -> let (oid, next) = S.addPermanent printing S.alice gs in (ids <> [oid], next)) ([], S.landsInPlay island (5 + spare)) [piker, piker, piker]
+      gs2 = if taxed then snd (S.addPermanent thalia S.bob gs1) else gs1
+      stocked = List.foldl' (\acc printing -> snd (S.addLibraryCard printing S.bob acc)) gs2 [card, island, piker]
+      drawable = snd (S.addGraveyardCard whip S.alice (List.foldl' (\acc _ -> snd (S.addLibraryCard island S.alice acc)) stocked [1 .. 8 :: Int]))
+      (spell, gs3) = S.addHandCard hama S.alice drawable
+      gs4 = gs3 {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+      exercising :: Prompt.Prompt r -> r
+      exercising p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      entered = S.runPure exercising (S.runPure exercising gs4 (S.cast S.alice spell)) (Stack.resolveTop >> Engine.settleForPriority)
+      triggered = S.runPure exercising entered Stack.resolveTop
+  case Game.zoneMembers Zone.Exile S.bob triggered of
+    [exiled] -> pure (exiled, pikers, triggered)
+    other -> Spec.assertFailure s ("Hama's trigger should exile bob's Think Twice, exiled: " <> show other)
 
 -- The payer who waterbends where `paid`: the candidate stating the waterbend
 -- licence that leaves the least mana to find, its taps the first ones offered.

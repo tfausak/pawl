@@ -316,6 +316,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.Waterbend 4)
       " {\"type\":\"Waterbend\",\"value\":4} "
+  -- Hama, the Bloodbender's alternative cost, never printed.
+  Spec.it s "WaterbendInstead" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.WaterbendInstead 3)
+      " {\"type\":\"WaterbendInstead\",\"value\":3} "
   -- CR 107.3a's variable of the same cost: nullary, the amount arriving with the
   -- announcement rather than off the card (Pawl.Engine.Cost.substituteX).
   Spec.it s "WaterbendX" $

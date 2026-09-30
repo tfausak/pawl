@@ -3035,6 +3035,7 @@ rewriteComponent pairs component = case component of
   CostComponent.MillCards _ -> component
   CostComponent.ChooseOpponent -> component
   CostComponent.Waterbend _ -> component
+  CostComponent.WaterbendInstead _ -> component
   CostComponent.WaterbendX -> component
 
 -- CR 603.2: replace every ControlledByBound atom whose slot this environment

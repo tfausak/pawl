@@ -8,6 +8,7 @@ import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -27,11 +28,12 @@ spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
           ExilePlayPermission.source = ObjectId.MkObjectId 2,
           ExilePlayPermission.expiry = Expiry.Never,
           ExilePlayPermission.spending = ManaSpending.AsProduced,
-          ExilePlayPermission.alternativeManaCost = Nothing,
+          ExilePlayPermission.alternativeCost = Nothing,
+          ExilePlayPermission.condition = Nothing,
           ExilePlayPermission.origin = PlayPermissionOrigin.Adventure,
           ExilePlayPermission.verb = PermissionVerb.Play
         }
-      " {\"player\":1,\"source\":2,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeManaCost\":null,\"origin\":{\"type\":\"Adventure\"},\"verb\":{\"type\":\"Play\"}} "
+      " {\"player\":1,\"source\":2,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeCost\":null,\"condition\":null,\"origin\":{\"type\":\"Adventure\"},\"verb\":{\"type\":\"Play\"}} "
   -- CR 601.3 with CR 118.14's rider, the shape Dire Fleet Daredevil writes: a
   -- granted permission lasting until end of turn, mana of any type spendable on
   -- it.
@@ -44,11 +46,12 @@ spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
           ExilePlayPermission.source = ObjectId.MkObjectId 4,
           ExilePlayPermission.expiry = Expiry.AtCleanup,
           ExilePlayPermission.spending = ManaSpending.AnyType,
-          ExilePlayPermission.alternativeManaCost = Nothing,
+          ExilePlayPermission.alternativeCost = Nothing,
+          ExilePlayPermission.condition = Nothing,
           ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
           ExilePlayPermission.verb = PermissionVerb.Play
         }
-      " {\"player\":3,\"source\":4,\"expiry\":{\"type\":\"AtCleanup\"},\"spending\":{\"type\":\"AnyType\"},\"alternativeManaCost\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"}} "
+      " {\"player\":3,\"source\":4,\"expiry\":{\"type\":\"AtCleanup\"},\"spending\":{\"type\":\"AnyType\"},\"alternativeCost\":null,\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"}} "
   -- CR 118.9's waiver, the shape Extract Power writes: a granted permission
   -- lasting as long as the card remains exiled, with the mana cost waived -- an
   -- alternative cost of nothing. The two riders are independent, so this one
@@ -62,10 +65,11 @@ spec s = Spec.describe s "Pawl.Codec.ExilePlayPermission" $ do
           ExilePlayPermission.source = ObjectId.MkObjectId 6,
           ExilePlayPermission.expiry = Expiry.Never,
           ExilePlayPermission.spending = ManaSpending.AsProduced,
-          ExilePlayPermission.alternativeManaCost = Just (ManaCost.MkManaCost []),
+          ExilePlayPermission.alternativeCost = Just (PermissionCost.InsteadOfManaCost (ManaCost.MkManaCost [])),
+          ExilePlayPermission.condition = Nothing,
           ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
           ExilePlayPermission.verb = PermissionVerb.Play
         }
-      " {\"player\":5,\"source\":6,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeManaCost\":[],\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"}} "
+      " {\"player\":5,\"source\":6,\"expiry\":{\"type\":\"Never\"},\"spending\":{\"type\":\"AsProduced\"},\"alternativeCost\":{\"type\":\"InsteadOfManaCost\",\"value\":[]},\"condition\":null,\"origin\":{\"type\":\"Granted\"},\"verb\":{\"type\":\"Play\"}} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s ExilePlayPermission.codec

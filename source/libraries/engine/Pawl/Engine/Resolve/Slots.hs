@@ -475,7 +475,7 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- Joined with the COUNT's own slots, TopOfLibrary's arm above and for its
   -- reason; the CHOOSER's are the generic playerRefSlots fold this case is joined
   -- into, which is what makes Animal Magnetism's ChoosePlayer slot a read.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _ count _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots count)
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _ count _ _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots count)
   -- The arm above's read, for its reasons: the candidates come from a slot, and
   -- the ref reads every member of the group to match them.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
@@ -544,7 +544,7 @@ objectRefQuantities ref = case ref of
   -- two, the library walks' counts above being the only other ObjectRef numbers.
   -- A REGRESSION FENCE rather than proven behaviour: every count in the pool is a
   -- Literal, which reads no slot, so dropping this leaves the suite green.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _) -> [count]
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _ _) -> [count]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   -- How many cards randomness names out of each hand -- Fall's printed two. A
   -- REGRESSION FENCE for the arm above's reason: every count in the pool is a
@@ -602,7 +602,7 @@ objectRefPlayerRefs ref = case ref of
   -- equality, so the only card whose chooser names a slot cannot observe this
   -- report. A chooser naming a DECLARED target slot would, and no printing writes
   -- one -- Pawl.Types.Chooser's BoundInSlot note says the same of its own.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser) -> [chooser]
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser _) -> [chooser]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player _ _) -> [player]
   -- ChosenCardInGraveyard's answer: the graveyards are named by a ZoneScope,
@@ -837,7 +837,7 @@ effectObjectRefs effect = case effect of
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _ _) -> [ref]
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _ _ _) -> [ref]
   Effect.GrantLookAtExiled grant -> [GrantLookAtExiled.cards grant]
   Effect.MakePlotted ref -> [ref]
   Effect.MakeForetold x -> [MakeForetold.cards x]
@@ -1432,7 +1432,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> objectRefSlots ref
   Effect.OfferNamedCopy {} -> Map.empty
   Effect.OfferNotedCopy {} -> Map.empty
-  Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)
+  Effect.GrantPlayFromExile grant -> joinTwo (durationSlots (GrantPlayFromExile.duration grant)) (maybe Map.empty conditionSlots (GrantPlayFromExile.condition grant))
   -- Everything the BODY reads, and what its per-member gate reads (modeSlots'
   -- payer, multiplier and basis). The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.
@@ -2051,7 +2051,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.OfferCast {} -> True
   Effect.OfferNamedCopy {} -> True
   Effect.OfferNotedCopy {} -> True
-  Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
+  Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant) && all conditionSlotsAreExhaustive (GrantPlayFromExile.condition grant)
   -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
   -- nested in the DEPTH is one slotsOf cannot see.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ gate) -> all slotsAreExhaustive body && all (all Quantity.slotsAreExhaustive . PayGate.perEach) gate

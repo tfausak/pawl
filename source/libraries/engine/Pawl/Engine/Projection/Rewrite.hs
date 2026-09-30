@@ -987,7 +987,8 @@ rewriteEffect pairs effect = case effect of
     Effect.GrantPlayFromExile
       grant
         { GrantPlayFromExile.duration = rewriteDuration pairs (GrantPlayFromExile.duration grant),
-          GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant)
+          GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant),
+          GrantPlayFromExile.condition = fmap (rewriteCondition pairs) (GrantPlayFromExile.condition grant)
         }
   Effect.ForEach (ForEach.MkForEach ref membership slot body individually gate) ->
     Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) membership slot (fmap (rewriteEffect pairs) body) individually (fmap (rewritePayGate pairs) gate))
@@ -1053,7 +1054,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.TopOfGraveyard _ -> ref
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f n) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f) (rewriteQuantity pairs n))
   ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p f) -> ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand p (Filter.rewrite pairs f))
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n f c w) -> ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n (Filter.rewrite pairs f) (rewriteQuantity pairs c) w)
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n f c w u) -> ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong n (Filter.rewrite pairs f) (rewriteQuantity pairs c) w u)
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong n f) -> ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong n (Filter.rewrite pairs f))
   -- A REGRESSION FENCE rather than proven behaviour, EachCardInYourLibrary's
   -- reason: no card in the pool narrows a random pick by a land type, and no

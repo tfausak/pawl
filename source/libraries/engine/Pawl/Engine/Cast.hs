@@ -1230,13 +1230,12 @@ grantedByAdventureRule oid gs =
 -- that turn, so a permission read from the moment it is stored allows a play the
 -- card forbids. Pawl.Engine.Expiry.begun is the question, and every other
 -- duration a permission can carry answers it True. Pawl.BoardEffectSpec's
--- GalvanicRelay group is the proof.
+-- GalvanicRelay group is the proof. The permission's own condition is the
+-- third (Expiry.permissionOpen).
 permitsPlayFromExile :: PlayerId -> ObjectId -> GameState -> Bool
 permitsPlayFromExile pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromExile of
   Nothing -> False
-  Just permission ->
-    ExilePlayPermission.player permission == pid
-      && Expiry.begun gs (ExilePlayPermission.expiry permission)
+  Just permission -> Expiry.permissionOpen pid permission gs
 
 -- The land side of permitsPlayFromExile: CR 305.9 / 601.3, a permission whose
 -- verb is Cast lets a spell be cast and never lets a land be played (Ragavan,

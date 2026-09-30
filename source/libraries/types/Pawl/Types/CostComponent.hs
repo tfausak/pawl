@@ -243,9 +243,11 @@ data CostComponent keyword
     -- optional one is the second option beside an empty one (Spirit Water
     -- Revival). So do a ward cost and an unless cost, paid at CR 118.12 (The
     -- Unagi of Kyoshi Island, Waterbending Lesson).
-    --
-    -- Not implemented: an alternative cost (#3901).
     Waterbend Natural.Natural
+  | -- | CR 118.9 / 701.67a: Waterbend's licence and CR 701.67c event, paid as an
+    -- alternative cost rather than an additional one, so it binds no record
+    -- (Hama, the Bloodbender; Pawl.Engine.Cost.permissionCost).
+    WaterbendInstead Natural.Natural
   | -- | CR 107.3a / 601.2b / Katara, Water Tribe's Hope: X as a waterbend
     -- amount, announced by the activator and rewritten to a Waterbend by
     -- Pawl.Engine.Cost.substituteX. BlightX's shape one keyword action over.

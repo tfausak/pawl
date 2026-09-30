@@ -40,6 +40,7 @@ import qualified Pawl.Engine.CrewRestriction as CrewRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Forage as Forage
 import qualified Pawl.Engine.Game as Game
@@ -126,6 +127,7 @@ import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
@@ -170,6 +172,25 @@ insteadOfManaCost mana face =
     { Cost.mana = Just mana,
       Cost.components = Face.additionalCosts face
     }
+
+-- CR 118.9a: the alternative cost a CR 601.3 permission states, settled against
+-- the face being cast.
+--
+-- A waterbend {X} is that much generic mana plus CR 701.67b's licence scoped to
+-- it, the shape a printed waterbend cost takes (CostComponent.WaterbendInstead). X is
+-- read off the FACE and not the card, so a split card's half is priced at its
+-- own mana value (CR 202.3d, 709.3b), and X in that face's own cost counts 0
+-- (CR 202.3e); the ruling's "the only legal choice for X is 0" is CR 107.3b
+-- and falls out, this cost having no variable.
+permissionCost :: PermissionCost.PermissionCost -> Face.Face card -> Cost Keyword.Type.Keyword
+permissionCost alternative face = case alternative of
+  PermissionCost.InsteadOfManaCost mana -> insteadOfManaCost mana face
+  PermissionCost.WaterbendManaValue ->
+    let amount = Integer.toNaturalSaturating (maybe 0 Quantity.manaCostValue (Face.manaCost face))
+     in Cost.MkCost
+          { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic amount | amount > 0]),
+            Cost.components = CostComponent.WaterbendInstead amount : Face.additionalCosts face
+          }
 
 -- CR 118.9's "without paying its mana cost", which is insteadOfManaCost of an
 -- EMPTY ManaCost -- {0} (CR 118.5a).
@@ -821,7 +842,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- rule 702.170d being the only thing permitting this cast. CR
                 -- 715.3d's permission states no cost and falls through to the `_`
                 -- arm; Effect.GrantPlayFromExile's states one only when it carries
-                -- CR 118.9's waiver, which is the arm two below.
+                -- an alternative cost, which is the arm two below.
                 Just Zone.Exile
                   | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
                 -- CR 702.143a: a FORETOLD card is cast for its foretell cost, CR
@@ -848,21 +869,22 @@ candidateCostsGiven permitted pid name oid gs =
                         (untagged . withAdditional)
                         (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (foretellCostFor face =<< Keyword.foretellCost (Face.keywordSet face)))
                 -- CR 118.9a: a CR 601.3 permission that states an alternative
-                -- cost -- "without paying its mana cost" (Extract Power), or rule
-                -- 701.65a's {2} -- REPLACES the printed cost for the plotted arm's
-                -- reason: that permission is the only thing making this cast
-                -- legal, so the cost it states is the only route to it. CR 118.5
+                -- cost -- "without paying its mana cost" (Extract Power), rule
+                -- 701.65a's {2}, or a waterbend (Hama, the Bloodbender) --
+                -- REPLACES the printed cost for the plotted arm's reason: that
+                -- permission is the only thing making this cast legal, so the
+                -- cost it states is the only route to it. CR 118.5
                 -- still makes the caster announce and pay it.
                 --
                 -- Scoped to the permission's OWN holder, whom
-                -- Pawl.Types.ExilePlayPermission baked in: a second player casting
-                -- the same card under some other permission is priced by the `_`
-                -- arm below.
+                -- Pawl.Types.ExilePlayPermission baked in, and to its window
+                -- (Expiry.permissionOpen): a player casting the same card under
+                -- some other permission is priced by the `_` arm below.
                 Just Zone.Exile
                   | Just permission <- Object.playableFromExile obj,
-                    ExilePlayPermission.player permission == pid,
-                    Just mana <- ExilePlayPermission.alternativeManaCost permission ->
-                      [untagged (insteadOfManaCost mana face)]
+                    Expiry.permissionOpen pid permission gs,
+                    Just alternative <- ExilePlayPermission.alternativeCost permission ->
+                      [untagged (permissionCost alternative face)]
                 -- CR 118.9's other half, "applied to it from another effect", as a
                 -- STANDING grant (Omniscience): a player-scoped alternative cost no
                 -- per-card list can hold. APPENDED to the hand's ordinary list rather
@@ -1223,7 +1245,7 @@ waterbendSubstitutions components = substitutionsOffering (waterbendOffers compo
 -- Ascension would refute it by stating a second.
 waterbendOffers :: [CostComponent.CostComponent Keyword.Type.Keyword] -> ManaSymbol.ManaSymbol -> [(Keyword.Substitute, Maybe Natural)]
 waterbendOffers components symbol =
-  let allowance = sum [n | CostComponent.Waterbend n <- components]
+  let allowance = sum [n | CostComponent.Waterbend n <- components] + sum [n | CostComponent.WaterbendInstead n <- components]
    in case symbol of
         ManaSymbol.Generic _ | allowance > 0 -> [(Keyword.TapUntapped waterbendCriterion, Just allowance)]
         _ -> []
@@ -1450,6 +1472,7 @@ substituteXInComponent x component = case component of
   -- The amount is already fixed: a waterbend cost written with X is
   -- WaterbendX above until the announcement rewrites it to this arm.
   CostComponent.Waterbend _ -> component
+  CostComponent.WaterbendInstead _ -> component
   -- PayLifeX's rewrite one keyword action over: CR 107.3a gives ONE announced
   -- value to the whole cost, so Soul Immolation's "blight X" takes the same X a
   -- mana cost's {X} would have taken.
@@ -1524,6 +1547,7 @@ componentHasVariable component = case component of
   CostComponent.ChooseOpponent -> False
   CostComponent.WaterbendX -> True
   CostComponent.Waterbend _ -> False
+  CostComponent.WaterbendInstead _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1629,6 +1653,7 @@ componentDemandGrowsWithX component = case component of
   -- which `manaHasVariable` answers for.
   CostComponent.WaterbendX -> False
   CostComponent.Waterbend _ -> False
+  CostComponent.WaterbendInstead _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileThis -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
@@ -1935,6 +1960,7 @@ loyaltyAmountOf component = case component of
   CostComponent.ChooseOpponent -> Nothing
   CostComponent.WaterbendX -> Nothing
   CostComponent.Waterbend _ -> Nothing
+  CostComponent.WaterbendInstead _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   CostComponent.ExileThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
@@ -2076,6 +2102,7 @@ zoneOfComponent component = case component of
   CostComponent.ChooseOpponent -> Nothing
   CostComponent.WaterbendX -> Nothing
   CostComponent.Waterbend _ -> Nothing
+  CostComponent.WaterbendInstead _ -> Nothing
 
 -- CR 118.8c: does this cost include "actions involving cards with a stated
 -- quality in a hidden zone"? What Resolve.offerCast reads to decide whether a
@@ -2164,6 +2191,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.ChooseOpponent -> False
   CostComponent.WaterbendX -> False
   CostComponent.Waterbend _ -> False
+  CostComponent.WaterbendInstead _ -> False
   -- The other hidden zone (CR 400.2), and the FIRST conjunct is satisfied where
   -- no other arm's is -- but the second is not: CR 701.17a takes the cards off
   -- the top, so "mill a card" describes no quality for a player to fail to find.
@@ -2806,6 +2834,7 @@ claimOf slots pid oid component gs =
         -- No claim: rule 701.67a's taps are a component of their own once the
         -- payer takes the offer (`manaSubstitutions`), and that one claims them.
         CostComponent.Waterbend _ -> Nothing
+        CostComponent.WaterbendInstead _ -> Nothing
         -- Nothing, Blight's arm above and for its reason one rule over: CR 701.20b
         -- leaves the revealed card in the hand, so nothing leaves any pool. CR
         -- 701.20c is what makes the shared-choice half right here too -- a card
@@ -3294,6 +3323,7 @@ uncountedCeiling pid oid claims gs component = case component of
   -- waterbend cost carries the mana it licenses, so `repeatsOf` answers 1
   -- before it reads this.
   CostComponent.Waterbend _ -> Just 1
+  CostComponent.WaterbendInstead _ -> Just 1
   where
     -- `thresholdRepeats` where this is the ONLY claim on its axis, and 1 where
     -- another component of the cost draws on it too: the selections would then
@@ -3598,6 +3628,7 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.ChooseOpponent -> 0
   CostComponent.WaterbendX -> 0
   CostComponent.Waterbend _ -> 0
+  CostComponent.WaterbendInstead _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -3649,6 +3680,7 @@ energyOwedByComponent component = case component of
   CostComponent.ChooseOpponent -> 0
   CostComponent.WaterbendX -> 0
   CostComponent.Waterbend _ -> 0
+  CostComponent.WaterbendInstead _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileThis -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
@@ -3708,6 +3740,7 @@ countersOwedByComponent component = case component of
   CostComponent.ChooseOpponent -> []
   CostComponent.WaterbendX -> []
   CostComponent.Waterbend _ -> []
+  CostComponent.WaterbendInstead _ -> []
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   CostComponent.ExileCardsFromGraveyard {} -> []
@@ -3990,6 +4023,7 @@ canPayComponent slots pid oid component gs = case component of
   -- Always payable: rule 701.67a's licence spends nothing of its own, and the
   -- mana it scopes is the cost's own mana part, which the mana half gates.
   CostComponent.Waterbend _ -> True
+  CostComponent.WaterbendInstead _ -> True
   -- CR 701.17b's last sentence, stated of costs in as many words: "the player
   -- can't pay a cost that includes milling a number of cards greater than the
   -- number of cards in their library". Not the general "as many as possible" of
@@ -4083,6 +4117,7 @@ criteriaOf component = case component of
   -- rule 701.67a's own words rather than printed, `manaSubstitutesFor`'s posture:
   -- no word of a card's is in it, so CR 612.2 has nothing to swap.
   CostComponent.Waterbend _ -> []
+  CostComponent.WaterbendInstead _ -> []
   CostComponent.ExileThisFromGraveyard -> []
   CostComponent.ExileThis -> []
   CostComponent.MillCards _ -> []
@@ -4797,6 +4832,7 @@ paidInSecondPass component = case component of
   CostComponent.ChooseOpponent -> False
   CostComponent.WaterbendX -> False
   CostComponent.Waterbend _ -> False
+  CostComponent.WaterbendInstead _ -> False
   -- CR 701.20b moves nothing out of any zone, so rule 601.2h's library half has
   -- nothing to ask of it.
   CostComponent.RevealCardFromHand _ -> False
@@ -4942,6 +4978,7 @@ orderSensitive component = case component of
   -- False: rule 701.67a's licence spends nothing another part of the same cost
   -- could have spent, ChooseOpponent's answer just above.
   CostComponent.Waterbend _ -> False
+  CostComponent.WaterbendInstead _ -> False
   -- CR 701.17a puts a card into a graveyard, which a graveyard-reading part of
   -- the same cost could then spend (Circling Vultures' "the top creature card of
   -- your graveyard"). Alone in CR 601.2h's second pass on this pool, so nothing
@@ -6356,6 +6393,13 @@ payComponent moment slots pid oid component = case component of
   CostComponent.Waterbend n -> do
     State.modify' (Event.recordEvent (GameEvent.Waterbent pid))
     pure (Payment.Paid (Map.singleton Binding.waterbendCost (Binding.toAmount n)))
+  -- CR 701.67c's event, Waterbend's reason, and NO record: this waterbend is
+  -- CR 118.9's alternative cost, so "if this spell's additional cost was paid"
+  -- must not read it. Pawl.CostSpec's "CR 118.8b Spirit Water Revival cast
+  -- through Hama without its {6} draws two" is the proof.
+  CostComponent.WaterbendInstead _ -> do
+    State.modify' (Event.recordEvent (GameEvent.Waterbent pid))
+    pure bindsNothing
   -- CR 406.2's move, through the Event.changeZone funnel, so the card gets a CR
   -- 400.7 incarnation and anything watching a graveyard-to-exile move sees it.
   -- No prompt: the cost names this card.
