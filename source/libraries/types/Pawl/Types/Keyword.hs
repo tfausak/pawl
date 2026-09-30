@@ -765,10 +765,6 @@ data Keyword
   | -- | 702.168a: disguise [cost] -- Morph's twin, casting the card as a 2\/2
     -- face-down creature with ward {2} for {3}; the Cost is what CR 702.168d
     -- charges to turn the permanent face up.
-    --
-    -- Not implemented: CR 702.168e's X in a disguise cost, which needs the value
-    -- chosen as the special action was taken to reach the permanent's other
-    -- abilities (#2056).
     Disguise (Cost.Cost Keyword)
   | -- | 702.170a: plot [cost] -- exile this card from hand for [cost] as CR
     -- 116.2k's special action, then cast it free on a later turn (CR 702.170d).

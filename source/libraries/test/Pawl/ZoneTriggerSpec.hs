@@ -154,6 +154,7 @@ import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnedFaceUp as TurnedFaceUp
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -2723,8 +2724,12 @@ representativeEvents cond =
           [] -> one (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
           c : cs -> Foldable.foldr1 (<>) (fmap representativeEvents (c NonEmpty.:| cs))
         -- CR 708.7's own event, and the only one this condition admits, on the
-        -- BEARER -- so the pair really matches.
-        TriggerCondition.SelfTurnedFaceUp -> one (GameEvent.TurnedFaceUp departed)
+        -- BEARER -- so the pair really matches. Twice: with CR 107.3d's X chosen
+        -- for the cost and without, the one key eventBindings stamps only
+        -- sometimes.
+        TriggerCondition.SelfTurnedFaceUp ->
+          noTable (GameEvent.TurnedFaceUp TurnedFaceUp.MkTurnedFaceUp {TurnedFaceUp.object = departed, TurnedFaceUp.announcedX = Just 3})
+            NonEmpty.:| [noTable (GameEvent.TurnedFaceUp TurnedFaceUp.MkTurnedFaceUp {TurnedFaceUp.object = departed, TurnedFaceUp.announcedX = Nothing})]
         -- CR 701.27a's own event, and the only one this condition admits, on the
         -- BEARER and naming the same face the condition does -- so the pair
         -- really matches; the face below is the one everyTriggerCondition names.
@@ -2738,7 +2743,7 @@ representativeEvents cond =
         -- `departed` again, so the pair really matches: the Filter this condition
         -- is instantiated with below is the trivial one, which admits whatever the
         -- id resolves to.
-        TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp departed)
+        TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp TurnedFaceUp.MkTurnedFaceUp {TurnedFaceUp.object = departed, TurnedFaceUp.announcedX = Just 3})
         -- CR 701.27b's event for the other direction, on `departed` for the arm
         -- above's reason.
         TriggerCondition.PermanentTurnedFaceDown _ -> one (GameEvent.TurnedFaceDown departed)

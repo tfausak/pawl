@@ -43,6 +43,7 @@ import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TappedForMana as TappedForMana
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
+import qualified Pawl.Types.TurnedFaceUp as TurnedFaceUp
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -281,7 +282,7 @@ data GameEvent
   | -- | CR 708.7: a face-down permanent was turned face up, which CR 708.8 makes
     -- a change to copiable values rather than a zone change, so no Moved event
     -- describes it.
-    TurnedFaceUp ObjectId.ObjectId
+    TurnedFaceUp TurnedFaceUp.TurnedFaceUp
   | -- | CR 708.2 / 701.27b: a face-up permanent was turned face down.
     TurnedFaceDown ObjectId.ObjectId
   | -- | CR 701.27a: a double-faced permanent TRANSFORMED. CR 701.27b makes that a
