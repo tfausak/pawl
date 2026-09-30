@@ -318,6 +318,22 @@ begun gs expiry = case expiry of
   Expiry.WhenPaid _ -> True
   Expiry.WhenUsed -> True
 
+-- CR 601.3: may this player use this object's exile permission right now? It
+-- names them, its duration's window has begun (`begun`), and its own condition
+-- holds -- Hama, the Bloodbender's "during your turn", read live against the
+-- permission's source as sweepConditional reads a duration's. The one question
+-- Pawl.Engine.Cast.permitsPlayFromExile and Pawl.Engine.Cost's exile arm share,
+-- so a cast allowed by some other permission outside this one's window is never
+-- priced by it.
+permissionOpen :: PlayerId -> ExilePlayPermission.ExilePlayPermission -> GameState -> Bool
+permissionOpen pid permission gs =
+  let source = ExilePlayPermission.source permission
+   in ExilePlayPermission.player permission == pid
+        && begun gs (ExilePlayPermission.expiry permission)
+        && all
+          (Condition.holds (Projection.fullView gs) (Filter.contextFor (Game.teams gs) (Just pid) (Just source)) gs source)
+          (ExilePlayPermission.condition permission)
+
 -- CR 514.2: "until end of turn" and "this turn" effects end during the cleanup
 -- step. Delete-and-recompute (design.md 2.5): dropping the stored entry makes
 -- the next projection revert -- nothing is explicitly undone.

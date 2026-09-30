@@ -1,8 +1,10 @@
 module Pawl.Types.GrantPlayFromExile where
 
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
@@ -22,11 +24,11 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 -- scoping: the permission is the granting effect's, so the same card cast under
 -- some other permission pays its printed colours.
 --
--- `withoutPayingManaCost` is CR 118.9's "you may cast [this object] without
--- paying its mana cost", printed in the same sentence as the permission on
--- Extract Power. It rides the grant for `spending`'s reason: the waiver is the
--- granting effect's, so the same card played under some other permission pays.
--- Pawl.Types.ExilePlayPermission's field of the same name is where it lands.
+-- `alternativeCost` is CR 118.9's alternative cost, printed in the same
+-- sentence as the permission -- Extract Power's "without paying its mana cost",
+-- Hama, the Bloodbender's waterbend. It rides the grant for `spending`'s
+-- reason; Pawl.Types.ExilePlayPermission's field of the same name is where it
+-- lands.
 --
 -- `player` is WHO may play, CR 601.3's "that player" -- Elkin Lair's "THE
 -- PLAYER may play that card this turn", the upkeep player the trigger bound,
@@ -45,7 +47,10 @@ data GrantPlayFromExile = MkGrantPlayFromExile
     player :: PlayerRef.PlayerRef,
     ref :: ObjectRef.ObjectRef,
     spending :: ManaSpending.ManaSpending,
-    withoutPayingManaCost :: Bool,
+    alternativeCost :: Maybe PermissionCost.PermissionCost,
+    -- | CR 601.3: Hama, the Bloodbender\'s "during your turn", a condition the
+    -- permission is open only while; baked as it is granted.
+    condition :: Maybe Condition.Condition,
     -- | CR 601.3 / 305.9: Ragavan, Nimble Pilferer\'s "you may CAST that card"
     -- is Cast, which never lets an exiled land be played; Galvanic Relay\'s
     -- "you may PLAY that card" is Play.

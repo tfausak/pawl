@@ -118,6 +118,10 @@
                       {
                         "type": "GrantPlayFromExile",
                         "value": {
+                          "alternativeCost": {
+                            "type": "InsteadOfManaCost",
+                            "value": []
+                          },
                           "duration": {
                             "type": "Indefinite"
                           },
@@ -127,8 +131,7 @@
                           },
                           "verb": {
                             "type": "Cast"
-                          },
-                          "withoutPayingManaCost": true
+                          }
                         }
                       },
                       {
