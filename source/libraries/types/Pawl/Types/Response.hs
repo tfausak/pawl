@@ -356,6 +356,10 @@ data Response
     -- rather than from either zone, and a transcript of one must not satisfy
     -- another.
     ChoseCardFromAmong ObjectId.ObjectId
+  | -- | CR 608.2d: the cards a player chose out of a bound group for an "up
+    -- to" Pawl.Types.ObjectRef.ChosenCardFromAmong. Apart from
+    -- ChoseAnyNumberOfPermanents, for ChoseCardFromAmong's reason.
+    ChoseCardsFromAmong (Set.Set ObjectId.ObjectId)
   | -- | CR 309.2a \/ 701.49a: the dungeon card a venturing player chose to bring
     -- in from outside the game.
     --

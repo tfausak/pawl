@@ -2206,6 +2206,57 @@ carthTheLionSpec s registry =
           Spec.assertEqWith s "and exactly one card was revealed" (revealed after) [idOf ids "Chandra, Fire Artisan"]
           Spec.assertEqWith s "both planeswalkers died" (namesIn Zone.Graveyard S.alice after, namesIn Zone.Graveyard S.bob after) ([named "Jace Beleren"], [named "Jace Beleren"])
 
+-- Uncovered Clues {2}{U} Sorcery, "Look at the top four cards of your library.
+-- You may reveal up to two instant and/or sorcery cards from among them and put
+-- the revealed cards into your hand. Put the rest on the bottom of your library
+-- in any order." (Oracle text checked against api.scryfall.com.) The reveal names
+-- SEVERAL cards of the group, and "the revealed cards" reads every one of them.
+--
+-- The top four, top first, are Murder, Divination, Lightning Bolt and Forest, so
+-- three cards match and the count of two leaves the chooser a real choice; the
+-- Island beneath them is never looked at.
+uncoveredCluesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+uncoveredCluesSpec s registry =
+  let named = Just . CardName.MkCardName . Text.pack
+      -- Bottom first, S.addLibraryCard putting each new card on top.
+      stockNames = ["Island", "Forest", "Lightning Bolt", "Divination", "Murder"]
+      -- Casts and resolves the spell with `wanted`, by name, as the answer to
+      -- the one pick, and names the cards the reveal showed.
+      run wanted = do
+        clues <- S.printingOf s registry "Uncovered Clues"
+        island <- S.printingOf s registry "Island"
+        printings <- Monad.mapM (S.printingOf s registry) stockNames
+        let stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) (S.landsFor island S.alice 3 (Setup.emptyGame S.bothPlayers)) printings
+            (withSpell, spell) = S.handOne clues stocked
+            nameOfId gs oid = fmap S.nameOf (Game.cardOf oid gs)
+            answer :: Prompt.Prompt r -> r
+            answer p = case p of
+              Prompt.ChooseCardsFromAmong _ _ _ offered _ -> Set.fromList (filter (\oid -> List.elem (nameOfId withSpell oid) (fmap named wanted)) offered)
+              _ -> S.identityAnswer p
+            after = S.runPure answer withSpell (S.cast S.alice spell >> Stack.resolveTop)
+            revealed =
+              Maybe.mapMaybe
+                ( \event -> case event of
+                    GameEvent.Revealed (Revealed.MkRevealed _ oid _ _) -> nameOfId withSpell oid
+                    _ -> Nothing
+                )
+                (S.eventsOf after)
+        pure (after, revealed)
+   in Spec.describe s "UncoveredClues" $ do
+        -- The headline: two cards picked, the first and the third match, so
+        -- neither the offer's head nor its first two could stand in for them.
+        Spec.it s "CR 701.20a both revealed cards are put into the hand, not only the last" $ do
+          (after, revealed) <- run ["Murder", "Lightning Bolt"]
+          Spec.assertEqWith s "alice's hand holds both revealed cards" (List.sort (namesIn Zone.Hand S.alice after)) [named "Lightning Bolt", named "Murder"]
+          Spec.assertEqWith s "and those two were the cards revealed" (List.sort revealed) (List.sort (Maybe.catMaybes [named "Lightning Bolt", named "Murder"]))
+          Spec.assertEqWith s "the other two go beneath the Island" (List.sort (drop 1 (namesIn Zone.Library S.alice after))) [named "Divination", named "Forest"]
+        -- CR 608.2d: "up to two" is a ceiling, so one card is a legal answer --
+        -- the per-card ask would have forced a second.
+        Spec.it s "CR 608.2d up to two admits one: the other matches go to the bottom" $ do
+          (after, _) <- run ["Divination"]
+          Spec.assertEqWith s "alice's hand holds the one card she chose" (namesIn Zone.Hand S.alice after) [named "Divination"]
+          Spec.assertEqWith s "and the two other matches reach the bottom with the Forest" (List.sort (drop 1 (namesIn Zone.Library S.alice after))) [named "Forest", named "Lightning Bolt", named "Murder"]
+
 -- The same arm reached from a TRIGGER rather than an activated ability, and over
 -- LAND cards rather than creature cards -- the two axes portOfKarfellSpec above
 -- holds fixed.
@@ -2401,5 +2452,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   mulchSpec s registry
   openTheWaySpec s registry
   carthTheLionSpec s registry
+  uncoveredCluesSpec s registry
   blossomingTortoiseSpec s registry
   timetwisterSpec s registry
