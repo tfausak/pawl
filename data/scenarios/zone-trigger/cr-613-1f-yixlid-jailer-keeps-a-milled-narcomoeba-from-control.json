@@ -1,0 +1,28 @@
+{
+  "description": "CR 613.1f Yixlid Jailer keeps a milled Narcomoeba from triggering",
+  "note": "The control for the Jailer board: the same Tome Scour without bob's Yixlid Jailer, the may taken, and Narcomoeba returns (CR 113.6k).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Island", "label": "island" }],
+        "hand": [{ "card": "Tome Scour", "label": "tome-scour" }],
+        "library": [
+          { "card": "Narcomoeba" },
+          { "card": "Soul Warden" },
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@tome-scour", "targets": ["@alice"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Narcomoeba", "count": 1 } } }
+  ]
+}

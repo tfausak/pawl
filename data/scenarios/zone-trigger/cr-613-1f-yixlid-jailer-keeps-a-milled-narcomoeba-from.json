@@ -1,0 +1,30 @@
+{
+  "description": "CR 613.1f Yixlid Jailer keeps a milled Narcomoeba from triggering",
+  "note": "Tome Scour's board with bob's Yixlid Jailer in play: CR 613.1f strips Narcomoeba's ability the moment it lands in the graveyard, so nothing triggers, no \"may\" is asked, and Narcomoeba stays there. The -control file is the same board without the Jailer.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Island", "label": "island" }],
+        "hand": [{ "card": "Tome Scour", "label": "tome-scour" }],
+        "library": [
+          { "card": "Narcomoeba" },
+          { "card": "Soul Warden" },
+          { "card": "Goblin Piker" }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Yixlid Jailer" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@tome-scour", "targets": ["@alice"], "mana": ["@island"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Graveyard", "card": "Narcomoeba", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Narcomoeba", "count": 0 } } }
+  ]
+}

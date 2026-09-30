@@ -7,6 +7,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Types.Activation as Activation
 import qualified Pawl.Types.Casting as Casting
 import qualified Pawl.Types.Label as Label
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Reference as Reference
 
 -- | One decision a scenario makes for a player.
@@ -30,6 +31,8 @@ data Move
     ChooseAttackTarget Reference.Reference
   | -- | CR 613.7m: one player's objects stamped at one moment, earliest first.
     OrderTimestamps (Seq.Seq Reference.Reference)
+  | -- | CR 603.5 / 608.2d: whether the deciding player takes a printed "may".
+    ChooseOptional OptionalDecision.OptionalDecision
   | -- | CR 104.3a.
     Concede
   | -- | CR 117.3d.

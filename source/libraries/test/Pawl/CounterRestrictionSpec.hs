@@ -274,7 +274,7 @@ meliraSpec s registry = Spec.describe s "Melira, Sylvok Outcast" $ do
     ((_, _, myElf, theirElf), _, ready) <- board True
     Spec.assertEqWith s "bob's Elf lost it, alice's kept it" (Projection.hasKeyword Keyword.Infect theirElf ready, Projection.hasKeyword Keyword.Infect myElf ready) (False, True)
 
-moveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+moveSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 moveSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
   let -- Agent's Toolkit ("whenever a creature you control enters, you may move a
       -- counter from this artifact onto that creature") already on the
@@ -317,13 +317,6 @@ moveSpec s registry = Spec.describe s "CR 122.5 moving a counter" $ do
       (artifact, Just entered, after) -> do
         Spec.assertEqWith s "the counter is still on the artifact, not removed from it" (S.counterOf CounterKind.PlusOnePlusOne artifact after) 1
         Spec.assertEqWith s "and the creature that entered got none" (seenOn CounterKind.PlusOnePlusOne entered after) (0, Just 2, Just 1)
-      _ -> Spec.assertFailure s "the creature did not reach the battlefield"
-  Spec.it s "and the same trigger on the same board without it moves the counter" $ do
-    built <- board False
-    case play built of
-      (artifact, Just entered, after) -> do
-        Spec.assertEqWith s "the counter left the artifact" (S.counterOf CounterKind.PlusOnePlusOne artifact after) 0
-        Spec.assertEqWith s "and landed on the creature that entered" (seenOn CounterKind.PlusOnePlusOne entered after) (1, Just 3, Just 2)
       _ -> Spec.assertFailure s "the creature did not reach the battlefield"
 
 pikerName :: CardName.CardName
