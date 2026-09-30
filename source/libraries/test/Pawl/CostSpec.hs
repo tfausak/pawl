@@ -107,6 +107,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.ReturnPermanents as ReturnPermanents
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -2539,6 +2540,99 @@ osseousExhaleBoard plains exhale giant inHand onBattlefield =
       withLands = S.landsFor plains S.alice 2 withSpell
    in (spellId, giantId, S.runPure (attackingWith giantId) withLands (Combat.declareAttackers S.manaPerformer S.alice))
 
+-- Champion of the Weird {3}{B} 5/5 Creature -- Goblin Berserker: "As an
+-- additional cost to cast this spell, behold a Goblin and exile it. Pay 1 life,
+-- Blight 2: Target opponent blights 2. Activate only as a sorcery. When this
+-- creature leaves the battlefield, return the exiled card to its owner's hand."
+-- (Oracle checked against Scryfall 2026-09-30.)
+--
+-- The gate card for CostComponent.BeholdAndExile and for CR 607.2q, the link
+-- from a card exiled to pay a permanent spell's cost to the permanent that spell
+-- becomes.
+--
+-- TWO Goblins in reach, a Goblin Piker in hand and a Goblin Brawler on the
+-- battlefield, so Prompt.ChooseBehold is raised. The pinned answer is the
+-- Brawler, the pool's SECOND entry (hand first), so an answerer ignored or a
+-- prompt never raised lands on the Piker instead. Four Swamps are exactly {3}{B}.
+championOfTheWeirdSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+championOfTheWeirdSpec s registry =
+  Spec.describe s "Champion of the Weird" $ do
+    Spec.it s "CR 701.4a / 406.2 the beheld Goblin permanent is exiled as the cost" $ do
+      (champion, piker, brawler, _, gs) <- championBoard s registry True
+      let resolved = S.runPure (beholdingOne brawler) (S.runPure (beholdingOne brawler) gs (S.cast S.alice champion)) Stack.resolveTop
+      Spec.assertEqWith s "CR 406.2 the Brawler she beheld is in exile, and nothing else is" (namesIn Zone.Exile resolved) [cardNamed "Goblin Brawler"]
+      Spec.assertBool s (List.elem piker (Game.zoneMembers Zone.Hand S.alice resolved)) "and the Piker she did not choose is still in her hand"
+      Spec.assertEqWith s "CR 608.3a and the Champion resolved onto the battlefield" (S.countOnBattlefieldByName (cardNamed "Champion of the Weird") S.alice resolved) 1
+    Spec.it s "CR 607.2q the Champion leaving returns the exiled card to its owner's hand" $ do
+      (champion, _, brawler, _, gs) <- championBoard s registry True
+      let resolved = S.runPure (beholdingOne brawler) (S.runPure (beholdingOne brawler) gs (S.cast S.alice champion)) Stack.resolveTop
+          onField = filter (\o -> fmap S.nameOf (Game.cardOf o resolved) == Just (cardNamed "Champion of the Weird")) (Set.toList (GameState.battlefield resolved))
+          killed = S.runPure S.identityAnswer resolved (Event.destroy Regenerability.Regenerable onField)
+          after = S.runPure S.identityAnswer killed Engine.priorityLoop
+      Spec.assertEqWith s "CR 607.2q the Brawler is back in alice's hand" (S.countByName (cardNamed "Goblin Brawler") S.alice after) 1
+      Spec.assertEqWith s "and nothing is left in exile" (namesIn Zone.Exile after) []
+    -- CR 118.3 on the same mana with the Champion the only Goblin: the spell on
+    -- the stack cannot behold itself, so the cast is refused.
+    Spec.it s "CR 118.3 with no other Goblin the Champion cannot be cast" $ do
+      (champion, _, _, _, gs) <- championBoard s registry False
+      Spec.assertEqWith s "CR 118.3 the cast is not offered at all" (filter (S.isCastOf champion) (Action.legalActions S.alice gs)) []
+    -- The card's second ability, on the first case's board: alice's Brawler is in
+    -- exile, so her cost's blight has the Champion alone to take its counters, and
+    -- bob's Wall of Stone is the only creature his blight can choose.
+    Spec.it s "CR 701.68a Pay 1 life, Blight 2: target opponent blights 2" $ do
+      printing <- S.printingOf s registry "Champion of the Weird"
+      (champion, _, brawler, wall, gs) <- championBoard s registry True
+      let resolved = S.runPure (beholdingOne brawler) (S.runPure (beholdingOne brawler) gs (S.cast S.alice champion)) Stack.resolveTop
+          onField = filter (\o -> fmap S.nameOf (Game.cardOf o resolved) == Just (cardNamed "Champion of the Weird")) (Set.toList (GameState.battlefield resolved))
+          minusOn o g = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject o g)
+      case onField of
+        [permanent] -> do
+          let activated = S.runPure (targetingPlayer S.bob) resolved (Activate.activateAbility S.alice permanent (theAbility printing))
+              after = S.runPure (targetingPlayer S.bob) activated Stack.resolveTop
+          Spec.assertEqWith s "CR 701.68a bob, the target, blighted 2 onto his Wall" (minusOn wall after) (Just 2)
+          Spec.assertEqWith s "CR 119.4 alice paid the 1 life" (S.lifeOf S.alice after) (Just 19)
+          Spec.assertEqWith s "CR 701.68a and blighted 2 onto the Champion to pay" (minusOn permanent after) (Just 2)
+        _ -> Spec.assertFailure s "the Champion should be alone on the battlefield under its name"
+
+-- alice's Champion in hand over four Swamps. `goblins` puts a Goblin Piker in
+-- her hand and a Goblin Brawler on her battlefield; without them she holds a
+-- Hill Giant instead, so the negative differs in the subtype alone.
+-- bob's Wall of Stone, a 0/8, is what the Champion's blight ability aims at.
+championBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+championBoard s registry goblins = do
+  swamp <- S.printingOf s registry "Swamp"
+  champion <- S.printingOf s registry "Champion of the Weird"
+  piker <- S.printingOf s registry "Goblin Piker"
+  brawler <- S.printingOf s registry "Goblin Brawler"
+  giant <- S.printingOf s registry "Hill Giant"
+  wall <- S.printingOf s registry "Wall of Stone"
+  let (wallId, base) = S.addPermanent wall S.bob (S.landsFor swamp S.alice 4 (Setup.emptyGame S.bothPlayers))
+      (pikerId, withHand) = S.addHandCard (if goblins then piker else giant) S.alice base
+      (brawlerId, withField) = if goblins then S.addPermanent brawler S.alice withHand else (pikerId, withHand)
+      (championId, gs) = S.addHandCard champion S.alice withField
+  pure
+    ( championId,
+      pikerId,
+      brawlerId,
+      wallId,
+      gs
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
+-- CR 701.4a's choice pinned to one object, FILTERED out of the offer.
+beholdingOne :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+beholdingOne which p = case p of
+  Prompt.ChooseBehold _ _ _ candidates
+    | List.elem which (NonEmpty.toList candidates) -> which
+  _ -> S.identityAnswer p
+
+-- A card name, from its printed spelling.
+cardNamed :: String -> CardName.CardName
+cardNamed = CardName.MkCardName . Text.pack
+
 -- Forensic Researcher {2}{U} Creature -- Merfolk Detective 1/3: "{T}: Untap
 -- another target permanent you control. {T}, Collect evidence 3: Tap target
 -- creature you don't control." (Oracle checked against Scryfall 2026-09-19.)
@@ -3079,6 +3173,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   livingDestinySpec s registry
   causticExhaleSpec s registry
   osseousExhaleSpec s registry
+  championOfTheWeirdSpec s registry
   forensicResearcherSpec s registry
   evidenceSpec s registry
   flingSpec s registry
