@@ -1,6 +1,7 @@
 module Pawl.Types.CostComponent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.CountersFromPermanents as CountersFromPermanents
 import qualified Pawl.Types.CountersFromThis as CountersFromThis
 import qualified Pawl.Types.DiscardCards as DiscardCards
@@ -188,23 +189,21 @@ data CostComponent keyword
     -- matching the Filter from their own hand, which the payer chooses. CR 701.20b
     -- leaves the card in the hand, so this component spends nothing.
     RevealCardFromHand (Filter.Filter keyword)
-  | -- | CR 701.4a as a cost / Caustic Exhale: the paying player beholds one object
-    -- matching the Filter, either revealing a matching card from their hand or
-    -- choosing a matching permanent they control.
+  | -- | CR 701.4a as a cost / Caustic Exhale, Kindle the Inner Flame: the paying
+    -- player beholds this many distinct objects matching the Filter, each either
+    -- a matching card revealed from their hand or a matching permanent they
+    -- control.
     --
     -- A TWO-ZONE choice, which is why this is not RevealCardFromHand with a wider
     -- criterion: rule 701.4a offers the hidden hand OR the battlefield, and the
     -- payer picks which. Pawl.Engine.Cost.beholdCandidates is the union and
     -- Prompt.ChooseBehold the ask.
     --
-    -- BINDS the beheld object under Pawl.Engine.Binding.beheldObject, which is
+    -- BINDS the beheld objects under Pawl.Engine.Binding.beheldObject, which is
     -- what CR 701.4b's "if a [quality] was beheld" is read off through
     -- Quantity.WasBound; CR 118.8b's optional "you may behold" is an option of a
     -- Pawl.Types.CostChoice whose other option is empty.
-    --
-    -- Not implemented: beholding more than one object -- the payload is one
-    -- Filter and states no count (#3889).
-    Behold (Filter.Filter keyword)
+    Behold (Behold.Behold keyword)
   | -- | CR 701.4a then CR 406.2 / Champion of the Weird: the paying player
     -- beholds one object matching the Filter and exiles it, linking the card to
     -- the spell for CR 607.2q's "the exiled card".

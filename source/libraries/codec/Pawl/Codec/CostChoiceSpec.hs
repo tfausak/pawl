@@ -7,6 +7,7 @@ import qualified Pawl.Codec.CostChoice as CostChoice
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostChoice as CostChoice
@@ -24,11 +25,11 @@ spec s = Spec.describe s "Pawl.Codec.CostChoice" $ do
       s
       CostChoice.codec
       ( CostChoice.MkCostChoice
-          ( Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = [CostComponent.Behold (Filter.HasCardType CardType.Creature)]}
+          ( Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = [CostComponent.Behold (Behold.MkBehold {Behold.count = 1, Behold.whichObjects = Filter.HasCardType CardType.Creature})]}
               NonEmpty.:| [Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.components = []}]
           )
       )
-      " [{\"components\":[{\"type\":\"Behold\",\"value\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}],\"mana\":[]},{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}] "
+      " [{\"components\":[{\"type\":\"Behold\",\"value\":{\"count\":1,\"whichObjects\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}],\"mana\":[]},{\"mana\":[{\"type\":\"Generic\",\"value\":1}]}] "
   -- CR 118.6 by accident: a choice with no options has no way to be paid, which
   -- Common.nonEmpty is what refuses.
   Spec.it s "an empty array is rejected rather than decoded" $

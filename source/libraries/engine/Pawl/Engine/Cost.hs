@@ -64,6 +64,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AppliedReduction as AppliedReduction
+import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.Binding as Binding.Type
 import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.CardName as CardName
@@ -2114,7 +2115,7 @@ componentStatesHiddenQuality component = case component of
   -- exactly, and rule 118.8c asks whether the cost INCLUDES such an action rather
   -- than whether it forces one, so the battlefield half it offers instead does
   -- not take this arm out.
-  CostComponent.Behold criterion -> Filter.statesAQuality criterion
+  CostComponent.Behold behold -> Filter.statesAQuality (Behold.whichObjects behold)
   -- The sixth, Behold's arm above: the exile after the behold changes nothing
   -- about which cards the cost is described by.
   CostComponent.BeholdAndExile criterion -> Filter.statesAQuality criterion
@@ -2265,6 +2266,41 @@ beholdCandidates slots pid oid criterion gs =
       matches candidate = Filter.matches context (viewOf candidate) criterion
    in revealFromHandCandidates slots pid oid criterion gs
         <> filter matches (List.sort (Projection.controls pid gs))
+
+-- CR 701.4a `n` times over `beholdCandidates`' one pool: the objects this player
+-- beholds to pay a Behold or BeholdAndExile component on `oid`, or Nothing where
+-- the pool holds fewer than `n`. The pool is read HERE so an earlier component of
+-- the same cost that emptied it leaves the component Unpaid.
+--
+-- DISTINCT: each pick is withheld from the asks after it, so no object is beheld
+-- twice -- Pawl.CostSpec's "CR 701.4a three Elementals are three objects" is the
+-- proof. One Prompt.ChooseBehold per object, raised only while the pool left
+-- holds more than the objects still owed; at exactly that many every one is
+-- beheld and there is nothing to choose. FILTERED and not trusted (#222).
+--
+-- Each is revealed where it is in the hand, conditioned on the ZONE rather than
+-- on which half the answer came from, so the two halves cannot disagree.
+beholdObjects :: Map.Map SlotName.SlotName (Set.Set ObjectId) -> PlayerId -> ObjectId -> Natural -> Filter.Type.Filter Keyword.Type.Keyword -> Game (Maybe [ObjectId])
+beholdObjects slots pid oid n criterion = do
+  gs <- State.get
+  let pool = beholdCandidates slots pid oid criterion gs
+      decider = Decide.deciderFor pid gs
+      pick chosen owed
+        | owed == 0 = pure (Just (reverse chosen))
+        | otherwise =
+            let left = filter (`notElem` chosen) pool
+             in case left of
+                  first : second : more
+                    | Natural.length left > owed -> do
+                        answer <- Game.choose (Prompt.ChooseBehold decider pid oid (first NonEmpty.:| (second : more)))
+                        pick ((if List.elem answer left then answer else first) : chosen) (owed - 1)
+                  first : _
+                    | Natural.length left >= owed -> pick (first : chosen) (owed - 1)
+                  _ -> pure Nothing
+  beheld <- pick [] n
+  Monad.forM_ (Maybe.fromMaybe [] beheld) $ \chosen ->
+    Monad.when (fmap Object.zone (Game.lookupObject chosen gs) == Just Zone.Hand) (Event.reveal RevealCause.Ordinary pid chosen)
+  pure beheld
 
 -- The cards this player may exile to pay an ExileCardsFromGraveyard component:
 -- their OWN graveyard, in its own order, narrowed by the criterion. Per-owner by
@@ -3815,13 +3851,15 @@ canPayComponent slots pid oid component gs = case component of
   -- assertion this arm alone reddens, and the two beneath it hold without it.
   CostComponent.RevealCardFromHand criterion ->
     not (null (revealFromHandCandidates slots pid oid criterion gs))
-  -- CR 118.3: payable only if the payer's hand or battlefield holds an object the
-  -- criterion admits, RevealCardFromHand's arm above over CR 701.4a's two zones at
-  -- once. What it decides is the OFFER; `payComponent` answers Unpaid on an empty
-  -- pool either way.
-  CostComponent.Behold criterion ->
-    not (null (beholdCandidates slots pid oid criterion gs))
-  -- The arm above: CR 118.3 asks the same pool, the exile spending what it beheld.
+  -- CR 118.3: payable only if the payer's hand and battlefield together hold at
+  -- least `n` objects the criterion admits, RevealCardFromHand's arm above over
+  -- CR 701.4a's two zones at once. What it decides is the OFFER;
+  -- `payComponent` answers Unpaid on too small a pool either way. Pawl.CostSpec's
+  -- "CR 118.3 two Elementals cannot behold three" is the proof.
+  CostComponent.Behold (Behold.MkBehold n criterion) ->
+    Natural.length (beholdCandidates slots pid oid criterion gs) >= n
+  -- The arm above at a count of one: CR 118.3 asks the same pool, the exile
+  -- spending what it beheld.
   CostComponent.BeholdAndExile criterion ->
     not (null (beholdCandidates slots pid oid criterion gs))
   -- CR 702.29a: payable only while the card is in the paying player's hand.
@@ -4006,7 +4044,7 @@ criteriaOf component = case component of
   CostComponent.PutCardFromHandOntoBattlefield criterion -> [criterion]
   CostComponent.ExileCardFromHand criterion -> [criterion]
   CostComponent.RevealCardFromHand criterion -> [criterion]
-  CostComponent.Behold criterion -> [criterion]
+  CostComponent.Behold behold -> [Behold.whichObjects behold]
   CostComponent.BeholdAndExile criterion -> [criterion]
   CostComponent.ExileCardsFromGraveyard exile -> [ExileCardsFromGraveyard.whichCards exile]
   CostComponent.ExileMaterials materials -> [ExileMaterials.whichObjects materials]
@@ -6030,59 +6068,34 @@ payComponent moment slots pid oid component = case component of
             pure (if List.elem answer held then answer else first)
         Event.reveal RevealCause.Ordinary pid chosen
         pure (Payment.Paid (Binding.paidObjects Binding.revealedCard (Set.singleton (Recipient.ToObject chosen))))
-  -- CR 701.4a's two-zone choice: ONE object out of the payer's hand and the
-  -- permanents they control taken together, revealed where it came out of the
-  -- hand and merely chosen where it is a permanent. The candidates are re-read
-  -- HERE so an earlier component of the same cost that emptied both pools leaves
-  -- this Unpaid, and the prompt is raised only at two or more, one candidate
-  -- leaving nothing to choose between. FILTERED and not trusted (#222).
+  -- CR 701.4a's two-zone choice through `beholdObjects`: this many distinct
+  -- objects out of the payer's hand and the permanents they control taken
+  -- together, each revealed where it came out of the hand.
   --
-  -- The reveal is conditioned on the ZONE the chosen object is in rather than on
-  -- which half the answer came from, so the two halves cannot disagree.
-  --
-  -- BINDS the object under Binding.beheldObject, which is what CR 701.4b's "if a
+  -- BINDS the objects under Binding.beheldObject, which is what CR 701.4b's "if a
   -- [quality] was beheld" is read off -- through Quantity.WasBound, which asks
   -- whether the slot is bound and never goes back to the board for the quality.
   -- Osseous Exhale is the card, and Pawl.CostSpec's "CR 701.4b the quality is
   -- the one the object had when it was beheld" is the proof.
-  CostComponent.Behold criterion -> do
-    gs <- State.get
-    let candidates = beholdCandidates slots pid oid criterion gs
-        decider = Decide.deciderFor pid gs
-    case candidates of
-      [] -> pure Payment.Unpaid
-      first : rest -> do
-        chosen <- case rest of
-          [] -> pure first
-          second : more -> do
-            answer <- Game.choose (Prompt.ChooseBehold decider pid oid (first NonEmpty.:| (second : more)))
-            pure (if List.elem answer candidates then answer else first)
-        Monad.when (fmap Object.zone (Game.lookupObject chosen gs) == Just Zone.Hand) (Event.reveal RevealCause.Ordinary pid chosen)
-        pure (Payment.Paid (Binding.paidObjects Binding.beheldObject (Set.singleton (Recipient.ToObject chosen))))
-  -- CR 701.4a's behold, the arm above's pool, prompt and reveal, then CR 406.2's
-  -- exile of what was beheld through Event.changeZoneReturning.
+  CostComponent.Behold (Behold.MkBehold n criterion) -> do
+    beheld <- beholdObjects slots pid oid n criterion
+    pure (maybe Payment.Unpaid (Payment.Paid . Binding.paidObjects Binding.beheldObject . Set.fromList . fmap Recipient.ToObject) beheld)
+  -- CR 701.4a's behold of ONE object, `beholdObjects` as the arm above, then CR
+  -- 406.2's exile of what was beheld through Event.changeZoneReturning.
   --
   -- LINKS the card CR 400.7 put into exile to `oid`, the spell, which is CR
   -- 607.2q's "cards exiled to pay the cost of the spell"; Event.carryOver hands
   -- the link to the permanent the spell becomes. Pawl.CostSpec's Champion of the
   -- Weird group is the proof.
   CostComponent.BeholdAndExile criterion -> do
-    gs <- State.get
-    let candidates = beholdCandidates slots pid oid criterion gs
-        decider = Decide.deciderFor pid gs
-    case candidates of
-      [] -> pure Payment.Unpaid
-      first : rest -> do
-        chosen <- case rest of
-          [] -> pure first
-          second : more -> do
-            answer <- Game.choose (Prompt.ChooseBehold decider pid oid (first NonEmpty.:| (second : more)))
-            pure (if List.elem answer candidates then answer else first)
-        Monad.when (fmap Object.zone (Game.lookupObject chosen gs) == Just Zone.Hand) (Event.reveal RevealCause.Ordinary pid chosen)
+    beheld <- beholdObjects slots pid oid 1 criterion
+    case beheld of
+      Just [chosen] -> do
         arrived <- Event.changeZoneReturning chosen Zone.Exile
         let link = ExileLink.MkExileLink {ExileLink.source = oid, ExileLink.ability = Nothing}
         State.modify' (\g -> g {GameState.exiledWith = foldr (`Map.insert` link) (GameState.exiledWith g) arrived})
         pure bindsNothing
+      _ -> pure Payment.Unpaid
   -- CR 107.14: paying energy removes that many energy counters from the player.
   -- Natural subtraction is PARTIAL, so `left` is guarded; canPayComponent
   -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.
