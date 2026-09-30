@@ -1,0 +1,22 @@
+{
+  "description": "CR 510.1b the tokens deal combat damage like any attacker",
+  "note": "Hanweir Garrison's attack trigger puts two 1/1 Humans onto the battlefield tapped and attacking (CR 508.4). The 2/3 Garrison and both tokens are unblocked, so bob takes 2 + 1 + 1.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Hanweir Garrison", "label": "garrison", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@garrison"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Human Token", "Human Token#2"] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 16 } } }
+  ]
+}

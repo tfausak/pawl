@@ -344,12 +344,6 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
     Spec.assertEqWith s "all six creatures are attacking" (Map.size attackers) 6
     Spec.assertEqWith s "but only the two Garrisons were DECLARED" (S.attackerDeclarationsOf atBlockers) mine
     mapM_ (\oid -> Spec.assertBool s (notElem oid (S.attackerDeclarationsOf atBlockers)) "no token was declared") tokens
-  Spec.it s "CR 510.1b the tokens deal combat damage like any attacker" $ do
-    garrison <- S.printingOf s registry "Hanweir Garrison"
-    let (gs, _, _) = S.combatBoardOf [garrison] []
-        after = S.runCombat S.aggressiveAnswer gs
-    -- The 2/3 Garrison plus two 1/1 tokens, all unblocked, against bob's 20.
-    Spec.assertEqWith s "bob takes 2 + 1 + 1" (S.lifeOf S.bob after) (Just 16)
 
 -- CR 306.6 / CR 508.1b: attacking a planeswalker, through Jace Beleren.
 --

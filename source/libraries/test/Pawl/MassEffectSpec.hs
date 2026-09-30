@@ -302,103 +302,10 @@ returnAllSpec s registry = Spec.describe s "ReturnAll" $ do
       )
       (survivors, True, 2, 1)
 
--- CR 109.2a's reading of a description -- "a description of an object that
--- includes the word 'card' and the name of a zone ... means a card matching that
--- description in the stated zone" -- swept as a SET rather than targeted:
--- ObjectRef.EachCardInGraveyard, where returnAllSpec above is CR 109.2's
--- battlefield default.
---
--- Rise of the Dark Realms {7}{B}{B} Sorcery -- "Put all creature cards from all
--- graveyards onto the battlefield under your control." (name, cost, type line and
--- Oracle text checked against api.scryfall.com). Its whole text is that one
--- sentence, so nothing else on the card can be what these assertions read.
---
--- THREE SEATS, and a graveyard per seat, because the board has to tell four
--- readings of "all graveyards" apart:
---
---   * EACH PLAYER'S versus YOUR OWN. bob and carol each bury a creature card of a
---     printing nobody else has, and both must be reanimated.
---   * EACH PLAYER'S versus AN OPPONENT'S. alice buries one too, and a two-seat
---     board would leave "opponents" and "each other player" indistinguishable
---     besides.
---   * CREATURE CARDS versus the whole zone. Every graveyard also holds one
---     non-creature card, and each must stay buried.
---   * A GRAVEYARD versus the battlefield. bob controls a Benalish Hero, which the
---     battlefield reading of the same sentence would hand to alice "under your
---     control"; it stays bob's, and the graveyards empty of creatures instead.
---
--- Cast off nine Swamps and resolved, for the reason castDayOfJudgment gives: the
--- card takes no target and prompts for nothing, so a hand-built applyEffect call
--- would differ from a real cast only in the mana.
-riseOfTheDarkRealmsSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-riseOfTheDarkRealmsSpec s registry = Spec.describe s "RiseOfTheDarkRealms" $ do
-  Spec.it s "CR 109.2a every creature card in every graveyard is reanimated under the caster's control" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    rise <- S.printingOf s registry "Rise of the Dark Realms"
-    piker <- S.printingOf s registry "Goblin Piker"
-    maiden <- S.printingOf s registry "Bird Maiden"
-    sentry <- S.printingOf s registry "Ogre Sentry"
-    hero <- S.printingOf s registry "Benalish Hero"
-    murder <- S.printingOf s registry "Murder"
-    judgment <- S.printingOf s registry "Day of Judgment"
-    forest <- S.printingOf s registry "Forest"
-    let mana = List.foldl' (\g _ -> snd (S.addPermanent swamp S.alice g)) S.threePlayerGame [1 .. (9 :: Int)]
-        (heroId, withHero) = S.addPermanent hero S.bob mana
-        buried =
-          List.foldl'
-            (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g))
-            withHero
-            [ (piker, S.alice),
-              (murder, S.alice),
-              (maiden, S.bob),
-              (judgment, S.bob),
-              (sentry, S.carol),
-              (forest, S.carol)
-            ]
-        (withSpell, spell) = S.handOne rise buried
-        afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
-        after = S.runPure S.identityAnswer afterCast Stack.resolveTop
-        -- Every battlefield object that is not one of alice's nine Swamps, by
-        -- name and CONTROLLER: CR 400.7 mints a new object at the destination, so
-        -- a reanimated card cannot be found by the id it was buried under.
-        reanimated gs =
-          List.sort
-            ( fmap
-                (\oid -> (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs))
-                ( filter
-                    (\oid -> fmap S.nameOf (Game.cardOf oid gs) /= Just (S.nameOf (Printing.card swamp)))
-                    (Set.toList (GameState.battlefield gs))
-                )
-            )
-        named = Just . CardName.MkCardName . Text.pack
-    Spec.assertEqWith
-      s
-      "all three buried creature cards are on the battlefield under alice's control, and bob keeps the one he already controlled"
-      (reanimated after)
-      ( List.sort
-          [ (named "Benalish Hero", Just S.bob),
-            (named "Bird Maiden", Just S.alice),
-            (named "Goblin Piker", Just S.alice),
-            (named "Ogre Sentry", Just S.alice)
-          ]
-      )
-    Spec.assertEqWith
-      s
-      "each graveyard keeps its non-creature card, and alice's also takes the spent sorcery (CR 608.2n)"
-      ( List.sort (namesIn Zone.Graveyard S.alice after),
-        namesIn Zone.Graveyard S.bob after,
-        namesIn Zone.Graveyard S.carol after
-      )
-      ( List.sort [named "Murder", named "Rise of the Dark Realms"],
-        [named "Day of Judgment"],
-        [named "Forest"]
-      )
-    Spec.assertBool s (S.onBattlefield heroId after) "bob's creature was never moved, so nothing swept the battlefield"
-
 -- The same CR 109.2a sweep with its scope taken from another SLOT of the same
--- announcement rather than from CR 109.5's perspective: riseOfTheDarkRealmsSpec
--- above names the whole table, this names the one player the trigger targeted;
--- see #1310.
+-- announcement rather than from CR 109.5's perspective: Rise of the Dark Realms
+-- (data/scenarios/mass-effect/) names the whole table, this names the one player
+-- the trigger targeted; see #1310.
 --
 -- Angel of Finality {3}{W} Creature -- Angel 3/4 -- "Flying / When this creature
 -- enters, exile target player's graveyard." (name, cost, type line, power,
@@ -631,8 +538,8 @@ enduranceSpec s registry = Spec.describe s "Endurance" $ do
     Spec.assertEqWith s "and nothing arrived in alice's or carol's library" (namesIn Zone.Library S.alice after, namesIn Zone.Library S.carol after) ([], [])
 
 -- CR 608.2d's choice made WHILE APPLYING an effect, over a graveyard:
--- ObjectRef.ChosenCardInGraveyard, where riseOfTheDarkRealmsSpec above is the
--- same zone swept as a set.
+-- ObjectRef.ChosenCardInGraveyard, where Rise of the Dark Realms
+-- (data/scenarios/mass-effect/) is the same zone swept as a set.
 --
 -- Port of Karfell -- Land, "This land enters tapped. {T}: Add {U}. {3}{U}{B}{B},
 -- {T}, Sacrifice this land: Mill four cards, then return a creature card from
@@ -2479,7 +2386,6 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   destroyAllSpec s registry
   returnAllSpec s registry
-  riseOfTheDarkRealmsSpec s registry
   angelOfFinalitySpec s registry
   amnesiaSpec s registry
   enduranceSpec s registry

@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Projection.View as Projection
 import qualified Pawl.Engine.Script as Script
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -411,6 +412,18 @@ answerTopPrompt decider asked =
           offers <- describeAll gs (Maybe.mapMaybe Recipient.objectOf (Set.toList offered))
           onEntry unscheduled key kind offers (takeForSource gs key source) $ \verb -> case verb of
             Move.AssignDamage assignment -> Just (fmap Map.fromList (mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)))
+            _ -> Nothing
+        -- The order named is the whole group, each object once; the engine
+        -- wants it as positions in the group it offered.
+        Prompt.Type.OrderTimestamps who _ group -> do
+          key <- whenOf gs (Decider.unwrap who)
+          offers <- describeAll gs group
+          onEntry unscheduled key kind offers (takeUnqualified key kind) $ \verb -> case verb of
+            Move.OrderTimestamps refs -> Just $ do
+              chosen <- mapM (resolveOffered gs key kind group) (Foldable.toList refs)
+              if List.sort chosen == List.sort group
+                then pure (Maybe.mapMaybe (\oid -> List.elemIndex oid group >>= Int.toNatural) chosen)
+                else failWith (Failure.MkActionNotOffered key verb offers)
             _ -> Nothing
         _ -> unscheduled []
 

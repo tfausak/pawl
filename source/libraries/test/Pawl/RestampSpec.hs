@@ -13,7 +13,7 @@
 -- is. The third, Pawl.Engine.Resolve's Effect.TurnFaceDown arm (CR 613.7f),
 -- reaches the same function and no board can observe it -- see the note on
 -- restampOrderSpec. Objects ENTERING together are Restamp.settle's, driven on
--- Replenish's MoveToZone road by entryOrderSpec and on the token road by
+-- Replenish's MoveToZone road by the data/scenarios/restamp/ files and on the token road by
 -- tokenOrderSpec, on Mirror Match's CR 608.2f loop by simultaneousCopiesSpec,
 -- and on Ornate Imitations' conjure loop by conjuredOrderSpec.
 module Pawl.RestampSpec where
@@ -61,7 +61,6 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
   restampOrderSpec s registry
   apnapOrderSpec s registry
-  entryOrderSpec s registry
   tokenOrderSpec s registry
   simultaneousCopiesSpec s registry
   conjuredOrderSpec s registry
@@ -89,24 +88,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Restamp" $ do
 -- that call site leaves the suite green. CR 702.145c's nightfall sweep is the
 -- third road and has its own board below, which cannot be this one -- a daybound
 -- permanent refuses an instruction's transform (CR 702.145b).
-restampOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+restampOrderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 restampOrderSpec s registry =
   Spec.describe s "OrderTimestamps" $ do
-    -- The gameplay-level assertion is the Wall's power: it is whichever back face
-    -- was stamped LATER, so it reads 5 only if alice's answer moved the Warden
-    -- behind the Keeper.
-    Spec.it s "CR 613.7m the seat's own answer decides which simultaneous stamp is later" $ do
-      (board, wardenId, keeperId, wallId) <- rampartBoard s registry True
-      let after = castAndResolve reversingAnswer board
-      Spec.assertEqWith s "CR 613.7m the Sculptor's 5/5 was stamped last, so it defines the Wall" (S.powerToughnessOf wallId after) (Just (5, 5))
-      Spec.assertEqWith s "both Humans transformed" (faceNames [wardenId, keeperId] after) [Just "Synthetic Rampart Sculptor", Just "Synthetic Rampart Shaper"]
-      Spec.assertEqWith s "and alice was asked once, over both of her permanents" (orderPrompts board) [(S.alice, 2)]
-    -- THE PAIR with the case above, differing only in the answer: the engine's
-    -- canonical order stands when alice takes it, and it is the other value.
-    Spec.it s "CR 613.7m the canonical order stands when the seat answers with it" $ do
-      (board, _, _, wallId) <- rampartBoard s registry True
-      let after = castAndResolve S.castAnswer board
-      Spec.assertEqWith s "CR 613.7m the Shaper's 3/3 was stamped last, so it defines the Wall" (S.powerToughnessOf wallId after) (Just (3, 3))
     -- One permanent is one order, so there is nothing to ask. The board differs
     -- from the two above in exactly one thing -- whether the Warden is on the
     -- battlefield.
@@ -232,58 +216,6 @@ orderPrompts gs =
 -- The face each of these permanents is showing, as a name.
 faceNames :: [ObjectId.ObjectId] -> GameState.GameState -> [Maybe String]
 faceNames oids gs = fmap (\oid -> fmap (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs)) oids
-
--- | CR 613.7m's named case, objects ENTERING a zone at one moment, on the
--- MoveToZone road (Restamp.settle after the batch). Replenish returns Humility
--- and Opalescence together; Opalescence makes Humility a creature (layer 4), and
--- in layer 7b Humility's own 1/1 and Opalescence's mana-value 4/4 both write it,
--- so whichever entered with the LATER stamp decides its size. Humility is
--- buried first, so the canonical order stamps Opalescence later.
-entryOrderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-entryOrderSpec s registry =
-  Spec.describe s "Entering" $ do
-    Spec.it s "CR 613.7m the seat's own answer decides which returned enchantment is stamped later" $ do
-      (board, humility) <- replenishBoard s registry
-      let after = castAndResolve reversingAnswer board
-      Spec.assertEqWith s "CR 613.7m Humility was stamped last, so its 1/1 defines it" (fmap (`S.powerToughnessOf` after) (onField humility after)) [Just (1, 1)]
-      Spec.assertEqWith s "and alice was asked once, over both enchantments" (orderPrompts board) [(S.alice, 2)]
-    -- THE PAIR with the case above, differing only in the answer.
-    Spec.it s "CR 613.7m the arrival order stands when the seat answers with it" $ do
-      (board, humility) <- replenishBoard s registry
-      let after = castAndResolve S.castAnswer board
-      Spec.assertEqWith s "CR 613.7m Opalescence was stamped last, so Humility is 4/4" (fmap (`S.powerToughnessOf` after) (onField humility after)) [Just (4, 4)]
-    -- CR 603.10 reads the board after the WHOLE event, so the enters trigger is
-    -- judged under the stamps alice chose, not the arrival order: Pawl.Engine.Event.Match
-    -- reads the entrant off the board at the CR 117.5 scan, after the settle. Kiora is a
-    -- planeswalker, so Humility leaves her ability alone; Humility entering as a
-    -- 4/4 is what she draws for.
-    Spec.it s "CR 613.7m / 603.10 an enters trigger reads the chosen stamps" $ do
-      (board, _) <- replenishBoard s registry
-      kiora <- S.printingOf s registry "Kiora, Behemoth Beckoner"
-      plains <- S.printingOf s registry "Plains"
-      let (_, k1) = S.addPermanent kiora S.alice board
-          (_, stocked) = S.addLibraryCard plains S.alice (snd (S.addLibraryCard plains S.alice k1))
-      Spec.assertEqWith s "CR 603.10 Humility entered as a 1/1 under alice's order, so Kiora draws nothing" (libraryAfter reversingAnswer stocked) 2
-      Spec.assertEqWith s "while the arrival order makes it a 4/4 she draws for" (libraryAfter S.castAnswer stocked) 1
-
--- How many cards alice's library holds after she casts her one spell, it
--- resolves, and every trigger it raised resolves too. The library rather than the
--- hand, since castAnswer plays a drawn land.
-libraryAfter :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Int
-libraryAfter answer gs = length (Game.zoneMembers Zone.Library S.alice (S.runPure answer (castAndResolve answer gs) Engine.priorityLoop))
-
--- alice holds Replenish and eight Plains, with Humility and then Opalescence in
--- her graveyard.
-replenishBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, Printing.Printing)
-replenishBoard s registry = do
-  plains <- S.printingOf s registry "Plains"
-  humility <- S.printingOf s registry "Humility"
-  opalescence <- S.printingOf s registry "Opalescence"
-  spell <- S.printingOf s registry "Replenish"
-  let (_, g1) = S.addGraveyardCard humility S.alice (S.landsFor plains S.alice 8 (Setup.emptyGame S.bothPlayers))
-      (_, g2) = S.addGraveyardCard opalescence S.alice g1
-      (g3, _) = S.handOne spell g2
-  pure (g3, humility)
 
 -- The battlefield permanents printed as this card.
 onField :: Printing.Printing -> GameState.GameState -> [ObjectId.ObjectId]
