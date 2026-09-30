@@ -551,11 +551,13 @@ answerActionChoice key verb choices asked =
                   else unexpected
           _ -> unexpected
         -- CR 601.2c: a single variable slot announces as many targets as the
-        -- move names, and the list stays for the ChooseTargets that follows.
+        -- move names, and the list stays for the ChooseTargets that follows;
+        -- none follows an announced zero, so an empty list is spent here.
         Prompt.Type.AnnounceTargets _ _ _ offered -> case (Choices.targets choices, Map.toList offered) of
           (Just targets, [(slot, (range, candidates))])
             | TargetCount.least range <= Natural.length targets
-                && Natural.length targets <= TargetCount.ceilingOn (Natural.length candidates) range ->
+                && Natural.length targets <= TargetCount.ceilingOn (Natural.length candidates) range -> do
+                Monad.when (null targets) (updateChoices (\current -> current {Choices.targets = Nothing}))
                 pure (Map.singleton slot (Natural.length targets))
           _ -> unexpected
         Prompt.Type.ChooseModes _ _ _ legal selection -> case Choices.modes choices of
