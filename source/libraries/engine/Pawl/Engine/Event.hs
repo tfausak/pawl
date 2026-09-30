@@ -3271,6 +3271,18 @@ apply batch candidate event =
                 else CounterKind.Named Keyword.chargeCounter
         addEnteringCounters oid kind (Natural.length (Projection.colorsSpentOf oid gs))
         pure (Just event)
+      -- CR 702.43a / 702.44c: Arcbound Wanderer's Modular--Sunburst. The arm
+      -- above's count, but modular's counter kind: rule 702.44c makes the
+      -- entering object's types irrelevant.
+      --
+      -- The KIND is a regression fence rather than proved behaviour: no board
+      -- enters a Modular--Sunburst object as a noncreature, so minting the
+      -- Sunburst row instead leaves the suite green (2026-09-30).
+      EntryRewrite.ModularSunburst -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        addEnteringCounters oid CounterKind.PlusOnePlusOne (Natural.length (Projection.colorsSpentOf oid gs))
+        pure (Just event)
       -- CR 702.150a via CR 614.1c: compleated on Tamiyo, Compleated Sage. "It
       -- instead enters the battlefield with that many loyalty counters MINUS TWO
       -- FOR EACH OF THOSE MANA SYMBOLS" -- the payload is the symbol count, so the

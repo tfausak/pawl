@@ -4982,6 +4982,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []
   EntryRewrite.Sunburst -> []
+  EntryRewrite.ModularSunburst -> []
   EntryRewrite.Bloodthirst _ -> []
   EntryRewrite.Tribute _ -> []
   EntryRewrite.Compleated _ -> []

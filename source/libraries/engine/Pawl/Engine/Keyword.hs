@@ -4354,7 +4354,10 @@ mintedReplacementsFor keyword count = case keyword of
       )
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind. One
   -- row per instance, and CR 702.43b makes them add up.
-  Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n))))))
+  Keyword.Modular (Just n) -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n))))))
+  -- CR 702.44c: Modular--Sunburst's N is the colors of mana spent, read off the
+  -- entering object where the row applies, as the sunburst arm below.
+  Keyword.Modular Nothing -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.ModularSunburst))
   -- CR 702.44a's one static ability, the arm above's row with both halves left
   -- to the board: rule 702.44b's count is the colors of mana spent on the
   -- entering object (Pawl.Engine.Projection.colorsSpentOf) and the kind turns

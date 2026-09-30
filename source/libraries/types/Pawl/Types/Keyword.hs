@@ -206,11 +206,9 @@ data Keyword
     -- counters actually present to target artifact creature; each instance works
     -- separately (CR 702.43b).
     --
-    -- A Natural and not a Quantity: CR 702.44c's "Modular--Sunburst" (Arcbound
-    -- Wanderer) is the one printing whose N is another keyword's count.
-    --
-    -- Not implemented: that printing (gap #3699).
-    Modular Natural.Natural
+    -- Nothing is CR 702.44c's "Modular--Sunburst" (Arcbound Wanderer): N is the
+    -- number of colors of mana spent to cast it, bloodthirst X's spelling.
+    Modular (Maybe Natural.Natural)
   | -- | 702.44a: a static ability functioning as this object enters -- with a
     -- +1/+1 counter for each color of mana spent to cast it if it is entering as
     -- a creature ignoring type-changing effects, and a charge counter for each
@@ -218,10 +216,8 @@ data Keyword
     --
     -- Nullary: rule 702.44a fixes both halves, and CR 702.44b's count is the
     -- entering object's own CR 400.7d mana record rather than anything a card
-    -- prints.
-    --
-    -- Not implemented: CR 702.44c's use of the word to set another ability's
-    -- number -- Arcbound Wanderer's "Modular--Sunburst" (gap #3699).
+    -- prints. CR 702.44c's use of the word to set another ability's number is
+    -- that ability's payload (Modular Nothing), not this keyword.
     Sunburst
   | -- | 702.45a: whenever this creature blocks or becomes blocked, it gets +N/+N
     -- until end of turn (CR 509.3a, CR 509.3c); each instance triggers separately
