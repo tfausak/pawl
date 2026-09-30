@@ -1909,15 +1909,20 @@ permitsCastFromGraveyard pid oid face gs =
 -- (Pawl.Engine.Cost.candidateCostsGiven) is scoped the same way, so neither the
 -- permission nor the price reaches the front half.
 --
--- The card is read PRINTED, which is CR 712.11d's own scope and the reading
--- Pawl.Engine.Cost.candidateCostsGiven takes for rule 702.162a: a disturb ability
--- granted to a card lying in a graveyard is not expanded (gap #1859).
+-- The FRONT face's keywords are PROJECTED where the card lies (CR 613.1f), with
+-- the object stamped as that face, since the caller's stamp is the back half and
+-- carries the back face's keywords: Yixlid Jailer's "lose all abilities" takes
+-- disturb away there. Pawl.TransformSpec's "CR 702.146a / 613.1f under Yixlid
+-- Jailer a buried Baithook Angler offers no disturb cast" proves it.
+-- A disturb GRANTED to a card printing none is still never proposed, since
+-- Pawl.Engine.Card.castableFaces reads the printed front face (gap #1859).
 permitsDisturb :: ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsDisturb oid face gs = case Game.cardOf oid gs of
   Nothing -> False
   Just card ->
-    fmap Face.name (Card.convertedFace card) == Just (Face.name face)
-      && not (null (Keyword.disturbCosts (Face.keywordSet (Card.frontFace card))))
+    let front = Face.name (Card.frontFace card)
+     in fmap Face.name (Card.convertedFace card) == Just (Face.name face)
+          && not (null (Keyword.disturbCosts (projectedKeywords oid (asProposed oid front Facing.FaceUp gs))))
 
 -- CR 400.1 / 400.3: is this the object's owner, and so the player whose copy of a
 -- per-player zone it lies in?
