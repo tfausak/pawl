@@ -26,9 +26,10 @@ spec s = Spec.describe s "Pawl.Codec.Seat" $ do
           Seat.Type.battlefield = Seq.singleton (card "Mountain"),
           Seat.Type.hand = Seq.singleton (card "Lightning Bolt"),
           Seat.Type.graveyard = Seq.singleton (card "Goblin Piker"),
-          Seat.Type.library = Seq.singleton (card "Island")
+          Seat.Type.library = Seq.singleton (card "Island"),
+          Seat.Type.exile = Seq.singleton (card "Bad Moon")
         }
-      " {\"name\":\"alice\",\"life\":7,\"battlefield\":[{\"card\":\"Mountain\"}],\"hand\":[{\"card\":\"Lightning Bolt\"}],\"graveyard\":[{\"card\":\"Goblin Piker\"}],\"library\":[{\"card\":\"Island\"}]} "
+      " {\"name\":\"alice\",\"life\":7,\"battlefield\":[{\"card\":\"Mountain\"}],\"hand\":[{\"card\":\"Lightning Bolt\"}],\"graveyard\":[{\"card\":\"Goblin Piker\"}],\"library\":[{\"card\":\"Island\"}],\"exile\":[{\"card\":\"Bad Moon\"}]} "
   Spec.it s "has a schema" $
     Common.assertHasSchema s Seat.codec
 
@@ -40,7 +41,8 @@ empty name =
       Seat.Type.battlefield = Seq.empty,
       Seat.Type.hand = Seq.empty,
       Seat.Type.graveyard = Seq.empty,
-      Seat.Type.library = Seq.empty
+      Seat.Type.library = Seq.empty,
+      Seat.Type.exile = Seq.empty
     }
 
 card :: String -> Placement.Type.Placement

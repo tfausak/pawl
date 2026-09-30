@@ -1,0 +1,31 @@
+{
+  "description": "CR 603.4 Planeswalker's Mischief returns the card alice never cast to bob's hand",
+  "note": "Planeswalker's Mischief at bob reveals his only card, Lightning Bolt, an instant, and exiles it. alice never casts it, so the delayed trigger's CR 603.4 condition holds at her end step and the Bolt returns to bob's hand.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Planeswalker's Mischief", "label": "planeswalkers-mischief" },
+          { "card": "Island", "label": "island" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Island", "label": "island-3" },
+          { "card": "Island", "label": "island-4" }
+        ]
+      },
+      {
+        "name": "bob",
+        "hand": [{ "card": "Lightning Bolt" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@planeswalkers-mischief", "targets": ["@bob"], "mana": ["@island", "@island-2", "@island-3", "@island-4"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Lightning Bolt", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Lightning Bolt", "count": 1 } } }
+  ]
+}

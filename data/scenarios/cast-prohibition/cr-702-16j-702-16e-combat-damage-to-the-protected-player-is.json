@@ -1,0 +1,38 @@
+{
+  "description": "CR 702.16j / 702.16e combat damage to the protected player is prevented, and the same attacker otherwise connects",
+  "note": "The Stasis Coffin's {2}, {T}, exile-itself ability resolves on alice's turn, so on bob's turn the Coffin is in exile and the shield's quality can only come off the stored row. Combat damage rather than a burn spell, since CR 702.16b keeps a protected player from ever being targeted and a burn case would stay green with CR 702.16e's prevention deleted. Two twins differ in one thing each: carol attacked on the same board, and alice attacked with the ability never activated.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "The Stasis Coffin", "label": "coffin" },
+          { "card": "Plains", "label": "plains", "ready": true },
+          { "card": "Plains", "label": "plains-2", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Plains", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ],
+        "hand": [{ "card": "Curse of Vitality" }],
+        "library": [{ "card": "Plains" }]
+      },
+      {
+        "name": "carol"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@coffin", "mana": ["@plains", "@plains-2"], "costOrder": [0, 1] } } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "do": { "Attack": ["@piker"] } },
+    { "turn": 2, "step": "DeclareAttackers", "player": "bob", "source": "@piker", "do": { "ChooseAttackTarget": "@alice" } },
+    { "turn": 2, "step": "EndOfCombat", "player": "bob", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "description": "CR 603.4 Psychic Theft returns the card alice never cast to bob's hand",
+  "note": "Psychic Theft at bob exiles his Lightning Bolt, the one instant beside his Goblin Piker. alice never casts it, so the delayed trigger's CR 603.4 condition holds at her end step and the Bolt returns to bob's hand. Two Mountains, so the {1} could come off one and still leave the Bolt's {R}.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Island", "label": "island" },
+          { "card": "Island", "label": "island-2" },
+          { "card": "Mountain", "label": "mountain" },
+          { "card": "Mountain", "label": "mountain-2" }
+        ],
+        "hand": [{ "card": "Psychic Theft", "label": "psychic-theft" }]
+      },
+      {
+        "name": "bob",
+        "hand": [
+          { "card": "Goblin Piker" },
+          { "card": "Lightning Bolt" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@psychic-theft", "targets": ["@bob"], "mana": ["@mountain", "@island", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Exile", "card": "Lightning Bolt", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Lightning Bolt", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}
