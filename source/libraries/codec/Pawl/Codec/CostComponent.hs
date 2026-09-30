@@ -81,7 +81,8 @@ codec keywordCodec =
       Arm.payload "MillCards" Common.natural CostComponent.MillCards (\x -> case x of CostComponent.MillCards y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseOpponent" CostComponent.ChooseOpponent,
       Arm.payload "Waterbend" Common.natural CostComponent.Waterbend (\x -> case x of CostComponent.Waterbend y -> Just y; _ -> Nothing),
-      Arm.nullary "WaterbendX" CostComponent.WaterbendX
+      Arm.nullary "WaterbendX" CostComponent.WaterbendX,
+      Arm.payload "WaterbendInstead" Common.natural CostComponent.WaterbendInstead (\x -> case x of CostComponent.WaterbendInstead y -> Just y; _ -> Nothing)
     ]
 
 tagOf :: CostComponent.CostComponent keyword -> String
@@ -127,3 +128,4 @@ tagOf x = case x of
   CostComponent.ChooseOpponent {} -> "ChooseOpponent"
   CostComponent.Waterbend {} -> "Waterbend"
   CostComponent.WaterbendX {} -> "WaterbendX"
+  CostComponent.WaterbendInstead {} -> "WaterbendInstead"
