@@ -1438,7 +1438,7 @@ effectObjectRefs effect =
         -- The pair comes out of a target slot, not an ObjectRef.
         Effect.SwitchBlockers {} -> []
         Effect.ExchangeBlocks {} -> []
-        Effect.Counter (Counter.MkCounter ref _ _) -> read_ [ref]
+        Effect.Counter (Counter.MkCounter ref _ _ _) -> read_ [ref]
         Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> read_ [ref]
         Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom _ _ ref) -> read_ [ref]
         -- BOTH sides, each a READ -- CR 122.5 takes no choice of WHICH objects the
@@ -1881,7 +1881,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
           -- PlayerRef above may name several hands. A COMPUTED count is plural
           -- here whatever the board would make it, TopOfLibrary's reading above
           -- and for its reason.
-          ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _) -> case count of
+          ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _ _) -> case count of
             Quantity.Type.Literal n -> n <= 1
             _ -> False
           -- FALSE where the arm above is True, which is the whole difference
@@ -2473,7 +2473,7 @@ effectLintSpec s registry = Spec.describe s "Lint" $ do
         group = SlotName.MkSlotName (Text.pack "revealed")
         inGraveyard = ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController (ZoneScope.Scoped PlayerScope.You) anyCard (Quantity.Type.Literal 1))
         inHand = ObjectRef.ChosenCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard)
-        fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You))
+        fromAmong = ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong group anyCard (Quantity.Type.Literal 1) (PlayerRef.Relative PlayerRelation.You) False)
         atRandom = ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))
         atRandomInGraveyard = ObjectRef.RandomCardInGraveyard (RandomCardInGraveyard.MkRandomCardInGraveyard (ZoneScope.Scoped PlayerScope.You) anyCard (Quantity.Type.Literal 1))
         sought = ObjectRef.RandomCardInLibrary (RandomCardInLibrary.MkRandomCardInLibrary (PlayerRef.Relative PlayerRelation.You) anyCard (Quantity.Type.Literal 1))

@@ -27,12 +27,12 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.TimeTravelChoice as TimeTravelChoice
 import qualified Pawl.Types.Zone as Zone
@@ -73,14 +73,12 @@ permanentCandidates pid gs = filter (\oid -> hasTimeCounter oid gs) (Projection.
 -- time counter -- so all three are asked and none is stored; Pawl.Engine.Suspend
 -- writes no stamp for that reason.
 --
--- The keyword is read off Game.faceOf, the PRINTED card, which is
--- Pawl.Engine.Event.Trigger's reading for its exile scan one zone over: a card in
--- exile is no permanent, so there is no projection over it to ask instead.
+-- The keyword is read through the PROJECTION (CR 613.1 names no zone), so a
+-- suspend an effect gave the exiled card counts -- Delay's "it gains suspend".
+-- Pawl.Engine.Event.Trigger's exile scan reads it the same way.
 suspendedCandidates :: PlayerId -> GameState.GameState -> [ObjectId]
 suspendedCandidates pid gs =
-  let hasSuspend oid = case Game.faceOf oid gs of
-        Nothing -> False
-        Just face -> Maybe.isJust (Keyword.suspend (Face.keywordSet face))
+  let hasSuspend oid = Maybe.isJust (Keyword.suspendKeyword (Map.keysSet (PC.keywords (Projection.project oid gs))))
    in filter (\oid -> hasSuspend oid && hasTimeCounter oid gs) (Game.zoneMembers Zone.Exile pid gs)
 
 -- CR 701.56a's whole candidate set, ASCENDING so a transcript and the prompt's

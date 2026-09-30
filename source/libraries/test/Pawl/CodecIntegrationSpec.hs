@@ -142,7 +142,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
         s
         "effects"
         (Card.allEffects card)
-        [Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing)]
+        [Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing Nothing Nothing)]
       Spec.assertEqWith
         s
         "target slot"
@@ -164,7 +164,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
         s
         "effects"
         (Card.allEffects card)
-        [Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ability"))) Nothing Nothing)]
+        [Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ability"))) Nothing Nothing Nothing)]
       Spec.assertEqWith
         s
         "target slot"

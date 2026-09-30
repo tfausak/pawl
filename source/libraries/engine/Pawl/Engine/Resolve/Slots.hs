@@ -475,7 +475,7 @@ objectRefSlots ref = joinTwo (joinSlots (fmap playerRefSlots (objectRefPlayerRef
   -- Joined with the COUNT's own slots, TopOfLibrary's arm above and for its
   -- reason; the CHOOSER's are the generic playerRefSlots fold this case is joined
   -- into, which is what makes Animal Magnetism's ChoosePlayer slot a read.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _ count _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots count)
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong slot _ count _ _) -> joinTwo (Map.singleton slot SlotArity.Many) (quantitySlots count)
   -- The arm above's read, for its reasons: the candidates come from a slot, and
   -- the ref reads every member of the group to match them.
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong slot _) -> Map.singleton slot SlotArity.Many
@@ -544,7 +544,7 @@ objectRefQuantities ref = case ref of
   -- two, the library walks' counts above being the only other ObjectRef numbers.
   -- A REGRESSION FENCE rather than proven behaviour: every count in the pool is a
   -- Literal, which reads no slot, so dropping this leaves the suite green.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _) -> [count]
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ count _ _) -> [count]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   -- How many cards randomness names out of each hand -- Fall's printed two. A
   -- REGRESSION FENCE for the arm above's reason: every count in the pool is a
@@ -602,7 +602,7 @@ objectRefPlayerRefs ref = case ref of
   -- equality, so the only card whose chooser names a slot cannot observe this
   -- report. A chooser naming a DECLARED target slot would, and no printing writes
   -- one -- Pawl.Types.Chooser's BoundInSlot note says the same of its own.
-  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser) -> [chooser]
+  ObjectRef.ChosenCardFromAmong (ChosenCardFromAmong.MkChosenCardFromAmong _ _ _ chooser _) -> [chooser]
   ObjectRef.EachCardFromAmong (EachCardFromAmong.MkEachCardFromAmong _ _) -> []
   ObjectRef.RandomCardInHand (RandomCardInHand.MkRandomCardInHand player _ _) -> [player]
   -- ChosenCardInGraveyard's answer: the graveyards are named by a ZoneScope,
@@ -731,7 +731,7 @@ effectObjectRefs effect = case effect of
   -- CR 614.9's two sides, the damage's old recipient -- absent where the card
   -- describes it instead -- and its new one.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from _ _ to _) -> Maybe.maybeToList from <> [to]
-  Effect.Counter (Counter.MkCounter ref _ _) -> [ref]
+  Effect.Counter (Counter.MkCounter ref _ _ _) -> [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> [ref]
   Effect.RemoveCounters {} -> []
   Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong _ from _ _) -> [from]
@@ -2456,7 +2456,7 @@ boundSlots effect = case effect of
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
   -- countered this way", and the permanents whose abilities were (CR 113.7).
-  Effect.Counter (Counter.MkCounter _ mSlot mSources) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources
+  Effect.Counter (Counter.MkCounter _ mSlot mSources mExiled) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources <> foldMap Set.singleton mExiled
   Effect.PutCounters {} -> Set.empty
   Effect.PutCountersFrom {} -> Set.empty
   -- CR 122.1: how many counters the removal actually took off, where the card
