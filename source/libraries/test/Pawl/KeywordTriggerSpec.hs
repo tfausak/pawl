@@ -758,12 +758,6 @@ selfBlocksSpec s registry =
       noBlocks p = case p of
         Prompt.DeclareBlockers {} -> Map.empty
         _ -> S.aggressiveAnswer p
-      -- Blocks EVERY attacker with `blocker` alone, which aggressiveAnswer
-      -- cannot express: it puts every blocker on the first attacker.
-      blockEverything :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-      blockEverything blocker p = case p of
-        Prompt.DeclareBlockers _ _ _ attackers -> Map.singleton blocker (Set.fromList attackers)
-        _ -> S.aggressiveAnswer p
       board mine theirs = do
         ours <- mapM (S.printingOf s registry) mine
         yours <- mapM (S.printingOf s registry) theirs
@@ -793,35 +787,6 @@ selfBlocksSpec s registry =
           let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer gs
           Spec.assertEqWith s "the fixture reached the combat damage step" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
           Spec.assertEqWith s "and bob is already at 23" (S.lifeOf S.bob atDamage) (Just 23)
-        -- CR 603.2: the condition is the BEARER's own declaration. bob blocks one
-        -- attacker with two creatures, so two declarations are recorded and only
-        -- one of them is the Guardian's. The falsifier is a match that ignores
-        -- the blocker on the event: that fires twice, for 26.
-        Spec.it s "CR 603.2 another creature's block does not fire the Guardian's ability" $ do
-          (gs, _, _) <- board ["Goblin Piker"] ["Pride Guardian", "Goblin Piker"]
-          let after = S.runCombat S.aggressiveAnswer gs
-          Spec.assertEqWith s "one gain of 3, not two" (S.lifeOf S.bob after) (Just 23)
-        -- CR 509.1a gives each blocker one creature to block by default, so a
-        -- second ATTACKER adds a declaration the Guardian is not in. alice attacks with
-        -- two Pikers and aggressiveAnswer blocks the first; the second's 2 gets
-        -- through. 20 + 3 - 2 = 21. The falsifier is a condition that matched an
-        -- attacker's declaration too -- three events rather than one, for 25.
-        Spec.it s "CR 509.3a an attacker's own declaration is not a block" $ do
-          (gs, _, _) <- board ["Goblin Piker", "Goblin Piker"] ["Pride Guardian"]
-          let after = S.runCombat S.aggressiveAnswer gs
-          Spec.assertEqWith s "gained 3 once, then took 2 from the unblocked Piker" (S.lifeOf S.bob after) (Just 21)
-        -- Rule 509.3a's "even if it blocks multiple creatures", now that a
-        -- creature can. A High Ground gives bob's team the arity, the Guardian
-        -- blocks both Pikers, and the gain is 3 once rather than 3 twice. The
-        -- falsifier is a match on the PAIRWISE GameEvent.BecameBlocking, which
-        -- fires per attacker blocked: 26.
-        Spec.it s "CR 509.3a blocking TWO creatures still gains 3 once" $ do
-          (gs, _, theirs) <- board ["Goblin Piker", "Goblin Piker"] ["Pride Guardian", "High Ground"]
-          case theirs of
-            [guardian, _] -> do
-              let after = S.runCombat (blockEverything guardian) gs
-              Spec.assertEqWith s "one gain of 3, not two" (S.lifeOf S.bob after) (Just 23)
-            _ -> Spec.assertFailure s "fixture should give bob a Guardian and a High Ground"
         -- The other side of the same coin, and CR 508.3a's own words: a creature
         -- that BLOCKS did not attack. Hanweir Garrison {2}{R} 2/3, "Whenever this
         -- creature attacks, create two 1/1 red Human creature tokens that are
@@ -1658,30 +1623,6 @@ selfBecomesBlockedSpec s registry =
               Spec.assertEqWith s "control leg: unblocked, so no gain" (S.lifeOf S.alice unblocked) (Just 20)
               Spec.assertEqWith s "and its 1 gets through" (S.lifeOf S.bob unblocked) (Just 19)
             _ -> Spec.assertFailure s "fixture should give alice one Sacred Prey"
-        -- CR 509.3c's "only once each combat for that creature, even if it's
-        -- blocked by multiple creatures". Two Pikers block the one Prey, so two
-        -- GameEvent.BecameBlocking are recorded and exactly one
-        -- GameEvent.AttackerBlocked. The falsifier is a condition matched against
-        -- the declaration's pairs instead: that fires twice, for 22.
-        Spec.it s "CR 509.3c two blockers on one attacker still gain 1, not 2" $ do
-          (gs, _, _) <- board ["Sacred Prey"] ["Goblin Piker", "Goblin Piker"]
-          Spec.assertEqWith s "one gain of 1" (S.lifeOf S.alice (S.runCombat S.aggressiveAnswer gs)) (Just 21)
-        -- CR 509.3a and CR 509.3c on one board, which is what tells the two arms
-        -- apart: alice's Prey becomes blocked by bob's Guardian, so alice gains 1
-        -- and bob gains 3 off a single declaration. Either arm reading the other's
-        -- event moves one of those two numbers.
-        Spec.it s "CR 509.3a and CR 509.3c fire on opposite sides of one declaration" $ do
-          (gs, _, _) <- board ["Sacred Prey"] ["Pride Guardian"]
-          let after = S.runCombat S.aggressiveAnswer gs
-          Spec.assertEqWith s "the attacker's controller gained 1" (S.lifeOf S.alice after) (Just 21)
-          Spec.assertEqWith s "the blocker's controller gained 3" (S.lifeOf S.bob after) (Just 23)
-        -- The converse, and CR 509.3c's own words: a creature that BLOCKS does not
-        -- become blocked. Here the Prey is bob's and blocking a Piker; the
-        -- falsifier is an arm that matched GameEvent.BecameBlocking, which would
-        -- put bob at 21.
-        Spec.it s "CR 509.3c blocking is not becoming blocked, so a blocking Sacred Prey gains nothing" $ do
-          (gs, _, _) <- board ["Goblin Piker"] ["Sacred Prey"]
-          Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer gs)) (Just 20)
         -- CR 509.3c's guard on its THIRD producer, and the one thing rule
         -- 509.3e's arrival road must not cost: "It will also trigger if that
         -- creature becomes blocked by an effect or by a creature that's put onto

@@ -1,0 +1,29 @@
+{
+  "description": "CR 509.3a blocking TWO creatures still gains 3 once",
+  "note": "Rule 509.3a's \"even if it blocks multiple creatures\". High Ground gives bob's team the extra block, the Guardian blocks both Pikers, and the gain is 3 once rather than 3 twice. The falsifier is a match on the per-attacker blocking event, which fires once per attacker blocked: 26.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "goblin-piker", "ready": true },
+          { "card": "Goblin Piker", "label": "goblin-piker-2", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          { "card": "Pride Guardian", "label": "pride-guardian", "ready": true },
+          { "card": "High Ground", "ready": true }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker", "@goblin-piker-2"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@pride-guardian": ["@goblin-piker", "@goblin-piker-2"] } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 23 } } }
+  ]
+}

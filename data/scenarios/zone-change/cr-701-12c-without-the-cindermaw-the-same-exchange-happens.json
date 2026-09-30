@@ -1,0 +1,37 @@
+{
+  "description": "CR 701.12c without the Cindermaw the same exchange happens",
+  "note": "The paired control on the same board: the Cindermaw is the only difference, so the Cindermaw case is not passing for want of mana or a target.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 4,
+        "battlefield": [
+          { "card": "Island", "label": "island", "ready": true },
+          { "card": "Island", "label": "island-2", "ready": true },
+          { "card": "Island", "label": "island-3", "ready": true },
+          { "card": "Island", "label": "island-4", "ready": true },
+          { "card": "Island", "label": "island-5", "ready": true },
+          { "card": "Island", "label": "island-6", "ready": true },
+          { "card": "Soul Conduit", "label": "soul-conduit", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "life": 27
+      },
+      {
+        "name": "carol",
+        "life": 13
+      }
+    ],
+    "active": "alice",
+    "step": "Upkeep"
+  },
+  "timeline": [
+    { "turn": 1, "step": "Upkeep", "player": "alice", "do": { "Activate": { "object": "@soul-conduit", "targets": ["@bob", "@carol"], "mana": ["@island", "@island-2", "@island-3", "@island-4", "@island-5", "@island-6"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "carol", "life": 27 } }
+  ]
+}

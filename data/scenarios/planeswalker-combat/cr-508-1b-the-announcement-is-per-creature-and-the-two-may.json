@@ -1,0 +1,35 @@
+{
+  "description": "CR 508.1b the announcement is per creature, and the two may differ",
+  "note": "CR 508.1b's announcement is asked PER CREATURE, and the answers are independent: two Pikers, one at Jace and one at bob.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Goblin Piker", "label": "goblin-piker", "ready": true },
+          { "card": "Goblin Piker", "label": "goblin-piker-2", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [
+          {
+            "card": "Jace Beleren",
+            "label": "jace-beleren",
+            "ready": true,
+            "counters": [{ "key": { "type": "Loyalty" }, "value": 3 }]
+          }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@goblin-piker", "@goblin-piker-2"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@goblin-piker", "do": { "ChooseAttackTarget": "@jace-beleren" } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@goblin-piker-2", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Counters": { "object": "@jace-beleren", "kind": { "type": "Loyalty" }, "count": 1 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } }
+  ]
+}

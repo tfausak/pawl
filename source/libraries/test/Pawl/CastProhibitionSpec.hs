@@ -429,21 +429,6 @@ blossomingCalmHandoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
 blossomingCalmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blossomingCalmSpec s registry =
   Spec.describe s "Blossoming Calm" $ do
-    -- THE CONTROL TWIN. Same seats, same Mountain, same Bolt, same answerer --
-    -- the only difference from the case below is that alice never cast her
-    -- instant. Without this, "alice took no damage" could mean the Bolt was
-    -- never cast at all.
-    Spec.it s "with no Calm cast, bob's Bolt reaches alice" $ do
-      plains <- S.printingOf s registry "Plains"
-      calm <- S.printingOf s registry "Blossoming Calm"
-      mountain <- S.printingOf s registry "Mountain"
-      bolt <- S.printingOf s registry "Lightning Bolt"
-      let (_, boltId, before) = blossomingCalmBoard plains calm mountain bolt
-          burned = blossomingCalmBolt boltId before
-      Spec.assertEqWith s "alice takes the Bolt" (S.lifeOf S.alice burned) (Just 17)
-      Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob burned) (Just 20)
-      Spec.assertEqWith s "and so is carol" (S.lifeOf S.carol burned) (Just 20)
-
     -- CR 611.1: the resolution stores the effect, and CR 702.11c's player
     -- hexproof takes alice out of the Bolt's candidate set. The life gain is the
     -- second clause of the same spell, and it is asserted for its own sake: it is

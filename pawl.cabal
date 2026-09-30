@@ -14,7 +14,7 @@ license-file: LICENSE.txt
 data-dir: data
 data-files:
   cards/*.json
-  scenarios/*.json
+  scenarios/**/*.json
 
 extra-doc-files:
   CHANGELOG.md

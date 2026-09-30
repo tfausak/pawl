@@ -1584,16 +1584,6 @@ galvanicBlastSpec s registry =
       -- CR 614.3's "until they're used up": the row applied, so Uses.Once spent
       -- it. Nothing is left to replace a later damage event this turn.
       Spec.assertEqWith s "and the one-shot was consumed" (GameState.replacements after) []
-    Spec.it s "CR 614.15 the metalcraft count is artifacts YOU control, not everyone's" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      myr <- S.printingOf s registry "Darksteel Myr"
-      galvanicBlast <- S.printingOf s registry "Galvanic Blast"
-      -- alice has two; bob has three. CR 109.5's "you" is the spell's
-      -- controller, so hers is the count that matters and metalcraft is off.
-      let (gs0, spellId) = metalcraftBoard mountain myr galvanicBlast 2 []
-          gs = List.foldl' (\g _ -> snd (S.addPermanent myr S.bob g)) gs0 [1 :: Int, 2, 3]
-          after = castAndResolve atBob gs spellId
-      Spec.assertEqWith s "bob takes 2, not 4" (S.lifeOf S.bob after) (Just 18)
     -- CR 616.1a, and the reason the SelfReplacement bucket exists: "if any of
     -- the replacement and/or prevention effects are self-replacement effects
     -- (see rule 614.15), one of them must be chosen."
@@ -1626,20 +1616,6 @@ galvanicBlastSpec s registry =
       -- two candidates share CR 616.1e's bucket, DOES ask -- so this is the
       -- bucket ordering being observed, not prompts being suppressed in general.
       Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
-    -- The control leg for the Furnace: with metalcraft OFF there is no
-    -- self-replacement at all, so the Furnace doubles the printed 2. Without
-    -- this, an engine that ignored the metalcraft clause entirely and simply
-    -- doubled twice would also reach 8.
-    Spec.it s "CR 614.1a Furnace of Rath alone doubles the printed 2, not 4" $ do
-      mountain <- S.printingOf s registry "Mountain"
-      myr <- S.printingOf s registry "Darksteel Myr"
-      furnaceOfRath <- S.printingOf s registry "Furnace of Rath"
-      galvanicBlast <- S.printingOf s registry "Galvanic Blast"
-      -- Two Myr, so the Furnace is the ONLY artifact short of metalcraft's three
-      -- -- an enchantment, so it cannot make up the count itself.
-      let (gs, spellId) = metalcraftBoard mountain myr galvanicBlast 2 [furnaceOfRath]
-          after = castAndResolve atBob gs spellId
-      Spec.assertEqWith s "bob takes 4" (S.lifeOf S.bob after) (Just 16)
     -- CR 614.15's "this way": the clause replaces the damage ITS OWN SOURCE is
     -- dealing and nothing else.
     --

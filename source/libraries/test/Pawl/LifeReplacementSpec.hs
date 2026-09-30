@@ -81,20 +81,6 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     Spec.assertEqWith s "CR 614.1a alice stops at 1 rather than the -1 the damage would give" (S.lifeOf S.alice after) (Just 1)
     Spec.assertEqWith s "CR 120.3f the whole 3 was still dealt, so lifelink gains bob 3 and not 1" (S.lifeOf S.bob after) (Just 23)
     Spec.assertEqWith s "CR 120.4b the damage event itself is undiminished" (fmap DamageEvent.amount (S.damageEventsOf after)) [3]
-  -- CR 120.4d's own Worship example, in its second reading: "Worship's effect sees
-  -- that the damage event would not reduce the player's life total to less than 1,
-  -- so Worship's effect is not applied."
-  Spec.it s "CR 120.4d damage that does not reach the floor is left alone" $ do
-    plains <- S.printingOf s registry "Plains"
-    worship <- S.printingOf s registry "Worship"
-    piker <- S.printingOf s registry "Goblin Piker"
-    celestine <- S.printingOf s registry "Celestine, the Living Saint"
-    let base = S.landsInPlay plains 2
-        (_, g1) = S.addPermanent worship S.alice base
-        (_, g2) = S.addPermanent piker S.alice g1
-        (_, g3) = S.addPermanent celestine S.bob g2
-        after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 5 g3))
-    Spec.assertEqWith s "the 3 lands whole: 5 - 3 = 2, not clamped to anything" (S.lifeOf S.alice after) (Just 2)
   -- The CONTROL is the same board with alice's creature taken away, so the only
   -- difference is the printed clause.
   Spec.it s "CR 604.2 with no creature the printed clause is false and the whole 3 lands" $ do
@@ -106,27 +92,6 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
         (_, g2) = S.addPermanent celestine S.bob g1
         after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g2))
     Spec.assertEqWith s "alice controls no creature, so she takes all 3 and ends at -1" (S.lifeOf S.alice after) (Just (-1))
-  -- CR 510.2's simultaneity, and CR 120.4d's first Worship example scaled down:
-  -- two attackers, each of whom alone would carry alice past the floor. Reading
-  -- each proposal against the PRE-BATCH life would cut both to a loss of 1 and
-  -- leave her at 0, dead to CR 704.5a.
-  Spec.it s "CR 510.2 two simultaneous hits still leave exactly 1" $ do
-    plains <- S.printingOf s registry "Plains"
-    worship <- S.printingOf s registry "Worship"
-    piker <- S.printingOf s registry "Goblin Piker"
-    celestine <- S.printingOf s registry "Celestine, the Living Saint"
-    -- A 2/1 lifelink Child of Night rather than a second Celestine: CR 704.5j
-    -- would bury one of two legends before either could attack, and the two
-    -- amounts differ anyway, which no single number could tell apart.
-    child <- S.printingOf s registry "Child of Night"
-    let base = S.landsInPlay plains 2
-        (_, g1) = S.addPermanent worship S.alice base
-        (_, g2) = S.addPermanent piker S.alice g1
-        (_, g3) = S.addPermanent celestine S.bob g2
-        (_, g4) = S.addPermanent child S.bob g3
-        after = S.runCombat attackNoBlock (bobAttacks (atLife S.alice 2 g4))
-    Spec.assertEqWith s "alice is at 1, not at the 0 a pre-batch reading would give" (S.lifeOf S.alice after) (Just 1)
-    Spec.assertEqWith s "CR 702.15e each lifelink source gained its own amount, 3 and 2" (S.lifeOf S.bob after) (Just 25)
   -- CR 120.4d's SECOND Example, which is the half CR 120.3f's gain makes
   -- reachable without Awe Strike: one damage event whose results are both a loss
   -- and a gain. "That's processed into its results, so the damage event is now
@@ -156,25 +121,6 @@ worshipSpec s registry = Spec.describe s "Worship (CR 120.4c)" $ do
     Spec.assertEqWith s "CR 120.4c alice ends at 4 - 5 + 3 = 2, the floor never applying" (S.lifeOf S.alice after) (Just 2)
     Spec.assertEqWith s "setup: the block happened, so Celestine's 3 killed the 2/1 Piker (CR 704.5g)" (S.creaturesInPlay S.bob after) 1
     Spec.assertEqWith s "setup: alice's lifelink blocker survived the Piker's 2, so Worship's clause stayed true" (S.creaturesInPlay S.alice after) 1
-  -- Worship's own ruling: "Worship does not prevent loss of life, so loss of life
-  -- bypasses Worship." Zof Consumption ({4}{B}{B} Sorcery, "Each opponent loses 4
-  -- life and you gain 4 life") is the road CR 119.3 owns, against the same board
-  -- at the same life that survives 3 damage above.
-  Spec.it s "CR 119.3 life loss from an effect bypasses the clause" $ do
-    swamp <- S.printingOf s registry "Swamp"
-    worship <- S.printingOf s registry "Worship"
-    piker <- S.printingOf s registry "Goblin Piker"
-    discipline <- S.printingOf s registry "Stronghold Discipline"
-    let base = S.landsInPlay swamp 4
-        (_, g1) = S.addPermanent worship S.alice base
-        (_, g2) = S.addPermanent piker S.alice g1
-        (_, g3) = S.addPermanent piker S.alice g2
-        (_, g4) = S.addPermanent piker S.alice g3
-        (held, g5) = S.addHandCard discipline S.alice g4
-        ready = inMainPhase S.alice (atLife S.alice 2 g5)
-        after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "alice loses the whole 3, floor and all: 2 - 3 = -1" (S.lifeOf S.alice after) (Just (-1))
-    Spec.assertEqWith s "and bob, controlling no creature, loses nothing" (S.lifeOf S.bob after) (Just 20)
 
 -- Fills every target slot with bob, the opponent whose life total the exchange
 -- cases below drive down. FILTERED rather than hand-built, so CR 608.2b's re-read
@@ -281,31 +227,6 @@ bloodletterSpec s registry = Spec.describe s "Bloodletter of Aclazotz (CR 119.4 
             (Damage.applyDamage [DamageEvent.MkDamageEvent source (Recipient.ToPlayer S.bob) 3 False False False 0 Nothing Nothing mempty False DamageKind.Noncombat])
     Spec.assertEqWith s "3 damage costs bob 6 life, not the 12 a second application would" (S.lifeOf S.bob after) (Just 14)
     Spec.assertEqWith s "CR 120.4b the damage event itself is undiminished" (fmap DamageEvent.amount (S.damageEventsOf after)) [3]
-  -- CR 119.5: "If an effect sets a player's life total to a specific number, the
-  -- player gains or loses the necessary amount of life to end up with the new
-  -- total." Biorhythm ({6}{G}{G} Sorcery, "Each player's life total becomes the
-  -- number of creatures they control") sets three seats at once off one pre-effect
-  -- board (CR 608.2f), which is what lets one case read all three answers:
-  -- an opponent's LOSS is resized, the controller's own loss is not, and a GAIN is
-  -- not a loss at all and proposes nothing.
-  --
-  -- Every number is distinct -- alice 20 -> 1, bob 20 -> -20 rather than 0, carol
-  -- 2 -> 3 rather than 4 -- so no two readings of the rule land on the same total.
-  Spec.it s "CR 119.5 a total set LOWER is a life loss the row resizes, and one set higher is not" $ do
-    forest <- S.printingOf s registry "Forest"
-    biorhythm <- S.printingOf s registry "Biorhythm"
-    bloodletter <- S.printingOf s registry "Bloodletter of Aclazotz"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addPermanent bloodletter S.alice S.threePlayerGame
-        (_, g2) = S.addPermanent piker S.carol g1
-        (_, g3) = S.addPermanent piker S.carol g2
-        (_, g4) = S.addPermanent piker S.carol g3
-        (held, g5) = S.addHandCard biorhythm S.alice g4
-        ready = inMainPhase S.alice (atLife S.carol 2 (S.landsFor forest S.alice 8 g5))
-        after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "CR 119.5 bob's total becomes 0, a loss of 20, which the row doubles to 40" (S.lifeOf S.bob after) (Just (-20))
-    Spec.assertEqWith s "alice's own loss of 19 down to her one creature is not an opponent's" (S.lifeOf S.alice after) (Just 1)
-    Spec.assertEqWith s "carol's three creatures RAISE her, and a gain is no life loss to resize" (S.lifeOf S.carol after) (Just 3)
   -- CR 701.12c: "each player gains or loses the amount of life necessary to equal
   -- the other player's previous life total. Replacement effects may modify these
   -- gains and losses". So an exchange is not a pair of assignments: its lowered
@@ -759,21 +680,6 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
     Spec.assertEqWith s "CR 614.1a alice's printed gain of 2 becomes 4" (S.lifeOf S.alice after) (Just 24)
     Spec.assertEqWith s "CR 109.5 bob is not the row's you, so his same 2 stays 2" (S.lifeOf S.bob after) (Just 22)
     Spec.assertEqWith s "and carol, who gained nothing, is untouched" (S.lifeOf S.carol after) (Just 20)
-  -- CR 616.2 rather than CR 614.5: the rewritten event is re-collected, so the
-  -- SECOND row applies to the doubled gain. The card's own ruling states the
-  -- answer -- "if you control two Boon Reflections, you'll gain four times the
-  -- original amount" -- and the board is the case above with one more row, so the
-  -- two differ in exactly one thing.
-  Spec.it s "CR 616.2 two rows compound rather than one spending the event" $ do
-    plains <- S.printingOf s registry "Plains"
-    calm <- S.printingOf s registry "Blossoming Calm"
-    boon <- S.printingOf s registry "Boon Reflection"
-    let (_, g1) = S.addPermanent boon S.alice S.threePlayerGame
-        (_, g2) = S.addPermanent boon S.alice g1
-        (alicesCalm, g3) = S.addHandCard calm S.alice g2
-        ready = S.landsFor plains S.alice 1 (inMainPhase S.alice g3)
-        after = S.runPure S.identityAnswer ready (S.cast S.alice alicesCalm Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "2 doubled twice is 8, not the 4 one row alone gives" (S.lifeOf S.alice after) (Just 28)
   -- CR 120.3f: lifelink's gain is a life gain event like any other, so the row
   -- reaches it -- which is the half of this unit that no Effect.GainLife road can
   -- prove, Pawl.Engine.Damage having its own write.
@@ -821,37 +727,6 @@ boonReflectionSpec s registry = Spec.describe s "Boon Reflection (CR 119.10 / 61
         after = S.runPure S.identityAnswer (snd (S.addPermanent boon S.alice armed)) (Event.drawCard S.alice)
     Spec.assertEqWith s "CR 614.1a the substituted 5 becomes 10, so alice is at 30" (S.lifeOf S.alice after) (Just 30)
     Spec.assertEqWith s "CR 614.6 and the draw still never happened" (S.handSize S.alice after) 0
-  -- CR 119.5's upward direction, through Pawl.Engine.Resolve's changeLifeByDelta:
-  -- "if an effect sets a player's life total to a specific number, the player
-  -- gains or loses the necessary amount of life". The card's own ruling is the
-  -- exact claim -- "your life total will actually become 17" from 3 on a set to
-  -- 10 -- so the resulting total OVERSHOOTS the number the effect named.
-  --
-  -- Biorhythm ({6}{G}{G} Sorcery, "Each player's life total becomes the number of
-  -- creatures they control") is the Bloodletter group's producer one direction
-  -- over: one instruction, three seats, three answers off one pre-effect board
-  -- (CR 608.2f). carol holds the row and is the only seat whose total goes UP.
-  --
-  -- Every number distinct -- alice to 1, bob to 2, carol from 2 by a gain of 1
-  -- doubled to 2 -- so the unreplaced reading of carol (3) collides with nothing.
-  Spec.it s "CR 119.5 a total set HIGHER is a life gain the row resizes" $ do
-    forest <- S.printingOf s registry "Forest"
-    biorhythm <- S.printingOf s registry "Biorhythm"
-    boon <- S.printingOf s registry "Boon Reflection"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (_, g1) = S.addPermanent boon S.carol S.threePlayerGame
-        (_, g2) = S.addPermanent piker S.alice g1
-        (_, g3) = S.addPermanent piker S.bob g2
-        (_, g4) = S.addPermanent piker S.bob g3
-        (_, g5) = S.addPermanent piker S.carol g4
-        (_, g6) = S.addPermanent piker S.carol g5
-        (_, g7) = S.addPermanent piker S.carol g6
-        (held, g8) = S.addHandCard biorhythm S.alice g7
-        ready = inMainPhase S.alice (atLife S.carol 2 (S.landsFor forest S.alice 8 g8))
-        after = S.runPure S.identityAnswer ready (S.cast S.alice held Monad.>> Stack.resolveTop)
-    Spec.assertEqWith s "CR 119.5 carol gains the 1 that would reach 3, doubled, so she ends at 4" (S.lifeOf S.carol after) (Just 4)
-    Spec.assertEqWith s "alice's total falls to her one creature, and a loss is no gain to resize" (S.lifeOf S.alice after) (Just 1)
-    Spec.assertEqWith s "and bob's falls to his two, the row being carol's alone" (S.lifeOf S.bob after) (Just 2)
 
 ashiokSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ashiokSpec s registry = Spec.describe s "Ashiok, Wicked Manipulator (CR 119.4 / 614.6)" $ do

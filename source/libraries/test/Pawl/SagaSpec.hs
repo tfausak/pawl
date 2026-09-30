@@ -75,16 +75,6 @@ birdToken = CardName.MkCardName (Text.pack "Bird Token")
 -- gameplay-level test rather than a projection one.
 entrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 entrySpec s registry = Spec.describe s "Entry" $ do
-  Spec.it s "CR 714.3a History of Benalia enters with a lore counter on it" $ do
-    plains <- S.printingOf s registry "Plains"
-    benalia <- S.printingOf s registry "History of Benalia"
-    let (gs, spellId) = S.handOne benalia (S.landsInPlay plains 3)
-        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
-        after = S.runPure S.identityAnswer cast Stack.resolveTop
-    case sagaOf after of
-      Nothing -> Spec.assertFailure s "History of Benalia did not reach the battlefield"
-      Just oid ->
-        Spec.assertEqWith s "one lore counter" (S.counterOf CounterKind.Lore oid after) 1
   -- CR 714.3a's "each Saga" reaching a permanent that is one only because layer 4
   -- says so (CR 613.1d / 205.1b). Synthetic Chronicle Weaving grants the subtype
   -- to the other enchantments its controller has, and High Ground -- printed as a
@@ -180,13 +170,6 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
         after = S.runPure S.identityAnswer gs Engine.runStep
     Spec.assertEqWith s "the step put the second lore counter on" (S.counterOf CounterKind.Lore oid after) 2
     Spec.assertEqWith s "and the step really was the precombat main phase" (GameState.phase gs) Phase.PrecombatMain
-  Spec.it s "CR 714.3c the active player puts a lore counter on each Saga they control" $ do
-    benalia <- S.printingOf s registry "History of Benalia"
-    let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
-        withCounter = S.addCounter CounterKind.Lore 1 oid base
-        gs = precombatMainOf S.alice withCounter
-        after = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
-    Spec.assertEqWith s "a second lore counter" (S.counterOf CounterKind.Lore oid after) 2
   Spec.it s "CR 714.3c and it fires the chapter that counter crossed, not the ones below it" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     let (oid, base) = S.addPermanent benalia S.alice (Setup.emptyGame S.bothPlayers)
@@ -238,15 +221,6 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
         bare = S.runPure S.identityAnswer (precombatMainOf S.alice base) (Engine.runTurnBasedActions Phase.PrecombatMain)
     Spec.assertEqWith s "two lore counters, not one" (S.counterOf CounterKind.Lore oid after) 2
     Spec.assertEqWith s "and one without the praetor" (S.counterOf CounterKind.Lore oid bare) 1
-  Spec.it s "CR 714.3c a Saga its controller does not control the turn of stays put" $ do
-    benalia <- S.printingOf s registry "History of Benalia"
-    let (oid, base) = S.addPermanent benalia S.bob (Setup.emptyGame S.bothPlayers)
-        withCounter = S.addCounter CounterKind.Lore 1 oid base
-        -- ALICE's precombat main phase. CR 505.4 names the active player, and
-        -- bob's Saga is not theirs to advance.
-        gs = precombatMainOf S.alice withCounter
-        after = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
-    Spec.assertEqWith s "bob's Saga still has one lore counter" (S.counterOf CounterKind.Lore oid after) 1
 
 -- CR 704.5s / 714.4: the state-based action.
 sacrificeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

@@ -1,0 +1,30 @@
+{
+  "description": "CR 601.2f Murderous Betrayal's half is fixed before Mana Confluence's life is paid",
+  "note": "Murderous Betrayal's {B}{B} from a Swamp and a Mana Confluence, at 11 life. CR 601.2f fixes the half at 6 before CR 601.2g's Confluence pays 1, so alice ends at 4; a half measured when the component is paid reads 10 and leaves her at 5.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "life": 11,
+        "battlefield": [
+          { "card": "Murderous Betrayal", "label": "murderous-betrayal" },
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Mana Confluence", "label": "mana-confluence", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "goblin-piker" }]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Activate": { "object": "@murderous-betrayal", "targets": ["@goblin-piker"], "mana": ["@swamp", "@mana-confluence"], "yields": [[{ "manaType": { "type": "Colored", "value": { "type": "Black" } }, "tags": [], "retention": { "type": "Ordinary" }, "restriction": null, "rider": null, "sourceChosenSubtype": null }]] } } }
+  ],
+  "final": [
+    { "Life": { "player": "alice", "life": 4 } },
+    { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } }
+  ]
+}

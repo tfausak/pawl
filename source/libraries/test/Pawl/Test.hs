@@ -1542,6 +1542,7 @@ spec s registry = do
   Pawl.SplitSecondSpec.spec s registry
   Pawl.StationSpec.spec s registry
   Pawl.ScenarioSpec.spec s registry
+  Pawl.ScenarioSpec.loadSpec s
   Pawl.TargetSpec.spec s registry
   Pawl.TargetPerPlayerSpec.spec s registry
   Pawl.RangeOfInfluenceSpec.spec s registry

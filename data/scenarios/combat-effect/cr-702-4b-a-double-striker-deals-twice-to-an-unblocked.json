@@ -1,0 +1,21 @@
+{
+  "description": "CR 702.4b a double striker deals twice to an unblocked player",
+  "note": "The 2/1 double striker deals 2 in each combat damage step, so bob loses 4. The first-strike and vanilla scenarios beside it are the controls: each deals once.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Ridgetop Raptor", "label": "ridgetop-raptor", "ready": true }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@ridgetop-raptor"] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 16 } } }
+  ]
+}

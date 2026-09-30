@@ -1,0 +1,37 @@
+{
+  "description": "CR 119.3 whole cards: Sign in Blood costs bob 2 life and Exquisite Blood gains alice that much",
+  "note": "The gameplay-level proof, cast to resolution: bob loses 2 (CR 119.3), and Exquisite Blood matches that event and gains alice the 2 it carried. Both players have library cards, so neither the target nor the control's target loses to CR 104.3c before a trigger could resolve.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Exquisite Blood", "ready": true }
+        ],
+        "hand": [{ "card": "Sign in Blood", "label": "sign-in-blood", "ready": true }],
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          { "card": "Swamp" },
+          { "card": "Swamp" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@sign-in-blood", "targets": ["@bob"], "mana": ["@swamp", "@swamp-2"] } } }
+  ],
+  "final": [
+    { "Life": { "player": "bob", "life": 18 } },
+    { "Life": { "player": "alice", "life": 22 } }
+  ]
+}
