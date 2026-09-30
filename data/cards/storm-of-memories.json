@@ -1,0 +1,154 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Storm"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Storm of Memories",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": {
+                      "ref": {
+                        "type": "RandomCardInGraveyard",
+                        "value": {
+                          "filter": {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "Or",
+                                "value": [
+                                  {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Instant"
+                                    }
+                                  },
+                                  {
+                                    "type": "HasCardType",
+                                    "value": {
+                                      "type": "Sorcery"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "ManaValueAtMost",
+                                "value": 3
+                              }
+                            ]
+                          },
+                          "players": {
+                            "type": "Scoped",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        }
+                      },
+                      "slot": "exiled",
+                      "zone": {
+                        "type": "Exile"
+                      }
+                    }
+                  },
+                  {
+                    "type": "OfferCast",
+                    "value": {
+                      "offer": {
+                        "withoutPayingManaCost": true
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "exiled"
+                      },
+                      "slot": "spell"
+                    }
+                  },
+                  {
+                    "type": "Replace",
+                    "value": {
+                      "duration": {
+                        "type": "Indefinite"
+                      },
+                      "effect": {
+                        "type": "ZoneChangeR",
+                        "value": {
+                          "destination": {
+                            "type": "Exile"
+                          },
+                          "matching": {
+                            "whatObject": {
+                              "type": "IsBound",
+                              "value": "spell"
+                            },
+                            "whenDestination": {
+                              "type": "Graveyard"
+                            }
+                          }
+                        }
+                      },
+                      "origin": {
+                        "type": "Other"
+                      },
+                      "uses": {
+                        "type": "Unlimited"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

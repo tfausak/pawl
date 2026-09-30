@@ -3440,6 +3440,61 @@ pickpocketSpec s registry =
       Spec.assertEqWith s "the offer reached bob's graveyard, nonland permanent cards only" offered [Set.fromList (fmap Recipient.ToObject candidates)]
       Spec.assertEqWith s "and one cast was offered, of the targeted card" offers [S.printingName vessel]
 
+-- Storm of Memories {2}{R}{R}{R} Sorcery (Scryfall, 2026-09-30): "Storm. Exile
+-- an instant or sorcery card with mana value 3 or less from your graveyard at
+-- random. You may cast it without paying its mana cost. If that spell would be
+-- put into a graveyard, exile it instead." CR 608.2g's offer, whose later
+-- sentence names the spell CR 400.7h lets it find -- OfferCast.slot.
+--
+-- alice holds the Storm and a Renewed Faith ({2}{W} Instant, "You gain 6
+-- life") over five Mountains and three Plains: the worst payment for the
+-- Storm still leaves {2}{W}. Her graveyard holds a second Faith, the only
+-- eligible card, and Make a Wish, mana value 4. Returns the hand Faith's id and
+-- the board with the Storm cast, the offered Faith cast, and both resolved.
+stormOfMemoriesBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+stormOfMemoriesBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  plains <- S.printingOf s registry "Plains"
+  storm <- S.printingOf s registry "Storm of Memories"
+  faith <- S.printingOf s registry "Renewed Faith"
+  wish <- S.printingOf s registry "Make a Wish"
+  let lands = S.landsFor plains S.alice 3 (S.landsFor mountain S.alice 5 S.threePlayerGame)
+      (_, g1) = S.addGraveyardCard faith S.alice lands
+      (_, g2) = S.addGraveyardCard wish S.alice g1
+      (handFaith, g3) = S.addHandCard faith S.alice g2
+      (stormId, board) = S.addHandCard storm S.alice g3
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.OfferedCast {} -> OptionalDecision.Exercises
+        Prompt.RandomObject offered -> NonEmpty.head offered
+        _ -> S.identityAnswer p
+      -- The Storm, its storm trigger (no copies), the Storm itself, then the
+      -- Faith CR 608.2g put on top of the stack.
+      resolved = S.runPure answer board (S.cast S.alice stormId *> Engine.settleForPriority *> Stack.resolveTop *> Stack.resolveTop *> Stack.resolveTop)
+  pure (handFaith, resolved)
+
+-- The names in `pid`'s share of `zone`, sorted.
+zoneNames :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
+zoneNames zone pid gs = List.sort (fmap (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+
+stormOfMemoriesSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+stormOfMemoriesSpec s registry =
+  Spec.describe s "StormOfMemories"
+    . Spec.it s "CR 400.7h the spell Storm of Memories' offer cast is exiled as it resolves, and a Faith from hand is not"
+    $ do
+      (handFaith, after) <- stormOfMemoriesBoard s registry
+      let named n = Just (CardName.MkCardName (Text.pack n))
+      Spec.assertEqWith s "CR 400.7h: the Faith the offer cast was exiled instead of put into alice's graveyard" (zoneNames Zone.Exile S.alice after) [named "Renewed Faith"]
+      Spec.assertEqWith s "and her graveyard holds only Make a Wish and the Storm" (zoneNames Zone.Graveyard S.alice after) [named "Make a Wish", named "Storm of Memories"]
+      Spec.assertEqWith s "the offered Faith was cast and resolved" (S.lifeOf S.alice after) (Just 26)
+      -- The pair, on the same board: the redirect names one object, not every
+      -- Faith, so this one goes where CR 608.2n sends it.
+      let fromHand = S.runPure S.identityAnswer after (S.cast S.alice handFaith)
+          resolved = S.runPure S.identityAnswer fromHand Stack.resolveTop
+      Spec.assertBool s (not (null (GameState.stack fromHand))) "the hand Faith really was cast"
+      Spec.assertEqWith s "CR 608.2n: the hand Faith goes to alice's graveyard" (zoneNames Zone.Graveyard S.alice resolved) [named "Make a Wish", named "Renewed Faith", named "Storm of Memories"]
+      Spec.assertEqWith s "and alice gained its life too" (S.lifeOf S.alice resolved) (Just 32)
+
 -- CR 305.9's subtraction on its own board: Dryad Arbor (Land Creature -- Forest
 -- Dryad) is the only card in bob's graveyard that a bare "permanent card" would
 -- admit, so with the printed "nonland" read there is no legal choice for the
@@ -6462,6 +6517,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   mirrorOfTheFallenSpec s registry
   harnessTheStormSpec s registry
   pickpocketSpec s registry
+  stormOfMemoriesSpec s registry
   arborTargetSpec s registry
   anyTypeSpec s registry
   jumpStartSpec s registry

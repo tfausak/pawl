@@ -32,7 +32,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.repetition = CastRepetition.Once,
             OfferCast.copied = False,
             OfferCast.verb = PermissionVerb.Cast,
-            OfferCast.controlWhileResolving = False
+            OfferCast.controlWhileResolving = False,
+            OfferCast.slot = Nothing
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}} "
@@ -57,7 +58,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.repetition = CastRepetition.Once,
             OfferCast.copied = False,
             OfferCast.verb = PermissionVerb.Cast,
-            OfferCast.controlWhileResolving = False
+            OfferCast.controlWhileResolving = False,
+            OfferCast.slot = Nothing
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}} "
@@ -83,7 +85,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.repetition = CastRepetition.Once,
             OfferCast.copied = False,
             OfferCast.verb = PermissionVerb.Cast,
-            OfferCast.controlWhileResolving = False
+            OfferCast.controlWhileResolving = False,
+            OfferCast.slot = Nothing
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"revealed\"},\"caster\":{\"type\":\"InSlot\",\"value\":\"thatPlayer\"},\"optionality\":{\"type\":\"Mandatory\"},\"offer\":{\"withoutPayingManaCost\":true}} "
@@ -101,7 +104,8 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.repetition = CastRepetition.AnyNumber,
             OfferCast.copied = False,
             OfferCast.verb = PermissionVerb.Cast,
-            OfferCast.controlWhileResolving = False
+            OfferCast.controlWhileResolving = False,
+            OfferCast.slot = Nothing
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"repetition\":{\"type\":\"AnyNumber\"}} "
@@ -118,8 +122,27 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
             OfferCast.repetition = CastRepetition.Once,
             OfferCast.copied = True,
             OfferCast.verb = PermissionVerb.Cast,
-            OfferCast.controlWhileResolving = False
+            OfferCast.controlWhileResolving = False,
+            OfferCast.slot = Nothing
           }
       )
       " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"copied\":true} "
+  -- CR 400.7h's key, Storm of Memories' "that spell".
+  Spec.it s "MkOfferCast, slot written" $
+    Common.assertCodec
+      s
+      OfferCast.codec
+      ( OfferCast.MkOfferCast
+          { OfferCast.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")),
+            OfferCast.caster = PlayerRef.Relative PlayerRelation.You,
+            OfferCast.optionality = CastObligation.Optional,
+            OfferCast.offer = CastOffer.defaultValue,
+            OfferCast.repetition = CastRepetition.Once,
+            OfferCast.copied = False,
+            OfferCast.verb = PermissionVerb.Cast,
+            OfferCast.controlWhileResolving = False,
+            OfferCast.slot = Just (SlotName.MkSlotName (Text.pack "spell"))
+          }
+      )
+      " {\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"slot\":\"spell\"} "
   Spec.it s "has a schema" $ Common.assertHasSchema s OfferCast.codec
