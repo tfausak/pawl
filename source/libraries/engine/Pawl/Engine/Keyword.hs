@@ -230,7 +230,8 @@ import qualified Pawl.Types.ZoneScope as ZoneScope
 -- stack (CR 113.6), and the graveyard reads go through the projection
 -- (Cost.costsFor, Cast.projectedKeywords).
 --
--- Not implemented: what is read while the object is on the STACK stays printed
+-- Not implemented: beyond the cast scan's triggered abilities, which go through
+-- the projection, what is read while the object is on the STACK stays printed
 -- (#1859).
 
 -- CR 702.70b: multiple instances of poisonous each trigger separately, so this
