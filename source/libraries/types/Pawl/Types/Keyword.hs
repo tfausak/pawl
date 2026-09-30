@@ -344,6 +344,9 @@ data Keyword
     -- event rather than a countdown, and CR 702.64c's several instances each
     -- apply separately, which is that function's count.
     Absorb Natural.Natural
+  | -- | 702.65a: aura swap [cost] -- "[Cost]: You may exchange this permanent
+    -- with an Aura card in your hand", minted as Effect.ExchangeWithCardInHand.
+    AuraSwap (Cost.Cost Keyword)
   | -- | 702.66a: for each generic mana in this spell's total cost you may exile a
     -- card from your graveyard rather than pay that mana. Convoke's neighbour
     -- below in placement -- CR 702.66b puts it where CR 702.51b puts that one, so

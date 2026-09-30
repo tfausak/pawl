@@ -39,6 +39,7 @@ import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChooseNumber as ChooseNumber
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.ClassLevel as ClassLevel
 import qualified Pawl.Types.CoinReading as CoinReading
 import qualified Pawl.Types.Color as Color
@@ -752,6 +753,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ExchangeZones (ExchangeZones.MkExchangeZones (PlayerRef.Relative PlayerRelation.You) ZonePair.HandAndGraveyard))
       " {\"type\":\"ExchangeZones\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"zones\":{\"type\":\"HandAndGraveyard\"}}} "
+  Spec.it s "ExchangeWithCardInHand" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeWithCardInHand (ChosenCardInHand.MkChosenCardInHand (PlayerRef.Relative PlayerRelation.You) (Filter.HasSubtype Subtype.Aura)))
+      " {\"type\":\"ExchangeWithCardInHand\",\"value\":{\"player\":{\"type\":\"Relative\",\"value\":{\"type\":\"You\"}},\"filter\":{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Aura\"}}}} "
   Spec.it s "SetLifeTotal" $
     Common.assertJsonCodec
       s

@@ -298,6 +298,7 @@ ownQuantities effect = case effect of
   Effect.ExchangeLifeTotals _ -> []
   Effect.ExchangeValues x -> durationQuantities (ExchangeValues.duration x)
   Effect.ExchangeZones _ -> []
+  Effect.ExchangeWithCardInHand _ -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> [quantity]
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -1201,6 +1202,9 @@ data Asks
     -- through chosenPermanentOf -- CR 702.95a's "another unpaired creature you
     -- control" -- and falls through to the pure sweep for everything else.
     AsksPairPartner
+  | -- | Pawl.Engine.Resolve's Effect.ExchangeWithCardInHand arm, which asks
+    -- its one hand chooser through chooseCardsInHand.
+    AsksExchangeArm
   deriving (Eq, Show)
 
 -- Whether an ObjectRef arm is a resolution-time QUESTION rather than a read --
@@ -1292,6 +1296,9 @@ asksFor asks ref = case asks of
   -- and reads every other arm off the pure sweep.
   AsksPairPartner -> case ref of
     ObjectRef.ChosenPermanent {} -> True
+    _ -> False
+  AsksExchangeArm -> case ref of
+    ObjectRef.ChosenCardInHand {} -> True
     _ -> False
 
 -- Every ObjectRef position one effect holds, each tagged with the asking site
@@ -1389,6 +1396,7 @@ effectObjectRefs effect =
         Effect.ExchangeLifeTotals {} -> []
         Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other _) -> read_ (foldMap Resolve.exchangedObjectRefs [one, other])
         Effect.ExchangeZones {} -> []
+        Effect.ExchangeWithCardInHand chosen -> [(AsksExchangeArm, ObjectRef.ChosenCardInHand chosen)]
         Effect.SetLifeTotal {} -> []
         Effect.LoseGame {} -> []
         Effect.WinGame {} -> []

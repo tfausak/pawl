@@ -694,6 +694,7 @@ effectObjectRefs effect = case effect of
   Effect.ExchangeLifeTotals {} -> []
   Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other _) -> foldMap exchangedObjectRefs [one, other]
   Effect.ExchangeZones {} -> []
+  Effect.ExchangeWithCardInHand chosen -> [ObjectRef.ChosenCardInHand chosen]
   Effect.SetLifeTotal {} -> []
   Effect.LoseGame {} -> []
   Effect.WinGame {} -> []
@@ -919,6 +920,8 @@ effectPlayerRefs effect = case effect of
   Effect.ExchangeLifeTotals {} -> []
   Effect.ExchangeValues (ExchangeValues.MkExchangeValues one other duration) -> foldMap exchangedPlayerRefs [one, other] <> durationPlayerRefs duration
   Effect.ExchangeZones x -> [ExchangeZones.player x]
+  -- The chooser is the ref's, objectRefPlayerRefs' half.
+  Effect.ExchangeWithCardInHand {} -> []
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref _) -> [ref]
   Effect.LoseGame ref -> [ref]
   Effect.WinGame ref -> [ref]
@@ -1217,6 +1220,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   -- Both sides' references are effectObjectRefs' and effectPlayerRefs' halves.
   Effect.ExchangeValues x -> durationSlots (ExchangeValues.duration x)
   Effect.ExchangeZones {} -> Map.empty
+  Effect.ExchangeWithCardInHand {} -> Map.empty
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantitySlots quantity
   Effect.LoseGame {} -> Map.empty
   Effect.WinGame {} -> Map.empty
@@ -1903,6 +1907,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.ExchangeLifeTotals _ -> True
   Effect.ExchangeValues x -> durationSlotsAreExhaustive (ExchangeValues.duration x)
   Effect.ExchangeZones {} -> True
+  Effect.ExchangeWithCardInHand {} -> True
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.LoseGame {} -> True
   Effect.WinGame {} -> True
@@ -2177,6 +2182,7 @@ readsX =
         Effect.ExchangeLifeTotals _ -> False
         Effect.ExchangeValues _ -> False
         Effect.ExchangeZones _ -> False
+        Effect.ExchangeWithCardInHand _ -> False
         Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
         Effect.LoseGame {} -> False
         Effect.WinGame {} -> False
@@ -2425,6 +2431,7 @@ boundSlots effect = case effect of
   Effect.ExchangeLifeTotals _ -> Set.empty
   Effect.ExchangeValues _ -> Set.empty
   Effect.ExchangeZones _ -> Set.empty
+  Effect.ExchangeWithCardInHand _ -> Set.empty
   Effect.SetLifeTotal {} -> Set.empty
   Effect.LoseGame {} -> Set.empty
   Effect.WinGame {} -> Set.empty
