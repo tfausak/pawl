@@ -144,6 +144,9 @@ data EntryRewrite ability effect
     -- is handed a keyword and a count, never a board. Pawl.Engine.Event reads
     -- both where the row applies.
     Sunburst
+  | -- | CR 702.43a / 702.44c via CR 614.1c: Modular--Sunburst's entry, a +1/+1
+    -- counter for each color of mana spent to cast it, whatever its card types.
+    ModularSunburst
   | -- | CR 702.54a via CR 614.1c: bloodthirst N, minted from the projection, with
     -- Nothing standing for CR 702.54b's "bloodthirst X".
     Bloodthirst (Maybe Natural.Natural)

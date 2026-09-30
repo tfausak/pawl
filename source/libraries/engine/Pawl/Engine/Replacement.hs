@@ -1162,6 +1162,9 @@ admitsEntry gs oid rewrite = case rewrite of
   -- suite green (2026-09-13). Bloodthirst's Kismet case is the shape that would
   -- observe it.
   EntryRewrite.Sunburst -> not (Set.null (Projection.colorsSpentOf oid gs))
+  -- CR 702.44c sets modular's number by sunburst, so rule 702.44b's condition
+  -- comes with it.
+  EntryRewrite.ModularSunburst -> not (Set.null (Projection.colorsSpentOf oid gs))
   -- CR 702.54a's own condition, the ability's rather than the pattern's: "IF AN
   -- OPPONENT WAS DEALT DAMAGE THIS TURN, this permanent enters with N +1/+1
   -- counters on it." Asked here rather than in Event's arm for rule 702.145b's
@@ -1296,6 +1299,7 @@ entryCostOf rewrite = case rewrite of
   EntryRewrite.ReadAhead -> Nothing
   EntryRewrite.Unleash -> Nothing
   EntryRewrite.Sunburst -> Nothing
+  EntryRewrite.ModularSunburst -> Nothing
   EntryRewrite.Bloodthirst _ -> Nothing
   EntryRewrite.Amplify _ -> Nothing
   EntryRewrite.Tribute _ -> Nothing
@@ -1865,6 +1869,7 @@ bucketOfEffect re = case re of
   -- CR 702.44a is none of CR 616.1a-d for riot's reason, one keyword over:
   -- sunburst rewrites what the permanent enters WITH.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Sunburst) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ModularSunburst) -> ReplacementBucket.Other
   -- CR 702.54a is none of CR 616.1a-d for riot's reason too: bloodthirst rewrites
   -- what the permanent enters WITH. Its condition does not change the bucket --
   -- `admitsEntry` has already kept an unsatisfied row out of the collection.
@@ -2056,6 +2061,8 @@ readsApplier re = case re of
   -- whichever row is applying. Two sunburst rows place the same counters in
   -- either order.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Sunburst) -> False
+  -- CR 702.44c: sunburst's answer, with the counter kind fixed by CR 702.43a.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ModularSunburst) -> False
   -- CR 702.54a: no chooser at all, and the count rides the effect. The condition
   -- `admitsEntry` asks reads the ENTERING object's controller rather than the
   -- applier, so two bloodthirst rows on one permanent are admitted together and

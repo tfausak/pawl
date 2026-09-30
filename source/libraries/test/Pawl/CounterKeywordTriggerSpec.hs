@@ -985,6 +985,22 @@ modularSpec s registry =
             entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
             named oid = fmap Face.name (Game.faceOf oid entered) == Just (CardName.MkCardName (Text.pack name))
         pure (List.find named (Set.toList (GameState.battlefield entered)), entered)
+      -- Arcbound Wanderer {6} cast off exactly six lands, so every one of them
+      -- pays and the colours spent are the lands' colours.
+      castWanderer lands = do
+        wanderer <- S.printingOf s registry "Arcbound Wanderer"
+        printings <- traverse (\(name, n) -> fmap (\p -> (p, n)) (S.printingOf s registry name)) lands
+        let base = List.foldl' (\acc (land, n) -> S.landsFor land S.alice n acc) (Setup.emptyGame S.bothPlayers) printings
+            (held, gs0) = S.addHandCard wanderer S.alice base
+            gs =
+              gs0
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
+            named oid = fmap Face.name (Game.faceOf oid entered) == Just (CardName.MkCardName (Text.pack "Arcbound Wanderer"))
+        pure (List.find named (Set.toList (GameState.battlefield entered)), entered)
       -- One upkeep for alice, run to the end of the priority loop, so the
       -- trigger is gathered (CR 603.3) and resolved. vanishingSpec's helper.
       upkeepOf gs =
@@ -1097,6 +1113,39 @@ modularSpec s registry =
           Spec.assertEqWith s "the Overseer's own modular 6 matches too, four from three" (plusOnes overseerId after) 4
           Spec.assertEqWith s "the Icehide Golem has no modular, so it keeps its seven" (plusOnes golemId after) 7
           Spec.assertEqWith s "and bob's Worker is no creature alice controls" (plusOnes theirsId after) 5
+        -- CR 702.44c: Arcbound Wanderer {6} Artifact Creature -- Golem 0/0,
+        -- "Modular--Sunburst" (Oracle verified 2026-09-30). Six mana of FOUR
+        -- colours, so the count is neither the mana spent (6) nor a printed N;
+        -- then the death trigger moves those four onto a Worker holding one.
+        Spec.it s "CR 702.44c whole card: Arcbound Wanderer enters with a counter per colour and moves them on death" $ do
+          (found, entered) <- castWanderer [("Plains", 1), ("Island", 1), ("Mountain", 1), ("Swamp", 3)]
+          swamp <- S.printingOf s registry "Swamp"
+          murder <- S.printingOf s registry "Murder"
+          worker <- S.printingOf s registry "Arcbound Worker"
+          case found of
+            Nothing -> Spec.assertFailure s "Arcbound Wanderer did not reach the battlefield"
+            Just wandererId -> do
+              Spec.assertEqWith s "four colours spent, four +1/+1 counters" (plusOnes wandererId entered) 4
+              Spec.assertEqWith s "so the printed 0/0 is a 4/4" (S.powerToughnessOf wandererId entered) (Just (4, 4))
+              -- Added AFTER the Wanderer entered, so it holds the greater
+              -- ObjectId and Murder's least recipient is the Wanderer.
+              let (workerId, g1) = S.addPermanent worker S.alice (S.landsFor swamp S.alice 3 entered)
+                  g2 = S.addCounter CounterKind.PlusOnePlusOne 1 workerId g1
+                  stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g2 [1 .. 5 :: Int]
+                  (settled, after) = murderIt exercising (S.handOne murder stocked)
+              Spec.assertBool s (not (S.onBattlefield wandererId after)) "the Wanderer died"
+              Spec.assertEqWith s "the Worker is up to five, one plus the Wanderer's four" (plusOnes workerId after) 5
+              Spec.assertEqWith s "so it is a 5/5" (S.powerToughnessOf workerId after) (Just (5, 5))
+              Spec.assertEqWith s "the death trigger reached the stack" (length (GameState.stack settled)) 1
+        -- The pair for the case above: six mana of ONE colour is one counter,
+        -- CR 702.44a's colours rather than mana.
+        Spec.it s "CR 702.44c six Swamps are one colour, so one counter" $ do
+          (found, entered) <- castWanderer [("Swamp", 6)]
+          case found of
+            Nothing -> Spec.assertFailure s "Arcbound Wanderer did not reach the battlefield"
+            Just wandererId -> do
+              Spec.assertEqWith s "one +1/+1 counter" (plusOnes wandererId entered) 1
+              Spec.assertEqWith s "a 1/1" (S.powerToughnessOf wandererId entered) (Just (1, 1))
         -- CR 702.43b: each instance works separately. Asserted of BOTH mints,
         -- vanishing's position, no printing in the pool carrying modular twice.
         -- Spelled out rather than compared against Keyword.modular itself, for
@@ -1105,12 +1154,12 @@ modularSpec s registry =
           Spec.assertEqWith
             s
             "modular 2 held twice mints two death triggers"
-            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Modular 2) 2)))
+            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Modular (Just 2)) 2)))
             [TriggerCondition.SelfDies, TriggerCondition.SelfDies]
           Spec.assertEqWith
             s
             "and two entry rewrites of two counters each, which is what makes them add up"
-            (Keyword.mintedReplacementsFor (Keyword.Type.Modular 2) 2)
+            (Keyword.mintedReplacementsFor (Keyword.Type.Modular (Just 2)) 2)
             (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.one CounterKind.PlusOnePlusOne (Quantity.Type.Literal 2))))))
 
 -- CR 510.1b / 510.2's combat damage watched by a BYSTANDER rather than by the

@@ -180,6 +180,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.Sunburst
       " {\"type\":\"Sunburst\"} "
     Spec.assertBool s (Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) EntryRewrite.Sunburst /= Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) EntryRewrite.Unleash) "sunburst and unleash encode differently"
+  -- CR 702.43a / 702.44c: Modular--Sunburst's rewrite, distinct from Sunburst's,
+  -- whose counter kind forks on card type.
+  Spec.it s "ModularSunburst (Arcbound Wanderer)" $ do
+    Common.assertCodec
+      s
+      (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec)))
+      EntryRewrite.ModularSunburst
+      " {\"type\":\"ModularSunburst\"} "
+    Spec.assertBool s (Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) EntryRewrite.ModularSunburst /= Codec.encode (EntryRewrite.codec (GrantedAbility.codec Card.codec) (Effect.codec Card.codec (GrantedAbility.codec Card.codec))) EntryRewrite.Sunburst) "modular--sunburst and sunburst encode differently"
   -- CR 702.54a: bloodthirst's rewrite, which DOES carry its N -- the printed
   -- number varies by card, where rule 702.136a fixes riot's. Encoded distinctly
   -- from WithCounters, whose payload names a counter kind rule 702.54a fixes.
