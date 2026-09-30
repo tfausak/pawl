@@ -15,6 +15,7 @@ import qualified Pawl.Types.ForetellCost as ForetellCost
 import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.KeywordCount as KeywordCount
+import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.PartnerText as PartnerText
 import qualified Pawl.Types.Protection as Protection
@@ -890,7 +891,7 @@ data Keyword
     -- (Pawl.Engine.Keyword.handReplacementsOf); the triggered one then offers
     -- its owner the cast for [cost], or the graveyard
     -- (Pawl.Engine.Keyword.exileTriggeredAbilitiesOf).
-    Madness (Cost.Cost Keyword)
+    Madness (MadnessCost.MadnessCost Keyword)
   | -- | 702.88a: a spell cast from its controller's hand is exiled as it
     -- resolves instead of going to the graveyard, and a delayed triggered
     -- ability offers its controller the cast from exile for nothing at the
