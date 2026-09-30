@@ -60,6 +60,7 @@ import qualified Pawl.Types.TappedForMana as TappedForMana
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
+import qualified Pawl.Types.TurnedFaceUp as TurnedFaceUp
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -373,14 +374,26 @@ eventBindings gs bearerBecame becameInGraveyard bearer you cond event = case (co
   -- Case of the Pilfered Proof reads exactly that intersection.
   --
   -- Unconditional given a match, which is what eventBindingSlots' per-condition
-  -- promise needs: every GameEvent.TurnedFaceUp carries exactly one ObjectId, and
-  -- it is the only thing the event carries. Bound whatever the Filter admitted,
+  -- promise needs: every GameEvent.TurnedFaceUp carries exactly one permanent.
+  -- Bound whatever the Filter admitted,
   -- for the PermanentEnters arm's reason.
   --
   -- SelfTurnedFaceUp gets no such arm: there the subject IS the bearer, whom CR
   -- 113.7a's source slot already names.
-  (TriggerCondition.PermanentTurnedFaceUp _, GameEvent.TurnedFaceUp oid) ->
-    Binding.setBecame oid Map.empty
+  --
+  -- Nor does the X chosen for the cost ride here: CR 702.37f and CR 702.168e
+  -- give it to "other abilities of THAT PERMANENT", and a watcher is another
+  -- permanent.
+  (TriggerCondition.PermanentTurnedFaceUp _, GameEvent.TurnedFaceUp t) ->
+    Binding.setBecame (TurnedFaceUp.object t) Map.empty
+  -- CR 702.37f / 702.168e: "the value of X in those abilities is equal to the
+  -- value of X chosen as the [morph / disguise] special action was taken", bound
+  -- where the X a spell announced is bound, so the trigger's target count
+  -- (Pawl.Engine.Engine.placeBorne) and its effects read it alike. Off the
+  -- event and never off the permanent, which state-based actions may already
+  -- have taken away (Pawl.Types.TurnedFaceUp). Nothing when no X was chosen.
+  (TriggerCondition.SelfTurnedFaceUp, GameEvent.TurnedFaceUp t) ->
+    maybe Map.empty (\x -> Binding.fromChoices Map.empty (Just x) Seq.empty) (TurnedFaceUp.announcedX t)
   -- CR 603.2's "that creature": the permanent the counters went on, which Auntie
   -- Ool, Cursewretch draws off or drains for. The bearer is a bystander, exactly
   -- as it is under the arm above -- Wickersmith's Tools is an artifact watching
@@ -1625,9 +1638,10 @@ eventBindingSlots cond = case cond of
   TriggerCondition.AnyOf conditions -> case fmap eventBindingSlots conditions of
     [] -> Set.empty
     slots : rest -> List.foldl' Set.intersection slots rest
-  -- CR 708.7's event names the permanent and nothing else, and CR 113.7a's source
-  -- slot already names it -- so this is a DELIBERATE empty rather than an arm
-  -- nobody wrote. eventBindings' fallthrough would answer the same for a
+  -- CR 708.7's event names the permanent, and CR 113.7a's source slot already
+  -- names it; the X it may carry is bound only sometimes
+  -- (eventBindingSlotsSometimes) -- so this is a DELIBERATE empty rather than an
+  -- arm nobody wrote. eventBindings' fallthrough would answer the same for a
   -- condition that had been forgotten, which is exactly why it is spelled out
   -- here: Pawl.TriggerSpec pins the two against each other.
   TriggerCondition.SelfTurnedFaceUp -> Set.empty
@@ -1926,4 +1940,8 @@ eventBindingSlotsSometimes cond = case cond of
     Set.difference
       (Set.unions (fmap (\c -> Set.union (eventBindingSlots c) (eventBindingSlotsSometimes c)) conditions))
       (eventBindingSlots cond)
+  -- CR 702.37f / 702.168e's X, bound only when the cost that turned the
+  -- permanent up had an X in it (Warbreak Trumpeter's morph {X}{X}{R}), and never
+  -- down an effect's road up, which chose none.
+  TriggerCondition.SelfTurnedFaceUp -> Set.singleton Binding.variableX
   _ -> Set.empty

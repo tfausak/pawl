@@ -79,6 +79,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Transformed as Transformed
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
+import qualified Pawl.Types.TurnedFaceUp as TurnedFaceUp
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -308,15 +309,16 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked (ObjectId.MkObjectId 4) (PlayerId.MkPlayerId 1) (CardName.MkCardName (Text.pack "Steaming Sauna")) True))
       " {\"type\":\"HalfUnlocked\",\"value\":{\"object\":4,\"actor\":1,\"name\":\"Steaming Sauna\",\"fully\":true}} "
-  -- CR 708.7. One id and no more: CR 708.8 makes turning face up a change to one
-  -- permanent, and the payload says only which.
+  -- CR 708.7, with CR 107.3d's X chosen for the cost. The payload's own round
+  -- trip lives in Pawl.Codec.TurnedFaceUpSpec.
   Spec.it s "TurnedFaceUp" $
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.TurnedFaceUp (ObjectId.MkObjectId 5))
-      " {\"type\":\"TurnedFaceUp\",\"value\":5} "
-  -- CR 701.27b's other direction, the same one-id payload.
+      (GameEvent.TurnedFaceUp TurnedFaceUp.MkTurnedFaceUp {TurnedFaceUp.object = ObjectId.MkObjectId 5, TurnedFaceUp.announcedX = Just 2})
+      " {\"type\":\"TurnedFaceUp\",\"value\":{\"object\":5,\"announcedX\":2}} "
+  -- CR 701.27b's other direction, a one-id payload: CR 708.8 makes the turn a
+  -- change to one permanent, and the payload says only which.
   Spec.it s "TurnedFaceDown" $
     Common.assertCodec
       s
@@ -334,7 +336,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Transformed Transformed.MkTransformed {Transformed.object = ObjectId.MkObjectId 5, Transformed.characteristics = ProjectedCharacteristicsSpec.testCharacteristics, Transformed.controller = Nothing, Transformed.attachments = Set.empty})
       ("{\"type\":\"Transformed\",\"value\":{\"object\":5,\"characteristics\":" <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "}}")
-  -- CR 702.112b. One id, TurnedFaceUp's payload exactly: the designation says only
+  -- CR 702.112b. One id, TurnedFaceDown's payload exactly: the designation says only
   -- which permanent got it.
   Spec.it s "BecameDesignated Renowned" $
     Common.assertCodec
@@ -496,7 +498,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (Recipient.ToPlayer (PlayerId.MkPlayerId 3)) (ObjectId.MkObjectId 11) StackObjectKind.Spell (PlayerId.MkPlayerId 2)))
       " {\"type\":\"BecameTarget\",\"value\":{\"targeted\":{\"type\":\"ToPlayer\",\"value\":3},\"source\":11,\"kind\":{\"type\":\"Spell\"},\"controller\":2}} "
-  -- CR 800.4a. One id, TurnedFaceUp's payload again: the object left the game, so
+  -- CR 800.4a. One id, TurnedFaceDown's payload again: the object left the game, so
   -- there is no destination zone to carry and no new incarnation to name.
   Spec.it s "LeftTheGame" $
     Common.assertCodec

@@ -119,6 +119,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnedFaceUp as TurnedFaceUp
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
@@ -8538,7 +8539,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- face-down ENTRY writes a Moved event and never this one, which is what makes
   -- CR 708.8's last sentence fall out rather than needing a clause.
   TriggerCondition.SelfTurnedFaceUp -> case event of
-    GameEvent.TurnedFaceUp oid -> oid == bearer
+    GameEvent.TurnedFaceUp t -> TurnedFaceUp.object t == bearer
     GameEvent.TurnedFaceDown _ -> False
     GameEvent.Transformed {} -> False
     GameEvent.BecameDesignated {} -> False
@@ -8880,7 +8881,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- match. Nothing is a permanent that is gone AND filed no last known
   -- information, about which no Filter can honestly answer.
   TriggerCondition.PermanentTurnedFaceUp f -> case event of
-    GameEvent.TurnedFaceUp oid -> case Projection.viewWithLastKnown oid gs oid of
+    GameEvent.TurnedFaceUp t -> case Projection.viewWithLastKnown (TurnedFaceUp.object t) gs (TurnedFaceUp.object t) of
       Nothing -> False
       Just view -> Filter.matches (Filter.contextFor (Game.teams gs) (Just you) (Just bearer)) view f
     GameEvent.TurnedFaceDown _ -> False
