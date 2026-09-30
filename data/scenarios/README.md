@@ -33,7 +33,11 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   damage assignment per attacker. `OrderTimestamps` answers CR 613.7m's
   prompt by naming every object in it, earliest first, and `ChooseOptional`
   answers a "may" with `Exercises` or `Declines`, its `source` the spell
-  resolving or the object whose ability is.
+  resolving or the object whose ability is. `ChooseTargets` names each slot's
+  targets, `{ "target": ["@moon"] }`, for a target prompt no cast or activation
+  of the scenario's own raises (a triggered ability's), keyed the same way; it
+  also answers that prompt's announcement of how many. A cast's own `targets`
+  likewise announce their count for a slot that takes a variable number.
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones;
   the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),

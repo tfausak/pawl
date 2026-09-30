@@ -9,6 +9,7 @@ import qualified Pawl.Types.Casting as Casting
 import qualified Pawl.Types.Label as Label
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Reference as Reference
+import qualified Pawl.Types.SlotName as SlotName
 
 -- | One decision a scenario makes for a player.
 data Move
@@ -33,6 +34,9 @@ data Move
     OrderTimestamps (Seq.Seq Reference.Reference)
   | -- | CR 603.5 / 608.2d: whether the deciding player takes a printed "may".
     ChooseOptional OptionalDecision.OptionalDecision
+  | -- | CR 601.2c / 603.3d: the targets of each slot a prompt outside a cast
+    -- or activation offers, which also answers its announcement of how many.
+    ChooseTargets (Map.Map SlotName.SlotName (Seq.Seq Reference.Reference))
   | -- | CR 104.3a.
     Concede
   | -- | CR 117.3d.

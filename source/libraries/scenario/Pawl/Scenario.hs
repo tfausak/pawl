@@ -91,8 +91,10 @@ import qualified Pawl.Types.Scenario as Scenario
 import qualified Pawl.Types.ScenarioFailure as Failure
 import qualified Pawl.Types.Seat as Seat
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Staged as Staged
 import qualified Pawl.Types.TappedIs as TappedIs
+import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.Timed as Timed
 import qualified Pawl.Types.TypesAre as TypesAre
 import qualified Pawl.Types.When as When
@@ -337,6 +339,7 @@ subChoiceFor :: When.When -> Prompt.Type.Prompt r -> Maybe Label.Label -> Bool
 subChoiceFor key prompt decider =
   decider == Just (When.player key) && case prompt of
     Prompt.Type.ChooseTargets {} -> True
+    Prompt.Type.AnnounceTargets {} -> True
     Prompt.Type.ChooseModes {} -> True
     Prompt.Type.ChooseX {} -> True
     Prompt.Type.ChooseCost {} -> True
@@ -413,6 +416,24 @@ answerTopPrompt decider asked =
           onEntry unscheduled key kind offers (takeForSource gs key source) $ \verb -> case verb of
             Move.AssignDamage assignment -> Just (fmap Map.fromList (mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)))
             _ -> Nothing
+        -- A target prompt outside a cast or activation, a triggered ability's
+        -- most often (CR 603.3d), keyed like ChooseOptional below.
+        Prompt.Type.ChooseTargets who _ asking offered -> do
+          key <- whenOf gs (Decider.unwrap who)
+          let named = Maybe.fromMaybe asking (Game.abilitySourceOf asking gs)
+          onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
+            Move.ChooseTargets chosen -> Just (resolveSlots gs key verb offered chosen)
+            _ -> Nothing
+        -- CR 601.2c's announcement, answered from the ChooseTargets entry that
+        -- will name the targets, which stays queued for that prompt.
+        Prompt.Type.AnnounceTargets who _ asking offered -> do
+          key <- whenOf gs (Decider.unwrap who)
+          let named = Maybe.fromMaybe asking (Game.abilitySourceOf asking gs)
+          found <- takeForSource gs key named
+          case fmap (Timed.entry . snd) found of
+            Just (Entry.Do verb@(Move.ChooseTargets chosen)) -> announceSlots key verb offered chosen
+            Just entry -> failWith (Failure.MkUnexpectedPrompt key entry kind [])
+            Nothing -> unscheduled []
         -- Keyed by what is resolving, since two "may"s can share a moment: the
         -- spell, or the object an ability came from (CR 113.7), which is what
         -- a board can label.
@@ -528,6 +549,14 @@ answerActionChoice key verb choices asked =
                     updateChoices (\current -> current {Choices.targets = Nothing})
                     pure (Map.singleton slot selected)
                   else unexpected
+          _ -> unexpected
+        -- CR 601.2c: a single variable slot announces as many targets as the
+        -- move names, and the list stays for the ChooseTargets that follows.
+        Prompt.Type.AnnounceTargets _ _ _ offered -> case (Choices.targets choices, Map.toList offered) of
+          (Just targets, [(slot, (range, candidates))])
+            | TargetCount.least range <= Natural.length targets
+                && Natural.length targets <= TargetCount.ceilingOn (Natural.length candidates) range ->
+                pure (Map.singleton slot (Natural.length targets))
           _ -> unexpected
         Prompt.Type.ChooseModes _ _ _ legal selection -> case Choices.modes choices of
           Just modes
@@ -795,6 +824,38 @@ resolveEither ref gs = do
 
 -- | The one offered recipient a reference names, whatever kind the offer
 -- calls it: a planeswalker is offered as one, a creature as another.
+-- | A ChooseTargets entry's answer: every offered slot named, each with exactly
+-- the number of distinct offered recipients it takes.
+resolveSlots :: GameState.GameState -> When.When -> Move.Move -> Map.Map SlotName.SlotName (Natural, Set.Set Recipient.Recipient) -> Map.Map SlotName.SlotName (Seq.Seq Reference.Reference) -> Run (Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
+resolveSlots gs key verb offered chosen =
+  let refused :: Run b
+      refused = failWith (Failure.MkActionNotOffered key verb (fmap SlotName.unwrap (Map.keys offered)))
+   in if Map.keysSet chosen /= Map.keysSet offered
+        then refused
+        else
+          Map.traverseWithKey
+            ( \slot (count, candidates) -> do
+                let refs = Foldable.toList (Map.findWithDefault Seq.empty slot chosen)
+                selected <- fmap Set.fromList (mapM (\ref -> resolveRecipient gs ref candidates refused) refs)
+                if Natural.length refs == count && Natural.length selected == count then pure selected else refused
+            )
+            offered
+
+-- | How many targets each offered slot's entry names, within CR 601.2c's range.
+announceSlots :: When.When -> Move.Move -> Map.Map SlotName.SlotName (TargetCount.TargetCount, Set.Set Recipient.Recipient) -> Map.Map SlotName.SlotName (Seq.Seq Reference.Reference) -> Run (Map.Map SlotName.SlotName Natural)
+announceSlots key verb offered chosen =
+  let refused :: Run b
+      refused = failWith (Failure.MkActionNotOffered key verb (fmap SlotName.unwrap (Map.keys offered)))
+   in if Map.keysSet chosen /= Map.keysSet offered
+        then refused
+        else
+          Map.traverseWithKey
+            ( \slot (range, candidates) ->
+                let n = Natural.length (Map.findWithDefault Seq.empty slot chosen)
+                 in if TargetCount.least range <= n && n <= TargetCount.ceilingOn (Natural.length candidates) range then pure n else refused
+            )
+            offered
+
 resolveRecipient :: GameState.GameState -> Reference.Reference -> Set.Set Recipient.Recipient -> Run Recipient.Recipient -> Run Recipient.Recipient
 resolveRecipient gs ref offered unmatched = do
   target <- resolveEither ref gs
