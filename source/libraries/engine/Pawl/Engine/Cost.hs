@@ -1429,6 +1429,7 @@ substituteXInComponent x component = case component of
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
+  CostComponent.RemoveLoyaltyFromThisX -> CostComponent.RemoveLoyaltyFromThis x
   CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.RemoveCounters {} -> component
   CostComponent.RemovePlusOneCountersX criterion -> CostComponent.RemoveCounters (CountersFromPermanents.MkCountersFromPermanents x (WhichCounters.OfKind CounterKind.PlusOnePlusOne) criterion CounterSpread.FromAmong)
@@ -1504,6 +1505,7 @@ componentHasVariable component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemoveLoyaltyFromThisX -> True
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> True
@@ -1604,6 +1606,9 @@ componentDemandGrowsWithX component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
+  -- CR 606.6 measures the announced X against the loyalty counters present, so
+  -- a big enough X refuses.
+  CostComponent.RemoveLoyaltyFromThisX -> True
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   -- CR 118.3 measures the announced count against the +1\/+1 counters the
@@ -1871,19 +1876,24 @@ isLoyaltyCost cost = any isLoyaltyComponent (Cost.components cost)
 loyaltyKindOf :: Cost Keyword.Type.Keyword -> LoyaltyKind.LoyaltyKind
 loyaltyKindOf cost = if isLoyaltyCost cost then LoyaltyKind.LoyaltyAbility else LoyaltyKind.NonLoyaltyAbility
 
+-- CR 606.2 reads the symbol, not its number, so an unannounced [-X] is one too.
 isLoyaltyComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
-isLoyaltyComponent = Maybe.isJust . loyaltyAmountOf
+isLoyaltyComponent component = component == CostComponent.RemoveLoyaltyFromThisX || Maybe.isJust (loyaltyAmountOf component)
 
 -- The SIGNED amount of loyalty a component moves, positive for CR 606.4's adding
 -- half and negative for the removing one. `isLoyaltyComponent` above is this
--- without the number, so the two cannot drift apart. An Integer and not a
--- Natural: CR 606.5's combining sums the two halves against each other.
+-- without the number, plus the unannounced [-X], so the two cannot drift
+-- apart. An Integer and not a Natural: CR 606.5's combining sums the two halves
+-- against each other.
 --
 -- EXHAUSTIVE with no wildcard, `orderSensitive`'s posture and for its reason.
 loyaltyAmountOf :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Integer
 loyaltyAmountOf component = case component of
   CostComponent.AddLoyaltyToThis n -> Just (toInteger n)
   CostComponent.RemoveLoyaltyFromThis n -> Just (negate (toInteger n))
+  -- Nothing until CR 601.2b substitutes it; `isLoyaltyComponent` classifies it
+  -- all the same.
+  CostComponent.RemoveLoyaltyFromThisX -> Nothing
   CostComponent.TapThis -> Nothing
   CostComponent.UntapThis -> Nothing
   CostComponent.SacrificeThis -> Nothing
@@ -1942,8 +1952,12 @@ loyaltyAmountOf component = case component of
 -- 606.4's battlefield-and-control floor is still asked and `isLoyaltyCost` stays
 -- true of the totalled cost. It takes the FIRST loyalty component's position, so
 -- the printed order survives and CR 601.2h's prompt sees the list it saw before.
+--
+-- Only NUMBERED components combine: `plusComponents` runs after `substituteX`,
+-- so an unannounced [-X] never reaches here, and one that did is left alone for
+-- canPayComponent to refuse rather than silently summed as 0.
 combineLoyalty :: [CostComponent.CostComponent Keyword.Type.Keyword] -> [CostComponent.CostComponent Keyword.Type.Keyword]
-combineLoyalty components = case break isLoyaltyComponent components of
+combineLoyalty components = case break numbered components of
   (_, []) -> components
   (before, _ : after) ->
     let net = sum (Maybe.mapMaybe loyaltyAmountOf components)
@@ -1951,7 +1965,9 @@ combineLoyalty components = case break isLoyaltyComponent components of
           if net < 0
             then CostComponent.RemoveLoyaltyFromThis (Integer.toNaturalSaturating (negate net))
             else CostComponent.AddLoyaltyToThis (Integer.toNaturalSaturating net)
-     in before <> (combined : filter (not . isLoyaltyComponent) after)
+     in before <> (combined : filter (not . numbered) after)
+  where
+    numbered = Maybe.isJust . loyaltyAmountOf
 
 -- CR 113.6m's COST half: an ability whose cost moves the object it's on out of a
 -- particular zone functions only in that zone. The "or effect" half is
@@ -2030,6 +2046,7 @@ zoneOfComponent component = case component of
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
+  CostComponent.RemoveLoyaltyFromThisX -> Nothing
   -- CR 122.1's counter is a marker and not an object, and CR 122.2 has counters
   -- "simply cease to exist" rather than travel, so removing one moves nothing out
   -- of any zone and CR 113.6's battlefield default stands. A FENCE and not proven
@@ -2127,6 +2144,7 @@ componentStatesHiddenQuality component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.RemoveLoyaltyFromThisX -> False
   CostComponent.RemoveCountersFromThis _ -> False
   CostComponent.RemoveCounters {} -> False
   CostComponent.RemovePlusOneCountersX _ -> False
@@ -2714,6 +2732,7 @@ claimOf slots pid oid component gs =
         CostComponent.PayEnergy _ -> Nothing
         CostComponent.AddLoyaltyToThis _ -> Nothing
         CostComponent.RemoveLoyaltyFromThis _ -> Nothing
+        CostComponent.RemoveLoyaltyFromThisX -> Nothing
         -- Nothing: CR 122.1's counter is a marker rather than an object, so no object
         -- leaves any pool -- the two arms either side of this one, for their reason. A
         -- FENCE, `repeatsOf` settling before any axis matters for a cost with one
@@ -3173,6 +3192,8 @@ uncountedCeiling component = case component of
   -- Zero, PayLifeX's answer above and for its reason: an unannounced X cannot be
   -- paid even once.
   CostComponent.BlightX -> Just 0
+  -- Zero, BlightX's answer above and for its reason.
+  CostComponent.RemoveLoyaltyFromThisX -> Just 0
   -- 1, and counted by none of the four totals: `claimOf` states no claim for
   -- this component, so `objectCeiling` has no pool to divide. An UNDERSTATEMENT
   -- -- a graveyard of nine pays three forages -- and the header's safe direction.
@@ -3422,6 +3443,7 @@ lifeOwedByComponent pid gs component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
+  CostComponent.RemoveLoyaltyFromThisX -> 0
   CostComponent.Forage -> 0
   CostComponent.FlipCoin -> 0
   CostComponent.ChooseOpponent -> 0
@@ -3472,6 +3494,7 @@ energyOwedByComponent component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.Blight _ -> 0
   CostComponent.BlightX -> 0
+  CostComponent.RemoveLoyaltyFromThisX -> 0
   CostComponent.Forage -> 0
   CostComponent.FlipCoin -> 0
   CostComponent.ChooseOpponent -> 0
@@ -3530,6 +3553,7 @@ countersOwedByComponent component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> []
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
+  CostComponent.RemoveLoyaltyFromThisX -> []
   CostComponent.Forage -> []
   CostComponent.FlipCoin -> []
   CostComponent.ChooseOpponent -> []
@@ -3829,6 +3853,9 @@ canPayComponent slots pid oid component gs = case component of
   -- measure or pay; a fence, with Pawl.CostSpec's "an unannounced blight X is
   -- unpayable" as the test.
   CostComponent.BlightX -> False
+  -- Unpayable until announced, BlightX's answer above and for its reason; a
+  -- fence with no test, the activation road substituting it first.
+  CostComponent.RemoveLoyaltyFromThisX -> False
 
 -- CR 601.2c / 602.2b: what the announcement had bound by the time CR 601.2h pays
 -- -- the targets, and CR 601.2b's X -- read off the stack object `pay` is handed
@@ -3894,6 +3921,7 @@ criteriaOf component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> []
   CostComponent.Blight _ -> []
   CostComponent.BlightX -> []
+  CostComponent.RemoveLoyaltyFromThisX -> []
   -- Rule 701.61a's two candidate sets are the rulebook's own and carry no card
   -- Filter, so there is no criterion for the lint to sweep.
   CostComponent.Forage -> []
@@ -4604,6 +4632,7 @@ paidInSecondPass component = case component of
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.Blight _ -> False
   CostComponent.BlightX -> False
+  CostComponent.RemoveLoyaltyFromThisX -> False
   -- CR 701.61a moves cards from a graveyard to exile, or a Food from the
   -- battlefield to a graveyard, and neither is a library, so the first pass holds
   -- it -- the header's reading.
@@ -4742,6 +4771,8 @@ orderSensitive component = case component of
   -- The arm above's classification, which is what CR 601.2b turns this into.
   -- Unreachable unsubstituted: `pay` runs on the announced cost.
   CostComponent.BlightX -> True
+  -- The substituted component's answer, BlightX's posture.
+  CostComponent.RemoveLoyaltyFromThisX -> True
   -- True: CR 701.61a moves three cards out of a graveyard or a Food off the
   -- battlefield, either of which another part of the same cost could have spent.
   -- A FENCE rather than proven behaviour -- Thornvault Forager is the one card in
@@ -6123,6 +6154,8 @@ payComponent moment slots pid oid component = case component of
   -- Unpayable, `canPayComponent`'s answer and for its reason -- PayLifeX's arm
   -- above, verbatim.
   CostComponent.BlightX -> pure Payment.Unpaid
+  -- Unpayable, BlightX's arm above and for its reason.
+  CostComponent.RemoveLoyaltyFromThisX -> pure Payment.Unpaid
   -- CR 701.61a's whole procedure, which Pawl.Engine.Forage owns -- the Blight arm
   -- above's shape. Unpaid on the board CR 608.2d refuses, which canPayComponent
   -- has already checked, so reaching it means the graveyard or the Food went away

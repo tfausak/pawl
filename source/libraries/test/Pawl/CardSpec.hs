@@ -3615,6 +3615,7 @@ costComponentFilters component = case component of
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
+  CostComponent.RemoveLoyaltyFromThisX -> []
   CostComponent.RemoveCountersFromThis _ -> []
   -- CR 118.1's removal aimed elsewhere: Zameck Guildmage's "a creature you
   -- control".

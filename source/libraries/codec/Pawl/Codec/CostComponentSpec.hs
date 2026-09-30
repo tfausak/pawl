@@ -146,6 +146,14 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.RemoveLoyaltyFromThis 1)
       " {\"type\":\"RemoveLoyaltyFromThis\",\"value\":1} "
+  -- Its X form, nullary on the wire for PayLifeX's reason: Tamiyo, Compleated
+  -- Sage's [-X].
+  Spec.it s "RemoveLoyaltyFromThisX" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.RemoveLoyaltyFromThisX
+      " {\"type\":\"RemoveLoyaltyFromThisX\"} "
   -- CR 118.1's counter removal as an activation cost, Barkhide Troll's.
   Spec.it s "RemoveCountersFromThis" $
     Common.assertCodec

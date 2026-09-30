@@ -76,6 +76,118 @@
           "cost": {
             "components": [
               {
+                "type": "RemoveLoyaltyFromThisX"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          "zone": {
+                            "type": "Exile"
+                          }
+                        }
+                      },
+                      {
+                        "type": "CreateCopy",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSlots": {
+                  "target": {
+                    "amount": {
+                      "type": "InSlot",
+                      "value": "X"
+                    },
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          }
+                        },
+                        {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Artifact"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Battle"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Enchantment"
+                              }
+                            },
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Planeswalker"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "ManaValueEqualToAmount"
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "CardsInGraveyard",
+                      "value": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
                 "type": "RemoveLoyaltyFromThis",
                 "value": 7
               }

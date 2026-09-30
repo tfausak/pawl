@@ -3020,6 +3020,7 @@ rewriteComponent pairs component = case component of
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
+  CostComponent.RemoveLoyaltyFromThisX -> component
   CostComponent.RemoveCountersFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.Blight _ -> component

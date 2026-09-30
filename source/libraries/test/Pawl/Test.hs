@@ -1498,6 +1498,7 @@ spec s registry = do
   Pawl.PlaneswalkerSpec.gristLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.ashiokLoyaltySpec s registry
   Pawl.PlaneswalkerSpec.tamiyoNotebookSpec s registry
+  Pawl.PlaneswalkerSpec.tamiyoMinusXSpec s registry
   Pawl.PlayerDesignationSpec.spec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.CastProhibitionSpec.spec s registry

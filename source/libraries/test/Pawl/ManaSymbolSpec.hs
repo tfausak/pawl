@@ -1647,9 +1647,6 @@ activateAndResolve answer gs oid ability =
 -- The loyalty assertions are CR 702.150a's compleated, which is why this group
 -- and not a spec of its own carries them: the keyword reads what CR 601.2b
 -- announced about this symbol, so the two rules are only observable together.
---
--- Not implemented: her -X, which data/cards/tamiyo-compleated-sage.json omits
--- (#1997). Stricter than printed, and no clause below rests on it.
 tamiyoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tamiyoSpec s registry = Spec.describe s "Tamiyo, Compleated Sage" $ do
   -- Off the card and off no board at all: CR 202.2d's colours and CR 202.3g's
