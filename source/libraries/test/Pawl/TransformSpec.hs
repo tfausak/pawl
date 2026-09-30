@@ -1552,7 +1552,7 @@ anglerBack = CardName.MkCardName (Text.pack "Hook-Haunt Drifter")
 -- TWO ISLANDS, which pay the disturb {1}{U} and the printed {1}{U} alike: the two
 -- costs are equal on this printing, deliberately, so mana cannot be what tells
 -- the graveyard cast from the hand cast and the FACE has to be.
-disturbSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+disturbSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 disturbSpec s registry = Spec.describe s "Disturb" $ do
   Spec.it s "CR 702.146a from her graveyard alice may cast only the transformed half, and it arrives with its back face up" $ do
     angler <- S.printingOf s registry "Baithook Angler"
@@ -1584,6 +1584,27 @@ disturbSpec s registry = Spec.describe s "Disturb" $ do
     Spec.assertEqWith s "CR 712.11a / 702.146b the disturbed spell arrives with its back face up: the 1/2 Spirit, not the 2/1 Human" (fmap (\o -> (Projection.namesOf o resolved, S.powerToughnessOf o resolved)) (anglerIn resolved)) [(Set.singleton anglerBack, Just (1, 2))]
     Spec.assertEqWith s "CR 702.146a / 712.11d the graveyard offers the back face and only it" (offeredNames buried graveyardBoard) [anglerBack]
     Spec.assertEqWith s "CR 712.11 her hand offers the front face and only it, the same two Islands paying either cost" (offeredNames held handBoard) [anglerFront]
+  -- CR 613.1f in a graveyard: Yixlid Jailer ("Cards in graveyards lose all
+  -- abilities.", api.scryfall.com 2026-09-30, whose ruling names a card's own
+  -- flashback as stopped) takes disturb off the buried front face, so CR 601.3
+  -- leaves nothing allowing the cast. A pair of boards differing only in
+  -- whether bob's Jailer is in play.
+  Spec.it s "CR 702.146a / 613.1f under Yixlid Jailer a buried Baithook Angler offers no disturb cast" $ do
+    angler <- S.printingOf s registry "Baithook Angler"
+    island <- S.printingOf s registry "Island"
+    jailer <- S.printingOf s registry "Yixlid Jailer"
+    let onTurn gs = gs {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+        (buried, without) = fmap onTurn (S.addGraveyardCard angler S.alice (S.landsInPlay island 2))
+        underJailer = snd (S.addPermanent jailer S.bob without)
+        offeredNames gs =
+          Maybe.mapMaybe
+            ( \action -> case action of
+                A.Cast o n _ | o == buried -> Just n
+                _ -> Nothing
+            )
+            (Action.legalActions S.alice gs)
+    Spec.assertEqWith s "CR 613.1f under the Jailer the graveyard offers no cast" (offeredNames underJailer) []
+    Spec.assertEqWith s "CR 702.146a without it the transformed cast is offered" (offeredNames without) [anglerBack]
 
 -- CR 702.162a: more than meets the eye, on the same Ratchet, Field Medic //
 -- Ratchet, Rescue Racer the convert group runs on -- "More Than Meets the Eye
