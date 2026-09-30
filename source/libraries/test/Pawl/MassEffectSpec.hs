@@ -2224,6 +2224,44 @@ uncoveredCluesSpec s registry =
           (after, _) <- run ["Divination"]
           Spec.assertEqWith s "alice's hand holds the one card she chose" (namesIn Zone.Hand S.alice after) [named "Divination"]
           Spec.assertEqWith s "and the two other matches reach the bottom with the Forest" (List.sort (drop 1 (namesIn Zone.Library S.alice after))) [named "Forest", named "Lightning Bolt", named "Murder"]
+        -- The printed "may": none is an answer too, and "the revealed cards" then
+        -- names nothing rather than failing on a slot never bound.
+        Spec.it s "CR 608.2d revealing none puts all four on the bottom" $ do
+          (after, revealed) <- run []
+          Spec.assertEqWith s "alice's hand is empty" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith s "nothing was revealed" revealed []
+          Spec.assertEqWith s "all four are beneath the Island" (List.sort (drop 1 (namesIn Zone.Library S.alice after))) [named "Divination", named "Forest", named "Lightning Bolt", named "Murder"]
+
+-- Zimone's Experiment {3}{G} Sorcery, "Look at the top five cards of your
+-- library. You may reveal up to two creature and/or land cards from among them,
+-- then put the rest on the bottom of your library in a random order. Put all
+-- land cards revealed this way onto the battlefield tapped and put all creature
+-- cards revealed this way into your hand." (Oracle text checked against
+-- api.scryfall.com.) "The rest" is the looked-at group less the revealed one,
+-- and the revealed group is split by card type.
+--
+-- The top five, top first, are Forest, Goblin Piker, Murder, Bird Maiden and
+-- Island, with a Swamp beneath them that is never looked at. Three cards match,
+-- so the count of two leaves a real choice.
+zimonesExperimentSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+zimonesExperimentSpec s registry =
+  let named = Just . CardName.MkCardName . Text.pack
+   in Spec.describe s "ZimonesExperiment" $ do
+        Spec.it s "CR 608.2c the revealed land enters, the revealed creature is taken, and only the rest go to the bottom" $ do
+          experiment <- S.printingOf s registry "Zimone's Experiment"
+          forest <- S.printingOf s registry "Forest"
+          printings <- Monad.mapM (S.printingOf s registry) ["Swamp", "Island", "Bird Maiden", "Murder", "Goblin Piker", "Forest"]
+          let stocked = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) (S.landsFor forest S.alice 4 (Setup.emptyGame S.bothPlayers)) printings
+              (withSpell, spell) = S.handOne experiment stocked
+              wanted = [named "Forest", named "Goblin Piker"]
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseCardsFromAmong _ _ _ offered _ -> Set.fromList (filter (\oid -> List.elem (fmap S.nameOf (Game.cardOf oid withSpell)) wanted) offered)
+                _ -> S.identityAnswer p
+              after = S.runPure answer withSpell (S.cast S.alice spell >> Stack.resolveTop)
+          Spec.assertEqWith s "the revealed creature card is in alice's hand" (namesIn Zone.Hand S.alice after) [named "Goblin Piker"]
+          Spec.assertEqWith s "the revealed land card is on the battlefield beside the four that paid" (length (filter (== named "Forest") (namesIn Zone.Battlefield S.alice after))) 5
+          Spec.assertEqWith s "only the three unrevealed cards went beneath the Swamp" (List.sort (drop 1 (namesIn Zone.Library S.alice after))) [named "Bird Maiden", named "Island", named "Murder"]
 
 -- The same arm reached from a TRIGGER rather than an activated ability, and over
 -- LAND cards rather than creature cards -- the two axes portOfKarfellSpec above
@@ -2421,5 +2459,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   openTheWaySpec s registry
   carthTheLionSpec s registry
   uncoveredCluesSpec s registry
+  zimonesExperimentSpec s registry
   blossomingTortoiseSpec s registry
   timetwisterSpec s registry

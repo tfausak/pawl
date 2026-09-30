@@ -54,6 +54,7 @@ module Pawl.SpecialActionSpec where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -1650,6 +1651,142 @@ suspendHaste s registry = Spec.describe s "CR 702.62a Durkwood Baloth" $ do
       )
       (1, 1)
 
+-- Delay (TSP 57) {1}{U} Instant, "Counter target spell. If the spell is
+-- countered this way, exile it with three time counters on it instead of
+-- putting it into its owner's graveyard. If it doesn't have suspend, it gains
+-- suspend." -- checked against Scryfall, 2026-09-30. A suspend an effect GIVES
+-- the exiled card, which the exile trigger scan sees through the projection.
+--
+-- bob's Goblin Piker is on the stack and alice aims Delay at it. The Piker
+-- prints no suspend and bob has no mana, so every counter that comes off and the
+-- cast at the end are the grant's. Libraries are stocked for the six turns.
+delayBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+delayBoard island delay victim traveler =
+  let (pikerId, onStack) = S.spellOnStack victim S.bob (S.landsInPlay island 2)
+      (gs, delayId) = S.handOne delay onStack
+      stocked =
+        (stockLibraries traveler gs)
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      -- PICKED OUT OF THE OFFERED SET, suspendAnswer's reason (CR 608.2b).
+      atPiker :: Prompt.Prompt r -> r
+      atPiker p = case p of
+        Prompt.ChooseTargets _ _ _ slots ->
+          Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (\r -> Recipient.objectOf r == Just pikerId) (Set.toList recipients))) slots
+        _ -> S.identityAnswer p
+      cast = snd (Engine.runGamePure atPiker stocked (S.cast S.alice delayId))
+   in snd (Engine.runGamePure atPiker cast Stack.resolveTop)
+
+-- Eight cards in each library, so nobody decks while the countdown runs (CR
+-- 104.3c).
+stockLibraries :: Printing.Printing -> GameState.GameState -> GameState.GameState
+stockLibraries card gs0 = List.foldl' (\g pid -> List.foldl' (\h _ -> snd (S.addLibraryCard card pid h)) g [1 :: Int .. 8]) gs0 [S.alice, S.bob]
+
+-- Passes every priority and takes CR 608.2g's offered cast.
+delayAnswer :: Prompt.Prompt r -> r
+delayAnswer p = case p of
+  Prompt.ChooseAction {} -> Action.Type.Pass
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- The time counters on the one exiled card.
+exiledTimeCounters :: GameState.GameState -> Maybe Natural.Natural
+exiledTimeCounters gs = do
+  oid <- soleExileOf gs
+  obj <- Game.lookupObject oid gs
+  pure (Map.findWithDefault 0 CounterKind.Time (Object.counters obj))
+
+-- The end of this player's next draw step: their upkeep has run.
+pastUpkeepOf :: Natural.Natural -> GameState.GameState -> Bool
+pastUpkeepOf turn g = GameState.turnNumber g >= turn && GameState.phase g == Phase.Beginning BeginningStep.DrawStep
+
+delaying :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+delaying s registry = Spec.describe s "CR 702.62a Delay" $ do
+  -- CR 702.62a's second and third abilities, on a card that gained suspend in
+  -- exile. The countdown runs at bob's upkeeps, turns 2, 4 and 6.
+  Spec.it s "the countered spell is exiled with three time counters, and its granted suspend casts it" $ do
+    island <- S.printingOf s registry "Island"
+    delay <- S.printingOf s registry "Delay"
+    piker <- S.printingOf s registry "Goblin Piker"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let delayed = delayBoard island delay piker traveler
+        firstUpkeep = runUntil delayAnswer (pastUpkeepOf 2) delayed
+        thirdUpkeep = runUntil delayAnswer (pastUpkeepOf 6) (runUntil delayAnswer (pastUpkeepOf 4) firstUpkeep)
+    Spec.assertEqWith
+      s
+      "exiled with three time counters, and bob's first upkeep takes one off"
+      (exiledTimeCounters delayed, exiledTimeCounters firstUpkeep)
+      (Just 3, Just 2)
+    Spec.assertEqWith
+      s
+      "the last counter off at bob's third upkeep, bob casts the Piker for free"
+      (S.countOnBattlefieldByName (S.printingName piker) S.bob thirdUpkeep, GameState.turnNumber thirdUpkeep)
+      (1, 6)
+  -- CR 702.62a's "PLAY it": Delay counters bob's Sea Gate Restoration, whose
+  -- back face is a land (CR 712.12). The last counter comes off at bob's own
+  -- upkeep with his land play unused (CR 305.2a), and he plays Sea Gate, Reborn
+  -- rather than casting the sorcery -- a cast would leave his battlefield empty.
+  Spec.it s "Delay on Sea Gate Restoration: the land back face is played when the last counter comes off" $ do
+    island <- S.printingOf s registry "Island"
+    delay <- S.printingOf s registry "Delay"
+    seaGate <- S.printingOf s registry "Sea Gate Restoration"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let playsLand :: Prompt.Prompt r -> r
+        playsLand p = case p of
+          Prompt.ChooseOfferedCastSpell _ _ offered -> Maybe.fromMaybe (NonEmpty.head offered) (List.find ((/= S.printingName seaGate) . snd) (NonEmpty.toList offered))
+          _ -> delayAnswer p
+        thirdUpkeep = runUntil playsLand (pastUpkeepOf 6) (runUntil playsLand (pastUpkeepOf 4) (runUntil playsLand (pastUpkeepOf 2) (delayBoard island delay seaGate traveler)))
+    Spec.assertEqWith
+      s
+      "Sea Gate, Reborn is on bob's battlefield and nothing is left in exile"
+      (fmap (\oid -> Game.cardOf oid thirdUpkeep == Just (Printing.card seaGate)) (Game.zoneMembers Zone.Battlefield S.bob thirdUpkeep), length (GameState.exile thirdUpkeep))
+      ([True], 0)
+  -- Suspend (MH2 68) {U} Instant, "Exile target creature and put two time
+  -- counters on it. If it doesn't have suspend, it gains suspend." -- checked
+  -- against Scryfall, 2026-09-30. The same grant reached from the BATTLEFIELD
+  -- by a MoveToZone rather than a countering: bob's Piker leaves, and comes
+  -- back cast at his second upkeep.
+  Spec.it s "Suspend exiles a creature with two time counters, and its granted suspend casts it" $ do
+    island <- S.printingOf s registry "Island"
+    suspendCard <- S.printingOf s registry "Suspend"
+    piker <- S.printingOf s registry "Goblin Piker"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (pikerId, withPiker) = S.addPermanent piker S.bob (S.landsInPlay island 1)
+        (gs, suspendId) = S.handOne suspendCard withPiker
+        stocked =
+          (stockLibraries traveler gs)
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        atPiker :: Prompt.Prompt r -> r
+        atPiker p = case p of
+          Prompt.ChooseTargets _ _ _ slots ->
+            Map.map (\(_, recipients) -> maybe Set.empty Set.singleton (List.find (\r -> Recipient.objectOf r == Just pikerId) (Set.toList recipients))) slots
+          _ -> S.identityAnswer p
+        exiled = snd (Engine.runGamePure atPiker (snd (Engine.runGamePure atPiker stocked (S.cast S.alice suspendId))) Stack.resolveTop)
+        secondUpkeep = runUntil delayAnswer (pastUpkeepOf 4) (runUntil delayAnswer (pastUpkeepOf 2) exiled)
+    Spec.assertEqWith
+      s
+      "exiled off the battlefield with two time counters, and cast back at bob's second upkeep"
+      (exiledTimeCounters exiled, S.countOnBattlefieldByName (S.printingName piker) S.bob exiled, S.countOnBattlefieldByName (S.printingName piker) S.bob secondUpkeep, GameState.turnNumber secondUpkeep)
+      (Just 2, 0, 1, 4)
+  -- The pair: the same Piker exiled with the same three time counters, but no
+  -- suspend. CR 702.62b makes it no suspended card, so nothing counts down.
+  Spec.it s "a card exiled with time counters and no suspend keeps them" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (pikerId, gs) = S.addExiledCard piker S.bob (Setup.emptyGame S.bothPlayers)
+        undelayed =
+          (stockLibraries traveler (S.addCounter CounterKind.Time 3 pikerId gs))
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+    Spec.assertEqWith s "bob's upkeep takes nothing off" (exiledTimeCounters (runUntil delayAnswer (pastUpkeepOf 2) undelayed)) (Just 3)
+
 -- Benalish Commander (PLC 2) {3}{W} Creature -- Human Soldier */*, "Benalish
 -- Commander's power and toughness are each equal to the number of Soldiers you
 -- control. / Suspend X--{X}{W}{W}. X can't be 0." -- checked against Scryfall,
@@ -1964,6 +2101,7 @@ spec s registry = do
   suspending s registry
   suspendHaste s registry
   suspendingForX s registry
+  delaying s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
 -- offered to (its own scope is EachPlayer, so every seat is offered it) and how

@@ -20,6 +20,7 @@ import qualified Pawl.Codec.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Codec.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Codec.PermanentsBecomeTargeted as PermanentsBecomeTargeted
+import qualified Pawl.Codec.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Codec.PlayerAttacksPlayer as PlayerAttacksPlayer
 import qualified Pawl.Codec.PlayerAttacksWith as PlayerAttacksWith
 import qualified Pawl.Codec.PlayerDrawsNthCard as PlayerDrawsNthCard
@@ -58,7 +59,7 @@ codec =
           Arm.nullary "SelfDealsDamageToCreature" TriggerCondition.SelfDealsDamageToCreature,
           Arm.nullary "SelfIsDealtDamage" TriggerCondition.SelfIsDealtDamage,
           Arm.payload "PermanentDealsCombatDamageToPlayer" filterCodec TriggerCondition.PermanentDealsCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentDealsCombatDamageToPlayer y -> Just y; _ -> Nothing),
-          Arm.payload "PermanentsDealCombatDamageToPlayer" filterCodec TriggerCondition.PermanentsDealCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentsDealCombatDamageToPlayer y -> Just y; _ -> Nothing),
+          Arm.payload "PermanentsDealCombatDamageToPlayer" PermanentsDealCombatDamageToPlayer.codec TriggerCondition.PermanentsDealCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentsDealCombatDamageToPlayer y -> Just y; _ -> Nothing),
           Arm.nullary "CreatureDealtCombatDamageToMonarch" TriggerCondition.CreatureDealtCombatDamageToMonarch,
           Arm.nullary "CreaturesDealtCombatDamageToInitiative" TriggerCondition.CreaturesDealtCombatDamageToInitiative,
           Arm.nullary "PlayerTookInitiative" TriggerCondition.PlayerTookInitiative,

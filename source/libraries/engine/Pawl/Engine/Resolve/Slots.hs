@@ -731,7 +731,7 @@ effectObjectRefs effect = case effect of
   -- CR 614.9's two sides, the damage's old recipient -- absent where the card
   -- describes it instead -- and its new one.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage _ _ _ from _ _ to _) -> Maybe.maybeToList from <> [to]
-  Effect.Counter (Counter.MkCounter ref _ _) -> [ref]
+  Effect.Counter (Counter.MkCounter ref _ _ _) -> [ref]
   Effect.PutCounters (PutCounters.MkPutCounters _ _ ref) -> [ref]
   Effect.RemoveCounters {} -> []
   Effect.RemoveCountersAmong (RemoveCountersAmong.MkRemoveCountersAmong _ from _ _) -> [from]
@@ -2456,7 +2456,7 @@ boundSlots effect = case effect of
   Effect.RedirectDamage {} -> Set.empty
   -- How many spells this countering ACTUALLY countered, for a "for each spell
   -- countered this way", and the permanents whose abilities were (CR 113.7).
-  Effect.Counter (Counter.MkCounter _ mSlot mSources) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources
+  Effect.Counter (Counter.MkCounter _ mSlot mSources mExiled) -> foldMap Set.singleton mSlot <> foldMap Set.singleton mSources <> foldMap Set.singleton mExiled
   Effect.PutCounters {} -> Set.empty
   Effect.PutCountersFrom {} -> Set.empty
   -- CR 122.1: how many counters the removal actually took off, where the card

@@ -254,6 +254,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PermanentTappedForMana as PermanentTappedForMana
 import qualified Pawl.Types.PermanentsBecomeTargeted as PermanentsBecomeTargeted
+import qualified Pawl.Types.PermanentsDealCombatDamageToPlayer as PermanentsDealCombatDamageToPlayer
 import qualified Pawl.Types.PermissionLimit as PermissionLimit
 import qualified Pawl.Types.PermissionPool as PermissionPool
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
@@ -634,7 +635,7 @@ objectRefPositions =
         ("prevent-next-damage", Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pn")) Nothing Nothing Nothing (Quantity.Type.Literal 1) Seq.empty), [plantedRef "pn"]),
         ("prevent-all-damage", Effect.PreventAllDamage (PreventAllDamage.MkPreventAllDamage Duration.UntilEndOfTurn Nothing (Just (plantedRef "pa")) Nothing DamageDirection.DealtTo Nothing (Filter.Type.And []) Seq.empty), [plantedRef "pa"]),
         ("redirect-damage", Effect.RedirectDamage (RedirectDamage.MkRedirectDamage Duration.UntilEndOfTurn Nothing Nothing (Just (plantedRef "rd-from")) Nothing Nothing (plantedRef "rd-to") Nothing), [plantedRef "rd-from", plantedRef "rd-to"]),
-        ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing), [plantedRef "co"]),
+        ("counter", Effect.Counter (Counter.MkCounter (plantedRef "co") Nothing Nothing Nothing), [plantedRef "co"]),
         ("put-counters", Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Type.Literal 1) (plantedRef "pc")), [plantedRef "pc"]),
         ("move-counters", Effect.MoveCounters (MoveCounters.MkMoveCounters (plantedRef "mc-from") MovedKinds.Every Nothing (plantedRef "mc-to")), [plantedRef "mc-from", plantedRef "mc-to"]),
         ("put-counters-from", Effect.PutCountersFrom (PutCountersFrom.MkPutCountersFrom (SlotName.MkSlotName (Text.pack "giver")) Nothing (plantedRef "pf")), [plantedRef "pf"]),
@@ -3217,8 +3218,10 @@ keywordPayloadFilters keyword = case keyword of
   -- card's own mana cost names no Filter.
   Keyword.Foretell (ForetellCost.Stated cost) -> costFilters cost
   Keyword.Foretell (ForetellCost.ManaCostReducedBy _) -> []
-  -- CR 702.62a: the suspend cost, reached the same way; its N is a number.
-  Keyword.Suspend (Suspend.MkSuspend _ cost) -> costFilters cost
+  -- CR 702.62a: the suspend cost, reached the same way; its N is a number. A
+  -- granted suspend has no cost.
+  Keyword.Suspend (Just (Suspend.MkSuspend _ cost)) -> costFilters cost
+  Keyword.Suspend Nothing -> []
   -- CR 702.139a's condition, which is a Filter rather than a Cost. KeywordFramed
   -- like the rest: Pawl.Engine.Companion.fulfilled matches it against a printed
   -- face through a bare Context, so no slot is in scope.
@@ -4226,7 +4229,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.2c's batch reading of the same written form carries the same Filter,
   -- swept the same way for PermanentsDie's reason: answering [] here would exempt
   -- Pia Nalaar's "artifact creatures you control" from every corpus filter lint.
-  TriggerCondition.PermanentsDealCombatDamageToPlayer f -> unframed [f]
+  TriggerCondition.PermanentsDealCombatDamageToPlayer p -> unframed [PermanentsDealCombatDamageToPlayer.filter p]
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.CreaturesDealtCombatDamageToInitiative -> []
   TriggerCondition.PlayerTookInitiative -> []
@@ -5849,7 +5852,7 @@ effectFilters effect = case effect of
   Effect.ExchangeBlocks _ -> []
   -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
   -- so the lint reaches it.
-  Effect.Counter (Counter.MkCounter ref _ _) -> frame SourceHostFramed (objectRefFilters ref)
+  Effect.Counter (Counter.MkCounter ref _ _ _) -> frame SourceHostFramed (objectRefFilters ref)
   -- All THREE positions: the ObjectRef carries Renegade Krasis' "each other
   -- creature you control with a +1/+1 counter on it", and a Filter there would
   -- otherwise escape the lint; the count is a Quantity like any other; and CR

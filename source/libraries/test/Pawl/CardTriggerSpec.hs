@@ -1336,32 +1336,29 @@ luluSpec s registry =
               Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
             _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Lulu"
 
--- CR 508.3d's SUBJECT named by the payload: the player who declared the
--- attackers, bound under Pawl.Engine.Binding.attackingPlayer.
+-- Norn's Decree {2}{W} Enchantment (data/cards/norns-decree.json; Oracle text
+-- checked against api.scryfall.com 2026-09-30): "Whenever one or more creatures
+-- an opponent controls deal combat damage to you, that opponent gets a poison
+-- counter. / Whenever a player attacks, if one or more players being attacked
+-- are poisoned, the attacking player draws a card."
 --
--- Synthetic Marauder's Toll {2}{W} Enchantment
--- (data/cards/synthetic-marauders-toll.json): "Whenever a player attacks, the
--- attacking player loses 2 life." SYNTHETIC because both printings that name
--- rule 508.3d's player back need a clause pawl cannot express yet: Norn's
--- Decree {2}{W} prints "if one or more players being attacked are poisoned"
--- (no Filter atom reads a player's poison counters) beside a GROUPED
--- combat-damage trigger, and Mirkwood Trapper {1}{G}{U} prints "if they aren't
--- attacking you" beside a choice made by a player who is not the ability's
--- controller (#2930). Both are the real producers and neither is weakened
--- here; the toll's one line is rule 508.3d's binding and nothing else.
+-- The second ability is CR 508.3d's SUBJECT named by the payload: the player
+-- who declared the attackers, bound under Pawl.Engine.Binding.attackingPlayer,
+-- behind a CR 603.4 intervening "if" over CR 122.1f's poisoned players among
+-- those CR 508.3b declared attacked. The first is CR 603.2c's batch reading of
+-- combat damage, narrowed to CR 109.5's "you" and naming the damagers'
+-- controller under Pawl.Engine.Binding.damagersController.
 --
 -- THREE SEATS, because two collapse the attacker onto either the ability's
 -- controller or the attacked player: bob holds the enchantment, alice
--- declares, and CR 506.2a's answer sends the declaration at carol. So the
--- three readings a wrong arm could take -- the declarer, CR 109.5's "you", and
--- CR 508.1b's announced player -- are three different life totals.
+-- declares, and CR 506.2a's answer sends the declaration at bob or carol.
 --
 -- The ACTIVE player is not discriminated from the declarer: without the shared
 -- team turns option CR 506.2 lets only the active player declare attackers, so
--- the two are the same seat on these boards. CR 805.10a's teammate is the board
--- that parts them.
-marauderTollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-marauderTollSpec s registry =
+-- the two are the same seat on these boards. Pawl.TeamSpec's shared-turns
+-- Norn's Decree case is the board that parts two damagers' controllers.
+nornsDecreeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nornsDecreeSpec s registry =
   let -- Answers CR 506.2a's turn-based choice with `defender` and sends every
       -- Piker at that player, both FILTERED out of what the engine offered
       -- rather than built, luluSpec's reason above.
@@ -1373,37 +1370,132 @@ marauderTollSpec s registry =
         _ -> S.aggressiveAnswer p
       atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
       sentAt gs = Combat.Type.attackers (GameState.combat gs)
-      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+      hands gs = (S.handSize S.alice gs, S.handSize S.bob gs, S.handSize S.carol gs)
+      poison gs = (S.playerCounterOf PlayerCounterKind.Poison S.alice gs, S.playerCounterOf PlayerCounterKind.Poison S.bob gs, S.playerCounterOf PlayerCounterKind.Poison S.carol gs)
       fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacks (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
-      fixture = do
+      -- Every seat's library stocked, so the draw has a card to take and CR
+      -- 704.5b ends nobody's game; `poisoned` names who starts with one poison
+      -- counter.
+      fixture poisoned = do
         piker <- S.printingOf s registry "Goblin Piker"
-        toll <- S.printingOf s registry "Synthetic Marauder's Toll"
-        pure (S.threePlayerCombat [piker, piker] [toll] [])
-   in Spec.describe s "Synthetic Marauder's Toll" $ do
-        -- The proving test: alice declares, so the 2 life comes off alice --
-        -- not off bob, whose enchantment it is, and not off carol, whom the
-        -- declaration was announced at.
-        Spec.it s "CR 508.3d the declaring player is the one that pays" $ do
-          (gs, mine, theirs, _) <- fixture
-          case (mine, theirs) of
-            ([first, second], [_]) -> do
+        decree <- S.printingOf s registry "Norn's Decree"
+        let (gs, mine, theirs, others) = S.threePlayerCombat [piker, piker] [decree] []
+            stocked = List.foldl' (\g pid -> snd (S.addLibraryCard piker pid g)) gs [S.alice, S.bob, S.carol]
+        pure (List.foldl' (flip (S.addPlayerCounter PlayerCounterKind.Poison 1)) stocked poisoned, mine, theirs, others)
+   in Spec.describe s "Norn's Decree" $ do
+        -- The proving test: alice declares at a poisoned carol, so the card goes
+        -- to alice -- not to bob, whose enchantment it is, and not to carol,
+        -- whom the declaration was announced at.
+        Spec.it s "CR 508.3d the declaring player draws when a player being attacked is poisoned" $ do
+          (gs, mine, _, _) <- fixture [S.carol]
+          case mine of
+            [first, second] -> do
               let after = atBlockers (answering S.carol [first, second]) gs
-              Spec.assertEqWith s "CR 119.3 alice lost the 2 life and neither other seat lost any" (lives after) (Just 18, Just 20, Just 20)
+              Spec.assertEqWith s "CR 121.1 alice drew the card and neither other seat did" (hands after) (1, 0, 0)
               Spec.assertEqWith s "CR 508.3d one trigger for the one declaration, however many creatures were in it" (fired after) 1
               Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
-            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Toll"
-        -- The same board with CR 506.2a's answer moved to bob, and nothing else
-        -- changed. The attacked player moves and the payer does not, which is
-        -- what parts this slot from the one CR 508.3e's arm stamps.
-        Spec.it s "CR 508.3d the payer does not follow who was attacked" $ do
-          (gs, mine, theirs, _) <- fixture
-          case (mine, theirs) of
-            ([first, second], [_]) -> do
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers"
+        -- The same board with CR 506.2a's answer moved to a poisoned bob. The
+        -- attacked player moves and the drawer does not, which is what parts
+        -- this slot from the one CR 508.3e's arm stamps.
+        Spec.it s "CR 508.3d the drawer does not follow who was attacked" $ do
+          (gs, mine, _, _) <- fixture [S.bob, S.carol]
+          case mine of
+            [first, second] -> do
               let after = atBlockers (answering S.bob [first, second]) gs
-              Spec.assertEqWith s "CR 119.3 alice still lost the 2 life, and bob none" (lives after) (Just 18, Just 20, Just 20)
-              Spec.assertEqWith s "CR 508.3d and it fired once here too" (fired after) 1
+              Spec.assertEqWith s "CR 121.1 alice still drew the card, and bob none" (hands after) (1, 0, 0)
               Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at bob" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)])
-            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Toll"
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers"
+        -- The first case's board with the poison counter moved from carol to
+        -- bob, whom nobody attacks: a poisoned player is at the table, but none
+        -- of the players being attacked is one.
+        Spec.it s "CR 603.4 no draw when only a player not being attacked is poisoned" $ do
+          (gs, mine, _, _) <- fixture [S.bob]
+          case mine of
+            [first, second] -> do
+              let after = atBlockers (answering S.carol [first, second]) gs
+              Spec.assertEqWith s "CR 603.4 nobody drew" (hands after) (0, 0, 0)
+              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers"
+        -- The first ability. alice's two Pikers connect with bob in one CR
+        -- 510.2 step, so "that opponent" is alice and she gets ONE counter --
+        -- the batch is one occurrence, not one per Piker.
+        Spec.it s "CR 603.2c the damagers' controller gets one poison counter per combat damage step" $ do
+          (gs, mine, _, _) <- fixture []
+          case mine of
+            [first, second] -> do
+              let after = S.runCombat (answering S.bob [first, second]) gs
+              Spec.assertEqWith s "CR 122.1f alice got one poison counter, and bob and carol none" (poison after) (1, 0, 0)
+              Spec.assertEqWith s "CR 510.2 both Pikers really dealt bob combat damage" (S.lifeOf S.bob after) (Just 16)
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers"
+        -- The same board with the declaration at carol: the damage reaches a
+        -- player, but not the Decree's controller.
+        Spec.it s "CR 603.2c no poison counter when the damage is dealt to another player" $ do
+          (gs, mine, _, _) <- fixture []
+          case mine of
+            [first, second] -> do
+              let after = S.runCombat (answering S.carol [first, second]) gs
+              Spec.assertEqWith s "CR 122.1f nobody got a poison counter" (poison after) (0, 0, 0)
+              Spec.assertEqWith s "CR 510.2 both Pikers really dealt carol combat damage" (S.lifeOf S.carol after) (Just 16)
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers"
+
+-- Mirkwood Trapper {1}{G}{U} Creature -- Elf Scout 1/4
+-- (data/cards/mirkwood-trapper.json; Oracle text checked against
+-- api.scryfall.com 2026-09-30): "Whenever a player attacks you, target attacking
+-- creature gets -2/-0 until end of turn. / Whenever a player attacks, if they
+-- aren't attacking you, that player chooses an attacking creature. It gets
+-- +2/+0 until end of turn."
+--
+-- The second ability's chooser is CR 508.3d's attacking player, read through
+-- Pawl.Types.ChosenPermanent's chooser rather than CR 109.5's "you"; its CR
+-- 603.4 "if" counts that player's creatures attacking the Trapper's
+-- controller. Three seats: bob holds the Trapper, alice declares, and the
+-- declaration goes at carol or at bob.
+mirkwoodTrapperSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mirkwoodTrapperSpec s registry =
+  let -- CR 506.2a's defender and the Pikers FILTERED out of what the engine
+      -- offered, nornsDecreeSpec's answerer, plus the CR 608.2d choice: who was
+      -- asked is recorded, and the LAST offered permanent is taken, pinned by
+      -- position rather than searched for.
+      answering :: PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      answering defender attackers p = case p of
+        Prompt.ChooseDefender _ _ options -> pure (Maybe.fromMaybe (NonEmpty.head options) (List.find (== defender) (NonEmpty.toList options)))
+        Prompt.DeclareAttackers _ _ ids -> pure (filter (`elem` attackers) ids)
+        Prompt.ChooseAttackTarget _ _ _ options -> pure (Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer defender) (NonEmpty.toList options)))
+        Prompt.ChoosePermanent _ chooser _ options -> do
+          State.modify' (<> [chooser])
+          pure (NonEmpty.last options)
+        _ -> pure (S.aggressiveAnswer p)
+      -- CR 507 and CR 508 in full: the beginning of combat step, then the
+      -- declare attackers step with its triggers resolved.
+      throughDeclaration defender attackers gs = State.runState (Engine.runGame (answering defender attackers) gs (Engine.runStep >> Engine.runStep)) []
+      powers ids gs = fmap (`Projection.powerOf` gs) ids
+      fixture = do
+        piker <- S.printingOf s registry "Goblin Piker"
+        trapper <- S.printingOf s registry "Mirkwood Trapper"
+        pure (S.threePlayerCombat [piker, piker] [trapper] [])
+   in Spec.describe s "Mirkwood Trapper" $ do
+        -- The proving test: alice attacks carol, not bob, so alice -- not bob,
+        -- whose Trapper it is -- chooses which of her attackers gets +2/+0.
+        Spec.it s "CR 508.3d the attacking player chooses the creature when they aren't attacking you" $ do
+          (gs, mine, _, _) <- fixture
+          case mine of
+            [first, second] -> do
+              let ((_, after), asked) = throughDeclaration S.carol [first, second] gs
+              Spec.assertEqWith s "CR 608.2d alice was asked, once" asked [S.alice]
+              Spec.assertEqWith s "CR 613.4c the Piker she chose got +2/+0 and the other nothing" (powers [first, second] after) [Just 2, Just 4]
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers"
+        -- The same board with the declaration at bob: "if they aren't attacking
+        -- you" is false, so nobody chooses, and the first ability's -2/-0 lands
+        -- on the attacker bob targets instead.
+        Spec.it s "CR 603.4 no choice when they are attacking you, and the first ability shrinks an attacker" $ do
+          (gs, mine, _, _) <- fixture
+          case mine of
+            [first, second] -> do
+              let ((_, after), asked) = throughDeclaration S.bob [first, second] gs
+              Spec.assertEqWith s "CR 603.4 nobody was asked to choose" asked []
+              Spec.assertEqWith s "CR 508.3e one Piker got -2/-0 and neither got +2/+0" (List.sort (powers [first, second] after)) [Just 0, Just 2]
+            _ -> Spec.assertFailure s "fixture should give alice two Pikers"
 
 -- CR 508.3e's TWO subjects named by one payload, which is what parts the
 -- attacking player's slot from the attacked player's.
@@ -4208,7 +4300,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   totalWarSpec s registry
   seiferSpec s registry
   luluSpec s registry
-  marauderTollSpec s registry
+  nornsDecreeSpec s registry
+  mirkwoodTrapperSpec s registry
   reprisalLedgerSpec s registry
   ezuriExperienceSpec s registry
   savantiRomeroSpec s registry
