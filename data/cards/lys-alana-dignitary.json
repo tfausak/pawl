@@ -105,9 +105,12 @@
               {
                 "type": "Behold",
                 "value": {
-                  "type": "HasSubtype",
-                  "value": {
-                    "type": "Elf"
+                  "count": 1,
+                  "whichObjects": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Elf"
+                    }
                   }
                 }
               }
