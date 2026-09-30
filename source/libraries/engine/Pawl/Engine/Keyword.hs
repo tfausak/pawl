@@ -2888,7 +2888,11 @@ permissionsFor cardTypes keyword = case keyword of
   -- (Pawl.Engine.Cost.candidateCostsGiven), where the state is in hand. The two
   -- readings cannot be told apart -- rule 702.187b's permission and its cost are
   -- one sentence, so a card whose mayhem cost is withheld has nothing to be cast
-  -- for, and a permission from somewhere else brings its own cost.
+  -- for, and a permission from somewhere else brings its own cost. CR
+  -- 702.187c's costless mayhem is the same permission, priced at the card's
+  -- ordinary costs where the same discard gates them (candidateCostsGiven's
+  -- graveyard arm); its land half is a play, not a cast
+  -- (Pawl.Engine.PlayerEffect.mayPlayByMayhem).
   Keyword.Mayhem _ -> [CastingPermission.CastFromGraveyard]
   -- CR 702.35a states no standing permission: the cast is offered by rule
   -- 702.35a's own triggered ability, which carries its cost as CR 608.2g's
@@ -2951,13 +2955,22 @@ hasRetrace = Set.member Keyword.Retrace
 -- A LIST for flashbackCosts' reason: rule 702.187b states no limit on how many
 -- mayhem abilities an object has, and CR 601.2b makes two of them a CHOICE.
 --
--- A wildcard rather than an exhaustive case, flashbackCosts' reason.
+-- A wildcard rather than an exhaustive case, flashbackCosts' reason. A costless
+-- mayhem (CR 702.187c) states no cost and contributes none; hasCostlessMayhem
+-- below is its reader.
 mayhemCosts :: Set Keyword -> [Cost Keyword]
 mayhemCosts keywords =
   let costOf keyword = case keyword of
-        Keyword.Mayhem cost -> Just cost
+        Keyword.Mayhem cost -> cost
         _ -> Nothing
    in Maybe.mapMaybe costOf (Set.toAscList keywords)
+
+-- | CR 702.187c: does this card have mayhem WITHOUT a cost, "you may play this
+-- card from your graveyard if you discarded it this turn"? Membership rather
+-- than a count, the rule taking no parameter. Read by
+-- Pawl.Engine.PlayerEffect.mayPlayByMayhem, which asks the zone and the discard.
+hasCostlessMayhem :: Set Keyword -> Bool
+hasCostlessMayhem = Set.member (Keyword.Mayhem Nothing)
 
 -- CR 702.185a: every cost this card may be cast from its owner's HAND for under
 -- its warp ability, in ascending Set order. mayhemCosts' shape above, read by

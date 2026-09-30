@@ -247,7 +247,9 @@ codec =
       Arm.nullary "Undaunted" Keyword.Undaunted,
       Arm.nullary "Improvise" Keyword.Improvise,
       Arm.nullary "Retrace" Keyword.Retrace,
-      Arm.payload "Mayhem" (Cost.codec codec) Keyword.Mayhem (\x -> case x of Keyword.Mayhem y -> Just y; _ -> Nothing),
+      -- CR 702.187c's costless mayhem (Oscorp Industries) is the ABSENT "value"
+      -- key, Modular--Sunburst's spelling above.
+      Arm.optionalPayload "Mayhem" (Cost.codec codec) Keyword.Mayhem (\x -> case x of Keyword.Mayhem y -> Just y; _ -> Nothing),
       Arm.payload "Madness" (Cost.codec codec) Keyword.Madness (\x -> case x of Keyword.Madness y -> Just y; _ -> Nothing),
       Arm.nullary "Rebound" Keyword.Rebound,
       Arm.payload "Scavenge" (Cost.codec codec) Keyword.Scavenge (\x -> case x of Keyword.Scavenge y -> Just y; _ -> Nothing),
