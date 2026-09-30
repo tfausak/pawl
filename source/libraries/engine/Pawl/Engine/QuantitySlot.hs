@@ -55,6 +55,7 @@ overCount f count = case Count.Type.aggregation count of
   Aggregation.DistinctColors -> pure count
   Aggregation.MostSharingACreatureType -> pure count
   Aggregation.MostSharingACardType -> pure count
+  Aggregation.DistinctNames -> pure count
   Aggregation.Greatest quantity -> fmap (\q -> count {Count.Type.aggregation = Aggregation.Greatest q}) (f quantity)
   Aggregation.Total quantity -> fmap (\q -> count {Count.Type.aggregation = Aggregation.Total q}) (f quantity)
 
