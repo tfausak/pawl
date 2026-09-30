@@ -1221,7 +1221,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
       )
       " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"}}} "
@@ -1247,7 +1248,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
       )
       " {\"type\":\"OfferCast\",\"value\":{\"ref\":{\"type\":\"InSlot\",\"value\":\"exiled\"},\"offer\":{\"transformed\":true,\"withoutPayingManaCost\":true}}} "

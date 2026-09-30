@@ -8,6 +8,7 @@ import qualified Pawl.Codec.CastRepetition as CastRepetition
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.PermissionVerb as PermissionVerb
 import qualified Pawl.Codec.PlayerRef as PlayerRef
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -27,7 +28,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 -- every existing offer into an instruction, a defaulted AnyNumber would turn
 -- every one of them into a repeated offer, and a defaulted True on `copied`
 -- would make CR 707.12's copy of every one of them. Likewise `verb` defaults to
--- Cast, and `controlWhileResolving` to no control.
+-- Cast, `controlWhileResolving` to no control, and `slot` to binding nothing.
 codec :: Codec.Codec OfferCast.OfferCast
 codec = Fields.object $ do
   ref <- Fields.required "ref" ObjectRef.codec OfferCast.ref
@@ -38,6 +39,7 @@ codec = Fields.object $ do
   repetition <- Fields.defaulted "repetition" CastRepetition.Type.Once CastRepetition.codec OfferCast.repetition
   copied <- Fields.defaulted "copied" False Common.boolean OfferCast.copied
   controlWhileResolving <- Fields.defaulted "controlWhileResolving" False Common.boolean OfferCast.controlWhileResolving
+  slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) OfferCast.slot
   pure
     OfferCast.MkOfferCast
       { OfferCast.ref = ref,
@@ -47,5 +49,6 @@ codec = Fields.object $ do
         OfferCast.offer = offer,
         OfferCast.repetition = repetition,
         OfferCast.copied = copied,
-        OfferCast.controlWhileResolving = controlWhileResolving
+        OfferCast.controlWhileResolving = controlWhileResolving,
+        OfferCast.slot = slot
       }

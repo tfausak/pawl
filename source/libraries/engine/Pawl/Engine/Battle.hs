@@ -335,7 +335,8 @@ siegeDefeat =
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,

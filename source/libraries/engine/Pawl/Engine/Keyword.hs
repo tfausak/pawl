@@ -8182,7 +8182,8 @@ miracle cost =
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfRevealedForMiracle,
@@ -8678,7 +8679,8 @@ cascade =
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
       rest =
         Effect.MoveToZone
@@ -8788,7 +8790,8 @@ ripple n =
               OfferCast.repetition = CastRepetition.AnyNumber,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
       rest =
         Effect.MoveToZone
@@ -8916,7 +8919,8 @@ suspendLastCounter ability =
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
@@ -8995,7 +8999,8 @@ reboundUpkeep =
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) Nothing TurnScope.ControllersTurn),
@@ -9051,7 +9056,8 @@ cipherTrigger card =
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = True,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer PlayerRelation.AnyPlayer,
@@ -9171,7 +9177,8 @@ paradigmCopy =
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = True,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
    in TriggeredAbility.MkTriggeredAbility
         { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain Nothing TurnScope.ControllersTurn),
@@ -9230,7 +9237,8 @@ madnessCast cost =
               OfferCast.repetition = CastRepetition.Once,
               OfferCast.copied = False,
               OfferCast.verb = PermissionVerb.Cast,
-              OfferCast.controlWhileResolving = False
+              OfferCast.controlWhileResolving = False,
+              OfferCast.slot = Nothing
             }
       -- Rule 702.35a's last sentence. No riders and no slot: the destination is
       -- a graveyard, which CR 400.3 makes the owner's, and nothing reads the

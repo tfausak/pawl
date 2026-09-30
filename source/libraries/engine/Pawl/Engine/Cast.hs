@@ -2480,7 +2480,8 @@ choosePlayPermission pid oid options = case options of
 -- granularity pawl records: a row some other object installed keeps naming the
 -- card, and correctly, since no rule lets it follow. Nothing for a cast the rules
 -- themselves allowed (CR 601.3's first clause), where there is no granting effect
--- to have named anything.
+-- to have named anything, and for CR 608.2g's offer, which binds the spell
+-- through Pawl.Types.OfferCast's `slot` instead.
 --
 -- The floating replacement store is the only captured environment rewritten. A
 -- delayed triggered ability captures one too (Pawl.Types.DelayedTrigger); not
