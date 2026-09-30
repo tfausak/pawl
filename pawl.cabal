@@ -1188,6 +1188,8 @@ library codec
     Pawl.Codec.TriggerLimitSpec
     Pawl.Codec.TriggerSource
     Pawl.Codec.TriggerSourceSpec
+    Pawl.Codec.TurnedFaceUp
+    Pawl.Codec.TurnedFaceUpSpec
     Pawl.Codec.TurnFaceDown
     Pawl.Codec.TurnFaceDownSpec
     Pawl.Codec.TurnScope
@@ -2459,6 +2461,7 @@ library types
     Pawl.Types.TriggerFrequency
     Pawl.Types.TriggerLimit
     Pawl.Types.TriggerSource
+    Pawl.Types.TurnedFaceUp
     Pawl.Types.TurnFaceDown
     Pawl.Types.TurnScope
     Pawl.Types.TurnUpProcedure

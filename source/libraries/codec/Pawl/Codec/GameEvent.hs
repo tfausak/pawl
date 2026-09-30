@@ -49,6 +49,7 @@ import qualified Pawl.Codec.StepBegan as StepBegan
 import qualified Pawl.Codec.TappedForMana as TappedForMana
 import qualified Pawl.Codec.Transformed as Transformed
 import qualified Pawl.Codec.TriggeredAbilitySource as TriggeredAbilitySource
+import qualified Pawl.Codec.TurnedFaceUp as TurnedFaceUp
 import qualified Pawl.Codec.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Codec.ZoneChange as ZoneChange
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -89,7 +90,7 @@ codec =
       Arm.payload "CountersPut" CounterChange.codec GameEvent.CountersPut (\x -> case x of GameEvent.CountersPut y -> Just y; _ -> Nothing),
       Arm.payload "CountersRemoved" CounterChange.codec GameEvent.CountersRemoved (\x -> case x of GameEvent.CountersRemoved y -> Just y; _ -> Nothing),
       Arm.payload "HalfUnlocked" HalfUnlocked.codec GameEvent.HalfUnlocked (\x -> case x of GameEvent.HalfUnlocked y -> Just y; _ -> Nothing),
-      Arm.payload "TurnedFaceUp" ObjectId.codec GameEvent.TurnedFaceUp (\x -> case x of GameEvent.TurnedFaceUp y -> Just y; _ -> Nothing),
+      Arm.payload "TurnedFaceUp" TurnedFaceUp.codec GameEvent.TurnedFaceUp (\x -> case x of GameEvent.TurnedFaceUp y -> Just y; _ -> Nothing),
       Arm.payload "TurnedFaceDown" ObjectId.codec GameEvent.TurnedFaceDown (\x -> case x of GameEvent.TurnedFaceDown y -> Just y; _ -> Nothing),
       Arm.payload "Transformed" Transformed.codec GameEvent.Transformed (\x -> case x of GameEvent.Transformed y -> Just y; _ -> Nothing),
       Arm.payload "BecameDesignated" BecameDesignated.codec GameEvent.BecameDesignated (\x -> case x of GameEvent.BecameDesignated y -> Just y; _ -> Nothing),

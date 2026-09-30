@@ -116,6 +116,7 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TriggeredAbilitySource as TriggeredAbilitySource
 import qualified Pawl.Types.TurnWindow as TurnWindow
+import qualified Pawl.Types.TurnedFaceUp as TurnedFaceUp
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import Pawl.Types.Zone (Zone)
@@ -338,7 +339,7 @@ participants event =
         GameEvent.CountersPut c -> one (CounterChange.object c)
         GameEvent.CountersRemoved c -> one (CounterChange.object c)
         GameEvent.HalfUnlocked h -> ([HalfUnlocked.object h], [HalfUnlocked.actor h])
-        GameEvent.TurnedFaceUp oid -> one oid
+        GameEvent.TurnedFaceUp t -> one (TurnedFaceUp.object t)
         GameEvent.TurnedFaceDown oid -> one oid
         GameEvent.Transformed t -> one (Transformed.object t)
         GameEvent.BecameDesignated d -> one (BecameDesignated.object d)

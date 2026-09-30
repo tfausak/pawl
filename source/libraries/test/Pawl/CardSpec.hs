@@ -1583,6 +1583,18 @@ spellCostsOf face =
     -- first printing to put one there (#3901).
     <> concatMap (NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices face)
 
+-- The morph and disguise costs CR 702.37e and CR 702.168d turn the permanent face
+-- up for, whose X CR 702.37f and CR 702.168e hand to the permanent's
+-- turned-face-up ability.
+turnUpCostsOf :: Face.Face Card.Type.Card -> [Cost.Type.Cost Keyword.Keyword]
+turnUpCostsOf face =
+  KeywordEngine.morphCosts (Face.keywordSet face) <> Maybe.maybeToList (KeywordEngine.disguiseCost (Face.keywordSet face))
+
+-- A turned-face-up triggered ability, the one CR 702.37f and CR 702.168e give
+-- the X chosen for the cost.
+turnedUpTriggers :: Face.Face Card.Type.Card -> [TriggeredAbility.TriggeredAbility Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)]
+turnedUpTriggers = filter ((== TriggerCondition.SelfTurnedFaceUp) . TriggeredAbility.condition) . Face.triggeredAbilities
+
 -- Every CR 118.12 cost this payload offers at resolution, over every mode and
 -- every clause, and every CR 608.2f loop's per-member offer. A READER of X
 -- rather than a declarer: Clash of Wills' "unless its controller pays {X}" and
@@ -6984,10 +6996,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             || any declaresVariable (payGateCostsOf (Face.spell c))
             || modalReadsAnnouncedX (Face.spell c)
             || entersTriggerReadsX c
-        offenders =
-          filter
-            (anyFace (\f -> readsX f /= any declaresVariable (spellCostsOf f)) . Printing.card)
-            ps
+            || turnedUpReadsX c
+        -- CR 702.37f / 702.168e's reader: a turned-face-up ability reading the X
+        -- chosen for the morph or disguise cost, through its effects (Warbreak
+        -- Trumpeter's X Goblins) or its target count (Aurelia's Vindicator). Its
+        -- declarer is that cost rather than a spell cost, so the pair is also
+        -- checked on its own below: a turn-up X declared and never read, or read
+        -- and never declared, is an offender whatever the spell costs say.
+        turnedUpReadsX c = any (\t -> Resolve.readsX (Modal.allEffects (TriggeredAbility.modal t)) || modalReadsAnnouncedX (TriggeredAbility.modal t)) (turnedUpTriggers c)
+        turnUpDeclaresX c = any declaresVariable (turnUpCostsOf c)
+        offends f =
+          let spellDeclaresX = any declaresVariable (spellCostsOf f)
+           in (readsX f /= (spellDeclaresX || turnUpDeclaresX f))
+                || (not spellDeclaresX && turnUpDeclaresX f /= turnedUpReadsX f)
+        offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "X read iff X declared" (fmap (S.nameOf . Printing.card) offenders) []
   -- The ACTIVATED-ABILITY half, and it is a separate sweep because it is a
   -- separate cost: CR 602.2b makes "an activated ability's analog to a spell's
@@ -7091,12 +7113,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (null abilities)) "the pool has activated abilities"
     Spec.assertBool s (any (declaresVariable . ActivatedAbility.cost . snd) abilities) "and one of them declares an X"
     Spec.assertEqWith s "X read iff X declared" (fmap fst (filter offends abilities)) []
-  -- CR 107.3m gives exactly one triggered ability a value of X to read -- an
+  -- CR 107.3m gives one triggered ability a value of X to read -- an
   -- object's enters-the-battlefield ability, whose X is the one announced for the
   -- spell that became that object -- and Pawl.Engine.Engine.placeBorne inherits it
   -- on exactly that condition, as Pawl.Engine.Condition.inheritedX does for the
   -- same ability's intervening "if" (CR 702.156a's "if X is 5 or more").
-  -- Every other trigger is placed with X as zero, so a
+  -- Every trigger but the two named here is placed with X as zero, so a
   -- slot counted by X there would silently take no targets. CR 107.3n's delayed
   -- twin is the same shape one ability over and is NOT inherited: Scryfall
   -- `m:{X} o:"at the beginning of the next end step" (t:instant or t:sorcery)`,
@@ -7109,9 +7131,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- The exemption is keyed on the CONDITION and not on which channel printed the
   -- ability, which is what placeBorne cases on: a room's ability carries no
   -- condition of its own, so it stays refused with the rest.
-  Spec.it s "CR 603.3d only an enters-the-battlefield triggered ability's target count reads an announced X" $ do
+  --
+  -- CR 702.37f and CR 702.168e are the second inheritance, and placeBorne honours
+  -- it too: a turned-face-up ability reads the X chosen for the morph or disguise
+  -- cost (Aurelia's Vindicator's "up to X other target creatures").
+  Spec.it s "CR 603.3d only an enters-the-battlefield or turned-face-up triggered ability's target count reads an announced X" $ do
     ps <- S.allPrintings s
-    let inheritsX ability = TriggeredAbility.condition ability == TriggerCondition.SelfEnters
+    let inheritsX ability = TriggeredAbility.condition ability `elem` [TriggerCondition.SelfEnters, TriggerCondition.SelfTurnedFaceUp]
         triggers f = Face.triggeredAbilities f <> Map.elems (Face.delayedAbilities f) <> grantedTriggeredAbilities f
         countsByX :: [Modal.Modal Card.Type.Card (GrantedAbility.GrantedAbility Card.Type.Card)] -> Bool
         countsByX = any (any (countReadsX . TargetSlot.count) . Modal.allTargetSlots)

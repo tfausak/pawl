@@ -136,6 +136,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activatable as Activatable
 import qualified Pawl.Engine.Activate as Activate
@@ -199,6 +200,7 @@ import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TurnUpProcedure as TurnUpProcedure
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
@@ -228,6 +230,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   shriekerSpec s registry
   unmaskingSpec s registry
   disguiseSpec s registry
+  turnedUpXSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
 --
@@ -3600,3 +3603,69 @@ turnUpReversalSpec s registry = Spec.describe s "Reversal at a special action" $
         Spec.assertEqWith s "no fourth Plains was tapped" (S.tappedCount S.alice after) 3
         Spec.assertEqWith s "nothing is floating" (floating S.alice after) 0
         Spec.assertEqWith s "CR 702.37e and the Kirin is face down all the same" (fmap Object.facing (Game.lookupObject permanent after)) (Just (Facing.faceDown FaceDownReason.Morphed))
+
+-- CR 702.37f and CR 702.168e: "if a permanent's [morph / disguise] cost includes
+-- X, other abilities of that permanent may also refer to X", valued at the X
+-- chosen as the special action was taken (CR 107.3d).
+--
+-- Aurelia's Vindicator is the disguise card, {2}{W}{W} 4/2, "Disguise {X}{3}{W}"
+-- and "When this creature is turned face up, exile up to X other target
+-- creatures from the battlefield and/or creature cards from graveyards", so its
+-- X counts the TARGETS. Warbreak Trumpeter is the morph card, {R} 1/1, "Morph
+-- {X}{X}{R}" and "When this creature is turned face up, create X 1/1 red Goblin
+-- creature tokens", so its X is read by the EFFECT as the ability resolves.
+turnedUpXSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnedUpXSpec s registry =
+  let disguised = Facing.FaceDown FaceDownState.MkFaceDownState {FaceDownState.reason = FaceDownReason.Disguised, FaceDownState.listed = FaceDownCharacteristics.disguisedValue}
+   in Spec.describe s "Turned-up X" $ do
+        -- THE PROVING TEST for the target count. Nine Plains: {3} for the
+        -- face-down cast and {2}{3}{W} for the disguise cost at X = 2. bob has
+        -- THREE Hill Giants, one more than X, so "up to X" is a real bound and not
+        -- the candidate count; the answerer announces the most the engine offers
+        -- and takes that many.
+        Spec.it s "CR 702.168e Aurelia's Vindicator exiles up to the X paid to turn it face up" $ do
+          plains <- S.printingOf s registry "Plains"
+          vindicator <- S.printingOf s registry "Aurelia's Vindicator"
+          giant <- S.printingOf s registry "Hill Giant"
+          let (board, oid) = morphBoard plains vindicator 9
+              (g1, withOne) = S.addPermanent giant S.bob board
+              (g2, withTwo) = S.addPermanent giant S.bob withOne
+              (g3, withThree) = S.addPermanent giant S.bob withTwo
+              giants = [g1, g2, g3]
+              (down, entered) = castAndResolve vindicator disguised withThree oid
+          case entered of
+            Nothing -> Spec.assertFailure s "the disguise cast did not reach the battlefield"
+            Just permanent -> do
+              let up = S.runPure (choosingX 2) down (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Disguise permanent >> Engine.priorityLoop)
+              Spec.assertEqWith s "CR 702.168e two of bob's three Giants exiled: up to X, and X was 2" (length (filter (`S.onBattlefield` up) giants)) 1
+              Spec.assertEqWith s "CR 702.168d {3} and {2}{3}{W}: nine mana in all" (S.tappedCount S.alice up) 9
+              Spec.assertEqWith s "CR 708.8 the printed 4/2" (S.powerToughnessOf permanent up) (Just (4, 2))
+
+        -- THE PROVING TEST for the effect, and for where the X is kept. Eight
+        -- Mountains: {3} for the cast and {X}{X}{R} at X = 2. The face-down 2/2
+        -- carries one damage, which the printed 1/1 it turns into cannot survive
+        -- (CR 704.5g) -- so the permanent is gone before its ability is put on the
+        -- stack, and the two Goblins can only come from the X the special action
+        -- recorded on its event.
+        Spec.it s "CR 702.37f Warbreak Trumpeter makes X Goblins even when it dies turning face up" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          trumpeter <- S.printingOf s registry "Warbreak Trumpeter"
+          case faceDownWith mountain trumpeter 8 of
+            Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+            Just (gs, permanent) -> do
+              let damaged = S.markDamage permanent 1 gs
+                  up = S.runPure (choosingX 2) damaged (FaceDown.turnFaceUp S.manaPerformer S.alice TurnUpProcedure.Morph permanent >> Engine.priorityLoop)
+                  goblins = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Token")) S.alice up
+              Spec.assertEqWith s "CR 702.37f two Goblins: X was 2" goblins 2
+              Spec.assertBool s (not (S.onBattlefield permanent up)) "CR 704.5g the 1/1 died to the damage the 2/2 carried"
+              Spec.assertEqWith s "CR 702.37e {3} and {2}{2}{R}: eight mana in all" (S.tappedCount S.alice up) 8
+
+-- CR 107.3d's X answered with `x`, and CR 601.2c's announcement answered with
+-- the most the engine offers, taken in id order. Offering the most is what makes
+-- the count the ENGINE's: a wrong X changes the offer, and the answer follows it.
+choosingX :: Natural -> Prompt.Prompt r -> r
+choosingX x p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (\(count, legal) -> maybe (Natural.length legal) (min (Natural.length legal)) (TargetCount.most count)) offers
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (Set.toAscList legal))) sets
+  _ -> S.identityAnswer p
