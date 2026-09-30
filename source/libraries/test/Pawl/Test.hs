@@ -73,6 +73,7 @@ import qualified Pawl.Codec.AttackOptionSpec
 import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.AttackTargetKindSpec
 import qualified Pawl.Codec.AttackTargetSpec
+import qualified Pawl.Codec.AttackedPlayerSpec
 import qualified Pawl.Codec.AttackerBlockedSpec
 import qualified Pawl.Codec.AttackerDeclaredSpec
 import qualified Pawl.Codec.AttackersAreSpec
@@ -867,6 +868,7 @@ spec s registry = do
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.AttackTargetKindSpec.spec s
   Pawl.Codec.AttackTargetSpec.spec s
+  Pawl.Codec.AttackedPlayerSpec.spec s
   Pawl.Codec.AttackerBlockedSpec.spec s
   Pawl.Codec.AttackerDeclaredSpec.spec s
   Pawl.Codec.AttackingPlayersSpec.spec s

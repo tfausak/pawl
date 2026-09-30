@@ -171,6 +171,8 @@ library codec
     Pawl.Codec.AttackCost
     Pawl.Codec.AttackCostScope
     Pawl.Codec.AttackCostSpec
+    Pawl.Codec.AttackedPlayer
+    Pawl.Codec.AttackedPlayerSpec
     Pawl.Codec.AttackerBlocked
     Pawl.Codec.AttackerBlockedSpec
     Pawl.Codec.AttackerDeclared
@@ -1896,6 +1898,7 @@ library types
     Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
     Pawl.Types.AttackCostScope
+    Pawl.Types.AttackedPlayer
     Pawl.Types.AttackerBlocked
     Pawl.Types.AttackerDeclared
     Pawl.Types.AttackersAre

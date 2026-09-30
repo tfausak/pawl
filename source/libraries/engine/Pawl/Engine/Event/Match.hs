@@ -28,6 +28,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityAddsMana as AbilityAddsMana
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackedPlayer as AttackedPlayer
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BattlefieldCandidate as BattlefieldCandidate
@@ -3070,8 +3071,8 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.CardArrived _ -> False
   -- CR 508.3e: the player the payload names declared attackers, and at least one
   -- of them was sent at a PLAYER. AttachedPlayerIsAttacked's event and its
-  -- per-TARGET arity, with the subject read off a relation instead of off the
-  -- bearer's attachment -- so one declaration split across two opponents fires
+  -- per-TARGET arity, with the declaring player qualified too -- so one
+  -- declaration split across two opponents fires
   -- this TWICE where PlayerAttacks above fires once, which is what parts rule
   -- 508.3e from rule 508.3d.
   --
@@ -3088,7 +3089,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- controller -- and not against each other, so Opponent on the ATTACKED side
   -- would say "somebody other than me was attacked" rather than restate CR
   -- 506.2a's requirement that the defending player be an opponent of the
-  -- attacker.
+  -- attacker. The attacked side may instead be named by attachment (CR 303.4b,
+  -- Archnemesis' "attack enchanted player"), read live off Object.attachedTo as
+  -- AttachedPlayerIsAttacked reads it.
   --
   -- ONLY AttackTarget.OfPlayer, which is rule 508.3e's last sentence in as many
   -- words: "it won't trigger if a creature attacks a planeswalker or a battle".
@@ -3104,7 +3107,9 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.BecameAttacked payload -> case BecameAttacked.target payload of
       AttackTarget.OfPlayer attacked ->
         PlayerRelation.holds (Game.teams gs) (PlayerAttacksPlayer.attacker subjects) you (BecameAttacked.attacker payload)
-          && PlayerRelation.holds (Game.teams gs) (PlayerAttacksPlayer.attacked subjects) you attacked
+          && case PlayerAttacksPlayer.attacked subjects of
+            AttackedPlayer.Related relation -> PlayerRelation.holds (Game.teams gs) relation you attacked
+            AttackedPlayer.Enchanted -> (Recipient.playerOf =<< (Object.attachedTo =<< Game.lookupObject bearer gs)) == Just attacked
       AttackTarget.OfPlaneswalker _ -> False
       AttackTarget.OfBattle _ -> False
     GameEvent.AttackerDeclared {} -> False

@@ -68,6 +68,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Placement as Placement
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -1497,63 +1498,67 @@ mirkwoodTrapperSpec s registry =
               Spec.assertEqWith s "CR 508.3e one Piker got -2/-0 and neither got +2/+0" (List.sort (powers [first, second] after)) [Just 0, Just 2]
             _ -> Spec.assertFailure s "fixture should give alice two Pikers"
 
--- CR 508.3e's TWO subjects named by one payload, which is what parts the
--- attacking player's slot from the attacked player's.
+-- CR 508.3e with the attacked side named by attachment (CR 303.4b), and its
+-- attacking player bound for a CR 701.3a move, with Archnemesis {1}{U}{B}
+-- Enchantment -- Aura: "Enchant opponent / Whenever you attack enchanted
+-- player, that player loses 2 life. You draw a card and gain 2 life. / Whenever
+-- a player attacks you, you may attach this Aura to that player."
 --
--- Synthetic Reprisal Ledger {1}{U}{B} Enchantment
--- (data/cards/synthetic-reprisal-ledger.json): "Whenever a player attacks
--- another player, the attacking player loses 2 life and the attacked player
--- loses 3 life." SYNTHETIC because Archnemesis {1}{U}{B}, the printing that
--- names rule 508.3e's attacking player ("whenever a player attacks you, you may
--- attach this Aura to that player"), needs CR 303.4's attaching an Aura to a
--- PLAYER and a CR 508.3e attacked side named by attachment, neither of which
--- pawl has (#2931). Seifer, Balamb Rival and Lulu,
--- Stern Guardian above read the attacked player alone.
---
--- THREE SEATS and TWO DIFFERENT AMOUNTS, so no pair of readings agrees: bob
--- holds the Ledger, alice declares, carol is announced. An arm binding one
--- player under both slots takes 5 life off one seat, and an arm that swapped
--- them takes 3 off alice.
-reprisalLedgerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-reprisalLedgerSpec s registry =
-  let answering :: PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-      answering defender attackers p = case p of
-        Prompt.ChooseDefender _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== defender) (NonEmpty.toList options))
-        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
-        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer defender) (NonEmpty.toList options))
+-- THREE SEATS, since two collapse "you", "enchanted player" and "an opponent".
+-- The first board splits alice's attack between the enchanted bob and carol;
+-- the second hands the Aura to bob, enchanting carol, so alice attacking carol
+-- is CR 508.3b's "enchanted player is attacked" but not rule 508.3e's "you
+-- attack".
+archnemesisSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+archnemesisSpec s registry =
+  let answering :: [(ObjectId.ObjectId, PlayerId.PlayerId)] -> Prompt.Prompt r -> r
+      answering aims p = case p of
+        Prompt.ChooseAttackTarget _ _ attacker options -> Maybe.fromMaybe (NonEmpty.head options) (do defender <- lookup attacker aims; List.find (== AttackTarget.OfPlayer defender) (NonEmpty.toList options))
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` fmap fst aims) ids
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
         _ -> S.aggressiveAnswer p
-      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
-      sentAt gs = Combat.Type.attackers (GameState.combat gs)
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
-      fired gs = length (Maybe.mapMaybe (\event -> case event of GameEvent.AbilityTriggered record | isPlayerAttacksPlayer (TriggeredAbility.condition (AbilityTriggered.ability record)) -> Just (); _ -> Nothing) (S.eventsOf gs))
-      fixture = do
-        piker <- S.printingOf s registry "Goblin Piker"
-        ledger <- S.printingOf s registry "Synthetic Reprisal Ledger"
-        pure (S.threePlayerCombat [piker, piker] [ledger] [])
-   in Spec.describe s "Synthetic Reprisal Ledger" $ do
-        -- The proving test: three seats, three life totals, and the two slots
-        -- land on the two players rule 508.3e names.
-        Spec.it s "CR 508.3e the attacker and the attacked player are told apart" $ do
-          (gs, mine, theirs, _) <- fixture
-          case (mine, theirs) of
-            ([first, second], [_]) -> do
-              let after = atBlockers (answering S.carol [first, second]) gs
-              Spec.assertEqWith s "CR 119.3 alice lost 2 as the attacker, carol 3 as the attacked player, bob none" (lives after) (Just 18, Just 20, Just 17)
-              Spec.assertEqWith s "CR 508.3e one trigger from the one attacked player" (fired after) 1
-              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at carol" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.carol), (second, AttackTarget.OfPlayer S.carol)])
-            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Ledger"
-        -- CR 506.2a's answer moved to bob, so the ability's own controller is
-        -- the attacked player: the 3 follows the announcement onto bob while
-        -- the 2 stays on alice.
-        Spec.it s "CR 508.3e the attacked player's 3 follows the announcement" $ do
-          (gs, mine, theirs, _) <- fixture
-          case (mine, theirs) of
-            ([first, second], [_]) -> do
-              let after = atBlockers (answering S.bob [first, second]) gs
-              Spec.assertEqWith s "CR 119.3 alice still lost 2, and bob lost the 3" (lives after) (Just 18, Just 17, Just 20)
-              Spec.assertEqWith s "CR 508.3e and it fired once here too" (fired after) 1
-              Spec.assertEqWith s "CR 508.1b and both Pikers really were declared at bob" (sentAt after) (Map.fromList [(first, AttackTarget.OfPlayer S.bob), (second, AttackTarget.OfPlayer S.bob)])
-            _ -> Spec.assertFailure s "fixture should give alice two Pikers and bob a Ledger"
+      enchanting oid gs = Recipient.playerOf =<< (Object.attachedTo =<< Game.lookupObject oid gs)
+      onto who placement = placement {Placement.attached = Just (S.seatLabel who)}
+      piker name = S.settled name "Goblin Piker"
+      stocked seat = seat {Seat.library = Seq.fromList [S.permanent "Island"]}
+      yours =
+        S.board
+          ( stocked (S.battlefield S.alice [piker "first", piker "second", S.aliased "archnemesis" (onto S.bob (S.permanent "Archnemesis"))])
+              NonEmpty.:| [S.playerSetup S.bob, S.playerSetup S.carol]
+          )
+          S.alice
+          S.beginningOfCombat
+      theirs =
+        S.board
+          ( S.battlefield S.alice [piker "first", piker "second"]
+              NonEmpty.:| [stocked (S.battlefield S.bob [S.aliased "archnemesis" (onto S.carol (S.permanent "Archnemesis"))]), S.playerSetup S.carol]
+          )
+          S.alice
+          S.beginningOfCombat
+      atBlockers aims built = S.runToStep S.declareBlockers (answering aims) (Staged.state built)
+   in Spec.describe s "Archnemesis" $ do
+        Spec.it s "CR 508.3e you attack enchanted player: that player loses 2, you draw and gain 2" $ do
+          built <- S.buildBoardOrFail s registry yours
+          case (aliasIn "first" built, aliasIn "second" built) of
+            (Just first, Just second) -> do
+              let after = atBlockers [(first, S.bob), (second, S.carol)] built
+              Spec.assertEqWith s "CR 119.3 bob lost 2 and alice gained 2, and carol, also attacked, lost nothing" (lives after, S.handSize S.alice after) ((Just 22, Just 18, Just 20), 1)
+            _ -> Spec.assertFailure s "fixture should alias alice's two Pikers"
+        Spec.it s "CR 508.3e another player attacking the enchanted player does not trigger it" $ do
+          built <- S.buildBoardOrFail s registry theirs
+          case (aliasIn "first" built, aliasIn "archnemesis" built) of
+            (Just first, Just archnemesis) -> do
+              let after = atBlockers [(first, S.carol)] built
+              Spec.assertEqWith s "CR 508.3e nobody's life or hand moved, and the Aura stayed on carol" (lives after, S.handSize S.bob after, enchanting archnemesis after) ((Just 20, Just 20, Just 20), 0, Just S.carol)
+            _ -> Spec.assertFailure s "fixture should alias alice's Piker and bob's Archnemesis"
+        Spec.it s "CR 701.3a a player attacking you gets the Aura" $ do
+          built <- S.buildBoardOrFail s registry theirs
+          case (aliasIn "first" built, aliasIn "archnemesis" built) of
+            (Just first, Just archnemesis) -> do
+              let after = atBlockers [(first, S.bob)] built
+              Spec.assertEqWith s "CR 701.3a Archnemesis now enchants alice, the attacking player" (enchanting archnemesis after) (Just S.alice)
+            _ -> Spec.assertFailure s "fixture should alias alice's Piker and bob's Archnemesis"
 
 -- CR 122.1's experience counters READ, with Ezuri, Claw of Progress {2}{G}{U}
 -- Legendary Creature -- Phyrexian Elf Warrior 3/3: "Whenever a creature you
@@ -4315,7 +4320,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   luluSpec s registry
   nornsDecreeSpec s registry
   mirkwoodTrapperSpec s registry
-  reprisalLedgerSpec s registry
+  archnemesisSpec s registry
   ezuriExperienceSpec s registry
   savantiRomeroSpec s registry
   handOfThePraetorsSpec s registry

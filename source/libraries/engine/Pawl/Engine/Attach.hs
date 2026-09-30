@@ -138,12 +138,12 @@ attachmentWith equippable src destination gs
   -- Equipment nor Fortification unattachable anyway, so this needs no
   -- subtype conjunct for the same reason the minted row needs none.
   --
-  -- A REGRESSION FENCE rather than a proven behaviour: no card in `data/cards/`
-  -- attaches an Aura to a player by a CR 701.3 move, and CR 608.3c's Aura spell
-  -- reaches its player without coming through here, so Pawl.Engine.Sba.fallsOff
-  -- is the gate the pool actually drives. Written because CR 101.2 makes the
-  -- "can't" beat rule 701.3a's permission below, exactly as the object case
-  -- above is.
+  -- A REGRESSION FENCE rather than a proven behaviour: Archnemesis moves an Aura
+  -- onto a player by a CR 701.3 move, but no test sends it at a protected one,
+  -- and CR 608.3c's Aura spell reaches its player without coming through here,
+  -- so Pawl.Engine.Sba.fallsOff is the gate the pool actually drives. Written
+  -- because CR 101.2 makes the "can't" beat rule 701.3a's permission below,
+  -- exactly as the object case above is.
   | Maybe.maybe False (\pid -> PlayerEffect.protectedFrom src pid gs) (Recipient.playerOf destination) = Nothing
   -- CR 301.5, "it can't legally be attached to anything that isn't a creature" --
   -- which is also why a player destination falls to Nothing here rather than
