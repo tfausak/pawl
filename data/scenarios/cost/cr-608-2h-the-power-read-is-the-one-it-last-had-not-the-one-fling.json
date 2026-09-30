@@ -1,0 +1,30 @@
+{
+  "description": "CR 608.2h the power read is the one it last had, not the one it printed",
+  "note": "Fling sacrifices a creature as an additional cost, so the damage reads the Ogre Sentry's last known power. Night of Souls' Betrayal makes that 2 where the printed power is 3: bob ends at 18, 17 for the printed reading, 20 for an unbound slot. The Sentry is alice's only creature, so the sacrifice asks nothing.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Ogre Sentry", "label": "ogre-sentry" },
+          { "card": "Night of Souls' Betrayal", "label": "night-of-souls-betrayal" }
+        ],
+        "hand": [{ "card": "Fling", "label": "fling" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@ogre-sentry", "power": 2, "toughness": 2 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fling", "targets": ["@bob"], "mana": ["@mountain", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 18 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Life": { "player": "alice", "life": 20 } } }
+  ]
+}

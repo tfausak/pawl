@@ -1530,6 +1530,19 @@ collectsEvidenceAsCost =
         _ -> False
    in any isCollect . Cost.Type.components
 
+-- Does this cost WATERBEND? collectsEvidenceAsCost's shape exactly: CR 601.2h's
+-- payment binds Binding.waterbendCost (Pawl.Engine.Cost.payComponent's
+-- Waterbend arm), which is what "if this spell's additional cost was paid"
+-- reads -- printed only on a card whose own cost waterbends. WaterbendX counts:
+-- the announcement rewrites it to a Waterbend before it is paid.
+waterbendsAsCost :: Cost.Type.Cost Keyword.Keyword -> Bool
+waterbendsAsCost =
+  let isWaterbend component = case component of
+        CostComponent.Waterbend _ -> True
+        CostComponent.WaterbendX -> True
+        _ -> False
+   in any isWaterbend . Cost.Type.components
+
 -- Does this cost sacrifice a permanent the payer CHOOSES? revealsAsCost's shape
 -- exactly: CR 601.2h's payment binds Binding.sacrificedPermanent
 -- (Pawl.Engine.Cost.payComponent's Sacrifice arm), and both carriers fold it on --
@@ -1581,9 +1594,8 @@ spellCostsOf face =
   (Cost.Type.MkCost (Face.manaCost face) (Face.additionalCosts face) : fmap AlternativeCost.cost (Face.alternativeCosts face))
     <> Map.elems (Face.modeCosts face)
     -- CR 118.8's choice costs, each option on its own: they are additional costs
-    -- of the same CR 601.2f total, so an X in one would bind Binding.variableX as
-    -- any other does. Not implemented: Crashing Wave's "waterbend {X}", the
-    -- first printing to put one there (#3901).
+    -- of the same CR 601.2f total, so an X in one binds Binding.variableX as
+    -- any other does (Waterbender's Restoration's "waterbend {X}").
     <> concatMap (NonEmpty.toList . CostChoice.unwrap) (Face.additionalCostChoices face)
 
 -- The morph and disguise costs CR 702.37e and CR 702.168d turn the permanent face
@@ -2602,6 +2614,7 @@ reservedSlots =
       Binding.revealedCard,
       Binding.beheldObject,
       Binding.collectedEvidence,
+      Binding.waterbendCost,
       Binding.removedCounters,
       Binding.crewedVehicle,
       Binding.crewers,
@@ -6446,6 +6459,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         --   * Binding.collectedEvidence, and only when the cost collects
         --     evidence, per `collectsEvidenceAsCost`: CR 701.59c's "if evidence
         --     was collected", beheldObject's reasoning exactly.
+        --   * Binding.waterbendCost, and only when the cost waterbends, per
+        --     `waterbendsAsCost`: "if this spell's additional cost was paid",
+        --     the same reasoning again.
         --   * Binding.sacrificedPermanent, and only when the cost sacrifices a
         --     permanent the payer chooses, per `sacrificesAsCost`. CR 601.2h's
         --     payment binds it and Pawl.Engine.Cast folds it onto the spell, so
@@ -6475,7 +6491,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 if any collectsEvidenceAsCost (spellCostsOf card)
                   then Set.singleton Binding.collectedEvidence
                   else Set.empty
-           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed, beheld, collected]) (Face.spell card)
+              waterbent =
+                if any waterbendsAsCost (spellCostsOf card)
+                  then Set.singleton Binding.waterbendCost
+                  else Set.empty
+           in modalSlotsOffend (Set.unions [Set.fromList [Binding.you, Binding.triggerSource], announcedX, revealed, sacrificed, beheld, collected, waterbent]) (Face.spell card)
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

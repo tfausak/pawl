@@ -1,0 +1,24 @@
+{
+  "description": "CR 509.3c a Guard that goes unblocked is not pumped",
+  "note": "The control leg for bushido's becoming-blocked half, on the same board: attacking is not becoming blocked, so alice's unblocked Inner-Chamber Guard stays 0/2 and its 0 power takes nothing from bob.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Inner-Chamber Guard", "label": "inner-chamber-guard", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "goblin-piker", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@inner-chamber-guard"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "PowerToughness": { "object": "@inner-chamber-guard", "power": 0, "toughness": 2 } } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}

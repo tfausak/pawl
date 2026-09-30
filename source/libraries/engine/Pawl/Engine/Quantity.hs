@@ -268,8 +268,12 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity =
         -- the action) rather than a hole, which is InSlot's answer above turned
         -- around -- that arm asks for a number a slot HOLDS, this one for whether
         -- the slot is there.
+        --
+        -- A slot holding an AMOUNT is there too: rule 701.67a's waterbend
+        -- payment may tap nothing, so Binding.waterbendCost records the amount
+        -- paid rather than an object (Spirit Water Revival).
         Quantity.WasBound slot ->
-          Just (if Set.null (Map.findWithDefault Set.empty slot (Filter.slotObjects context)) then 0 else 1)
+          Just (if Set.null (Map.findWithDefault Set.empty slot (Filter.slotObjects context)) && Map.notMember slot (Filter.boundAmounts context) then 0 else 1)
         -- WasBound's count rather than its yes-or-no, off the binding for the
         -- same reason: an attacker that has since left the battlefield still
         -- counts toward Screaming Swarm's "that many" (CR 608.2i).

@@ -28,7 +28,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots)
+import Pawl.CardSpec (anyFace, cardAuthoredEffects, cardCounts, cardResolutionEffects, collectsEvidenceAsCost, declaresVariable, effectCounts, grantedActivatedAbilities, lintMode, modalActivated, modalSlotsOffend, oneEffectActivated, oneEffectTrigger, removesCountersAsCost, sacrificesAsCost, spellCostsOf, triggerConditionSlots, waterbendsAsCost)
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -747,11 +747,13 @@ abilitySlotLintSpec s registry = Spec.describe s "Lint" $ do
     let -- CR 400.7d: the permanent a spell becomes keeps the record its own
         -- cost bound (Binding.paidCostRecord), and every ability it triggers
         -- carries it -- so a face whose cost collects evidence may read the
-        -- slot there (Vitu-Ghazi Inspector).
+        -- slot there (Vitu-Ghazi Inspector), and one whose cost waterbends
+        -- (Katara, Seeking Revenge).
         inherited face =
-          if any collectsEvidenceAsCost (spellCostsOf face)
-            then Set.singleton Binding.collectedEvidence
-            else Set.empty
+          Set.unions
+            [ if any collectsEvidenceAsCost (spellCostsOf face) then Set.singleton Binding.collectedEvidence else Set.empty,
+              if any waterbendsAsCost (spellCostsOf face) then Set.singleton Binding.waterbendCost else Set.empty
+            ]
         cardOffends face = any (triggeredAbilityOffendsGiven (inherited face)) (Face.triggeredAbilities face)
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling triggered-ability slot" (fmap (S.nameOf . Printing.card) offenders) []

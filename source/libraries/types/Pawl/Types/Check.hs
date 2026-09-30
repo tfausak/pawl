@@ -8,6 +8,7 @@ import qualified Pawl.Types.DamageIs as DamageIs
 import qualified Pawl.Types.DefendersAre as DefendersAre
 import qualified Pawl.Types.LifeIs as LifeIs
 import qualified Pawl.Types.MonarchIs as MonarchIs
+import qualified Pawl.Types.PowerToughnessIs as PowerToughnessIs
 import qualified Pawl.Types.TappedIs as TappedIs
 import qualified Pawl.Types.TypesAre as TypesAre
 
@@ -24,4 +25,5 @@ data Check
   | Blockers BlockersAre.BlockersAre
   | Defenders DefendersAre.DefendersAre
   | Monarch MonarchIs.MonarchIs
+  | PowerToughness PowerToughnessIs.PowerToughnessIs
   deriving (Eq, Ord, Show)

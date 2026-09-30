@@ -946,6 +946,8 @@ library codec
     Pawl.Codec.PoolSpec
     Pawl.Codec.Power
     Pawl.Codec.PowerSpec
+    Pawl.Codec.PowerToughnessIs
+    Pawl.Codec.PowerToughnessIsSpec
     Pawl.Codec.PreventAllDamage
     Pawl.Codec.PreventAllDamageSpec
     Pawl.Codec.Prevention
@@ -2326,6 +2328,7 @@ library types
     Pawl.Types.Plus
     Pawl.Types.Pool
     Pawl.Types.Power
+    Pawl.Types.PowerToughnessIs
     Pawl.Types.PreventAllDamage
     Pawl.Types.Prevention
     Pawl.Types.PreventionRider

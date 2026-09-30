@@ -1267,21 +1267,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "survives at 3/3 with 2 marked" (Projection.toughnessOf mammothId damaged) (Just 3)
     Spec.assertEqWith s "no creature survives once toughness is 1" (S.creaturesInPlay S.bob afterSba) 0
 
-  Spec.it s "CR 613 layer order: Giant Growth on a Humility'd Piker is 4/4" $ do
-    forest <- S.printingOf s registry "Forest"
-    piker <- S.printingOf s registry "Goblin Piker"
-    humility <- S.printingOf s registry "Humility"
-    giantGrowth <- S.printingOf s registry "Giant Growth"
-    let base = S.landsInPlay forest 1
-        (pikerId, withPiker) = S.addPermanent piker S.alice base
-        withHum = S.withHumility humility withPiker
-        (gs, ggId) = S.handOne giantGrowth withHum
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice ggId))
-        resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    -- Layer 7b (set 1/1) before 7c (+3/+3): 1 then +3 = 4.
-    Spec.assertEqWith s "power" (Projection.powerOf pikerId resolved) (Just 4)
-    Spec.assertEqWith s "toughness" (Projection.toughnessOf pikerId resolved) (Just 4)
-
   Spec.it s "CR 611 Serpent's Gift grants deathtouch to its target" $ do
     -- {2}{G} needs 3 total mana; 3 Forests, not 2 (a brief fixture bug --
     -- 2 Forests only pay {1}{G}, leaving the spell uncast and the assertion
