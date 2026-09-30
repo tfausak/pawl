@@ -718,7 +718,7 @@ candidateCostsGiven permitted pid name oid gs =
                       -- cost's condition above: a clause that does not hold is not an
                       -- offer withheld, it is no offer at all. The discarder asked
                       -- about is the CASTER, rule 702.187b's "you".
-                      mayhem cost = CandidateCost.plain (Just (Keyword.Type.Mayhem cost)) (withAdditional cost)
+                      mayhem cost = CandidateCost.plain (Just (Keyword.Type.Mayhem (Just cost))) (withAdditional cost)
                       -- CR 702.180a's FIRST and SECOND static abilities, `emerged`
                       -- above one characteristic over: the tap rides in the
                       -- candidate's components and the generic reduction in
@@ -809,8 +809,12 @@ candidateCostsGiven permitted pid name oid gs =
                            )
                         -- UNTAGGED: an effect's permission states no cost, so
                         -- neither rule 702.34a's clause nor rule 702.133a's is
-                        -- satisfied by paying it.
-                        <> (if permitted || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs then ordinary else [])
+                        -- satisfied by paying it. CR 702.187c's costless mayhem
+                        -- states no cost either, so it opens the same list. A
+                        -- regression fence: its one printing is a land, which is
+                        -- played rather than cast (MTGJSON 2026-08-23, text
+                        -- "Mayhem (You may play": Oscorp Industries alone).
+                        <> (if permitted || PlayerEffect.mayCastFrom pid Zone.Graveyard oid gs || PlayerEffect.mayPlayByMayhem pid oid gs then ordinary else [])
                 -- CR 702.170d: a PLOTTED card is cast "without paying its mana
                 -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
                 -- rule 702.170d being the only thing permitting this cast. CR
