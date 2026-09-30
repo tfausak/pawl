@@ -32,6 +32,8 @@ spec s = Spec.describe s "Pawl.Codec.Move" $ do
     Common.assertCodec s Move.codec (Move.Type.ChooseDefender (Label.Type.MkLabel (Text.pack "bob"))) " {\"ChooseDefender\":\"bob\"} "
   Spec.it s "ChooseAttackTarget" $
     Common.assertCodec s Move.codec (Move.Type.ChooseAttackTarget (ref "bob")) " {\"ChooseAttackTarget\":\"@bob\"} "
+  Spec.it s "OrderTimestamps" $
+    Common.assertCodec s Move.codec (Move.Type.OrderTimestamps (Seq.fromList [ref "first", ref "second"])) " {\"OrderTimestamps\":[\"@first\",\"@second\"]} "
   Spec.it s "Concede" $
     Common.assertCodec s Move.codec Move.Type.Concede " \"Concede\" "
   Spec.it s "Pass" $

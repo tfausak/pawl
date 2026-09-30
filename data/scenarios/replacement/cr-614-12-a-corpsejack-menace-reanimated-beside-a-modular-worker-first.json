@@ -1,0 +1,39 @@
+{
+  "description": "CR 614.12 a Corpsejack Menace reanimated beside a modular creature doubles nothing (#78)",
+  "note": "The proving test for #78's candidate-collection channel. CR 614.12 settles an entering permanent's replacements from continuous effects that already exist, and a permanent arriving in the same batch has none yet. Rise of the Dark Realms returns both cards as one CR 608.2f event, so Corpsejack Menace cannot double Arcbound Worker's modular counter: one counter, a 1/1 (two would be a 2/2, none a 0/0 CR 704.5f buries). The mirrored leg: the Worker is buried first, and the answer must not depend on the batch's processing order (CR 608.2f).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Swamp", "label": "swamp-1", "ready": true },
+          { "card": "Swamp", "label": "swamp-2", "ready": true },
+          { "card": "Swamp", "label": "swamp-3", "ready": true },
+          { "card": "Swamp", "label": "swamp-4", "ready": true },
+          { "card": "Swamp", "label": "swamp-5", "ready": true },
+          { "card": "Swamp", "label": "swamp-6", "ready": true },
+          { "card": "Swamp", "label": "swamp-7", "ready": true },
+          { "card": "Swamp", "label": "swamp-8", "ready": true },
+          { "card": "Swamp", "label": "swamp-9", "ready": true }
+        ],
+        "hand": [{ "card": "Rise of the Dark Realms", "label": "rise" }],
+        "graveyard": [
+          { "card": "Arcbound Worker" },
+          { "card": "Corpsejack Menace" }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@rise", "mana": ["@swamp-1", "@swamp-2", "@swamp-3", "@swamp-4", "@swamp-5", "@swamp-6", "@swamp-7", "@swamp-8", "@swamp-9"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Arcbound Worker", "Corpsejack Menace"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Arcbound Worker", "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Arcbound Worker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Arcbound Worker", "power": 1, "toughness": 1 } } }
+  ]
+}

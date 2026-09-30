@@ -32,6 +32,7 @@ import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.KeywordCount as KeywordCount
 import qualified Pawl.Types.KeywordTally as KeywordTally
+import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -2906,9 +2907,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.187b's cost, where there is one, is printed, so its components take the same descent
   -- flashback's do.
   Keyword.Type.Mayhem cost -> Keyword.Type.Mayhem (fmap (rewriteCost pairs) cost)
-  -- CR 702.35a's cost is printed, so its components take the same descent
-  -- mayhem's do.
-  Keyword.Type.Madness cost -> Keyword.Type.Madness (rewriteCost pairs cost)
+  -- CR 702.35a's cost, where it is stated, is printed, so its components take
+  -- the same descent mayhem's do; the card's own mana cost names no word.
+  Keyword.Type.Madness (MadnessCost.Stated cost) -> Keyword.Type.Madness (MadnessCost.Stated (rewriteCost pairs cost))
+  Keyword.Type.Madness MadnessCost.OwnManaCost -> keyword
   -- CR 702.88a takes no parameter and prints no cost, retrace's position: rule
   -- 702.88a's exile, upkeep and free cast are all the rule's, so CR 612.2 has no
   -- printed word here to swap.

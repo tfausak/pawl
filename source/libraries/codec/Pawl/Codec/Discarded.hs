@@ -3,6 +3,8 @@
 module Pawl.Codec.Discarded where
 
 import qualified Pawl.Codec.DiscardCause as DiscardCause
+import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.MadnessCost as MadnessCost
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -18,11 +20,11 @@ codec = Fields.object $ do
   player <- Fields.required "player" PlayerId.codec Discarded.player
   card <- Fields.required "card" ObjectId.codec Discarded.card
   cause <- Fields.required "cause" DiscardCause.codec Discarded.cause
-  exiledForMadness <- Fields.required "exiledForMadness" Common.boolean Discarded.exiledForMadness
+  madness <- Fields.required "madness" (Common.set (MadnessCost.codec Keyword.codec)) Discarded.madness
   pure
     Discarded.MkDiscarded
       { Discarded.player = player,
         Discarded.card = card,
         Discarded.cause = cause,
-        Discarded.exiledForMadness = exiledForMadness
+        Discarded.madness = madness
       }

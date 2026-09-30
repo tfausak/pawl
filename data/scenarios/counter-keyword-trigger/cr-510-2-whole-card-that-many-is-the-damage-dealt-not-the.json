@@ -1,0 +1,33 @@
+{
+  "description": "CR 510.2 whole card: that many is the damage dealt, not the damager's power",
+  "note": "Shroofus Sproutsire, a 5/5 with four +1/+1 counters, tramples over bob's Goblin Piker holding 1 back and spilling 4, while alice's Goblin Piker connects unblocked for 2. Four Saproling tokens is not the damager's power (5), a fixed count (1), one per damager (2), or a count that admitted the non-Saproling Piker's 2 as well (6).",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Shroofus Sproutsire", "label": "shroofus", "ready": true, "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 4 }] },
+          { "card": "Goblin Piker", "label": "alice-piker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Goblin Piker", "label": "bob-piker", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@shroofus", "@alice-piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "check": { "PowerToughness": { "object": "@shroofus", "power": 5, "toughness": 5 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@bob-piker": ["@shroofus"] } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "source": "@shroofus", "do": { "AssignDamage": { "@bob-piker": 1, "@bob": 4 } } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTimestamps": ["Saproling Token", "Saproling Token#2", "Saproling Token#3", "Saproling Token#4"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 14 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Goblin Piker", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Saproling Token", "count": 4 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Shroofus Sproutsire", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

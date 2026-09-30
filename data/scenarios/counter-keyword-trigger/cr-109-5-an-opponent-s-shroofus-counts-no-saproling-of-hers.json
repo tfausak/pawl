@@ -1,0 +1,36 @@
+{
+  "description": "CR 109.5 an opponent's Shroofus counts no Saproling of hers",
+  "note": "Three seats, so the damager's controller, the damaged player and a bystanding opponent are three different people. alice's 5/5 Shroofus Sproutsire connects unblocked with bob for 5 and makes five Saprolings; bob's and carol's Shroofus watch it and make nothing, since the Saproling is not one they control.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Shroofus Sproutsire", "label": "shroofus", "ready": true, "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 4 }] }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Shroofus Sproutsire", "label": "bob-shroofus", "ready": true }]
+      },
+      {
+        "name": "carol",
+        "battlefield": [{ "card": "Shroofus Sproutsire", "label": "carol-shroofus", "ready": true }]
+      }
+    ],
+    "active": "alice",
+    "step": "BeginningOfCombat"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@shroofus"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "source": "@shroofus", "do": { "ChooseAttackTarget": "@bob" } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": {} } },
+    { "turn": 1, "step": "CombatDamage", "player": "alice", "do": { "OrderTimestamps": ["Saproling Token", "Saproling Token#2", "Saproling Token#3", "Saproling Token#4", "Saproling Token#5"] } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 15 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "carol", "life": 20 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Saproling Token", "count": 5 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Shroofus Sproutsire", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Saproling Token", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Shroofus Sproutsire", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Saproling Token", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "carol", "zone": "Battlefield", "card": "Shroofus Sproutsire", "count": 1 } } }
+  ]
+}

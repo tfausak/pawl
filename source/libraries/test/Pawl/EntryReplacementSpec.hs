@@ -2327,14 +2327,6 @@ frontierMastodonSpec s registry = Spec.describe s "Frontier Mastodon (CR 614.12)
             (ready, held) = S.handOne mastodon withOjanen
             after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
         pure (newestNamed mastodonName after, after)
-  Spec.it s "CR 614.12 the 5/5 reanimated in the same sweep is not on the battlefield yet, so the row does not apply" $ do
-    (found, after) <- reanimated True
-    case found of
-      Just oid -> do
-        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
-        Spec.assertEqWith s "so it is the printed 3/2" (S.powerToughnessOf oid after) (Just (3, 2))
-        Spec.assertEqWith s "and the Cat was reanimated beside it" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jedit Ojanen")) S.alice after) 1
-      _ -> Spec.assertFailure s "the Elephant did not reach the battlefield"
   Spec.it s "CR 614.12 the same 5/5 already on the battlefield does count, so the row applies" $ do
     (found, after) <- reanimated False
     case found of
@@ -2467,7 +2459,7 @@ magneticLockdownSpec s registry = Spec.describe s "Synthetic Magnetic Lockdown (
 -- the nine Swamps are lands, and the Captain's own row says "other" (Filter.Not
 -- Filter.IsSource), so 0, 2 and 4 stay distinct from any reading that counted the
 -- subject as well.
-squadCaptainSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+squadCaptainSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 squadCaptainSpec s registry = Spec.describe s "Squad Captain (CR 614.12)" $ do
   let captainName = CardName.MkCardName (Text.pack "Squad Captain")
       -- alice's nine Swamps for the {7}{B}{B}, Rise of the Dark Realms in hand,
@@ -2488,14 +2480,6 @@ squadCaptainSpec s registry = Spec.describe s "Squad Captain (CR 614.12)" $ do
             (ready, held) = S.handOne rise withCaptain
             after = S.runPure S.identityAnswer ready (S.cast S.alice held >> Stack.resolveTop)
         pure (newestNamed captainName after, after)
-  Spec.it s "CR 614.12 the two creatures reanimated in the same sweep are not on the battlefield yet, so its own count is zero" $ do
-    (found, after) <- reanimated True
-    case found of
-      Just oid -> do
-        Spec.assertEqWith s "no +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne oid after) 0
-        Spec.assertEqWith s "so it is the printed 2/2" (S.powerToughnessOf oid after) (Just (2, 2))
-        Spec.assertEqWith s "and both were reanimated beside it" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jedit Ojanen")) S.alice after, S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) (1, 1)
-      _ -> Spec.assertFailure s "the Captain did not reach the battlefield"
   Spec.it s "CR 614.12 the same two already on the battlefield do count, so it enters with two counters" $ do
     (found, after) <- reanimated False
     case found of

@@ -8418,7 +8418,7 @@ discardReturning cause pid oid = do
   before <- State.get
   -- READ BEFORE THE MOVE: CR 400.7 deletes this incarnation, so the hand card's
   -- own keywords are unreadable by the time the funnel returns.
-  let hasMadness = maybe False (not . null . Keyword.madnessCosts . Face.keywordSet) (Game.faceOf oid before)
+  let madness = Set.fromList (Keyword.madnessCosts (Projection.handMintingKeywordsOf oid before))
   moved <- changeZoneWithCause (Just cause) Nothing Set.empty oid Zone.Graveyard LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False CarryOver.NotCarried False
   after <- State.get
   -- CR 702.35a's "exiled THIS WAY": which redirect the CR 616.1 loop applied,
@@ -8428,8 +8428,9 @@ discardReturning cause pid oid = do
   -- is the discarded card itself. Rest in Peace's row chosen instead files Rest
   -- in Peace, and an unredirected discard files nothing.
   --
-  -- The MADNESS conjunct is what makes "the row was the card's own" and "the row
-  -- was rule 702.35a's" coincide rather than merely agree. Rule 702.35a's is the
+  -- The recorded set, empty for a card without madness, is what makes "the row
+  -- was the card's own" and "the row was rule 702.35a's" coincide rather than
+  -- merely agree. Rule 702.35a's is the
   -- only row any rule MINTS onto a card in a hand (Keyword.handReplacementsOf),
   -- so the other way a card in a hand is the source of one is a PRINTED row whose
   -- PrintedReplacement.functionsFrom names the hand -- Progenitus and Nexus of
@@ -8437,18 +8438,18 @@ discardReturning cause pid oid = do
   -- that would tell the two readings apart prints madness AND a row of its own
   -- that redirects it into exile; none does.
   --
-  -- The PRINTED face, Projection.replacementsAffecting's read at the matching
-  -- mint point and for its reason: a madness ability granted to a card in a hand
-  -- mints no row there either (gap #1859), so the two questions agree on it.
-  --
-  -- A REGRESSION FENCE rather than a proof: neutralizing the conjunct leaves the
-  -- suite green, since the card that would tell it from the exiledWith test alone
-  -- is the one printing both madness and a hand-functioning self-exiling row.
-  let exiledForMadness newId = hasMadness && fmap ExileLink.source (Map.lookup newId (GameState.exiledWith after)) == Just oid
+  -- The keywords Projection.replacementsAffecting mints the row from
+  -- (Projection.handMintingKeywordsOf), so the two questions agree on a
+  -- madness an effect granted. Recorded HERE, and read by the trigger off this
+  -- event rather than off the exiled card (Discarded.madness).
+  let madnessOf newId =
+        if fmap ExileLink.source (Map.lookup newId (GameState.exiledWith after)) == Just oid
+          then madness
+          else Set.empty
   -- One record per arrival: a card discarded is a card, so this loop runs once
   -- for every move the funnel makes. A melded permanent is never in a hand, so
   -- the sequence never holds two here.
-  Monad.forM_ moved $ \newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause (exiledForMadness newId))))
+  Monad.forM_ moved $ \newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause (madnessOf newId))))
   pure moved
 
 -- Ask the interpreter to shuffle this player's library (CR 103.3 / 701.24).

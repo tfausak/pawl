@@ -112,7 +112,7 @@ import qualified Pawl.Types.Zone as Zone
 -- player: a graveyard is filed under the card's owner (CR 400.3), so the card
 -- writes EntryRiders' underOwner and every returning creature enters under its
 -- owner rather than under the caster's control. That is the whole difference from
--- riseOfTheDarkRealmsSpec's "under your control".
+-- Rise of the Dark Realms' "under your control".
 --
 -- THREE SEATS, with a board built so that the readings are told apart:
 --

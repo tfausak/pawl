@@ -5258,15 +5258,17 @@ replacementsAffecting gs =
       -- Pawl.Engine.Keyword.handReplacementsOf is what decides which keywords
       -- reach it, and madness is the only one.
       --
-      -- The PRINTED face, `statedFrom`'s read and for its reason: `project` is
-      -- what the short-circuit exists to skip, so a madness ability an effect
-      -- granted to a card in a hand mints nothing (gap #1859).
+      -- Minted off the PROJECTION's keywords (CR 613.1 names no zone), projected
+      -- only for a card printing madness or while a grantor writes it
+      -- (`handMintingKeywordsGiven`), which keeps the walk from projecting every
+      -- card in every hand. Pawl.CastSpec's "CR 702.35a Falkenrath Gorger gives
+      -- a Vampire card in hand madness" proves the granted direction.
       --
       -- ReplacementProvenance.Minted, replacementsOfGiven's mark for every row a
       -- rule writes onto an object rather than a face printing it.
-      mintedInHand oid = case Game.faceOf oid gs of
-        Nothing -> []
-        Just face -> fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (Face.keywordSet face))
+      mintedInHand oid = fmap (\re -> (oid, ReplacementProvenance.Minted, re)) (Keyword.handReplacementsOf (handMintingKeywordsGiven handGrantInForce oid gs))
+      -- A thunk, so the grantor walk runs once per gather rather than per card.
+      handGrantInForce = madnessGrantInForce gs
       -- CR 702.52a's replacement, minted for a card in a GRAVEYARD --
       -- `mintedInHand`'s sibling one zone over.
       -- Pawl.Engine.Keyword.graveyardReplacementsOf is what decides which
@@ -5314,12 +5316,36 @@ replacementsAffecting gs =
           else concatMap (forOne Zone.Battlefield) onBattlefield <> concatMap (forOne Zone.Command) inCommand
    in onBoard <> stated
 
--- Does anything grant a keyword satisfying `p`, to anything? A static ability
--- of a permanent, a stored continuous effect (storedWrites), or a static
--- ability functioning from another zone (elsewhereGrants). What a zone walk
--- asks before it projects a card whose printed face carries no such keyword:
--- replacementsAffecting's dredge mint and Pawl.Engine.Event.Trigger's exile
--- scan.
+-- The keywords of a card in a hand that CR 702.35a's discard replacement is
+-- minted from (Keyword.handReplacementsOf) -- the projection's, since CR 613.1
+-- names no zone, so an effect granting or removing madness there is seen.
+--
+-- Projected when the printed face has madness, so an effect removing it is
+-- seen, or when some grantor writes madness (`keywordGrantInForce`), so one
+-- granting it is. A card printing none on a board granting none skips the
+-- projection and answers empty, the projection's set differing there only in
+-- keywords that mint nothing in a hand.
+handMintingKeywordsOf :: ObjectId -> GameState -> Set Keyword
+handMintingKeywordsOf oid gs = handMintingKeywordsGiven (madnessGrantInForce gs) oid gs
+
+-- `handMintingKeywordsOf` with `madnessGrantInForce`'s answer handed in, for a
+-- walk over every hand that asks it once.
+handMintingKeywordsGiven :: Bool -> ObjectId -> GameState -> Set Keyword
+handMintingKeywordsGiven granted oid gs = case Game.faceOf oid gs of
+  Nothing -> Set.empty
+  Just face
+    | null (Keyword.handReplacementsOf (Face.keywordSet face)) && not granted -> Set.empty
+    | otherwise -> Map.keysSet (keywordsOf oid gs)
+
+-- Does anything grant madness (`keywordGrantInForce`)?
+madnessGrantInForce :: GameState -> Bool
+madnessGrantInForce = keywordGrantInForce (not . null . Keyword.handReplacementsOf . Set.singleton)
+
+-- Does anything write a modification handing out a keyword satisfying `p`? A
+-- battlefield permanent's static ability, a stored effect (`storedWrites`) or
+-- an off-battlefield static ability (`elsewhereGrants`) -- the three grantor
+-- disjuncts replacementsAffecting's gate asks, for a gate that must decide
+-- whether to project a card off the battlefield without projecting it.
 keywordGrantInForce :: (Keyword -> Bool) -> GameState -> Bool
 keywordGrantInForce p gs =
   let writes = grantsKeywordWhere p

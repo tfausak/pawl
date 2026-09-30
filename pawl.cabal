@@ -725,6 +725,8 @@ library codec
     Pawl.Codec.LoyaltyKind
     Pawl.Codec.LoyaltyKindSpec
     Pawl.Codec.LoyaltySpec
+    Pawl.Codec.MadnessCost
+    Pawl.Codec.MadnessCostSpec
     Pawl.Codec.MakeForetold
     Pawl.Codec.MakeForetoldSpec
     Pawl.Codec.Mana
@@ -2199,6 +2201,7 @@ library types
     Pawl.Types.LoopMembers
     Pawl.Types.Loyalty
     Pawl.Types.LoyaltyKind
+    Pawl.Types.MadnessCost
     Pawl.Types.MakeForetold
     Pawl.Types.Mana
     Pawl.Types.ManaAbilityPerformer

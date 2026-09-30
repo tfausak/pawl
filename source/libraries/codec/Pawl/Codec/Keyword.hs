@@ -14,6 +14,7 @@ import qualified Pawl.Codec.ForetellCost as ForetellCost
 import qualified Pawl.Codec.Gift as Gift
 import qualified Pawl.Codec.Impending as Impending
 import qualified Pawl.Codec.KeywordCount as KeywordCount
+import qualified Pawl.Codec.MadnessCost as MadnessCost
 import qualified Pawl.Codec.Morph as Morph
 import qualified Pawl.Codec.PartnerText as PartnerText
 import qualified Pawl.Codec.Protection as Protection
@@ -252,7 +253,7 @@ codec =
       -- CR 702.187c's costless mayhem (Oscorp Industries) is the ABSENT "value"
       -- key, Modular--Sunburst's spelling above.
       Arm.optionalPayload "Mayhem" (Cost.codec codec) Keyword.Mayhem (\x -> case x of Keyword.Mayhem y -> Just y; _ -> Nothing),
-      Arm.payload "Madness" (Cost.codec codec) Keyword.Madness (\x -> case x of Keyword.Madness y -> Just y; _ -> Nothing),
+      Arm.payload "Madness" (MadnessCost.codec codec) Keyword.Madness (\x -> case x of Keyword.Madness y -> Just y; _ -> Nothing),
       Arm.nullary "Rebound" Keyword.Rebound,
       Arm.payload "Scavenge" (Cost.codec codec) Keyword.Scavenge (\x -> case x of Keyword.Scavenge y -> Just y; _ -> Nothing),
       Arm.payload "Transmute" (Cost.codec codec) Keyword.Transmute (\x -> case x of Keyword.Transmute y -> Just y; _ -> Nothing),

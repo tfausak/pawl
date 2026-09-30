@@ -94,6 +94,7 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LoggedEvent as LoggedEvent
+import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.ManaAbilityResolved as ManaAbilityResolved
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
@@ -2417,7 +2418,7 @@ representativeEvents cond =
         -- so the pin here is that an inherent condition binds nothing from the
         -- log, which is what Event.eventBindingSlots claims for it.
         TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 2))
-        TriggerCondition.SelfCycled -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost False))
+        TriggerCondition.SelfCycled -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Set.empty))
         -- CR 702.94a's cause, so the event is one this condition genuinely
         -- admits; an Ordinary reveal would pin nothing.
         TriggerCondition.SelfRevealedForMiracle -> one (GameEvent.Revealed (Revealed.MkRevealed S.alice departed (RevealCause.ForMiracle (Cost.Type.MkCost {Cost.Type.mana = Nothing, Cost.Type.components = []})) S.emptyCharacteristics))
@@ -2426,19 +2427,19 @@ representativeEvents cond =
         -- discard and a cycle are each an event it genuinely admits, and an arm
         -- that read the cause would pin nothing for one of them.
         TriggerCondition.SelfDiscarded ->
-          noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary False))
-            NonEmpty.:| [noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost False))]
-        -- CR 702.35a's own discard: the exiledForMadness flag SET, which is the
+          noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Set.empty))
+            NonEmpty.:| [noTable (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Set.empty))]
+        -- CR 702.35a's own discard: the madness set NON-EMPTY, which is the
         -- only event this condition admits -- the cause is irrelevant to it and
         -- the flag is not, so a False event would pin nothing.
-        TriggerCondition.SelfExiledForMadness -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary True))
-        TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary False))
+        TriggerCondition.SelfExiledForMadness -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary (Set.singleton MadnessCost.OwnManaCost)))
+        TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Set.empty))
         -- The same event, which binds this batch reading's one card as its amount.
-        TriggerCondition.PlayerDiscardsCards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary False))
+        TriggerCondition.PlayerDiscardsCards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary Set.empty))
         -- The CYCLING cause, which is the only one this condition admits -- an
         -- Ordinary discard is an event it rejects, and eventBindings is consulted
         -- only for a match, so it would pin nothing.
-        TriggerCondition.PlayerCycles _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost False))
+        TriggerCondition.PlayerCycles _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost Set.empty))
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
         -- eventBindings being consulted only for a match.

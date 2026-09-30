@@ -25,6 +25,7 @@ import qualified Pawl.Types.Gift as Gift
 import qualified Pawl.Types.Impending as Impending
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordCount as KeywordCount
+import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -1676,13 +1677,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- share Mayhem's tag: rule 702.35a casts from exile off a trigger and rule
   -- 702.187b from a graveyard off a permission.
   Spec.it s "Madness carries its cost, and is not Mayhem" $ do
-    let madness n = Keyword.Madness (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    let madness n = Keyword.Madness (MadnessCost.Stated (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []))
         mayhemOf n = Keyword.Mayhem (Just (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []))
     Common.assertCodec
       s
       Keyword.codec
       (madness 3)
-      " {\"type\":\"Madness\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}} "
+      " {\"type\":\"Madness\",\"value\":{\"type\":\"Stated\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":3}]}}} "
     Spec.assertBool s (Codec.encode Keyword.codec (madness 3) /= Codec.encode Keyword.codec (mayhemOf 3)) "the same cost under two keywords encodes differently"
   -- CR 702.92a, CR 702.163a and CR 702.182a: nullary, because each rule states
   -- one fixed token and takes no parameter. Three arms rather than one

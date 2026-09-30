@@ -1,0 +1,27 @@
+{
+  "description": "CR 702.181a the granted mobilize X reads the equipped creature's power",
+  "note": "Infantry Shield grants mobilize X, X the equipped creature's power, to the Goblin Piker it rides: two tokens. X read off the Shield itself, which has no power, makes none; the Doomed Traveler attacking beside it, power one, would add one more if the grant reached it too.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Infantry Shield", "label": "shield", "attached": "piker" },
+          { "card": "Goblin Piker", "label": "piker", "ready": true },
+          { "card": "Doomed Traveler", "label": "traveler", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@piker", "@traveler"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Warrior Token", "Warrior Token#2"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 2 } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "alice", "check": { "Attackers": { "attackers": { "@piker": "@bob", "@traveler": "@bob", "Warrior Token": "@bob", "Warrior Token#2": "@bob" } } } }
+  ]
+}

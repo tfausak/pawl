@@ -1539,7 +1539,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
     GameEvent.CardArrived _ -> False
   -- CR 702.35a's "when this card is exiled THIS WAY": the same discard the arm
   -- above reads, narrowed to the one rule 702.35a's own replacement redirected
-  -- into exile. `Discarded.exiledForMadness` is where the discard funnel records
+  -- into exile. `Discarded.madness` is where the discard funnel records
   -- which redirect applied (Pawl.Engine.Event.discardReturning); the DESTINATION
   -- cannot answer it, since Rest in Peace's row chosen over madness's under CR
   -- 616.1 exiles the card just the same and rule 702.35a's trigger must not fire.
@@ -1547,7 +1547,7 @@ matchesTriggerGiven bindings board gs bearer you cond event = case cond of
   -- The bearer is the EXILE incarnation, which is the id the CR 400.7 funnel
   -- minted and the id the event carries -- see the arm above.
   TriggerCondition.SelfExiledForMadness -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded _ oid _ exiledForMadness) -> exiledForMadness && oid == bearer
+    GameEvent.Discarded (Discarded.MkDiscarded _ oid _ madness) -> not (Set.null madness) && oid == bearer
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False

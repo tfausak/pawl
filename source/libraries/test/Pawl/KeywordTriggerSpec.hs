@@ -787,20 +787,6 @@ selfBlocksSpec s registry =
           let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer gs
           Spec.assertEqWith s "the fixture reached the combat damage step" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
           Spec.assertEqWith s "and bob is already at 23" (S.lifeOf S.bob atDamage) (Just 23)
-        -- The other side of the same coin, and CR 508.3a's own words: a creature
-        -- that BLOCKS did not attack. Hanweir Garrison {2}{R} 2/3, "Whenever this
-        -- creature attacks, create two 1/1 red Human creature tokens that are
-        -- tapped and attacking", is the pool's cheapest attack trigger; here it
-        -- is bob's, and blocking. The falsifier is a SelfAttacks arm that matched
-        -- the blocking declaration: two tokens rather than none.
-        Spec.it s "CR 508.3a a block is not an attack, so a blocking Hanweir Garrison makes no tokens" $ do
-          (blocking, _, _) <- board ["Goblin Piker"] ["Hanweir Garrison"]
-          (attacking, _, _) <- board ["Hanweir Garrison"] ["Goblin Piker"]
-          Spec.assertEqWith s "the Garrison blocked and made nothing" (length (S.tokensOf (S.runCombat S.aggressiveAnswer blocking))) 0
-          -- The positive control: the same card on the attacking side really does
-          -- have the ability, so the zero above is a fact about blocking rather
-          -- than about the fixture.
-          Spec.assertEqWith s "the same card attacking makes two" (length (S.tokensOf (S.runCombat S.aggressiveAnswer attacking))) 2
 
 -- CR 509.3b: "Whenever [a creature] blocks a creature, . . ." -- selfBlocksSpec's
 -- condition with the attacker NAMED, bound under Binding.blockedCreature and

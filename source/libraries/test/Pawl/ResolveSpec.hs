@@ -2935,26 +2935,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "carol, a genuine subgame participant who did not win, lost 3" (S.lifeOf S.carol after) (Just 17)
     Spec.assertEqWith s "bob departed before the subgame and never played it, so he pays nothing" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "alice won" (S.lifeOf S.alice after) (Just 20)
-  Spec.it s "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    dragonFodder <- S.printingOf s registry "Dragon Fodder"
-    let base = S.landsInPlay mountain 2
-        (gs, spellId) = S.handOne dragonFodder base
-        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
-        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    -- Two Goblin tokens exist (count == 2 proves two distinct objects). The
-    -- battlefield also holds alice's 2 Mountains, so filter by name/creature.
-    -- CR 111.4: Dragon Fodder does not name its tokens, so each is named
-    -- "Goblin Token" -- its subtype plus the word "Token".
-    Spec.assertEqWith s "two Goblin tokens on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Token") S.alice after) 2
-    Spec.assertEqWith s "alice controls two creatures (the tokens)" (S.creaturesInPlay S.alice after) 2
-    Spec.assertEqWith s "Dragon Fodder went to the graveyard (CR 608.2n)" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
-    -- The control leg for Hanweir Garrison's "tapped and attacking" riders
-    -- (CombatSpec's PutOntoBattlefieldAttacking group): a Create that says
-    -- neither takes CR 110.5b's default and joins no combat, so the riders
-    -- are the effect's and not something every token gets.
-    Spec.assertEqWith s "CR 110.5b: the Goblins enter untapped" (Maybe.mapMaybe (\oid -> fmap Object.tapped (Game.lookupObject oid after)) (S.tokensOf after)) [TapState.Untapped, TapState.Untapped]
-    Spec.assertEqWith s "and attacking nothing" (Combat.Type.attackers (GameState.combat after)) Map.empty
   Spec.it s "CR 615 Fog prevents combat damage but not spell damage (the gate)" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"

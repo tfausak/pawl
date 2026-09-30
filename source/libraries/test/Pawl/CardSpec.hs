@@ -216,6 +216,7 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.LoopMembers as LoopMembers
 import qualified Pawl.Types.Loyalty as Loyalty
+import qualified Pawl.Types.MadnessCost as MadnessCost
 import qualified Pawl.Types.MakeForetold as MakeForetold
 import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -3550,8 +3551,10 @@ keywordPayloadFilters keyword = case keyword of
   Keyword.Retrace -> []
   -- CR 702.187b's payload is a whole Cost, flashback's shape, and CR 702.187c's is none.
   Keyword.Mayhem cost -> foldMap costFilters cost
-  -- CR 702.35a's payload is a whole Cost, mayhem's shape.
-  Keyword.Madness cost -> costFilters cost
+  -- CR 702.35a's stated payload is a whole Cost, mayhem's shape; the card's own
+  -- mana cost carries no filter.
+  Keyword.Madness (MadnessCost.Stated cost) -> costFilters cost
+  Keyword.Madness MadnessCost.OwnManaCost -> []
   -- CR 702.88a carries no payload, retrace's position.
   Keyword.Rebound -> []
   -- CR 702.97a's and CR 702.141a's payloads are whole Costs, embalm's shape.

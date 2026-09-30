@@ -1,0 +1,71 @@
+{
+  "description": "CR 702.50a the delayed ability copies the spell at each of its controller's upkeeps, and the copy arms no copier of its own",
+  "note": "Endless Swarm makes a Snake per card in alice's hand, and the Snake count moves by a different amount at each reading: three as it resolves (three Fogs in hand), none at bob's upkeep (rule 702.50a's \"your\"), three more at alice's next upkeep, and four more at the one after, alice having drawn once between. A copy that armed a copier of its own would make the last reading 14 rather than 10. No land anywhere alice can reach, so her hand moves only by her draws; twelve library cards each keep CR 104.3c away.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Forest", "label": "forest-1" },
+          { "card": "Forest", "label": "forest-2" },
+          { "card": "Forest", "label": "forest-3" },
+          { "card": "Forest", "label": "forest-4" },
+          { "card": "Forest", "label": "forest-5" },
+          { "card": "Forest", "label": "forest-6" },
+          { "card": "Forest", "label": "forest-7" },
+          { "card": "Forest", "label": "forest-8" },
+          { "card": "Forest", "label": "forest-9" }
+        ],
+        "hand": [
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Endless Swarm", "label": "swarm" }
+        ],
+        "library": [
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" }
+        ]
+      },
+      {
+        "name": "bob",
+        "library": [
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" },
+          { "card": "Fog" }
+        ]
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@swarm", "mana": ["@forest-1", "@forest-2", "@forest-3", "@forest-4", "@forest-5", "@forest-6", "@forest-7", "@forest-8", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Snake Token", "Snake Token#2", "Snake Token#3"] } },
+    { "turn": 2, "step": "DrawStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Snake Token", "count": 3 } } },
+    { "turn": 3, "step": "Upkeep", "player": "alice", "do": { "OrderTimestamps": ["Snake Token#4", "Snake Token#5", "Snake Token#6"] } },
+    { "turn": 3, "step": "DrawStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Snake Token", "count": 6 } } },
+    { "turn": 3, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": [] } },
+    { "turn": 5, "step": "Upkeep", "player": "alice", "do": { "OrderTimestamps": ["Snake Token#7", "Snake Token#8", "Snake Token#9", "Snake Token#10"] } },
+    { "turn": 5, "step": "DrawStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Snake Token", "count": 10 } } }
+  ]
+}
