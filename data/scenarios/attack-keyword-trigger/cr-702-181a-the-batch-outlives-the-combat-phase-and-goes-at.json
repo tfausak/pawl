@@ -1,0 +1,29 @@
+{
+  "description": "CR 702.181a the batch outlives the combat phase and goes at the next end step",
+  "note": "Dalkovan Packbeasts' mobilize 3 arms a delayed sacrifice at the beginning of the next end step (CR 513.2), not at end of combat as decayed and myriad do: the batch is read once in the postcombat main phase, where it is still there, and again once the end step's trigger has resolved. The Goblin Piker attacking beside it is the control, so a sacrifice scoped to attackers rather than to the batch reddens.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Dalkovan Packbeasts", "label": "packbeasts", "ready": true },
+          { "card": "Goblin Piker", "label": "piker", "ready": true }
+        ]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@packbeasts", "@piker"] } },
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "OrderTimestamps": ["Warrior Token", "Warrior Token#2", "Warrior Token#3"] } },
+    { "turn": 1, "step": "PostcombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 3 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "do": "Pass" },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Warrior Token", "count": 0 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Dalkovan Packbeasts", "count": 1 } } },
+    { "turn": 1, "step": "EndStep", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Piker", "count": 1 } } }
+  ]
+}

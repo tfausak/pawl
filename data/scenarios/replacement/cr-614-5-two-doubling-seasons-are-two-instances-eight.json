@@ -1,0 +1,28 @@
+{
+  "description": "CR 614.5 two Doubling Seasons are two instances: eight Goblins",
+  "note": "Two Doubling Seasons are two replacement effects, each applied once (CR 614.5): 2 -> 4 -> 8.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Doubling Season", "ready": true },
+          { "card": "Doubling Season", "ready": true }
+        ],
+        "hand": [{ "card": "Dragon Fodder", "label": "fodder" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fodder", "mana": ["@mountain-1", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2", "Goblin Token#3", "Goblin Token#4", "Goblin Token#5", "Goblin Token#6", "Goblin Token#7", "Goblin Token#8"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 8 } } }
+  ]
+}

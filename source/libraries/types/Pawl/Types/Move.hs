@@ -28,6 +28,8 @@ data Move
     ChooseDefender Label.Label
   | -- | CR 508.1b.
     ChooseAttackTarget Reference.Reference
+  | -- | CR 613.7m: one player's objects stamped at one moment, earliest first.
+    OrderTimestamps (Seq.Seq Reference.Reference)
   | -- | CR 104.3a.
     Concede
   | -- | CR 117.3d.

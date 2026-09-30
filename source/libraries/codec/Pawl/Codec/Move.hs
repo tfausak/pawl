@@ -23,6 +23,7 @@ codec =
       Arm.payload "AssignDamage" (Common.textMap Reference.toText Reference.fromText Common.natural) Move.AssignDamage (\x -> case x of Move.AssignDamage y -> Just y; _ -> Nothing),
       Arm.payload "ChooseDefender" Label.codec Move.ChooseDefender (\x -> case x of Move.ChooseDefender y -> Just y; _ -> Nothing),
       Arm.payload "ChooseAttackTarget" Reference.codec Move.ChooseAttackTarget (\x -> case x of Move.ChooseAttackTarget y -> Just y; _ -> Nothing),
+      Arm.payload "OrderTimestamps" (Common.seq Reference.codec) Move.OrderTimestamps (\x -> case x of Move.OrderTimestamps y -> Just y; _ -> Nothing),
       Arm.nullary "Concede" Move.Concede,
       Arm.nullary "Pass" Move.Pass
     ]
@@ -37,5 +38,6 @@ tagOf x = case x of
   Move.AssignDamage {} -> "AssignDamage"
   Move.ChooseDefender {} -> "ChooseDefender"
   Move.ChooseAttackTarget {} -> "ChooseAttackTarget"
+  Move.OrderTimestamps {} -> "OrderTimestamps"
   Move.Concede {} -> "Concede"
   Move.Pass {} -> "Pass"

@@ -30,7 +30,8 @@ subdirectory named for that spec; `docs/scenario-burndown.md` lists the ones sti
   comes. A check runs when its player is next offered priority at its key, so
   put a `"Pass"` between a check with a spell on the stack and one after it
   resolves. `source` picks among prompts sharing a key, such as one combat
-  damage assignment per attacker.
+  damage assignment per attacker. `OrderTimestamps` answers CR 613.7m's
+  prompt by naming every object in it, earliest first.
 - **Checks.** `Life`, `Count` (cards of one name in one of a player's zones;
   the controller's, for the battlefield), `Damage`, `Tapped`, `Counters` (of
   one kind on an object), `Types` (an object's card types, all of them),

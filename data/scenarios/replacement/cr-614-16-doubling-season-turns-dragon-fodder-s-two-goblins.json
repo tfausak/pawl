@@ -1,0 +1,27 @@
+{
+  "description": "CR 614.16 Doubling Season turns Dragon Fodder's two Goblins into four",
+  "note": "Doubling Season's token clause, CR 614.16's \"twice that many\": Dragon Fodder's two Goblins become four.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Mountain", "label": "mountain-1", "ready": true },
+          { "card": "Mountain", "label": "mountain-2", "ready": true },
+          { "card": "Doubling Season", "ready": true }
+        ],
+        "hand": [{ "card": "Dragon Fodder", "label": "fodder" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@fodder", "mana": ["@mountain-1", "@mountain-2"] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "OrderTimestamps": ["Goblin Token", "Goblin Token#2", "Goblin Token#3", "Goblin Token#4"] } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Goblin Token", "count": 4 } } }
+  ]
+}

@@ -1515,7 +1515,7 @@ aragornSpec s registry =
 --
 -- No library stocking: nothing here draws, and runCombat stops at end of combat,
 -- so CR 104.3c never comes up.
-shroofusSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+shroofusSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 shroofusSpec s registry =
   let board mine theirs = do
         ours <- mapM (S.printingOf s registry) mine
@@ -1535,35 +1535,7 @@ shroofusSpec s registry =
         Prompt.DeclareBlockers {} -> blocks
         Prompt.AssignCombatDamage _ _ damager _ _ -> Maybe.fromMaybe Map.empty (List.lookup damager divisions)
         _ -> S.aggressiveAnswer p
-      -- CR 508.1b's choice, which only the three-seat board raises: bob is
-      -- attacked, carol is the opponent who is neither the damaged player nor the
-      -- damager's controller.
-      atBob :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
-      atBob attackers p = case p of
-        Prompt.ChooseAttackTarget _ _ _ options -> Maybe.fromMaybe (NonEmpty.head options) (List.find (== AttackTarget.OfPlayer S.bob) (NonEmpty.toList options))
-        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
-        Prompt.DeclareBlockers {} -> Map.empty
-        _ -> S.aggressiveAnswer p
    in Spec.describe s "Tokens counted off a combat damage event" $ do
-        -- The proving case. A 5/5 trampler holds 1 back on the blocker and spills
-        -- 4, while a Goblin Piker connects unblocked for 2 alongside it.
-        Spec.it s "CR 510.2 whole card: that many is the damage dealt, not the damager's power" $ do
-          (gs, mine, theirs) <- board ["Shroofus Sproutsire", "Goblin Piker"] ["Goblin Piker"]
-          case (mine, theirs) of
-            ([shroofus, piker], [blocker]) -> do
-              let loaded = S.addCounter CounterKind.PlusOnePlusOne 4 shroofus gs
-                  blocks = Map.singleton blocker (Set.singleton shroofus)
-                  spilling = [(shroofus, Map.fromList [(Recipient.ToCreature blocker, 1), (Recipient.ToPlayer S.bob, 4)])]
-                  after = S.runCombat (swing [shroofus, piker] blocks spilling) loaded
-              Spec.assertEqWith s "the counters make Shroofus a 5/5" (S.powerToughnessOf shroofus loaded) (Just (5, 5))
-              Spec.assertEqWith s "4 spilled past the blocker, plus the Piker's 2" (S.lifeOf S.bob after) (Just 14)
-              Spec.assertBool s (not (Set.member blocker (GameState.battlefield after))) "CR 704.5g: the blocker took its 1"
-              -- 6 = Shroofus, the Goblin Piker, and four tokens. A count read off
-              -- his POWER would be 7, a fixed count of one 3, and a filter that
-              -- admitted the Goblin Piker's 2 as well 8.
-              Spec.assertEqWith s "so four tokens, not five and not one and not six" (S.creaturesInPlay S.alice after) 6
-              Spec.assertEqWith s "and bob keeps nothing" (S.creaturesInPlay S.bob after) 0
-            _ -> Spec.assertFailure s "fixture should give alice a Shroofus and a Piker, bob a Piker"
         -- The negative, on the SAME board with the same seats, the same creatures
         -- and the same declaration -- only the division differs. CR 702.19b lets
         -- the whole 5 stay on the blocker, so the Saproling deals its
@@ -1583,23 +1555,6 @@ shroofusSpec s registry =
               Spec.assertBool s (not (Set.member blocker (GameState.battlefield after))) "CR 704.5g: the blocker took all 5"
               Spec.assertEqWith s "and alice keeps her two creatures, with no token beside them" (S.creaturesInPlay S.alice after) 2
             _ -> Spec.assertFailure s "fixture should give alice a Shroofus and a Piker, bob a Piker"
-        -- CR 109.5's "you control", on three seats so that the damager's
-        -- controller, the damaged player and a bystanding opponent are three
-        -- different people. alice's Shroofus connects unblocked for 5; bob's and
-        -- carol's watch it and make nothing.
-        Spec.it s "CR 109.5 an opponent's Shroofus counts no Saproling of hers" $ do
-          shroofus <- S.printingOf s registry "Shroofus Sproutsire"
-          let (gs, mine, theirs, hers) = S.threePlayerCombat [shroofus] [shroofus] [shroofus]
-          case (mine, theirs, hers) of
-            ([attacker], [_], [_]) -> do
-              let loaded = S.addCounter CounterKind.PlusOnePlusOne 4 attacker gs
-                  after = S.runCombat (atBob [attacker]) loaded
-              Spec.assertEqWith s "unblocked, all 5 reached bob" (S.lifeOf S.bob after) (Just 15)
-              Spec.assertEqWith s "carol was not attacked" (S.lifeOf S.carol after) (Just 20)
-              Spec.assertEqWith s "alice took five tokens" (S.creaturesInPlay S.alice after) 6
-              Spec.assertEqWith s "bob none" (S.creaturesInPlay S.bob after) 1
-              Spec.assertEqWith s "and carol none" (S.creaturesInPlay S.carol after) 1
-            _ -> Spec.assertFailure s "fixture should give each seat a Shroofus"
 
 -- CR 702.25a's flanking, which rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one

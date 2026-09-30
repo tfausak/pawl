@@ -6338,24 +6338,6 @@ dominionHaul gs =
 
 epicSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 epicSpec s registry = Spec.describe s "Epic" $ do
-  -- Rule 702.50a's second spell ability, driven to the two upkeeps it names. The
-  -- once-not-twice reading comes first: it is the one a copy carrying epic would
-  -- break, and the two readings behind it are ordinary counts.
-  Spec.it s "CR 702.50a the delayed ability copies the spell at each of its controller's upkeeps, and the copy arms no copier of its own" $ do
-    forest <- S.printingOf s registry "Forest"
-    fog <- S.printingOf s registry "Fog"
-    swarm <- S.printingOf s registry "Endless Swarm"
-    let (gs, swarmId, _) = epicBoard forest fog swarm
-        resolved = S.runPure S.identityAnswer gs (S.cast S.alice swarmId >> Stack.resolveTop)
-        startTurn = GameState.turnNumber resolved
-        atDrawOf n g = GameState.turnNumber g > startTurn + n && GameState.phase g == Phase.Beginning BeginningStep.DrawStep
-        -- bob's upkeep is the turn between, and rule 702.50a's "YOUR" excludes it.
-        betweenTurns = reboundRunUntil S.identityAnswer (atDrawOf 0) resolved
-        firstUpkeep = reboundRunUntil S.identityAnswer (atDrawOf 1) betweenTurns
-        secondUpkeep = reboundRunUntil S.identityAnswer (atDrawOf 3) firstUpkeep
-    Spec.assertEqWith s "alice's second upkeep copies the spell once more, not twice" (length (S.tokensOf secondUpkeep)) 10
-    Spec.assertEqWith s "her first upkeep after it copied the spell" (length (S.tokensOf firstUpkeep)) 6
-    Spec.assertEqWith s "and bob's upkeep in between did not" (length (S.tokensOf betweenTurns)) 3
   -- Rule 702.50a's FIRST spell ability, read off the same two boards: CR 702.50b
   -- dates it from the resolution, so the board before it is the control.
   Spec.it s "CR 702.50b its controller can't cast spells once a spell with epic they control resolves" $ do

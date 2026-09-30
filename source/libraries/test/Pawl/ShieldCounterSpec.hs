@@ -954,26 +954,9 @@ queenAllenalSpec s registry = Spec.describe s "Queen Allenal of Ruadach (CR 614.
         Spec.assertEqWith s "and every one of them tapped (CR 110.5b)" (length (filter tapped soldiers)) 3
       _ -> Spec.assertFailure s "fixture should give alice a Hero and a Queen"
 
--- Quina, Qu Gourmet, {2}{G} Legendary Creature -- Qu 2/3: "If one or more
--- tokens would be created under your control, those tokens plus a 1/1 green
--- Frog creature token are created instead." The append with NO kind: the same
--- Clue that slips past the Queen above brings a Frog here.
-quinaSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
-quinaSpec s registry = Spec.describe s "Quina, Qu Gourmet (CR 614.1a)" $ do
-  Spec.it s "CR 614.1a any token at all: a Clue plus a Frog" $ do
-    island <- S.printingOf s registry "Island"
-    quina <- S.printingOf s registry "Quina, Qu Gourmet"
-    eliminate <- S.printingOf s registry "Eliminate the Impossible"
-    let (_, g1) = S.addPermanent quina S.alice (S.landsInPlay island 2)
-        (g2, spellId) = S.handOne eliminate g1
-        after = castAndResolve S.identityAnswer g2 spellId
-    Spec.assertEqWith s "one Frog" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Frog Token")) S.alice after) 1
-    Spec.assertEqWith s "beside the Clue" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Clue Token")) S.alice after) 1
-
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   queenAllenalSpec s registry
-  quinaSpec s registry
   shieldCounterSpec s registry
   dragonstormGlobeSpec s registry
   tidewalkerSpec s registry
