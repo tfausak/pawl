@@ -1,0 +1,34 @@
+{
+  "description": "and the same trigger on the same board without it moves the counter",
+  "note": "The control for Solemnity's CR 122.5 case: the same Agent's Toolkit, bearing one +1/+1 counter, and the same Goblin Piker entering, with no Solemnity. The counter leaves the artifact and lands on the creature, which CR 613.4c shows as a 3/2. The counter is placed by the board rather than by the Toolkit's own entry, which Solemnity would refuse on the other board.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [
+          { "card": "Plains" },
+          { "card": "Plains" },
+          { "card": "Plains" },
+          { "card": "Mountain" },
+          { "card": "Mountain" },
+          { "card": "Forest" },
+          { "card": "Forest" },
+          { "card": "Agent's Toolkit", "label": "toolkit", "counters": [{ "key": { "type": "PlusOnePlusOne" }, "value": 1 }] }
+        ],
+        "hand": [{ "card": "Goblin Piker", "label": "piker" }]
+      },
+      {
+        "name": "bob"
+      }
+    ],
+    "active": "alice",
+    "step": "PrecombatMain"
+  },
+  "timeline": [
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "Cast": { "object": "@piker", "mana": ["Mountain", "Mountain#2", null] } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "do": { "ChooseOptional": { "type": "Exercises" } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "@toolkit", "kind": { "type": "PlusOnePlusOne" }, "count": 0 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "Counters": { "object": "Goblin Piker", "kind": { "type": "PlusOnePlusOne" }, "count": 1 } } },
+    { "turn": 1, "step": "PrecombatMain", "player": "alice", "check": { "PowerToughness": { "object": "Goblin Piker", "power": 3, "toughness": 2 } } }
+  ]
+}

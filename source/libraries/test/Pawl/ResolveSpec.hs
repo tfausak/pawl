@@ -1035,24 +1035,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "nor onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ashnod's Altar") S.alice settled) 0
     Spec.assertEqWith s "CR 701.23e: the card says only \"exile it\", so nothing was revealed" (S.revealsOf settled) []
     Spec.assertEqWith s "the nonartifact was no candidate and stayed in the library" (Game.zoneMembers Zone.Library S.alice settled) [pikerId]
-  -- The paired negative: the SAME board, the same mana, the same answers, with
-  -- CR 603.5's "may" declined instead of exercised. Nothing is searched and
-  -- nothing is exiled, so an engine that exiled a card off some other path than
-  -- this search would fail here.
-  Spec.it s "CR 603.5 declining Hoarding Dragon's \"may\" exiles nothing" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    dragon <- S.printingOf s registry "Hoarding Dragon"
-    altar <- S.printingOf s registry "Ashnod's Altar"
-    piker <- S.printingOf s registry "Goblin Piker"
-    let base0 = S.landsInPlay mountain 5
-        (altarId, base1) = S.addLibraryCard altar S.alice base0
-        (pikerId, base2) = S.addLibraryCard piker S.alice base1
-        (gs, spellId) = S.handOne dragon base2
-        cast = snd (Engine.runGamePure findFirstDeclining gs (S.cast S.alice spellId))
-        settled = snd (Engine.runGamePure findFirstDeclining cast Engine.priorityLoop)
-    Spec.assertEqWith s "the Dragon still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Hoarding Dragon") S.alice settled) 1
-    Spec.assertEqWith s "exile is empty" (Game.zoneMembers Zone.Exile S.alice settled) []
-    Spec.assertEqWith s "both library cards are still there" (Set.fromList (Game.zoneMembers Zone.Library S.alice settled)) (Set.fromList [altarId, pikerId])
   -- CR 608.2c's "If you do", on the pair of boards that tells it from a clause
   -- that always happens: Tweeze -- "Tweeze deals 3 damage to any target. You may
   -- discard a card. If you do, draw a card." -- cast at bob off the SAME board
@@ -1072,14 +1054,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library is one card shorter" (length (Game.zoneMembers Zone.Library S.alice after)) 2
     Spec.assertEqWith s "the discard she chose, and only it, is in her graveyard beside Tweeze" (List.sort (namesIn Zone.Graveyard S.alice after)) (List.sort [nameOf "Bird Maiden", nameOf "Tweeze"])
     Spec.assertEqWith s "CR 608.2c the first clause is untouched: bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
-  Spec.it s "CR 608.2c declining Tweeze's discard skips the draw and nothing else" $ do
-    board <- tweezeBoard s registry
-    let after = tweezeResolved OptionalDecision.Declines board
-        nameOf = Just . CardName.MkCardName . Text.pack
-    Spec.assertEqWith s "CR 608.2c the gated clause was skipped: no Piker was drawn" (List.sort (namesIn Zone.Hand S.alice after)) (List.sort [nameOf "Bird Maiden", nameOf "Chaos Charm"])
-    Spec.assertEqWith s "and her library still holds all three" (length (Game.zoneMembers Zone.Library S.alice after)) 3
-    Spec.assertEqWith s "nothing was discarded -- only Tweeze itself is in the graveyard" (namesIn Zone.Graveyard S.alice after) [nameOf "Tweeze"]
-    Spec.assertEqWith s "CR 608.2c the ungated first clause still happened: bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
   -- CR 608.2d, the half that says an option has to be a real one: "the player
   -- can't choose an option that's illegal or impossible". The SAME Tweeze off a
   -- board where alice's hand is empty once the spell is on the stack, so "you
@@ -1098,41 +1072,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "and her library still holds all three Pikers" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "CR 603.5's \"may\" was never put" (optionalsAnswered asked) []
     Spec.assertEqWith s "the control: the mandatory first clause still happened, so bob took the 3 damage" (S.lifeOf S.bob after) (Just 17)
-  -- CR 608.2c's negative, "if no one does": Browbeat ({2}{R} Sorcery, "Any
-  -- player may have Browbeat deal 5 damage to them. If no one does, target
-  -- player draws three cards."; api.scryfall.com 2026-09-27) at carol, off one
-  -- three-seat board twice, differing in bob's answer alone. The draw is
-  -- Clause.ifTaken's NoneTaken over the "may" clause, asked of every seat in
-  -- APNAP order (CR 101.4).
-  Spec.it s "CR 608.2c Browbeat's draw is skipped when a player takes the damage" $ do
-    (gs, spellId) <- browbeatBoard s registry
-    let after = S.runPure (browbeatAnswer [S.bob]) gs (S.cast S.alice spellId >> Stack.resolveTop)
-    Spec.assertEqWith s "CR 608.2c bob took the 5, so carol drew nothing" (namesIn Zone.Hand S.carol after) []
-    Spec.assertEqWith s "bob is at 15" (S.lifeOf S.bob after) (Just 15)
-    Spec.assertEqWith s "and the seats that declined were dealt nothing" (S.lifeOf S.alice after, S.lifeOf S.carol after) (Just 20, Just 20)
-  Spec.it s "CR 608.2c Browbeat's target draws three when no player takes the damage" $ do
-    (gs, spellId) <- browbeatBoard s registry
-    let after = S.runPure (browbeatAnswer []) gs (S.cast S.alice spellId >> Stack.resolveTop)
-        piker = Just (CardName.MkCardName (Text.pack "Goblin Piker"))
-    Spec.assertEqWith s "CR 608.2c no one took it, so carol drew three" (namesIn Zone.Hand S.carol after) [piker, piker, piker]
-    Spec.assertEqWith s "and nobody was dealt damage" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
-  -- Breaking Point ({1}{R}{R} Sorcery, "Any player may have Breaking Point deal
-  -- 6 damage to them. If no one does, destroy all creatures. Creatures
-  -- destroyed this way can't be regenerated."; api.scryfall.com 2026-09-27):
-  -- Browbeat's shape over an untargeted sweep, as a pair differing in carol's
-  -- answer alone.
-  Spec.it s "CR 608.2c Breaking Point destroys every creature when no player takes the damage" $ do
-    (gs, spellId, pikerId) <- breakingPointBoard s registry
-    let after = S.runPure (browbeatAnswer []) gs (S.cast S.alice spellId >> Stack.resolveTop)
-    Spec.assertEqWith s "CR 608.2c no one took it, so bob's Piker left the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 0
-    Spec.assertEqWith s "and it is in his graveyard" (namesIn Zone.Graveyard S.bob after) [Just (CardName.MkCardName (Text.pack "Goblin Piker"))]
-    Spec.assertEqWith s "setup: the Piker was on the battlefield before" (Maybe.isJust (Game.lookupObject pikerId gs)) True
-    Spec.assertEqWith s "and nobody was dealt damage" (fmap (`S.lifeOf` after) [S.alice, S.bob, S.carol]) [Just 20, Just 20, Just 20]
-  Spec.it s "CR 608.2c Breaking Point destroys nothing when a player takes the damage" $ do
-    (gs, spellId, _) <- breakingPointBoard s registry
-    let after = S.runPure (browbeatAnswer [S.carol]) gs (S.cast S.alice spellId >> Stack.resolveTop)
-    Spec.assertEqWith s "CR 608.2c carol took the 6, so bob's Piker survives" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 1
-    Spec.assertEqWith s "carol is at 14" (S.lifeOf S.carol after) (Just 14)
   -- Distant Memories ({2}{U}{U} Sorcery, "Search your library for a card, exile
   -- it, then shuffle. Any opponent may have you put that card into your hand. If
   -- no player does, you draw three cards."; api.scryfall.com 2026-09-27): the
@@ -2106,20 +2045,6 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
       "every seat was asked the may, and only the two who took it were asked to search"
       asked
       [may S.alice, may S.bob, may S.carol, search S.alice, search S.carol]
-  -- The same board differing in exactly one thing: EVERY seat declines. The
-  -- shuffle answerer is still the reversing one, so a library that came back in
-  -- its original order is one nothing shuffled -- and the whole sentence,
-  -- shuffle included, is what nobody performed.
-  Spec.it s "CR 603.5 whole card: nobody takes Jungle Wayfinder's may, so no library moves at all" $ do
-    (gs, spellId) <- wayfinderBoard s registry
-    let cast = snd (Engine.runGamePure findFirstExercising gs (S.cast S.alice spellId))
-        onStack = snd (Engine.runGamePure findFirstExercising cast (Stack.resolveTop >> Engine.settleForPriority))
-        ((_, after), asked) = State.runState (Engine.runGame decliningWayfinderAnswer onStack Stack.resolveTop) []
-        libraries g = fmap (\pid -> namesIn Zone.Library pid g) [S.alice, S.bob, S.carol]
-    Spec.assertEqWith s "every library is untouched, in its original order" (libraries after) (libraries onStack)
-    Spec.assertEqWith s "and every hand is empty" (fmap (\pid -> namesIn Zone.Hand pid after) [S.alice, S.bob, S.carol]) [[], [], []]
-    Spec.assertEqWith s "three asks and no search" asked [(Text.pack "may", S.alice), (Text.pack "may", S.bob), (Text.pack "may", S.carol)]
-    Spec.assertEqWith s "the Wayfinder itself still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Jungle Wayfinder")) S.alice after) 1
   -- CR 101.4b: a pair of boards differing only in alice's answer to the "may".
   -- bob and carol each give the answer their prompt says the seat before them
   -- gave, declining when told nothing, so what they do is what they were told.
@@ -3474,11 +3399,6 @@ findFirstExercising p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> findFirst p
 
-findFirstDeclining :: Prompt.Prompt r -> r
-findFirstDeclining p = case p of
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  _ -> findFirst p
-
 -- The board both Tweeze cases share: three Mountains for the {2}{R}, Tweeze plus
 -- TWO discardable cards in alice's hand so CR 701.9b's choice is a real one, and
 -- three Goblin Pikers in her library so the draw is observable by name and CR
@@ -3510,36 +3430,6 @@ emptyHandedTweezeBoard s registry = do
   let (base, tweezeId) = S.handOne tweeze (S.landsInPlay mountain 3)
       stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.alice gs)) base [1 :: Int .. 3]
   pure (stocked, tweezeId)
-
--- Three seats and three Mountains for Browbeat's {2}{R}, with three Goblin
--- Pikers in carol's library so her draw is visible by name.
-browbeatBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId)
-browbeatBoard s registry = do
-  mountain <- S.printingOf s registry "Mountain"
-  browbeat <- S.printingOf s registry "Browbeat"
-  piker <- S.printingOf s registry "Goblin Piker"
-  let lands = S.landsFor mountain S.alice 3 S.threePlayerGame
-      stocked = List.foldl' (\gs _ -> snd (S.addLibraryCard piker S.carol gs)) lands [1 :: Int .. 3]
-  pure (S.handOne browbeat stocked)
-
--- Browbeat aimed at carol by FILTERING the offer, and its "may" taken by the
--- seats named and declined by the rest.
-browbeatAnswer :: [PlayerId.PlayerId] -> Prompt.Prompt r -> r
-browbeatAnswer takers p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.carol) sets
-  Prompt.ChooseOptional _ pid _ _ _ _ -> if pid `elem` takers then OptionalDecision.Exercises else OptionalDecision.Declines
-  _ -> S.identityAnswer p
-
--- Three seats, three Mountains for Breaking Point's {1}{R}{R}, and a Goblin
--- Piker of bob's for the sweep to find.
-breakingPointBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
-breakingPointBoard s registry = do
-  mountain <- S.printingOf s registry "Mountain"
-  breaking <- S.printingOf s registry "Breaking Point"
-  piker <- S.printingOf s registry "Goblin Piker"
-  let (pikerId, withPiker) = S.addPermanent piker S.bob (S.landsFor mountain S.alice 3 S.threePlayerGame)
-      (gs, spellId) = S.handOne breaking withPiker
-  pure (gs, spellId, pikerId)
 
 -- Three seats and four Islands for Distant Memories' {2}{U}{U}; alice's library
 -- holds a Cancel for the search and four Goblin Pikers for the draw.
@@ -3957,15 +3847,6 @@ wayfinderAnswer p = case p of
     pure (if pid == S.carol then [] else List.genericTake cap matches)
   Prompt.Shuffle offered -> pure (reverse offered)
   _ -> pure (S.identityAnswer p)
-
--- wayfinderAnswer with every seat declining, and the SAME reversing shuffle, so
--- a board run through both differs in exactly the decisions.
-decliningWayfinderAnswer :: Prompt.Prompt r -> State.State [(Text.Text, PlayerId.PlayerId)] r
-decliningWayfinderAnswer p = case p of
-  Prompt.ChooseOptional _ pid _ _ _ _ -> do
-    State.modify' (<> [(Text.pack "may", pid)])
-    pure OptionalDecision.Declines
-  _ -> wayfinderAnswer p
 
 -- CR 101.4b's answerer for Jungle Wayfinder: alice answers `hers`, and each
 -- later seat gives the answer its prompt says the seat before it gave, declining

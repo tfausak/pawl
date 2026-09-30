@@ -1,0 +1,31 @@
+{
+  "description": "CR 608.2c declining to return Aetherplasm skips the clause its 'If you do' hangs on",
+  "note": "bob declines Aetherplasm's first \"may\", so it stays blocking and the second clause's \"If you do\" never holds: nothing is asked about it. Ungated, the Cabal Evangel would arrive blocking the Golem, which would then take 1 plus 2 and die; the Golem's survival is the discriminating quantity. bob's 20 is a control: the Golem is blocked throughout, so it assigns him nothing either way.",
+  "board": {
+    "seats": [
+      {
+        "name": "alice",
+        "battlefield": [{ "card": "Icehide Golem", "label": "golem", "ready": true }]
+      },
+      {
+        "name": "bob",
+        "battlefield": [{ "card": "Aetherplasm", "label": "plasm", "ready": true }],
+        "hand": [{ "card": "Cabal Evangel", "label": "evangel" }]
+      }
+    ],
+    "active": "alice",
+    "step": "DeclareAttackers"
+  },
+  "timeline": [
+    { "turn": 1, "step": "DeclareAttackers", "player": "alice", "do": { "Attack": ["@golem"] } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "Block": { "@plasm": ["@golem"] } } },
+    { "turn": 1, "step": "DeclareBlockers", "player": "bob", "do": { "ChooseOptional": { "type": "Declines" } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "alice", "zone": "Battlefield", "card": "Icehide Golem", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Damage": { "object": "@golem", "damage": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Cabal Evangel", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Hand", "card": "Cabal Evangel", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Battlefield", "card": "Aetherplasm", "count": 0 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Count": { "player": "bob", "zone": "Graveyard", "card": "Aetherplasm", "count": 1 } } },
+    { "turn": 1, "step": "EndOfCombat", "player": "alice", "check": { "Life": { "player": "bob", "life": 20 } } }
+  ]
+}
