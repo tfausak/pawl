@@ -876,6 +876,8 @@ library codec
     Pawl.Codec.PermanentTappedForManaSpec
     Pawl.Codec.PermanentWasSacrificed
     Pawl.Codec.PermanentWasSacrificedSpec
+    Pawl.Codec.PermissionCost
+    Pawl.Codec.PermissionCostSpec
     Pawl.Codec.PermissionLimit
     Pawl.Codec.PermissionLimitSpec
     Pawl.Codec.PermissionPool
@@ -2290,6 +2292,7 @@ library types
     Pawl.Types.PermanentsBecomeTargeted
     Pawl.Types.PermanentTappedForMana
     Pawl.Types.PermanentWasSacrificed
+    Pawl.Types.PermissionCost
     Pawl.Types.PermissionLimit
     Pawl.Types.PermissionPool
     Pawl.Types.PermissionVerb

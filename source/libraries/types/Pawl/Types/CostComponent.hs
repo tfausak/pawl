@@ -242,9 +242,9 @@ data CostComponent keyword
     -- and this licence one Face.additionalCostChoices option (Water Whip); an
     -- optional one is the second option beside an empty one (Spirit Water
     -- Revival). So do a ward cost and an unless cost, paid at CR 118.12 (The
-    -- Unagi of Kyoshi Island, Waterbending Lesson).
-    --
-    -- Not implemented: an alternative cost (#3901).
+    -- Unagi of Kyoshi Island, Waterbending Lesson). So does an alternative cost
+    -- a CR 601.3 permission states (Pawl.Engine.Cost.permissionCost, Hama, the
+    -- Bloodbender).
     Waterbend Natural.Natural
   | -- | CR 107.3a / 601.2b / Katara, Water Tribe's Hope: X as a waterbend
     -- amount, announced by the activator and rewritten to a Waterbend by

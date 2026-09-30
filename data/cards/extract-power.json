@@ -69,14 +69,17 @@
                   {
                     "type": "GrantPlayFromExile",
                     "value": {
+                      "alternativeCost": {
+                        "type": "InsteadOfManaCost",
+                        "value": []
+                      },
                       "duration": {
                         "type": "Indefinite"
                       },
                       "ref": {
                         "type": "InSlot",
                         "value": "exiled"
-                      },
-                      "withoutPayingManaCost": true
+                      }
                     }
                   }
                 ]

@@ -413,6 +413,7 @@ import qualified Pawl.Codec.PermanentSacrificedSpec
 import qualified Pawl.Codec.PermanentTappedForManaSpec
 import qualified Pawl.Codec.PermanentWasSacrificedSpec
 import qualified Pawl.Codec.PermanentsBecomeTargetedSpec
+import qualified Pawl.Codec.PermissionCostSpec
 import qualified Pawl.Codec.PermissionLimitSpec
 import qualified Pawl.Codec.PermissionPoolSpec
 import qualified Pawl.Codec.PermissionVerbSpec
@@ -1198,6 +1199,7 @@ spec s registry = do
   Pawl.Codec.PermanentsBecomeTargetedSpec.spec s
   Pawl.Codec.PermissionLimitSpec.spec s
   Pawl.Codec.PermissionPoolSpec.spec s
+  Pawl.Codec.PermissionCostSpec.spec s
   Pawl.Codec.PermissionVerbSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
   Pawl.Codec.PhaseSelectorSpec.spec s

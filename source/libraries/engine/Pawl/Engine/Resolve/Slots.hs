@@ -837,7 +837,7 @@ effectObjectRefs effect = case effect of
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> [ref]
   Effect.OfferNamedCopy {} -> []
   Effect.OfferNotedCopy {} -> []
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _ _) -> [ref]
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile _ _ ref _ _ _ _) -> [ref]
   Effect.GrantLookAtExiled grant -> [GrantLookAtExiled.cards grant]
   Effect.MakePlotted ref -> [ref]
   Effect.MakeForetold x -> [MakeForetold.cards x]
@@ -1432,7 +1432,7 @@ slotsOf effect = joinTwo (joinTwo (joinSlots (fmap objectRefSlots (effectObjectR
   Effect.OfferCast (OfferCast.MkOfferCast ref _ _ _ _ _ _ _ _) -> objectRefSlots ref
   Effect.OfferNamedCopy {} -> Map.empty
   Effect.OfferNotedCopy {} -> Map.empty
-  Effect.GrantPlayFromExile grant -> durationSlots (GrantPlayFromExile.duration grant)
+  Effect.GrantPlayFromExile grant -> joinTwo (durationSlots (GrantPlayFromExile.duration grant)) (maybe Map.empty conditionSlots (GrantPlayFromExile.condition grant))
   -- Everything the BODY reads, and what its per-member gate reads (modeSlots'
   -- payer, multiplier and basis). The loop's own slot is NOT subtracted as the
   -- rider's reserved slot is: boundSlots below defines it.
@@ -2051,7 +2051,7 @@ ownSlotsAreExhaustive effect = case effect of
   Effect.OfferCast {} -> True
   Effect.OfferNamedCopy {} -> True
   Effect.OfferNotedCopy {} -> True
-  Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
+  Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant) && all conditionSlotsAreExhaustive (GrantPlayFromExile.condition grant)
   -- PreventNextDamage's answer for the body, plus its own ref's: a PlayerRef
   -- nested in the DEPTH is one slotsOf cannot see.
   Effect.ForEach (ForEach.MkForEach _ _ _ body _ gate) -> all slotsAreExhaustive body && all (all Quantity.slotsAreExhaustive . PayGate.perEach) gate

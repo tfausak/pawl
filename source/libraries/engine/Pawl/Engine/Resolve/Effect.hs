@@ -248,7 +248,6 @@ import qualified Pawl.Types.ManaAbilityPerformer as ManaAbilityPerformer
 import qualified Pawl.Types.ManaAdded as ManaAdded
 import qualified Pawl.Types.ManaAddedCause as ManaAddedCause
 import qualified Pawl.Types.ManaAddition as ManaAddition
-import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Meld as Meld
@@ -5338,7 +5337,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- NOT gated on the object being in exile: CR 601.3's permissions are not
   -- zone-scoped, so a zone test would be the rules core reading the effect.
-  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile duration player ref spending free verb) ->
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile duration player ref spending alternativeCost condition verb) ->
     State.modify' $ \gs ->
       -- The sweep every ObjectRef-taking opcode shares: a player recipient, an
       -- illegal slot (CR 608.2b) and a set that matched nothing all arrive empty.
@@ -5362,13 +5361,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         -- Pawl.Engine.Mana is the only thing that acts on it.
                         ExilePlayPermission.spending = spending,
                         -- CR 118.9, carried from the opcode unread;
-                        -- Pawl.Engine.Cost is the only thing that acts on it. The
-                        -- opcode's Bool is the waiver alone -- an alternative cost
-                        -- of nothing -- where the permission's field holds any
-                        -- amount (CR 118.9a), which is what rule 701.65a's {2}
-                        -- needs; no card states an amount here, so no opcode field
-                        -- carries one.
-                        ExilePlayPermission.alternativeManaCost = if free then Just (ManaCost.MkManaCost []) else Nothing,
+                        -- Pawl.Engine.Cost is the only thing that acts on it.
+                        ExilePlayPermission.alternativeCost = alternativeCost,
+                        -- BAKED, Expiry.arm's ForAsLongAs reason: the permission
+                        -- outlives this resolution's slots.
+                        ExilePlayPermission.condition = fmap (Condition.bakeBound (Binding.playersIn legal)) condition,
                         -- CR 715.3d's "other effects that allow a player to cast
                         -- it": a card said this, not rule 715.3d, so the Adventure
                         -- exclusion does not reach it.

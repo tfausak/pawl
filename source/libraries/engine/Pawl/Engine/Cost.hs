@@ -40,6 +40,7 @@ import qualified Pawl.Engine.CrewRestriction as CrewRestriction
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Forage as Forage
 import qualified Pawl.Engine.Game as Game
@@ -126,6 +127,7 @@ import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentMoment as PaymentMoment
 import qualified Pawl.Types.PaymentSubject as PaymentSubject
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
@@ -170,6 +172,25 @@ insteadOfManaCost mana face =
     { Cost.mana = Just mana,
       Cost.components = Face.additionalCosts face
     }
+
+-- CR 118.9a: the alternative cost a CR 601.3 permission states, settled against
+-- the face being cast.
+--
+-- A waterbend {X} is that much generic mana plus CR 701.67b's licence scoped to
+-- it, the shape a printed waterbend cost takes (CostComponent.Waterbend). X is
+-- read off the FACE and not the card, so a split card's half is priced at its
+-- own mana value (CR 202.3d, 709.3b), and X in that face's own cost counts 0
+-- (CR 202.3e); the ruling's "the only legal choice for X is 0" is CR 107.3b
+-- and falls out, this cost having no variable.
+permissionCost :: PermissionCost.PermissionCost -> Face.Face card -> Cost Keyword.Type.Keyword
+permissionCost alternative face = case alternative of
+  PermissionCost.InsteadOfManaCost mana -> insteadOfManaCost mana face
+  PermissionCost.WaterbendManaValue ->
+    let amount = Integer.toNaturalSaturating (maybe 0 Quantity.manaCostValue (Face.manaCost face))
+     in Cost.MkCost
+          { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic amount | amount > 0]),
+            Cost.components = CostComponent.Waterbend amount : Face.additionalCosts face
+          }
 
 -- CR 118.9's "without paying its mana cost", which is insteadOfManaCost of an
 -- EMPTY ManaCost -- {0} (CR 118.5a).
@@ -821,7 +842,7 @@ candidateCostsGiven permitted pid name oid gs =
                 -- rule 702.170d being the only thing permitting this cast. CR
                 -- 715.3d's permission states no cost and falls through to the `_`
                 -- arm; Effect.GrantPlayFromExile's states one only when it carries
-                -- CR 118.9's waiver, which is the arm two below.
+                -- an alternative cost, which is the arm two below.
                 Just Zone.Exile
                   | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
                 -- CR 702.143a: a FORETOLD card is cast for its foretell cost, CR
@@ -848,21 +869,22 @@ candidateCostsGiven permitted pid name oid gs =
                         (untagged . withAdditional)
                         (Maybe.maybeToList (grantedForetellCost face obj) <> Maybe.maybeToList (foretellCostFor face =<< Keyword.foretellCost (Face.keywordSet face)))
                 -- CR 118.9a: a CR 601.3 permission that states an alternative
-                -- cost -- "without paying its mana cost" (Extract Power), or rule
-                -- 701.65a's {2} -- REPLACES the printed cost for the plotted arm's
-                -- reason: that permission is the only thing making this cast
-                -- legal, so the cost it states is the only route to it. CR 118.5
+                -- cost -- "without paying its mana cost" (Extract Power), rule
+                -- 701.65a's {2}, or a waterbend (Hama, the Bloodbender) --
+                -- REPLACES the printed cost for the plotted arm's reason: that
+                -- permission is the only thing making this cast legal, so the
+                -- cost it states is the only route to it. CR 118.5
                 -- still makes the caster announce and pay it.
                 --
                 -- Scoped to the permission's OWN holder, whom
-                -- Pawl.Types.ExilePlayPermission baked in: a second player casting
-                -- the same card under some other permission is priced by the `_`
-                -- arm below.
+                -- Pawl.Types.ExilePlayPermission baked in, and to its window
+                -- (Expiry.permissionOpen): a player casting the same card under
+                -- some other permission is priced by the `_` arm below.
                 Just Zone.Exile
                   | Just permission <- Object.playableFromExile obj,
-                    ExilePlayPermission.player permission == pid,
-                    Just mana <- ExilePlayPermission.alternativeManaCost permission ->
-                      [untagged (insteadOfManaCost mana face)]
+                    Expiry.permissionOpen pid permission gs,
+                    Just alternative <- ExilePlayPermission.alternativeCost permission ->
+                      [untagged (permissionCost alternative face)]
                 -- CR 118.9's other half, "applied to it from another effect", as a
                 -- STANDING grant (Omniscience): a player-scoped alternative cost no
                 -- per-card list can hold. APPENDED to the hand's ordinary list rather
