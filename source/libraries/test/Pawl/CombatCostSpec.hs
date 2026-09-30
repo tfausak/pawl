@@ -1723,38 +1723,6 @@ putOntoBattlefieldBlockingSpec s registry = Spec.describe s "PutOntoBattlefieldB
         Spec.assertBool s (not (S.onBattlefield plasm atEnd)) "CR 506.4: Aetherplasm left the battlefield, so it was removed from combat"
         Spec.assertEqWith s "CR 400.3: and bob's hand holds Aetherplasm alone, the Evangel having left it" (fmap (fmap S.nameOf . (`Game.cardOf` atEnd)) (Game.zoneMembers Zone.Hand S.bob atEnd)) [Just (S.nameOf (Printing.card plasmP))]
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
-  -- The CR 608.2c fence, differing from the leg above in ONE answer: bob
-  -- declines the first "may", so Aetherplasm stays where it is and clause 1's
-  -- "If you do" never holds. Nothing is asked about clause 1 at all.
-  --
-  -- What the leg pins is that the gate is real: an engine that ran clause 1
-  -- regardless would put the Evangel onto the battlefield blocking the Golem
-  -- too, and the Golem would take 1 from Aetherplasm plus 2 from the Evangel and
-  -- die. So the Golem's survival is the discriminating quantity, and the
-  -- answerer exercises every clause but the first for exactly that reason.
-  --
-  -- A trigger that never fired at all would leave the same board, which is what
-  -- the leg above rules out: it is the SAME fixture and the same answerer, and
-  -- there the trigger moves Aetherplasm and the Evangel both.
-  Spec.it s "CR 608.2c declining to return Aetherplasm skips the clause its 'If you do' hangs on" $ do
-    golemP <- S.printingOf s registry "Icehide Golem"
-    plasmP <- S.printingOf s registry "Aetherplasm"
-    evangelP <- S.printingOf s registry "Cabal Evangel"
-    case aetherBoard golemP plasmP evangelP of
-      (gs, [golem], [plasm], evangel) -> do
-        let golemName = S.nameOf (Printing.card golemP)
-            evangelName = S.nameOf (Printing.card evangelP)
-            atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
-            declineFirst cIdx = if cIdx == ClauseIndex.MkClauseIndex 0 then OptionalDecision.Declines else OptionalDecision.Exercises
-            atEnd = runToEndOfCombat (aetherAnswer plasm golem evangel declineFirst) atBlockers
-        -- GAMEPLAY FIRST: the Golem took Aetherplasm's 1 and lived, and nothing
-        -- came out of bob's hand. Ungated, the Evangel would have arrived
-        -- blocking and the pair would read (0, 1).
-        Spec.assertEqWith s "CR 608.2c: the second clause never ran, so the Golem took only Aetherplasm's 1 and nothing left bob's hand" (length (battlefieldNamed golemName S.alice atEnd), length (battlefieldNamed evangelName S.bob atEnd)) (1, 0)
-        Spec.assertBool s (List.elem evangel (Game.zoneMembers Zone.Hand S.bob atEnd)) "the Evangel is still the card bob is holding"
-        Spec.assertBool s (not (S.onBattlefield plasm atEnd)) "CR 510.1c: Aetherplasm stayed blocking and took the Golem's 2, so it died"
-        Spec.assertEqWith s "control: bob takes nothing, the Golem being blocked throughout" (S.lifeOf S.bob atEnd) (Just 20)
-      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
   -- The rider's own control, differing from the whole-card leg in ONE answer:
   -- bob returns Aetherplasm and then declines to put anything out. Everything
   -- else on the card has run, so what is left out is the arrival and nothing

@@ -988,14 +988,6 @@ midnightTillingSpec s registry =
             "and the Bird Maiden stays milled"
             (List.sort (namesIn Zone.Graveyard S.alice after))
             (List.delete (named "Goblin Piker") allBuried)
-        -- CR 603.5: the printed "may" is a real choice, and declining leaves the
-        -- whole batch where the mill put it. The mill still ran, so this cannot
-        -- pass because the spell never resolved.
-        Spec.it s "CR 603.5 declining the may leaves every milled card in the graveyard" $ do
-          gs <- setup
-          let after = cast S.identityAnswer gs
-          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
-          Spec.assertEqWith s "and the mill still happened" (List.sort (namesIn Zone.Graveyard S.alice after)) allBuried
         -- CR 608.2d: four milled Murders leave no permanent card among them, so
         -- the return is impossible and the "may" is not put -- though the
         -- graveyard holds the Benalish Hero buried before the mill, which a pool
@@ -1107,15 +1099,6 @@ communeWithTheGodsSpec s registry =
             "and the Bad Moon is among the rest"
             (List.sort (namesIn Zone.Graveyard S.alice after))
             (List.delete (named "Goblin Piker") allBuried)
-        -- CR 603.5: the printed "may" is a real choice, and declining sends the
-        -- whole group to the graveyard. The reveal still ran, so this cannot pass
-        -- because the spell never resolved.
-        Spec.it s "CR 603.5 declining the may buries all five revealed cards" $ do
-          gs <- setup
-          let after = cast S.identityAnswer gs
-          Spec.assertEqWith s "nothing reached alice's hand" (namesIn Zone.Hand S.alice after) []
-          Spec.assertEqWith s "and every revealed card is in the graveyard" (List.sort (namesIn Zone.Graveyard S.alice after)) allBuried
-          Spec.assertEqWith s "the sixth card is still the library" (namesIn Zone.Library S.alice after) [named "Swamp"]
         -- CR 608.2d: a group holding no matching card makes the move impossible,
         -- so the "may" is not put and the rest is all of it. The pair with the
         -- headline differs in exactly one thing -- which cards are stocked.
@@ -1136,21 +1119,6 @@ communeWithTheGodsSpec s registry =
             "and all five revealed cards are in the graveyard"
             (List.sort (namesIn Zone.Graveyard S.alice after))
             (List.sort [named "Commune with the Gods", named "Island", named "Island", named "Murder", named "Murder", named "Murder"])
-        -- A reveal that names exactly ONE card binds the SINGULAR shape rather
-        -- than a group, and "from among them" has to see it: the offer is elided
-        -- at one candidate (CR 101.3), so taking the printed "may" puts that card
-        -- in hand and leaves the rest empty. A read that saw only the group shape
-        -- would offer nothing and bury the card instead -- which is what this
-        -- fixture did before fromAmongMembers gave the three readers of a slot
-        -- one definition.
-        Spec.it s "CR 608.2d a one-card library still offers its card from among them" $ do
-          forest <- S.printingOf s registry "Forest"
-          commune <- S.printingOf s registry "Commune with the Gods"
-          maiden <- S.printingOf s registry "Bird Maiden"
-          let after = cast (taking 0) (board forest commune [maiden])
-          Spec.assertEqWith s "the one revealed card came to alice's hand" (namesIn Zone.Hand S.alice after) [named "Bird Maiden"]
-          Spec.assertEqWith s "and only the spell is in her graveyard" (namesIn Zone.Graveyard S.alice after) [named "Commune with the Gods"]
-          Spec.assertEqWith s "her library is empty" (namesIn Zone.Library S.alice after) []
 
 -- ObjectRef.ChosenCardInGraveyard's COUNT: one gather taking more than one card
 -- out of each named graveyard, where portOfKarfellSpec and graspingTentaclesSpec

@@ -3429,19 +3429,6 @@ graftedWargearSpec s registry =
 -- what tell those readings apart -- one seat could not.
 sixthSenseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 sixthSenseSpec s registry = Spec.describe s "CR 613.1f a granted triggered ability" $ do
-  -- The gameplay-level proof, and the pair's positive half.
-  Spec.it s "CR 603.3a whole card: the enchanted creature connects and ITS controller draws" $ do
-    ps <- traverse (S.printingOf s registry) ["Goblin Piker", "Sixth Sense", "Mountain", "Island"]
-    case ps of
-      [piker, sense, mountain, island] -> case sixthSenseBoard piker sense mountain island True of
-        ([attackerId], _, gs) -> do
-          let after = S.runCombat sixthSenseAnswer gs
-          Spec.assertEqWith s "alice drew the one card her library held" (handNames S.alice after) ["Mountain"]
-          Spec.assertEqWith s "and the Aura's controller drew nothing" (handNames S.carol after) []
-          Spec.assertEqWith s "CR 510.1b the Piker's 2 damage reached bob" (S.lifeOf S.bob after) (Just 18)
-          Spec.assertBool s (S.onBattlefield attackerId after) "the unblocked attacker survived combat"
-        _ -> Spec.assertFailure s "fixture should give alice exactly one attacker"
-      _ -> Spec.assertFailure s "four printings"
   -- The pair's other half: the same board, the same combat, the Aura sitting on
   -- carol's battlefield unattached. Nothing else differs, so a draw here would
   -- mean the trigger came from somewhere other than the grant.
