@@ -2160,10 +2160,11 @@ controlledTeam controller target gs =
 -- card and skipped at none (CR 101.3, CR 609.3).
 --
 -- The ONE asking read of ObjectRef.ChosenCardInHand, shared by Effect.MoveToZone's
--- gather and by Effect.LookAt, so the two cannot ask differently. Every other
--- position reads the ref through the pure Slots.objectRefObjects, which answers
--- [] for it -- Pawl.EffectLintSpec's "no effect asks for a chosen card where
--- nothing can ask" is what stops a card writing one there.
+-- gather, Effect.LookAt and Effect.ExchangeWithCardInHand, so they cannot ask
+-- differently. Every other position reads the ref through the pure
+-- Slots.objectRefObjects, which answers [] for it -- Pawl.EffectLintSpec's "no
+-- effect asks for a chosen card where nothing can ask" is what stops a card
+-- writing one there.
 chooseCardsInHand ::
   ObjectId ->
   ObjectId ->
@@ -3062,6 +3063,11 @@ effectIsImpossible resolving source controller legal gs effect = case effect of
   Effect.ExchangeValues {} -> False
   -- CR 701.12f: an exchange with an empty zone still happens.
   Effect.ExchangeZones {} -> False
+  -- CR 400.7: a source that has left the battlefield is gone, so there is no
+  -- permanent to exchange; and a hand holding no card the filter admits offers
+  -- nothing to exchange it with (CR 702.65b).
+  Effect.ExchangeWithCardInHand chosen ->
+    Set.notMember source (GameState.battlefield gs) || choosesFromNothing (ObjectRef.ChosenCardInHand chosen)
   Effect.SetLifeTotal {} -> False
   -- CR 608.2d: never impossible. Every player the reference can name is one
   -- Game.stillPlaying answered, and a target who has already left the game is an
@@ -5185,6 +5191,37 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             (\pid -> fmap (\oid -> (oid, other)) (Game.zoneMembers one pid before) <> fmap (\oid -> (oid, one)) (Game.zoneMembers other pid before))
             exchanging
     Event.simultaneously (Monad.forM_ moves (uncurry (Event.changeZoneInBatch before)))
+  -- CR 702.65a's exchange of this permanent with a card in hand, CR 701.12d's
+  -- cross-zone exchange. The card is chosen from every card the filter admits,
+  -- not only those that could enchant the host: an unattachable pick is a legal
+  -- choice whose result is nothing (Arcanum Wings ruling, 2007-05-01, and CR
+  -- 702.65b).
+  --
+  -- Whether BOTH halves can happen is decided before either does (CR 701.12a):
+  -- the two cards share an owner (CR 701.12d), and the chosen card can legally
+  -- enchant what the source is attached to (CR 303.4i, through attachmentFor
+  -- and the projection). Then one CR 608.2f event: the source goes to its
+  -- owner's hand, and the card enters attached to the source's former host (CR
+  -- 701.12e), so CR 303.4f asks nobody, under the resolving controller (CR
+  -- 110.2a). An unattached source exchanges nothing: unreachable, CR 704.3 and
+  -- 704.5m putting an unattached Aura into its graveyard before anyone has
+  -- priority.
+  -- Pawl.AuraSpec's AuraSwap group is the proof.
+  Effect.ExchangeWithCardInHand inHand -> do
+    gs <- State.get
+    Monad.when (Set.member source (GameState.battlefield gs)) $ do
+      picked <- chooseCardsInHand resolving source controller legal inHand
+      before <- State.get
+      let ownerOf oid = fmap Object.owner (Game.lookupObject oid before)
+          host = Game.lookupObject source before >>= Object.attachedTo
+      case picked of
+        [card]
+          | ownerOf card == ownerOf source,
+            Just seed <- host >>= \h -> Attach.attachmentFor card h before ->
+              Event.simultaneously $ do
+                Event.changeZoneInBatch before source Zone.Hand
+                Monad.void (Event.changeZoneAttaching (Just before) Set.empty card Zone.Battlefield LibraryPosition.defaultValue (Just seed) TapState.Untapped Map.empty (Just controller) Nothing Facing.FaceUp False CarryOver.NotCarried False)
+        _ -> pure ()
   -- CR 701.24: shuffle the objects the refs name into their OWNERS' libraries. Two
   -- steps: CR 400.7's move through the same changeZone funnel every destination
   -- uses, so a library-entry replacement gets its CR 616.1 opportunity (CR 400.3

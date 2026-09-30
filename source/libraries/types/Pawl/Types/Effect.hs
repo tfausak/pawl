@@ -18,6 +18,7 @@ import qualified Pawl.Types.ChooseCardName as ChooseCardName
 import qualified Pawl.Types.ChooseNumber as ChooseNumber
 import qualified Pawl.Types.ChoosePlayer as ChoosePlayer
 import qualified Pawl.Types.ChoosePlayerAtRandom as ChoosePlayerAtRandom
+import qualified Pawl.Types.ChosenCardInHand as ChosenCardInHand
 import qualified Pawl.Types.Conjure as Conjure
 import qualified Pawl.Types.Connive as Connive
 import qualified Pawl.Types.ControlPlayer as ControlPlayer
@@ -301,6 +302,9 @@ data Effect card ability
   | -- | CR 701.12d / 701.12f: the named players each exchange the cards in two
     -- of their own zones, even where one is empty.
     ExchangeZones ExchangeZones.ExchangeZones
+  | -- | CR 701.12d / 702.65a: this permanent (the effect's source) and a card
+    -- the named player chooses from their hand exchange zones.
+    ExchangeWithCardInHand ChosenCardInHand.ChosenCardInHand
   | -- | CR 119.5: the players the PlayerRef names each gain or lose the
     -- necessary amount to end up with this life total (Magister Sphinx).
     SetLifeTotal PlayerQuantity.PlayerQuantity

@@ -835,6 +835,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Absorb 2) /= Codec.encode Keyword.codec (Keyword.Graft 2))
       "absorb 2 is not graft 2"
+  -- CR 702.65a's payload is fortify's bare Cost, under its own tag.
+  Spec.it s "AuraSwap carries its cost" $ do
+    let auraSwap n = Keyword.AuraSwap (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (auraSwap 2)
+      " {\"type\":\"AuraSwap\",\"value\":{\"mana\":[{\"type\":\"Generic\",\"value\":2}]}} "
+    Spec.assertBool s (Codec.encode Keyword.codec (auraSwap 2) /= Codec.encode Keyword.codec (Keyword.Fortify (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) []))) "and is not fortify"
   -- CR 702.70a's N rides the constructor the same way, and the two payloaded
   -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do

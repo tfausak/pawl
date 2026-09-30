@@ -5555,9 +5555,10 @@ changeZoneResolvingReturning oid requestedDest = changeZoneAttaching Nothing Set
 -- The ORDERING against the entry loop and the Moved event is the rule's rather
 -- than anything a card in data/cards reads.
 --
--- Stack's Aura branch is the only caller supplying a seed. An Aura entering by any
--- other route is CR 303.4f's, and the body below asks its controller what it will
--- enchant rather than letting it enter unattached -- see there.
+-- Stack's Aura branch, Resolve's attachFound and its CR 701.12e exchange are the
+-- callers supplying a seed. An Aura entering by any other route is CR 303.4f's,
+-- and the body below asks its controller what it will enchant rather than
+-- letting it enter unattached -- see there.
 --
 -- `asOf` and `batch` are applyReplacementsIn's, supplied by changeZoneInBatch and
 -- by changeZoneEnteringIn; every other door names a lone move and passes Nothing
