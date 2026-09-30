@@ -413,10 +413,13 @@ answerTopPrompt decider asked =
           onEntry unscheduled key kind offers (takeForSource gs key source) $ \verb -> case verb of
             Move.AssignDamage assignment -> Just (fmap Map.fromList (mapM (resolveDamage gs key kind offered) (Map.toAscList assignment)))
             _ -> Nothing
-        -- Keyed by the resolving object, since two "may"s can share a moment.
+        -- Keyed by what is resolving, since two "may"s can share a moment: the
+        -- spell, or the object an ability came from (CR 113.7), which is what
+        -- a board can label.
         Prompt.Type.ChooseOptional who _ resolving _ _ _ -> do
           key <- whenOf gs (Decider.unwrap who)
-          onEntry unscheduled key kind [] (takeForSource gs key resolving) $ \verb -> case verb of
+          let named = Maybe.fromMaybe resolving (Game.abilitySourceOf resolving gs)
+          onEntry unscheduled key kind [] (takeForSource gs key named) $ \verb -> case verb of
             Move.ChooseOptional decision -> Just (pure decision)
             _ -> Nothing
         -- The order named is the whole group, each object once; the engine
