@@ -8,9 +8,12 @@
               {
                 "type": "Behold",
                 "value": {
-                  "type": "HasSubtype",
-                  "value": {
-                    "type": "Dragon"
+                  "count": 1,
+                  "whichObjects": {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Dragon"
+                    }
                   }
                 }
               }

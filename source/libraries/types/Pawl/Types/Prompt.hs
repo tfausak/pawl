@@ -256,10 +256,10 @@ data Prompt r where
   -- | CR 701.68a: which creature is blighted, the candidates unnarrowed; not
   -- raised for zero (CR 101.3, CR 701.68b).
   ChooseBlight :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
-  -- | CR 701.4a: which object CostComponent.Behold or BeholdAndExile beholds --
-  -- a card in the payer's hand or a permanent they control, in one pool, the
-  -- ObjectId being the object the cost is on. Not raised for one candidate,
-  -- where the two zones between them offer a single answer.
+  -- | CR 701.4a: which object CostComponent.Behold or BeholdAndExile beholds
+  -- next -- a card in the payer's hand or a permanent they control, in one pool,
+  -- the ObjectId being the object the cost is on. Asked once per object; not
+  -- raised where the candidates left are no more than the objects still owed.
   ChooseBehold :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 701.38a: which of the listed choices this player votes for; the seats
   -- are asked one at a time, starting with the one the effect specifies and

@@ -81,6 +81,7 @@ import qualified Pawl.Types.AttackLimitUnless as AttackLimitUnless
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.Backup as Backup
 import qualified Pawl.Types.BecomeCopy as BecomeCopy
+import qualified Pawl.Types.Behold as Behold
 import qualified Pawl.Types.Blight as Blight
 import qualified Pawl.Types.BlockCost as BlockCost
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -3613,7 +3614,7 @@ costComponentFilters component = case component of
   CostComponent.RevealCardFromHand f -> [f]
   -- CR 701.4a over the hand and the battlefield at once: Caustic Exhale's "a
   -- Dragon".
-  CostComponent.Behold f -> [f]
+  CostComponent.Behold behold -> [Behold.whichObjects behold]
   -- The same, then exiled: Champion of the Weird's "a Goblin".
   CostComponent.BeholdAndExile f -> [f]
   CostComponent.TapThis -> []

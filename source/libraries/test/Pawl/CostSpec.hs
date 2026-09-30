@@ -2610,6 +2610,87 @@ beholdingOne which p = case p of
 cardNamed :: String -> CardName.CardName
 cardNamed = CardName.MkCardName . Text.pack
 
+-- Kindle the Inner Flame {3}{R} Kindred Sorcery -- Elemental: "Create a token
+-- that's a copy of target creature you control, except it has haste and 'At the
+-- beginning of the end step, sacrifice this token.' Flashback--{1}{R}, Behold
+-- three Elementals." (Oracle checked against Scryfall 2026-09-30.)
+--
+-- The gate card for a CostComponent.Behold of more than one object: CR 701.4a
+-- stated per object, three times over one pool that spans the hand and the
+-- battlefield.
+--
+-- The Kindle is in alice's GRAVEYARD, so every cast here is the flashback one,
+-- and two Mountains are exactly {1}{R}: the positive and negative boards have
+-- the same mana and differ in ONE hand card, Gaea's Protector (an Elemental) or
+-- Goblin Piker (not). The field Elementals are Glacial Crasher and Sickle Ripper,
+-- distinct printings; the Ripper is the copy's target, a 2/1 no other creature
+-- here shares a name with.
+kindleTheInnerFlameSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kindleTheInnerFlameSpec s registry =
+  Spec.describe s "Kindle the Inner Flame" $ do
+    -- Two Elementals on the battlefield and the third in hand: a one-zone
+    -- reading of rule 701.4a finds two and refuses.
+    Spec.it s "CR 701.4a three Elementals across both zones pay the flashback cost" $ do
+      (kindle, ripper, _, gs) <- kindleBoard s registry "Gaea's Protector" []
+      let resolved = S.runPure (targeting ripper) (S.runPure (targeting ripper) gs (S.cast S.alice kindle)) Stack.resolveTop
+          minted = Set.toList (GameState.battlefield resolved) List.\\ Set.toList (GameState.battlefield gs)
+      Spec.assertEqWith s "CR 707.2 the flashback cast resolved into one token copy of the Ripper" (fmap (\o -> Projection.namesOf o resolved) minted) [Set.singleton (cardNamed "Sickle Ripper")]
+      Spec.assertBool s (all (\o -> Projection.hasKeyword Keyword.Haste o resolved) minted) "CR 707.9a and the copy has haste"
+      Spec.assertEqWith s "CR 701.4a the Protector was revealed out of her hand" (S.revealsOf resolved) [(S.alice, Set.singleton (cardNamed "Gaea's Protector"))]
+      Spec.assertEqWith s "CR 702.34a and the Kindle was exiled" (namesIn Zone.Exile resolved) [cardNamed "Kindle the Inner Flame"]
+    -- CR 118.3 on the same mana, the Protector swapped for a Goblin Piker: two
+    -- Elementals are one short of three.
+    Spec.it s "CR 118.3 two Elementals cannot behold three" $ do
+      (kindle, ripper, _, gs) <- kindleBoard s registry "Goblin Piker" []
+      let cast = S.runPure (targeting ripper) gs (S.cast S.alice kindle)
+      Spec.assertEqWith s "CR 118.3 the flashback cast is not offered at all" (filter (S.isCastOf kindle) (Action.legalActions S.alice gs)) []
+      Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack cast)) 0
+    -- FOUR Elementals, so each of the three asks is a real choice. The answerer
+    -- is hostile: it answers the first ask's first candidate every time. A payment
+    -- that let one object be beheld twice would offer it again.
+    Spec.it s "CR 701.4a three Elementals are three objects" $ do
+      (kindle, ripper, _, gs) <- kindleBoard s registry "Gaea's Protector" ["Sickle Ripper"]
+      let offered :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+          offered p = case p of
+            Prompt.ChooseBehold _ _ _ candidates -> do
+              State.modify' (<> [NonEmpty.toList candidates])
+              asked <- State.get
+              pure (maybe (NonEmpty.head candidates) NonEmpty.head (NonEmpty.nonEmpty (concat (take 1 asked))))
+            _ -> pure (targeting ripper p)
+          asks = State.execState (Engine.runGame offered gs (S.cast S.alice kindle)) []
+      case asks of
+        pool@[first, second, _, _] : _ ->
+          Spec.assertEqWith s "CR 701.4a three asks, each without the objects already beheld" asks [pool, pool List.\\ [first], pool List.\\ [first, second]]
+        _ -> Spec.assertFailure s ("expected a first ask over four Elementals, got " <> show asks)
+
+-- alice's Kindle in her graveyard over two Mountains, a Glacial Crasher and a
+-- Sickle Ripper on her battlefield, `inHand` in her hand, and `extra` further
+-- permanents. Returns the Kindle, the Ripper, the hand card and the board.
+kindleBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> [String] -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+kindleBoard s registry inHand extra = do
+  mountain <- S.printingOf s registry "Mountain"
+  kindle <- S.printingOf s registry "Kindle the Inner Flame"
+  crasher <- S.printingOf s registry "Glacial Crasher"
+  ripper <- S.printingOf s registry "Sickle Ripper"
+  held <- S.printingOf s registry inHand
+  extras <- traverse (S.printingOf s registry) extra
+  let base = S.landsFor mountain S.alice 2 (Setup.emptyGame S.bothPlayers)
+      (_, withCrasher) = S.addPermanent crasher S.alice base
+      (ripperId, withRipper) = S.addPermanent ripper S.alice withCrasher
+      withExtras = List.foldl' (\g printing -> snd (S.addPermanent printing S.alice g)) withRipper extras
+      (heldId, withHand) = S.addHandCard held S.alice withExtras
+      (kindleId, gs) = S.addGraveyardCard kindle S.alice withHand
+  pure
+    ( kindleId,
+      ripperId,
+      heldId,
+      gs
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+    )
+
 -- Forensic Researcher {2}{U} Creature -- Merfolk Detective 1/3: "{T}: Untap
 -- another target permanent you control. {T}, Collect evidence 3: Tap target
 -- creature you don't control." (Oracle checked against Scryfall 2026-09-19.)
@@ -3134,6 +3215,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   causticExhaleSpec s registry
   osseousExhaleSpec s registry
   championOfTheWeirdSpec s registry
+  kindleTheInnerFlameSpec s registry
   forensicResearcherSpec s registry
   evidenceSpec s registry
   flingSpec s registry
