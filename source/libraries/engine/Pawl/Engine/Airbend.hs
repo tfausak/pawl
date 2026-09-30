@@ -41,6 +41,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import Pawl.Types.PlayerId (PlayerId)
@@ -109,7 +110,8 @@ permission source owner =
       ExilePlayPermission.source = source,
       ExilePlayPermission.expiry = Expiry.Never,
       ExilePlayPermission.spending = ManaSpending.AsProduced,
-      ExilePlayPermission.alternativeManaCost = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
+      ExilePlayPermission.alternativeCost = Just (PermissionCost.InsteadOfManaCost (ManaCost.MkManaCost [ManaSymbol.Generic 2])),
+      ExilePlayPermission.condition = Nothing,
       ExilePlayPermission.origin = PlayPermissionOrigin.Granted,
       -- CR 701.65a: "may cast it".
       ExilePlayPermission.verb = PermissionVerb.Cast

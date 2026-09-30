@@ -1,9 +1,10 @@
 module Pawl.Types.ExilePlayPermission where
 
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Expiry as Expiry
-import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PermissionCost as PermissionCost
 import qualified Pawl.Types.PermissionVerb as PermissionVerb
 import qualified Pawl.Types.PlayPermissionOrigin as PlayPermissionOrigin
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -56,16 +57,10 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- (Pawl.Types.CastOffer.spending) by Pawl.Engine.Cast.spendingWith -- and
 -- Pawl.Engine.Mana.relax is what acts on the value it hands back.
 --
--- `alternativeManaCost` is CR 118.9a's alternative cost said of the cards this
--- permission covers, printed in the same sentence as the permission itself:
--- `Just` an empty ManaCost is CR 118.9's "you may cast [this object] without
--- paying its mana cost" (Extract Power), and `Just` {2} is rule 701.65a's "may
--- cast it by paying {2} rather than paying its mana cost". ONE field and not two,
--- because the two are one thing to every reader -- CR 118.5 makes the caster
--- announce and pay whatever amount it holds, and CR 107.3b's "the only legal
--- choice for X is 0" falls out of an empty cost having no variable rather than
--- being enforced. Nothing means the permission states no cost and the card is
--- cast for its printed one.
+-- `alternativeCost` is CR 118.9a's alternative cost said of the cards this
+-- permission covers, printed in the same sentence as the permission itself
+-- (Pawl.Types.PermissionCost has the arms). Nothing means the permission states
+-- no cost and the card is cast for its printed one.
 --
 -- It rides the permission rather than the exiled card for CR 118.14's scoping
 -- reason one field up: the cost belongs to the effect that granted the play, so
@@ -94,7 +89,10 @@ data ExilePlayPermission = MkExilePlayPermission
     source :: ObjectId.ObjectId,
     expiry :: Expiry.Expiry,
     spending :: ManaSpending.ManaSpending,
-    alternativeManaCost :: Maybe ManaCost.ManaCost,
+    alternativeCost :: Maybe PermissionCost.PermissionCost,
+    -- | CR 601.3: a condition the permission is open only while, read live --
+    -- Hama, the Bloodbender's "during your turn". Nothing is always open.
+    condition :: Maybe Condition.Condition,
     origin :: PlayPermissionOrigin.PlayPermissionOrigin,
     -- | CR 601.3 / 305.9: whether the permission also lets an exiled land be
     -- played (Play) or only lets a spell be cast (Cast). Read by
