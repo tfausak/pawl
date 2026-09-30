@@ -835,6 +835,8 @@ library codec
     Pawl.Codec.OfferCastSpec
     Pawl.Codec.Onset
     Pawl.Codec.OnsetSpec
+    Pawl.Codec.OptionalDecision
+    Pawl.Codec.OptionalDecisionSpec
     Pawl.Codec.Optionality
     Pawl.Codec.OptionalitySpec
     Pawl.Codec.OrElse

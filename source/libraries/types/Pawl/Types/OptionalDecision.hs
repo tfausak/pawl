@@ -8,4 +8,4 @@ module Pawl.Types.OptionalDecision where
 data OptionalDecision
   = Declines
   | Exercises
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
